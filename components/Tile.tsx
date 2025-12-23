@@ -70,8 +70,8 @@ export default function Tile({
   const [isCurrentUser, setIsCurrentUser] = useState(false);
   const supabase = createClient();
 
-  // Room name: use "live_central" for now, or could be "live_stream_{liveStreamId}"
-  const roomName = liveStreamId ? `live_stream_${liveStreamId}` : 'live_central';
+  // Room name: Use single global room for all streamers
+  const roomName = 'live_central';
 
   // Connect to LiveKit room ONLY when:
   // 1. Streamer is actually publishing (isLive = true, which means is_published)

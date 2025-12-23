@@ -113,7 +113,8 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
   }, [supabase]); // Removed onLiveStatusChange from deps to prevent loops
 
   // Room name for publishing
-  const roomName = liveStreamId ? `live_stream_${liveStreamId}` : 'live_central';
+  // Use single global room for all streamers
+  const roomName = 'live_central';
 
   // Get current user's profile for participant name
   const [participantName, setParticipantName] = useState('Streamer');
