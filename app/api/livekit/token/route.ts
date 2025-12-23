@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
-const LIVEKIT_URL = process.env.LIVEKIT_URL;
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Trim whitespace from environment variables to prevent issues
+const LIVEKIT_URL = process.env.LIVEKIT_URL?.trim();
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY?.trim();
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET?.trim();
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 export async function POST(request: NextRequest) {
   try {
@@ -194,31 +195,65 @@ export async function POST(request: NextRequest) {
     });
 
     // Validate API key/secret format (they should be strings)
+    // Check for common issues: whitespace, newlines, quotes
+    const apiKeyClean = LIVEKIT_API_KEY?.replace(/[\r\n\t\s"']/g, '');
+    const apiSecretClean = LIVEKIT_API_SECRET?.replace(/[\r\n\t\s"']/g, '');
+    
     if (typeof LIVEKIT_API_KEY !== 'string' || LIVEKIT_API_KEY.length < 10) {
-      console.error('Invalid LIVEKIT_API_KEY format');
+      console.error('Invalid LIVEKIT_API_KEY format:', {
+        type: typeof LIVEKIT_API_KEY,
+        length: LIVEKIT_API_KEY?.length,
+        hasWhitespace: LIVEKIT_API_KEY !== apiKeyClean,
+      });
       return NextResponse.json(
         { error: 'Invalid LiveKit API Key format. Please check your Vercel environment variables.' },
         { status: 500 }
       );
     }
     if (typeof LIVEKIT_API_SECRET !== 'string' || LIVEKIT_API_SECRET.length < 10) {
-      console.error('Invalid LIVEKIT_API_SECRET format');
+      console.error('Invalid LIVEKIT_API_SECRET format:', {
+        type: typeof LIVEKIT_API_SECRET,
+        length: LIVEKIT_API_SECRET?.length,
+        hasWhitespace: LIVEKIT_API_SECRET !== apiSecretClean,
+      });
       return NextResponse.json(
         { error: 'Invalid LiveKit API Secret format. Please check your Vercel environment variables.' },
         { status: 500 }
       );
     }
+    
+    // Use cleaned versions if there were whitespace issues
+    const finalApiKey = apiKeyClean || LIVEKIT_API_KEY;
+    const finalApiSecret = apiSecretClean || LIVEKIT_API_SECRET;
+    
+    if (finalApiKey !== LIVEKIT_API_KEY || finalApiSecret !== LIVEKIT_API_SECRET) {
+      console.warn('Whitespace detected in LiveKit credentials - using cleaned versions');
+    }
 
     let at: AccessToken;
     try {
-      // Create token with 6 hour expiration
-      at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+      // Create token with 6 hour expiration - use cleaned credentials
+      at = new AccessToken(finalApiKey, finalApiSecret, {
         identity: identity,
         name: name,
         ttl: '6h', // 6 hours expiration
       });
+      
+      console.log('AccessToken created with:', {
+        apiKeyPrefix: finalApiKey.substring(0, 15) + '...',
+        apiKeyLength: finalApiKey.length,
+        apiSecretLength: finalApiSecret.length,
+        identity,
+        name,
+        roomName,
+      });
     } catch (tokenErr: any) {
-      console.error('Error creating AccessToken:', tokenErr);
+      console.error('Error creating AccessToken:', {
+        error: tokenErr.message,
+        stack: tokenErr.stack,
+        apiKeyPrefix: finalApiKey.substring(0, 15) + '...',
+        apiKeyLength: finalApiKey.length,
+      });
       return NextResponse.json(
         { error: `Failed to create LiveKit token: ${tokenErr.message || 'Invalid API credentials'}` },
         { status: 500 }
