@@ -638,32 +638,31 @@ export default function LiveRoom() {
       let data: any[] = [];
       let error: any = null;
 
-      if (sortMode === 'random') {
-        // Use random function with stable seed
-        const result = await supabase.rpc('get_live_grid_random', {
-          p_viewer_id: user.id,
-          p_seed: randomSeed,
-        });
-        data = result.data || [];
-        error = result.error;
-      } else {
-        // Use sorted function
+      // Try sorted function first (if it exists and not random mode)
+      if (sortMode !== 'random') {
         const result = await supabase.rpc('get_live_grid', {
           p_viewer_id: user.id,
           p_sort_mode: sortMode,
         });
-        data = result.data || [];
-        error = result.error;
+        if (!result.error && result.data) {
+          data = result.data;
+        } else {
+          // Fallback if get_live_grid doesn't exist
+          error = result.error;
+        }
       }
 
-      if (error) {
-        console.error('RPC error, falling back to regular query:', error);
-        // Fallback to old RPC
+      // If random mode or get_live_grid failed, use fallback RPC
+      if (sortMode === 'random' || error) {
         const fallbackResult = await supabase.rpc('get_available_streamers_filtered', {
           p_viewer_id: user.id,
         });
-        if (fallbackResult.error) throw fallbackResult.error;
+        if (fallbackResult.error) {
+          console.error('RPC error, falling back to regular query:', fallbackResult.error);
+          throw fallbackResult.error;
+        }
         data = fallbackResult.data || [];
+        error = null; // Clear error since fallback succeeded
       }
 
       // Process streamers from RPC (new structure)
