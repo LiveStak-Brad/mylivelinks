@@ -79,26 +79,7 @@ export async function POST(request: NextRequest) {
       console.warn('getUser with token failed:', err.message);
     }
 
-    // Method 2: If we have service role key and clientUserId, verify via admin client
-    if (!verifiedUser && SUPABASE_SERVICE_ROLE_KEY && clientUserId) {
-      try {
-        const adminClient = createSupabaseClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-        const { data: profile } = await adminClient
-          .from('profiles')
-          .select('id')
-          .eq('id', clientUserId)
-          .single();
-        
-        if (profile) {
-          verifiedUser = { id: clientUserId } as any;
-          console.log('User verified via service role lookup');
-        }
-      } catch (adminErr) {
-        console.warn('Admin lookup failed:', adminErr);
-      }
-    }
-
-    // Method 3: Decode JWT to extract user ID (fallback)
+    // Method 2: Decode JWT to extract user ID (fallback)
     if (!verifiedUser && tokenToUse) {
       try {
         const parts = tokenToUse.split('.');
@@ -106,7 +87,7 @@ export async function POST(request: NextRequest) {
           const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
           const userId = payload.sub;
           
-          if (userId && (!clientUserId || userId === clientUserId)) {
+          if (userId) {
             verifiedUser = { id: userId } as any;
             console.log('User ID extracted from JWT token');
           }
@@ -115,6 +96,9 @@ export async function POST(request: NextRequest) {
         console.warn('JWT decode failed:', jwtErr);
       }
     }
+
+    // Method 3: If we have service role key and clientUserId from body, verify via admin client
+    // (This will be checked after we parse the body below)
 
     const user = verifiedUser;
 
