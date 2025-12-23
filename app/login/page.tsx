@@ -66,7 +66,23 @@ export default function LoginPage() {
           // Clear any mock user data
           localStorage.removeItem('mock_user');
           
-          // Create profile with provided username
+          // IMPORTANT: Sign in FIRST before creating profile (RLS requires auth.uid() = id)
+          // Since auth is disabled, user should be auto-confirmed, but we need to establish session
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (signInError) {
+            console.error('Auto-login error:', signInError);
+            // If sign-in fails, try to create profile anyway (might work if user is confirmed)
+            // But this is less ideal - better to ensure sign-in works
+            setMessage('Account created but sign-in failed. Please try signing in manually.');
+            setIsSignUp(false);
+            return;
+          }
+
+          // Now create profile AFTER signing in (so auth.uid() is set)
           const cleanUsername = username.toLowerCase().trim();
           const { error: profileError } = await (supabase.from('profiles') as any).upsert({
             id: data.user.id,
@@ -84,19 +100,6 @@ export default function LoginPage() {
               throw new Error(`Username "${cleanUsername}" is already taken. Please choose another.`);
             }
             throw profileError;
-          }
-
-          // Auto-login after signup (since auth is disabled, user is already confirmed)
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-          if (signInError) {
-            console.error('Auto-login error:', signInError);
-            setMessage('Account created! Please sign in.');
-            setIsSignUp(false);
-            return;
           }
 
           setMessage('Account created successfully! Redirecting...');
