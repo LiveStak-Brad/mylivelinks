@@ -487,6 +487,8 @@ export default function LiveRoom() {
     });
 
     // Subscribe to live streamer changes
+    // CRITICAL: Debounce to prevent rapid reloads that cause disconnections
+    let gridReloadTimeout: NodeJS.Timeout | null = null;
     const channel = supabase
       .channel('live-streamers')
       .on(
@@ -497,9 +499,20 @@ export default function LiveRoom() {
           table: 'live_streams',
         },
         () => {
-          loadLiveStreamers().then((streamers) => {
-            loadUserGridLayout(streamers);
-          });
+          // Debounce grid reload to prevent disconnections
+          if (gridReloadTimeout) {
+            clearTimeout(gridReloadTimeout);
+          }
+          gridReloadTimeout = setTimeout(() => {
+            // Only update streamer list, don't reload grid layout
+            // Grid layout reload causes disconnections
+            loadLiveStreamers().then((streamers) => {
+              // Update streamer list but preserve current grid
+              setLiveStreamers(streamers);
+              // Only auto-fill empty slots, don't reload entire layout
+              autoFillGrid();
+            });
+          }, 2000); // 2 second debounce
         }
       )
       .subscribe();
@@ -1034,28 +1047,6 @@ export default function LiveRoom() {
 
         // Sort slots by index
         const sortedSlots = updatedSlots.sort((a, b) => a.slotIndex - b.slotIndex);
-        
-        // CRITICAL: Preserve existing live streamers that aren't in saved layout
-        // Merge current grid slots with saved layout to prevent clearing live tiles
-        const currentSlotsMap = new Map(currentSlots.map(s => [s.slotIndex, s]));
-        sortedSlots.forEach((slot, index) => {
-          // If slot is empty in saved layout but has a live streamer in current grid, preserve it
-          if (slot.isEmpty) {
-            const currentSlot = currentSlotsMap.get(slot.slotIndex);
-            if (currentSlot?.streamer) {
-              const streamerStillAvailable = availableStreamers.find(
-                s => s.profile_id === currentSlot.streamer!.profile_id && s.live_available
-              );
-              if (streamerStillAvailable) {
-                sortedSlots[index] = {
-                  ...slot,
-                  streamer: streamerStillAvailable,
-                  isEmpty: false,
-                };
-              }
-            }
-          }
-        });
         
         // CRITICAL: Autofill empty slots with available streamers (runs on join)
         // This ensures new users see all available cameras immediately

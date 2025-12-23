@@ -259,7 +259,7 @@ RETURNS TABLE (
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT DISTINCT
+    SELECT
         ls.profile_id as streamer_id,
         p.username,
         p.display_name,
@@ -279,7 +279,7 @@ BEGIN
              OR (b.blocker_id = ls.profile_id AND b.blocked_id = p_viewer_id)
       )
     GROUP BY ls.profile_id, p.username, p.display_name, p.avatar_url, ls.id, ls.is_published
-    ORDER BY viewer_count DESC, ls.published_at DESC;
+    ORDER BY COUNT(DISTINCT av.viewer_id) DESC, ls.published_at DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;
