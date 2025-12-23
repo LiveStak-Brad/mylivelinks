@@ -264,12 +264,11 @@ export function useLiveKitPublisher({
       if (roomRef.current && roomRef.current.state === 'connected') {
         const participant = roomRef.current.localParticipant;
         if (participant) {
-          // Unpublish all tracks
-          const tracksToUnpublish = participant.trackPublications.values();
-          for (const publication of tracksToUnpublish) {
+          // Unpublish tracks we published (use tracksRef to ensure we unpublish the right ones)
+          for (const track of tracksRef.current) {
             try {
-              await participant.unpublishTrack(publication.trackSid);
-              console.log('Unpublished track:', publication.trackSid);
+              await participant.unpublishTrack(track);
+              console.log('Unpublished track:', track.kind);
             } catch (err) {
               console.warn('Error unpublishing track:', err);
             }
