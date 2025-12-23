@@ -220,6 +220,10 @@ export function useLiveKitPublisher({
           // Unpublish all camera/microphone tracks
           for (const track of publishedTracks) {
             try {
+              if (!track.sid) {
+                console.log('Track has no sid, skipping:', track.kind);
+                continue;
+              }
               const publication = participant.trackPublications.get(track.sid);
               if (publication) {
                 await participant.unpublishTrack(track);
