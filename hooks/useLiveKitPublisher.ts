@@ -31,6 +31,7 @@ export function useLiveKitPublisher({
   const [error, setError] = useState<Error | null>(null);
   const roomRef = useRef<Room | null>(null);
   const tracksRef = useRef<LocalTrack[]>([]);
+  const isPublishingRef = useRef(false); // Track publishing state to prevent flashing
   const supabase = createClient();
 
   // Get LiveKit token for publisher
@@ -219,7 +220,11 @@ export function useLiveKitPublisher({
           }));
           
           console.log('All tracks published successfully');
-          setIsPublishing(true);
+          // Only update state if it actually changed
+          if (!isPublishingRef.current) {
+            isPublishingRef.current = true;
+            setIsPublishing(true);
+          }
           if (onPublished) {
             onPublished();
           }
@@ -234,7 +239,10 @@ export function useLiveKitPublisher({
 
       newRoom.on(RoomEvent.Disconnected, () => {
         setIsConnected(false);
-        setIsPublishing(false);
+        if (isPublishingRef.current) {
+          isPublishingRef.current = false;
+          setIsPublishing(false);
+        }
         setRoom(null);
         if (onUnpublished) {
           onUnpublished();
@@ -382,7 +390,10 @@ export function useLiveKitPublisher({
         roomRef.current = null;
         setRoom(null);
         setIsConnected(false);
-        setIsPublishing(false);
+        if (isPublishingRef.current) {
+          isPublishingRef.current = false;
+          setIsPublishing(false);
+        }
       }
 
       console.log('Stop publishing completed');

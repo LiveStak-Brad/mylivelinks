@@ -232,6 +232,7 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
 
   // LiveKit publisher hook - only enable when we have everything ready
   const shouldEnablePublisher = !!(isLive && selectedVideoDevice && selectedAudioDevice && liveStreamId);
+  const [isPublishingState, setIsPublishingState] = useState(false);
   
   const { isPublishing, error, startPublishing, stopPublishing } = useLiveKitPublisher({
     roomName,
@@ -241,12 +242,14 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
     audioDeviceId: selectedAudioDevice,
     onPublished: () => {
       console.log('Started publishing to LiveKit');
+      setIsPublishingState(true);
       setShowDeviceModal(false);
       setLoading(false);
       stopPreview();
     },
     onUnpublished: () => {
       console.log('Stopped publishing to LiveKit');
+      setIsPublishingState(false);
     },
     onError: (err) => {
       console.error('Publishing error:', err);
@@ -289,6 +292,7 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
         lastLiveStateRef.current = false;
         isLiveRef.current = false;
         setIsLive(false);
+        setIsPublishingState(false);
         setLiveStreamId(null);
         setSelectedVideoDevice('');
         setSelectedAudioDevice('');
@@ -440,7 +444,7 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       >
         {loading ? (
           'Loading...'
-        ) : isLive && isPublishing ? (
+        ) : isLive && (isPublishing || isPublishingState) ? (
           // Only show "LIVE" when both isLive AND isPublishing are true
           '🔴 LIVE'
         ) : isLive ? (

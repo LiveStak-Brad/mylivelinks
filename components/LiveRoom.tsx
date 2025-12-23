@@ -164,6 +164,70 @@ export default function LiveRoom() {
     setGridSlots(initialSlots);
   }, []);
 
+  // Ensure current user stays in slot 1 when live
+  useEffect(() => {
+    if (!currentUserId || authDisabled) return;
+    
+    const ensureUserInSlot1 = async () => {
+      const { data: userLiveStream } = await supabase
+        .from('live_streams')
+        .select('id, is_published, live_available')
+        .eq('profile_id', currentUserId)
+        .eq('live_available', true)
+        .single();
+      
+      if (userLiveStream) {
+        // User is live - ensure they're in slot 1
+        const slot1 = gridSlots.find(s => s.slotIndex === 1);
+        const userInSlot1 = slot1?.streamer?.profile_id === currentUserId;
+        
+        if (!userInSlot1) {
+          // Find user's streamer data
+          const userStreamer = liveStreamers.find(s => s.profile_id === currentUserId);
+          if (userStreamer) {
+            addUserToSlot1(userStreamer);
+          } else {
+            // Load user's streamer data
+            const { data: userProfile } = await supabase
+              .from('profiles')
+              .select('username, avatar_url, gifter_level')
+              .eq('id', currentUserId)
+              .single();
+            
+            if (userProfile) {
+              let badgeInfo = null;
+              if (userProfile.gifter_level) {
+                const { data: badge } = await supabase
+                  .from('gifter_levels')
+                  .select('*')
+                  .eq('level', userProfile.gifter_level)
+                  .single();
+                badgeInfo = badge;
+              }
+              
+              const ownStream: LiveStreamer = {
+                id: userLiveStream.id.toString(),
+                profile_id: currentUserId,
+                username: userProfile.username,
+                avatar_url: userProfile.avatar_url,
+                is_published: userLiveStream.is_published,
+                live_available: userLiveStream.live_available,
+                viewer_count: 0,
+                gifter_level: badgeInfo?.level || 0,
+                badge_name: badgeInfo?.badge_name,
+                badge_color: badgeInfo?.badge_color,
+              };
+              
+              addUserToSlot1(ownStream);
+            }
+          }
+        }
+      }
+    };
+    
+    ensureUserInSlot1();
+  }, [currentUserId, gridSlots, liveStreamers, authDisabled]);
+
   // Load live streamers and user's grid layout
   useEffect(() => {
     if (!mounted) return;
@@ -392,10 +456,14 @@ export default function LiveRoom() {
         setGridSlots(emptySlots);
         return;
       }
-      if (!user) {
-        // If no user, auto-fill with empty grid (already handled by loadLiveStreamers)
-        return;
-      }
+
+      // Check if user is live - if so, ensure they're in slot 1
+      const { data: userLiveStream } = await supabase
+        .from('live_streams')
+        .select('id, is_published, live_available')
+        .eq('profile_id', user.id)
+        .eq('live_available', true)
+        .single();
 
       const { data, error } = await supabase
         .from('user_grid_slots')
@@ -438,6 +506,75 @@ export default function LiveRoom() {
 
         // Fill remaining slots
         const filledIndices = updatedSlots.map((s) => s.slotIndex);
+        
+        // If user is live, ensure they're in slot 1 (lock them there)
+        if (userLiveStream) {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('username, avatar_url, gifter_level')
+            .eq('id', user.id)
+            .single();
+          
+          if (userProfile) {
+            let badgeInfo = null;
+            if (userProfile.gifter_level) {
+              const { data: badge } = await supabase
+                .from('gifter_levels')
+                .select('*')
+                .eq('level', userProfile.gifter_level)
+                .single();
+              badgeInfo = badge;
+            }
+            
+            const ownStream: LiveStreamer = {
+              id: userLiveStream.id.toString(),
+              profile_id: user.id,
+              username: userProfile.username,
+              avatar_url: userProfile.avatar_url,
+              is_published: userLiveStream.is_published,
+              live_available: userLiveStream.live_available,
+              viewer_count: 0,
+              gifter_level: badgeInfo?.level || 0,
+              badge_name: badgeInfo?.badge_name,
+              badge_color: badgeInfo?.badge_color,
+            };
+            
+            // Find slot 1 and ensure user is there
+            const slot1Index = updatedSlots.findIndex(s => s.slotIndex === 1);
+            if (slot1Index !== -1) {
+              updatedSlots[slot1Index] = {
+                slotIndex: 1,
+                streamer: ownStream,
+                isPinned: updatedSlots[slot1Index]?.isPinned || false,
+                isMuted: updatedSlots[slot1Index]?.isMuted || false,
+                isEmpty: false,
+                volume: 0.5,
+              };
+            } else {
+              // Slot 1 doesn't exist, add it
+              updatedSlots.push({
+                slotIndex: 1,
+                streamer: ownStream,
+                isPinned: false,
+                isMuted: false,
+                isEmpty: false,
+                volume: 0.5,
+              });
+            }
+            
+            // Remove user from any other slot
+            updatedSlots.forEach((slot, index) => {
+              if (slot.slotIndex !== 1 && slot.streamer?.profile_id === user.id) {
+                updatedSlots[index] = {
+                  ...slot,
+                  streamer: null,
+                  isEmpty: true,
+                };
+              }
+            });
+          }
+        }
+        
         for (let i = 1; i <= 12; i++) {
           if (!filledIndices.includes(i)) {
             updatedSlots.push({

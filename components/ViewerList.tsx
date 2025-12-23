@@ -42,12 +42,16 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
   const supabase = createClient();
 
   useEffect(() => {
-    // Get current user ID
-    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
-      setCurrentUserId(user?.id || null);
-    });
-
-    loadViewers();
+    // Get current user ID and load viewers
+    const initViewers = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || null;
+      setCurrentUserId(userId);
+      // Load viewers after setting currentUserId
+      await loadViewers();
+    };
+    
+    initViewers();
 
     // Realtime subscriptions (replaces polling)
     const activeViewersChannel = supabase
@@ -91,18 +95,20 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
   const loadViewers = async () => {
     try {
       // Get current user ID if not set
-      if (!currentUserId) {
+      let userId = currentUserId;
+      if (!userId) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           setLoading(false);
           return;
         }
-        setCurrentUserId(user.id);
+        userId = user.id;
+        setCurrentUserId(userId);
       }
 
       // Get viewers from active_viewers (people watching streams)
       const { data, error } = await supabase.rpc('get_viewer_list_filtered', {
-        p_viewer_id: currentUserId || '',
+        p_viewer_id: userId || '',
         p_live_stream_id: null,
       });
 
@@ -113,11 +119,11 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       let combinedData = [...(data || [])];
       
       // Add current user if not already in the list
-      if (currentUserId && !viewerIds.has(currentUserId)) {
+      if (userId && !viewerIds.has(userId)) {
         const { data: currentUserProfile } = await supabase
           .from('profiles')
           .select('id, username, avatar_url, gifter_level')
-          .eq('id', currentUserId)
+          .eq('id', userId)
           .single();
         
         if (currentUserProfile) {
