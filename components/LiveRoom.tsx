@@ -255,8 +255,32 @@ export default function LiveRoom() {
       )
       .subscribe();
 
+    // Also trigger publish state update when active_viewers changes
+    // This ensures that when a streamer watches their own stream, publishing starts immediately
+    const activeViewersChannel = supabase
+      .channel('active-viewers-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'active_viewers',
+        },
+        async () => {
+          // Trigger publish state update when viewers change
+          // This ensures streamer watching their own stream triggers publishing
+          try {
+            await supabase.rpc('update_publish_state_from_viewers');
+          } catch (error) {
+            console.error('Error updating publish state:', error);
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(activeViewersChannel);
     };
   }, [sortMode, mounted]); // Reload when sort mode or mount state changes
 

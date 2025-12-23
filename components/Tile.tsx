@@ -221,13 +221,21 @@ export default function Tile({
   }, [audioTrack, isMuted, volume]);
 
   // Manage viewer heartbeat when tile is active and not muted
+  // IMPORTANT: Enable heartbeat even when streamer is watching their own stream in preview mode
+  // This ensures that when a streamer joins as a viewer, it triggers publishing
+  const shouldSendHeartbeat = !!(
+    liveStreamId !== undefined && 
+    !isMuted &&
+    (isLive || (isLiveAvailable && isCurrentUser)) // Enable for published streams OR current user's own preview
+  );
+  
   useViewerHeartbeat({
     liveStreamId: liveStreamId || 0,
     isActive: isActive && !isMuted,
     isUnmuted: !isMuted,
     isVisible: isVisible,
     isSubscribed: true,
-    enabled: isLive && liveStreamId !== undefined && !isMuted,
+    enabled: shouldSendHeartbeat,
   });
 
   // Track visibility for heartbeat
