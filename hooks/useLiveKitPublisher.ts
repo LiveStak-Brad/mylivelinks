@@ -113,16 +113,42 @@ export function useLiveKitPublisher({
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Token endpoint error:', { status: response.status, error: errorData });
-        throw new Error(errorData.error || `Failed to get token (${response.status})`);
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || `HTTP ${response.status}` };
+        }
+        console.error('Token endpoint error:', { 
+          status: response.status, 
+          statusText: response.statusText,
+          error: errorData,
+          responseText: errorText.substring(0, 200),
+        });
+        throw new Error(errorData.error || `Failed to get token (${response.status} ${response.statusText})`);
       }
 
-      const { token, url } = await response.json();
-      console.log('Token received:', { hasToken: !!token, url });
+      const responseData = await response.json();
+      const { token, url } = responseData;
+      
+      console.log('Token received:', { 
+        hasToken: !!token, 
+        tokenLength: token?.length,
+        url,
+        urlLength: url?.length,
+        fullResponse: responseData,
+      });
       
       if (!token || !url) {
+        console.error('Invalid token response:', { token: !!token, url: !!url, responseData });
         throw new Error('Invalid token response: missing token or URL');
+      }
+      
+      // Validate token format (JWT should have 3 parts separated by dots)
+      if (!token.includes('.') || token.split('.').length !== 3) {
+        console.error('Invalid token format:', { tokenLength: token.length, tokenPrefix: token.substring(0, 50) });
+        throw new Error('Invalid token format received from server');
       }
       
       return { token, url };
@@ -218,22 +244,58 @@ export function useLiveKitPublisher({
       // Connect to room
       console.log('Connecting to MyLiveLinks room:', { 
         roomName, 
-        url: url?.substring(0, 50) + '...',
+        url: url?.substring(0, 60) + '...',
         tokenLength: token?.length,
-        tokenPrefix: token?.substring(0, 20) + '...',
+        tokenPrefix: token?.substring(0, 30) + '...',
+        urlStartsWith: url?.substring(0, 6), // Should be "wss://"
       });
       
       try {
+        console.log('Attempting LiveKit connection...', {
+          url: url?.substring(0, 60) + '...',
+          roomName,
+          tokenLength: token?.length,
+          tokenPrefix: token?.substring(0, 30) + '...',
+        });
+        
+        // Validate URL format before connecting
+        if (!url || (!url.startsWith('wss://') && !url.startsWith('ws://'))) {
+          throw new Error(`Invalid LiveKit URL format: ${url?.substring(0, 50)}. URL must start with wss:// or ws://`);
+        }
+        
         await newRoom.connect(url, token);
         console.log('Successfully connected to MyLiveLinks room');
       } catch (connectErr: any) {
         console.error('Room connection error:', {
           message: connectErr.message,
           code: connectErr.code,
-          url: url?.substring(0, 50),
+          reason: connectErr.reason,
+          url: url?.substring(0, 60),
           roomName,
+          errorType: connectErr.constructor?.name,
+          stack: connectErr.stack?.substring(0, 200),
         });
-        throw new Error(`Failed to connect to room: ${connectErr.message || 'Invalid token or connection error'}`);
+        
+        // Provide more specific error messages
+        let errorMessage = 'Failed to connect to room';
+        if (connectErr.message) {
+          errorMessage += `: ${connectErr.message}`;
+        } else if (connectErr.reason) {
+          errorMessage += `: ${connectErr.reason}`;
+        } else {
+          errorMessage += ': Could not establish signal connection';
+        }
+        
+        // Add helpful hints based on error type
+        if (connectErr.message?.includes('token') || connectErr.message?.includes('invalid')) {
+          errorMessage += ' (The LiveKit token is invalid. Check Vercel environment variables match your LiveKit dashboard)';
+        } else if (connectErr.message?.includes('network') || connectErr.message?.includes('timeout')) {
+          errorMessage += ' (Check your internet connection)';
+        } else if (connectErr.message?.includes('URL')) {
+          errorMessage += ' (Check LIVEKIT_URL in Vercel environment variables)';
+        }
+        
+        throw new Error(errorMessage);
       }
       
       roomRef.current = newRoom;
