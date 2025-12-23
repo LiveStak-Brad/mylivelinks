@@ -89,7 +89,7 @@ export default function LiveRoom() {
   // Check if auth is disabled for testing
   const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
 
-  // Get current user ID
+  // Get current user ID and track room presence
   useEffect(() => {
     if (authDisabled) {
       // Skip auth check if disabled for testing
@@ -97,9 +97,6 @@ export default function LiveRoom() {
       return;
     }
     
-    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
-      setCurrentUserId(user?.id || null);
-    });
   }, [supabase, authDisabled]);
 
   // Auto-enable Focus Mode when tile is expanded

@@ -100,16 +100,39 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         setCurrentUserId(user.id);
       }
 
-      // Use filtered viewer list RPC function to exclude blocked users
+      // Get viewers from active_viewers (people watching streams)
       const { data, error } = await supabase.rpc('get_viewer_list_filtered', {
         p_viewer_id: currentUserId || '',
         p_live_stream_id: null,
       });
 
       if (error) throw error;
+      
+      // Ensure current user is always included in viewer list (room presence)
+      const viewerIds = new Set((data || []).map((item: any) => item.viewer_id));
+      let combinedData = [...(data || [])];
+      
+      // Add current user if not already in the list
+      if (currentUserId && !viewerIds.has(currentUserId)) {
+        const { data: currentUserProfile } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url, gifter_level')
+          .eq('id', currentUserId)
+          .single();
+        
+        if (currentUserProfile) {
+          combinedData.push({
+            viewer_id: currentUserProfile.id,
+            username: currentUserProfile.username,
+            avatar_url: currentUserProfile.avatar_url,
+            gifter_level: currentUserProfile.gifter_level || 0,
+            joined_at: new Date().toISOString(),
+          });
+        }
+      }
 
       // Get badge info and live stream info
-      const profileIds = [...new Set((data || []).map((item: any) => item.viewer_id))];
+      const profileIds = [...new Set((combinedData || []).map((item: any) => item.viewer_id))];
       
       // Check which profiles are live available and published
       const { data: liveStreams } = await supabase
@@ -130,7 +153,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       );
 
       const viewersWithBadges = await Promise.all(
-        (data || []).map(async (item: any) => {
+        (combinedData || []).map(async (item: any) => {
           let badgeInfo = null;
           if (item.gifter_level !== null && item.gifter_level > 0) {
             const { data: badge } = await supabase

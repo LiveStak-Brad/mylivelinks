@@ -440,10 +440,12 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       >
         {loading ? (
           'Loading...'
+        ) : isLive && isPublishing ? (
+          // Only show "LIVE" when both isLive AND isPublishing are true
+          '🔴 LIVE'
         ) : isLive ? (
-          // When live, show "LIVE" if publishing, otherwise "Stop Live"
-          // This prevents flashing between states
-          isPublishing ? '🔴 LIVE' : '⏸️ Stop Live'
+          // Show "Stop Live" when isLive is true but not publishing yet
+          '⏸️ Stop Live'
         ) : (
           '▶️ Go Live'
         )}
