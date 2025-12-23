@@ -247,10 +247,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Generate token - toJwt() is synchronous and returns a string
+    // Generate token - toJwt() returns a Promise<string> in this SDK version
     let token: string;
     try {
-      token = at.toJwt();
+      token = await at.toJwt();
     } catch (jwtErr: any) {
       console.error('Error generating JWT:', jwtErr);
       return NextResponse.json(
