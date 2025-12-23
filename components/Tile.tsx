@@ -22,6 +22,7 @@ interface TileProps {
   liveStreamId?: number;
   sharedRoom?: Room | null; // Shared LiveKit room connection
   isRoomConnected?: boolean; // Whether shared room is connected
+  isCurrentUserPublishing?: boolean; // NEW: Whether current user is publishing (for echo prevention)
   onClose: () => void;
   onMute: () => void;
   isMuted: boolean;
@@ -48,6 +49,7 @@ export default function Tile({
   liveStreamId,
   sharedRoom,
   isRoomConnected = false,
+  isCurrentUserPublishing = false, // NEW: Whether current user is publishing
   onClose,
   onMute,
   isMuted,
@@ -82,9 +84,35 @@ export default function Tile({
   // Subscribe to tracks from the streamer when room is connected
   // CRITICAL: Only depend on streamerId and liveStreamId to prevent re-subscription loops
   // CRITICAL: Don't return early if live_available=true but is_published=false - wait for tracks
+  const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+  
   useEffect(() => {
+    if (DEBUG_LIVEKIT) {
+      console.log('[DEBUG] Tile subscription effect:', {
+        slotIndex,
+        streamerId,
+        liveStreamId,
+        isLiveAvailable,
+        isLive,
+        hasSharedRoom: !!sharedRoom,
+        isRoomConnected,
+        alreadySubscribed: subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId,
+      });
+    }
+    
     // Must have room, connection, liveStreamId, streamerId, and streamer must be live_available
     if (!sharedRoom || !isRoomConnected || !liveStreamId || !streamerId || !isLiveAvailable) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[DEBUG] Tile subscription blocked (missing requirements):', {
+          slotIndex,
+          streamerId,
+          hasSharedRoom: !!sharedRoom,
+          isRoomConnected,
+          hasLiveStreamId: !!liveStreamId,
+          hasStreamerId: !!streamerId,
+          isLiveAvailable,
+        });
+      }
       // Only clear tracks if streamer is no longer live_available (not just because room disconnected temporarily)
       if (!isLiveAvailable && subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
         setVideoTrack(null);
@@ -101,16 +129,35 @@ export default function Tile({
 
     // Skip if already subscribed to this streamer (identity check only)
     if (subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[DEBUG] Tile already subscribed, skipping:', { slotIndex, streamerId });
+      }
       return;
     }
 
     // Mark as subscribed
     subscriptionRef.current.subscribed = true;
     subscriptionRef.current.streamerId = streamerId;
+    
+    if (DEBUG_LIVEKIT) {
+      console.log('[DEBUG] Starting tile subscription:', { slotIndex, streamerId, liveStreamId });
+    }
 
     const handleTrackSubscribed = (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
       // Only subscribe to tracks from this specific streamer
       if (participant.identity === streamerId) {
+        if (DEBUG_LIVEKIT) {
+          console.log('[DEBUG] Tile track subscribed:', {
+            slotIndex,
+            streamerId,
+            trackKind: track.kind,
+            trackSid: track.sid,
+            hasVideoRef: !!videoRef.current,
+            hasAudioRef: !!audioRef.current,
+            alreadyHasVideo: hasTracksRef.current.video,
+            alreadyHasAudio: hasTracksRef.current.audio,
+          });
+        }
         if (track.kind === Track.Kind.Video) {
           // Only update if we don't already have this track (prevent flicker)
           if (!hasTracksRef.current.video) {
@@ -118,6 +165,9 @@ export default function Tile({
             setVideoTrack(track);
             if (videoRef.current) {
               track.attach(videoRef.current);
+              if (DEBUG_LIVEKIT) {
+                console.log('[DEBUG] Video track attached to DOM:', { slotIndex, streamerId, trackSid: track.sid });
+              }
             }
           }
         } else if (track.kind === Track.Kind.Audio) {
@@ -127,6 +177,9 @@ export default function Tile({
             setAudioTrack(track);
             if (audioRef.current) {
               track.attach(audioRef.current);
+              if (DEBUG_LIVEKIT) {
+                console.log('[DEBUG] Audio track attached to DOM:', { slotIndex, streamerId, trackSid: track.sid });
+              }
             }
           }
         }
@@ -159,8 +212,29 @@ export default function Tile({
 
     // Subscribe to existing tracks
     const checkForTracks = () => {
+      let foundParticipant = false;
+      let trackCount = 0;
+      
       sharedRoom.remoteParticipants.forEach((participant) => {
         if (participant.identity === streamerId) {
+          foundParticipant = true;
+          trackCount = participant.trackPublications.size;
+          
+          if (DEBUG_LIVEKIT) {
+            console.log('[DEBUG] Found remote participant for tile:', {
+              slotIndex,
+              streamerId,
+              participantIdentity: participant.identity,
+              trackPublicationsCount: participant.trackPublications.size,
+              publications: Array.from(participant.trackPublications.values()).map(p => ({
+                kind: p.track?.kind,
+                sid: p.trackSid,
+                isSubscribed: p.isSubscribed,
+                hasTrack: !!p.track,
+              })),
+            });
+          }
+          
           participant.trackPublications.forEach((publication) => {
             if (publication.track) {
               handleTrackSubscribed(publication.track as RemoteTrack, publication, participant);
@@ -168,6 +242,16 @@ export default function Tile({
           });
         }
       });
+      
+      if (DEBUG_LIVEKIT && !foundParticipant) {
+        console.log('[DEBUG] Remote participant NOT found for tile:', {
+          slotIndex,
+          streamerId,
+          liveStreamId,
+          remoteParticipantsCount: sharedRoom.remoteParticipants.size,
+          remoteParticipantIdentities: Array.from(sharedRoom.remoteParticipants.values()).map(p => p.identity),
+        });
+      }
     };
     
     // Check immediately
@@ -216,9 +300,11 @@ export default function Tile({
         subscriptionRef.current.streamerId = null;
       }
     };
-    // CRITICAL: Depend on streamerId and liveStreamId for identity, isLive for publishing state
+    // CRITICAL: Depend on streamerId and liveStreamId for identity
+    // Removed isLive from deps - subscription should work regardless of is_published state
     // The subscriptionRef guard prevents re-subscription when streamerId hasn't changed
-  }, [sharedRoom, isRoomConnected, isLive, liveStreamId, streamerId]);
+    // CRITICAL: Subscription must work even if streamer is live_available but not yet is_published
+  }, [sharedRoom, isRoomConnected, liveStreamId, streamerId, isLiveAvailable]);
 
   // Check if this is the current user's tile
   useEffect(() => {
@@ -334,6 +420,7 @@ export default function Tile({
   }, [videoTrack]);
 
   // Attach audio track and apply volume/mute - use ref to prevent re-attachment
+  // CRITICAL: Prevent echo - mute own audio playback when publishing to avoid feedback loop
   const attachedAudioTrackRef = useRef<RemoteTrack | null>(null);
   useEffect(() => {
     if (audioTrack && audioRef.current) {
@@ -346,8 +433,26 @@ export default function Tile({
         audioTrack.attach(audioRef.current);
         attachedAudioTrackRef.current = audioTrack;
       }
-      // Always update volume/mute
-      audioRef.current.volume = isMuted ? 0 : volume;
+      
+      // CRITICAL: Echo prevention - ONLY mute current user's OWN tile audio when publishing
+      // Use reliable publishing state flag instead of checking localParticipant (pub.isSubscribed is unreliable)
+      // This prevents feedback loop: when you publish audio, don't play it back to yourself
+      const shouldMuteForEcho = isCurrentUser && isCurrentUserPublishing;
+      
+      if (DEBUG_LIVEKIT && isCurrentUser) {
+        console.log('[DEBUG] Echo prevention check:', {
+          slotIndex,
+          isCurrentUser,
+          isCurrentUserPublishing,
+          shouldMuteForEcho,
+          isMuted,
+        });
+      }
+      
+      // Apply mute: either user muted OR echo prevention (ONLY for current user's own tile)
+      // Other tiles are never affected by echo prevention
+      const finalMute = isMuted || shouldMuteForEcho;
+      audioRef.current.volume = finalMute ? 0 : volume;
     } else if (!audioTrack && attachedAudioTrackRef.current && audioRef.current) {
       // Clean up if track is removed
       attachedAudioTrackRef.current.detach();
@@ -360,7 +465,7 @@ export default function Tile({
         attachedAudioTrackRef.current = null;
       }
     };
-  }, [audioTrack, isMuted, volume]);
+  }, [audioTrack, isMuted, volume, isCurrentUser, isCurrentUserPublishing]);
 
   // Manage viewer heartbeat when tile is active and not muted
   // CRITICAL: Enable heartbeat for ALL live_available streamers (not just is_published)
@@ -372,12 +477,21 @@ export default function Tile({
     isLiveAvailable // Enable for ANY live_available streamer (published or waiting)
   );
   
+  // CRITICAL: Track actual subscription state for heartbeat (not hardcoded true)
+  // This ensures heartbeat accurately reflects whether we're subscribed to tracks
+  const [isActuallySubscribed, setIsActuallySubscribed] = useState(false);
+  
+  useEffect(() => {
+    // Update subscription state based on whether we have tracks
+    setIsActuallySubscribed(!!(videoTrack || audioTrack));
+  }, [videoTrack, audioTrack]);
+  
   useViewerHeartbeat({
     liveStreamId: liveStreamId || 0,
     isActive: isActive && !isMuted,
     isUnmuted: !isMuted,
     isVisible: isVisible,
-    isSubscribed: true,
+    isSubscribed: isActuallySubscribed, // Use actual subscription state, not hardcoded
     enabled: shouldSendHeartbeat,
   });
 

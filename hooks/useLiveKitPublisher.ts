@@ -125,9 +125,34 @@ export function useLiveKitPublisher({
           }
           
           await Promise.all(tracks.map(track => {
+            const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+            if (DEBUG_LIVEKIT) {
+              console.log('[DEBUG] Publishing track:', {
+                kind: track.kind,
+                attempt: publishAttempts + 1,
+                roomState: room.state,
+                localParticipantSid: room.localParticipant.sid,
+              });
+            }
             console.log('Publishing track:', track.kind, `(attempt ${publishAttempts + 1})`);
             return room.localParticipant.publishTrack(track);
           }));
+          
+          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+          if (DEBUG_LIVEKIT) {
+            const publishedTracks = Array.from(room.localParticipant.trackPublications.values())
+              .filter(pub => pub.track && pub.source === 'camera' || pub.source === 'microphone')
+              .map(pub => ({
+                kind: pub.track?.kind,
+                sid: pub.trackSid,
+                source: pub.source,
+                isSubscribed: pub.isSubscribed,
+              }));
+            console.log('[DEBUG] Publishing complete, local tracks:', {
+              publishedTracksCount: publishedTracks.length,
+              publishedTracks,
+            });
+          }
           
           console.log('All tracks published successfully');
           // Only update state if it actually changed

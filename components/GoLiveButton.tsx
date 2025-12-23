@@ -9,6 +9,7 @@ interface GoLiveButtonProps {
   sharedRoom?: Room | null; // Shared LiveKit room connection
   isRoomConnected?: boolean; // Whether shared room is connected
   onLiveStatusChange?: (isLive: boolean) => void;
+  onPublishingChange?: (isPublishing: boolean) => void; // NEW: Report publishing state
   onGoLive?: (liveStreamId: number, profileId: string) => void;
 }
 
@@ -17,7 +18,7 @@ interface DeviceInfo {
   label: string;
 }
 
-export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onGoLive }: GoLiveButtonProps) {
+export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive }: GoLiveButtonProps) {
   const [isLive, setIsLive] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -242,6 +243,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     onPublished: () => {
       console.log('Started publishing to LiveKit');
       setIsPublishingState(true);
+      onPublishingChange?.(true); // Report publishing state
       setShowDeviceModal(false);
       setLoading(false);
       stopPreview();
@@ -249,6 +251,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     onUnpublished: () => {
       console.log('Stopped publishing to LiveKit');
       setIsPublishingState(false);
+      onPublishingChange?.(false); // Report publishing state
     },
     onError: (err) => {
       console.error('Publishing error:', err);

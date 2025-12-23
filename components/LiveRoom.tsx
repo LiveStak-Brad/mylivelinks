@@ -71,6 +71,7 @@ export default function LiveRoom() {
   const [volumeSliderOpenSlot, setVolumeSliderOpenSlot] = useState<number | null>(null);
   const [selectedSlotForReplacement, setSelectedSlotForReplacement] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isCurrentUserPublishing, setIsCurrentUserPublishing] = useState(false); // Track if current user is publishing
   
   // Live Grid Sort Mode
   type LiveSortMode = 'random' | 'most_viewed' | 'most_gifted' | 'newest';
@@ -166,8 +167,19 @@ export default function LiveRoom() {
         });
 
         // Set up event handlers BEFORE connecting
+        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+        
         const handleConnected = () => {
           if (mounted) {
+            if (DEBUG_LIVEKIT) {
+              console.log('[DEBUG] Room connected:', {
+                roomState: newRoom.state,
+                roomName: newRoom.name,
+                localParticipantSid: newRoom.localParticipant.sid,
+                localParticipantIdentity: newRoom.localParticipant.identity,
+                remoteParticipantsCount: newRoom.remoteParticipants.size,
+              });
+            }
             console.log('Shared LiveKit room connected');
             setIsRoomConnected(true);
             roomConnectionRef.current.connected = true;
@@ -177,6 +189,12 @@ export default function LiveRoom() {
 
         const handleDisconnected = () => {
           if (mounted) {
+            if (DEBUG_LIVEKIT) {
+              console.log('[DEBUG] Room disconnected:', {
+                roomState: newRoom.state,
+                roomName: newRoom.name,
+              });
+            }
             console.log('Shared LiveKit room disconnected');
             setIsRoomConnected(false);
             // CRITICAL: Reset connection flags on disconnect to allow reconnection if needed
@@ -185,8 +203,53 @@ export default function LiveRoom() {
           }
         };
 
+        const handleParticipantConnected = (participant: any) => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[DEBUG] Participant connected:', {
+              identity: participant.identity,
+              sid: participant.sid,
+              trackPublicationsCount: participant.trackPublications.size,
+              isLocal: participant === newRoom.localParticipant,
+            });
+          }
+        };
+
+        const handleParticipantDisconnected = (participant: any) => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[DEBUG] Participant disconnected:', {
+              identity: participant.identity,
+              sid: participant.sid,
+            });
+          }
+        };
+
+        const handleTrackSubscribed = (track: any, publication: any, participant: any) => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[DEBUG] Track subscribed:', {
+              participantIdentity: participant.identity,
+              trackKind: track.kind,
+              trackSid: track.sid,
+              publicationSid: publication.trackSid,
+            });
+          }
+        };
+
+        const handleTrackUnsubscribed = (track: any, publication: any, participant: any) => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[DEBUG] Track unsubscribed:', {
+              participantIdentity: participant.identity,
+              trackKind: track.kind,
+              trackSid: track.sid,
+            });
+          }
+        };
+
         newRoom.on(RoomEvent.Connected, handleConnected);
         newRoom.on(RoomEvent.Disconnected, handleDisconnected);
+        newRoom.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
+        newRoom.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
+        newRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+        newRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
 
         // Connect to room
         await newRoom.connect(url, token);
@@ -1716,7 +1779,12 @@ export default function LiveRoom() {
 
           {/* Right Section - Go Live, Focus Mode, Options and Login grouped together */}
           <div className="flex items-center gap-3 flex-shrink-0 z-10">
-            <GoLiveButton sharedRoom={sharedRoom} isRoomConnected={isRoomConnected} onGoLive={handleGoLive} />
+            <GoLiveButton 
+              sharedRoom={sharedRoom} 
+              isRoomConnected={isRoomConnected} 
+              onGoLive={handleGoLive}
+              onPublishingChange={setIsCurrentUserPublishing}
+            />
             <button
               onClick={toggleFocusMode}
               className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-sm sm:text-base font-medium shadow-md"
@@ -1859,6 +1927,7 @@ export default function LiveRoom() {
                         })() : undefined}
                         sharedRoom={sharedRoom}
                         isRoomConnected={isRoomConnected}
+                        isCurrentUserPublishing={isCurrentUserPublishing}
                         onClose={() => handleCloseTile(slot.slotIndex)}
                         onMute={() => handleMuteTile(slot.slotIndex)}
                         isMuted={slot.isMuted}
