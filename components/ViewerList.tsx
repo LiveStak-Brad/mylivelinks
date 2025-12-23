@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import GifterBadge from './GifterBadge';
 import MiniProfile from './MiniProfile';
+import ViewerVideoPreview from './ViewerVideoPreview';
 
 interface Viewer {
   profile_id: string;
@@ -15,6 +16,7 @@ interface Viewer {
   is_active: boolean;
   last_active_at: string;
   is_live_available?: boolean; // Whether they're live streaming/available
+  is_published?: boolean; // Whether they're actually publishing video
   live_stream_id?: number; // Their live stream ID if available
 }
 
@@ -108,15 +110,22 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       // Get badge info and live stream info
       const profileIds = [...new Set((data || []).map((item: any) => item.viewer_id))];
       
-      // Check which profiles are live available
+      // Check which profiles are live available and published
       const { data: liveStreams } = await supabase
         .from('live_streams')
-        .select('profile_id, id, live_available')
+        .select('profile_id, id, live_available, is_published')
         .in('profile_id', profileIds)
         .eq('live_available', true);
 
       const liveStreamMap = new Map(
-        (liveStreams || []).map((ls: any) => [ls.profile_id, { isLive: true, streamId: ls.id }])
+        (liveStreams || []).map((ls: any) => [
+          ls.profile_id, 
+          { 
+            isLiveAvailable: ls.live_available || false, 
+            isPublished: ls.is_published || false,
+            streamId: ls.id 
+          }
+        ])
       );
 
       const viewersWithBadges = await Promise.all(
@@ -131,7 +140,11 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
             badgeInfo = badge;
           }
 
-          const liveInfo = liveStreamMap.get(item.viewer_id) as { isLive: boolean; streamId: number } | undefined;
+          const liveInfo = liveStreamMap.get(item.viewer_id) as { 
+            isLiveAvailable: boolean; 
+            isPublished: boolean;
+            streamId: number 
+          } | undefined;
 
           return {
             profile_id: item.viewer_id,
@@ -142,7 +155,8 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
             badge_color: badgeInfo?.badge_color,
             is_active: true,
             last_active_at: item.joined_at,
-            is_live_available: liveInfo?.isLive || false,
+            is_live_available: liveInfo?.isLiveAvailable || false,
+            is_published: liveInfo?.isPublished || false,
             live_stream_id: liveInfo?.streamId,
           };
         })
@@ -199,7 +213,11 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                 badgeInfo = badge;
               }
 
-              const liveInfo = liveStreamMap.get(profile.id) as { isLive: boolean; streamId: number } | undefined;
+              const liveInfo = liveStreamMap.get(profile.id) as { 
+            isLiveAvailable: boolean; 
+            isPublished: boolean;
+            streamId: number 
+          } | undefined;
 
               return {
                 profile_id: profile.id,
@@ -210,7 +228,8 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                 badge_color: badgeInfo?.badge_color,
                 is_active: item.is_active,
                 last_active_at: item.last_active_at,
-                is_live_available: liveInfo?.isLive || false,
+                is_live_available: liveInfo?.isLiveAvailable || false,
+                is_published: liveInfo?.isPublished || false,
                 live_stream_id: liveInfo?.streamId,
               };
             })
@@ -282,10 +301,19 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                   }
                 `}
               >
-                {/* Live Camera Icon - Webcam Style */}
-                {viewer.is_live_available && (
+                {/* Video Preview or Avatar */}
+                {viewer.is_published && viewer.live_stream_id ? (
+                  // Show live video preview if they're actually publishing
+                  <ViewerVideoPreview
+                    viewerId={viewer.profile_id}
+                    viewerUsername={viewer.username}
+                    liveStreamId={viewer.live_stream_id}
+                    isLive={viewer.is_published}
+                  />
+                ) : viewer.is_live_available ? (
+                  // Show live camera icon if they're in preview mode (not publishing yet)
                   <div className="relative flex-shrink-0">
-                    <div className="w-7 h-7 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center shadow-lg border border-red-400">
+                    <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center shadow-lg border border-red-400">
                       <svg 
                         className="w-5 h-5 text-white" 
                         viewBox="0 0 24 24" 
@@ -309,17 +337,16 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                       <span className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75" />
                     </div>
                   </div>
-                )}
-
-                {/* Avatar */}
-                {viewer.avatar_url ? (
+                ) : viewer.avatar_url ? (
+                  // Regular avatar if not live
                   <img
                     src={viewer.avatar_url}
                     alt={viewer.username}
-                    className={`w-8 h-8 rounded-full flex-shrink-0 ${viewer.is_live_available ? 'ring-2 ring-red-500' : ''}`}
+                    className="w-8 h-8 rounded-full flex-shrink-0"
                   />
                 ) : (
-                  <div className={`w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${viewer.is_live_available ? 'ring-2 ring-red-500' : ''}`}>
+                  // Default avatar if no image
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                     {viewer.username[0].toUpperCase()}
                   </div>
                 )}
