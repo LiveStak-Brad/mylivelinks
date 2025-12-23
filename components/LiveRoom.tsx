@@ -732,7 +732,7 @@ export default function LiveRoom() {
           // Get viewer counts
           const streamersWithCounts = await Promise.all(
             directResult.data.map(async (stream: any) => {
-              const profile = profiles.find(p => p.id === stream.profile_id);
+              const profile = profiles.find((p: any) => p.id === stream.profile_id);
               if (!profile) return null;
               
               const { count } = await supabase
