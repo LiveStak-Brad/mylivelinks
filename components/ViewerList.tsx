@@ -28,6 +28,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
   const [viewers, setViewers] = useState<Viewer[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [roomOwnerId, setRoomOwnerId] = useState<string | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<{
     profileId: string;
     username: string;
@@ -162,12 +163,48 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         })
       );
 
-      // Filter out current user from viewer list
-      const filteredViewers = viewersWithBadges.filter(
-        viewer => viewer.profile_id !== currentUserId
-      );
+      // Find room owner (streamer with most viewers)
+      // Get streamer_id from active_viewers for each viewer
+      const { data: activeViewersData } = await supabase
+        .from('active_viewers')
+        .select('streamer_id, viewer_id')
+        .in('viewer_id', profileIds)
+        .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
 
-      setViewers(filteredViewers);
+      // Count viewers per streamer
+      const streamerViewerCounts = new Map<string, number>();
+      activeViewersData?.forEach((av: any) => {
+        const count = streamerViewerCounts.get(av.streamer_id) || 0;
+        streamerViewerCounts.set(av.streamer_id, count + 1);
+      });
+
+      // Find streamer with most viewers (room owner)
+      let foundRoomOwnerId: string | null = null;
+      let maxViewers = 0;
+      streamerViewerCounts.forEach((count, streamerId) => {
+        if (count > maxViewers) {
+          maxViewers = count;
+          foundRoomOwnerId = streamerId;
+        }
+      });
+      
+      setRoomOwnerId(foundRoomOwnerId);
+
+      // Sort viewers: room owner first, then current user, then everyone else
+      const sortedViewers = viewersWithBadges.sort((a, b) => {
+        // Room owner first
+        if (a.profile_id === foundRoomOwnerId && b.profile_id !== foundRoomOwnerId) return -1;
+        if (b.profile_id === foundRoomOwnerId && a.profile_id !== foundRoomOwnerId) return 1;
+        
+        // Current user second (if not room owner)
+        if (a.profile_id === currentUserId && b.profile_id !== currentUserId && a.profile_id !== foundRoomOwnerId) return -1;
+        if (b.profile_id === currentUserId && a.profile_id !== currentUserId && b.profile_id !== foundRoomOwnerId) return 1;
+        
+        // Everyone else sorted by join time (most recent first)
+        return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
+      });
+
+      setViewers(sortedViewers);
     } catch (error) {
       console.error('Error loading viewers:', error);
       // Fallback to regular query if RPC fails
@@ -240,12 +277,46 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
             })
           );
 
-          // Filter out current user from viewer list
-          const filteredViewers = viewersWithBadges.filter(
-            viewer => viewer.profile_id !== currentUserId
-          );
+          // Find room owner (streamer with most viewers)
+          const fallbackProfileIds = [...new Set((data || []).map((item: any) => item.profiles.id))];
+          const { data: activeViewersData } = await supabase
+            .from('active_viewers')
+            .select('streamer_id, viewer_id')
+            .in('viewer_id', fallbackProfileIds)
+            .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
 
-          setViewers(filteredViewers);
+          const streamerViewerCounts = new Map<string, number>();
+          activeViewersData?.forEach((av: any) => {
+            const count = streamerViewerCounts.get(av.streamer_id) || 0;
+            streamerViewerCounts.set(av.streamer_id, count + 1);
+          });
+
+          let foundRoomOwnerId: string | null = null;
+          let maxViewers = 0;
+          streamerViewerCounts.forEach((count, streamerId) => {
+            if (count > maxViewers) {
+              maxViewers = count;
+              foundRoomOwnerId = streamerId;
+            }
+          });
+          
+          setRoomOwnerId(foundRoomOwnerId);
+
+          // Sort viewers: room owner first, then current user, then everyone else
+          const sortedViewers = viewersWithBadges.sort((a, b) => {
+            // Room owner first
+            if (a.profile_id === foundRoomOwnerId && b.profile_id !== foundRoomOwnerId) return -1;
+            if (b.profile_id === foundRoomOwnerId && a.profile_id !== foundRoomOwnerId) return 1;
+            
+            // Current user second (if not room owner)
+            if (a.profile_id === currentUserId && b.profile_id !== currentUserId && a.profile_id !== foundRoomOwnerId) return -1;
+            if (b.profile_id === currentUserId && a.profile_id !== currentUserId && b.profile_id !== foundRoomOwnerId) return 1;
+            
+            // Everyone else sorted by join time (most recent first)
+            return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
+          });
+
+          setViewers(sortedViewers);
         }
       } catch (fallbackError) {
         console.error('Fallback query also failed:', fallbackError);
@@ -387,6 +458,17 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                         badgeColor={viewer.badge_color}
                         size="sm"
                       />
+                    )}
+                    {/* Room Owner and Current User Badges */}
+                    {viewer.profile_id === roomOwnerId && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-purple-500 text-white rounded">
+                        Owner
+                      </span>
+                    )}
+                    {viewer.profile_id === currentUserId && viewer.profile_id !== roomOwnerId && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded">
+                        You
+                      </span>
                     )}
                   </div>
                 </div>
