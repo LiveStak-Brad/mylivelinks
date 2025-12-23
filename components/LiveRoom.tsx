@@ -898,10 +898,32 @@ export default function LiveRoom() {
       if (error) throw error;
 
       if (data && data.length > 0) {
+        // CRITICAL: Preserve existing grid slots that have live streamers
+        // Only clear slots that are explicitly closed in the saved layout
+        const currentSlots = gridSlotsRef.current;
+        
         // Load streamer info for each slot
         const updatedSlots = await Promise.all(
           data.map(async (slot: any) => {
+            // If slot is explicitly closed (streamer_id is null AND slot exists in DB), respect that
             if (!slot.streamer_id) {
+              // Check if current grid has a live streamer in this slot
+              const currentSlot = currentSlots.find(s => s.slotIndex === slot.slot_index);
+              const currentStreamer = currentSlot?.streamer;
+              
+              // If current slot has a live streamer that's still available, preserve it
+              // Only clear if the streamer is no longer live_available
+              if (currentStreamer && availableStreamers.find(s => s.profile_id === currentStreamer.profile_id && s.live_available)) {
+                return {
+                  slotIndex: slot.slot_index,
+                  streamer: currentStreamer, // Preserve live streamer
+                  isPinned: slot.is_pinned,
+                  isMuted: slot.is_muted,
+                  isEmpty: false,
+                  volume: currentSlot?.volume || 0.5,
+                };
+              }
+              
               return {
                 slotIndex: slot.slot_index,
                 streamer: null,
@@ -1012,6 +1034,28 @@ export default function LiveRoom() {
 
         // Sort slots by index
         const sortedSlots = updatedSlots.sort((a, b) => a.slotIndex - b.slotIndex);
+        
+        // CRITICAL: Preserve existing live streamers that aren't in saved layout
+        // Merge current grid slots with saved layout to prevent clearing live tiles
+        const currentSlotsMap = new Map(currentSlots.map(s => [s.slotIndex, s]));
+        sortedSlots.forEach((slot, index) => {
+          // If slot is empty in saved layout but has a live streamer in current grid, preserve it
+          if (slot.isEmpty) {
+            const currentSlot = currentSlotsMap.get(slot.slotIndex);
+            if (currentSlot?.streamer) {
+              const streamerStillAvailable = availableStreamers.find(
+                s => s.profile_id === currentSlot.streamer!.profile_id && s.live_available
+              );
+              if (streamerStillAvailable) {
+                sortedSlots[index] = {
+                  ...slot,
+                  streamer: streamerStillAvailable,
+                  isEmpty: false,
+                };
+              }
+            }
+          }
+        });
         
         // CRITICAL: Autofill empty slots with available streamers (runs on join)
         // This ensures new users see all available cameras immediately
