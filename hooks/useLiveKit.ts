@@ -230,13 +230,27 @@ export function useLiveKit({
     };
   }, [disconnect]);
 
-  // Auto-connect when enabled
+  // Auto-connect when enabled - with debouncing to prevent rapid connect/disconnect cycles
   useEffect(() => {
+    let connectTimeout: NodeJS.Timeout | null = null;
+    
     if (enabled && !isConnected && !roomRef.current) {
-      connect();
+      // Debounce connection attempts to prevent rapid reconnection
+      connectTimeout = setTimeout(() => {
+        if (enabled && !isConnected && !roomRef.current) {
+          connect();
+        }
+      }, 500); // Wait 500ms before connecting
     } else if (!enabled && roomRef.current) {
+      // Disconnect immediately when disabled
       disconnect();
     }
+    
+    return () => {
+      if (connectTimeout) {
+        clearTimeout(connectTimeout);
+      }
+    };
   }, [enabled, isConnected, connect, disconnect]);
 
   return {

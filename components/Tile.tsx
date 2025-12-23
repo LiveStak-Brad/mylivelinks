@@ -77,13 +77,22 @@ export default function Tile({
   // 1. Streamer is actually publishing (isLive = true, which means is_published)
   // 2. We have a valid streamer ID and liveStreamId
   // 3. Streamer ID is not empty/null
-  // Note: For current user in preview mode, we don't connect (they see local preview)
-  const shouldConnect = !!(
-    isLive && // Only connect when actually publishing (is_published = true)
-    liveStreamId !== undefined && 
-    streamerId && 
-    streamerId.trim() !== ''
-  );
+  // 4. NOT the current user in preview mode (they see local preview instead)
+  // Note: We use useMemo to prevent rapid re-evaluation of this condition
+  const shouldConnect = useMemo(() => {
+    // Don't connect if it's the current user in preview mode (they see local preview)
+    if (isCurrentUser && isLiveAvailable && !isLive) {
+      return false;
+    }
+    
+    // Only connect when actually publishing
+    return !!(
+      isLive && // Only connect when actually publishing (is_published = true)
+      liveStreamId !== undefined && 
+      streamerId && 
+      streamerId.trim() !== ''
+    );
+  }, [isLive, isLiveAvailable, isCurrentUser, liveStreamId, streamerId]);
 
   const { room, isConnected } = useLiveKit({
     roomName,

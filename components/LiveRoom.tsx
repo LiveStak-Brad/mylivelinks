@@ -257,6 +257,8 @@ export default function LiveRoom() {
 
     // Also trigger publish state update when active_viewers changes
     // This ensures that when a streamer watches their own stream, publishing starts immediately
+    // Use debouncing to prevent rapid updates
+    let publishStateUpdateTimeout: NodeJS.Timeout | null = null;
     const activeViewersChannel = supabase
       .channel('active-viewers-updates')
       .on(
@@ -267,13 +269,17 @@ export default function LiveRoom() {
           table: 'active_viewers',
         },
         async () => {
-          // Trigger publish state update when viewers change
-          // This ensures streamer watching their own stream triggers publishing
-          try {
-            await supabase.rpc('update_publish_state_from_viewers');
-          } catch (error) {
-            console.error('Error updating publish state:', error);
+          // Debounce publish state updates to prevent rapid connect/disconnect cycles
+          if (publishStateUpdateTimeout) {
+            clearTimeout(publishStateUpdateTimeout);
           }
+          publishStateUpdateTimeout = setTimeout(async () => {
+            try {
+              await supabase.rpc('update_publish_state_from_viewers');
+            } catch (error) {
+              console.error('Error updating publish state:', error);
+            }
+          }, 2000); // Wait 2 seconds after last change before updating
         }
       )
       .subscribe();
