@@ -415,65 +415,87 @@ export default function LiveRoom() {
   useEffect(() => {
     if (!currentUserId || authDisabled) return;
     
+    // Debounce to prevent rapid queries causing 406 errors
+    let timeoutId: NodeJS.Timeout | null = null;
+    
     const ensureUserInSlot1 = async () => {
-      const { data: userLiveStream } = await supabase
-        .from('live_streams')
-        .select('id, is_published, live_available')
-        .eq('profile_id', currentUserId)
-        .eq('live_available', true)
-        .single();
-      
-      if (userLiveStream) {
-        // User is live - ensure they're in slot 1
-        const currentSlots = gridSlotsRef.current;
-        const slot1 = currentSlots.find(s => s.slotIndex === 1);
-        const userInSlot1 = slot1?.streamer?.profile_id === currentUserId;
+      try {
+        const { data: userLiveStream } = await supabase
+          .from('live_streams')
+          .select('id, is_published, live_available')
+          .eq('profile_id', currentUserId)
+          .eq('live_available', true)
+          .single();
         
-        if (!userInSlot1) {
-          // Find user's streamer data
-          const userStreamer = liveStreamers.find(s => s.profile_id === currentUserId);
-          if (userStreamer) {
-            addUserToSlot1(userStreamer);
-          } else {
-            // Load user's streamer data
-            const { data: userProfile } = await supabase
-              .from('profiles')
-              .select('username, avatar_url, gifter_level')
-              .eq('id', currentUserId)
-              .single();
-            
-            if (userProfile) {
-              let badgeInfo = null;
-              if (userProfile.gifter_level) {
-                const { data: badge } = await supabase
-                  .from('gifter_levels')
-                  .select('*')
-                  .eq('level', userProfile.gifter_level)
-                  .single();
-                badgeInfo = badge;
+        if (userLiveStream) {
+          // User is live - ensure they're in slot 1
+          const currentSlots = gridSlotsRef.current;
+          const slot1 = currentSlots.find(s => s.slotIndex === 1);
+          const userInSlot1 = slot1?.streamer?.profile_id === currentUserId;
+          
+          if (!userInSlot1) {
+            // Find user's streamer data
+            const userStreamer = liveStreamers.find(s => s.profile_id === currentUserId);
+            if (userStreamer) {
+              addUserToSlot1(userStreamer);
+            } else {
+              // Load user's streamer data
+              const { data: userProfile } = await supabase
+                .from('profiles')
+                .select('username, avatar_url, gifter_level')
+                .eq('id', currentUserId)
+                .single();
+              
+              if (userProfile) {
+                let badgeInfo = null;
+                if (userProfile.gifter_level) {
+                  const { data: badge } = await supabase
+                    .from('gifter_levels')
+                    .select('*')
+                    .eq('level', userProfile.gifter_level)
+                    .single();
+                  badgeInfo = badge;
+                }
+                
+                const ownStream: LiveStreamer = {
+                  id: userLiveStream.id.toString(),
+                  profile_id: currentUserId,
+                  username: userProfile.username,
+                  avatar_url: userProfile.avatar_url,
+                  is_published: userLiveStream.is_published,
+                  live_available: userLiveStream.live_available,
+                  viewer_count: 0,
+                  gifter_level: badgeInfo?.level || 0,
+                  badge_name: badgeInfo?.badge_name,
+                  badge_color: badgeInfo?.badge_color,
+                };
+                
+                addUserToSlot1(ownStream);
               }
-              
-              const ownStream: LiveStreamer = {
-                id: userLiveStream.id.toString(),
-                profile_id: currentUserId,
-                username: userProfile.username,
-                avatar_url: userProfile.avatar_url,
-                is_published: userLiveStream.is_published,
-                live_available: userLiveStream.live_available,
-                viewer_count: 0,
-                gifter_level: badgeInfo?.level || 0,
-                badge_name: badgeInfo?.badge_name,
-                badge_color: badgeInfo?.badge_color,
-              };
-              
-              addUserToSlot1(ownStream);
             }
           }
+        }
+      } catch (error) {
+        // Silently ignore 406 errors (RLS or query issues)
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'PGRST116') {
+          console.warn('Error checking user live status:', error);
         }
       }
     };
     
-    ensureUserInSlot1();
+    // Debounce: only run after 500ms of no changes
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      ensureUserInSlot1();
+    }, 500);
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [currentUserId, liveStreamers, authDisabled]); // Removed gridSlots from deps to prevent loops
 
   // Load live streamers and user's grid layout
