@@ -332,6 +332,12 @@ export default function LiveRoom() {
   }, []);
 
   // Ensure current user stays in slot 1 when live
+  // Use ref to prevent infinite loops from gridSlots dependency
+  const gridSlotsRef = useRef<GridSlot[]>(gridSlots);
+  useEffect(() => {
+    gridSlotsRef.current = gridSlots;
+  }, [gridSlots]);
+
   useEffect(() => {
     if (!currentUserId || authDisabled) return;
     
@@ -345,7 +351,8 @@ export default function LiveRoom() {
       
       if (userLiveStream) {
         // User is live - ensure they're in slot 1
-        const slot1 = gridSlots.find(s => s.slotIndex === 1);
+        const currentSlots = gridSlotsRef.current;
+        const slot1 = currentSlots.find(s => s.slotIndex === 1);
         const userInSlot1 = slot1?.streamer?.profile_id === currentUserId;
         
         if (!userInSlot1) {
@@ -393,7 +400,7 @@ export default function LiveRoom() {
     };
     
     ensureUserInSlot1();
-  }, [currentUserId, gridSlots, liveStreamers, authDisabled]);
+  }, [currentUserId, liveStreamers, authDisabled]); // Removed gridSlots from deps to prevent loops
 
   // Load live streamers and user's grid layout
   useEffect(() => {
@@ -1089,66 +1096,97 @@ export default function LiveRoom() {
   };
 
   const addUserToSlot1 = (streamer: LiveStreamer) => {
+    // Use current grid slots from state
+    const currentSlots = [...gridSlots];
+    
     // Check if user is already in slot 1
-    const slot1 = gridSlots.find(s => s.slotIndex === 1);
+    const slot1 = currentSlots.find(s => s.slotIndex === 1);
     if (slot1 && slot1.streamer?.profile_id === streamer.profile_id) {
       // Already in slot 1, but update streamer data in case it changed
-      const newSlots = [...gridSlots];
-      const slot1Index = newSlots.findIndex(s => s.slotIndex === 1);
+      const slot1Index = currentSlots.findIndex(s => s.slotIndex === 1);
       if (slot1Index !== -1) {
-        newSlots[slot1Index] = {
-          ...newSlots[slot1Index],
+        currentSlots[slot1Index] = {
+          ...currentSlots[slot1Index],
           streamer: streamer, // Update with latest data
         };
-        setGridSlots(newSlots);
-        saveGridLayout(newSlots);
+        setGridSlots(currentSlots);
+        saveGridLayout(currentSlots);
       }
       return;
     }
 
-    // Create new slots array
-    const newSlots = [...gridSlots];
-    const slot1Index = newSlots.findIndex(s => s.slotIndex === 1);
+    const slot1Index = currentSlots.findIndex(s => s.slotIndex === 1);
     
     // Remove user from any other slot they might be in
-    const userSlotIndex = newSlots.findIndex(s => s.streamer?.profile_id === streamer.profile_id);
+    const userSlotIndex = currentSlots.findIndex(s => s.streamer?.profile_id === streamer.profile_id);
     if (userSlotIndex !== -1 && userSlotIndex !== slot1Index) {
-      newSlots[userSlotIndex] = {
-        ...newSlots[userSlotIndex],
+      currentSlots[userSlotIndex] = {
+        ...currentSlots[userSlotIndex],
         streamer: null,
         isEmpty: true,
       };
     }
     
-    // If slot 1 has someone else, move them to first empty slot (or the slot the user was in)
-    if (slot1Index !== -1 && newSlots[slot1Index].streamer && newSlots[slot1Index].streamer?.profile_id !== streamer.profile_id) {
-      const targetSlotIndex = userSlotIndex !== -1 && userSlotIndex !== slot1Index 
-        ? userSlotIndex 
-        : newSlots.findIndex(s => s.isEmpty && s.slotIndex !== 1);
+    // If slot 1 has someone else, move them to first available slot
+    // Priority: 1) slot user was in, 2) first empty slot, 3) last slot
+    if (slot1Index !== -1 && currentSlots[slot1Index].streamer && 
+        currentSlots[slot1Index].streamer?.profile_id !== streamer.profile_id) {
+      const displacedStreamer = currentSlots[slot1Index].streamer;
       
+      // Find target slot: prefer user's old slot, then first empty, then last slot
+      let targetSlotIndex = -1;
+      
+      if (userSlotIndex !== -1 && userSlotIndex !== slot1Index) {
+        // Use the slot the user was in
+        targetSlotIndex = userSlotIndex;
+      } else {
+        // Find first empty slot (excluding slot 1)
+        targetSlotIndex = currentSlots.findIndex(s => s.isEmpty && s.slotIndex !== 1);
+        
+        // If no empty slot, use the last occupied slot (shift everyone down)
+        if (targetSlotIndex === -1) {
+          // Find the last slot that has a streamer
+          for (let i = currentSlots.length - 1; i >= 0; i--) {
+            if (currentSlots[i].slotIndex !== 1 && currentSlots[i].streamer) {
+              targetSlotIndex = i;
+              break;
+            }
+          }
+          
+          // If still no slot found, use slot 12 (last slot)
+          if (targetSlotIndex === -1) {
+            targetSlotIndex = currentSlots.findIndex(s => s.slotIndex === 12);
+          }
+        }
+      }
+      
+      // Move displaced streamer to target slot
       if (targetSlotIndex !== -1) {
-        newSlots[targetSlotIndex] = {
-          ...newSlots[targetSlotIndex],
-          streamer: newSlots[slot1Index].streamer,
+        currentSlots[targetSlotIndex] = {
+          ...currentSlots[targetSlotIndex],
+          streamer: displacedStreamer,
           isEmpty: false,
         };
+      } else {
+        // Fallback: if we can't find a slot, log warning but don't lose the streamer
+        console.warn('Could not find slot for displaced streamer:', displacedStreamer?.username);
       }
     }
 
     // Put the user in slot 1 (top-left)
     if (slot1Index !== -1) {
-      newSlots[slot1Index] = {
-        ...newSlots[slot1Index],
+      currentSlots[slot1Index] = {
+        ...currentSlots[slot1Index],
         streamer: streamer,
         isEmpty: false,
         isPinned: false,
       };
     }
 
-    setGridSlots(newSlots);
+    setGridSlots(currentSlots);
     
     // Save to database
-    saveGridLayout(newSlots);
+    saveGridLayout(currentSlots);
     
     console.log('Added user to slot 1 (top-left)');
   };
