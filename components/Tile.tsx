@@ -187,15 +187,33 @@ export default function Tile({
     };
 
     const handleTrackUnsubscribed = (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
-      // CRITICAL: Only clear tracks if participant is actually leaving or track is muted/disabled
-      // Don't clear on temporary unsubscriptions (network hiccups, etc.)
+      // CRITICAL: Only clear tracks if participant is ACTUALLY LEAVING the room
+      // LiveKit fires unsubscription events for many reasons (adaptive streaming, network, etc.)
+      // We must be very defensive and only clear when participant is gone
       if (participant.identity === streamerId) {
-        // Check if participant is still in room and has other tracks
+        // Check if participant is still in room
         const participantStillInRoom = sharedRoom.remoteParticipants.has(participant.identity);
-        const hasOtherTracks = participant.trackPublications.size > 0;
         
-        // Only clear if participant is leaving OR track is explicitly muted/disabled
-        if (!participantStillInRoom || (!hasOtherTracks && publication.isMuted)) {
+        if (DEBUG_LIVEKIT) {
+          console.log('[DEBUG] Tile track unsubscribed:', {
+            slotIndex,
+            streamerId,
+            trackKind: track.kind,
+            trackSid: track.sid,
+            participantStillInRoom,
+            trackPublicationsCount: participant.trackPublications.size,
+            publicationIsMuted: publication.isMuted,
+            publicationIsSubscribed: publication.isSubscribed,
+          });
+        }
+        
+        // ONLY clear tracks if participant has LEFT the room entirely
+        // Do NOT clear on temporary unsubscriptions, adaptive streaming changes, or mute events
+        // LiveKit will automatically resubscribe when tracks are available again
+        if (!participantStillInRoom) {
+          if (DEBUG_LIVEKIT) {
+            console.log('[DEBUG] Participant left room, clearing tracks:', { slotIndex, streamerId });
+          }
           if (track.kind === Track.Kind.Video) {
             track.detach();
             hasTracksRef.current.video = false;
@@ -205,8 +223,18 @@ export default function Tile({
             hasTracksRef.current.audio = false;
             setAudioTrack(null);
           }
+        } else {
+          // Participant still in room - this is a temporary unsubscription
+          // Do NOT clear tracks - LiveKit will resubscribe automatically
+          // Clearing here causes the flicker/black screen issue
+          if (DEBUG_LIVEKIT) {
+            console.log('[DEBUG] Ignoring temporary unsubscription (participant still in room):', {
+              slotIndex,
+              streamerId,
+              trackKind: track.kind,
+            });
+          }
         }
-        // Otherwise, ignore temporary unsubscriptions (they'll resubscribe automatically)
       }
     };
 
