@@ -245,7 +245,7 @@ export default function LiveRoom() {
         };
 
         // Store handlers in ref so cleanup can access them
-        const handlersRef = {
+        handlersRef.current = {
           handleConnected,
           handleDisconnected,
           handleParticipantConnected,
@@ -253,10 +253,6 @@ export default function LiveRoom() {
           handleTrackSubscribed,
           handleTrackUnsubscribed,
         };
-        
-        // Store ref for cleanup
-        roomRef.current = newRoom;
-        (roomRef.current as any).handlersRef = handlersRef;
 
         newRoom.on(RoomEvent.Connected, handleConnected);
         newRoom.on(RoomEvent.Disconnected, handleDisconnected);
@@ -264,6 +260,9 @@ export default function LiveRoom() {
         newRoom.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
         newRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
         newRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+        
+        // Store room ref AFTER adding listeners
+        roomRef.current = newRoom;
 
         // Connect to room
         await newRoom.connect(url, token);
@@ -303,17 +302,16 @@ export default function LiveRoom() {
 
     return () => {
       mounted = false;
-      if (roomRef.current) {
+      if (roomRef.current && handlersRef.current) {
         // CRITICAL: Remove ALL event listeners before disconnecting to prevent memory leaks
-        const handlers = (roomRef.current as any).handlersRef;
-        if (handlers) {
-          roomRef.current.off(RoomEvent.Connected, handlers.handleConnected);
-          roomRef.current.off(RoomEvent.Disconnected, handlers.handleDisconnected);
-          roomRef.current.off(RoomEvent.ParticipantConnected, handlers.handleParticipantConnected);
-          roomRef.current.off(RoomEvent.ParticipantDisconnected, handlers.handleParticipantDisconnected);
-          roomRef.current.off(RoomEvent.TrackSubscribed, handlers.handleTrackSubscribed);
-          roomRef.current.off(RoomEvent.TrackUnsubscribed, handlers.handleTrackUnsubscribed);
-        }
+        const handlers = handlersRef.current;
+        roomRef.current.off(RoomEvent.Connected, handlers.handleConnected);
+        roomRef.current.off(RoomEvent.Disconnected, handlers.handleDisconnected);
+        roomRef.current.off(RoomEvent.ParticipantConnected, handlers.handleParticipantConnected);
+        roomRef.current.off(RoomEvent.ParticipantDisconnected, handlers.handleParticipantDisconnected);
+        roomRef.current.off(RoomEvent.TrackSubscribed, handlers.handleTrackSubscribed);
+        roomRef.current.off(RoomEvent.TrackUnsubscribed, handlers.handleTrackUnsubscribed);
+        handlersRef.current = null;
         roomRef.current.disconnect().catch(console.error);
         roomRef.current = null;
         setSharedRoom(null);
