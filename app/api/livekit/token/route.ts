@@ -211,13 +211,12 @@ export async function POST(request: NextRequest) {
 
     let at: AccessToken;
     try {
+      // Create token with 6 hour expiration
       at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
         identity: identity,
         name: name,
+        ttl: '6h', // 6 hours expiration
       });
-      
-      // Set explicit expiration (6 hours from now)
-      at.exp = Math.floor(Date.now() / 1000) + (6 * 60 * 60);
     } catch (tokenErr: any) {
       console.error('Error creating AccessToken:', tokenErr);
       return NextResponse.json(
