@@ -86,12 +86,21 @@ export default function LiveRoom() {
 
   const supabase = createClient();
 
+  // Check if auth is disabled for testing
+  const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+
   // Get current user ID
   useEffect(() => {
+    if (authDisabled) {
+      // Skip auth check if disabled for testing
+      setCurrentUserId(null);
+      return;
+    }
+    
     supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       setCurrentUserId(user?.id || null);
     });
-  }, [supabase]);
+  }, [supabase, authDisabled]);
 
   // Auto-enable Focus Mode when tile is expanded
   useEffect(() => {
@@ -192,8 +201,14 @@ export default function LiveRoom() {
 
   const loadLiveStreamers = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      let user = null;
+      if (!authDisabled) {
+        const result = await supabase.auth.getUser();
+        user = result.data?.user || null;
+      }
+      
+      // If auth disabled, still load streamers (just without user filtering)
+      if (!authDisabled && !user) {
         setLoading(false);
         return;
       }
@@ -361,7 +376,25 @@ export default function LiveRoom() {
 
   const loadUserGridLayout = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      let user = null;
+      if (!authDisabled) {
+        const result = await supabase.auth.getUser();
+        user = result.data?.user || null;
+      }
+      
+      if (!user) {
+        // No user - use default empty grid
+        const emptySlots = Array.from({ length: 12 }, (_, i) => ({
+          slotIndex: i + 1,
+          streamer: null,
+          isPinned: false,
+          isMuted: false,
+          isEmpty: true,
+          volume: 0.5,
+        }));
+        setGridSlots(emptySlots);
+        return;
+      }
       if (!user) {
         // If no user, auto-fill with empty grid (already handled by loadLiveStreamers)
         return;
@@ -434,7 +467,14 @@ export default function LiveRoom() {
 
   const saveGridLayout = useCallback(async (slots: GridSlot[]) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      if (authDisabled) {
+        // Skip saving if auth disabled (testing mode)
+        return;
+      }
+      
+      let user = null;
+      const result = await supabase.auth.getUser();
+      user = result.data?.user || null;
       if (!user) return;
 
       // Delete existing slots
@@ -495,7 +535,15 @@ export default function LiveRoom() {
       console.log('handleGoLive called:', { liveStreamId, profileId });
       
       // Directly load the user's stream data instead of reloading all streamers
-      const { data: { user } } = await supabase.auth.getUser();
+      if (authDisabled) {
+        alert('⚠️ Testing Mode: "Go Live" requires authentication. Please enable auth or log in.');
+        return;
+      }
+      
+      let user = null;
+      const result = await supabase.auth.getUser();
+      user = result.data?.user || null;
+      
       if (!user || user.id !== profileId) {
         console.error('User mismatch or not authenticated');
         return;
@@ -900,7 +948,11 @@ export default function LiveRoom() {
 
   const handleAddStreamer = async (slotIndex: number, streamerId: string) => {
     // Check if this is the current user going live
-    const { data: { user } } = await supabase.auth.getUser();
+    let user = null;
+    if (!authDisabled) {
+      const result = await supabase.auth.getUser();
+      user = result.data?.user || null;
+    }
     const isCurrentUser = user && user.id === streamerId;
     
     // If it's the current user and they're live, auto-place them in slot 1
@@ -1004,6 +1056,13 @@ export default function LiveRoom() {
 
   return (
     <div className="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col">
+      {/* Testing Mode Banner (if auth disabled) */}
+      {authDisabled && (
+        <div className="w-full bg-yellow-500 dark:bg-yellow-600 text-black dark:text-white text-center py-2 px-4 text-sm font-semibold">
+          ⚠️ TESTING MODE: Authentication Disabled - Anyone can access
+        </div>
+      )}
+      
       {/* Beta/Testing Banner */}
       <div className="bg-yellow-500 text-black text-center py-2 px-4 text-sm font-semibold z-50 flex-shrink-0">
         <span className="inline-block">BETA/TESTING - NO CASH VALUE</span>

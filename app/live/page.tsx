@@ -12,8 +12,18 @@ function LivePageContent() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
+  // Check if auth is disabled for testing
+  const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+
   useEffect(() => {
     const checkAuth = async () => {
+      // Skip auth check if disabled for testing
+      if (authDisabled) {
+        setIsAuthenticated(true);
+        setIsChecking(false);
+        return;
+      }
+
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         
@@ -57,7 +67,7 @@ function LivePageContent() {
         subscription.unsubscribe();
       }
     };
-  }, [router, searchParams, supabase]);
+  }, [router, searchParams, supabase, authDisabled]);
 
   // Show loading state while checking auth
   if (isChecking || !isAuthenticated) {
