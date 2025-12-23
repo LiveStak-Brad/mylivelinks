@@ -281,11 +281,26 @@ export function useLiveKitPublisher({
   }, [stopPublishing]);
 
   // Auto-start when enabled and room is connected
+  // Use refs to prevent rapid toggling
+  const enabledRef = useRef(enabled);
+  const isPublishingStateRef = useRef(isPublishing);
+  
   useEffect(() => {
-    if (enabled && isRoomConnected && room && room.state === 'connected' && !isPublishing) {
+    enabledRef.current = enabled;
+  }, [enabled]);
+  
+  useEffect(() => {
+    isPublishingStateRef.current = isPublishing;
+  }, [isPublishing]);
+  
+  useEffect(() => {
+    // Only start if enabled, room connected, and not already publishing
+    if (enabledRef.current && isRoomConnected && room && room.state === 'connected' && !isPublishingStateRef.current) {
       console.log('Auto-starting publisher (enabled=true, room connected)...');
       startPublishing();
-    } else if (!enabled && isPublishing) {
+    } 
+    // Only stop if disabled AND currently publishing (prevent rapid toggling)
+    else if (!enabledRef.current && isPublishingStateRef.current) {
       console.log('Stopping publisher (enabled=false)...');
       stopPublishing();
     }
