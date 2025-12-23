@@ -1133,35 +1133,66 @@ export default function LiveRoom() {
   const autoFillGrid = useCallback(() => {
     if (liveStreamers.length === 0) return;
 
-    // Sort by: published first, then live_available, then by viewer count
-    // This ensures published streamers appear first, then waiting ones
-    const sorted = [...liveStreamers].sort((a, b) => {
-      // Published streamers first
-      if (a.is_published !== b.is_published) {
-        return a.is_published ? -1 : 1;
+    // CRITICAL: Only fill EMPTY slots, preserve existing tiles
+    // This prevents clearing streams when realtime updates fire
+    setGridSlots((currentSlots) => {
+      // Find empty slots
+      const emptySlots = currentSlots.filter(s => s.isEmpty);
+      if (emptySlots.length === 0) {
+        // No empty slots, nothing to fill
+        return currentSlots;
       }
-      // Then live_available streamers
-      if (a.live_available !== b.live_available) {
-        return a.live_available ? -1 : 1;
+
+      // Get streamers already in grid
+      const usedStreamerIds = new Set(
+        currentSlots
+          .filter(s => s.streamer)
+          .map(s => s.streamer!.profile_id)
+      );
+
+      // Get available streamers not already in grid
+      const availableStreamers = liveStreamers.filter(
+        s => !usedStreamerIds.has(s.profile_id)
+      );
+
+      if (availableStreamers.length === 0) {
+        // No new streamers to add
+        return currentSlots;
       }
-      // Then by viewer count
-      return b.viewer_count - a.viewer_count;
-    });
 
-    const newSlots: GridSlot[] = Array.from({ length: 12 }, (_, i) => {
-      const streamer = sorted[i] || null;
-      return {
-        slotIndex: i + 1,
-        streamer,
-        isPinned: false,
-        isMuted: false,
-        isEmpty: !streamer,
-        volume: 0.5, // Medium volume by default
-      };
-    });
+      // Sort by: published first, then live_available, then by viewer count
+      const sorted = [...availableStreamers].sort((a, b) => {
+        if (a.is_published !== b.is_published) {
+          return a.is_published ? -1 : 1;
+        }
+        if (a.live_available !== b.live_available) {
+          return a.live_available ? -1 : 1;
+        }
+        return b.viewer_count - a.viewer_count;
+      });
 
-    setGridSlots(newSlots);
-    saveGridLayout(newSlots);
+      // Fill empty slots with available streamers
+      const updatedSlots = [...currentSlots];
+      let streamerIndex = 0;
+      
+      for (let i = 0; i < updatedSlots.length && streamerIndex < sorted.length; i++) {
+        if (updatedSlots[i].isEmpty) {
+          updatedSlots[i] = {
+            ...updatedSlots[i],
+            streamer: sorted[streamerIndex],
+            isEmpty: false,
+          };
+          streamerIndex++;
+        }
+      }
+
+      // Only save if we actually changed something
+      if (streamerIndex > 0) {
+        saveGridLayout(updatedSlots);
+      }
+
+      return updatedSlots;
+    });
   }, [liveStreamers, saveGridLayout]);
 
   const handleGoLive = async (liveStreamId: number, profileId: string) => {
