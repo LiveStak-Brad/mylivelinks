@@ -1,0 +1,606 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { createClient, isSeedModeEnabled } from '@/lib/supabase';
+import { getPinnedPost, upsertPinnedPost, deletePinnedPost, PinnedPost } from '@/lib/pinnedPosts';
+import { uploadAvatar, uploadPinnedPostMedia, deleteAvatar, deletePinnedPostMedia } from '@/lib/storage';
+import Image from 'next/image';
+
+interface UserLink {
+  id?: number;
+  title: string;
+  url: string;
+  display_order: number;
+  is_active: boolean;
+}
+
+export default function ProfileSettingsPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Profile fields
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  const [displayName, setDisplayName] = useState('');
+  const [bio, setBio] = useState('');
+  const [username, setUsername] = useState('');
+  
+  // Links
+  const [links, setLinks] = useState<UserLink[]>([]);
+  
+  // Pinned post
+  const [pinnedPost, setPinnedPost] = useState<PinnedPost | null>(null);
+  const [pinnedPostCaption, setPinnedPostCaption] = useState('');
+  const [pinnedPostMedia, setPinnedPostMedia] = useState<File | null>(null);
+  const [pinnedPostMediaPreview, setPinnedPostMediaPreview] = useState<string>('');
+  const [pinnedPostMediaType, setPinnedPostMediaType] = useState<'image' | 'video'>('image');
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    // Always try real Supabase auth first if credentials are available
+    const hasSupabaseConfig = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const forceMock = process.env.NEXT_PUBLIC_PREVIEW_MODE === 'true' || process.env.NEXT_PUBLIC_DEV_SEED_MODE === 'true';
+    
+    if (!forceMock && hasSupabaseConfig) {
+      // Clear mock data if using real auth
+      localStorage.removeItem('mock_user');
+      localStorage.removeItem('mock_profile');
+      
+      // Real Supabase auth
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('Auth error:', error);
+        router.push('/login');
+        return;
+      }
+      
+      if (user) {
+        setCurrentUserId(user.id);
+        await loadProfile(user.id);
+        return;
+      } else {
+        router.push('/login');
+        return;
+      }
+    }
+    
+    // Fallback to mock mode only if Supabase is not configured
+    if (isSeedModeEnabled()) {
+      const mockUserStr = localStorage.getItem('mock_user');
+      if (mockUserStr) {
+        const mockUser = JSON.parse(mockUserStr);
+        setCurrentUserId(mockUser.id);
+        await loadProfile(mockUser.id);
+        return;
+      }
+    }
+    
+    // No auth found, redirect to login
+    router.push('/login');
+  };
+
+  const loadProfile = async (userId: string) => {
+    try {
+      if (isSeedModeEnabled()) {
+        // Mock mode: use default values
+        setDisplayName('Owner');
+        setBio('Platform Owner Account');
+        setUsername('owner');
+        setAvatarUrl('');
+        setLinks([]);
+        setPinnedPost(null);
+        setLoading(false);
+        return;
+      }
+
+      // Load profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profile) {
+        setAvatarUrl(profile.avatar_url || '');
+        setDisplayName(profile.display_name || '');
+        setBio(profile.bio || '');
+        setUsername(profile.username || '');
+      }
+
+      // Load links
+      const { data: linksData } = await supabase
+        .from('user_links')
+        .select('*')
+        .eq('profile_id', userId)
+        .order('display_order');
+
+      setLinks(linksData || []);
+
+      // Load pinned post
+      const post = await getPinnedPost(userId);
+      if (post) {
+        setPinnedPost(post);
+        setPinnedPostCaption(post.caption || '');
+        setPinnedPostMediaPreview(post.media_url);
+        setPinnedPostMediaType(post.media_type);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        const url = URL.createObjectURL(file);
+        setAvatarUrl(url);
+      }
+    }
+  };
+
+  const handlePinnedPostMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPinnedPostMedia(file);
+      
+      if (file.type.startsWith('image/')) {
+        setPinnedPostMediaType('image');
+        const url = URL.createObjectURL(file);
+        setPinnedPostMediaPreview(url);
+      } else if (file.type.startsWith('video/')) {
+        setPinnedPostMediaType('video');
+        const url = URL.createObjectURL(file);
+        setPinnedPostMediaPreview(url);
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (!currentUserId) {
+      alert('Error: No user ID. Please log in again.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (isSeedModeEnabled()) {
+        // Mock mode: just save to localStorage
+        localStorage.setItem('mock_profile', JSON.stringify({
+          display_name: displayName,
+          bio: bio,
+          avatar_url: avatarUrl,
+          username: username,
+          links: links,
+          pinnedPost: pinnedPostMediaPreview ? {
+            caption: pinnedPostCaption,
+            media_url: pinnedPostMediaPreview,
+            media_type: pinnedPostMediaType,
+          } : null,
+        }));
+        alert('⚠️ Mock Mode: Data saved locally only.\n\nTo save to database, add Supabase credentials to .env.local:\nNEXT_PUBLIC_SUPABASE_URL=your_url\nNEXT_PUBLIC_SUPABASE_ANON_KEY=your_key\n\nThen restart the dev server.');
+        router.push(`/${username}`);
+        return;
+      }
+
+      // Upload avatar to storage if changed
+      let finalAvatarUrl = avatarUrl;
+      if (avatarInputRef.current?.files?.[0]) {
+        try {
+          finalAvatarUrl = await uploadAvatar(currentUserId, avatarInputRef.current.files[0]);
+        } catch (error: any) {
+          console.error('Avatar upload error:', error);
+          throw new Error(`Failed to upload avatar: ${error.message}`);
+        }
+      }
+
+      // Update profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          display_name: displayName,
+          bio: bio,
+          avatar_url: finalAvatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentUserId)
+        .select();
+      
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+        throw new Error(`Profile update failed: ${profileError.message} (${profileError.code || 'unknown'})`);
+      }
+
+      // Update links
+      // Delete all existing links
+      await supabase
+        .from('user_links')
+        .delete()
+        .eq('profile_id', currentUserId);
+
+      // Insert updated links
+      if (links.length > 0) {
+        const linksToInsert = links
+          .filter(link => link.title.trim() && link.url.trim())
+          .map((link, index) => ({
+            profile_id: currentUserId,
+            title: link.title,
+            url: link.url,
+            display_order: index,
+            is_active: true,
+          }));
+
+        if (linksToInsert.length > 0) {
+          const { error: linksError } = await supabase
+            .from('user_links')
+            .insert(linksToInsert);
+
+          if (linksError) throw linksError;
+        }
+      }
+
+      // Update pinned post
+      if (pinnedPostMedia && pinnedPostMediaPreview) {
+        // Upload media to storage
+        let mediaUrl: string;
+        try {
+          mediaUrl = await uploadPinnedPostMedia(currentUserId, pinnedPostMedia);
+        } catch (error: any) {
+          console.error('Pinned post media upload error:', error);
+          throw new Error(`Failed to upload media: ${error.message}`);
+        }
+        
+        await upsertPinnedPost(
+          currentUserId,
+          pinnedPostCaption,
+          mediaUrl,
+          pinnedPostMediaType
+        );
+      } else if (pinnedPost && pinnedPostCaption) {
+        // Update caption only (keep existing media URL)
+        await upsertPinnedPost(
+          currentUserId,
+          pinnedPostCaption,
+          pinnedPost.media_url,
+          pinnedPost.media_type
+        );
+      } else if (!pinnedPostMediaPreview && pinnedPost) {
+        // Delete pinned post if media removed
+        // Also delete from storage
+        await deletePinnedPostMedia(currentUserId);
+        await deletePinnedPost(currentUserId);
+      }
+
+      alert('Profile saved successfully!');
+      router.push(`/${username}`);
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      alert(`Failed to save profile: ${errorMessage}\n\nCheck the browser console (F12) for more details.`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addLink = () => {
+    setLinks([...links, { title: '', url: '', display_order: links.length, is_active: true }]);
+  };
+
+  const updateLink = (index: number, field: keyof UserLink, value: string) => {
+    const updated = [...links];
+    updated[index] = { ...updated[index], [field]: value };
+    setLinks(updated);
+  };
+
+  const removeLink = (index: number) => {
+    setLinks(links.filter((_, i) => i !== index));
+  };
+
+  const moveLink = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === links.length - 1) return;
+
+    const updated = [...links];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+    setLinks(updated);
+  };
+
+  const handleDeletePinnedPost = async () => {
+    if (!currentUserId || !pinnedPost) return;
+    
+    if (confirm('Delete pinned post?')) {
+      try {
+        // Delete from storage first
+        await deletePinnedPostMedia(currentUserId);
+        // Then delete from database
+        await deletePinnedPost(currentUserId);
+        setPinnedPost(null);
+        setPinnedPostCaption('');
+        setPinnedPostMedia(null);
+        setPinnedPostMediaPreview('');
+      } catch (error: any) {
+        console.error('Error deleting pinned post:', error);
+        alert(`Failed to delete pinned post: ${error.message}`);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="animate-pulse text-center">
+          <div className="w-24 h-24 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-4" />
+          <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded w-48 mx-auto" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 overflow-y-auto">
+      <div className="max-w-2xl mx-auto px-4 pb-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold">Edit Profile</h1>
+            <Link href={`/${username}`} className="text-blue-500 hover:text-blue-600">
+              View Profile
+            </Link>
+          </div>
+        </div>
+
+        {/* Profile Photo */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Profile Photo</h2>
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              {avatarUrl ? (
+                <div className="relative w-24 h-24 rounded-full overflow-hidden">
+                  <Image
+                    src={avatarUrl}
+                    alt="Avatar"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold">
+                  {username[0]?.toUpperCase() || 'U'}
+                </div>
+              )}
+            </div>
+            <div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                className="hidden"
+              />
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+              >
+                Change Photo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Display Name & Bio */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Basic Info</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Display Name</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Your display name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Bio</label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Tell us about yourself"
+                maxLength={500}
+              />
+              <p className="text-xs text-gray-500 mt-1">{bio.length}/500</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Pinned Post */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Pinned Post</h2>
+          
+          {pinnedPostMediaPreview ? (
+            <div className="mb-4 max-h-96 overflow-hidden rounded-lg">
+              {pinnedPostMediaType === 'image' ? (
+                <div className="relative w-full max-h-96 rounded-lg overflow-hidden">
+                  <Image
+                    src={pinnedPostMediaPreview}
+                    alt="Pinned post preview"
+                    width={800}
+                    height={600}
+                    className="w-full h-auto max-h-96 object-contain rounded-lg"
+                  />
+                </div>
+              ) : (
+                <video
+                  src={pinnedPostMediaPreview}
+                  controls
+                  className="w-full max-h-96 rounded-lg bg-black"
+                />
+              )}
+            </div>
+          ) : pinnedPost ? (
+            <div className="mb-4 max-h-96 overflow-hidden rounded-lg">
+              {pinnedPost.media_type === 'image' ? (
+                <div className="relative w-full max-h-96 rounded-lg overflow-hidden">
+                  <Image
+                    src={pinnedPost.media_url}
+                    alt="Pinned post"
+                    width={800}
+                    height={600}
+                    className="w-full h-auto max-h-96 object-contain rounded-lg"
+                  />
+                </div>
+              ) : (
+                <video
+                  src={pinnedPost.media_url}
+                  controls
+                  className="w-full max-h-96 rounded-lg bg-black"
+                />
+              )}
+            </div>
+          ) : null}
+
+          <div className="space-y-4">
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                onChange={handlePinnedPostMediaChange}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition text-gray-600 dark:text-gray-400"
+              >
+                {pinnedPostMediaPreview || pinnedPost ? 'Replace Media' : 'Upload Media (Image or Video)'}
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Caption</label>
+              <textarea
+                value={pinnedPostCaption}
+                onChange={(e) => setPinnedPostCaption(e.target.value)}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="Add a caption..."
+                maxLength={500}
+              />
+            </div>
+
+            {(pinnedPostMediaPreview || pinnedPost) && (
+              <button
+                onClick={handleDeletePinnedPost}
+                className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+              >
+                Delete Pinned Post
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Links */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Links</h2>
+            <button
+              onClick={addLink}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition text-sm"
+            >
+              Add Link
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {links.map((link, index) => (
+              <div key={index} className="flex gap-2 items-start">
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="text"
+                    value={link.title}
+                    onChange={(e) => updateLink(index, 'title', e.target.value)}
+                    placeholder="Link title"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                  />
+                  <input
+                    type="url"
+                    value={link.url}
+                    onChange={(e) => updateLink(index, 'url', e.target.value)}
+                    placeholder="https://..."
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => moveLink(index, 'up')}
+                    disabled={index === 0}
+                    className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs disabled:opacity-50"
+                    title="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveLink(index, 'down')}
+                    disabled={index === links.length - 1}
+                    className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs disabled:opacity-50"
+                    title="Move down"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => removeLink(index)}
+                    className="px-2 py-1 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded text-xs hover:bg-red-200 dark:hover:bg-red-900/40"
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {links.length === 0 && (
+              <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+                No links yet. Click "Add Link" to get started.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="flex gap-4">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+          <button
+            onClick={() => router.push(`/${username}`)}
+            className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

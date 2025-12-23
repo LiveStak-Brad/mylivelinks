@@ -1,0 +1,124 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { createClient } from '@/lib/supabase';
+import GifterBadge from './GifterBadge';
+
+export default function UserStatsSection() {
+  const [coinBalance, setCoinBalance] = useState<number>(0);
+  const [diamondBalance, setDiamondBalance] = useState<number>(0);
+  const [username, setUsername] = useState<string>('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [gifterLevel, setGifterLevel] = useState<number>(0);
+  const [badgeInfo, setBadgeInfo] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    loadUserStats();
+  }, []);
+
+  const loadUserStats = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !profile) {
+        setLoading(false);
+        return;
+      }
+
+      setCoinBalance(profile.coin_balance || 0);
+      setDiamondBalance(profile.earnings_balance || 0);
+      setUsername(profile.username);
+      setAvatarUrl(profile.avatar_url);
+      setGifterLevel(profile.gifter_level || 0);
+
+      // Load badge info
+      if (profile.gifter_level !== null) {
+        const { data: badge } = await supabase
+          .from('gifter_levels')
+          .select('*')
+          .eq('level', profile.gifter_level)
+          .single();
+        setBadgeInfo(badge);
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+        <div className="animate-pulse space-y-3">
+          <div className="h-16 bg-gray-200 dark:bg-gray-700 rounded" />
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+      <h3 className="text-lg font-semibold mb-3">Your Stats</h3>
+      
+      {/* User Info */}
+      <div className="flex items-center gap-3 mb-4">
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={username}
+            className="w-12 h-12 rounded-full"
+          />
+        ) : (
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+            {username[0]?.toUpperCase() || 'U'}
+          </div>
+        )}
+        <div className="flex-1">
+          <div className="font-semibold">{username}</div>
+          {badgeInfo && (
+            <GifterBadge
+              level={gifterLevel}
+              badgeName={badgeInfo.badge_name}
+              badgeColor={badgeInfo.badge_color}
+              size="sm"
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Balances */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded">
+          <span className="text-sm text-gray-600 dark:text-gray-400">Coins</span>
+          <span className="font-bold text-blue-600 dark:text-blue-400">
+            {coinBalance.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between items-center p-2 bg-white dark:bg-gray-800 rounded">
+          <span className="text-sm text-gray-600 dark:text-gray-400">Diamonds</span>
+          <span className="font-bold text-purple-600 dark:text-purple-400">
+            {diamondBalance.toLocaleString()}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+
