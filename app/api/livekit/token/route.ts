@@ -11,13 +11,38 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export async function POST(request: NextRequest) {
   try {
-    // Validate environment variables
-    if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+    // Validate environment variables with detailed error messages
+    if (!LIVEKIT_URL) {
+      console.error('LIVEKIT_URL is not set in environment variables');
       return NextResponse.json(
-        { error: 'LiveKit credentials not configured' },
+        { error: 'LiveKit URL not configured. Please set LIVEKIT_URL in Vercel environment variables.' },
         { status: 500 }
       );
     }
+    if (!LIVEKIT_API_KEY) {
+      console.error('LIVEKIT_API_KEY is not set in environment variables');
+      return NextResponse.json(
+        { error: 'LiveKit API Key not configured. Please set LIVEKIT_API_KEY in Vercel environment variables.' },
+        { status: 500 }
+      );
+    }
+    if (!LIVEKIT_API_SECRET) {
+      console.error('LIVEKIT_API_SECRET is not set in environment variables');
+      return NextResponse.json(
+        { error: 'LiveKit API Secret not configured. Please set LIVEKIT_API_SECRET in Vercel environment variables.' },
+        { status: 500 }
+      );
+    }
+
+    // Log credential status (without exposing secrets)
+    console.log('LiveKit credentials check:', {
+      hasUrl: !!LIVEKIT_URL,
+      urlFormat: LIVEKIT_URL?.substring(0, 20) + '...',
+      hasApiKey: !!LIVEKIT_API_KEY,
+      apiKeyLength: LIVEKIT_API_KEY?.length,
+      hasApiSecret: !!LIVEKIT_API_SECRET,
+      apiSecretLength: LIVEKIT_API_SECRET?.length,
+    });
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
       return NextResponse.json(
@@ -165,10 +190,35 @@ export async function POST(request: NextRequest) {
       canSubscribe,
     });
 
-    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-      identity: identity,
-      name: name,
-    });
+    // Validate API key/secret format (they should be strings)
+    if (typeof LIVEKIT_API_KEY !== 'string' || LIVEKIT_API_KEY.length < 10) {
+      console.error('Invalid LIVEKIT_API_KEY format');
+      return NextResponse.json(
+        { error: 'Invalid LiveKit API Key format. Please check your Vercel environment variables.' },
+        { status: 500 }
+      );
+    }
+    if (typeof LIVEKIT_API_SECRET !== 'string' || LIVEKIT_API_SECRET.length < 10) {
+      console.error('Invalid LIVEKIT_API_SECRET format');
+      return NextResponse.json(
+        { error: 'Invalid LiveKit API Secret format. Please check your Vercel environment variables.' },
+        { status: 500 }
+      );
+    }
+
+    let at: AccessToken;
+    try {
+      at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+        identity: identity,
+        name: name,
+      });
+    } catch (tokenErr: any) {
+      console.error('Error creating AccessToken:', tokenErr);
+      return NextResponse.json(
+        { error: `Failed to create LiveKit token: ${tokenErr.message || 'Invalid API credentials'}` },
+        { status: 500 }
+      );
+    }
 
     // Grant permissions
     at.addGrant({
