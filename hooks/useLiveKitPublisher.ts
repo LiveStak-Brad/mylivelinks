@@ -244,25 +244,66 @@ export function useLiveKitPublisher({
   // Stop publishing
   const stopPublishing = useCallback(async () => {
     try {
-      // Unpublish and detach tracks
+      console.log('Stopping publishing...', {
+        hasRoom: !!roomRef.current,
+        tracksCount: tracksRef.current.length,
+        roomState: roomRef.current?.state,
+      });
+
+      // Unpublish tracks from room first
+      if (roomRef.current && roomRef.current.state === 'connected') {
+        const participant = roomRef.current.localParticipant;
+        if (participant) {
+          // Unpublish all tracks
+          const tracksToUnpublish = participant.trackPublications.values();
+          for (const publication of tracksToUnpublish) {
+            try {
+              await participant.unpublishTrack(publication.trackSid);
+              console.log('Unpublished track:', publication.trackSid);
+            } catch (err) {
+              console.warn('Error unpublishing track:', err);
+            }
+          }
+        }
+      }
+
+      // Stop and detach tracks
       tracksRef.current.forEach(track => {
-        track.stop();
-        track.detach();
+        try {
+          track.stop();
+          track.detach();
+        } catch (err) {
+          console.warn('Error stopping track:', err);
+        }
       });
       tracksRef.current = [];
 
       // Disconnect from room
       if (roomRef.current) {
-        await roomRef.current.disconnect();
+        try {
+          await roomRef.current.disconnect();
+          console.log('Disconnected from room');
+        } catch (err) {
+          console.warn('Error disconnecting from room:', err);
+        }
         roomRef.current = null;
         setRoom(null);
         setIsConnected(false);
         setIsPublishing(false);
       }
+
+      console.log('Stop publishing completed');
     } catch (err) {
       console.error('Error in stopPublishing:', err);
       // Reset state even if disconnect fails
       tracksRef.current = [];
+      if (roomRef.current) {
+        try {
+          await roomRef.current.disconnect();
+        } catch (e) {
+          // Ignore disconnect errors
+        }
+      }
       roomRef.current = null;
       setRoom(null);
       setIsConnected(false);

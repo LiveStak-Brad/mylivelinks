@@ -244,28 +244,45 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
 
-        // Stop LiveKit publishing (await it)
-        try {
-          await stopPublishing();
-        } catch (err) {
-          console.error('Error stopping publishing:', err);
-          // Continue even if stopPublishing fails
-        }
+        console.log('Stopping live stream...', { liveStreamId, isPublishing });
 
-        // Update database
-        const { error } = await (supabase.from('live_streams') as any)
+        // Update database first (this will trigger realtime updates)
+        const { error: updateError } = await (supabase.from('live_streams') as any)
           .update({ live_available: false, ended_at: new Date().toISOString() })
           .eq('profile_id', user.id);
 
-        if (error) throw error;
+        if (updateError) {
+          console.error('Database update error:', updateError);
+          throw updateError;
+        }
 
+        console.log('Database updated, stopping LiveKit publishing...');
+
+        // Stop LiveKit publishing (await it)
+        try {
+          await stopPublishing();
+          console.log('LiveKit publishing stopped');
+        } catch (err) {
+          console.error('Error stopping publishing:', err);
+          // Continue even if stopPublishing fails - database is already updated
+        }
+
+        // Update local state
         isLiveRef.current = false;
         setIsLive(false);
         setLiveStreamId(null);
+        setSelectedVideoDevice('');
+        setSelectedAudioDevice('');
         onLiveStatusChange?.(false);
+
+        console.log('Stop live completed successfully');
       } catch (err: any) {
         console.error('Error stopping live:', err);
         alert('Failed to stop live: ' + err.message);
+        // Still try to reset state
+        isLiveRef.current = false;
+        setIsLive(false);
+        setLiveStreamId(null);
       } finally {
         setLoading(false);
       }
