@@ -247,10 +247,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Generate token
-    const token = at.toJwt();
+    // Generate token - toJwt() is synchronous and returns a string
+    let token: string;
+    try {
+      token = at.toJwt();
+    } catch (jwtErr: any) {
+      console.error('Error generating JWT:', jwtErr);
+      return NextResponse.json(
+        { error: `Failed to generate token: ${jwtErr.message || 'Unknown error'}` },
+        { status: 500 }
+      );
+    }
     
-    // Validate token was generated (toJwt returns a string, not a Promise)
+    // Validate token was generated
     if (!token || typeof token !== 'string' || token.length < 50) {
       console.error('Token generation failed - token too short or invalid:', { 
         tokenType: typeof token,
