@@ -22,6 +22,17 @@ const createMockClient = () => {
       getUser: async () => ({ data: { user: null }, error: null }),
       signIn: async () => ({ data: { user: null }, error: null }),
       signOut: async () => ({ error: null }),
+      getSession: async () => ({ data: { session: null }, error: null }),
+      onAuthStateChange: (callback: (event: string, session: any) => void) => {
+        // Return a mock subscription object
+        return {
+          data: {
+            subscription: {
+              unsubscribe: () => {},
+            },
+          },
+        };
+      },
     },
     from: () => ({
       select: () => ({ data: [], error: null }),

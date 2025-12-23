@@ -19,10 +19,12 @@ export default function LoginPage() {
     // Check if already logged in
     supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       if (user) {
-        router.push('/settings/profile');
+        // Redirect to returnUrl if provided, otherwise to /live
+        const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
+        router.push(returnUrl);
       }
     });
-  }, []);
+  }, [router, supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +86,11 @@ export default function LoginPage() {
           }
 
           setMessage('Check your email to confirm your account!');
+          // After signup, redirect to /live (they'll need to confirm email first)
+          setTimeout(() => {
+            const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
+            router.push(returnUrl);
+          }, 2000);
         }
       } else {
         // Sign in
@@ -97,7 +104,9 @@ export default function LoginPage() {
         if (data.user) {
           // Clear any mock user data
           localStorage.removeItem('mock_user');
-          router.push('/settings/profile');
+          // Redirect to returnUrl if provided, otherwise to /live
+          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
+          router.push(returnUrl);
         }
       }
     } catch (err: any) {
