@@ -36,28 +36,92 @@ export function useLiveKit({
   // Get LiveKit token
   const getToken = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('Auth error:', authError);
+        throw new Error('User not authenticated: ' + (authError?.message || 'No user'));
       }
+
+      console.log('User authenticated for viewer:', { userId: user.id, email: user.email });
+
+      // Get the session token to pass to the API
+      let session = null;
+      let accessToken = null;
+      
+      try {
+        const sessionResult = await supabase.auth.getSession();
+        session = sessionResult.data?.session;
+        accessToken = session?.access_token;
+        
+        console.log('Session check (getSession):', {
+          hasSession: !!session,
+          hasAccessToken: !!accessToken,
+          error: sessionResult.error?.message,
+        });
+      } catch (err) {
+        console.warn('getSession failed, trying getUser:', err);
+      }
+
+      // Fallback: if no session, try getUser (which might refresh the session)
+      if (!session || !accessToken) {
+        const userResult = await supabase.auth.getUser();
+        if (userResult.data?.user) {
+          // Try getSession again after getUser (might refresh)
+          const retrySession = await supabase.auth.getSession();
+          session = retrySession.data?.session;
+          accessToken = session?.access_token;
+          
+          console.log('Session check (after getUser):', {
+            hasSession: !!session,
+            hasAccessToken: !!accessToken,
+            userId: userResult.data.user.id,
+          });
+        }
+      }
+
+      if (!session || !accessToken) {
+        const errorMsg = 'No active session found. Please log in first.';
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      const headers: HeadersInit = { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      };
+
+      console.log('Requesting token with headers:', {
+        hasAuth: !!headers['Authorization'],
+        roomName,
+        participantName,
+      });
 
       const response = await fetch('/api/livekit/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include', // Include cookies
         body: JSON.stringify({
           roomName,
           participantName,
           canPublish,
           canSubscribe,
+          userId: user.id, // Pass user ID for server-side verification
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get token');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Token endpoint error:', { status: response.status, error: errorData });
+        throw new Error(errorData.error || `Failed to get token (${response.status})`);
       }
 
       const { token, url } = await response.json();
+      console.log('Token received:', { hasToken: !!token, url });
+      
+      if (!token || !url) {
+        throw new Error('Invalid token response: missing token or URL');
+      }
+      
       return { token, url };
     } catch (err: any) {
       console.error('Error getting LiveKit token:', err);
