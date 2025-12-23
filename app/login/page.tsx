@@ -8,6 +8,7 @@ import SmartBrandLogo from '@/components/SmartBrandLogo';
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,12 +38,25 @@ export default function LoginPage() {
       localStorage.removeItem('mock_user');
 
       if (isSignUp) {
-        // Sign up
+        // Validate username
+        if (!username || username.length < 3) {
+          throw new Error('Username must be at least 3 characters');
+        }
+        
+        // Validate username format (alphanumeric and underscores only)
+        if (!/^[a-z0-9_]+$/.test(username.toLowerCase())) {
+          throw new Error('Username can only contain letters, numbers, and underscores');
+        }
+
+        // Sign up - with auto-confirm since auth is disabled on Supabase
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/settings/profile`,
+            data: {
+              username: username.toLowerCase(),
+            },
           },
         });
 
@@ -52,23 +66,44 @@ export default function LoginPage() {
           // Clear any mock user data
           localStorage.removeItem('mock_user');
           
-          // Create profile if it doesn't exist
+          // Create profile with provided username
+          const cleanUsername = username.toLowerCase().trim();
           const { error: profileError } = await (supabase.from('profiles') as any).upsert({
             id: data.user.id,
-            username: email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, ''),
-            display_name: email.split('@')[0],
+            username: cleanUsername,
+            display_name: username, // Use original case for display
+            coin_balance: 0,
+            earnings_balance: 0,
+            gifter_level: 0,
           });
 
           if (profileError) {
             console.error('Profile creation error:', profileError);
+            // If username already exists, suggest alternatives
+            if (profileError.code === '23505') { // Unique violation
+              throw new Error(`Username "${cleanUsername}" is already taken. Please choose another.`);
+            }
+            throw profileError;
           }
 
-          setMessage('Check your email to confirm your account!');
-          // After signup, redirect to /live (they'll need to confirm email first)
+          // Auto-login after signup (since auth is disabled, user is already confirmed)
+          const { error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (signInError) {
+            console.error('Auto-login error:', signInError);
+            setMessage('Account created! Please sign in.');
+            setIsSignUp(false);
+            return;
+          }
+
+          setMessage('Account created successfully! Redirecting...');
+          // Redirect to profile settings to complete setup
           setTimeout(() => {
-            const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
-            router.push(returnUrl);
-          }, 2000);
+            router.push('/settings/profile');
+          }, 1000);
         }
       } else {
         // Sign in
@@ -142,6 +177,33 @@ export default function LoginPage() {
               />
             </div>
 
+            {isSignUp && (
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium mb-2">
+                  Username
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => {
+                    // Only allow lowercase letters, numbers, and underscores
+                    const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                    setUsername(value);
+                  }}
+                  required
+                  minLength={3}
+                  maxLength={20}
+                  pattern="[a-z0-9_]+"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="username"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Letters, numbers, and underscores only (3-20 characters)
+                </p>
+              </div>
+            )}
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium mb-2">
                 Password
@@ -156,6 +218,11 @@ export default function LoginPage() {
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                 placeholder="••••••••"
               />
+              {isSignUp && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Minimum 6 characters
+                </p>
+              )}
             </div>
 
             <button
@@ -174,6 +241,7 @@ export default function LoginPage() {
                 setIsSignUp(!isSignUp);
                 setError(null);
                 setMessage(null);
+                setUsername(''); // Clear username when switching
               }}
               className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm"
             >
