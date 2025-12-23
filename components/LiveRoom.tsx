@@ -362,8 +362,73 @@ export default function LiveRoom() {
         } as LiveStreamer;
       });
 
-      // Always include the current user's own stream if they're live, even if not published yet
+      // Also fetch streamers who are live_available but not yet published (waiting for viewers)
+      // This ensures all "waiting" cameras are available to new viewers
       if (user) {
+        const { data: waitingStreams } = await supabase
+          .from('live_streams')
+          .select('id, profile_id, is_published, live_available')
+          .eq('live_available', true)
+          .eq('is_published', false);
+
+        if (waitingStreams && waitingStreams.length > 0) {
+          const waitingProfileIds = waitingStreams.map((s: any) => s.profile_id);
+          const { data: waitingProfiles } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, gifter_level')
+            .in('id', waitingProfileIds);
+
+          if (waitingProfiles) {
+            // Get badges for waiting streamers
+            const uniqueLevels = [...new Set(waitingProfiles.map((p: any) => p.gifter_level).filter((l: any) => l !== null && l > 0))];
+            const waitingBadgeMap: Record<string, any> = {};
+            
+            if (uniqueLevels.length > 0) {
+              const { data: badges } = await supabase
+                .from('gifter_levels')
+                .select('*')
+                .in('level', uniqueLevels);
+              
+              if (badges) {
+                const badgeMap: Record<number, any> = {};
+                badges.forEach((badge: any) => {
+                  badgeMap[badge.level] = badge;
+                });
+                
+                waitingProfiles.forEach((profile: any) => {
+                  if (profile.gifter_level) {
+                    waitingBadgeMap[profile.id] = badgeMap[profile.gifter_level];
+                  }
+                });
+              }
+            }
+
+            // Add waiting streamers to the list (if not already present)
+            waitingStreams.forEach((stream: any) => {
+              const alreadyExists = streamersWithBadges.find(s => s.profile_id === stream.profile_id);
+              if (!alreadyExists) {
+                const profile = waitingProfiles.find((p: any) => p.id === stream.profile_id);
+                if (profile) {
+                  const badgeInfo = waitingBadgeMap[profile.id] || null;
+                  streamersWithBadges.push({
+                    id: stream.id.toString(),
+                    profile_id: stream.profile_id,
+                    username: profile.username,
+                    avatar_url: profile.avatar_url,
+                    is_published: false,
+                    live_available: true,
+                    viewer_count: 0,
+                    gifter_level: badgeInfo?.level || 0,
+                    badge_name: badgeInfo?.badge_name,
+                    badge_color: badgeInfo?.badge_color,
+                  } as LiveStreamer);
+                }
+              }
+            });
+          }
+        }
+
+        // Always include the current user's own stream if they're live, even if not published yet
         const { data: ownLiveStream } = await supabase
           .from('live_streams')
           .select('id, profile_id, is_published, live_available')
@@ -590,7 +655,8 @@ export default function LiveRoom() {
 
         setGridSlots(updatedSlots.sort((a, b) => a.slotIndex - b.slotIndex));
       } else {
-        // Auto-fill with live streamers
+        // No saved layout - auto-fill with ALL available streamers (both published and waiting)
+        // This ensures new users see all cameras that are available
         autoFillGrid();
       }
     } catch (error) {
@@ -640,11 +706,18 @@ export default function LiveRoom() {
   const autoFillGrid = useCallback(() => {
     if (liveStreamers.length === 0) return;
 
-    // Sort by: published first, then by viewer count
+    // Sort by: published first, then live_available, then by viewer count
+    // This ensures published streamers appear first, then waiting ones
     const sorted = [...liveStreamers].sort((a, b) => {
+      // Published streamers first
       if (a.is_published !== b.is_published) {
         return a.is_published ? -1 : 1;
       }
+      // Then live_available streamers
+      if (a.live_available !== b.live_available) {
+        return a.live_available ? -1 : 1;
+      }
+      // Then by viewer count
       return b.viewer_count - a.viewer_count;
     });
 
