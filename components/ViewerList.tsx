@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import GifterBadge from './GifterBadge';
 import MiniProfile from './MiniProfile';
-import ViewerVideoPreview from './ViewerVideoPreview';
 
 interface Viewer {
   profile_id: string;
@@ -265,17 +264,9 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                   }
                 `}
               >
-                {/* Video Preview or Avatar */}
-                {viewer.is_published && viewer.live_stream_id ? (
-                  // Show live video preview if they're actually publishing
-                  <ViewerVideoPreview
-                    viewerId={viewer.profile_id}
-                    viewerUsername={viewer.username}
-                    liveStreamId={viewer.live_stream_id}
-                    isLive={viewer.is_published}
-                  />
-                ) : viewer.is_live_available ? (
-                  // Show live camera icon if they're in preview mode (not publishing yet)
+                {/* Webcam Icon for Live Viewers, Avatar for Others */}
+                {viewer.is_live_available ? (
+                  // Show red webcam icon for all live viewers (published or preview mode)
                   <div className="relative flex-shrink-0">
                     <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center shadow-lg border border-red-400">
                       <svg 
