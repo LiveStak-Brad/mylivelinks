@@ -420,12 +420,22 @@ export default function LiveRoom() {
     
     const ensureUserInSlot1 = async () => {
       try {
-        const { data: userLiveStream } = await supabase
+        // Use maybeSingle() instead of single() to handle no-row case gracefully
+        const { data: userLiveStream, error: queryError } = await supabase
           .from('live_streams')
           .select('id, is_published, live_available')
           .eq('profile_id', currentUserId)
           .eq('live_available', true)
-          .single();
+          .maybeSingle();
+        
+        // If query fails with 406, skip silently (RLS or query issue)
+        if (queryError) {
+          if (queryError.code === 'PGRST116' || queryError.message?.includes('406')) {
+            // No row found or RLS issue - skip silently
+            return;
+          }
+          throw queryError;
+        }
         
         if (userLiveStream) {
           // User is live - ensure they're in slot 1
