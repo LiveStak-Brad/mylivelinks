@@ -248,7 +248,27 @@ export function useLiveKitPublisher({
         tokenLength: token?.length,
         tokenPrefix: token?.substring(0, 30) + '...',
         urlStartsWith: url?.substring(0, 6), // Should be "wss://"
+        fullUrl: url, // Log full URL for debugging
       });
+      
+      // Decode token to verify it was generated correctly
+      try {
+        const tokenParts = token.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+          console.log('Token payload decoded:', {
+            sub: payload.sub,
+            iss: payload.iss,
+            exp: payload.exp,
+            expDate: new Date(payload.exp * 1000).toISOString(),
+            video: payload.video,
+            room: payload.video?.room,
+            roomMatches: payload.video?.room === roomName,
+          });
+        }
+      } catch (decodeErr) {
+        console.warn('Could not decode token:', decodeErr);
+      }
       
       try {
         console.log('Attempting LiveKit connection...', {
@@ -271,9 +291,11 @@ export function useLiveKitPublisher({
           code: connectErr.code,
           reason: connectErr.reason,
           url: url?.substring(0, 60),
+          fullUrl: url,
           roomName,
           errorType: connectErr.constructor?.name,
-          stack: connectErr.stack?.substring(0, 200),
+          stack: connectErr.stack?.substring(0, 500),
+          fullError: connectErr,
         });
         
         // Provide more specific error messages

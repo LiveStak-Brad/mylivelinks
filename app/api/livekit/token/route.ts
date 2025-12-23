@@ -271,17 +271,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Decode token to verify structure (first part is header, second is payload)
+    let tokenPayload: any = null;
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        tokenPayload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      }
+    } catch (decodeErr) {
+      console.warn('Could not decode token payload:', decodeErr);
+    }
+    
     console.log('Token generated successfully for:', { 
       identity, 
       name, 
       roomName,
       url: LIVEKIT_URL,
       tokenLength: token.length,
-      tokenPrefix: token.substring(0, 20) + '...',
-      apiKeyPrefix: LIVEKIT_API_KEY?.substring(0, 10) + '...',
+      tokenPrefix: token.substring(0, 30) + '...',
+      apiKeyPrefix: LIVEKIT_API_KEY?.substring(0, 15) + '...',
       apiKeyLength: LIVEKIT_API_KEY?.length,
       apiSecretLength: LIVEKIT_API_SECRET?.length,
       urlMatches: LIVEKIT_URL?.includes('mylivelinkscom'),
+      tokenPayload: tokenPayload ? {
+        sub: tokenPayload.sub,
+        iss: tokenPayload.iss,
+        exp: tokenPayload.exp,
+        video: tokenPayload.video,
+        room: tokenPayload.video?.room,
+      } : null,
     });
 
     // Validate URL format
