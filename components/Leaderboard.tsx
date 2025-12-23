@@ -316,19 +316,19 @@ export default function Leaderboard() {
           No entries yet. Be the first!
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {entries.map((entry, index) => (
             <div
               key={entry.profile_id}
-              className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-md transition-all group"
+              className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all group"
               style={{
                 animation: `fadeIn 0.3s ease-out ${index * 0.05}s both`,
               }}
             >
               {/* Rank */}
-              <div className="flex-shrink-0 w-10 text-center">
+              <div className="flex-shrink-0 w-6 text-center">
                 <span
-                  className={`text-2xl font-bold ${
+                  className={`text-sm font-bold ${
                     entry.rank === 1
                       ? 'text-yellow-500'
                       : entry.rank === 2
@@ -348,17 +348,17 @@ export default function Leaderboard() {
                   <img
                     src={entry.avatar_url}
                     alt={entry.username}
-                    className="w-14 h-14 rounded-full border-2 border-gray-200 dark:border-gray-700"
+                    className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700"
                   />
                 ) : (
-                  <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold border-2 border-gray-200 dark:border-gray-700">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-gray-200 dark:border-gray-700">
                     {entry.username[0].toUpperCase()}
                   </div>
                 )}
                 {/* Gifter Badge Overlay - Top Right */}
                 {entry.gifter_level > 0 && (
                   <div
-                    className="absolute -top-1 -right-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white shadow-md border border-white dark:border-gray-800"
+                    className="absolute -top-0.5 -right-0.5 rounded-full px-1 py-0.5 text-[8px] font-bold text-white shadow-sm border border-white dark:border-gray-800"
                     style={{
                       backgroundColor: entry.badge_color || '#94A3B8',
                     }}
@@ -370,20 +370,20 @@ export default function Leaderboard() {
 
               {/* User Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold text-base truncate">{entry.username}</span>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span className="font-medium text-sm truncate">{entry.username}</span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">
                   {type === 'top_streamers' ? 'Diamonds earned' : 'Coins spent'}
                 </p>
               </div>
 
               {/* Metric Value */}
               <div className="flex-shrink-0 text-right">
-                <div className="text-xl font-bold text-gray-900 dark:text-white">
+                <div className="text-sm font-bold text-gray-900 dark:text-white">
                   {formatMetric(entry.metric_value)}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   {type === 'top_streamers' ? 'diamonds' : 'coins'}
                 </div>
               </div>

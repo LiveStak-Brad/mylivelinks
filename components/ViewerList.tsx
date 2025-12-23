@@ -162,7 +162,12 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         })
       );
 
-      setViewers(viewersWithBadges);
+      // Filter out current user from viewer list
+      const filteredViewers = viewersWithBadges.filter(
+        viewer => viewer.profile_id !== currentUserId
+      );
+
+      setViewers(filteredViewers);
     } catch (error) {
       console.error('Error loading viewers:', error);
       // Fallback to regular query if RPC fails
@@ -213,7 +218,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                 badgeInfo = badge;
               }
 
-              const liveInfo = liveStreamMap.get(profile.id) as { 
+          const liveInfo = liveStreamMap.get(profile.id) as { 
             isLiveAvailable: boolean; 
             isPublished: boolean;
             streamId: number 
@@ -235,7 +240,12 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
             })
           );
 
-          setViewers(viewersWithBadges);
+          // Filter out current user from viewer list
+          const filteredViewers = viewersWithBadges.filter(
+            viewer => viewer.profile_id !== currentUserId
+          );
+
+          setViewers(filteredViewers);
         }
       } catch (fallbackError) {
         console.error('Fallback query also failed:', fallbackError);
