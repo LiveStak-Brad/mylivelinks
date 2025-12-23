@@ -714,7 +714,7 @@ export default function LiveRoom() {
           }
           
           // Convert to expected format
-          const profileIds = directResult.data?.map(s => s.profile_id) || [];
+          const profileIds = directResult.data?.map((s: any) => s.profile_id) || [];
           if (profileIds.length === 0) {
             return [];
           }
