@@ -97,9 +97,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Method 3: If we have service role key and clientUserId from body, verify via admin client
-    // (This will be checked after we parse the body below)
-
     const user = verifiedUser;
 
     console.log('Auth result:', {
