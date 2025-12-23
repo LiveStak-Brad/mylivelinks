@@ -142,7 +142,7 @@ export default function LiveRoom() {
           body: JSON.stringify({
             roomName: 'live_central',
             participantName: 'Viewer',
-            canPublish: false,
+            canPublish: true, // CRITICAL: Must be true so streamers can publish on shared room
             canSubscribe: true,
             userId: user?.id || 'anonymous',
           }),
