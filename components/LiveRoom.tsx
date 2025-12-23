@@ -244,6 +244,20 @@ export default function LiveRoom() {
           }
         };
 
+        // Store handlers in ref so cleanup can access them
+        const handlersRef = {
+          handleConnected,
+          handleDisconnected,
+          handleParticipantConnected,
+          handleParticipantDisconnected,
+          handleTrackSubscribed,
+          handleTrackUnsubscribed,
+        };
+        
+        // Store ref for cleanup
+        roomRef.current = newRoom;
+        (roomRef.current as any).handlersRef = handlersRef;
+
         newRoom.on(RoomEvent.Connected, handleConnected);
         newRoom.on(RoomEvent.Disconnected, handleDisconnected);
         newRoom.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
@@ -290,6 +304,16 @@ export default function LiveRoom() {
     return () => {
       mounted = false;
       if (roomRef.current) {
+        // CRITICAL: Remove ALL event listeners before disconnecting to prevent memory leaks
+        const handlers = (roomRef.current as any).handlersRef;
+        if (handlers) {
+          roomRef.current.off(RoomEvent.Connected, handlers.handleConnected);
+          roomRef.current.off(RoomEvent.Disconnected, handlers.handleDisconnected);
+          roomRef.current.off(RoomEvent.ParticipantConnected, handlers.handleParticipantConnected);
+          roomRef.current.off(RoomEvent.ParticipantDisconnected, handlers.handleParticipantDisconnected);
+          roomRef.current.off(RoomEvent.TrackSubscribed, handlers.handleTrackSubscribed);
+          roomRef.current.off(RoomEvent.TrackUnsubscribed, handlers.handleTrackUnsubscribed);
+        }
         roomRef.current.disconnect().catch(console.error);
         roomRef.current = null;
         setSharedRoom(null);
