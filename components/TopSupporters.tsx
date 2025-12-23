@@ -96,9 +96,7 @@ export default function TopSupporters() {
             id,
             username,
             avatar_url,
-            gifter_level,
-            badge_name,
-            badge_color
+            gifter_level
           )
         `)
         .eq('recipient_id', user.id)
@@ -111,6 +109,25 @@ export default function TopSupporters() {
         return;
       }
 
+      // Get unique gifter levels and load badges
+      const uniqueLevels = [...new Set(
+        data?.map((gift: any) => gift.sender?.gifter_level).filter((l: any) => l !== null && l > 0) || []
+      )];
+      const badgeMap: Record<number, any> = {};
+      
+      if (uniqueLevels.length > 0) {
+        const { data: badges } = await supabase
+          .from('gifter_levels')
+          .select('*')
+          .in('level', uniqueLevels);
+        
+        if (badges) {
+          badges.forEach((badge: any) => {
+            badgeMap[badge.level] = badge;
+          });
+        }
+      }
+
       // Aggregate by sender
       const supporterMap = new Map<string, Supporter>();
       
@@ -119,6 +136,8 @@ export default function TopSupporters() {
         const profile = gift.sender;
         
         if (!profile) return;
+
+        const badgeInfo = profile.gifter_level ? badgeMap[profile.gifter_level] : null;
 
         if (supporterMap.has(senderId)) {
           const existing = supporterMap.get(senderId)!;
@@ -130,8 +149,8 @@ export default function TopSupporters() {
             username: profile.username || 'Unknown',
             avatar_url: profile.avatar_url,
             gifter_level: profile.gifter_level || 0,
-            badge_name: profile.badge_name,
-            badge_color: profile.badge_color,
+            badge_name: badgeInfo?.badge_name,
+            badge_color: badgeInfo?.badge_color,
             total_gifted: gift.coin_amount || 0,
             gift_count: 1,
           });
