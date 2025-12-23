@@ -417,6 +417,33 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       }
 
       setLiveStreamId(data.id);
+      
+      // CRITICAL: Update participant metadata in LiveKit room when going live
+      // This ensures webhook can identify the streamer and permissions are correct
+      if (sharedRoom && isRoomConnected && sharedRoom.state === 'connected') {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, display_name, avatar_url')
+            .eq('id', user.id)
+            .single();
+          
+          const metadata = {
+            profile_id: user.id,
+            username: profile?.username || 'Anonymous',
+            display_name: profile?.display_name || profile?.username || 'Anonymous',
+            avatar_url: profile?.avatar_url || null,
+            live_stream_id: data.id,
+          };
+          
+          await sharedRoom.localParticipant.setMetadata(JSON.stringify(metadata));
+          console.log('Updated participant metadata with live_stream_id:', data.id);
+        } catch (metadataError: any) {
+          console.warn('Failed to update participant metadata (non-critical):', metadataError);
+          // Don't fail the whole flow if metadata update fails
+        }
+      }
+      
       // Update state immediately (bypass debounce for manual start)
       lastLiveStateRef.current = true;
       isLiveRef.current = true;
