@@ -230,9 +230,7 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
     },
     onError: (err) => {
       console.error('Publishing error:', err);
-      setLoading(false);
-      setPermissionError(err.message || 'Failed to start streaming. Check console for details.');
-      // Keep modal open so user can see the error
+      handleConnectionError(err.message || 'Failed to start streaming. Check console for details.');
     },
   });
 
@@ -293,6 +291,39 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
     }
   };
 
+  // Handle connection errors - reset state and close modal
+  const handleConnectionError = async (errorMessage: string) => {
+    console.error('Connection error:', errorMessage);
+    setPermissionError(errorMessage);
+    setLoading(false);
+    
+    // Reset database state
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && liveStreamId) {
+        await (supabase.from('live_streams') as any)
+          .update({ live_available: false, ended_at: new Date().toISOString() })
+          .eq('profile_id', user.id);
+      }
+    } catch (err) {
+      console.error('Error resetting database state:', err);
+    }
+    
+    // Reset local state
+    isLiveRef.current = false;
+    setIsLive(false);
+    setLiveStreamId(null);
+    setSelectedVideoDevice('');
+    setSelectedAudioDevice('');
+    onLiveStatusChange?.(false);
+    
+    // Close modal after a short delay so user can see the error
+    setTimeout(() => {
+      setShowDeviceModal(false);
+      stopPreview();
+    }, 3000);
+  };
+
   const handleStartLive = async () => {
     if (!selectedVideoDevice || !selectedAudioDevice) {
       alert('Please select both a camera and microphone');
@@ -350,30 +381,24 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
           setTimeout(() => {
             if (!isPublishing && loading) {
               console.warn('Publishing did not start after manual attempt');
-              setPermissionError('Connection attempt completed but publishing did not start. Please check your LiveKit configuration.');
-              setLoading(false);
+              handleConnectionError('Connection attempt completed but publishing did not start. Please check your LiveKit configuration.');
             }
           }, 2000);
         } catch (err: any) {
           console.error('Manual start failed:', err);
-          setPermissionError(err.message || 'Failed to connect to MyLiveLinks. Check console for details.');
-          setLoading(false);
+          handleConnectionError(err.message || 'Failed to connect to MyLiveLinks. Check console for details.');
         }
       }, 500);
 
       // Fallback: if still not publishing after 8 seconds, show error
       setTimeout(() => {
         if (loading && !isPublishing && !error) {
-          setPermissionError('Connection is taking longer than expected. Please check your browser console for errors or try again.');
-          setLoading(false);
+          handleConnectionError('Connection is taking longer than expected. Please check your browser console for errors or try again.');
         }
       }, 8000);
     } catch (err: any) {
       console.error('Error starting live:', err);
-      setPermissionError(err.message || 'Failed to go live');
-      setLoading(false);
-      isLiveRef.current = false;
-      setIsLive(false);
+      handleConnectionError(err.message || 'Failed to go live');
     }
   };
 
@@ -390,10 +415,10 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       >
         {loading ? (
           'Loading...'
+        ) : isLive && isPublishing ? (
+          '🔴 LIVE'
         ) : isLive ? (
-          <>
-            {isPublishing ? '🔴 LIVE' : '⏸️ Stop Live'}
-          </>
+          '⏸️ Stop Live'
         ) : (
           '▶️ Go Live'
         )}
