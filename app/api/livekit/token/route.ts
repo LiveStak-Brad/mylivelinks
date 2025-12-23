@@ -215,6 +215,9 @@ export async function POST(request: NextRequest) {
         identity: identity,
         name: name,
       });
+      
+      // Set explicit expiration (6 hours from now)
+      at.exp = Math.floor(Date.now() / 1000) + (6 * 60 * 60);
     } catch (tokenErr: any) {
       console.error('Error creating AccessToken:', tokenErr);
       return NextResponse.json(
@@ -245,8 +248,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Generate token with expiration (6 hours)
-    const token = await at.toJwt();
+    // Generate token (synchronous, no await needed)
+    const token = at.toJwt();
+    
+    // Validate token was generated
+    if (!token || token.length < 50) {
+      console.error('Token generation failed - token too short:', { tokenLength: token?.length });
+      return NextResponse.json(
+        { error: 'Failed to generate valid token' },
+        { status: 500 }
+      );
+    }
 
     console.log('Token generated successfully for:', { 
       identity, 
