@@ -1311,7 +1311,7 @@ export default function LiveRoom() {
                   badgeName={expandedSlot.streamer.badge_name}
                   badgeColor={expandedSlot.streamer.badge_color}
                   slotIndex={expandedSlot.slotIndex}
-                  liveStreamId={expandedSlot.streamer.id && expandedSlot.streamer.live_available ? (() => {
+                  liveStreamId={expandedSlot.streamer.id && (expandedSlot.streamer.is_published || expandedSlot.streamer.live_available) ? (() => {
                     const idStr = expandedSlot.streamer.id.toString();
                     // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
                     if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) {
@@ -1408,7 +1408,7 @@ export default function LiveRoom() {
                         badgeName={slot.streamer.badge_name}
                         badgeColor={slot.streamer.badge_color}
                         slotIndex={slot.slotIndex}
-                        liveStreamId={slot.streamer.id ? (() => {
+                        liveStreamId={slot.streamer.id && (slot.streamer.is_published || slot.streamer.live_available) ? (() => {
                           const idStr = slot.streamer.id.toString();
                           // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
                           if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) {

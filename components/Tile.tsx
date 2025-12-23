@@ -74,11 +74,12 @@ export default function Tile({
   const roomName = liveStreamId ? `live_stream_${liveStreamId}` : 'live_central';
 
   // Connect to LiveKit room ONLY when:
-  // 1. Streamer is actually publishing (isLive = true)
+  // 1. Streamer is actually publishing (isLive = true, which means is_published)
   // 2. We have a valid streamer ID and liveStreamId
   // 3. Streamer ID is not empty/null
+  // Note: For current user in preview mode, we don't connect (they see local preview)
   const shouldConnect = !!(
-    isLive && 
+    isLive && // Only connect when actually publishing (is_published = true)
     liveStreamId !== undefined && 
     streamerId && 
     streamerId.trim() !== ''
@@ -129,10 +130,11 @@ export default function Tile({
   }, [streamerId, supabase]);
 
   // Start local preview when it's current user in preview mode (live_available but not published)
+  // They should see themselves as live even when not broadcasting yet
   useEffect(() => {
     let stream: MediaStream | null = null;
     
-    if (isCurrentUser && isLiveAvailable && !isLive && liveStreamId) {
+    if (isCurrentUser && isLiveAvailable && liveStreamId) {
       // Start local camera preview
       const startLocalPreview = async () => {
         try {
@@ -259,11 +261,11 @@ export default function Tile({
   }, [volume, isMuted]);
 
   // Determine tile state
-  const tileState = isLive
-    ? 'live' // Actively publishing
-    : isLiveAvailable
-    ? 'preview' // Live-available but not publishing
-    : 'offline'; // Not live
+  // For current user: show as 'live' when live_available (even if not published yet)
+  // For others: show as 'live' only when actually publishing
+  const tileState = isCurrentUser
+    ? (isLiveAvailable ? 'live' : 'offline') // Current user sees themselves as live when available
+    : (isLive ? 'live' : isLiveAvailable ? 'preview' : 'offline'); // Others see preview when available but not publishing
 
   return (
     <div
@@ -332,7 +334,7 @@ export default function Tile({
           />
         )}
 
-        {/* Preview Mode Overlay - Only show if not current user (they see their own preview) */}
+        {/* Preview Mode Overlay - Only show for other users (not current user) */}
         {tileState === 'preview' && !isCurrentUser && (
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
             <div className="text-center text-white">
@@ -342,14 +344,7 @@ export default function Tile({
           </div>
         )}
         
-        {/* Preview Mode Indicator for Current User - Subtle overlay */}
-        {tileState === 'preview' && isCurrentUser && (
-          <div className="absolute bottom-2 left-2 z-10">
-            <div className="bg-yellow-500/80 text-white px-2 py-1 rounded text-xs font-medium">
-              Waiting for viewers...
-            </div>
-          </div>
-        )}
+        {/* No preview overlay for current user - they see themselves as live */}
 
         {/* Loading indicator when connecting */}
         {isLive && !isConnected && !videoTrack && (
@@ -369,7 +364,7 @@ export default function Tile({
             LIVE
           </div>
         )}
-        {tileState === 'preview' && (
+        {tileState === 'preview' && !isCurrentUser && (
           <div className="flex items-center gap-1 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium">
             <span className="w-2 h-2 bg-white rounded-full" />
             PREVIEW
@@ -377,8 +372,8 @@ export default function Tile({
         )}
       </div>
 
-      {/* Stats Overlay */}
-      {viewerCount > 0 && (
+      {/* Stats Overlay - Show viewer count (even if 0 for current user when live) */}
+      {(viewerCount > 0 || (isCurrentUser && isLiveAvailable)) && (
         <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs z-20">
           👁️ {viewerCount}
         </div>
