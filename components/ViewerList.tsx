@@ -131,7 +131,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         .in('profile_id', profileIds)
         .eq('live_available', true);
 
-      const profileMap = new Map(
+      const profileMap = new Map<string, any>(
         (profiles || []).map((p: any) => [p.id, p])
       );
 
@@ -149,7 +149,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       // Build viewers list from room_presence
       const viewersWithBadges = await Promise.all(
         (presenceData || []).map(async (presence: any) => {
-          const profile = profileMap.get(presence.profile_id);
+          const profile = profileMap.get(presence.profile_id) as { id: string; username: string; avatar_url?: string; gifter_level: number | null } | undefined;
           if (!profile) return null;
 
           let badgeInfo = null;
