@@ -65,7 +65,7 @@ export default function GiftModal({
       .single();
 
     if (!error && data) {
-      setUserCoinBalance(data.coin_balance);
+      setUserCoinBalance((data as any).coin_balance);
     }
   };
 
@@ -85,7 +85,7 @@ export default function GiftModal({
       if (!user) throw new Error('Not authenticated');
 
       // Call RPC function
-      const { data, error: rpcError } = await supabase.rpc('process_gift', {
+      const { data, error: rpcError } = await (supabase.rpc as any)('process_gift', {
         p_sender_id: user.id,
         p_recipient_id: recipientId,
         p_gift_type_id: selectedGift.id,

@@ -50,7 +50,7 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
         .single();
       
       // For now, check if username is 'owner' or 'admin'
-      setIsAdmin(profile?.username === 'owner' || profile?.username === 'admin');
+      setIsAdmin((profile as any)?.username === 'owner' || (profile as any)?.username === 'admin');
     }
   };
 

@@ -1,7 +1,4 @@
-// Mock adapter for pinned posts
-// Can be swapped with real Supabase queries later
-
-import { createClient, isSeedModeEnabled } from './supabase';
+import { createClient } from './supabase';
 
 export interface PinnedPost {
   id: number;
@@ -18,11 +15,6 @@ const mockPinnedPosts: Map<string, PinnedPost> = new Map();
 
 export async function getPinnedPost(profileId: string): Promise<PinnedPost | null> {
   const supabase = createClient();
-
-  if (isSeedModeEnabled()) {
-    // Return mock data for seed mode
-    return mockPinnedPosts.get(profileId) || null;
-  }
 
   try {
     const { data, error } = await supabase
@@ -52,21 +44,6 @@ export async function upsertPinnedPost(
 ): Promise<PinnedPost | null> {
   const supabase = createClient();
 
-  if (isSeedModeEnabled()) {
-    // Mock storage
-    const post: PinnedPost = {
-      id: Date.now(),
-      profile_id: profileId,
-      caption,
-      media_url: mediaUrl,
-      media_type: mediaType,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    mockPinnedPosts.set(profileId, post);
-    return post;
-  }
-
   try {
     const { data, error } = await supabase
       .from('pinned_posts')
@@ -90,11 +67,6 @@ export async function upsertPinnedPost(
 
 export async function deletePinnedPost(profileId: string): Promise<void> {
   const supabase = createClient();
-
-  if (isSeedModeEnabled()) {
-    mockPinnedPosts.delete(profileId);
-    return;
-  }
 
   try {
     const { error } = await supabase

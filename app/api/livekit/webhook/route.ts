@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
               .single();
             
             if (stream) {
-              liveStreamId = stream.id;
+              liveStreamId = (stream as any).id;
             }
           }
         } catch (e) {
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
         // Participant joined - create/update active_viewers record
         // Note: We'll rely on the client heartbeat for detailed state
         // This webhook just ensures the record exists
-        const { error } = await supabase.rpc('update_viewer_heartbeat', {
+        const { error } = await (supabase.rpc as any)('update_viewer_heartbeat', {
           p_viewer_id: viewerId,
           p_live_stream_id: liveStreamId,
           p_is_active: true,
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Trigger publish state update
-        await supabase.rpc('update_publish_state_from_viewers');
+        await (supabase.rpc as any)('update_publish_state_from_viewers');
       } else if (event.event === 'participant_left') {
         // Participant left - remove from active_viewers
         const { error } = await supabase
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Trigger publish state update
-        await supabase.rpc('update_publish_state_from_viewers');
+        await (supabase.rpc as any)('update_publish_state_from_viewers');
       }
     }
 

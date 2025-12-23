@@ -44,10 +44,11 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
         .single();
 
       if (data) {
-        const liveState = data.live_available || false;
+        const d = data as any;
+        const liveState = d.live_available || false;
         isLiveRef.current = liveState;
         setIsLive(liveState);
-        setLiveStreamId(data.id);
+        setLiveStreamId(d.id);
         onLiveStatusChange?.(liveState);
       }
 
@@ -252,8 +253,7 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
         }
 
         // Update database
-        const { error } = await supabase
-          .from('live_streams')
+        const { error } = await (supabase.from('live_streams') as any)
           .update({ live_available: false, ended_at: new Date().toISOString() })
           .eq('profile_id', user.id);
 

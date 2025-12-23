@@ -41,7 +41,7 @@ export default function AdminModeration({ userId, username }: AdminModerationPro
 
       // TODO: Implement proper admin check
       // For now, allow if username contains 'admin' (remove in production!)
-      setIsAdmin(profile?.username?.includes('admin') || false);
+      setIsAdmin((profile as any)?.username?.includes('admin') || false);
     } catch (error) {
       console.error('Error checking admin status:', error);
     }
@@ -57,8 +57,7 @@ export default function AdminModeration({ userId, username }: AdminModerationPro
     try {
       // Global mute: Update profile or create moderation record
       // This would typically go to a moderation_logs table
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await (supabase.from('profiles') as any)
         .update({
           // Add muted_until timestamp or is_muted flag
           // This is a placeholder - implement your moderation schema
@@ -92,8 +91,7 @@ export default function AdminModeration({ userId, username }: AdminModerationPro
       const timeoutUntil = new Date(Date.now() + duration * 60 * 1000).toISOString();
 
       // Update profile with timeout
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await (supabase.from('profiles') as any)
         .update({
           // Add timeout_until timestamp
           // Placeholder - implement your moderation schema
@@ -128,8 +126,7 @@ export default function AdminModeration({ userId, username }: AdminModerationPro
     setLoading(true);
     try {
       // Ban user: Set is_banned flag
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await (supabase.from('profiles') as any)
         .update({
           is_banned: true,
           // Add ban_reason, banned_at, etc.
@@ -145,8 +142,7 @@ export default function AdminModeration({ userId, username }: AdminModerationPro
       await removeFromChat();
 
       // End live stream if active
-      await supabase
-        .from('live_streams')
+      await (supabase.from('live_streams') as any)
         .update({ live_available: false, ended_at: new Date().toISOString() })
         .eq('profile_id', userId);
 

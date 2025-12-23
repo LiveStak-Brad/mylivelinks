@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createClient, isSeedModeEnabled } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase';
 import { getPinnedPost, upsertPinnedPost, deletePinnedPost, PinnedPost } from '@/lib/pinnedPosts';
 import { uploadAvatar, uploadPinnedPostMedia, deleteAvatar, deletePinnedPostMedia } from '@/lib/storage';
 import Image from 'next/image';
@@ -47,63 +47,31 @@ export default function ProfileSettingsPage() {
   }, []);
 
   const checkAuth = async () => {
-    // Always try real Supabase auth first if credentials are available
-    const hasSupabaseConfig = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const forceMock = process.env.NEXT_PUBLIC_PREVIEW_MODE === 'true' || process.env.NEXT_PUBLIC_DEV_SEED_MODE === 'true';
+    // Clear mock data
+    localStorage.removeItem('mock_user');
+    localStorage.removeItem('mock_profile');
     
-    if (!forceMock && hasSupabaseConfig) {
-      // Clear mock data if using real auth
-      localStorage.removeItem('mock_user');
-      localStorage.removeItem('mock_profile');
-      
-      // Real Supabase auth
-      const { data: { user }, error } = await supabase.auth.getUser();
-      
-      if (error) {
-        console.error('Auth error:', error);
-        router.push('/login');
-        return;
-      }
-      
-      if (user) {
-        setCurrentUserId(user.id);
-        await loadProfile(user.id);
-        return;
-      } else {
-        router.push('/login');
-        return;
-      }
+    // Real Supabase auth
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (error) {
+      console.error('Auth error:', error);
+      router.push('/login');
+      return;
     }
     
-    // Fallback to mock mode only if Supabase is not configured
-    if (isSeedModeEnabled()) {
-      const mockUserStr = localStorage.getItem('mock_user');
-      if (mockUserStr) {
-        const mockUser = JSON.parse(mockUserStr);
-        setCurrentUserId(mockUser.id);
-        await loadProfile(mockUser.id);
-        return;
-      }
+    if (user) {
+      setCurrentUserId(user.id);
+      await loadProfile(user.id);
+      return;
+    } else {
+      router.push('/login');
+      return;
     }
-    
-    // No auth found, redirect to login
-    router.push('/login');
   };
 
   const loadProfile = async (userId: string) => {
     try {
-      if (isSeedModeEnabled()) {
-        // Mock mode: use default values
-        setDisplayName('Owner');
-        setBio('Platform Owner Account');
-        setUsername('owner');
-        setAvatarUrl('');
-        setLinks([]);
-        setPinnedPost(null);
-        setLoading(false);
-        return;
-      }
-
       // Load profile
       const { data: profile } = await supabase
         .from('profiles')
@@ -112,10 +80,11 @@ export default function ProfileSettingsPage() {
         .single();
 
       if (profile) {
-        setAvatarUrl(profile.avatar_url || '');
-        setDisplayName(profile.display_name || '');
-        setBio(profile.bio || '');
-        setUsername(profile.username || '');
+        const p = profile as any;
+        setAvatarUrl(p.avatar_url || '');
+        setDisplayName(p.display_name || '');
+        setBio(p.bio || '');
+        setUsername(p.username || '');
       }
 
       // Load links
@@ -177,25 +146,6 @@ export default function ProfileSettingsPage() {
 
     setSaving(true);
     try {
-      if (isSeedModeEnabled()) {
-        // Mock mode: just save to localStorage
-        localStorage.setItem('mock_profile', JSON.stringify({
-          display_name: displayName,
-          bio: bio,
-          avatar_url: avatarUrl,
-          username: username,
-          links: links,
-          pinnedPost: pinnedPostMediaPreview ? {
-            caption: pinnedPostCaption,
-            media_url: pinnedPostMediaPreview,
-            media_type: pinnedPostMediaType,
-          } : null,
-        }));
-        alert('⚠️ Mock Mode: Data saved locally only.\n\nTo save to database, add Supabase credentials to .env.local:\nNEXT_PUBLIC_SUPABASE_URL=your_url\nNEXT_PUBLIC_SUPABASE_ANON_KEY=your_key\n\nThen restart the dev server.');
-        router.push(`/${username}`);
-        return;
-      }
-
       // Upload avatar to storage if changed
       let finalAvatarUrl = avatarUrl;
       if (avatarInputRef.current?.files?.[0]) {
@@ -208,8 +158,7 @@ export default function ProfileSettingsPage() {
       }
 
       // Update profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
+      const { data: profileData, error: profileError } = await (supabase.from('profiles') as any)
         .update({
           display_name: displayName,
           bio: bio,
@@ -244,8 +193,7 @@ export default function ProfileSettingsPage() {
           }));
 
         if (linksToInsert.length > 0) {
-          const { error: linksError } = await supabase
-            .from('user_links')
+          const { error: linksError } = await (supabase.from('user_links') as any)
             .insert(linksToInsert);
 
           if (linksError) throw linksError;

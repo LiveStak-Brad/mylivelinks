@@ -3,7 +3,7 @@
  * Handles Supabase Storage uploads for avatars and pinned posts
  */
 
-import { createClient, isSeedModeEnabled } from './supabase';
+import { createClient } from './supabase';
 
 /**
  * Upload avatar to Supabase Storage
@@ -14,11 +14,6 @@ export async function uploadAvatar(
   file: File
 ): Promise<string> {
   const supabase = createClient();
-
-  // Seed mode: return object URL (not persisted)
-  if (isSeedModeEnabled()) {
-    return URL.createObjectURL(file);
-  }
 
   // Get file extension
   const ext = file.name.split('.').pop() || 'jpg';
@@ -60,11 +55,6 @@ export async function uploadPinnedPostMedia(
 ): Promise<string> {
   const supabase = createClient();
 
-  // Seed mode: return object URL (not persisted)
-  if (isSeedModeEnabled()) {
-    return URL.createObjectURL(file);
-  }
-
   // Get file extension
   const ext = file.name.split('.').pop() || (file.type.startsWith('video/') ? 'mp4' : 'jpg');
   const fileName = `pinned.${ext}`;
@@ -101,11 +91,6 @@ export async function uploadPinnedPostMedia(
 export async function deleteAvatar(profileId: string): Promise<void> {
   const supabase = createClient();
 
-  // Seed mode: no-op
-  if (isSeedModeEnabled()) {
-    return;
-  }
-
   // Try to delete avatar (may not exist)
   const { error } = await supabase.storage
     .from('avatars')
@@ -122,11 +107,6 @@ export async function deleteAvatar(profileId: string): Promise<void> {
  */
 export async function deletePinnedPostMedia(profileId: string): Promise<void> {
   const supabase = createClient();
-
-  // Seed mode: no-op
-  if (isSeedModeEnabled()) {
-    return;
-  }
 
   // Try to delete pinned post media (may not exist)
   const { error } = await supabase.storage

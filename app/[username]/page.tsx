@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClient, isSeedModeEnabled } from '@/lib/supabase';
-import { getSeedProfileByUsername } from '@/lib/seedData';
+import { createClient } from '@/lib/supabase';
 import { getPinnedPost, PinnedPost } from '@/lib/pinnedPosts';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -36,69 +35,6 @@ export default function ProfilePage() {
 
   const loadProfile = async () => {
     try {
-      // Seed mode: use fake profile or mock data
-      if (isSeedModeEnabled()) {
-        // Check for mock profile data from localStorage
-        const mockProfileStr = localStorage.getItem('mock_profile');
-        const mockUserStr = localStorage.getItem('mock_user');
-        
-        if (mockProfileStr && mockUserStr && username === 'owner') {
-          const mockProfile = JSON.parse(mockProfileStr);
-          const mockUser = JSON.parse(mockUserStr);
-          
-          setProfile({
-            id: mockUser.id,
-            username: mockProfile.username || 'owner',
-            avatar_url: mockProfile.avatar_url || '',
-            bio: mockProfile.bio || '',
-            display_name: mockProfile.display_name || 'Owner',
-            follower_count: 0,
-            is_live: false,
-          });
-          
-          setUserLinks(mockProfile.links || []);
-          
-          if (mockProfile.pinnedPost) {
-            setPinnedPost({
-              id: 1,
-              profile_id: mockUser.id,
-              caption: mockProfile.pinnedPost.caption,
-              media_url: mockProfile.pinnedPost.media_url,
-              media_type: mockProfile.pinnedPost.media_type,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-          } else {
-            setPinnedPost(null);
-          }
-          
-          setIsOwnProfile(true);
-          setCurrentUserId(mockUser.id);
-          setLoading(false);
-          return;
-        }
-        
-        // Fallback to seed profile
-        const seedProfile = getSeedProfileByUsername(username);
-        if (seedProfile) {
-          setProfile({
-            id: seedProfile.id,
-            username: seedProfile.username,
-            avatar_url: seedProfile.avatar_url,
-            bio: seedProfile.bio,
-            display_name: seedProfile.display_name,
-            follower_count: seedProfile.follower_count || 0,
-            is_live: seedProfile.is_live || false,
-          });
-          setUserLinks([]);
-          setPinnedPost(null);
-          setIsOwnProfile(false);
-          setCurrentUserId(null);
-          setLoading(false);
-          return;
-        }
-      }
-
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUserId(user?.id || null);
@@ -108,7 +44,7 @@ export default function ProfilePage() {
         .from('profiles')
         .select('id, username, avatar_url, bio, display_name, follower_count, is_live')
         .ilike('username', username)
-        .single();
+        .single() as { data: Profile | null; error: any };
 
       if (profileError) {
         // Try exact match as fallback
@@ -116,18 +52,20 @@ export default function ProfilePage() {
           .from('profiles')
           .select('id, username, avatar_url, bio, display_name, follower_count, is_live')
           .eq('username', username)
-          .single();
+          .single() as { data: Profile | null };
         
         if (!fallbackData) {
           setLoading(false);
           return;
         }
         
-        setProfile(fallbackData);
-        setIsOwnProfile(user?.id === fallbackData.id);
+        const fallbackProfile = fallbackData as Profile;
+        setProfile(fallbackProfile);
+        setIsOwnProfile(user?.id === fallbackProfile.id);
       } else if (profileData) {
-        setProfile(profileData);
-        setIsOwnProfile(user?.id === profileData.id);
+        const profile = profileData as Profile;
+        setProfile(profile);
+        setIsOwnProfile(user?.id === profile.id);
       } else {
         setLoading(false);
         return;

@@ -31,8 +31,8 @@ export default function DiamondConversion() {
       .single();
 
     if (!error && data) {
-      setCoinBalance(data.coin_balance);
-      setDiamondBalance(data.earnings_balance); // earnings_balance = diamond_balance
+      setCoinBalance((data as any).coin_balance);
+      setDiamondBalance((data as any).earnings_balance); // earnings_balance = diamond_balance
     }
   };
 
@@ -77,7 +77,7 @@ export default function DiamondConversion() {
       if (!user) throw new Error('Not authenticated');
 
       // Call RPC function
-      const { data, error: rpcError } = await supabase.rpc('convert_diamonds_to_coins', {
+      const { data, error: rpcError } = await (supabase.rpc as any)('convert_diamonds_to_coins', {
         p_profile_id: user.id,
         p_diamonds_in: diamonds,
       });

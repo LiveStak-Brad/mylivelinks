@@ -300,11 +300,11 @@ export default function Chat() {
       const newMsg = {
         id: message.id,
         profile_id: message.profile_id,
-        username: profile?.username || 'Unknown',
-        avatar_url: profile?.avatar_url,
-        gifter_level: profile?.gifter_level || 0,
-        badge_name: badgeInfo?.badge_name,
-        badge_color: badgeInfo?.badge_color,
+        username: (profile as any)?.username || 'Unknown',
+        avatar_url: (profile as any)?.avatar_url,
+        gifter_level: (profile as any)?.gifter_level || 0,
+        badge_name: (badgeInfo as any)?.badge_name,
+        badge_color: (badgeInfo as any)?.badge_color,
         message_type: message.message_type,
         content: message.content,
         created_at: message.created_at,
@@ -393,7 +393,7 @@ export default function Chat() {
     setTimeout(() => scrollToBottom(), 50);
 
     // Send to database in background (realtime will replace optimistic with real message)
-    supabase.from('chat_messages').insert({
+    (supabase.from('chat_messages') as any).insert({
       profile_id: currentUserId,
       message_type: 'text',
       content: messageToSend,

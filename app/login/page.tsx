@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient, isSeedModeEnabled } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase';
 import SmartBrandLogo from '@/components/SmartBrandLogo';
 
 export default function LoginPage() {
@@ -33,29 +33,7 @@ export default function LoginPage() {
     setMessage(null);
 
     try {
-      // Check if Supabase is actually configured
-      const hasSupabaseConfig = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      const forceMock = process.env.NEXT_PUBLIC_PREVIEW_MODE === 'true' || process.env.NEXT_PUBLIC_DEV_SEED_MODE === 'true';
-      
-      // Only use mock mode if Supabase is not configured or forced
-      if (!hasSupabaseConfig || forceMock) {
-        if (isSeedModeEnabled()) {
-          // Mock login for seed mode - create a mock user session
-          setMessage('Mock mode: Logging in...');
-          // Store mock user in localStorage for this session
-          localStorage.setItem('mock_user', JSON.stringify({
-            id: 'mock-user-id',
-            email: email,
-            created_at: new Date().toISOString(),
-          }));
-          setTimeout(() => {
-            router.push('/settings/profile');
-          }, 1000);
-          return;
-        }
-      }
-      
-      // Clear any mock user data if using real auth
+      // Clear any mock user data
       localStorage.removeItem('mock_user');
 
       if (isSignUp) {
@@ -75,7 +53,7 @@ export default function LoginPage() {
           localStorage.removeItem('mock_user');
           
           // Create profile if it doesn't exist
-          const { error: profileError } = await supabase.from('profiles').upsert({
+          const { error: profileError } = await (supabase.from('profiles') as any).upsert({
             id: data.user.id,
             username: email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, ''),
             display_name: email.split('@')[0],
