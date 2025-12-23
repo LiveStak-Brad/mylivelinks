@@ -77,11 +77,12 @@ export default function Tile({
   // 1. Streamer is actually publishing (isLive = true)
   // 2. We have a valid streamer ID and liveStreamId
   // 3. Streamer ID is not empty/null
-  const shouldConnect = 
+  const shouldConnect = !!(
     isLive && 
     liveStreamId !== undefined && 
     streamerId && 
-    streamerId.trim() !== '';
+    streamerId.trim() !== ''
+  );
 
   const { room, isConnected } = useLiveKit({
     roomName,
@@ -122,7 +123,7 @@ export default function Tile({
 
   // Check if this is the current user's tile
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       setIsCurrentUser(user?.id === streamerId);
     });
   }, [streamerId, supabase]);

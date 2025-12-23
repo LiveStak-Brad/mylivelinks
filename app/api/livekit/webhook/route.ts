@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     
     let event;
     try {
-      event = receiver.receive(body, authHeader);
+      event = await receiver.receive(body, authHeader);
     } catch (error: any) {
       console.error('Webhook signature verification failed:', error);
       return NextResponse.json(

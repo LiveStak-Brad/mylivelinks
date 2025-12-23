@@ -17,7 +17,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Check if already logged in
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       if (user) {
         router.push('/settings/profile');
       }

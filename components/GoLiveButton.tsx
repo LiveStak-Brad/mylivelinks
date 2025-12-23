@@ -97,14 +97,14 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
   // Get current user's profile for participant name
   const [participantName, setParticipantName] = useState('Streamer');
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       if (user) {
         supabase
           .from('profiles')
           .select('username, display_name')
           .eq('id', user.id)
           .single()
-          .then(({ data }) => {
+          .then(({ data }: { data: any }) => {
             if (data) {
               setParticipantName(data.display_name || data.username);
             }
@@ -210,7 +210,7 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
   };
 
   // LiveKit publisher hook - only enable when we have everything ready
-  const shouldEnablePublisher = isLive && selectedVideoDevice && selectedAudioDevice && liveStreamId;
+  const shouldEnablePublisher = !!(isLive && selectedVideoDevice && selectedAudioDevice && liveStreamId);
   
   const { isPublishing, error, startPublishing, stopPublishing } = useLiveKitPublisher({
     roomName,

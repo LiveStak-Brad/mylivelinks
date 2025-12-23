@@ -50,14 +50,14 @@ export default function StreamerSelectionModal({
             .from('live_streams')
             .select('profile_id, live_available, is_published');
 
-          const liveMap = new Map(
-            (liveStreams || []).map(ls => [
+          const liveMap = new Map<string, { live_available: boolean; is_published: boolean }>(
+            (liveStreams || []).map((ls: any) => [
               ls.profile_id,
               { live_available: ls.live_available, is_published: ls.is_published }
             ])
           );
 
-          setStreamers((data || []).map(profile => ({
+          setStreamers((data || []).map((profile: any) => ({
             profile_id: profile.id,
             username: profile.username,
             display_name: profile.display_name,

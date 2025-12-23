@@ -6,7 +6,7 @@ import GifterBadge from './GifterBadge';
 import MiniProfile from './MiniProfile';
 
 interface ChatMessage {
-  id: number;
+  id: number | string;
   profile_id: string | null;
   username?: string;
   avatar_url?: string;
@@ -43,7 +43,7 @@ export default function Chat() {
 
   useEffect(() => {
     // Get current user ID and profile
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       if (user) {
         setCurrentUserId(user.id);
         // Load user profile immediately for optimistic messages
@@ -52,7 +52,7 @@ export default function Chat() {
           .select('username, avatar_url, gifter_level')
           .eq('id', user.id)
           .single()
-          .then(({ data: profile }) => {
+          .then(({ data: profile }: { data: any }) => {
             if (profile) {
               setCurrentUserProfile({
                 username: profile.username,
@@ -163,7 +163,7 @@ export default function Chat() {
         };
       });
 
-      setMessages(messagesWithBadges.sort((a, b) => 
+      setMessages(messagesWithBadges.sort((a: any, b: any) =>
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       ));
       
@@ -264,8 +264,8 @@ export default function Chat() {
       if (prev.some(m => m.id === message.id)) return prev;
       
       // Check if this is replacing an optimistic message (same profile_id + content + recent)
-      const optimisticMatch = prev.find(m => 
-        typeof m.id === 'string' && 
+      const optimisticMatch = prev.find((m: any) =>
+        typeof m.id === 'string' &&
         m.id.startsWith('temp-') &&
         m.profile_id === message.profile_id &&
         m.content === message.content &&
@@ -384,7 +384,7 @@ export default function Chat() {
     // Add optimistic message immediately (synchronous)
     setMessages((prev) => {
       const updated = [...prev, optimisticMsg];
-      return updated.sort((a, b) => 
+      return updated.sort((a: ChatMessage, b: ChatMessage) => 
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
     });
@@ -397,7 +397,7 @@ export default function Chat() {
       profile_id: currentUserId,
       message_type: 'text',
       content: messageToSend,
-    }).then(({ error, data }) => {
+    }).then(({ error, data }: { error: any; data: any }) => {
       if (error) {
         console.error('Error sending message:', error);
         // Remove optimistic message on error
@@ -407,10 +407,10 @@ export default function Chat() {
       }
       // If success, realtime subscription will receive the new message
       // and replace the optimistic one (matched by profile_id + content + recent timestamp)
-    }).catch((error) => {
+    }).catch((error: any) => {
       console.error('Error sending message:', error);
       // Remove optimistic message and restore input
-      setMessages((prev) => prev.filter(m => m.id !== tempId));
+      setMessages((prev) => prev.filter((m: ChatMessage) => m.id !== tempId));
       setNewMessage(messageToSend);
       alert('Failed to send message');
     });

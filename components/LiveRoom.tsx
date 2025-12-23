@@ -88,7 +88,7 @@ export default function LiveRoom() {
 
   // Get current user ID
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       setCurrentUserId(user?.id || null);
     });
   }, [supabase]);

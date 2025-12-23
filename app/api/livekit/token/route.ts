@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
       canPublish: canPublish !== false, // Default to true, can be overridden
       canSubscribe: canSubscribe !== false, // Default to true, can be overridden
       canPublishData: true,
-      canUpdateMetadata: true,
+      canUpdateOwnMetadata: true,
     });
 
     // Add metadata

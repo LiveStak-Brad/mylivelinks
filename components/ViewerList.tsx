@@ -40,7 +40,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
 
   useEffect(() => {
     // Get current user ID
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
       setCurrentUserId(user?.id || null);
     });
 
