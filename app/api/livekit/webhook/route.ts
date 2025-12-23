@@ -55,35 +55,52 @@ export async function POST(request: NextRequest) {
       // Extract profile_id from participant identity (we use Supabase user ID as LiveKit identity)
       const viewerId = participant.identity;
       
-      // Extract live_stream_id from room name (format: "live_central" or "live_stream_{id}")
-      // For now, we'll use room name to find the stream
-      // In production, you might want to store room -> stream_id mapping
+      // Extract live_stream_id for global room
+      // Since we're using a single global room ("live_central"), we need to identify
+      // which streamer this participant is watching based on participant identity
+      // For viewers: participant.identity is the viewer's profile_id
+      // For streamers: participant.identity is the streamer's profile_id
+      // We need to find which streamer's tracks this viewer is subscribed to
       let liveStreamId: number | null = null;
       
-      // Try to extract stream ID from room name if it follows a pattern
-      const streamIdMatch = room.name.match(/live_stream_(\d+)/);
-      if (streamIdMatch) {
-        liveStreamId = parseInt(streamIdMatch[1], 10);
-      } else {
-        // For "live_central", we need to find the streamer's live_stream_id
-        // We can get this from participant metadata or query by profile_id
-        try {
-          const metadata = participant.metadata ? JSON.parse(participant.metadata) : null;
-          if (metadata?.profile_id) {
-            // Find the live_stream for this profile
-            const { data: stream } = await supabase
-              .from('live_streams')
-              .select('id')
-              .eq('profile_id', metadata.profile_id)
-              .eq('live_available', true)
-              .single();
-            
-            if (stream) {
-              liveStreamId = (stream as any).id;
-            }
+      // Try to get stream ID from participant metadata first
+      try {
+        const metadata = participant.metadata ? JSON.parse(participant.metadata) : null;
+        if (metadata?.live_stream_id) {
+          liveStreamId = parseInt(metadata.live_stream_id, 10);
+        } else if (metadata?.profile_id) {
+          // If metadata has profile_id but no live_stream_id, find the stream
+          // This handles the case where a streamer joins
+          const { data: stream } = await supabase
+            .from('live_streams')
+            .select('id')
+            .eq('profile_id', metadata.profile_id)
+            .eq('live_available', true)
+            .single();
+          
+          if (stream) {
+            liveStreamId = (stream as any).id;
           }
-        } catch (e) {
-          console.error('Error parsing metadata:', e);
+        }
+      } catch (e) {
+        console.error('Error parsing metadata:', e);
+      }
+      
+      // If still no liveStreamId, try to find it from the participant's identity
+      // In a global room, we need to determine which streamer this viewer is watching
+      // For now, we'll use a heuristic: if participant is publishing, they're a streamer
+      // Otherwise, we need to check active_viewers to see which stream they're watching
+      if (!liveStreamId && participant.isPublisher) {
+        // Participant is a streamer - find their live_stream_id
+        const { data: stream } = await supabase
+          .from('live_streams')
+          .select('id')
+          .eq('profile_id', viewerId)
+          .eq('live_available', true)
+          .single();
+        
+        if (stream) {
+          liveStreamId = (stream as any).id;
         }
       }
 

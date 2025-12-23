@@ -115,3 +115,4 @@ Share:
 2. Vercel function logs (from `/api/livekit/token`)
 3. Whether you've added the 3 variables to Vercel
 
+

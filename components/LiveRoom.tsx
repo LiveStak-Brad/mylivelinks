@@ -102,17 +102,23 @@ export default function LiveRoom() {
     let mounted = true;
     
     const connectSharedRoom = async () => {
-      // Prevent multiple connection attempts
+      // CRITICAL: Enforce "connect once" guard - prevent double-connect from:
+      // - React Strict Mode double-invoking effects in dev
+      // - Fast refresh / component remount
+      // - Route transitions
       if (roomConnectionRef.current.connecting || roomConnectionRef.current.connected) {
+        console.log('Room connection already in progress or connected, skipping');
         return;
       }
 
       try {
+        // Set connecting flag IMMEDIATELY to prevent race conditions
         roomConnectionRef.current.connecting = true;
         
         const { data: { user } } = await supabase.auth.getUser();
         if (!user && !authDisabled) {
           console.log('No user, skipping room connection');
+          roomConnectionRef.current.connecting = false; // Reset flag on early return
           return;
         }
 
@@ -122,6 +128,7 @@ export default function LiveRoom() {
         
         if (!accessToken && !authDisabled) {
           console.log('No access token, skipping room connection');
+          roomConnectionRef.current.connecting = false; // Reset flag on early return
           return;
         }
 
@@ -172,6 +179,7 @@ export default function LiveRoom() {
           if (mounted) {
             console.log('Shared LiveKit room disconnected');
             setIsRoomConnected(false);
+            // CRITICAL: Reset connection flags on disconnect to allow reconnection if needed
             roomConnectionRef.current.connected = false;
             roomConnectionRef.current.connecting = false;
           }
@@ -205,7 +213,9 @@ export default function LiveRoom() {
         }
       } catch (error: any) {
         console.error('Error connecting shared room:', error);
+        // CRITICAL: Always reset connecting flag on error to allow retry
         roomConnectionRef.current.connecting = false;
+        roomConnectionRef.current.connected = false;
         if (mounted) {
           setIsRoomConnected(false);
         }
@@ -221,8 +231,9 @@ export default function LiveRoom() {
         roomRef.current = null;
         setSharedRoom(null);
         setIsRoomConnected(false);
-        roomConnectionRef.current = { connecting: false, connected: false };
       }
+      // CRITICAL: Always reset connection flags on cleanup to prevent stale state
+      roomConnectionRef.current = { connecting: false, connected: false };
     };
   }, [supabase, authDisabled]);
 
@@ -407,8 +418,9 @@ export default function LiveRoom() {
     if (!mounted) return;
 
     // Load streamers first, then grid layout (which depends on streamers)
-    loadLiveStreamers().then(() => {
-      loadUserGridLayout();
+    // Pass streamers directly to avoid race condition with state updates
+    loadLiveStreamers().then((streamers) => {
+      loadUserGridLayout(streamers);
     });
 
     // Subscribe to live streamer changes
@@ -422,8 +434,8 @@ export default function LiveRoom() {
           table: 'live_streams',
         },
         () => {
-          loadLiveStreamers().then(() => {
-            loadUserGridLayout();
+          loadLiveStreamers().then((streamers) => {
+            loadUserGridLayout(streamers);
           });
         }
       )
@@ -433,6 +445,10 @@ export default function LiveRoom() {
     // This ensures that when a streamer watches their own stream, publishing starts immediately
     // Use debouncing to prevent rapid updates
     let publishStateUpdateTimeout: NodeJS.Timeout | null = null;
+    let fullReloadTimeout: NodeJS.Timeout | null = null;
+    let lastFullReload = 0;
+    const MIN_RELOAD_INTERVAL = 3000; // Max once every 3 seconds
+    
     const activeViewersChannel = supabase
       .channel('active-viewers-updates')
       .on(
@@ -443,15 +459,27 @@ export default function LiveRoom() {
           table: 'active_viewers',
         },
         async () => {
-          // Debounce publish state updates to prevent rapid connect/disconnect cycles
+          // Update publish state (debounced)
           if (publishStateUpdateTimeout) {
             clearTimeout(publishStateUpdateTimeout);
           }
           publishStateUpdateTimeout = setTimeout(async () => {
             try {
               await supabase.rpc('update_publish_state_from_viewers');
-              // Reload streamers to update viewer counts after publish state changes
-              await loadLiveStreamers();
+              // Only update viewer counts, don't reload everything
+              updateViewerCountsOnly();
+              
+              // Debounced full reload (max once every 3 seconds)
+              const now = Date.now();
+              if (now - lastFullReload >= MIN_RELOAD_INTERVAL) {
+                if (fullReloadTimeout) {
+                  clearTimeout(fullReloadTimeout);
+                }
+                fullReloadTimeout = setTimeout(async () => {
+                  lastFullReload = Date.now();
+                  await loadLiveStreamers();
+                }, 500); // Small delay to batch multiple updates
+              }
             } catch (error) {
               console.error('Error updating publish state:', error);
             }
@@ -465,6 +493,34 @@ export default function LiveRoom() {
       supabase.removeChannel(activeViewersChannel);
     };
   }, [sortMode, mounted]); // Reload when sort mode or mount state changes
+
+  // Update viewer counts only (without full reload) to prevent re-subscription loops
+  const updateViewerCountsOnly = async () => {
+    try {
+      // Update viewer counts for all current streamers without reloading everything
+      const updatedStreamers = await Promise.all(
+        liveStreamers.map(async (streamer) => {
+          if (!streamer.live_available || !streamer.id) return streamer;
+          
+          const { count } = await supabase
+            .from('active_viewers')
+            .select('*', { count: 'exact', head: true })
+            .eq('live_stream_id', parseInt(streamer.id))
+            .eq('is_active', true)
+            .eq('is_unmuted', true)
+            .eq('is_visible', true)
+            .eq('is_subscribed', true)
+            .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
+          
+          return { ...streamer, viewer_count: count || 0 };
+        })
+      );
+      
+      setLiveStreamers(updatedStreamers);
+    } catch (error) {
+      console.error('Error updating viewer counts:', error);
+    }
+  };
 
   const loadLiveStreamers = async () => {
     try {
@@ -713,6 +769,9 @@ export default function LiveRoom() {
       if (!streamersWithBadges || streamersWithBadges.length === 0) {
         setLoading(false);
       }
+      
+      // Return streamers array so caller can use it directly (fixes race condition)
+      return streamersWithBadges;
     } catch (error) {
       console.error('Error loading live streamers:', error);
       setLoading(false);
@@ -728,12 +787,13 @@ export default function LiveRoom() {
         }));
         setGridSlots(emptySlots);
       }
+      return []; // Return empty array on error
     } finally {
       setLoading(false);
     }
   };
 
-  const loadUserGridLayout = async () => {
+  const loadUserGridLayout = async (streamers?: LiveStreamer[]) => {
     try {
       let user = null;
       if (!authDisabled) {
@@ -754,6 +814,9 @@ export default function LiveRoom() {
         setGridSlots(emptySlots);
         return;
       }
+      
+      // Use provided streamers array or fall back to state (for backwards compatibility)
+      const availableStreamers = streamers || liveStreamers;
 
       // Check if user is live - if so, ensure they're in slot 1
       const { data: userLiveStream } = await supabase
@@ -786,8 +849,8 @@ export default function LiveRoom() {
               };
             }
 
-            // Get streamer info
-            const streamer = liveStreamers.find(
+            // Get streamer info from provided array or state
+            const streamer = availableStreamers.find(
               (s) => s.profile_id === slot.streamer_id
             );
 
@@ -891,13 +954,13 @@ export default function LiveRoom() {
         // This ensures new users see all available cameras immediately
         // This also triggers active_viewers entries which will trigger publishing
         const emptySlots = sortedSlots.filter(s => s.isEmpty);
-        if (emptySlots.length > 0 && liveStreamers.length > 0) {
+        if (emptySlots.length > 0 && availableStreamers.length > 0) {
           // Get streamers not already in grid
           const usedStreamerIds = new Set(sortedSlots.filter(s => s.streamer).map(s => s.streamer!.profile_id));
-          const availableStreamers = liveStreamers.filter(s => !usedStreamerIds.has(s.profile_id));
+          const unusedStreamers = availableStreamers.filter(s => !usedStreamerIds.has(s.profile_id));
           
           // Fill empty slots with available streamers (prioritize published, then live_available)
-          const sortedStreamers = availableStreamers.sort((a, b) => {
+          const sortedStreamers = unusedStreamers.sort((a, b) => {
             if (a.is_published !== b.is_published) return a.is_published ? -1 : 1;
             if (a.live_available !== b.live_available) return a.live_available ? -1 : 1;
             return b.viewer_count - a.viewer_count;
@@ -1653,7 +1716,7 @@ export default function LiveRoom() {
 
           {/* Right Section - Go Live, Focus Mode, Options and Login grouped together */}
           <div className="flex items-center gap-3 flex-shrink-0 z-10">
-            <GoLiveButton onGoLive={handleGoLive} />
+            <GoLiveButton sharedRoom={sharedRoom} isRoomConnected={isRoomConnected} onGoLive={handleGoLive} />
             <button
               onClick={toggleFocusMode}
               className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-sm sm:text-base font-medium shadow-md"

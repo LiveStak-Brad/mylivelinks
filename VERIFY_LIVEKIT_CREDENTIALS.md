@@ -70,3 +70,4 @@ After redeploying, check what Vercel is actually using:
 3. Check browser console (F12) for detailed error messages
 4. If still failing, check Vercel function logs to see what credentials it's using
 
+

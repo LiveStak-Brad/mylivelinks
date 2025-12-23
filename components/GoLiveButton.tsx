@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLiveKitPublisher } from '@/hooks/useLiveKitPublisher';
 import { createClient } from '@/lib/supabase';
-import { LocalVideoTrack, LocalAudioTrack } from 'livekit-client';
+import { LocalVideoTrack, LocalAudioTrack, Room } from 'livekit-client';
 
 interface GoLiveButtonProps {
+  sharedRoom?: Room | null; // Shared LiveKit room connection
+  isRoomConnected?: boolean; // Whether shared room is connected
   onLiveStatusChange?: (isLive: boolean) => void;
   onGoLive?: (liveStreamId: number, profileId: string) => void;
 }
@@ -15,7 +17,7 @@ interface DeviceInfo {
   label: string;
 }
 
-export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveButtonProps) {
+export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onGoLive }: GoLiveButtonProps) {
   const [isLive, setIsLive] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -111,10 +113,6 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       }
     };
   }, [supabase]); // Removed onLiveStatusChange from deps to prevent loops
-
-  // Room name for publishing
-  // Use single global room for all streamers
-  const roomName = 'live_central';
 
   // Get current user's profile for participant name
   const [participantName, setParticipantName] = useState('Streamer');
@@ -231,13 +229,13 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
     }
   };
 
-  // LiveKit publisher hook - only enable when we have everything ready
-  const shouldEnablePublisher = !!(isLive && selectedVideoDevice && selectedAudioDevice && liveStreamId);
+  // LiveKit publisher hook - only enable when we have everything ready AND room is connected
+  const shouldEnablePublisher = !!(isLive && selectedVideoDevice && selectedAudioDevice && liveStreamId && isRoomConnected && sharedRoom);
   const [isPublishingState, setIsPublishingState] = useState(false);
   
   const { isPublishing, error, startPublishing, stopPublishing } = useLiveKitPublisher({
-    roomName,
-    participantName,
+    room: sharedRoom || null,
+    isRoomConnected,
     enabled: shouldEnablePublisher,
     videoDeviceId: selectedVideoDevice,
     audioDeviceId: selectedAudioDevice,

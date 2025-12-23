@@ -125,3 +125,4 @@ Share:
 3. Vercel function logs (from `/api/livekit/token`)
 4. Confirmation that all 3 variables are set in Vercel
 
+

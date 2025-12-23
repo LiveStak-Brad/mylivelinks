@@ -95,3 +95,4 @@ If you get errors when running the SQL:
 - Check that the `profiles` table exists first
 - Share the error message you see
 
+

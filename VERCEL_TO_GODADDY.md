@@ -170,3 +170,4 @@ CNAME   www     cname.vercel-dns.com
 - [ ] Tested domain in browser
 - [ ] HTTPS working (automatic)
 
+

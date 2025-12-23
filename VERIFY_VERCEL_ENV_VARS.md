@@ -101,3 +101,4 @@ Even if they're copied from `.env.local`, if `.env.local` has old/wrong values, 
 
 **Solution:** Copy fresh values from LiveKit dashboard → API Keys section.
 
+

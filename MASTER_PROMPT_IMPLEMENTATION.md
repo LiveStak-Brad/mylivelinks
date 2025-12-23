@@ -184,3 +184,4 @@ CREATE TABLE room_presence (
 - Self-pinning ensures consistent "self first" experience
 - Demand-based publishing still works internally for cost control
 
+

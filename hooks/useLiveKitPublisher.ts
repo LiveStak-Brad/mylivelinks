@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Room, RoomEvent, LocalTrack, createLocalTracks, Track } from 'livekit-client';
-import { createClient } from '@/lib/supabase';
 
 interface UseLiveKitPublisherOptions {
-  roomName: string;
-  participantName: string;
+  room: Room | null; // Shared room connection (must already be connected)
+  isRoomConnected: boolean; // Whether the shared room is connected
   enabled?: boolean;
   videoDeviceId?: string;
   audioDeviceId?: string;
@@ -16,8 +15,8 @@ interface UseLiveKitPublisherOptions {
 }
 
 export function useLiveKitPublisher({
-  roomName,
-  participantName,
+  room,
+  isRoomConnected,
   enabled = false,
   videoDeviceId,
   audioDeviceId,
@@ -25,422 +24,163 @@ export function useLiveKitPublisher({
   onUnpublished,
   onError,
 }: UseLiveKitPublisherOptions) {
-  const [room, setRoom] = useState<Room | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const roomRef = useRef<Room | null>(null);
   const tracksRef = useRef<LocalTrack[]>([]);
   const isPublishingRef = useRef(false); // Track publishing state to prevent flashing
-  const supabase = createClient();
+  const roomRef = useRef<Room | null>(null);
 
-  // Get LiveKit token for publisher
-  const getToken = useCallback(async () => {
-    try {
-      console.log('Getting token for:', { roomName, participantName });
-      
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.error('Auth error:', authError);
-        throw new Error('User not authenticated: ' + (authError?.message || 'No user'));
-      }
+  // Update room ref when room prop changes
+  useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
 
-      console.log('User authenticated:', { userId: user.id, email: user.email });
-
-      // Get the session token to pass to the API
-      // Try getSession first (faster), then getUser if needed
-      let session = null;
-      let accessToken = null;
-      
-      try {
-        const sessionResult = await supabase.auth.getSession();
-        session = sessionResult.data?.session;
-        accessToken = session?.access_token;
-        
-        console.log('Session check (getSession):', {
-          hasSession: !!session,
-          hasAccessToken: !!accessToken,
-          error: sessionResult.error?.message,
-        });
-      } catch (err) {
-        console.warn('getSession failed, trying getUser:', err);
-      }
-
-      // Fallback: if no session, try getUser (which might refresh the session)
-      if (!session || !accessToken) {
-        const userResult = await supabase.auth.getUser();
-        if (userResult.data?.user) {
-          // Try getSession again after getUser (might refresh)
-          const retrySession = await supabase.auth.getSession();
-          session = retrySession.data?.session;
-          accessToken = session?.access_token;
-          
-          console.log('Session check (after getUser):', {
-            hasSession: !!session,
-            hasAccessToken: !!accessToken,
-            userId: userResult.data.user.id,
-          });
-        }
-      }
-
-      if (!session || !accessToken) {
-        const errorMsg = 'No active session found. Please log in first.';
-        console.error(errorMsg);
-        throw new Error(errorMsg);
-      }
-
-      const headers: HeadersInit = { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
-      };
-
-      console.log('Requesting token with headers:', {
-        hasAuth: !!headers['Authorization'],
-        roomName,
-        participantName,
-      });
-
-      const response = await fetch('/api/livekit/token', {
-        method: 'POST',
-        headers,
-        credentials: 'include', // Include cookies
-        body: JSON.stringify({
-          roomName,
-          participantName,
-          canPublish: true,
-          canSubscribe: false,
-          userId: user.id, // Pass user ID for server-side verification
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { error: errorText || `HTTP ${response.status}` };
-        }
-        console.error('Token endpoint error:', { 
-          status: response.status, 
-          statusText: response.statusText,
-          error: errorData,
-          responseText: errorText.substring(0, 200),
-        });
-        throw new Error(errorData.error || `Failed to get token (${response.status} ${response.statusText})`);
-      }
-
-      const responseData = await response.json();
-      const { token, url } = responseData;
-      
-      console.log('Token received:', { 
-        hasToken: !!token, 
-        tokenLength: token?.length,
-        url,
-        urlLength: url?.length,
-        fullResponse: responseData,
-      });
-      
-      if (!token || !url) {
-        console.error('Invalid token response:', { token: !!token, url: !!url, responseData });
-        throw new Error('Invalid token response: missing token or URL');
-      }
-      
-      // Validate token format (JWT should have 3 parts separated by dots)
-      if (!token.includes('.') || token.split('.').length !== 3) {
-        console.error('Invalid token format:', { tokenLength: token.length, tokenPrefix: token.substring(0, 50) });
-        throw new Error('Invalid token format received from server');
-      }
-      
-      return { token, url };
-    } catch (err: any) {
-      console.error('Error getting LiveKit token:', err);
-      throw err;
-    }
-  }, [roomName, participantName, supabase]);
-
-  // Start publishing
+  // Start publishing (creates tracks and publishes to shared room)
   const startPublishing = useCallback(async () => {
-    // Allow manual start even if enabled is false (for fallback)
-    if (roomRef.current?.state === 'connected' || roomRef.current?.state === 'connecting') {
-      console.log('Already connected or connecting, skipping...');
+    // Must have a connected room
+    if (!room || !isRoomConnected || room.state !== 'connected') {
+      const err = new Error('Room not connected. Cannot publish.');
+      setError(err);
+      if (onError) {
+        onError(err);
+      }
+      return;
+    }
+
+    // Already publishing?
+    if (isPublishingRef.current) {
+      console.log('Already publishing, skipping...');
       return;
     }
 
     try {
       setError(null);
-      const { token, url } = await getToken();
-
-      // Import Room and createLocalTracks dynamically
-      const { Room: LiveKitRoom, createLocalTracks: createTracks } = await import('livekit-client');
       
-      const newRoom = new LiveKitRoom({
-        adaptiveStream: true,
-        dynacast: true,
+      // Import createLocalTracks dynamically
+      const { createLocalTracks: createTracks } = await import('livekit-client');
+
+      // Wait a moment to ensure room is fully ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify room is still connected
+      if (room.state !== 'connected') {
+        throw new Error('Room disconnected before publishing could start');
+      }
+
+      // Create tracks
+      console.log('Creating tracks with options:', {
+        hasAudioDevice: !!audioDeviceId,
+        hasVideoDevice: !!videoDeviceId,
+        roomState: room.state,
       });
 
-      // Set up event handlers
-      newRoom.on(RoomEvent.Connected, async () => {
-        setIsConnected(true);
-        setRoom(newRoom);
+      const trackOptions: any = {
+        audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
+        video: videoDeviceId 
+          ? { 
+              deviceId: { exact: videoDeviceId },
+              width: 1280,
+              height: 720,
+            }
+          : {
+              facingMode: 'user',
+              width: 1280,
+              height: 720,
+            },
+      };
 
-        // Wait a moment to ensure connection is fully established before publishing
-        // This prevents "engine not connected within timeout" errors
-        await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('Requesting tracks...');
+      const tracks = await createTracks(trackOptions);
+      console.log('Tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
 
-        // Verify room is still connected before proceeding
-        if (newRoom.state !== 'connected') {
-          console.error('Room disconnected before publishing could start');
-          setError(new Error('Room disconnected before publishing'));
-          if (onError) {
-            onError(new Error('Room disconnected before publishing'));
-          }
-          return;
-        }
-
-        // Create and publish tracks
+      tracksRef.current = tracks;
+      
+      // Verify room is still connected before publishing
+      if (room.state !== 'connected') {
+        console.error('Room disconnected after creating tracks');
+        // Clean up tracks
+        tracks.forEach(track => {
+          track.stop();
+          track.detach();
+        });
+        tracksRef.current = [];
+        throw new Error('Room disconnected before publishing');
+      }
+      
+      // Publish tracks with retry logic
+      console.log('Publishing tracks to shared room...', { roomState: room.state });
+      let publishAttempts = 0;
+      const maxPublishAttempts = 3;
+      
+      while (publishAttempts < maxPublishAttempts) {
         try {
-          console.log('Creating tracks with options:', {
-            hasAudioDevice: !!audioDeviceId,
-            hasVideoDevice: !!videoDeviceId,
-            roomState: newRoom.state,
-          });
-
-          const trackOptions: any = {
-            audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
-            video: videoDeviceId 
-              ? { 
-                  deviceId: { exact: videoDeviceId },
-                  width: 1280,
-                  height: 720,
-                }
-              : {
-                  facingMode: 'user',
-                  width: 1280,
-                  height: 720,
-                },
-          };
-
-          console.log('Requesting tracks...');
-          const tracks = await createTracks(trackOptions);
-          console.log('Tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
-
-          tracksRef.current = tracks;
+          // Wait a bit longer if this is a retry
+          if (publishAttempts > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * publishAttempts));
+          }
           
-          // Double-check room is still connected before publishing
-          if (newRoom.state !== 'connected') {
-            console.error('Room disconnected after creating tracks');
+          // Verify connection again
+          if (room.state !== 'connected') {
+            throw new Error('Room not connected');
+          }
+          
+          await Promise.all(tracks.map(track => {
+            console.log('Publishing track:', track.kind, `(attempt ${publishAttempts + 1})`);
+            return room.localParticipant.publishTrack(track);
+          }));
+          
+          console.log('All tracks published successfully');
+          // Only update state if it actually changed
+          if (!isPublishingRef.current) {
+            isPublishingRef.current = true;
+            setIsPublishing(true);
+          }
+          if (onPublished) {
+            onPublished();
+          }
+          break; // Success, exit retry loop
+        } catch (publishErr: any) {
+          publishAttempts++;
+          console.warn(`Publish attempt ${publishAttempts} failed:`, publishErr.message);
+          
+          if (publishAttempts >= maxPublishAttempts) {
+            // All retries failed
+            console.error('All publish attempts failed');
             // Clean up tracks
             tracks.forEach(track => {
               track.stop();
               track.detach();
             });
             tracksRef.current = [];
-            setError(new Error('Room disconnected before publishing'));
+            setError(publishErr);
             if (onError) {
-              onError(new Error('Room disconnected before publishing'));
-            }
-            return;
-          }
-          
-          // Publish tracks with retry logic
-          console.log('Publishing tracks...', { roomState: newRoom.state });
-          let publishAttempts = 0;
-          const maxPublishAttempts = 3;
-          
-          while (publishAttempts < maxPublishAttempts) {
-            try {
-              // Wait a bit longer if this is a retry
-              if (publishAttempts > 0) {
-                await new Promise(resolve => setTimeout(resolve, 1000 * publishAttempts));
-              }
-              
-              // Verify connection again
-              if (newRoom.state !== 'connected') {
-                throw new Error('Room not connected');
-              }
-              
-              await Promise.all(tracks.map(track => {
-                console.log('Publishing track:', track.kind, `(attempt ${publishAttempts + 1})`);
-                return newRoom.localParticipant.publishTrack(track);
-              }));
-              
-              console.log('All tracks published successfully');
-              // Only update state if it actually changed
-              if (!isPublishingRef.current) {
-                isPublishingRef.current = true;
-                setIsPublishing(true);
-              }
-              if (onPublished) {
-                onPublished();
-              }
-              break; // Success, exit retry loop
-            } catch (publishErr: any) {
-              publishAttempts++;
-              console.warn(`Publish attempt ${publishAttempts} failed:`, publishErr.message);
-              
-              if (publishAttempts >= maxPublishAttempts) {
-                // All retries failed
-                console.error('All publish attempts failed');
-                // Clean up tracks
-                tracks.forEach(track => {
-                  track.stop();
-                  track.detach();
-                });
-                tracksRef.current = [];
-                setError(publishErr);
-                if (onError) {
-                  onError(publishErr);
-                }
-              }
-              // Otherwise, continue to next retry
+              onError(publishErr);
             }
           }
-        } catch (err: any) {
-          console.error('Error publishing tracks:', err);
-          setError(err);
-          if (onError) {
-            onError(err);
-          }
+          // Otherwise, continue to next retry
         }
-      });
-
-      newRoom.on(RoomEvent.Disconnected, () => {
-        setIsConnected(false);
-        if (isPublishingRef.current) {
-          isPublishingRef.current = false;
-          setIsPublishing(false);
-        }
-        setRoom(null);
-        if (onUnpublished) {
-          onUnpublished();
-        }
-      });
-
-      // Connect to room
-      console.log('Connecting to MyLiveLinks room:', { 
-        roomName, 
-        url: url?.substring(0, 60) + '...',
-        tokenLength: token?.length,
-        tokenPrefix: token?.substring(0, 30) + '...',
-        urlStartsWith: url?.substring(0, 6), // Should be "wss://"
-        fullUrl: url, // Log full URL for debugging
-      });
-      
-      // Decode token to verify it was generated correctly
-      try {
-        const tokenParts = token.split('.');
-        if (tokenParts.length === 3) {
-          const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
-          console.log('Token payload decoded:', {
-            sub: payload.sub,
-            iss: payload.iss,
-            exp: payload.exp,
-            expDate: new Date(payload.exp * 1000).toISOString(),
-            video: payload.video,
-            room: payload.video?.room,
-            roomMatches: payload.video?.room === roomName,
-          });
-        }
-      } catch (decodeErr) {
-        console.warn('Could not decode token:', decodeErr);
       }
-      
-      try {
-        console.log('Attempting LiveKit connection...', {
-          url: url?.substring(0, 60) + '...',
-          roomName,
-          tokenLength: token?.length,
-          tokenPrefix: token?.substring(0, 30) + '...',
-        });
-        
-        // Validate URL format before connecting
-        if (!url || (!url.startsWith('wss://') && !url.startsWith('ws://'))) {
-          throw new Error(`Invalid LiveKit URL format: ${url?.substring(0, 50)}. URL must start with wss:// or ws://`);
-        }
-        
-        // Connect to room - wait for connection to complete
-        await newRoom.connect(url, token);
-        
-        // Wait for connection to be fully established before proceeding
-        // This prevents "engine not connected within timeout" errors
-        let connectionWaitAttempts = 0;
-        const maxWaitAttempts = 20; // 20 * 250ms = 5 seconds max wait
-        while (newRoom.state !== 'connected' && connectionWaitAttempts < maxWaitAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 250));
-          connectionWaitAttempts++;
-        }
-        
-        if (newRoom.state !== 'connected') {
-          throw new Error('Room connection timeout: Room did not connect within 5 seconds');
-        }
-        
-        console.log('Successfully connected to MyLiveLinks room', { 
-          roomState: newRoom.state,
-          waitAttempts: connectionWaitAttempts 
-        });
-      } catch (connectErr: any) {
-        console.error('Room connection error:', {
-          message: connectErr.message,
-          code: connectErr.code,
-          reason: connectErr.reason,
-          url: url?.substring(0, 60),
-          fullUrl: url,
-          roomName,
-          errorType: connectErr.constructor?.name,
-          stack: connectErr.stack?.substring(0, 500),
-          fullError: connectErr,
-        });
-        
-        // Provide more specific error messages
-        let errorMessage = 'Failed to connect to room';
-        if (connectErr.message) {
-          errorMessage += `: ${connectErr.message}`;
-        } else if (connectErr.reason) {
-          errorMessage += `: ${connectErr.reason}`;
-        } else {
-          errorMessage += ': Could not establish signal connection';
-        }
-        
-        // Add helpful hints based on error type
-        if (connectErr.message?.includes('token') || connectErr.message?.includes('invalid')) {
-          errorMessage += ' (The LiveKit token is invalid. Check Vercel environment variables match your LiveKit dashboard)';
-        } else if (connectErr.message?.includes('network') || connectErr.message?.includes('timeout')) {
-          errorMessage += ' (Check your internet connection)';
-        } else if (connectErr.message?.includes('URL')) {
-          errorMessage += ' (Check LIVEKIT_URL in Vercel environment variables)';
-        }
-        
-        throw new Error(errorMessage);
-      }
-      
-      roomRef.current = newRoom;
-      setRoom(newRoom);
     } catch (err: any) {
-      console.error('Error connecting to MyLiveLinks room:', err);
+      console.error('Error publishing tracks:', err);
       setError(err);
-      setIsConnected(false);
-      setIsPublishing(false);
       if (onError) {
         onError(err);
       }
-      // Re-throw so caller can handle it
-      throw err;
     }
-  }, [enabled, getToken, onPublished, onUnpublished, onError, roomName, videoDeviceId, audioDeviceId]);
+  }, [room, isRoomConnected, videoDeviceId, audioDeviceId, onPublished, onError]);
 
-  // Stop publishing
+  // Stop publishing (unpublishes tracks but does NOT disconnect room)
   const stopPublishing = useCallback(async () => {
     try {
       console.log('Stopping publishing...', {
-        hasRoom: !!roomRef.current,
+        hasRoom: !!room,
         tracksCount: tracksRef.current.length,
-        roomState: roomRef.current?.state,
+        roomState: room?.state,
       });
 
-      // Unpublish tracks from room first
-      if (roomRef.current && roomRef.current.state === 'connected') {
-        const participant = roomRef.current.localParticipant;
+      // Unpublish tracks from room first (if room is still connected)
+      if (room && room.state === 'connected') {
+        const participant = room.localParticipant;
         if (participant) {
           // Unpublish tracks we published (use tracksRef to ensure we unpublish the right ones)
           for (const track of tracksRef.current) {
@@ -465,41 +205,27 @@ export function useLiveKitPublisher({
       });
       tracksRef.current = [];
 
-      // Disconnect from room
-      if (roomRef.current) {
-        try {
-          await roomRef.current.disconnect();
-          console.log('Disconnected from room');
-        } catch (err) {
-          console.warn('Error disconnecting from room:', err);
-        }
-        roomRef.current = null;
-        setRoom(null);
-        setIsConnected(false);
-        if (isPublishingRef.current) {
-          isPublishingRef.current = false;
-          setIsPublishing(false);
-        }
+      // Update state (but do NOT disconnect room - it's shared)
+      if (isPublishingRef.current) {
+        isPublishingRef.current = false;
+        setIsPublishing(false);
+      }
+
+      if (onUnpublished) {
+        onUnpublished();
       }
 
       console.log('Stop publishing completed');
     } catch (err) {
       console.error('Error in stopPublishing:', err);
-      // Reset state even if disconnect fails
+      // Reset state even if unpublish fails
       tracksRef.current = [];
-      if (roomRef.current) {
-        try {
-          await roomRef.current.disconnect();
-        } catch (e) {
-          // Ignore disconnect errors
-        }
+      if (isPublishingRef.current) {
+        isPublishingRef.current = false;
+        setIsPublishing(false);
       }
-      roomRef.current = null;
-      setRoom(null);
-      setIsConnected(false);
-      setIsPublishing(false);
     }
-  }, []);
+  }, [room, onUnpublished]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -508,20 +234,18 @@ export function useLiveKitPublisher({
     };
   }, [stopPublishing]);
 
-  // Auto-start when enabled
+  // Auto-start when enabled and room is connected
   useEffect(() => {
-    if (enabled && !isConnected && !isPublishing) {
-      console.log('Auto-starting publisher (enabled=true)...');
+    if (enabled && isRoomConnected && room && room.state === 'connected' && !isPublishing) {
+      console.log('Auto-starting publisher (enabled=true, room connected)...');
       startPublishing();
-    } else if (!enabled && roomRef.current) {
+    } else if (!enabled && isPublishing) {
       console.log('Stopping publisher (enabled=false)...');
       stopPublishing();
     }
-  }, [enabled, isConnected, isPublishing, startPublishing, stopPublishing]);
+  }, [enabled, isRoomConnected, room, isPublishing, startPublishing, stopPublishing]);
 
   return {
-    room,
-    isConnected,
     isPublishing,
     error,
     startPublishing,

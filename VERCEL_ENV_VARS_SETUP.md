@@ -129,3 +129,4 @@ NEXT_PUBLIC_DISABLE_AUTH=false
 - Verify all required variables are set
 - Check browser console for specific error messages
 
+

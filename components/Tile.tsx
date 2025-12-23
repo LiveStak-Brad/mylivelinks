@@ -77,12 +77,14 @@ export default function Tile({
   const subscriptionRef = useRef<{ streamerId: string | null; subscribed: boolean }>({ streamerId: null, subscribed: false });
 
   // Use shared room connection instead of creating our own
-  // Subscribe to tracks from the streamer when room is connected and streamer is publishing
+  // Subscribe to tracks from the streamer when room is connected
+  // CRITICAL: Only depend on streamerId and liveStreamId to prevent re-subscription loops
+  // CRITICAL: Don't return early if live_available=true but is_published=false - wait for tracks
   useEffect(() => {
-    // Only proceed if we have all required data
-    if (!sharedRoom || !isRoomConnected || !isLive || !liveStreamId || !streamerId) {
-      // Only clear tracks if streamer is no longer live (not just because room disconnected temporarily)
-      if (!isLive && subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
+    // Must have room, connection, liveStreamId, streamerId, and streamer must be live_available
+    if (!sharedRoom || !isRoomConnected || !liveStreamId || !streamerId || !isLiveAvailable) {
+      // Only clear tracks if streamer is no longer live_available (not just because room disconnected temporarily)
+      if (!isLiveAvailable && subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
         setVideoTrack(null);
         setAudioTrack(null);
         subscriptionRef.current.subscribed = false;
@@ -90,8 +92,11 @@ export default function Tile({
       }
       return;
     }
+    
+    // If streamer is live_available but not yet published, still try to subscribe (tracks may appear soon)
+    // Heartbeat is already running, which will trigger publishing
 
-    // Skip if already subscribed to this streamer
+    // Skip if already subscribed to this streamer (identity check only)
     if (subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
       return;
     }
@@ -130,21 +135,56 @@ export default function Tile({
     };
 
     // Subscribe to existing tracks
-    sharedRoom.remoteParticipants.forEach((participant) => {
-      if (participant.identity === streamerId) {
-        participant.trackPublications.forEach((publication) => {
-          if (publication.track) {
-            handleTrackSubscribed(publication.track as RemoteTrack, publication, participant);
-          }
-        });
+    const checkForTracks = () => {
+      sharedRoom.remoteParticipants.forEach((participant) => {
+        if (participant.identity === streamerId) {
+          participant.trackPublications.forEach((publication) => {
+            if (publication.track) {
+              handleTrackSubscribed(publication.track as RemoteTrack, publication, participant);
+            }
+          });
+        }
+      });
+    };
+    
+    // Check immediately
+    checkForTracks();
+    
+    // If tracks not found and streamer is live_available but not yet published, retry
+    // This handles the race condition where heartbeat triggers publishing but tracks aren't ready yet
+    let retryAttempts = 0;
+    const maxRetryAttempts = 10;
+    const retryInterval = 600; // 600ms between retries = ~6 seconds total
+    
+    const retryTimer = setInterval(() => {
+      // Stop retrying if conditions changed
+      if (!sharedRoom || !isRoomConnected || !liveStreamId || !streamerId || !isLiveAvailable) {
+        clearInterval(retryTimer);
+        return;
       }
-    });
+      
+      // Stop if we already have tracks
+      if (videoTrack || audioTrack) {
+        clearInterval(retryTimer);
+        return;
+      }
+      
+      retryAttempts++;
+      if (retryAttempts >= maxRetryAttempts) {
+        clearInterval(retryTimer);
+        return;
+      }
+      
+      // Check for tracks again
+      checkForTracks();
+    }, retryInterval);
 
     // Listen for new tracks
     sharedRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
     sharedRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
 
     return () => {
+      clearInterval(retryTimer);
       sharedRoom.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       sharedRoom.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
       // Only mark as unsubscribed if this is the same streamer
@@ -153,6 +193,8 @@ export default function Tile({
         subscriptionRef.current.streamerId = null;
       }
     };
+    // CRITICAL: Depend on streamerId and liveStreamId for identity, isLive for publishing state
+    // The subscriptionRef guard prevents re-subscription when streamerId hasn't changed
   }, [sharedRoom, isRoomConnected, isLive, liveStreamId, streamerId]);
 
   // Check if this is the current user's tile
@@ -296,12 +338,13 @@ export default function Tile({
   }, [audioTrack, isMuted, volume]);
 
   // Manage viewer heartbeat when tile is active and not muted
-  // IMPORTANT: Enable heartbeat even when streamer is watching their own stream in preview mode
-  // This ensures that when a streamer joins as a viewer, it triggers publishing
+  // CRITICAL: Enable heartbeat for ALL live_available streamers (not just is_published)
+  // This ensures that when a viewer places a streamer in a tile, heartbeat creates active_viewers entry
+  // which triggers is_published to become true, which then starts publishing
   const shouldSendHeartbeat = !!(
     liveStreamId !== undefined && 
     !isMuted &&
-    (isLive || (isLiveAvailable && isCurrentUser)) // Enable for published streams OR current user's own preview
+    isLiveAvailable // Enable for ANY live_available streamer (published or waiting)
   );
   
   useViewerHeartbeat({
