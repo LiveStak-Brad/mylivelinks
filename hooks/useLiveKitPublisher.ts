@@ -216,14 +216,24 @@ export function useLiveKitPublisher({
       });
 
       // Connect to room
-      console.log('Connecting to MyLiveLinks room:', { roomName, url: url?.substring(0, 50) + '...' });
+      console.log('Connecting to MyLiveLinks room:', { 
+        roomName, 
+        url: url?.substring(0, 50) + '...',
+        tokenLength: token?.length,
+        tokenPrefix: token?.substring(0, 20) + '...',
+      });
       
       try {
         await newRoom.connect(url, token);
         console.log('Successfully connected to MyLiveLinks room');
       } catch (connectErr: any) {
-        console.error('Room connection error:', connectErr);
-        throw new Error('Failed to connect to room: ' + (connectErr.message || 'Unknown error'));
+        console.error('Room connection error:', {
+          message: connectErr.message,
+          code: connectErr.code,
+          url: url?.substring(0, 50),
+          roomName,
+        });
+        throw new Error(`Failed to connect to room: ${connectErr.message || 'Invalid token or connection error'}`);
       }
       
       roomRef.current = newRoom;

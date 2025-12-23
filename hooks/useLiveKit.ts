@@ -185,9 +185,27 @@ export function useLiveKit({
       });
 
       // Connect to room
-      await newRoom.connect(url, token);
-      roomRef.current = newRoom;
-      setRoom(newRoom);
+      console.log('Connecting to LiveKit room:', { 
+        url: url?.substring(0, 50) + '...', 
+        roomName,
+        tokenLength: token?.length,
+        tokenPrefix: token?.substring(0, 20) + '...',
+      });
+      
+      try {
+        await newRoom.connect(url, token);
+        console.log('Successfully connected to LiveKit room');
+        roomRef.current = newRoom;
+        setRoom(newRoom);
+      } catch (connectErr: any) {
+        console.error('LiveKit connection error:', {
+          message: connectErr.message,
+          code: connectErr.code,
+          url: url?.substring(0, 50),
+          roomName,
+        });
+        throw new Error(`Failed to connect to room: ${connectErr.message || 'Invalid token or connection error'}`);
+      }
     } catch (err: any) {
       console.error('Error connecting to LiveKit room:', err);
       setError(err);

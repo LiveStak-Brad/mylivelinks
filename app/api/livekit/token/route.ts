@@ -192,14 +192,38 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Generate token
+    // Generate token with expiration (6 hours)
     const token = await at.toJwt();
 
-    console.log('Token generated successfully for:', { identity, name, roomName });
+    console.log('Token generated successfully for:', { 
+      identity, 
+      name, 
+      roomName,
+      url: LIVEKIT_URL,
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 20) + '...',
+    });
+
+    // Validate URL format
+    if (!LIVEKIT_URL || (!LIVEKIT_URL.startsWith('wss://') && !LIVEKIT_URL.startsWith('ws://') && !LIVEKIT_URL.startsWith('https://'))) {
+      console.error('Invalid LIVEKIT_URL format:', LIVEKIT_URL);
+      return NextResponse.json(
+        { error: 'Invalid LiveKit URL format. Must start with wss://, ws://, or https://' },
+        { status: 500 }
+      );
+    }
+
+    // Ensure URL is WebSocket format for client connection
+    let wsUrl = LIVEKIT_URL;
+    if (wsUrl.startsWith('https://')) {
+      wsUrl = wsUrl.replace('https://', 'wss://');
+    } else if (!wsUrl.startsWith('wss://') && !wsUrl.startsWith('ws://')) {
+      wsUrl = `wss://${wsUrl}`;
+    }
 
     return NextResponse.json({
       token,
-      url: LIVEKIT_URL,
+      url: wsUrl,
     });
   } catch (error: any) {
     console.error('Error generating LiveKit token:', error);
