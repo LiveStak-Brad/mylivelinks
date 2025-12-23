@@ -37,11 +37,14 @@ export async function POST(request: NextRequest) {
     // Log credential status (without exposing secrets)
     console.log('LiveKit credentials check:', {
       hasUrl: !!LIVEKIT_URL,
-      urlFormat: LIVEKIT_URL?.substring(0, 20) + '...',
+      urlFormat: LIVEKIT_URL?.substring(0, 50) + '...',
+      urlFull: LIVEKIT_URL, // Log full URL to verify it matches
       hasApiKey: !!LIVEKIT_API_KEY,
       apiKeyLength: LIVEKIT_API_KEY?.length,
+      apiKeyPrefix: LIVEKIT_API_KEY?.substring(0, 15) + '...', // First 15 chars to verify
       hasApiSecret: !!LIVEKIT_API_SECRET,
       apiSecretLength: LIVEKIT_API_SECRET?.length,
+      apiSecretPrefix: LIVEKIT_API_SECRET?.substring(0, 15) + '...', // First 15 chars to verify
     });
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
