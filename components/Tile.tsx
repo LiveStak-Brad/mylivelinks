@@ -73,19 +73,32 @@ export default function Tile({
   const [isCurrentUser, setIsCurrentUser] = useState(false);
   const supabase = createClient();
 
+  // Track subscription state to prevent re-subscriptions
+  const subscriptionRef = useRef<{ streamerId: string | null; subscribed: boolean }>({ streamerId: null, subscribed: false });
+
   // Use shared room connection instead of creating our own
   // Subscribe to tracks from the streamer when room is connected and streamer is publishing
   useEffect(() => {
-    if (!sharedRoom || !isRoomConnected) {
-      setVideoTrack(null);
-      setAudioTrack(null);
+    // Only proceed if we have all required data
+    if (!sharedRoom || !isRoomConnected || !isLive || !liveStreamId || !streamerId) {
+      // Only clear tracks if streamer is no longer live (not just because room disconnected temporarily)
+      if (!isLive && subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
+        setVideoTrack(null);
+        setAudioTrack(null);
+        subscriptionRef.current.subscribed = false;
+        subscriptionRef.current.streamerId = null;
+      }
       return;
     }
 
-    // Only subscribe if streamer is actually publishing (isLive = true)
-    if (!isLive || !liveStreamId || !streamerId) {
+    // Skip if already subscribed to this streamer
+    if (subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
       return;
     }
+
+    // Mark as subscribed
+    subscriptionRef.current.subscribed = true;
+    subscriptionRef.current.streamerId = streamerId;
 
     const handleTrackSubscribed = (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
       // Only subscribe to tracks from this specific streamer
@@ -134,6 +147,11 @@ export default function Tile({
     return () => {
       sharedRoom.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       sharedRoom.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      // Only mark as unsubscribed if this is the same streamer
+      if (subscriptionRef.current.streamerId === streamerId) {
+        subscriptionRef.current.subscribed = false;
+        subscriptionRef.current.streamerId = null;
+      }
     };
   }, [sharedRoom, isRoomConnected, isLive, liveStreamId, streamerId]);
 
@@ -221,25 +239,60 @@ export default function Tile({
     }
   }, [localPreviewStream]);
 
-  // Attach video track when it becomes available
+  // Attach video track when it becomes available - use ref to prevent re-attachment
+  const attachedVideoTrackRef = useRef<RemoteTrack | null>(null);
   useEffect(() => {
     if (videoTrack && videoRef.current) {
-      videoTrack.attach(videoRef.current);
-      return () => {
-        videoTrack.detach();
-      };
+      // Only attach if it's a different track
+      if (attachedVideoTrackRef.current !== videoTrack) {
+        // Detach previous track if exists
+        if (attachedVideoTrackRef.current && videoRef.current) {
+          attachedVideoTrackRef.current.detach();
+        }
+        videoTrack.attach(videoRef.current);
+        attachedVideoTrackRef.current = videoTrack;
+      }
+    } else if (!videoTrack && attachedVideoTrackRef.current && videoRef.current) {
+      // Clean up if track is removed
+      attachedVideoTrackRef.current.detach();
+      attachedVideoTrackRef.current = null;
     }
+    
+    return () => {
+      if (attachedVideoTrackRef.current && videoRef.current) {
+        attachedVideoTrackRef.current.detach();
+        attachedVideoTrackRef.current = null;
+      }
+    };
   }, [videoTrack]);
 
-  // Attach audio track and apply volume/mute
+  // Attach audio track and apply volume/mute - use ref to prevent re-attachment
+  const attachedAudioTrackRef = useRef<RemoteTrack | null>(null);
   useEffect(() => {
     if (audioTrack && audioRef.current) {
-      audioTrack.attach(audioRef.current);
+      // Only attach if it's a different track
+      if (attachedAudioTrackRef.current !== audioTrack) {
+        // Detach previous track if exists
+        if (attachedAudioTrackRef.current && audioRef.current) {
+          attachedAudioTrackRef.current.detach();
+        }
+        audioTrack.attach(audioRef.current);
+        attachedAudioTrackRef.current = audioTrack;
+      }
+      // Always update volume/mute
       audioRef.current.volume = isMuted ? 0 : volume;
-      return () => {
-        audioTrack.detach();
-      };
+    } else if (!audioTrack && attachedAudioTrackRef.current && audioRef.current) {
+      // Clean up if track is removed
+      attachedAudioTrackRef.current.detach();
+      attachedAudioTrackRef.current = null;
     }
+    
+    return () => {
+      if (attachedAudioTrackRef.current && audioRef.current) {
+        attachedAudioTrackRef.current.detach();
+        attachedAudioTrackRef.current = null;
+      }
+    };
   }, [audioTrack, isMuted, volume]);
 
   // Manage viewer heartbeat when tile is active and not muted

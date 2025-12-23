@@ -158,33 +158,49 @@ export default function LiveRoom() {
           dynacast: true,
         });
 
-        // Set up event handlers
-        newRoom.on(RoomEvent.Connected, () => {
+        // Set up event handlers BEFORE connecting
+        const handleConnected = () => {
           if (mounted) {
             console.log('Shared LiveKit room connected');
             setIsRoomConnected(true);
             roomConnectionRef.current.connected = true;
             roomConnectionRef.current.connecting = false;
           }
-        });
+        };
 
-        newRoom.on(RoomEvent.Disconnected, () => {
+        const handleDisconnected = () => {
           if (mounted) {
             console.log('Shared LiveKit room disconnected');
             setIsRoomConnected(false);
             roomConnectionRef.current.connected = false;
             roomConnectionRef.current.connecting = false;
           }
-        });
+        };
+
+        newRoom.on(RoomEvent.Connected, handleConnected);
+        newRoom.on(RoomEvent.Disconnected, handleDisconnected);
 
         // Connect to room
         await newRoom.connect(url, token);
         
+        // Wait a moment to ensure connection is fully established
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         if (mounted) {
-          roomRef.current = newRoom;
-          setSharedRoom(newRoom);
+          // Verify connection before setting state
+          if (newRoom.state === 'connected') {
+            roomRef.current = newRoom;
+            setSharedRoom(newRoom);
+            setIsRoomConnected(true);
+            roomConnectionRef.current.connected = true;
+            roomConnectionRef.current.connecting = false;
+          } else {
+            throw new Error('Room did not connect successfully');
+          }
         } else {
           // Cleanup if component unmounted during connection
+          newRoom.off(RoomEvent.Connected, handleConnected);
+          newRoom.off(RoomEvent.Disconnected, handleDisconnected);
           await newRoom.disconnect();
         }
       } catch (error: any) {
