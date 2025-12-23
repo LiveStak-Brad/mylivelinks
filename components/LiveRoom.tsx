@@ -668,10 +668,67 @@ export default function LiveRoom() {
           p_viewer_id: user.id,
         });
         if (fallbackResult.error) {
-          console.error('RPC error, falling back to regular query:', fallbackResult.error);
-          throw fallbackResult.error;
+          console.error('RPC error, falling back to direct query:', fallbackResult.error);
+          // Final fallback: direct query from live_streams
+          const directResult = await supabase
+            .from('live_streams')
+            .select('id, profile_id, is_published, live_available')
+            .eq('live_available', true)
+            .order('published_at', { ascending: false, nullsFirst: false })
+            .limit(50);
+          
+          if (directResult.error) {
+            console.error('Direct query also failed:', directResult.error);
+            return []; // Return empty array instead of throwing
+          }
+          
+          // Convert to expected format
+          const profileIds = directResult.data?.map(s => s.profile_id) || [];
+          if (profileIds.length === 0) {
+            return [];
+          }
+          
+          // Load profiles
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, gifter_level')
+            .in('id', profileIds);
+          
+          if (!profiles) {
+            return [];
+          }
+          
+          // Get viewer counts
+          const streamersWithCounts = await Promise.all(
+            directResult.data.map(async (stream) => {
+              const profile = profiles.find(p => p.id === stream.profile_id);
+              if (!profile) return null;
+              
+              const { count } = await supabase
+                .from('active_viewers')
+                .select('*', { count: 'exact', head: true })
+                .eq('live_stream_id', stream.id)
+                .eq('is_active', true)
+                .eq('is_unmuted', true)
+                .eq('is_visible', true)
+                .eq('is_subscribed', true)
+                .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
+              
+              return {
+                streamer_id: profile.id,
+                username: profile.username,
+                avatar_url: profile.avatar_url,
+                live_stream_id: stream.id,
+                is_published: stream.is_published,
+                viewer_count: count || 0,
+              };
+            })
+          );
+          
+          data = streamersWithCounts.filter(s => s !== null) as any[];
+        } else {
+          data = fallbackResult.data || [];
         }
-        data = fallbackResult.data || [];
         error = null; // Clear error since fallback succeeded
       }
 
