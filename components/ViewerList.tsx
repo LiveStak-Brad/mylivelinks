@@ -53,18 +53,18 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
     
     initViewers();
 
-    // Realtime subscriptions (replaces polling)
-    const activeViewersChannel = supabase
-      .channel('viewers-realtime')
+    // Realtime subscriptions for room_presence (global room presence)
+    const roomPresenceChannel = supabase
+      .channel('room-presence-realtime')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'active_viewers',
+          table: 'room_presence',
         },
         () => {
-          // Reload viewers when active_viewers changes
+          // Reload viewers when room presence changes
           loadViewers();
         }
       )
@@ -87,7 +87,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(activeViewersChannel);
+      supabase.removeChannel(roomPresenceChannel);
       supabase.removeChannel(liveStreamsChannel);
     };
   }, []);
@@ -106,46 +106,34 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         setCurrentUserId(userId);
       }
 
-      // Get viewers from active_viewers (people watching streams)
-      const { data, error } = await supabase.rpc('get_viewer_list_filtered', {
-        p_viewer_id: userId || '',
-        p_live_stream_id: null,
-      });
+      // Get viewers from room_presence (global room presence, NOT tile watching)
+      // This shows everyone currently on /live page, regardless of what tiles they're watching
+      const { data: presenceData, error } = await supabase
+        .from('room_presence')
+        .select('profile_id, username, is_live_available, last_seen_at')
+        .gt('last_seen_at', new Date(Date.now() - 60000).toISOString()) // Active within last 60 seconds
+        .order('is_live_available', { ascending: false }) // live_available users first
+        .order('last_seen_at', { ascending: false }); // Then by most recent
 
       if (error) throw error;
-      
-      // Ensure current user is always included in viewer list (room presence)
-      const viewerIds = new Set((data || []).map((item: any) => item.viewer_id));
-      let combinedData = [...(data || [])];
-      
-      // Add current user if not already in the list
-      if (userId && !viewerIds.has(userId)) {
-        const { data: currentUserProfile } = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, gifter_level')
-          .eq('id', userId)
-          .single();
-        
-        if (currentUserProfile) {
-          combinedData.push({
-            viewer_id: currentUserProfile.id,
-            username: currentUserProfile.username,
-            avatar_url: currentUserProfile.avatar_url,
-            gifter_level: currentUserProfile.gifter_level || 0,
-            joined_at: new Date().toISOString(),
-          });
-        }
-      }
 
-      // Get badge info and live stream info
-      const profileIds = [...new Set((combinedData || []).map((item: any) => item.viewer_id))];
+      const profileIds = [...new Set((presenceData || []).map((item: any) => item.profile_id))];
       
-      // Check which profiles are live available and published
+      // Get profile info (avatar, gifter_level) and live stream info
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url, gifter_level')
+        .in('id', profileIds);
+
       const { data: liveStreams } = await supabase
         .from('live_streams')
         .select('profile_id, id, live_available, is_published')
         .in('profile_id', profileIds)
         .eq('live_available', true);
+
+      const profileMap = new Map(
+        (profiles || []).map((p: any) => [p.id, p])
+      );
 
       const liveStreamMap = new Map(
         (liveStreams || []).map((ls: any) => [
@@ -158,198 +146,64 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         ])
       );
 
+      // Build viewers list from room_presence
       const viewersWithBadges = await Promise.all(
-        (combinedData || []).map(async (item: any) => {
+        (presenceData || []).map(async (presence: any) => {
+          const profile = profileMap.get(presence.profile_id);
+          if (!profile) return null;
+
           let badgeInfo = null;
-          if (item.gifter_level !== null && item.gifter_level > 0) {
+          if (profile.gifter_level !== null && profile.gifter_level > 0) {
             const { data: badge } = await supabase
               .from('gifter_levels')
               .select('*')
-              .eq('level', item.gifter_level)
+              .eq('level', profile.gifter_level)
               .single();
             badgeInfo = badge;
           }
 
-          const liveInfo = liveStreamMap.get(item.viewer_id) as { 
+          const liveInfo = liveStreamMap.get(presence.profile_id) as { 
             isLiveAvailable: boolean; 
             isPublished: boolean;
             streamId: number 
           } | undefined;
 
           return {
-            profile_id: item.viewer_id,
-            username: item.username,
-            avatar_url: item.avatar_url,
-            gifter_level: item.gifter_level || 0,
+            profile_id: presence.profile_id,
+            username: presence.username || profile.username,
+            avatar_url: profile.avatar_url,
+            gifter_level: profile.gifter_level || 0,
             badge_name: badgeInfo?.badge_name,
             badge_color: badgeInfo?.badge_color,
             is_active: true,
-            last_active_at: item.joined_at,
-            is_live_available: liveInfo?.isLiveAvailable || false,
+            last_active_at: presence.last_seen_at,
+            is_live_available: presence.is_live_available || liveInfo?.isLiveAvailable || false,
             is_published: liveInfo?.isPublished || false,
             live_stream_id: liveInfo?.streamId,
           };
         })
       );
 
-      // Find room owner (streamer with most viewers)
-      // Get streamer_id from active_viewers for each viewer
-      const { data: activeViewersData } = await supabase
-        .from('active_viewers')
-        .select('streamer_id, viewer_id')
-        .in('viewer_id', profileIds)
-        .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
-
-      // Count viewers per streamer
-      const streamerViewerCounts = new Map<string, number>();
-      activeViewersData?.forEach((av: any) => {
-        const count = streamerViewerCounts.get(av.streamer_id) || 0;
-        streamerViewerCounts.set(av.streamer_id, count + 1);
-      });
-
-      // Find streamer with most viewers (room owner)
-      let foundRoomOwnerId: string | null = null;
-      let maxViewers = 0;
-      streamerViewerCounts.forEach((count, streamerId) => {
-        if (count > maxViewers) {
-          maxViewers = count;
-          foundRoomOwnerId = streamerId;
-        }
-      });
-      
-      setRoomOwnerId(foundRoomOwnerId);
-
-      // Sort viewers: room owner first, then current user, then everyone else
-      const sortedViewers = viewersWithBadges.sort((a, b) => {
-        // Room owner first
-        if (a.profile_id === foundRoomOwnerId && b.profile_id !== foundRoomOwnerId) return -1;
-        if (b.profile_id === foundRoomOwnerId && a.profile_id !== foundRoomOwnerId) return 1;
-        
-        // Current user second (if not room owner)
-        if (a.profile_id === currentUserId && b.profile_id !== currentUserId && a.profile_id !== foundRoomOwnerId) return -1;
-        if (b.profile_id === currentUserId && a.profile_id !== currentUserId && b.profile_id !== foundRoomOwnerId) return 1;
-        
-        // Everyone else sorted by join time (most recent first)
-        return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
-      });
+      // Filter out nulls and sort: live_available users first, then others
+      const sortedViewers = viewersWithBadges
+        .filter((v): v is Viewer => v !== null)
+        .sort((a, b) => {
+          // live_available users first
+          if (a.is_live_available && !b.is_live_available) return -1;
+          if (!a.is_live_available && b.is_live_available) return 1;
+          
+          // Current user second (if not live)
+          if (a.profile_id === currentUserId && b.profile_id !== currentUserId && !a.is_live_available) return -1;
+          if (b.profile_id === currentUserId && a.profile_id !== currentUserId && !b.is_live_available) return 1;
+          
+          // Everyone else sorted by last_seen_at (most recent first)
+          return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
+        });
 
       setViewers(sortedViewers);
     } catch (error) {
       console.error('Error loading viewers:', error);
-      // Fallback to regular query if RPC fails
-      try {
-        const { data, error: fallbackError } = await supabase
-          .from('active_viewers')
-          .select(`
-            viewer_id,
-            is_active,
-            last_active_at,
-            live_stream_id,
-            profiles!inner (
-              id,
-              username,
-              avatar_url,
-              gifter_level
-            )
-          `)
-          .eq('is_active', true)
-          .gt('last_active_at', new Date(Date.now() - 60000).toISOString())
-          .order('last_active_at', { ascending: false })
-          .limit(50);
-
-        if (!fallbackError && data) {
-          const profileIds = [...new Set((data || []).map((item: any) => item.profiles.id))];
-          
-          const { data: liveStreams } = await supabase
-            .from('live_streams')
-            .select('profile_id, id, live_available')
-            .in('profile_id', profileIds)
-            .eq('live_available', true);
-
-          const liveStreamMap = new Map(
-            (liveStreams || []).map((ls: any) => [ls.profile_id, { isLive: true, streamId: ls.id }])
-          );
-
-          const viewersWithBadges = await Promise.all(
-            (data || []).map(async (item: any) => {
-              const profile = item.profiles;
-              let badgeInfo = null;
-
-              if (profile.gifter_level !== null) {
-                const { data: badge } = await supabase
-                  .from('gifter_levels')
-                  .select('*')
-                  .eq('level', profile.gifter_level)
-                  .single();
-                badgeInfo = badge;
-              }
-
-          const liveInfo = liveStreamMap.get(profile.id) as { 
-            isLiveAvailable: boolean; 
-            isPublished: boolean;
-            streamId: number 
-          } | undefined;
-
-              return {
-                profile_id: profile.id,
-                username: profile.username,
-                avatar_url: profile.avatar_url,
-                gifter_level: profile.gifter_level || 0,
-                badge_name: badgeInfo?.badge_name,
-                badge_color: badgeInfo?.badge_color,
-                is_active: item.is_active,
-                last_active_at: item.last_active_at,
-                is_live_available: liveInfo?.isLiveAvailable || false,
-                is_published: liveInfo?.isPublished || false,
-                live_stream_id: liveInfo?.streamId,
-              };
-            })
-          );
-
-          // Find room owner (streamer with most viewers)
-          const fallbackProfileIds = [...new Set((data || []).map((item: any) => item.profiles.id))];
-          const { data: activeViewersData } = await supabase
-            .from('active_viewers')
-            .select('streamer_id, viewer_id')
-            .in('viewer_id', fallbackProfileIds)
-            .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
-
-          const streamerViewerCounts = new Map<string, number>();
-          activeViewersData?.forEach((av: any) => {
-            const count = streamerViewerCounts.get(av.streamer_id) || 0;
-            streamerViewerCounts.set(av.streamer_id, count + 1);
-          });
-
-          let foundRoomOwnerId: string | null = null;
-          let maxViewers = 0;
-          streamerViewerCounts.forEach((count, streamerId) => {
-            if (count > maxViewers) {
-              maxViewers = count;
-              foundRoomOwnerId = streamerId;
-            }
-          });
-          
-          setRoomOwnerId(foundRoomOwnerId);
-
-          // Sort viewers: room owner first, then current user, then everyone else
-          const sortedViewers = viewersWithBadges.sort((a, b) => {
-            // Room owner first
-            if (a.profile_id === foundRoomOwnerId && b.profile_id !== foundRoomOwnerId) return -1;
-            if (b.profile_id === foundRoomOwnerId && a.profile_id !== foundRoomOwnerId) return 1;
-            
-            // Current user second (if not room owner)
-            if (a.profile_id === currentUserId && b.profile_id !== currentUserId && a.profile_id !== foundRoomOwnerId) return -1;
-            if (b.profile_id === currentUserId && a.profile_id !== currentUserId && b.profile_id !== foundRoomOwnerId) return 1;
-            
-            // Everyone else sorted by join time (most recent first)
-            return new Date(b.last_active_at).getTime() - new Date(a.last_active_at).getTime();
-          });
-
-          setViewers(sortedViewers);
-        }
-      } catch (fallbackError) {
-        console.error('Fallback query also failed:', fallbackError);
-      }
+      // No fallback needed - room_presence is the source of truth for viewer list
     } finally {
       setLoading(false);
     }

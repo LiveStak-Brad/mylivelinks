@@ -138,7 +138,7 @@ export default function StreamerSelectionModal({
                         ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                         : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                     }`}>
-                      {streamer.is_published ? 'LIVE' : 'PREVIEW'}
+                      LIVE
                     </div>
                   )}
                 </button>

@@ -17,6 +17,7 @@ import OptionsMenu from './OptionsMenu';
 import StreamerSelectionModal from './StreamerSelectionModal';
 import GoLiveButton from './GoLiveButton';
 import Image from 'next/image';
+import { useRoomPresence } from '@/hooks/useRoomPresence';
 
 interface LiveStreamer {
   id: string;
@@ -90,14 +91,44 @@ export default function LiveRoom() {
   const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
 
   // Get current user ID and track room presence
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  
   useEffect(() => {
     if (authDisabled) {
       // Skip auth check if disabled for testing
       setCurrentUserId(null);
+      setCurrentUsername(null);
       return;
     }
     
+    const initUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        // Get username for room presence
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+        if (profile) {
+          setCurrentUsername(profile.username);
+        }
+      } else {
+        setCurrentUserId(null);
+        setCurrentUsername(null);
+      }
+    };
+    
+    initUser();
   }, [supabase, authDisabled]);
+
+  // Track room presence (global room presence, separate from tile watching)
+  useRoomPresence({
+    userId: currentUserId,
+    username: currentUsername,
+    enabled: !authDisabled && !!currentUserId && !!currentUsername,
+  });
 
   // Auto-enable Focus Mode when tile is expanded
   useEffect(() => {
@@ -634,16 +665,13 @@ export default function LiveRoom() {
               badge_color: badgeInfo?.badge_color,
             };
             
-            // Find slot 1 and ensure user is there
+            // CRITICAL: Force user into slot 1 (self-pinning) - override any saved layout
             const slot1Index = updatedSlots.findIndex(s => s.slotIndex === 1);
-            if (slot1Index !== -1) {
+            if (slot1Index >= 0) {
               updatedSlots[slot1Index] = {
-                slotIndex: 1,
+                ...updatedSlots[slot1Index],
                 streamer: ownStream,
-                isPinned: updatedSlots[slot1Index]?.isPinned || false,
-                isMuted: updatedSlots[slot1Index]?.isMuted || false,
                 isEmpty: false,
-                volume: 0.5,
               };
             } else {
               // Slot 1 doesn't exist, add it
@@ -670,6 +698,7 @@ export default function LiveRoom() {
           }
         }
         
+        // Fill remaining slots (1-12) that don't have streamers
         for (let i = 1; i <= 12; i++) {
           if (!filledIndices.includes(i)) {
             updatedSlots.push({
@@ -683,7 +712,42 @@ export default function LiveRoom() {
           }
         }
 
-        setGridSlots(updatedSlots.sort((a, b) => a.slotIndex - b.slotIndex));
+        // Sort slots by index
+        const sortedSlots = updatedSlots.sort((a, b) => a.slotIndex - b.slotIndex);
+        
+        // CRITICAL: Autofill empty slots with available streamers (runs on join)
+        // This ensures new users see all available cameras immediately
+        // This also triggers active_viewers entries which will trigger publishing
+        const emptySlots = sortedSlots.filter(s => s.isEmpty);
+        if (emptySlots.length > 0 && liveStreamers.length > 0) {
+          // Get streamers not already in grid
+          const usedStreamerIds = new Set(sortedSlots.filter(s => s.streamer).map(s => s.streamer!.profile_id));
+          const availableStreamers = liveStreamers.filter(s => !usedStreamerIds.has(s.profile_id));
+          
+          // Fill empty slots with available streamers (prioritize published, then live_available)
+          const sortedStreamers = availableStreamers.sort((a, b) => {
+            if (a.is_published !== b.is_published) return a.is_published ? -1 : 1;
+            if (a.live_available !== b.live_available) return a.live_available ? -1 : 1;
+            return b.viewer_count - a.viewer_count;
+          });
+          
+          sortedStreamers.slice(0, emptySlots.length).forEach((streamer, index) => {
+            const emptySlot = emptySlots[index];
+            if (emptySlot) {
+              const slotIndex = sortedSlots.findIndex(s => s.slotIndex === emptySlot.slotIndex);
+              if (slotIndex >= 0) {
+                sortedSlots[slotIndex] = {
+                  ...sortedSlots[slotIndex],
+                  streamer,
+                  isEmpty: false,
+                };
+              }
+            }
+          });
+        }
+
+        setGridSlots(sortedSlots);
+        saveGridLayout(sortedSlots);
       } else {
         // No saved layout - auto-fill with ALL available streamers (both published and waiting)
         // This ensures new users see all cameras that are available

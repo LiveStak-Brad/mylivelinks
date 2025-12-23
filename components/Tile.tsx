@@ -277,12 +277,9 @@ export default function Tile({
     }
   }, [volume, isMuted]);
 
-  // Determine tile state
-  // For current user: show as 'live' when live_available (even if not published yet)
-  // For others: show as 'live' only when actually publishing
-  const tileState = isCurrentUser
-    ? (isLiveAvailable ? 'live' : 'offline') // Current user sees themselves as live when available
-    : (isLive ? 'live' : isLiveAvailable ? 'preview' : 'offline'); // Others see preview when available but not publishing
+  // Determine tile state - ALWAYS show as 'live' when live_available (hide preview mode from users)
+  // Preview mode is internal technical state only - users should never see it
+  const tileState = isLiveAvailable ? 'live' : 'offline';
 
   return (
     <div
@@ -293,8 +290,6 @@ export default function Tile({
         ${
           tileState === 'live'
             ? 'border-red-500 shadow-lg shadow-red-500/20'
-            : tileState === 'preview'
-            ? 'border-yellow-500/50 border-dashed'
             : 'border-gray-300 dark:border-gray-700'
         }
         ${isMuted ? 'opacity-60' : ''}
@@ -313,7 +308,7 @@ export default function Tile({
           />
         )}
         
-        {/* Local Preview - Show when it's current user in preview mode (waiting for viewers) */}
+        {/* Local Preview - Show when it's current user and live_available (even if not published yet) */}
         {isCurrentUser && isLiveAvailable && !isLive && (
           <video
             ref={previewVideoRef}
@@ -351,17 +346,7 @@ export default function Tile({
           />
         )}
 
-        {/* Preview Mode Overlay - Only show for other users (not current user) */}
-        {tileState === 'preview' && !isCurrentUser && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-            <div className="text-center text-white">
-              <div className="text-sm font-medium mb-1">Preview Mode</div>
-              <div className="text-xs opacity-75">Waiting for viewers...</div>
-            </div>
-          </div>
-        )}
-        
-        {/* No preview overlay for current user - they see themselves as live */}
+        {/* No preview overlays - preview mode is invisible to users */}
 
         {/* Loading indicator when connecting */}
         {isLive && !isConnected && !videoTrack && (
@@ -373,18 +358,12 @@ export default function Tile({
         )}
       </div>
 
-      {/* State Indicator */}
+      {/* State Indicator - Always show LIVE when live_available (hide preview mode) */}
       <div className="absolute top-2 left-2 flex items-center gap-1.5">
         {tileState === 'live' && (
           <div className="flex items-center gap-1 bg-red-500 text-white px-2 py-1 rounded text-xs font-medium shadow-lg">
             <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
             LIVE
-          </div>
-        )}
-        {tileState === 'preview' && !isCurrentUser && (
-          <div className="flex items-center gap-1 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium">
-            <span className="w-2 h-2 bg-white rounded-full" />
-            PREVIEW
           </div>
         )}
       </div>
