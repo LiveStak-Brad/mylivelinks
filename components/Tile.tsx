@@ -75,6 +75,8 @@ export default function Tile({
 
   // Track subscription state to prevent re-subscriptions
   const subscriptionRef = useRef<{ streamerId: string | null; subscribed: boolean }>({ streamerId: null, subscribed: false });
+  // Track if we have tracks (for retry timer to check current state)
+  const hasTracksRef = useRef<{ video: boolean; audio: boolean }>({ video: false, audio: false });
 
   // Use shared room connection instead of creating our own
   // Subscribe to tracks from the streamer when room is connected
@@ -87,6 +89,7 @@ export default function Tile({
       if (!isLiveAvailable && subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
         setVideoTrack(null);
         setAudioTrack(null);
+        hasTracksRef.current = { video: false, audio: false };
         subscriptionRef.current.subscribed = false;
         subscriptionRef.current.streamerId = null;
       }
@@ -109,28 +112,48 @@ export default function Tile({
       // Only subscribe to tracks from this specific streamer
       if (participant.identity === streamerId) {
         if (track.kind === Track.Kind.Video) {
-          setVideoTrack(track);
-          if (videoRef.current) {
-            track.attach(videoRef.current);
+          // Only update if we don't already have this track (prevent flicker)
+          if (!hasTracksRef.current.video) {
+            hasTracksRef.current.video = true;
+            setVideoTrack(track);
+            if (videoRef.current) {
+              track.attach(videoRef.current);
+            }
           }
         } else if (track.kind === Track.Kind.Audio) {
-          setAudioTrack(track);
-          if (audioRef.current) {
-            track.attach(audioRef.current);
+          // Only update if we don't already have this track (prevent flicker)
+          if (!hasTracksRef.current.audio) {
+            hasTracksRef.current.audio = true;
+            setAudioTrack(track);
+            if (audioRef.current) {
+              track.attach(audioRef.current);
+            }
           }
         }
       }
     };
 
     const handleTrackUnsubscribed = (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
+      // CRITICAL: Only clear tracks if participant is actually leaving or track is muted/disabled
+      // Don't clear on temporary unsubscriptions (network hiccups, etc.)
       if (participant.identity === streamerId) {
-        if (track.kind === Track.Kind.Video) {
-          track.detach();
-          setVideoTrack(null);
-        } else if (track.kind === Track.Kind.Audio) {
-          track.detach();
-          setAudioTrack(null);
+        // Check if participant is still in room and has other tracks
+        const participantStillInRoom = sharedRoom.remoteParticipants.has(participant.identity);
+        const hasOtherTracks = participant.trackPublications.size > 0;
+        
+        // Only clear if participant is leaving OR track is explicitly muted/disabled
+        if (!participantStillInRoom || (!hasOtherTracks && publication.isMuted)) {
+          if (track.kind === Track.Kind.Video) {
+            track.detach();
+            hasTracksRef.current.video = false;
+            setVideoTrack(null);
+          } else if (track.kind === Track.Kind.Audio) {
+            track.detach();
+            hasTracksRef.current.audio = false;
+            setAudioTrack(null);
+          }
         }
+        // Otherwise, ignore temporary unsubscriptions (they'll resubscribe automatically)
       }
     };
 
@@ -163,8 +186,8 @@ export default function Tile({
         return;
       }
       
-      // Stop if we already have tracks
-      if (videoTrack || audioTrack) {
+      // Stop if we already have tracks (use ref for current state, not closure)
+      if (hasTracksRef.current.video || hasTracksRef.current.audio) {
         clearInterval(retryTimer);
         return;
       }
@@ -293,11 +316,13 @@ export default function Tile({
         }
         videoTrack.attach(videoRef.current);
         attachedVideoTrackRef.current = videoTrack;
+        hasTracksRef.current.video = true; // Sync ref for retry timer
       }
     } else if (!videoTrack && attachedVideoTrackRef.current && videoRef.current) {
       // Clean up if track is removed
       attachedVideoTrackRef.current.detach();
       attachedVideoTrackRef.current = null;
+      hasTracksRef.current.video = false; // Sync ref for retry timer
     }
     
     return () => {
@@ -406,8 +431,8 @@ export default function Tile({
     >
       {/* Video/Stream Area */}
       <div className="w-full h-full flex items-center justify-center bg-gray-900 relative overflow-hidden">
-        {/* LiveKit Video Element - Only show when we have a video track (published) */}
-        {isLive && videoTrack && (
+        {/* LiveKit Video Element - Show whenever we have a video track (regardless of isLive state to prevent flicker) */}
+        {videoTrack && (
           <video
             ref={videoRef}
             className={`absolute inset-0 w-full h-full object-cover ${isMuted ? 'grayscale' : ''}`}
@@ -429,7 +454,8 @@ export default function Tile({
         )}
         
         {/* Fallback: Avatar or placeholder (when no video track or preview) */}
-        {(!isLive || !videoTrack) && !(isCurrentUser && isLiveAvailable && localPreviewStream) && (
+        {/* CRITICAL: Only show avatar if we truly don't have video (not just because isLive changed) */}
+        {!videoTrack && !(isCurrentUser && isLiveAvailable && localPreviewStream) && (
           <div className="absolute inset-0 w-full h-full">
             {streamerAvatar ? (
               <img
