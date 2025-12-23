@@ -207,13 +207,34 @@ export function useLiveKitPublisher({
       if (room && room.state === 'connected') {
         const participant = room.localParticipant;
         if (participant) {
-          // Unpublish tracks we published (use tracksRef to ensure we unpublish the right ones)
-          for (const track of tracksRef.current) {
+          // CRITICAL: Unpublish using actual published tracks from participant, not stale refs
+          // This prevents "no publication was found" errors
+          const publishedTracks = Array.from(participant.trackPublications.values())
+            .filter(pub => {
+              // Only unpublish camera/microphone tracks (not screen share, etc.)
+              const source = pub.source;
+              return (source === 'camera' || source === 'microphone') && pub.track;
+            })
+            .map(pub => pub.track!);
+          
+          // Unpublish all camera/microphone tracks
+          for (const track of publishedTracks) {
             try {
-              await participant.unpublishTrack(track);
-              console.log('Unpublished track:', track.kind);
-            } catch (err) {
-              console.warn('Error unpublishing track:', err);
+              const publication = participant.trackPublications.get(track.sid);
+              if (publication) {
+                await participant.unpublishTrack(track);
+                console.log('Unpublished track:', track.kind);
+              } else {
+                // Track might already be unpublished, skip silently
+                console.log('Track already unpublished:', track.kind);
+              }
+            } catch (err: any) {
+              // Ignore "no publication found" errors - track might already be unpublished
+              if (err?.message?.includes('no publication') || err?.message?.includes('not found')) {
+                console.log('Track already unpublished (ignoring):', track.kind);
+              } else {
+                console.warn('Error unpublishing track:', err);
+              }
             }
           }
         }
