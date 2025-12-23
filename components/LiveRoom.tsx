@@ -443,6 +443,8 @@ export default function LiveRoom() {
           publishStateUpdateTimeout = setTimeout(async () => {
             try {
               await supabase.rpc('update_publish_state_from_viewers');
+              // Reload streamers to update viewer counts after publish state changes
+              await loadLiveStreamers();
             } catch (error) {
               console.error('Error updating publish state:', error);
             }
@@ -601,12 +603,26 @@ export default function LiveRoom() {
             }
 
             // Add waiting streamers to the list (if not already present)
-            waitingStreams.forEach((stream: any) => {
+            for (const stream of waitingStreams) {
               const alreadyExists = streamersWithBadges.find(s => s.profile_id === stream.profile_id);
               if (!alreadyExists) {
                 const profile = waitingProfiles.find((p: any) => p.id === stream.profile_id);
                 if (profile) {
                   const badgeInfo = waitingBadgeMap[profile.id] || null;
+                  
+                  // Get viewer count for waiting streamers too
+                  let viewerCount = 0;
+                  const { count } = await supabase
+                    .from('active_viewers')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('live_stream_id', stream.id)
+                    .eq('is_active', true)
+                    .eq('is_unmuted', true)
+                    .eq('is_visible', true)
+                    .eq('is_subscribed', true)
+                    .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
+                  viewerCount = count || 0;
+                  
                   streamersWithBadges.push({
                     id: stream.id.toString(),
                     profile_id: stream.profile_id,
@@ -614,14 +630,14 @@ export default function LiveRoom() {
                     avatar_url: profile.avatar_url,
                     is_published: false,
                     live_available: true,
-                    viewer_count: 0,
+                    viewer_count: viewerCount,
                     gifter_level: badgeInfo?.level || 0,
                     badge_name: badgeInfo?.badge_name,
                     badge_color: badgeInfo?.badge_color,
                   } as LiveStreamer);
                 }
               }
-            });
+            }
           }
         }
 
@@ -655,6 +671,19 @@ export default function LiveRoom() {
                 badgeInfo = badge;
               }
 
+              // Get viewer count for own stream
+              let ownViewerCount = 0;
+              const { count: ownCount } = await supabase
+                .from('active_viewers')
+                .select('*', { count: 'exact', head: true })
+                .eq('live_stream_id', ownLiveStream.id)
+                .eq('is_active', true)
+                .eq('is_unmuted', true)
+                .eq('is_visible', true)
+                .eq('is_subscribed', true)
+                .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
+              ownViewerCount = ownCount || 0;
+              
               streamersWithBadges.unshift({
                 id: ownLiveStream.id.toString(),
                 profile_id: user.id,
@@ -662,7 +691,7 @@ export default function LiveRoom() {
                 avatar_url: ownProfile.avatar_url,
                 is_published: ownLiveStream.is_published,
                 live_available: true,
-                viewer_count: 0,
+                viewer_count: ownViewerCount,
                 gifter_level: badgeInfo?.level || 0,
                 badge_name: badgeInfo?.badge_name,
                 badge_color: badgeInfo?.badge_color,
@@ -1286,14 +1315,19 @@ export default function LiveRoom() {
         badgeInfo = badge;
       }
 
-      // Get viewer count
+      // Get viewer count - must match the same criteria as update_publish_state_from_viewers
+      // Count only active viewers: is_active + unmuted + visible + subscribed + heartbeat within 60 seconds
       let viewerCount = 0;
       if (streamId) {
         const { count } = await supabase
           .from('active_viewers')
           .select('*', { count: 'exact', head: true })
           .eq('live_stream_id', streamId)
-          .eq('is_active', true);
+          .eq('is_active', true)
+          .eq('is_unmuted', true)
+          .eq('is_visible', true)
+          .eq('is_subscribed', true)
+          .gt('last_active_at', new Date(Date.now() - 60000).toISOString()); // Within last 60 seconds
         viewerCount = count || 0;
       }
 
