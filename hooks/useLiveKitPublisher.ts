@@ -184,11 +184,26 @@ export function useLiveKitPublisher({
         setIsConnected(true);
         setRoom(newRoom);
 
+        // Wait a moment to ensure connection is fully established before publishing
+        // This prevents "engine not connected within timeout" errors
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Verify room is still connected before proceeding
+        if (newRoom.state !== 'connected') {
+          console.error('Room disconnected before publishing could start');
+          setError(new Error('Room disconnected before publishing'));
+          if (onError) {
+            onError(new Error('Room disconnected before publishing'));
+          }
+          return;
+        }
+
         // Create and publish tracks
         try {
           console.log('Creating tracks with options:', {
             hasAudioDevice: !!audioDeviceId,
             hasVideoDevice: !!videoDeviceId,
+            roomState: newRoom.state,
           });
 
           const trackOptions: any = {
@@ -212,21 +227,74 @@ export function useLiveKitPublisher({
 
           tracksRef.current = tracks;
           
-          // Publish tracks
-          console.log('Publishing tracks...');
-          await Promise.all(tracks.map(track => {
-            console.log('Publishing track:', track.kind);
-            return newRoom.localParticipant.publishTrack(track);
-          }));
-          
-          console.log('All tracks published successfully');
-          // Only update state if it actually changed
-          if (!isPublishingRef.current) {
-            isPublishingRef.current = true;
-            setIsPublishing(true);
+          // Double-check room is still connected before publishing
+          if (newRoom.state !== 'connected') {
+            console.error('Room disconnected after creating tracks');
+            // Clean up tracks
+            tracks.forEach(track => {
+              track.stop();
+              track.detach();
+            });
+            tracksRef.current = [];
+            setError(new Error('Room disconnected before publishing'));
+            if (onError) {
+              onError(new Error('Room disconnected before publishing'));
+            }
+            return;
           }
-          if (onPublished) {
-            onPublished();
+          
+          // Publish tracks with retry logic
+          console.log('Publishing tracks...', { roomState: newRoom.state });
+          let publishAttempts = 0;
+          const maxPublishAttempts = 3;
+          
+          while (publishAttempts < maxPublishAttempts) {
+            try {
+              // Wait a bit longer if this is a retry
+              if (publishAttempts > 0) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * publishAttempts));
+              }
+              
+              // Verify connection again
+              if (newRoom.state !== 'connected') {
+                throw new Error('Room not connected');
+              }
+              
+              await Promise.all(tracks.map(track => {
+                console.log('Publishing track:', track.kind, `(attempt ${publishAttempts + 1})`);
+                return newRoom.localParticipant.publishTrack(track);
+              }));
+              
+              console.log('All tracks published successfully');
+              // Only update state if it actually changed
+              if (!isPublishingRef.current) {
+                isPublishingRef.current = true;
+                setIsPublishing(true);
+              }
+              if (onPublished) {
+                onPublished();
+              }
+              break; // Success, exit retry loop
+            } catch (publishErr: any) {
+              publishAttempts++;
+              console.warn(`Publish attempt ${publishAttempts} failed:`, publishErr.message);
+              
+              if (publishAttempts >= maxPublishAttempts) {
+                // All retries failed
+                console.error('All publish attempts failed');
+                // Clean up tracks
+                tracks.forEach(track => {
+                  track.stop();
+                  track.detach();
+                });
+                tracksRef.current = [];
+                setError(publishErr);
+                if (onError) {
+                  onError(publishErr);
+                }
+              }
+              // Otherwise, continue to next retry
+            }
           }
         } catch (err: any) {
           console.error('Error publishing tracks:', err);
@@ -291,8 +359,26 @@ export function useLiveKitPublisher({
           throw new Error(`Invalid LiveKit URL format: ${url?.substring(0, 50)}. URL must start with wss:// or ws://`);
         }
         
+        // Connect to room - wait for connection to complete
         await newRoom.connect(url, token);
-        console.log('Successfully connected to MyLiveLinks room');
+        
+        // Wait for connection to be fully established before proceeding
+        // This prevents "engine not connected within timeout" errors
+        let connectionWaitAttempts = 0;
+        const maxWaitAttempts = 20; // 20 * 250ms = 5 seconds max wait
+        while (newRoom.state !== 'connected' && connectionWaitAttempts < maxWaitAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 250));
+          connectionWaitAttempts++;
+        }
+        
+        if (newRoom.state !== 'connected') {
+          throw new Error('Room connection timeout: Room did not connect within 5 seconds');
+        }
+        
+        console.log('Successfully connected to MyLiveLinks room', { 
+          roomState: newRoom.state,
+          waitAttempts: connectionWaitAttempts 
+        });
       } catch (connectErr: any) {
         console.error('Room connection error:', {
           message: connectErr.message,
