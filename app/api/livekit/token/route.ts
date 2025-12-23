@@ -252,6 +252,10 @@ export async function POST(request: NextRequest) {
       url: LIVEKIT_URL,
       tokenLength: token.length,
       tokenPrefix: token.substring(0, 20) + '...',
+      apiKeyPrefix: LIVEKIT_API_KEY?.substring(0, 10) + '...',
+      apiKeyLength: LIVEKIT_API_KEY?.length,
+      apiSecretLength: LIVEKIT_API_SECRET?.length,
+      urlMatches: LIVEKIT_URL?.includes('mylivelinkscom'),
     });
 
     // Validate URL format
