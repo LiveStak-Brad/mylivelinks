@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import SmartBrandLogo from './SmartBrandLogo';
@@ -18,6 +18,7 @@ import StreamerSelectionModal from './StreamerSelectionModal';
 import GoLiveButton from './GoLiveButton';
 import Image from 'next/image';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
+import { Room, RoomEvent } from 'livekit-client';
 
 interface LiveStreamer {
   id: string;
@@ -89,6 +90,125 @@ export default function LiveRoom() {
 
   // Check if auth is disabled for testing
   const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+
+  // Shared LiveKit room connection - connect once, stay connected
+  const [sharedRoom, setSharedRoom] = useState<Room | null>(null);
+  const [isRoomConnected, setIsRoomConnected] = useState(false);
+  const roomConnectionRef = useRef<{ connecting: boolean; connected: boolean }>({ connecting: false, connected: false });
+  const roomRef = useRef<Room | null>(null);
+
+  // Connect to shared LiveKit room ONCE on mount
+  useEffect(() => {
+    let mounted = true;
+    
+    const connectSharedRoom = async () => {
+      // Prevent multiple connection attempts
+      if (roomConnectionRef.current.connecting || roomConnectionRef.current.connected) {
+        return;
+      }
+
+      try {
+        roomConnectionRef.current.connecting = true;
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user && !authDisabled) {
+          console.log('No user, skipping room connection');
+          return;
+        }
+
+        // Get token for viewer connection
+        const { data: { session } } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        
+        if (!accessToken && !authDisabled) {
+          console.log('No access token, skipping room connection');
+          return;
+        }
+
+        const response = await fetch('/api/livekit/token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            roomName: 'live_central',
+            participantName: 'Viewer',
+            canPublish: false,
+            canSubscribe: true,
+            userId: user?.id || 'anonymous',
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to get token: ${response.status}`);
+        }
+
+        const { token, url } = await response.json();
+        
+        if (!token || !url) {
+          throw new Error('Invalid token response');
+        }
+
+        // Import Room dynamically
+        const { Room: LiveKitRoom } = await import('livekit-client');
+        const newRoom = new LiveKitRoom({
+          adaptiveStream: true,
+          dynacast: true,
+        });
+
+        // Set up event handlers
+        newRoom.on(RoomEvent.Connected, () => {
+          if (mounted) {
+            console.log('Shared LiveKit room connected');
+            setIsRoomConnected(true);
+            roomConnectionRef.current.connected = true;
+            roomConnectionRef.current.connecting = false;
+          }
+        });
+
+        newRoom.on(RoomEvent.Disconnected, () => {
+          if (mounted) {
+            console.log('Shared LiveKit room disconnected');
+            setIsRoomConnected(false);
+            roomConnectionRef.current.connected = false;
+            roomConnectionRef.current.connecting = false;
+          }
+        });
+
+        // Connect to room
+        await newRoom.connect(url, token);
+        
+        if (mounted) {
+          roomRef.current = newRoom;
+          setSharedRoom(newRoom);
+        } else {
+          // Cleanup if component unmounted during connection
+          await newRoom.disconnect();
+        }
+      } catch (error: any) {
+        console.error('Error connecting shared room:', error);
+        roomConnectionRef.current.connecting = false;
+        if (mounted) {
+          setIsRoomConnected(false);
+        }
+      }
+    };
+
+    connectSharedRoom();
+
+    return () => {
+      mounted = false;
+      if (roomRef.current) {
+        roomRef.current.disconnect().catch(console.error);
+        roomRef.current = null;
+        setSharedRoom(null);
+        setIsRoomConnected(false);
+        roomConnectionRef.current = { connecting: false, connected: false };
+      }
+    };
+  }, [supabase, authDisabled]);
 
   // Get current user ID and track room presence
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
@@ -1487,6 +1607,8 @@ export default function LiveRoom() {
                     const parsed = parseInt(idStr);
                     return parsed > 0 ? parsed : undefined;
                   })() : undefined}
+                  sharedRoom={sharedRoom}
+                  isRoomConnected={isRoomConnected}
                   onClose={handleExitFullscreen}
                   onMute={() => handleMuteTile(expandedSlot.slotIndex)}
                   isMuted={expandedSlot.isMuted}
@@ -1584,6 +1706,8 @@ export default function LiveRoom() {
                           const parsed = parseInt(idStr);
                           return parsed > 0 ? parsed : undefined;
                         })() : undefined}
+                        sharedRoom={sharedRoom}
+                        isRoomConnected={isRoomConnected}
                         onClose={() => handleCloseTile(slot.slotIndex)}
                         onMute={() => handleMuteTile(slot.slotIndex)}
                         isMuted={slot.isMuted}

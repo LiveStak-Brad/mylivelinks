@@ -5,8 +5,7 @@ import GifterBadge from './GifterBadge';
 import GiftModal from './GiftModal';
 import MiniProfile from './MiniProfile';
 import { useViewerHeartbeat } from '@/hooks/useViewerHeartbeat';
-import { useLiveKit } from '@/hooks/useLiveKit';
-import { RemoteTrack, TrackPublication, RemoteParticipant, Track } from 'livekit-client';
+import { RemoteTrack, TrackPublication, RemoteParticipant, Track, RoomEvent, Room } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
 
 interface TileProps {
@@ -21,6 +20,8 @@ interface TileProps {
   badgeColor?: string;
   slotIndex: number;
   liveStreamId?: number;
+  sharedRoom?: Room | null; // Shared LiveKit room connection
+  isRoomConnected?: boolean; // Whether shared room is connected
   onClose: () => void;
   onMute: () => void;
   isMuted: boolean;
@@ -45,6 +46,8 @@ export default function Tile({
   badgeColor,
   slotIndex,
   liveStreamId,
+  sharedRoom,
+  isRoomConnected = false,
   onClose,
   onMute,
   isMuted,
@@ -70,55 +73,38 @@ export default function Tile({
   const [isCurrentUser, setIsCurrentUser] = useState(false);
   const supabase = createClient();
 
-  // Room name: Use single global room for all streamers
-  const roomName = 'live_central';
-
-  // Connect to LiveKit room ONLY when:
-  // 1. Streamer is actually publishing (isLive = true, which means is_published)
-  // 2. We have a valid streamer ID and liveStreamId
-  // 3. Streamer ID is not empty/null
-  // 4. NOT the current user in preview mode (they see local preview instead)
-  // Note: We use useMemo to prevent rapid re-evaluation of this condition
-  const shouldConnect = useMemo(() => {
-    // Don't connect if it's the current user in preview mode (they see local preview)
-    if (isCurrentUser && isLiveAvailable && !isLive) {
-      return false;
+  // Use shared room connection instead of creating our own
+  // Subscribe to tracks from the streamer when room is connected and streamer is publishing
+  useEffect(() => {
+    if (!sharedRoom || !isRoomConnected) {
+      setVideoTrack(null);
+      setAudioTrack(null);
+      return;
     }
-    
-    // Only connect when actually publishing
-    return !!(
-      isLive && // Only connect when actually publishing (is_published = true)
-      liveStreamId !== undefined && 
-      streamerId && 
-      streamerId.trim() !== ''
-    );
-  }, [isLive, isLiveAvailable, isCurrentUser, liveStreamId, streamerId]);
 
-  const { room, isConnected } = useLiveKit({
-    roomName,
-    participantName: streamerUsername,
-    canPublish: false,
-    canSubscribe: true,
-    enabled: shouldConnect,
-    onTrackSubscribed: (track, publication, participant) => {
-      // Only subscribe to tracks from the streamer
+    // Only subscribe if streamer is actually publishing (isLive = true)
+    if (!isLive || !liveStreamId || !streamerId) {
+      return;
+    }
+
+    const handleTrackSubscribed = (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
+      // Only subscribe to tracks from this specific streamer
       if (participant.identity === streamerId) {
         if (track.kind === Track.Kind.Video) {
           setVideoTrack(track);
-          // Attach video track to video element
           if (videoRef.current) {
             track.attach(videoRef.current);
           }
         } else if (track.kind === Track.Kind.Audio) {
           setAudioTrack(track);
-          // Attach audio track to audio element
           if (audioRef.current) {
             track.attach(audioRef.current);
           }
         }
       }
-    },
-    onTrackUnsubscribed: (track, publication, participant) => {
+    };
+
+    const handleTrackUnsubscribed = (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
       if (participant.identity === streamerId) {
         if (track.kind === Track.Kind.Video) {
           track.detach();
@@ -128,8 +114,28 @@ export default function Tile({
           setAudioTrack(null);
         }
       }
-    },
-  });
+    };
+
+    // Subscribe to existing tracks
+    sharedRoom.remoteParticipants.forEach((participant) => {
+      if (participant.identity === streamerId) {
+        participant.trackPublications.forEach((publication) => {
+          if (publication.track) {
+            handleTrackSubscribed(publication.track as RemoteTrack, publication, participant);
+          }
+        });
+      }
+    });
+
+    // Listen for new tracks
+    sharedRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+    sharedRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+
+    return () => {
+      sharedRoom.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+      sharedRoom.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+    };
+  }, [sharedRoom, isRoomConnected, isLive, liveStreamId, streamerId]);
 
   // Check if this is the current user's tile
   useEffect(() => {
@@ -138,12 +144,19 @@ export default function Tile({
     });
   }, [streamerId, supabase]);
 
-  // Start local preview when it's current user in preview mode (live_available but not published)
-  // They should see themselves as live even when not broadcasting yet
+  // Start local preview when it's current user and live_available
+  // Show preview immediately - even if not published yet, or if published but videoTrack not available yet
+  // This ensures streamer always sees themselves with no flicker or "Connecting..." state
   useEffect(() => {
     let stream: MediaStream | null = null;
     
-    if (isCurrentUser && isLiveAvailable && liveStreamId) {
+    // Show local preview when:
+    // 1. It's the current user
+    // 2. They're live_available
+    // 3. Either not published yet OR published but videoTrack not available yet
+    const shouldShowPreview = isCurrentUser && isLiveAvailable && liveStreamId && (!isLive || !videoTrack);
+    
+    if (shouldShowPreview) {
       // Start local camera preview
       const startLocalPreview = async () => {
         try {
@@ -171,9 +184,9 @@ export default function Tile({
       };
       startLocalPreview();
     } else {
-      // Stop local preview when not needed
-      if (localPreviewStream) {
-        console.log('Stopping local preview');
+      // Stop local preview when not needed (when videoTrack is available and published)
+      if (localPreviewStream && isLive && videoTrack) {
+        console.log('Stopping local preview - videoTrack is now available');
         localPreviewStream.getTracks().forEach(track => track.stop());
         setLocalPreviewStream(null);
       }
@@ -184,12 +197,12 @@ export default function Tile({
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
-      if (localPreviewStream) {
+      if (localPreviewStream && (!isCurrentUser || !isLiveAvailable)) {
         localPreviewStream.getTracks().forEach(track => track.stop());
         setLocalPreviewStream(null);
       }
     };
-  }, [isCurrentUser, isLiveAvailable, isLive, liveStreamId]);
+  }, [isCurrentUser, isLiveAvailable, isLive, liveStreamId, videoTrack]);
 
   // Attach local preview stream to video element when both are ready
   useEffect(() => {
@@ -308,8 +321,8 @@ export default function Tile({
           />
         )}
         
-        {/* Local Preview - Show when it's current user and live_available (even if not published yet) */}
-        {isCurrentUser && isLiveAvailable && !isLive && (
+        {/* Local Preview - Show when it's current user and live_available (even if not published yet, or published but videoTrack not available) */}
+        {isCurrentUser && isLiveAvailable && localPreviewStream && (!isLive || !videoTrack) && (
           <video
             ref={previewVideoRef}
             className="absolute inset-0 w-full h-full object-cover bg-black"
@@ -320,7 +333,7 @@ export default function Tile({
         )}
         
         {/* Fallback: Avatar or placeholder (when no video track or preview) */}
-        {(!isLive || !videoTrack) && !(isCurrentUser && isLiveAvailable && !isLive && localPreviewStream) && (
+        {(!isLive || !videoTrack) && !(isCurrentUser && isLiveAvailable && localPreviewStream) && (
           <div className="absolute inset-0 w-full h-full">
             {streamerAvatar ? (
               <img
@@ -347,15 +360,7 @@ export default function Tile({
         )}
 
         {/* No preview overlays - preview mode is invisible to users */}
-
-        {/* Loading indicator when connecting */}
-        {isLive && !isConnected && !videoTrack && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
-            <div className="text-center text-white">
-              <div className="text-sm font-medium mb-1">Connecting...</div>
-            </div>
-          </div>
-        )}
+        {/* No "Connecting..." UI - streamer should never see this */}
       </div>
 
       {/* State Indicator - Always show LIVE when live_available (hide preview mode) */}

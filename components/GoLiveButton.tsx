@@ -543,16 +543,11 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
                 disabled={!selectedVideoDevice || !selectedAudioDevice || loading}
                 className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? (isPublishing ? 'Connecting to MyLiveLinks...' : 'Starting...') : 'Start Live'}
+                {loading ? 'Starting...' : 'Start Live'}
               </button>
               {error && (
                 <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-sm">
                   Error: {error.message}
-                </div>
-              )}
-              {loading && !isPublishing && (
-                <div className="mt-2 p-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded text-sm">
-                  Connecting to MyLiveLinks... This may take a few seconds.
                 </div>
               )}
             </div>
