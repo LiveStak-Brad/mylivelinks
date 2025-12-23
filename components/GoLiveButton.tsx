@@ -27,6 +27,8 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [previewVideoRef, setPreviewVideoRef] = useState<HTMLVideoElement | null>(null);
   const isLiveRef = useRef(false); // Track current state to prevent unnecessary updates
+  const lastLiveStateRef = useRef<boolean | null>(null); // Track last state to prevent rapid changes
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Debounce state updates
   const supabase = createClient();
 
   // Get current user's live stream (only on mount, not when callbacks change)
@@ -46,6 +48,8 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       if (data) {
         const d = data as any;
         const liveState = d.live_available || false;
+        // Set initial state without debounce (first load)
+        lastLiveStateRef.current = liveState;
         isLiveRef.current = liveState;
         setIsLive(liveState);
         setLiveStreamId(d.id);
@@ -55,7 +59,7 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       // Subscribe to changes for this user's live stream only
       // Only update state when live_available actually changes to prevent flashing
       channel = supabase
-        .channel(`user-live-stream-${user.id}-${Date.now()}`)
+        .channel(`user-live-stream-${user.id}`)
         .on(
           'postgres_changes',
           {
@@ -70,12 +74,25 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
             // Only update if live_available actually changed
             if (oldData?.live_available !== newData?.live_available) {
               const newLiveState = newData.live_available || false;
+              
+              // Debounce rapid updates - clear any pending timeout
+              if (updateTimeoutRef.current) {
+                clearTimeout(updateTimeoutRef.current);
+              }
+              
               // Only update if state actually changed (prevent unnecessary re-renders)
-              if (isLiveRef.current !== newLiveState) {
-                isLiveRef.current = newLiveState;
-                setIsLive(newLiveState);
-                setLiveStreamId(newData.id || null);
-                onLiveStatusChange?.(newLiveState);
+              if (lastLiveStateRef.current !== newLiveState) {
+                // Debounce the update slightly to prevent rapid flashing
+                updateTimeoutRef.current = setTimeout(() => {
+                  // Double-check state hasn't changed again during debounce
+                  if (lastLiveStateRef.current !== newLiveState) {
+                    lastLiveStateRef.current = newLiveState;
+                    isLiveRef.current = newLiveState;
+                    setIsLive(newLiveState);
+                    setLiveStreamId(newData.id || null);
+                    onLiveStatusChange?.(newLiveState);
+                  }
+                }, 100); // 100ms debounce
               }
             }
           }
@@ -88,6 +105,9 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
+      }
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
     };
   }, [supabase]); // Removed onLiveStatusChange from deps to prevent loops
@@ -265,7 +285,8 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
           // Continue even if stopPublishing fails - database is already updated
         }
 
-        // Update local state
+        // Update local state (bypass debounce for manual stop)
+        lastLiveStateRef.current = false;
         isLiveRef.current = false;
         setIsLive(false);
         setLiveStreamId(null);
@@ -277,7 +298,8 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       } catch (err: any) {
         console.error('Error stopping live:', err);
         alert('Failed to stop live: ' + err.message);
-        // Still try to reset state
+        // Still try to reset state (bypass debounce for error recovery)
+        lastLiveStateRef.current = false;
         isLiveRef.current = false;
         setIsLive(false);
         setLiveStreamId(null);
@@ -309,7 +331,8 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       console.error('Error resetting database state:', err);
     }
     
-    // Reset local state
+    // Reset local state (bypass debounce for error recovery)
+    lastLiveStateRef.current = false;
     isLiveRef.current = false;
     setIsLive(false);
     setLiveStreamId(null);
@@ -353,6 +376,8 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       if (error) throw error;
 
       setLiveStreamId(data.id);
+      // Update state immediately (bypass debounce for manual start)
+      lastLiveStateRef.current = true;
       isLiveRef.current = true;
       setIsLive(true);
       onLiveStatusChange?.(true);
@@ -415,10 +440,10 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       >
         {loading ? (
           'Loading...'
-        ) : isLive && isPublishing ? (
-          '🔴 LIVE'
         ) : isLive ? (
-          '⏸️ Stop Live'
+          // When live, show "LIVE" if publishing, otherwise "Stop Live"
+          // This prevents flashing between states
+          isPublishing ? '🔴 LIVE' : '⏸️ Stop Live'
         ) : (
           '▶️ Go Live'
         )}
