@@ -392,28 +392,68 @@ export default function Chat() {
     // Scroll immediately
     setTimeout(() => scrollToBottom(), 50);
 
-    // Send to database in background (realtime will replace optimistic with real message)
-    (supabase.from('chat_messages') as any).insert({
-      profile_id: currentUserId,
-      message_type: 'text',
-      content: messageToSend,
-    }).then(({ error, data }: { error: any; data: any }) => {
-      if (error) {
-        console.error('Error sending message:', error);
-        // Remove optimistic message on error
-        setMessages((prev) => prev.filter(m => m.id !== tempId));
-        setNewMessage(messageToSend); // Restore input
-        alert('Failed to send message');
+    // Ensure profile exists before sending message
+    // This prevents foreign key constraint violations
+    const ensureProfileExists = async () => {
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', currentUserId)
+        .single();
+
+      if (!existingProfile) {
+        // Profile doesn't exist - try to create it
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+
+        const email = user.email || `user_${user.id.slice(0, 8)}`;
+        const defaultUsername = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 50);
+        
+        const { error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            username: defaultUsername,
+            display_name: defaultUsername,
+            coin_balance: 0,
+            earnings_balance: 0,
+            gifter_level: 0,
+          });
+
+        if (createError) {
+          console.error('Failed to create profile for chat:', createError);
+          throw new Error(`Profile not found. Please contact support.`);
+        }
       }
-      // If success, realtime subscription will receive the new message
-      // and replace the optimistic one (matched by profile_id + content + recent timestamp)
-    }).catch((error: any) => {
-      console.error('Error sending message:', error);
-      // Remove optimistic message and restore input
-      setMessages((prev) => prev.filter((m: ChatMessage) => m.id !== tempId));
-      setNewMessage(messageToSend);
-      alert('Failed to send message');
-    });
+    };
+
+    // Send to database in background (realtime will replace optimistic with real message)
+    ensureProfileExists()
+      .then(() => {
+        return (supabase.from('chat_messages') as any).insert({
+          profile_id: currentUserId,
+          message_type: 'text',
+          content: messageToSend,
+        });
+      })
+      .then(({ error, data }: { error: any; data: any }) => {
+        if (error) {
+          console.error('Error sending message:', error);
+          // Remove optimistic message on error
+          setMessages((prev) => prev.filter(m => m.id !== tempId));
+          setNewMessage(messageToSend); // Restore input
+          alert(`Failed to send message: ${error.message || 'Unknown error'}`);
+        }
+        // If success, realtime subscription will receive the new message
+        // and replace the optimistic one (matched by profile_id + content + recent timestamp)
+      })
+      .catch((error: any) => {
+        console.error('Error sending message:', error);
+        // Remove optimistic message and restore input
+        setMessages((prev) => prev.filter((m: ChatMessage) => m.id !== tempId));
+        setNewMessage(messageToSend);
+        alert(`Failed to send message: ${error.message || 'Unknown error'}`);
+      });
   };
 
   const scrollToBottom = () => {

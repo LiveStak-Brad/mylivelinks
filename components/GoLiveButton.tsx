@@ -365,7 +365,42 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Upsert live_stream record first
+      // Ensure profile exists before creating live stream
+      // This prevents foreign key constraint violations
+      const { data: existingProfile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .eq('id', user.id)
+        .single();
+
+      if (profileCheckError || !existingProfile) {
+        // Profile doesn't exist - try to create it
+        console.warn('Profile not found, attempting to create:', profileCheckError);
+        
+        // Get user email for username fallback
+        const email = user.email || `user_${user.id.slice(0, 8)}`;
+        const defaultUsername = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '_').substring(0, 50);
+        
+        const { error: createProfileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            username: defaultUsername,
+            display_name: defaultUsername,
+            coin_balance: 0,
+            earnings_balance: 0,
+            gifter_level: 0,
+          });
+
+        if (createProfileError) {
+          console.error('Failed to create profile:', createProfileError);
+          throw new Error(`Profile not found and could not be created: ${createProfileError.message}. Please contact support.`);
+        }
+        
+        console.log('Profile created successfully');
+      }
+
+      // Upsert live_stream record (profile should exist now)
       const { data, error } = await supabase
         .from('live_streams')
         .upsert({
@@ -378,7 +413,10 @@ export default function GoLiveButton({ onLiveStatusChange, onGoLive }: GoLiveBut
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error upserting live_stream:', error);
+        throw new Error(`Failed to start live stream: ${error.message}`);
+      }
 
       setLiveStreamId(data.id);
       // Update state immediately (bypass debounce for manual start)
