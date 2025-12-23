@@ -2,6 +2,7 @@ import { Inter } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import './globals.css';
 import ClientThemeProvider from '@/components/ClientThemeProvider';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,9 +22,11 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/branding/favicon/apple-touch-icon.png" />
       </head>
       <body className={inter.className}>
-        <ClientThemeProvider>
-          {children}
-        </ClientThemeProvider>
+        <ErrorBoundary>
+          <ClientThemeProvider>
+            {children}
+          </ClientThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
