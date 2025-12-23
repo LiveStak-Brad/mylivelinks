@@ -873,8 +873,6 @@ export default function LiveRoom() {
     } catch (error) {
       console.error('Error loading live streamers:', error);
       setLoading(false);
-      // Return empty array on error
-      return [];
       // Ensure we have empty slots even on error
       if (gridSlots.length === 0) {
         const emptySlots: GridSlot[] = Array.from({ length: 12 }, (_, i) => ({
