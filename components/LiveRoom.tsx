@@ -97,6 +97,15 @@ export default function LiveRoom() {
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const roomConnectionRef = useRef<{ connecting: boolean; connected: boolean }>({ connecting: false, connected: false });
   const roomRef = useRef<Room | null>(null);
+  // Store handlers in ref so cleanup can access them
+  const handlersRef = useRef<{
+    handleConnected: () => void;
+    handleDisconnected: () => void;
+    handleParticipantConnected: (participant: any) => void;
+    handleParticipantDisconnected: (participant: any) => void;
+    handleTrackSubscribed: (track: any, publication: any, participant: any) => void;
+    handleTrackUnsubscribed: (track: any, publication: any, participant: any) => void;
+  } | null>(null);
 
   // Connect to shared LiveKit room ONCE on mount
   useEffect(() => {
