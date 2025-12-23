@@ -631,7 +631,7 @@ export default function LiveRoom() {
       // If auth disabled, still load streamers (just without user filtering)
       if (!authDisabled && !user) {
         setLoading(false);
-        return;
+        return []; // Return empty array instead of undefined
       }
 
       // Use new RPC function with sort mode
@@ -873,6 +873,8 @@ export default function LiveRoom() {
     } catch (error) {
       console.error('Error loading live streamers:', error);
       setLoading(false);
+      // Return empty array on error
+      return [];
       // Ensure we have empty slots even on error
       if (gridSlots.length === 0) {
         const emptySlots: GridSlot[] = Array.from({ length: 12 }, (_, i) => ({
