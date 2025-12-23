@@ -756,7 +756,7 @@ export default function LiveRoom() {
             })
           );
           
-          data = streamersWithCounts.filter(s => s !== null) as any[];
+          data = streamersWithCounts.filter((s: any) => s !== null) as any[];
         } else {
           data = fallbackResult.data || [];
         }
