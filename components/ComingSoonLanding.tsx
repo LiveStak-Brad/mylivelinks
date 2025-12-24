@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import LiveRoom from '@/components/LiveRoom';
+import { createClient } from '@/lib/supabase';
 
 export default function ComingSoonLanding() {
   const [mounted, setMounted] = useState(false);
@@ -27,14 +28,41 @@ export default function ComingSoonLanding() {
       return;
     }
     
-    // TODO: Save to database or send to email service
-    console.log('Email submitted:', email);
-    setEmailSubmitted(true);
-    setTimeout(() => {
-      setShowEmailModal(false);
-      setEmailSubmitted(false);
-      setEmail('');
-    }, 2000);
+    try {
+      const supabase = createClient();
+      
+      // Save email to waitlist
+      const { error } = await supabase
+        .from('waitlist_emails')
+        .insert({
+          email: email.toLowerCase().trim(),
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+          referrer: typeof document !== 'undefined' ? document.referrer : null,
+        });
+      
+      if (error) {
+        // Check if it's a duplicate email error
+        if (error.code === '23505') {
+          alert('This email is already on the waitlist! We\'ll notify you when we launch.');
+        } else {
+          console.error('Error saving email:', error);
+          alert('Oops! Something went wrong. Please try again.');
+          return;
+        }
+      }
+      
+      console.log('Email successfully saved:', email);
+      setEmailSubmitted(true);
+      
+      setTimeout(() => {
+        setShowEmailModal(false);
+        setEmailSubmitted(false);
+        setEmail('');
+      }, 2000);
+    } catch (err) {
+      console.error('Error submitting email:', err);
+      alert('Oops! Something went wrong. Please try again.');
+    }
   };
 
   const features = [
