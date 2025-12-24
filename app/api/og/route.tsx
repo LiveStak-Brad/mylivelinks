@@ -7,9 +7,9 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
-    const displayName = searchParams.get('displayName') || username;
+    const displayName = searchParams.get('displayName') || username || 'User';
     const bio = searchParams.get('bio') || `Check out ${displayName}'s profile on MyLiveLinks`;
-    const avatarUrl = searchParams.get('avatarUrl') || '';
+    const avatarUrl = searchParams.get('avatarUrl');
     
     return new ImageResponse(
       (
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
             {avatarUrl && (
               <img
                 src={avatarUrl}
-                alt={displayName}
+                alt={displayName || 'Profile'}
                 width="180"
                 height="180"
                 style={{
