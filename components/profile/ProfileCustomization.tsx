@@ -228,15 +228,22 @@ export default function ProfileCustomization({
             <label className="block text-sm font-semibold mb-2">
               Card Opacity: {((settings.card_opacity || 0.95) * 100).toFixed(0)}%
             </label>
+            <p className="text-xs text-gray-500 mb-2">
+              Lower opacity lets your background show through the cards
+            </p>
             <input
               type="range"
-              min="0.5"
+              min="0.3"
               max="1"
               step="0.05"
               value={settings.card_opacity || 0.95}
               onChange={(e) => setSettings({ ...settings, card_opacity: parseFloat(e.target.value) })}
-              className="w-full"
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
             />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>30% (See-through)</span>
+              <span>100% (Solid)</span>
+            </div>
           </div>
           
           <div>

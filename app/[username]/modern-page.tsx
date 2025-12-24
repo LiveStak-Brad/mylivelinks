@@ -289,7 +289,7 @@ export default function ModernProfilePage() {
   const FollowIcon = followBtnConfig.icon;
   
   return (
-    <div className={`min-h-screen ${fontClass}`}>
+    <div className={`min-h-screen overflow-y-auto overflow-x-hidden ${fontClass}`}>
       {/* Background */}
       <div className="fixed inset-0 z-0">
         {profile.profile_bg_url ? (
@@ -299,6 +299,8 @@ export default function ModernProfilePage() {
             fill
             className="object-cover"
             priority
+            sizes="100vw"
+            quality={75}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500" />
@@ -306,33 +308,34 @@ export default function ModernProfilePage() {
         <div className={`absolute inset-0 ${overlayClass}`} />
       </div>
       
-      {/* Content */}
-      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8">
+      {/* Content - Scrollable */}
+      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20">
         {/* Hero Section */}
-        <div className={`${borderRadiusClass} overflow-hidden shadow-2xl mb-6`} style={cardStyle}>
-          <div className="p-8">
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+        <div className={`${borderRadiusClass} overflow-hidden shadow-2xl mb-4 sm:mb-6`} style={cardStyle}>
+          <div className="p-4 sm:p-8">
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6">
               {/* Avatar */}
               <div className="relative flex-shrink-0">
                 {profile.avatar_url ? (
-                  <div className="relative w-32 h-32 rounded-full overflow-hidden ring-4 ring-white/50 shadow-lg">
+                  <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden ring-4 ring-white/50 shadow-lg">
                     <Image
                       src={profile.avatar_url}
                       alt={profile.username}
                       fill
                       className="object-cover"
+                      sizes="(max-width: 640px) 96px, 128px"
                     />
                   </div>
                 ) : (
                   <div 
-                    className="w-32 h-32 rounded-full flex items-center justify-center text-white text-4xl font-bold ring-4 ring-white/50 shadow-lg"
+                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center text-white text-3xl sm:text-4xl font-bold ring-4 ring-white/50 shadow-lg"
                     style={{ backgroundColor: accentColor }}
                   >
                     {profile.username[0].toUpperCase()}
                   </div>
                 )}
                 {profile.is_live && (
-                  <div className="absolute -bottom-2 -right-2 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+                  <div className="absolute -bottom-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 sm:px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
                     <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
                     LIVE
                   </div>
@@ -340,36 +343,36 @@ export default function ModernProfilePage() {
               </div>
               
               {/* Info */}
-              <div className="flex-1 text-center md:text-left">
-                <h1 className="text-3xl md:text-4xl font-bold mb-2">
+              <div className="flex-1 text-center md:text-left w-full">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words">
                   {profile.display_name || profile.username}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400 text-lg mb-3">
+                <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg mb-3">
                   @{profile.username}
                 </p>
                 
                 {profile.bio && (
-                  <p className="text-gray-700 dark:text-gray-300 mb-4 max-w-2xl">
+                  <p className="text-gray-700 dark:text-gray-300 mb-4 max-w-2xl text-sm sm:text-base break-words">
                     {profile.bio}
                   </p>
                 )}
                 
                 {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                <div className="flex flex-wrap gap-2 sm:gap-3 justify-center md:justify-start">
                   {!isOwnProfile && (
                     <>
                       <button
                         onClick={handleFollow}
                         disabled={followLoading}
-                        className={`px-6 py-2 rounded-lg font-semibold transition flex items-center gap-2 ${followBtnConfig.className}`}
+                        className={`px-4 sm:px-6 py-2 rounded-lg font-semibold transition flex items-center gap-2 text-sm sm:text-base ${followBtnConfig.className}`}
                         style={{ backgroundColor: profileData.relationship === 'none' ? accentColor : undefined }}
                       >
-                        <FollowIcon size={20} />
+                        <FollowIcon size={18} className="sm:w-5 sm:h-5" />
                         {followLoading ? 'Loading...' : followBtnConfig.text}
                       </button>
                       
-                      <button className="px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2">
-                        <MessageCircle size={20} />
+                      <button className="px-4 sm:px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2 text-sm sm:text-base">
+                        <MessageCircle size={18} className="sm:w-5 sm:h-5" />
                         Message
                       </button>
                     </>
@@ -378,7 +381,7 @@ export default function ModernProfilePage() {
                   {isOwnProfile && (
                     <Link
                       href="/settings/profile"
-                      className="px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      className="px-4 sm:px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm sm:text-base"
                     >
                       Edit Profile
                     </Link>
@@ -386,9 +389,9 @@ export default function ModernProfilePage() {
                   
                   <button
                     onClick={handleShare}
-                    className="px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2"
+                    className="px-4 sm:px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2 text-sm sm:text-base"
                   >
-                    <Share2 size={20} />
+                    <Share2 size={18} className="sm:w-5 sm:h-5" />
                     Share
                   </button>
                 </div>
@@ -398,7 +401,7 @@ export default function ModernProfilePage() {
         </div>
         
         {/* Stats & Social Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
           <SocialCountsWidget
             followerCount={profileData.follower_count}
             followingCount={profileData.following_count}
@@ -431,7 +434,7 @@ export default function ModernProfilePage() {
           profile.social_tiktok || profile.social_facebook || profile.social_twitch ||
           profile.social_discord || profile.social_snapchat || profile.social_linkedin ||
           profile.social_github || profile.social_spotify || profile.social_onlyfans) && (
-          <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-6 p-6`} style={cardStyle}>
+          <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6 p-4 sm:p-6`} style={cardStyle}>
             <SocialMediaBar
               socials={{
                 social_instagram: profile.social_instagram,
