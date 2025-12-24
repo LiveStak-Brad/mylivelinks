@@ -237,6 +237,67 @@ export default function Tile({
       let foundParticipant = false;
       let trackCount = 0;
       
+      // CRITICAL: Check if this is the current user's own tile
+      // If so, use local participant's published tracks instead of remote
+      if (sharedRoom.localParticipant && sharedRoom.localParticipant.identity === streamerId) {
+        foundParticipant = true;
+        const localParticipant = sharedRoom.localParticipant;
+        trackCount = localParticipant.trackPublications.size;
+        
+        if (DEBUG_LIVEKIT) {
+          console.log('[SUB] Found LOCAL participant (self) for tile:', {
+            slotIndex,
+            streamerId,
+            participantIdentity: localParticipant.identity,
+            trackPublicationsCount: localParticipant.trackPublications.size,
+            publications: Array.from(localParticipant.trackPublications.values()).map(p => ({
+              kind: p.track?.kind,
+              source: p.source,
+              sid: p.trackSid,
+              hasTrack: !!p.track,
+            })),
+          });
+        }
+        
+        // Handle local tracks - attach them to this tile so user can see themselves
+        localParticipant.trackPublications.forEach((publication) => {
+          const isCameraOrMic = publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone;
+          
+          if (isCameraOrMic && publication.track) {
+            const track = publication.track;
+            if (DEBUG_LIVEKIT) {
+              console.log('[SUB] Attaching LOCAL track to tile:', {
+                slotIndex,
+                kind: track.kind,
+                source: publication.source,
+              });
+            }
+            
+            // Attach local tracks to this tile's video/audio elements
+            if (track.kind === Track.Kind.Video) {
+              if (!hasTracksRef.current.video) {
+                hasTracksRef.current.video = true;
+                setVideoTrack(track as any); // Cast to RemoteTrack type for state
+                if (videoRef.current) {
+                  track.attach(videoRef.current);
+                }
+              }
+            } else if (track.kind === Track.Kind.Audio) {
+              if (!hasTracksRef.current.audio) {
+                hasTracksRef.current.audio = true;
+                setAudioTrack(track as any); // Cast to RemoteTrack type for state
+                if (audioRef.current) {
+                  track.attach(audioRef.current);
+                }
+              }
+            }
+          }
+        });
+        
+        return; // Done processing local participant
+      }
+      
+      // Not the current user - check remote participants
       sharedRoom.remoteParticipants.forEach((participant) => {
         if (participant.identity === streamerId) {
           foundParticipant = true;

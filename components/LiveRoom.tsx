@@ -1441,15 +1441,39 @@ export default function LiveRoom() {
   }, [supabase]);
 
   const autoFillGrid = useCallback(() => {
-    if (liveStreamers.length === 0) return;
+    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    
+    if (DEBUG_LIVEKIT) {
+      console.log('[GRID] autoFillGrid called', {
+        liveStreamersCount: liveStreamers.length,
+      });
+    }
+    
+    if (liveStreamers.length === 0) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[GRID] No streamers available to fill');
+      }
+      return;
+    }
 
     // CRITICAL: Only fill EMPTY slots, preserve existing tiles
     // This prevents clearing streams when realtime updates fire
     setGridSlots((currentSlots) => {
       // Find empty slots
       const emptySlots = currentSlots.filter(s => s.isEmpty);
+      
+      if (DEBUG_LIVEKIT) {
+        console.log('[GRID] Checking for empty slots', {
+          emptySlotCount: emptySlots.length,
+          totalSlots: currentSlots.length,
+        });
+      }
+      
       if (emptySlots.length === 0) {
         // No empty slots, nothing to fill
+        if (DEBUG_LIVEKIT) {
+          console.log('[GRID] No empty slots to fill');
+        }
         return currentSlots;
       }
 
@@ -1499,6 +1523,17 @@ export default function LiveRoom() {
 
       // Only save if we actually changed something
       if (streamerIndex > 0) {
+        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+        if (DEBUG_LIVEKIT) {
+          console.log('[GRID] Auto-filled slots', {
+            streamersAdded: streamerIndex,
+            addedStreamers: sorted.slice(0, streamerIndex).map(s => ({
+              username: s.username,
+              profile_id: s.profile_id,
+              is_published: s.is_published,
+            })),
+          });
+        }
         saveGridLayout(updatedSlots);
       }
 
