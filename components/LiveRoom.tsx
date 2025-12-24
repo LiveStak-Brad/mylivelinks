@@ -64,6 +64,7 @@ export default function LiveRoom() {
     }))
   );
   const [liveStreamers, setLiveStreamers] = useState<LiveStreamer[]>([]);
+  const liveStreamersRef = useRef<LiveStreamer[]>([]); // Track current streamers to prevent clearing
   const [loading, setLoading] = useState(false); // Start as false to render immediately
   const [draggedSlot, setDraggedSlot] = useState<number | null>(null);
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
@@ -574,19 +575,27 @@ export default function LiveRoom() {
               // Use functional update to compare and prevent unnecessary re-renders
               setLiveStreamers((prevStreamers) => {
                 // CRITICAL: Don't clear streamers if we get an empty array - might be temporary error
-                // Only clear if we're sure there are no streamers (after initial load)
-                if (streamers.length === 0 && prevStreamers.length > 0) {
-                  console.warn('loadLiveStreamers returned empty array but we have existing streamers - keeping existing');
-                  return prevStreamers; // Keep existing streamers to prevent Tile unmounting
+                // Use ref to check current state (more reliable than prevStreamers in rapid updates)
+                const currentStreamers = liveStreamersRef.current.length > 0 ? liveStreamersRef.current : prevStreamers;
+                
+                if (streamers.length === 0 && currentStreamers.length > 0) {
+                  console.warn('Realtime: loadLiveStreamers returned empty array but we have existing streamers - keeping existing', {
+                    currentCount: currentStreamers.length,
+                    prevCount: prevStreamers.length,
+                  });
+                  return currentStreamers; // Keep existing streamers to prevent Tile unmounting
                 }
                 
-                if (prevStreamers.length === streamers.length) {
-                  const prevIds = prevStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
+                if (currentStreamers.length === streamers.length) {
+                  const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
                   const newIds = streamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
                   if (prevIds === newIds) {
-                    return prevStreamers; // No change, prevent re-render
+                    return currentStreamers; // No change, prevent re-render
                   }
                 }
+                
+                // Update ref with new data
+                liveStreamersRef.current = streamers;
                 return streamers; // Changed, update
               });
               // Only auto-fill empty slots, don't reload entire layout
