@@ -279,6 +279,19 @@ export default function Tile({
             const isCameraOrMic = publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone;
             
             if (isCameraOrMic) {
+              // CRITICAL: Only subscribe if publication has a trackSid (track is actually ready)
+              // Subscribing to publications without tracks causes rapid subscribe/unsubscribe cycles
+              if (!publication.trackSid) {
+                if (DEBUG_LIVEKIT) {
+                  console.log('[DEBUG] Skipping subscription (no trackSid yet):', {
+                    slotIndex,
+                    streamerId,
+                    source: publication.source,
+                  });
+                }
+                return;
+              }
+              
               // If not already subscribed, subscribe now
               if (!publication.isSubscribed) {
                 if (DEBUG_LIVEKIT) {
@@ -289,7 +302,13 @@ export default function Tile({
                     sid: publication.trackSid,
                   });
                 }
-                publication.setSubscribed(true);
+                try {
+                  publication.setSubscribed(true);
+                } catch (err) {
+                  if (DEBUG_LIVEKIT) {
+                    console.warn('[DEBUG] Failed to subscribe to publication:', err);
+                  }
+                }
               }
               
               // If track is already available, handle it immediately
