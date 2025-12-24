@@ -79,6 +79,7 @@ export default function LiveRoom() {
   const [selectedSlotForReplacement, setSelectedSlotForReplacement] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCurrentUserPublishing, setIsCurrentUserPublishing] = useState(false); // Track if current user is publishing
+  const [roomPresenceCountMinusSelf, setRoomPresenceCountMinusSelf] = useState<number>(0); // Room-demand: count of others in room
   
   // Live Grid Sort Mode
   type LiveSortMode = 'random' | 'most_viewed' | 'most_gifted' | 'newest';
@@ -104,6 +105,8 @@ export default function LiveRoom() {
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const roomConnectionRef = useRef<{ connecting: boolean; connected: boolean }>({ connecting: false, connected: false });
   const roomRef = useRef<Room | null>(null);
+  // CRITICAL: Track room instance ID for debugging - prove only ONE instance exists
+  const roomInstanceIdRef = useRef<number>(0);
   // Store handlers in ref so cleanup can access them
   const handlersRef = useRef<{
     handleConnected: () => void;
@@ -177,6 +180,20 @@ export default function LiveRoom() {
 
         // Import Room dynamically
         const { Room: LiveKitRoom } = await import('livekit-client');
+        
+        // CRITICAL: Track room instance creation - prove only ONE instance
+        roomInstanceIdRef.current += 1;
+        const currentInstanceId = roomInstanceIdRef.current;
+        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+        
+        if (DEBUG_LIVEKIT) {
+          console.log('[ROOM] created', {
+            roomInstanceId: currentInstanceId,
+            timestamp: new Date().toISOString(),
+            stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n'),
+          });
+        }
+        
         const newRoom = new LiveKitRoom({
           adaptiveStream: true,
           dynacast: true,
@@ -281,6 +298,17 @@ export default function LiveRoom() {
         roomRef.current = newRoom;
 
         // Connect to room
+        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+        if (DEBUG_LIVEKIT) {
+          const tokenHashShort = token ? token.substring(0, 8) + '...' : 'none';
+          console.log('[ROOM] connect called', {
+            roomInstanceId: currentInstanceId,
+            caller: 'connectSharedRoom',
+            tokenHashShort,
+            timestamp: new Date().toISOString(),
+            stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n'),
+          });
+        }
         await newRoom.connect(url, token);
         
         // Wait a moment to ensure connection is fully established
@@ -377,6 +405,65 @@ export default function LiveRoom() {
     username: currentUsername,
     enabled: !authDisabled && !!currentUserId && !!currentUsername,
   });
+
+  // ROOM-DEMAND: Track room presence count (excluding self) for publisher enable logic
+  useEffect(() => {
+    if (!currentUserId || authDisabled) {
+      setRoomPresenceCountMinusSelf(0);
+      return;
+    }
+
+    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    
+    // Initial load
+    const loadRoomPresenceCount = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_room_presence_count_minus_self');
+        if (error) {
+          console.error('Error getting room presence count:', error);
+          return;
+        }
+        const count = data || 0;
+        setRoomPresenceCountMinusSelf(count);
+        if (DEBUG_LIVEKIT) {
+          console.log('[ROOM-DEMAND] room presence count (minus self):', count);
+        }
+      } catch (err) {
+        console.error('Error loading room presence count:', err);
+      }
+    };
+
+    loadRoomPresenceCount();
+
+    // Subscribe to room_presence changes
+    const roomPresenceChannel = supabase
+      .channel('room-presence-count-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'room_presence',
+        },
+        async () => {
+          // Debounce rapid updates
+          setTimeout(async () => {
+            await loadRoomPresenceCount();
+          }, 500);
+        }
+      )
+      .subscribe();
+
+    // Also poll every 5 seconds as backup (in case realtime misses updates)
+    const pollInterval = setInterval(() => {
+      loadRoomPresenceCount();
+    }, 5000);
+
+    return () => {
+      supabase.removeChannel(roomPresenceChannel);
+      clearInterval(pollInterval);
+    };
+  }, [currentUserId, authDisabled, supabase]);
 
   // Auto-enable Focus Mode when tile is expanded
   useEffect(() => {
@@ -559,6 +646,8 @@ export default function LiveRoom() {
     // Subscribe to live streamer changes
     // CRITICAL: Debounce to prevent rapid reloads that cause disconnections
     let gridReloadTimeout: NodeJS.Timeout | null = null;
+    let lastLoadTime = 0;
+    const MIN_LOAD_INTERVAL = 3000; // Minimum 3 seconds between loads
     const channel = supabase
       .channel('live-streamers')
       .on(
@@ -574,6 +663,19 @@ export default function LiveRoom() {
             clearTimeout(gridReloadTimeout);
           }
           gridReloadTimeout = setTimeout(() => {
+            const now = Date.now();
+            // CRITICAL: Prevent rapid calls - only load if enough time has passed
+            if (now - lastLoadTime < MIN_LOAD_INTERVAL) {
+              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+              if (DEBUG_LIVEKIT) {
+                console.log('[GRID] Skipping loadLiveStreamers - too soon', {
+                  timeSinceLastLoad: now - lastLoadTime,
+                  minInterval: MIN_LOAD_INTERVAL,
+                });
+              }
+              return;
+            }
+            lastLoadTime = now;
             // Only update streamer list, don't reload grid layout
             // Grid layout reload causes disconnections
             loadLiveStreamers().then((streamers) => {
@@ -617,13 +719,12 @@ export default function LiveRoom() {
       )
       .subscribe();
 
-    // Also trigger publish state update when active_viewers changes
-    // This ensures that when a streamer watches their own stream, publishing starts immediately
-    // Use debouncing to prevent rapid updates
-    let publishStateUpdateTimeout: NodeJS.Timeout | null = null;
+    // ROOM-DEMAND: Disabled tile-demand path (update_publish_state_from_viewers)
+    // active_viewers changes no longer control publishing - room presence does
+    // Keep active_viewers subscription for analytics/viewer counts only
     let fullReloadTimeout: NodeJS.Timeout | null = null;
     let lastFullReload = 0;
-    const MIN_RELOAD_INTERVAL = 3000; // Max once every 3 seconds
+    const MIN_RELOAD_INTERVAL = 5000; // Max once every 5 seconds
     
     const activeViewersChannel = supabase
       .channel('active-viewers-updates')
@@ -635,31 +736,29 @@ export default function LiveRoom() {
           table: 'active_viewers',
         },
         async () => {
-          // Update publish state (debounced)
-          if (publishStateUpdateTimeout) {
-            clearTimeout(publishStateUpdateTimeout);
+          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+          if (DEBUG_LIVEKIT) {
+            console.log('[HEARTBEAT] active_viewers change detected (analytics only, NOT controlling publish)');
           }
-          publishStateUpdateTimeout = setTimeout(async () => {
-            try {
-              await supabase.rpc('update_publish_state_from_viewers');
-              // Only update viewer counts, don't reload everything
-              updateViewerCountsOnly();
-              
-              // Debounced full reload (max once every 3 seconds)
-              const now = Date.now();
-              if (now - lastFullReload >= MIN_RELOAD_INTERVAL) {
-                if (fullReloadTimeout) {
-                  clearTimeout(fullReloadTimeout);
-                }
-                fullReloadTimeout = setTimeout(async () => {
-                  lastFullReload = Date.now();
-                  await loadLiveStreamers();
-                }, 500); // Small delay to batch multiple updates
-              }
-            } catch (error) {
-              console.error('Error updating publish state:', error);
+          
+          // ROOM-DEMAND: Do NOT call update_publish_state_from_viewers() - publishing is controlled by room presence
+          // Only update viewer counts for display/analytics
+          updateViewerCountsOnly();
+          
+          // Debounced full reload (max once every 5 seconds) for viewer count updates
+          const now = Date.now();
+          if (now - lastFullReload >= MIN_RELOAD_INTERVAL) {
+            if (fullReloadTimeout) {
+              clearTimeout(fullReloadTimeout);
             }
-          }, 2000); // Wait 2 seconds after last change before updating
+            fullReloadTimeout = setTimeout(async () => {
+              lastFullReload = Date.now();
+              if (DEBUG_LIVEKIT) {
+                console.log('[GRID] Full reload triggered by active_viewers change (analytics only)');
+              }
+              await loadLiveStreamers();
+            }, 1000);
+          }
         }
       )
       .subscribe();
@@ -719,7 +818,16 @@ export default function LiveRoom() {
       // If auth disabled, still load streamers (just without user filtering)
       if (!authDisabled && !user) {
         setLoading(false);
-        return []; // Return empty array instead of undefined
+        // CRITICAL: Don't return empty array if we have existing streamers - might be temporary auth issue
+        const existingStreamers = liveStreamersRef.current.length > 0 ? liveStreamersRef.current : [];
+        if (existingStreamers.length > 0) {
+          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+          if (DEBUG_LIVEKIT) {
+            console.warn('[GRID] loadLiveStreamers: No user but have existing streamers, keeping them');
+          }
+          return existingStreamers;
+        }
+        return []; // Only return empty if truly no streamers
       }
 
       // Use new RPC function with sort mode
@@ -1006,50 +1114,81 @@ export default function LiveRoom() {
         }
       }
 
-      // CRITICAL: Only update state if streamers actually changed (prevent unnecessary re-renders)
-      // Compare by profile_id and key properties to avoid creating new array reference unnecessarily
-      setLiveStreamers((prevStreamers) => {
-        // CRITICAL: ABSOLUTE GUARD - Never clear streamers if we have existing ones and get empty array
-        // Use ref to check current state (more reliable than prevStreamers in rapid updates)
-        const currentStreamers = liveStreamersRef.current.length > 0 ? liveStreamersRef.current : prevStreamers;
-        
-        // STRICT: If we have streamers and new data is empty, ALWAYS keep existing (might be error/race condition)
-        if (streamersWithBadges.length === 0) {
-          if (currentStreamers.length > 0) {
-            console.warn('[GUARD] loadLiveStreamers: Blocking empty array - keeping existing streamers', {
-              currentCount: currentStreamers.length,
-              prevCount: prevStreamers.length,
-              refCount: liveStreamersRef.current.length,
-              stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n'),
+        // CRITICAL: Only update state if streamers actually changed (prevent unnecessary re-renders)
+        // Compare by profile_id and key properties to avoid creating new array reference unnecessarily
+        setLiveStreamers((prevStreamers) => {
+          // CRITICAL: ABSOLUTE GUARD - Never clear streamers if we have existing ones and get empty array
+          // Use ref to check current state (more reliable than prevStreamers in rapid updates)
+          const currentStreamers = liveStreamersRef.current.length > 0 ? liveStreamersRef.current : prevStreamers;
+          
+          // CRITICAL: NEVER clear streamers if we have existing ones - this prevents remount loops
+          // Empty arrays from loadLiveStreamers() are likely errors/race conditions, not real "no streamers"
+          if (streamersWithBadges.length === 0) {
+            const currentCount = currentStreamers.length > 0 ? currentStreamers.length : liveStreamersRef.current.length;
+            if (currentCount > 0) {
+              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+              if (DEBUG_LIVEKIT) {
+                console.warn('[GRID] loadLiveStreamers: Blocking empty array - keeping existing streamers', {
+                  currentCount: currentStreamers.length,
+                  refCount: liveStreamersRef.current.length,
+                  reason: 'empty result likely error/race condition',
+                });
+              }
+              // Return existing streamers to prevent clearing state
+              return currentStreamers.length > 0 ? currentStreamers : liveStreamersRef.current;
+            }
+            // Only allow empty array if we truly have no streamers (initial load)
+            // But still check ref to be safe
+            if (liveStreamersRef.current.length > 0) {
+              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+              if (DEBUG_LIVEKIT) {
+                console.warn('[GRID] loadLiveStreamers: Blocking empty array - keeping ref streamers', {
+                  refCount: liveStreamersRef.current.length,
+                });
+              }
+              return liveStreamersRef.current;
+            }
+            liveStreamersRef.current = [];
+            return [];
+          }
+          
+          // ENHANCED: Deep comparison - check if data actually changed
+          // Compare by profile_id, is_published, live_available, and viewer_count
+          if (currentStreamers.length === streamersWithBadges.length) {
+            const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.live_available}:${s.viewer_count}`).join(',');
+            const newIds = streamersWithBadges.map(s => `${s.profile_id}:${s.is_published}:${s.live_available}:${s.viewer_count}`).join(',');
+            if (prevIds === newIds) {
+              // Data hasn't changed, return previous array reference to prevent re-render
+              // This is CRITICAL - prevents tile subscription effects from rerunning
+              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+              if (DEBUG_LIVEKIT) {
+                console.log('[GRID] loadLiveStreamers: No changes detected, keeping previous array reference');
+              }
+              return currentStreamers; // Return same reference
+            }
+          }
+          
+          // Update ref with new data BEFORE returning
+          liveStreamersRef.current = streamersWithBadges;
+          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+          if (DEBUG_LIVEKIT) {
+            console.log('[GRID] liveStreamers updated:', {
+              oldCount: currentStreamers.length,
+              newCount: streamersWithBadges.length,
+              changedFields: currentStreamers.map((s, i) => {
+                const newS = streamersWithBadges[i];
+                if (!newS) return { profile_id: s.profile_id, change: 'removed' };
+                const changes: string[] = [];
+                if (s.is_published !== newS.is_published) changes.push('is_published');
+                if (s.viewer_count !== newS.viewer_count) changes.push('viewer_count');
+                if (s.live_available !== newS.live_available) changes.push('live_available');
+                return { profile_id: s.profile_id, changes };
+              }),
             });
-            return currentStreamers; // Keep existing streamers to prevent Tile unmounting
           }
-          // If we don't have existing streamers, empty array is OK (initial load or truly no streamers)
-          liveStreamersRef.current = [];
-          return [];
-        }
-        
-        // Quick check: same length and same IDs in same order?
-        if (currentStreamers.length === streamersWithBadges.length) {
-          const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
-          const newIds = streamersWithBadges.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
-          if (prevIds === newIds) {
-            // Data hasn't changed, return previous array to prevent re-render
-            return currentStreamers;
-          }
-        }
-        
-        // Update ref with new data BEFORE returning
-        liveStreamersRef.current = streamersWithBadges;
-        console.log('[UPDATE] liveStreamers updated:', {
-          oldCount: currentStreamers.length,
-          newCount: streamersWithBadges.length,
-          oldIds: currentStreamers.map(s => s.profile_id),
-          newIds: streamersWithBadges.map(s => s.profile_id),
+          // Data changed, return new array
+          return streamersWithBadges;
         });
-        // Data changed, return new array
-        return streamersWithBadges;
-      });
       
       // If no streamers found, still set loading to false
       if (!streamersWithBadges || streamersWithBadges.length === 0) {
@@ -2056,6 +2195,7 @@ export default function LiveRoom() {
               isRoomConnected={isRoomConnected} 
               onGoLive={handleGoLive}
               onPublishingChange={setIsCurrentUserPublishing}
+              roomPresenceCountMinusSelf={roomPresenceCountMinusSelf}
             />
             <button
               onClick={toggleFocusMode}

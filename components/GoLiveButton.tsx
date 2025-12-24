@@ -11,6 +11,7 @@ interface GoLiveButtonProps {
   onLiveStatusChange?: (isLive: boolean) => void;
   onPublishingChange?: (isPublishing: boolean) => void; // NEW: Report publishing state
   onGoLive?: (liveStreamId: number, profileId: string) => void;
+  roomPresenceCountMinusSelf?: number; // ROOM-DEMAND: Count of others in room (excluding self)
 }
 
 interface DeviceInfo {
@@ -18,7 +19,7 @@ interface DeviceInfo {
   label: string;
 }
 
-export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive }: GoLiveButtonProps) {
+export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, roomPresenceCountMinusSelf = 0 }: GoLiveButtonProps) {
   const [isLive, setIsLive] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,7 +33,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   const isLiveRef = useRef(false); // Track current state to prevent unnecessary updates
   const lastLiveStateRef = useRef<boolean | null>(null); // Track last state to prevent rapid changes
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Debounce state updates
-  const stopPublishingRef = useRef<(() => Promise<void>) | null>(null); // Store stopPublishing function for realtime handler
+  const stopPublishingRef = useRef<((reason?: string) => Promise<void>) | null>(null); // Store stopPublishing function for realtime handler
   const isPublishingRef = useRef(false); // Store isPublishing state for realtime handler
   const supabase = createClient();
 
@@ -85,7 +86,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
               if (!newLiveState && isLiveRef.current && isPublishingRef.current && stopPublishingRef.current) {
                 console.log('Database updated: live_available=false, stopping publishing...');
                 // Stop publishing when database says user is no longer live
-                stopPublishingRef.current().catch((err) => {
+                stopPublishingRef.current('live_available=false from DB').catch((err) => {
                   console.error('Error stopping publishing after database update:', err);
                 });
               }
@@ -242,11 +243,38 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     }
   };
 
-  // LiveKit publisher hook - only enable when we have everything ready AND room is connected
-  // CRITICAL: Use useMemo to stabilize this value and prevent rapid toggling
+  // ROOM-DEMAND: Publisher enable logic
+  // NEW RULE: Publish when live_available=true AND room has others present (roomPresenceCountMinusSelf > 0)
+  // This replaces tile-demand (active_viewers) to prevent circular dependencies and flapping
+  // CRITICAL: NOT tied to active_viewers / is_published / tile placement
   const shouldEnablePublisher = useMemo(() => {
-    return !!(isLive && selectedVideoDevice && selectedAudioDevice && liveStreamId && isRoomConnected && sharedRoom);
-  }, [isLive, selectedVideoDevice, selectedAudioDevice, liveStreamId, isRoomConnected, sharedRoom]);
+    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    
+    // Enable publisher if:
+    // 1. User pressed "Go Live" (live_available=true, i.e., isLive=true)
+    // 2. Has devices selected
+    // 3. Room is connected
+    // 4. Room has others present (roomPresenceCountMinusSelf > 0)
+    // NOTE: When alone (roomPresenceCountMinusSelf === 0), show preview only (local preview), no publishing
+    const hasRequiredDevices = !!(selectedVideoDevice && selectedAudioDevice && liveStreamId);
+    const roomHasOthers = roomPresenceCountMinusSelf > 0;
+    const enabled = !!(isLive && hasRequiredDevices && isRoomConnected && sharedRoom && roomHasOthers);
+    
+    if (DEBUG_LIVEKIT) {
+      console.log('[PUBLISH] enable check (ROOM-DEMAND)', {
+        enabled,
+        isLive, // This is live_available from DB
+        hasRequiredDevices,
+        roomPresenceCountMinusSelf,
+        roomHasOthers,
+        isRoomConnected,
+        hasSharedRoom: !!sharedRoom,
+        // NOTE: is_published is NOT in this check - that's correct!
+        // NOTE: active_viewers is NOT in this check - room-demand replaces tile-demand!
+      });
+    }
+    return enabled;
+  }, [isLive, selectedVideoDevice, selectedAudioDevice, liveStreamId, isRoomConnected, sharedRoom, roomPresenceCountMinusSelf]);
   const [isPublishingState, setIsPublishingState] = useState(false);
   
   const { isPublishing, error, startPublishing, stopPublishing } = useLiveKitPublisher({
@@ -278,8 +306,9 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
 
   // Store stopPublishing function in ref so realtime handler can access it
   // CRITICAL: This must be AFTER useLiveKitPublisher hook call
+  // Wrap it to pass reason parameter
   useEffect(() => {
-    stopPublishingRef.current = stopPublishing;
+    stopPublishingRef.current = (reason?: string) => stopPublishing(reason || 'realtime handler');
   }, [stopPublishing]);
 
   const handleGoLive = async () => {
@@ -306,7 +335,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
 
         // Stop LiveKit publishing (await it)
         try {
-          await stopPublishing();
+          await stopPublishing('user clicked stop live');
           console.log('LiveKit publishing stopped');
         } catch (err) {
           console.error('Error stopping publishing:', err);
@@ -500,7 +529,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       setTimeout(async () => {
         try {
           console.log('Attempting manual start...');
-          await startPublishing();
+          await startPublishing('manual start from handleStartLive');
           // If we get here, check if publishing started
           setTimeout(() => {
             if (!isPublishing && loading) {
