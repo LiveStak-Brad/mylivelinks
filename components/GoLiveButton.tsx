@@ -461,9 +461,14 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         onGoLive(data.id, user.id);
       }
 
-      // Don't close modal yet - wait for publishing to start
-      // The hook will automatically start publishing when enabled becomes true
-      // But also try manual start immediately as a fallback
+      // CRITICAL: Ensure room is connected before trying to publish
+      // The hook will automatically start publishing when enabled becomes true AND room is connected
+      // If room isn't connected yet, it will start when the room connects
+      if (!isRoomConnected || !sharedRoom) {
+        console.log('Room not connected yet, publisher will start when room connects');
+      } else if (sharedRoom.state === 'connected') {
+        console.log('Room is connected, publisher should start automatically');
+      }
       console.log('Starting MyLiveLinks connection...', {
         enabled: shouldEnablePublisher,
         liveStreamId: data.id,

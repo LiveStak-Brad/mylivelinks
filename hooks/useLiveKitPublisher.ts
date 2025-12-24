@@ -336,15 +336,36 @@ export function useLiveKitPublisher({
     // Debounce rapid toggles (wait 500ms before acting on changes)
     // Increased from 300ms to 500ms to better handle rapid state changes
     toggleTimeoutRef.current = setTimeout(() => {
-      // Only start if enabled, room connected, and not already publishing
+      // CRITICAL: Check if we should be publishing but aren't
+      // This handles the case where isLive becomes true before room connects
       if (enabledRef.current && isRoomConnected && room && room.state === 'connected' && !isPublishingStateRef.current) {
-        console.log('Auto-starting publisher (enabled=true, room connected)...');
-        startPublishing();
+        console.log('Auto-starting publisher (enabled=true, room connected):', {
+          enabled: enabledRef.current,
+          isRoomConnected,
+          roomState: room.state,
+          isPublishing: isPublishingStateRef.current,
+        });
+        startPublishing().catch((err) => {
+          console.error('Failed to start publishing:', err);
+          setError(err);
+        });
       } 
       // Only stop if disabled AND currently publishing (prevent rapid toggling)
       else if (!enabledRef.current && isPublishingStateRef.current) {
-        console.log('Stopping publisher (enabled=false)...');
+        console.log('Stopping publisher (enabled=false):', {
+          enabled: enabledRef.current,
+          isPublishing: isPublishingStateRef.current,
+        });
         stopPublishing();
+      }
+      // If enabled but room not connected yet, log for debugging
+      else if (enabledRef.current && (!isRoomConnected || !room || room.state !== 'connected')) {
+        console.log('Publisher waiting for room connection:', {
+          enabled: enabledRef.current,
+          isRoomConnected,
+          hasRoom: !!room,
+          roomState: room?.state,
+        });
       }
     }, 500); // 500ms debounce to prevent rapid toggling
 
