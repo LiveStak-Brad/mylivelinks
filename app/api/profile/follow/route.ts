@@ -14,8 +14,9 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
+      console.error('Auth error in follow API:', authError);
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { success: false, error: 'Unauthorized - Please log in' },
         { status: 401 }
       );
     }
@@ -24,11 +25,17 @@ export async function POST(request: NextRequest) {
     const { targetProfileId } = body;
     
     if (!targetProfileId) {
+      console.error('Missing targetProfileId in follow request');
       return NextResponse.json(
-        { error: 'Missing targetProfileId' },
+        { success: false, error: 'Missing targetProfileId' },
         { status: 400 }
       );
     }
+    
+    console.log('Follow request:', {
+      userId: user.id,
+      targetProfileId,
+    });
     
     // Call RPC function to toggle follow
     const { data, error } = await supabase.rpc('toggle_follow', {
@@ -36,26 +43,38 @@ export async function POST(request: NextRequest) {
       p_followee_id: targetProfileId
     });
     
+    console.log('RPC toggle_follow result:', { data, error });
+    
     if (error) {
-      console.error('Follow toggle error:', error);
+      console.error('Follow toggle RPC error:', error);
       return NextResponse.json(
-        { error: 'Failed to toggle follow' },
+        { success: false, error: `Database error: ${error.message}` },
+        { status: 500 }
+      );
+    }
+    
+    if (!data) {
+      console.error('No data returned from toggle_follow');
+      return NextResponse.json(
+        { success: false, error: 'No response from database' },
         { status: 500 }
       );
     }
     
     if (data?.error) {
+      console.error('Follow toggle returned error:', data.error);
       return NextResponse.json(
-        { error: data.error },
+        { success: false, error: data.error },
         { status: 400 }
       );
     }
     
+    console.log('Follow successful:', data);
     return NextResponse.json(data, { status: 200 });
-  } catch (error) {
-    console.error('Follow API error:', error);
+  } catch (error: any) {
+    console.error('Follow API exception:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { success: false, error: `Internal server error: ${error.message}` },
       { status: 500 }
     );
   }

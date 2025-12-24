@@ -157,8 +157,18 @@ export default function ModernProfilePage() {
   const handleFollow = async () => {
     if (!profileData || followLoading) return;
     
+    // Check if user is logged in
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('Please log in to follow users');
+      router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
+      return;
+    }
+    
     setFollowLoading(true);
     try {
+      console.log('Attempting to follow:', profileData.profile.id);
+      
       const response = await fetch('/api/profile/follow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -166,6 +176,13 @@ export default function ModernProfilePage() {
       });
       
       const data = await response.json();
+      console.log('Follow response:', data);
+      
+      if (!response.ok) {
+        console.error('Follow failed:', data);
+        alert(data.error || 'Failed to follow/unfollow');
+        return;
+      }
       
       if (data.success) {
         // Update relationship status locally
@@ -176,9 +193,13 @@ export default function ModernProfilePage() {
             ? prev.follower_count - 1 
             : prev.follower_count + 1
         } : null);
+      } else {
+        console.error('Follow unsuccessful:', data);
+        alert(data.error || 'Failed to follow/unfollow');
       }
     } catch (error) {
       console.error('Follow error:', error);
+      alert('An error occurred. Please try again.');
     } finally {
       setFollowLoading(false);
     }
