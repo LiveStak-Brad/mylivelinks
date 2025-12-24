@@ -49,22 +49,27 @@ export default function ProfileCustomization({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
-      // Create unique filename with timestamp
+      // Create filename with user ID prefix for RLS
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}_bg_${Date.now()}.${fileExt}`;
       
-      // Try to upload directly to root of avatars bucket (same as avatar uploads)
+      console.log('Uploading file:', fileName);
+      
+      // Upload to Supabase Storage
       const { error: uploadError, data: uploadData } = await supabase.storage
         .from('avatars')
         .upload(fileName, file, {
           cacheControl: '3600',
-          upsert: true // Allow overwriting if same filename
+          upsert: true,
+          contentType: file.type
         });
       
       if (uploadError) {
         console.error('Upload error details:', uploadError);
         throw new Error(uploadError.message || 'Upload failed');
       }
+      
+      console.log('Upload successful:', uploadData);
       
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
@@ -75,12 +80,14 @@ export default function ProfileCustomization({
         throw new Error('Failed to get public URL');
       }
       
+      console.log('Public URL:', publicUrl);
+      
       setSettings({ ...settings, profile_bg_url: publicUrl });
       alert('Background image uploaded successfully!');
     } catch (error) {
       console.error('Upload error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to upload background image';
-      alert(`Upload failed: ${errorMessage}\n\nPlease check browser console for details.`);
+      alert(`Upload failed: ${errorMessage}\n\nMake sure you've run the storage policies SQL migration.`);
     } finally {
       setUploading(false);
     }
