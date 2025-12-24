@@ -16,11 +16,13 @@ import { getMobileIdentity } from '../lib/mobileIdentity';
 import { getDeviceId, generateSessionId } from '../lib/deviceId';
 import { selectGridParticipants, type ParticipantLite, type SortMode } from '../lib/live';
 
-const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
-const ROOM_NAME = 'mylivelinks-main'; // Global room for all streams
+import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT } from '../lib/livekit-constants';
+
+const DEBUG = DEBUG_LIVEKIT;
+const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
 const TOKEN_ENDPOINT = process.env.EXPO_PUBLIC_API_URL 
-  ? `${process.env.EXPO_PUBLIC_API_URL}/api/livekit/token`
-  : 'https://mylivelinks.com/api/livekit/token'; // Default to production
+  ? `${process.env.EXPO_PUBLIC_API_URL}${TOKEN_ENDPOINT_PATH}`
+  : `https://mylivelinks.com${TOKEN_ENDPOINT_PATH}`; // Default to production
 
 interface UseLiveRoomParticipantsReturn {
   participants: Participant[];

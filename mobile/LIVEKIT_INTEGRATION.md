@@ -35,7 +35,7 @@ Real LiveKit integration for mobile viewing of web streamers. Mobile users conne
 ```typescript
 POST /api/livekit/token
 Body: {
-  roomName: "mylivelinks-main",
+  roomName: "live_central",  // MUST match web (lib/livekit-constants.ts)
   participantName: "Mobile User",
   canPublish: false,  // Mobile is viewer-only
   canSubscribe: true,
