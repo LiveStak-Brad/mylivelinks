@@ -2171,7 +2171,6 @@ export default function LiveRoom() {
               isRoomConnected={isRoomConnected} 
               onGoLive={handleGoLive}
               onPublishingChange={setIsCurrentUserPublishing}
-              roomPresenceCountMinusSelf={roomPresenceCountMinusSelf}
             />
             <button
               onClick={toggleFocusMode}
