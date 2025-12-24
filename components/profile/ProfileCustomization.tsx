@@ -16,11 +16,15 @@ interface ProfileCustomizationProps {
     accent_color?: string;
     links_section_title?: string;
   };
+  hideStreamingStats?: boolean;
+  onHideStatsChange?: (hide: boolean) => void;
   onSave: (settings: any) => Promise<void>;
 }
 
 export default function ProfileCustomization({
   initialSettings,
+  hideStreamingStats = false,
+  onHideStatsChange,
   onSave
 }: ProfileCustomizationProps) {
   const [settings, setSettings] = useState(initialSettings);
@@ -335,6 +339,34 @@ export default function ProfileCustomization({
           <p className="text-xs text-gray-500 mt-1">
             Examples: "My Links", "Follow Me", "My Platforms", "Sponsors"
           </p>
+        </div>
+      </div>
+      
+      {/* Display Preferences */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <Layout size={20} />
+          Display Preferences
+        </h3>
+        
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="hideStreamingStats"
+              checked={hideStreamingStats}
+              onChange={(e) => onHideStatsChange?.(e.target.checked)}
+              className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <label htmlFor="hideStreamingStats" className="block text-sm font-semibold cursor-pointer">
+                Links-Only Profile (Hide Streaming Stats)
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Hide streaming stats, top supporters, and top streamers widgets. Your profile will only show your links, social media, and bio - perfect for creators who just want a link hub.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
       

@@ -50,6 +50,8 @@ interface ProfileData {
     social_github?: string;
     social_spotify?: string;
     social_onlyfans?: string;
+    // Display preferences
+    hide_streaming_stats?: boolean;
     // Private (only if owner)
     coin_balance?: number;
     earnings_balance?: number;
@@ -404,34 +406,36 @@ export default function ModernProfilePage() {
           </div>
         </div>
         
-        {/* Stats & Social Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
-          <SocialCountsWidget
-            followerCount={profileData.follower_count}
-            followingCount={profileData.following_count}
-            friendsCount={profileData.friends_count}
-            onShowFollowers={() => setShowFollowersModal(true)}
-            onShowFollowing={() => setShowFollowingModal(true)}
-            onShowFriends={() => setShowFriendsModal(true)}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-            accentColor={accentColor}
-          />
-          
-          <TopSupportersWidget
-            supporters={profileData.top_supporters}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-            accentColor={accentColor}
-          />
-          
-          <TopStreamersWidget
-            streamers={profileData.top_streamers}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-            accentColor={accentColor}
-          />
-        </div>
+        {/* Stats & Social Grid - Hide if hideStreamingStats is true */}
+        {!profile.hide_streaming_stats && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
+            <SocialCountsWidget
+              followerCount={profileData.follower_count}
+              followingCount={profileData.following_count}
+              friendsCount={profileData.friends_count}
+              onShowFollowers={() => setShowFollowersModal(true)}
+              onShowFollowing={() => setShowFollowingModal(true)}
+              onShowFriends={() => setShowFriendsModal(true)}
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+              accentColor={accentColor}
+            />
+            
+            <TopSupportersWidget
+              supporters={profileData.top_supporters}
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+              accentColor={accentColor}
+            />
+            
+            <TopStreamersWidget
+              streamers={profileData.top_streamers}
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+              accentColor={accentColor}
+            />
+          </div>
+        )}
         
         {/* Social Media Bar */}
         {(profile.social_instagram || profile.social_twitter || profile.social_youtube || 
@@ -480,16 +484,18 @@ export default function ModernProfilePage() {
           accentColor={accentColor}
         />
         
-        {/* Stats Card */}
-        <StatsCard
-          streamStats={profileData.stream_stats}
-          gifterLevel={profile.gifter_level}
-          totalGiftsSent={profile.total_gifts_sent}
-          totalGiftsReceived={profile.total_gifts_received}
-          cardStyle={cardStyle}
-          borderRadiusClass={borderRadiusClass}
-          accentColor={accentColor}
-        />
+        {/* Stats Card - Hide if hideStreamingStats is true */}
+        {!profile.hide_streaming_stats && (
+          <StatsCard
+            streamStats={profileData.stream_stats}
+            gifterLevel={profile.gifter_level}
+            totalGiftsSent={profile.total_gifts_sent}
+            totalGiftsReceived={profile.total_gifts_received}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+            accentColor={accentColor}
+          />
+        )}
         
         {/* Premium Branding Footer - Powered by MyLiveLinks */}
         <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 sm:p-8 text-center`} style={cardStyle}>

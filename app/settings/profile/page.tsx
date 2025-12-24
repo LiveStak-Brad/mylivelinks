@@ -59,6 +59,9 @@ export default function ProfileSettingsPage() {
     links_section_title: 'My Links'
   });
   
+  // Display preferences
+  const [hideStreamingStats, setHideStreamingStats] = useState(false);
+  
   // Pinned post
   const [pinnedPost, setPinnedPost] = useState<PinnedPost | null>(null);
   const [pinnedPostCaption, setPinnedPostCaption] = useState('');
@@ -126,6 +129,9 @@ export default function ProfileSettingsPage() {
         setSocialGithub(p.social_github || '');
         setSocialSpotify(p.social_spotify || '');
         setSocialOnlyfans(p.social_onlyfans || '');
+        
+        // Load display preferences
+        setHideStreamingStats(p.hide_streaming_stats || false);
         
         // Load customization fields
         setCustomization({
@@ -229,6 +235,8 @@ export default function ProfileSettingsPage() {
           social_github: socialGithub.trim() || null,
           social_spotify: socialSpotify.trim() || null,
           social_onlyfans: socialOnlyfans.trim() || null,
+          // Display preferences
+          hide_streaming_stats: hideStreamingStats,
           // Customization fields
           profile_bg_url: customization.profile_bg_url || null,
           profile_bg_overlay: customization.profile_bg_overlay,
@@ -598,6 +606,8 @@ export default function ProfileSettingsPage() {
         {/* Profile Customization */}
         <ProfileCustomization
           initialSettings={customization}
+          hideStreamingStats={hideStreamingStats}
+          onHideStatsChange={setHideStreamingStats}
           onSave={async (settings) => {
             setCustomization(settings);
             // Auto-save will happen on main save button
