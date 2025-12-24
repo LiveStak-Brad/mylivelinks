@@ -102,8 +102,11 @@ export default function AgeVerificationModal() {
         return;
       }
       
-      // Success - close modal
+      // Success - close modal and reload to refresh all data
       setShow(false);
+      
+      // Reload the page to ensure all components get the updated DOB
+      window.location.reload();
     } catch (error) {
       console.error('Submit error:', error);
       setError('An error occurred');
