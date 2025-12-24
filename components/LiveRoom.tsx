@@ -2204,7 +2204,6 @@ export default function LiveRoom() {
                   streamerUsername={expandedSlot.streamer.username}
                   streamerAvatar={expandedSlot.streamer.avatar_url}
                   isLive={expandedSlot.streamer.is_published}
-                  isLiveAvailable={expandedSlot.streamer.live_available}
                   viewerCount={expandedSlot.streamer.viewer_count}
                   gifterLevel={expandedSlot.streamer.gifter_level}
                   badgeName={expandedSlot.streamer.badge_name}
@@ -2303,7 +2302,6 @@ export default function LiveRoom() {
                         streamerUsername={slot.streamer.username}
                         streamerAvatar={slot.streamer.avatar_url}
                         isLive={slot.streamer.is_published}
-                        isLiveAvailable={slot.streamer.live_available}
                         viewerCount={slot.streamer.viewer_count}
                         gifterLevel={slot.streamer.gifter_level}
                         badgeName={slot.streamer.badge_name}

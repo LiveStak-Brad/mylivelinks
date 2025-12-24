@@ -12,8 +12,7 @@ interface TileProps {
   streamerId: string;
   streamerUsername: string;
   streamerAvatar?: string;
-  isLive: boolean; // is_published (actively streaming)
-  isLiveAvailable: boolean; // live_available (in preview mode)
+  isLive: boolean; // Derived from track publications only (no preview mode)
   viewerCount: number;
   gifterLevel: number;
   badgeName?: string;
@@ -40,7 +39,6 @@ export default function Tile({
   streamerUsername,
   streamerAvatar,
   isLive,
-  isLiveAvailable,
   viewerCount,
   gifterLevel,
   badgeName,
@@ -68,10 +66,8 @@ export default function Tile({
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
   const [audioTrack, setAudioTrack] = useState<RemoteTrack | null>(null);
-  const [localPreviewStream, setLocalPreviewStream] = useState<MediaStream | null>(null);
   const [isCurrentUser, setIsCurrentUser] = useState(false);
   const supabase = createClient();
 
@@ -479,82 +475,7 @@ export default function Tile({
     });
   }, [streamerId, supabase]);
 
-  // Start local preview when it's current user and live_available
-  // Show preview immediately - even if not published yet, or if published but videoTrack not available yet
-  // This ensures streamer always sees themselves with no flicker or "Connecting..." state
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-    
-    // Show local preview when:
-    // 1. It's the current user
-    // 2. They're live_available
-    // 3. Either not published yet OR published but videoTrack not available yet
-    const shouldShowPreview = isCurrentUser && isLiveAvailable && liveStreamId && (!isLive || !videoTrack);
-    
-    if (shouldShowPreview) {
-      // Start local camera preview
-      const startLocalPreview = async () => {
-        try {
-          console.log('Starting local preview for current user');
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: true, // Use default video constraints
-            audio: false, // Don't need audio for preview
-          });
-          console.log('Local preview stream obtained:', stream);
-          setLocalPreviewStream(stream);
-        } catch (err: any) {
-          console.error('Error starting local preview:', err);
-          // Try again with more permissive constraints
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-              audio: false,
-            });
-            console.log('Local preview stream obtained with fallback constraints:', stream);
-            setLocalPreviewStream(stream);
-          } catch (fallbackErr) {
-            console.error('Fallback preview also failed:', fallbackErr);
-          }
-        }
-      };
-      startLocalPreview();
-    } else {
-      // Stop local preview when not needed (when videoTrack is available and published)
-      if (localPreviewStream && isLive && videoTrack) {
-        console.log('Stopping local preview - videoTrack is now available');
-        localPreviewStream.getTracks().forEach(track => track.stop());
-        setLocalPreviewStream(null);
-      }
-    }
-
-    return () => {
-      // Cleanup on unmount
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      if (localPreviewStream && (!isCurrentUser || !isLiveAvailable)) {
-        localPreviewStream.getTracks().forEach(track => track.stop());
-        setLocalPreviewStream(null);
-      }
-    };
-  }, [isCurrentUser, isLiveAvailable, isLive, liveStreamId, videoTrack]);
-
-  // Attach local preview stream to video element when both are ready
-  useEffect(() => {
-    if (localPreviewStream && previewVideoRef.current) {
-      console.log('Attaching local preview stream to video element');
-      previewVideoRef.current.srcObject = localPreviewStream;
-      previewVideoRef.current.play()
-        .then(() => {
-          console.log('Local preview video playing');
-        })
-        .catch(err => {
-          console.error('Error playing preview:', err);
-        });
-    } else if (!localPreviewStream && previewVideoRef.current) {
-      previewVideoRef.current.srcObject = null;
-    }
-  }, [localPreviewStream]);
+  // NO PREVIEW MODE: Current user sees their own tracks through the room
 
   // Attach video track when it becomes available - use ref to prevent re-attachment
   const attachedVideoTrackRef = useRef<RemoteTrack | null>(null);
@@ -709,7 +630,7 @@ export default function Tile({
     >
       {/* Video/Stream Area */}
       <div className="w-full h-full flex items-center justify-center bg-gray-900 relative overflow-hidden">
-        {/* LiveKit Video Element - Show whenever we have a video track (regardless of isLive state to prevent flicker) */}
+        {/* LiveKit Video Element - Show whenever we have a video track */}
         {videoTrack && (
           <video
             ref={videoRef}
@@ -720,20 +641,8 @@ export default function Tile({
           />
         )}
         
-        {/* Local Preview - Show when it's current user and live_available (even if not published yet, or published but videoTrack not available) */}
-        {isCurrentUser && isLiveAvailable && localPreviewStream && (!isLive || !videoTrack) && (
-          <video
-            ref={previewVideoRef}
-            className="absolute inset-0 w-full h-full object-cover bg-black"
-            autoPlay
-            playsInline
-            muted
-          />
-        )}
-        
-        {/* Fallback: Avatar or placeholder (when no video track or preview) */}
-        {/* CRITICAL: Only show avatar if we truly don't have video (not just because isLive changed) */}
-        {!videoTrack && !(isCurrentUser && isLiveAvailable && localPreviewStream) && (
+        {/* Fallback: Avatar or placeholder when no video track */}
+        {!videoTrack && (
           <div className="absolute inset-0 w-full h-full">
             {streamerAvatar ? (
               <img
@@ -763,7 +672,7 @@ export default function Tile({
         {/* No "Connecting..." UI - streamer should never see this */}
       </div>
 
-      {/* State Indicator - Always show LIVE when live_available (hide preview mode) */}
+      {/* State Indicator - Show LIVE badge when video track exists */}
       <div className="absolute top-2 left-2 flex items-center gap-1.5">
         {tileState === 'live' && (
           <div className="flex items-center gap-1 bg-red-500 text-white px-2 py-1 rounded text-xs font-medium shadow-lg">
@@ -773,8 +682,8 @@ export default function Tile({
         )}
       </div>
 
-      {/* Stats Overlay - Show viewer count (even if 0 for current user when live) */}
-      {(viewerCount > 0 || (isCurrentUser && isLiveAvailable)) && (
+      {/* Stats Overlay - Show viewer count */}
+      {viewerCount > 0 && (
         <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs z-20">
           👁️ {viewerCount}
         </div>

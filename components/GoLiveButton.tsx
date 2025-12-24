@@ -251,13 +251,16 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     const enabled = !!(isLive && hasRequiredDevices && isRoomConnected && sharedRoom);
     
     if (DEBUG_LIVEKIT) {
-      console.log('[PUBLISH] enable check (GO-LIVE)', {
+      console.log('[PUBLISH] Go Live enable check', {
         enabled,
-        isLive, // This is live_available from DB
+        isLive,
         hasRequiredDevices,
         isRoomConnected,
         hasSharedRoom: !!sharedRoom,
-        reason: 'GoLive clicked -> publish immediately',
+        selectedVideoDevice,
+        selectedAudioDevice,
+        liveStreamId,
+        reason: enabled ? 'publishing immediately (Go Live clicked)' : 'waiting for requirements',
       });
     }
     return enabled;
@@ -271,6 +274,10 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     videoDeviceId: selectedVideoDevice,
     audioDeviceId: selectedAudioDevice,
     onPublished: () => {
+      const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+      if (DEBUG_LIVEKIT) {
+        console.log('[PUBLISH] publishing started successfully');
+      }
       console.log('Started publishing to LiveKit');
       setIsPublishingState(true);
       isPublishingRef.current = true; // Update ref for realtime handler
@@ -280,6 +287,10 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       stopPreview();
     },
     onUnpublished: () => {
+      const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+      if (DEBUG_LIVEKIT) {
+        console.log('[PUBLISH] publishing stopped');
+      }
       console.log('Stopped publishing to LiveKit');
       setIsPublishingState(false);
       isPublishingRef.current = false; // Update ref for realtime handler

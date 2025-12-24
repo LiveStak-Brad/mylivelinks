@@ -435,3 +435,4 @@ useEffect(() => {
 - Allows streamers to view other streams
 - Reduces connection overhead by 50% (one room instead of two)
 
+

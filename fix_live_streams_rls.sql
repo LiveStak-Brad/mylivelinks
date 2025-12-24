@@ -43,3 +43,4 @@ CREATE POLICY "Streamers can insert own live stream"
 -- 3. "Streamers can insert own live stream" - INSERT - WITH CHECK (auth.uid() = profile_id)
 -- ============================================================================
 
+

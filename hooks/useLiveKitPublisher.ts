@@ -36,10 +36,21 @@ export function useLiveKitPublisher({
   }, [room]);
 
   // Start publishing (creates tracks and publishes to shared room)
-  const startPublishing = useCallback(async () => {
+  const startPublishing = useCallback(async (reason: string = 'unknown') => {
+    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    
     // Must have a connected room
     if (!room || !isRoomConnected || room.state !== 'connected') {
       const err = new Error('Room not connected. Cannot publish.');
+      if (DEBUG_LIVEKIT) {
+        console.log('[PUBLISH] start requested', {
+          reason,
+          enabledState: 'room not connected',
+          live_available: 'unknown',
+          watcherCount: 'unknown',
+          blocked: true,
+        });
+      }
       setError(err);
       if (onError) {
         onError(err);
@@ -49,8 +60,27 @@ export function useLiveKitPublisher({
 
     // Already publishing?
     if (isPublishingRef.current) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[PUBLISH] start requested', {
+          reason,
+          enabledState: 'already publishing',
+          live_available: 'unknown',
+          watcherCount: 'unknown',
+          blocked: true,
+        });
+      }
       console.log('Already publishing, skipping...');
       return;
+    }
+    
+    if (DEBUG_LIVEKIT) {
+      console.log('[PUBLISH] start requested', {
+        reason,
+        enabledState: 'proceeding',
+        live_available: 'unknown', // Would need to pass this
+        watcherCount: 'unknown', // Would need to pass this
+        blocked: false,
+      });
     }
 
     // CRITICAL: Clean up any existing tracks before creating new ones
@@ -155,9 +185,8 @@ export function useLiveKitPublisher({
           // CRITICAL: Publish tracks sequentially, not in parallel
           // This prevents race conditions and ensures each track is fully published before the next
           for (const track of tracks) {
-            const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
             if (DEBUG_LIVEKIT) {
-              console.log('[DEBUG] Publishing track:', {
+              console.log('[PUBLISH] Publishing track', {
                 kind: track.kind,
                 attempt: publishAttempts + 1,
                 roomState: room.state,
@@ -172,7 +201,6 @@ export function useLiveKitPublisher({
             await new Promise(resolve => setTimeout(resolve, 100));
           }
           
-          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
           if (DEBUG_LIVEKIT) {
             const publishedTracks = Array.from(room.localParticipant.trackPublications.values())
               .filter(pub => {
@@ -255,10 +283,20 @@ export function useLiveKitPublisher({
   // - User closes their own box
   // - Component unmounts (navigate away)
   const stopPublishing = useCallback(async () => {
+    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    
     // Mark that user explicitly stopped (prevents auto-restart)
     userExplicitlyStoppedRef.current = true;
     
     try {
+      if (DEBUG_LIVEKIT) {
+        console.log('[PUBLISH] Stopping publishing', {
+          reason: 'explicit user action',
+          hasRoom: !!room,
+          tracksCount: tracksRef.current.length,
+          roomState: room?.state,
+        });
+      }
       console.log('Stopping publishing (explicit user action)...', {
         hasRoom: !!room,
         tracksCount: tracksRef.current.length,
@@ -371,6 +409,8 @@ export function useLiveKitPublisher({
   }, [isPublishing]);
   
   useEffect(() => {
+    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    
     // Clear any pending toggle
     if (toggleTimeoutRef.current) {
       clearTimeout(toggleTimeoutRef.current);
@@ -382,6 +422,16 @@ export function useLiveKitPublisher({
       // CRITICAL: Only auto-START publishing when enabled becomes true
       // NEVER auto-stop - that should only happen from explicit user actions
       if (enabledRef.current && isRoomConnected && room && room.state === 'connected' && !isPublishingStateRef.current && !userExplicitlyStoppedRef.current) {
+        if (DEBUG_LIVEKIT) {
+          console.log('[PUBLISH] Auto-starting publisher', {
+            reason: 'enabled=true, room connected',
+            enabled: enabledRef.current,
+            isRoomConnected,
+            roomState: room.state,
+            isPublishing: isPublishingStateRef.current,
+            userExplicitlyStopped: userExplicitlyStoppedRef.current,
+          });
+        }
         console.log('Auto-starting publisher (enabled=true, room connected):', {
           enabled: enabledRef.current,
           isRoomConnected,

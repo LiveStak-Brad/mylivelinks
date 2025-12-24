@@ -126,3 +126,4 @@ Share:
 4. Confirmation that all 3 variables are set in Vercel
 
 
+
