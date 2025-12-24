@@ -11,6 +11,7 @@ import TopSupportersWidget from '@/components/profile/TopSupportersWidget';
 import TopStreamersWidget from '@/components/profile/TopStreamersWidget';
 import StatsCard from '@/components/profile/StatsCard';
 import ModernLinksSection from '@/components/profile/ModernLinksSection';
+import AdultLinksSection from '@/components/adult/AdultLinksSection';
 import FollowersModal from '@/components/profile/FollowersModal';
 
 interface ProfileData {
@@ -47,6 +48,17 @@ interface ProfileData {
     click_count: number;
     display_order: number;
   }>;
+  adult_links: Array<{
+    id: number;
+    title: string;
+    url: string;
+    icon?: string;
+    click_count: number;
+    display_order: number;
+    adult_category?: string;
+    requires_warning: boolean;
+  }>;
+  show_adult_section: boolean;
   follower_count: number;
   following_count: number;
   friends_count: number;
@@ -411,6 +423,15 @@ export default function ModernProfilePage() {
             isOwner={isOwnProfile}
           />
         )}
+        
+        {/* Adult Links Section (WEB ONLY, 18+, CONSENT REQUIRED) */}
+        <AdultLinksSection
+          links={profileData.adult_links || []}
+          show={profileData.show_adult_section || false}
+          cardStyle={cardStyle}
+          borderRadiusClass={borderRadiusClass}
+          accentColor={accentColor}
+        />
         
         {/* Stats Card */}
         <StatsCard

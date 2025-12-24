@@ -18,10 +18,16 @@ export async function GET(
     const { data: { user } } = await supabase.auth.getUser();
     const viewerId = user?.id || null;
     
-    // Call RPC function to get complete profile
-    const { data, error } = await supabase.rpc('get_public_profile', {
+    // Detect platform from user agent (mobile vs web)
+    const userAgent = request.headers.get('user-agent') || '';
+    const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
+    const platform = isMobile ? 'mobile' : 'web';
+    
+    // Call RPC function to get complete profile with adult filtering
+    const { data, error } = await supabase.rpc('get_public_profile_with_adult_filtering', {
       p_username: username,
-      p_viewer_id: viewerId
+      p_viewer_id: viewerId,
+      p_platform: platform
     });
     
     if (error) {
