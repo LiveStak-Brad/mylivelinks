@@ -25,22 +25,26 @@ export async function generateMetadata({ params }: { params: { username: string 
     const avatarUrl = profile.avatar_url || 'https://mylivelinks.com/default-avatar.png';
     const profileUrl = `https://mylivelinks.com/${profile.username}`;
     
+    // Generate dynamic OG image URL
+    const ogImageUrl = `https://mylivelinks.com/api/og?username=${encodeURIComponent(profile.username)}&displayName=${encodeURIComponent(displayName)}&bio=${encodeURIComponent(bio.substring(0, 120))}&avatarUrl=${encodeURIComponent(avatarUrl)}`;
+    
     return {
       title: `${displayName} (@${profile.username}) | MyLiveLinks`,
-      description: bio.substring(0, 160), // Limit for SEO
+      description: `${bio.substring(0, 160)} - View ${displayName}'s profile, links, and live streams on MyLiveLinks! 🔥`,
       
       // Open Graph (Facebook, LinkedIn, Discord)
       openGraph: {
         type: 'profile',
         url: profileUrl,
-        title: `${displayName} on MyLiveLinks`,
-        description: bio,
+        title: `${displayName} is on MyLiveLinks! 🔥`,
+        description: `${bio.substring(0, 200)}\n\n👉 Click to view profile, links, and exclusive content!`,
         images: [
           {
-            url: avatarUrl,
+            url: ogImageUrl,
             width: 1200,
             height: 630,
-            alt: `${displayName}'s profile picture`,
+            alt: `${displayName}'s MyLiveLinks Profile`,
+            type: 'image/png',
           },
         ],
         siteName: 'MyLiveLinks',
@@ -51,9 +55,9 @@ export async function generateMetadata({ params }: { params: { username: string 
         card: 'summary_large_image',
         site: '@MyLiveLinks',
         creator: `@${profile.username}`,
-        title: `${displayName} on MyLiveLinks`,
-        description: bio,
-        images: [avatarUrl],
+        title: `${displayName} is on MyLiveLinks! 🔥`,
+        description: `${bio.substring(0, 160)}\n\nView profile, links & live streams 👉`,
+        images: [ogImageUrl],
       },
       
       // Additional metadata
@@ -70,6 +74,8 @@ export async function generateMetadata({ params }: { params: { username: string 
       // Other metadata
       other: {
         'profile:username': profile.username,
+        'og:see_also': profileUrl,
+        'og:locale': 'en_US',
       },
     };
   } catch (error) {
