@@ -573,6 +573,13 @@ export default function LiveRoom() {
               // Update streamer list but preserve current grid
               // Use functional update to compare and prevent unnecessary re-renders
               setLiveStreamers((prevStreamers) => {
+                // CRITICAL: Don't clear streamers if we get an empty array - might be temporary error
+                // Only clear if we're sure there are no streamers (after initial load)
+                if (streamers.length === 0 && prevStreamers.length > 0) {
+                  console.warn('loadLiveStreamers returned empty array but we have existing streamers - keeping existing');
+                  return prevStreamers; // Keep existing streamers to prevent Tile unmounting
+                }
+                
                 if (prevStreamers.length === streamers.length) {
                   const prevIds = prevStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
                   const newIds = streamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
@@ -982,6 +989,13 @@ export default function LiveRoom() {
       // CRITICAL: Only update state if streamers actually changed (prevent unnecessary re-renders)
       // Compare by profile_id and key properties to avoid creating new array reference unnecessarily
       setLiveStreamers((prevStreamers) => {
+        // CRITICAL: Don't clear streamers if we get an empty array - might be temporary error
+        // Only clear if we're sure there are no streamers (and we had streamers before, this is suspicious)
+        if (streamersWithBadges.length === 0 && prevStreamers.length > 0) {
+          console.warn('loadLiveStreamers returned empty array but we have existing streamers - keeping existing');
+          return prevStreamers; // Keep existing streamers to prevent Tile unmounting
+        }
+        
         // Quick check: same length and same IDs in same order?
         if (prevStreamers.length === streamersWithBadges.length) {
           const prevIds = prevStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
