@@ -1,0 +1,50 @@
+-- ============================================================================
+-- QUICK START: Find Your User ID and Give Yourself Test Coins
+-- ============================================================================
+
+-- Step 1: Find your user ID
+-- Run this and copy your ID from the results:
+
+SELECT id, username, email, coin_balance, earnings_balance as diamonds
+FROM profiles
+WHERE email = 'your@email.com';  -- Replace with your email
+
+-- OR if you know your username:
+
+SELECT id, username, email, coin_balance, earnings_balance as diamonds
+FROM profiles
+WHERE username = 'your_username';  -- Replace with your username
+
+-- Step 2: Copy your ID from above, then run this:
+-- (Replace 'YOUR_USER_ID_HERE' with the UUID you just copied)
+
+UPDATE profiles
+SET coin_balance = 100000
+WHERE id = 'YOUR_USER_ID_HERE';
+
+-- Step 3: Verify it worked:
+
+SELECT username, coin_balance, earnings_balance as diamonds
+FROM profiles
+WHERE id = 'YOUR_USER_ID_HERE';
+
+-- You should now see:
+-- coin_balance: 100000
+-- diamonds: 0
+
+-- ============================================================================
+-- FULL RESET (if you want to wipe EVERYTHING and start fresh)
+-- ============================================================================
+-- Uncomment the lines below to reset the entire economy:
+
+-- -- Reset ALL profiles
+-- UPDATE profiles SET coin_balance = 0, earnings_balance = 0, total_spent = 0, gifter_level = 0;
+-- 
+-- -- Clear transaction history
+-- TRUNCATE TABLE gifts RESTART IDENTITY CASCADE;
+-- TRUNCATE TABLE diamond_conversions RESTART IDENTITY CASCADE;
+-- TRUNCATE TABLE coin_ledger RESTART IDENTITY CASCADE;
+-- 
+-- -- Give yourself coins again
+-- UPDATE profiles SET coin_balance = 100000 WHERE id = 'YOUR_USER_ID_HERE';
+
