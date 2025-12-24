@@ -246,11 +246,13 @@ export default function Tile({
     const checkForTracks = () => {
       let foundParticipant = false;
       let trackCount = 0;
+      let isLocalParticipant = false;
       
       // CRITICAL: Check if this is the current user's own tile
       // If so, use local participant's published tracks instead of remote
       if (sharedRoom.localParticipant && sharedRoom.localParticipant.identity === streamerId) {
         foundParticipant = true;
+        isLocalParticipant = true;
         const localParticipant = sharedRoom.localParticipant;
         trackCount = localParticipant.trackPublications.size;
         
@@ -304,7 +306,13 @@ export default function Tile({
           }
         });
         
-        return; // Done processing local participant
+        // Don't return yet - we still need to set up listeners below
+        // return; // Done processing local participant
+      }
+      
+      // If we already handled local participant, skip remote participant check
+      if (isLocalParticipant) {
+        return foundParticipant;
       }
       
       // Not the current user - check remote participants
@@ -447,6 +455,23 @@ export default function Tile({
     sharedRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
     sharedRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
     
+    // CRITICAL: Also listen for LOCAL participant track publications (when current user goes live)
+    // This ensures we see our own video when we publish
+    const handleLocalTrackPublished = () => {
+      if (sharedRoom.localParticipant && sharedRoom.localParticipant.identity === streamerId) {
+        if (DEBUG_LIVEKIT) {
+          console.log('[SUB] Local track published, re-checking for self-view:', {
+            slotIndex,
+            streamerId,
+            trackPublicationsCount: sharedRoom.localParticipant.trackPublications.size,
+          });
+        }
+        // Re-check tracks to attach newly published local tracks
+        checkForTracks();
+      }
+    };
+    sharedRoom.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
+    
     // CRITICAL: Also listen for when participants connect and when they publish tracks
     // This ensures we subscribe to tracks even if they're published after the Tile mounts
     const handleParticipantConnected = (participant: RemoteParticipant) => {
@@ -514,6 +539,7 @@ export default function Tile({
       clearInterval(retryTimer);
       sharedRoom.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       sharedRoom.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      sharedRoom.off(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
       sharedRoom.off(RoomEvent.ParticipantConnected, roomParticipantConnectedHandler);
       // Clean up participant-level listeners
       participantCleanups.forEach(cleanup => cleanup());
