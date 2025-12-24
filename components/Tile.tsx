@@ -264,6 +264,7 @@ export default function Tile({
               trackPublicationsCount: participant.trackPublications.size,
               publications: Array.from(participant.trackPublications.values()).map(p => ({
                 kind: p.track?.kind,
+                source: p.source,
                 sid: p.trackSid,
                 isSubscribed: p.isSubscribed,
                 hasTrack: !!p.track,
@@ -271,9 +272,30 @@ export default function Tile({
             });
           }
           
+          // CRITICAL: Explicitly subscribe to ALL camera/microphone publications
+          // In LiveKit, publications exist but must be explicitly subscribed to
           participant.trackPublications.forEach((publication) => {
-            if (publication.track) {
-              handleTrackSubscribed(publication.track as RemoteTrack, publication, participant);
+            // Only subscribe to camera and microphone tracks
+            const isCameraOrMic = publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone;
+            
+            if (isCameraOrMic) {
+              // If not already subscribed, subscribe now
+              if (!publication.isSubscribed) {
+                if (DEBUG_LIVEKIT) {
+                  console.log('[DEBUG] Subscribing to publication:', {
+                    slotIndex,
+                    streamerId,
+                    source: publication.source,
+                    sid: publication.trackSid,
+                  });
+                }
+                publication.setSubscribed(true);
+              }
+              
+              // If track is already available, handle it immediately
+              if (publication.track) {
+                handleTrackSubscribed(publication.track as RemoteTrack, publication, participant);
+              }
             }
           });
         }
@@ -295,9 +317,10 @@ export default function Tile({
     
     // If tracks not found and streamer is live_available but not yet published, retry
     // This handles the race condition where heartbeat triggers publishing but tracks aren't ready yet
+    // Also handles cases where publications appear after participant connects
     let retryAttempts = 0;
-    const maxRetryAttempts = 10;
-    const retryInterval = 600; // 600ms between retries = ~6 seconds total
+    const maxRetryAttempts = 20; // Increased to handle slower publishing
+    const retryInterval = 500; // 500ms between retries = ~10 seconds total
     
     const retryTimer = setInterval(() => {
       // Stop retrying if conditions changed
@@ -306,19 +329,28 @@ export default function Tile({
         return;
       }
       
-      // Stop if we already have tracks (use ref for current state, not closure)
-      if (hasTracksRef.current.video || hasTracksRef.current.audio) {
+      // Stop if we already have BOTH video AND audio tracks
+      // Keep checking if we only have one (waiting for the other)
+      if (hasTracksRef.current.video && hasTracksRef.current.audio) {
         clearInterval(retryTimer);
         return;
       }
       
       retryAttempts++;
       if (retryAttempts >= maxRetryAttempts) {
+        if (DEBUG_LIVEKIT) {
+          console.log('[DEBUG] Retry timer stopped (max attempts reached):', {
+            slotIndex,
+            streamerId,
+            hasVideo: hasTracksRef.current.video,
+            hasAudio: hasTracksRef.current.audio,
+          });
+        }
         clearInterval(retryTimer);
         return;
       }
       
-      // Check for tracks again
+      // Check for tracks again (will subscribe to any new publications)
       checkForTracks();
     }, retryInterval);
 
