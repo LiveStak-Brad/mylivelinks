@@ -188,6 +188,13 @@ export default function LiveRoom() {
 
         const { token, url } = await response.json();
         
+        console.log('[ROOM] Token received', {
+          hasToken: !!token,
+          hasUrl: !!url,
+          identity: participantIdentity,
+          displayName: participantDisplayName,
+        });
+        
         if (!token || !url) {
           throw new Error('Invalid token response');
         }
@@ -217,16 +224,15 @@ export default function LiveRoom() {
         
         const handleConnected = () => {
           if (mounted) {
-            if (DEBUG_LIVEKIT) {
-              console.log('[DEBUG] Room connected:', {
-                roomState: newRoom.state,
-                roomName: newRoom.name,
-                localParticipantSid: newRoom.localParticipant.sid,
-                localParticipantIdentity: newRoom.localParticipant.identity,
-                remoteParticipantsCount: newRoom.remoteParticipants.size,
-              });
-            }
-            console.log('Shared LiveKit room connected');
+            console.log('[ROOM] ✅ Connected successfully', {
+              roomState: newRoom.state,
+              roomName: newRoom.name,
+              localParticipantSid: newRoom.localParticipant.sid,
+              localParticipantIdentity: newRoom.localParticipant.identity,
+              remoteParticipantsCount: newRoom.remoteParticipants.size,
+              canPublish: newRoom.localParticipant.permissions?.canPublish,
+              canSubscribe: newRoom.localParticipant.permissions?.canSubscribe,
+            });
             setIsRoomConnected(true);
             roomConnectionRef.current.connected = true;
             roomConnectionRef.current.connecting = false;

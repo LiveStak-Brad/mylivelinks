@@ -378,15 +378,46 @@ export function useLiveKitPublisher({
   }, [room, onUnpublished]);
 
   // Cleanup on unmount - only stop if actually publishing
+  // CRITICAL: Empty dependency array so cleanup ONLY runs on actual unmount, not when deps change
   useEffect(() => {
     return () => {
       // Only stop if we're actually publishing (user navigated away while live)
-      if (isPublishingRef.current && room && room.state === 'connected') {
-        console.log('Component unmounting, stopping publishing...');
-        stopPublishing();
+      const currentRoom = roomRef.current;
+      if (isPublishingRef.current && currentRoom && currentRoom.state === 'connected') {
+        console.log('[PUBLISH] Component unmounting, cleaning up tracks...');
+        
+        // Unpublish tracks inline without calling stopPublishing callback
+        const participant = currentRoom.localParticipant;
+        if (participant) {
+          const publishedTracks = Array.from(participant.trackPublications.values())
+            .filter(pub => pub.track)
+            .map(pub => pub.track!);
+          
+          for (const track of publishedTracks) {
+            try {
+              participant.unpublishTrack(track).catch(() => {});
+              track.stop();
+            } catch (err) {
+              // Ignore errors during cleanup
+            }
+          }
+        }
+        
+        // Stop local tracks
+        tracksRef.current.forEach(track => {
+          try {
+            track.stop();
+            track.detach();
+          } catch (err) {
+            // Ignore
+          }
+        });
+        tracksRef.current = [];
+        isPublishingRef.current = false;
       }
     };
-  }, [stopPublishing, room]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - ONLY run on actual mount/unmount
 
   // Auto-start when enabled and room is connected
   // CRITICAL: Only auto-START publishing, NEVER auto-STOP
