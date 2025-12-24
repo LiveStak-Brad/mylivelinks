@@ -127,11 +127,6 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     };
   }, [supabase]); // Removed onLiveStatusChange from deps to prevent loops
 
-  // Store stopPublishing function in ref so realtime handler can access it
-  useEffect(() => {
-    stopPublishingRef.current = stopPublishing;
-  }, [stopPublishing]);
-
   // Get current user's profile for participant name
   const [participantName, setParticipantName] = useState('Streamer');
   useEffect(() => {
