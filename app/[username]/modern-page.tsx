@@ -37,6 +37,19 @@ interface ProfileData {
     font_preset?: string;
     accent_color?: string;
     links_section_title?: string;
+    // Social Media
+    social_instagram?: string;
+    social_twitter?: string;
+    social_youtube?: string;
+    social_tiktok?: string;
+    social_facebook?: string;
+    social_twitch?: string;
+    social_discord?: string;
+    social_snapchat?: string;
+    social_linkedin?: string;
+    social_github?: string;
+    social_spotify?: string;
+    social_onlyfans?: string;
     // Private (only if owner)
     coin_balance?: number;
     earnings_balance?: number;
