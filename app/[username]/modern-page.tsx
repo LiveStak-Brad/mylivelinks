@@ -13,6 +13,7 @@ import StatsCard from '@/components/profile/StatsCard';
 import ModernLinksSection from '@/components/profile/ModernLinksSection';
 import AdultLinksSection from '@/components/adult/AdultLinksSection';
 import FollowersModal from '@/components/profile/FollowersModal';
+import SocialMediaBar from '@/components/profile/SocialMediaBar';
 
 interface ProfileData {
   profile: {
@@ -411,6 +412,13 @@ export default function ModernProfilePage() {
             accentColor={accentColor}
           />
         </div>
+        
+        {/* Social Media Bar */}
+        <SocialMediaBar
+          socials={profile}
+          accentColor={accentColor}
+          className={`${borderRadiusClass} overflow-hidden shadow-lg mb-6 p-6`}
+        />
         
         {/* Links Section */}
         {profileData.links.length > 0 && (
