@@ -40,18 +40,34 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
     };
   }, [showMenu]);
 
+  const isAllowedAdmin = (userId?: string | null, email?: string | null, username?: string | null) => {
+    const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    const hardcodedIds = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
+    const hardcodedEmails = ['wcba.mo@gmail.com'];
+    const idMatch = userId && (envIds.includes(userId) || hardcodedIds.includes(userId));
+    const emailMatch = email && (envEmails.includes(email.toLowerCase()) || hardcodedEmails.includes(email.toLowerCase()));
+    const usernameMatch = username === 'owner' || username === 'admin'; // legacy fallback
+    return !!(idMatch || emailMatch || usernameMatch);
+  };
+
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       // Check if user is admin (you can customize this logic)
       const { data: profile } = await supabase
         .from('profiles')
-        .select('username')
+        .select('username, email')
         .eq('id', user.id)
         .single();
       
-      // For now, check if username is 'owner' or 'admin'
-      setIsAdmin((profile as any)?.username === 'owner' || (profile as any)?.username === 'admin');
+      setIsAdmin(
+        isAllowedAdmin(
+          user.id,
+          (profile as any)?.email || user.email || null,
+          (profile as any)?.username
+        )
+      );
     }
   };
 

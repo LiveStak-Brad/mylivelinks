@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Check admin/owner by username (matches OptionsMenu logic)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('username')
+      .select('username, email')
       .eq('id', userData.user.id)
       .single();
 
@@ -51,8 +51,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 403 });
     }
 
-    const username = (profile as any).username;
-    const isAdmin = username === 'owner' || username === 'admin';
+    const username = (profile as any).username as string | undefined;
+    const email = (profile as any).email as string | undefined;
+
+    const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    const hardcodedIds = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
+    const hardcodedEmails = ['wcba.mo@gmail.com'];
+    const idMatch = userData.user.id && (envIds.includes(userData.user.id) || hardcodedIds.includes(userData.user.id));
+    const emailMatch = email && (envEmails.includes(email.toLowerCase()) || hardcodedEmails.includes(email.toLowerCase()));
+    const usernameMatch = username === 'owner' || username === 'admin'; // legacy fallback
+
+    const isAdmin = !!(idMatch || emailMatch || usernameMatch);
     if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
