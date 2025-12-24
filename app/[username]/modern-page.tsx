@@ -159,38 +159,31 @@ export default function ModernProfilePage() {
     
     setFollowLoading(true);
     try {
-      // Check if user is logged in
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Get session for token
+      const { data: { session } } = await supabase.auth.getSession();
       
-      console.log('Session check:', { 
-        hasSession: !!session, 
-        hasUser: !!session?.user,
-        error: sessionError 
-      });
-      
-      if (!session || !session.user) {
-        setFollowLoading(false);
-        alert('Please log in to follow users. Redirecting to login...');
-        // Use a timeout to prevent loop
-        setTimeout(() => {
-          router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
-        }, 100);
-        return;
-      }
-      
-      console.log('Attempting to follow:', profileData.profile.id);
+      console.log('Has session:', !!session);
       
       const response = await fetch('/api/profile/follow', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}` // Pass token explicitly
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
         },
         body: JSON.stringify({ targetProfileId: profileData.profile.id })
       });
       
       const data = await response.json();
       console.log('Follow response:', data);
+      
+      // Only redirect if server says unauthorized
+      if (response.status === 401) {
+        alert('Please log in to follow users');
+        setTimeout(() => {
+          router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
+        }, 100);
+        return;
+      }
       
       if (!response.ok) {
         console.error('Follow failed:', data);
