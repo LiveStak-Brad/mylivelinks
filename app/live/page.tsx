@@ -1,9 +1,53 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Video, Sparkles, Users, TrendingUp } from 'lucide-react';
+import { createClient } from '@/lib/supabase';
+import LiveRoom from '@/components/LiveRoom';
+
+const OWNER_UUID = '2b4a1178-3c39-4179-94ea-314dd824a818';
 
 export default function LiveComingSoonPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [isOwner, setIsOwner] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkOwner();
+  }, []);
+
+  const checkOwner = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user && user.id === OWNER_UUID) {
+        setIsOwner(true);
+      }
+    } catch (error) {
+      console.error('Error checking owner:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
+
+  // If owner, show the actual LiveRoom
+  if (isOwner) {
+    return <LiveRoom />;
+  }
+
+  // Everyone else sees "Coming Soon"
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full">
