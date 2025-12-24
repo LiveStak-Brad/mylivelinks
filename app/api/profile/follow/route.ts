@@ -11,55 +11,51 @@ export async function POST(request: NextRequest) {
   try {
     console.log('=== FOLLOW API DEBUG ===');
     
-    // Try to get auth token from Authorization header first
-    const authHeader = request.headers.get('authorization');
+    // Initialize with server client by default (uses cookies)
+    let supabase = createServerSupabaseClient();
     let user = null;
     
-    // Initialize supabase client
-    let supabase = createServerSupabaseClient();
+    // First, try cookie-based auth (most reliable in Next.js)
+    const { data: { user: cookieUser }, error: cookieError } = await supabase.auth.getUser();
     
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      // Use token from header
-      const token = authHeader.replace('Bearer ', '');
-      console.log('Using Authorization header token');
+    if (cookieUser && !cookieError) {
+      user = cookieUser;
+      console.log('Auth via cookies successful:', user.id);
+    } else {
+      console.log('Cookie auth failed, trying Authorization header');
       
-      supabase = createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          global: {
-            headers: {
-              Authorization: authHeader
+      // Fallback to Authorization header token
+      const authHeader = request.headers.get('authorization');
+      
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        console.log('Using Authorization header token');
+        
+        supabase = createSupabaseClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          {
+            global: {
+              headers: {
+                Authorization: authHeader
+              }
             }
           }
+        );
+        
+        const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token);
+        
+        if (tokenUser && !tokenError) {
+          user = tokenUser;
+          console.log('Auth via token successful:', user.id);
+        } else {
+          console.error('Token auth failed:', tokenError);
         }
-      );
-      
-      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token);
-      
-      if (tokenUser && !tokenError) {
-        user = tokenUser;
-        console.log('Auth via token successful:', user.id);
-      } else {
-        console.error('Token auth failed:', tokenError);
-      }
-    }
-    
-    // Fallback to cookie-based auth
-    if (!user) {
-      console.log('Trying cookie-based auth');
-      supabase = createServerSupabaseClient();
-      const { data: { user: cookieUser }, error: cookieError } = await supabase.auth.getUser();
-      
-      if (cookieUser && !cookieError) {
-        user = cookieUser;
-        console.log('Auth via cookies successful:', user.id);
-      } else {
-        console.error('Cookie auth failed:', cookieError);
       }
     }
     
     if (!user) {
+      console.error('Authentication failed - no user found via cookies or token');
       return NextResponse.json(
         { success: false, error: 'Unauthorized - Please log in' },
         { status: 401 }
