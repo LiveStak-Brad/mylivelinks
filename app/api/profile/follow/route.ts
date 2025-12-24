@@ -10,8 +10,19 @@ export async function POST(request: NextRequest) {
   const supabase = createServerSupabaseClient();
   
   try {
+    console.log('=== FOLLOW API DEBUG ===');
+    console.log('Headers:', Object.fromEntries(request.headers.entries()));
+    console.log('Has cookie header:', request.headers.has('cookie'));
+    console.log('Cookie header:', request.headers.get('cookie'));
+    
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    console.log('Auth result:', { 
+      hasUser: !!user, 
+      userId: user?.id, 
+      error: authError?.message 
+    });
     
     if (authError || !user) {
       console.error('Auth error in follow API:', authError);
