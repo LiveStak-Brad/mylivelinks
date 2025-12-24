@@ -1731,10 +1731,28 @@ export default function LiveRoom() {
     }
   };
 
-  const handleCloseTile = (slotIndex: number) => {
+  const handleCloseTile = async (slotIndex: number) => {
     const newSlots = [...gridSlots];
     const slot = newSlots.find((s) => s.slotIndex === slotIndex);
     if (slot) {
+      // CRITICAL: If user closes their own box, stop publishing
+      if (slot.streamer && slot.streamer.profile_id === currentUserId && isCurrentUserPublishing) {
+        console.log('User closed their own box, stopping live stream...');
+        // Trigger stop live by updating database (this will cause isLive to become false)
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase
+              .from('live_streams')
+              .update({ live_available: false, ended_at: new Date().toISOString() })
+              .eq('profile_id', user.id);
+            // The GoLiveButton will detect the change and stop publishing
+          }
+        } catch (err) {
+          console.error('Error stopping live when closing own box:', err);
+        }
+      }
+      
       slot.streamer = null;
       slot.isEmpty = true;
       slot.isPinned = false;
