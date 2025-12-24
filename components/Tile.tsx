@@ -657,8 +657,8 @@ export default function Tile({
   useEffect(() => {
     if (liveStreamId && slotIndex) {
       // Get viewer ID for watch session key
-      supabase.auth.getUser().then((result) => {
-        const user = result?.data?.user;
+      supabase.auth.getUser().then(({ data }) => {
+        const user = data?.user;
         if (user) {
           const key = `${user.id}:${slotIndex}:${liveStreamId}`;
           setWatchSessionKey(key);
