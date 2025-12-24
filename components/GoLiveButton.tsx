@@ -78,6 +78,16 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
             if (oldData?.live_available !== newData?.live_available) {
               const newLiveState = newData.live_available || false;
               
+              // CRITICAL: If live_available becomes false (user stopped via database update),
+              // we need to stop publishing explicitly
+              if (!newLiveState && isLiveRef.current && isPublishing) {
+                console.log('Database updated: live_available=false, stopping publishing...');
+                // Stop publishing when database says user is no longer live
+                stopPublishing().catch((err) => {
+                  console.error('Error stopping publishing after database update:', err);
+                });
+              }
+              
               // Debounce rapid updates - clear any pending timeout
               if (updateTimeoutRef.current) {
                 clearTimeout(updateTimeoutRef.current);
