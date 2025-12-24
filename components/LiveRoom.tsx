@@ -1009,22 +1009,44 @@ export default function LiveRoom() {
       // CRITICAL: Only update state if streamers actually changed (prevent unnecessary re-renders)
       // Compare by profile_id and key properties to avoid creating new array reference unnecessarily
       setLiveStreamers((prevStreamers) => {
-        // CRITICAL: Don't clear streamers if we get an empty array - might be temporary error
-        // Only clear if we're sure there are no streamers (and we had streamers before, this is suspicious)
-        if (streamersWithBadges.length === 0 && prevStreamers.length > 0) {
-          console.warn('loadLiveStreamers returned empty array but we have existing streamers - keeping existing');
-          return prevStreamers; // Keep existing streamers to prevent Tile unmounting
+        // CRITICAL: ABSOLUTE GUARD - Never clear streamers if we have existing ones and get empty array
+        // Use ref to check current state (more reliable than prevStreamers in rapid updates)
+        const currentStreamers = liveStreamersRef.current.length > 0 ? liveStreamersRef.current : prevStreamers;
+        
+        // STRICT: If we have streamers and new data is empty, ALWAYS keep existing (might be error/race condition)
+        if (streamersWithBadges.length === 0) {
+          if (currentStreamers.length > 0) {
+            console.warn('[GUARD] loadLiveStreamers: Blocking empty array - keeping existing streamers', {
+              currentCount: currentStreamers.length,
+              prevCount: prevStreamers.length,
+              refCount: liveStreamersRef.current.length,
+              stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n'),
+            });
+            return currentStreamers; // Keep existing streamers to prevent Tile unmounting
+          }
+          // If we don't have existing streamers, empty array is OK (initial load or truly no streamers)
+          liveStreamersRef.current = [];
+          return [];
         }
         
         // Quick check: same length and same IDs in same order?
-        if (prevStreamers.length === streamersWithBadges.length) {
-          const prevIds = prevStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
+        if (currentStreamers.length === streamersWithBadges.length) {
+          const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
           const newIds = streamersWithBadges.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
           if (prevIds === newIds) {
             // Data hasn't changed, return previous array to prevent re-render
-            return prevStreamers;
+            return currentStreamers;
           }
         }
+        
+        // Update ref with new data BEFORE returning
+        liveStreamersRef.current = streamersWithBadges;
+        console.log('[UPDATE] liveStreamers updated:', {
+          oldCount: currentStreamers.length,
+          newCount: streamersWithBadges.length,
+          oldIds: currentStreamers.map(s => s.profile_id),
+          newIds: streamersWithBadges.map(s => s.profile_id),
+        });
         // Data changed, return new array
         return streamersWithBadges;
       });
