@@ -32,6 +32,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   const isLiveRef = useRef(false); // Track current state to prevent unnecessary updates
   const lastLiveStateRef = useRef<boolean | null>(null); // Track last state to prevent rapid changes
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Debounce state updates
+  const stopPublishingRef = useRef<(() => Promise<void>) | null>(null); // Store stopPublishing function for realtime handler
+  const isPublishingRef = useRef(false); // Store isPublishing state for realtime handler
   const supabase = createClient();
 
   // Get current user's live stream (only on mount, not when callbacks change)
@@ -80,10 +82,10 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
               
               // CRITICAL: If live_available becomes false (user stopped via database update),
               // we need to stop publishing explicitly
-              if (!newLiveState && isLiveRef.current && isPublishing) {
+              if (!newLiveState && isLiveRef.current && isPublishingRef.current && stopPublishingRef.current) {
                 console.log('Database updated: live_available=false, stopping publishing...');
                 // Stop publishing when database says user is no longer live
-                stopPublishing().catch((err) => {
+                stopPublishingRef.current().catch((err) => {
                   console.error('Error stopping publishing after database update:', err);
                 });
               }
@@ -124,6 +126,11 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       }
     };
   }, [supabase]); // Removed onLiveStatusChange from deps to prevent loops
+
+  // Store stopPublishing function in ref so realtime handler can access it
+  useEffect(() => {
+    stopPublishingRef.current = stopPublishing;
+  }, [stopPublishing]);
 
   // Get current user's profile for participant name
   const [participantName, setParticipantName] = useState('Streamer');
@@ -256,6 +263,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     onPublished: () => {
       console.log('Started publishing to LiveKit');
       setIsPublishingState(true);
+      isPublishingRef.current = true; // Update ref for realtime handler
       onPublishingChange?.(true); // Report publishing state
       setShowDeviceModal(false);
       setLoading(false);
@@ -264,6 +272,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     onUnpublished: () => {
       console.log('Stopped publishing to LiveKit');
       setIsPublishingState(false);
+      isPublishingRef.current = false; // Update ref for realtime handler
       onPublishingChange?.(false); // Report publishing state
     },
     onError: (err) => {
