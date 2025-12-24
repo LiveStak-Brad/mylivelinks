@@ -678,7 +678,6 @@ export default function Tile({
     isVisible: isVisible,
     isSubscribed: isActuallySubscribed, // Use actual subscription state, not hardcoded
     enabled: shouldSendHeartbeat && !!liveStreamId, // CRITICAL: Only enable if we have valid liveStreamId
-    slotIndex,
     watchSessionKey, // CRITICAL: Stable key prevents cleanup on rerender
   });
 
