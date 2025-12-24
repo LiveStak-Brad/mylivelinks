@@ -17,7 +17,8 @@ export default function SignUpPage() {
 
   useEffect(() => {
     // Check if already logged in
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    supabase.auth.getUser().then(async (response) => {
+      const user = response.data?.user;
       if (user) {
         // Check if profile is complete
         const { data: profile } = await supabase
