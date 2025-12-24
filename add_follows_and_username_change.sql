@@ -53,11 +53,11 @@ COMMENT ON TABLE follows IS 'User follow relationships';
 
 CREATE OR REPLACE FUNCTION change_username(
     p_profile_id UUID,
-    p_new_username VARCHAR(50)
+    p_new_username VARCHAR(15)
 )
 RETURNS JSON AS $$
 DECLARE
-    v_current_username VARCHAR(50);
+    v_current_username VARCHAR(15);
     v_username_available BOOLEAN;
 BEGIN
     -- Get current username
@@ -88,10 +88,10 @@ BEGIN
         );
     END IF;
     
-    IF LENGTH(p_new_username) > 50 THEN
+    IF LENGTH(p_new_username) > 15 THEN
         RETURN json_build_object(
             'success', false,
-            'error', 'Username must be 50 characters or less'
+            'error', 'Username must be 15 characters or less'
         );
     END IF;
     
@@ -139,7 +139,7 @@ COMMENT ON FUNCTION change_username IS 'Change username with validation and avai
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION check_username_availability(
-    p_username VARCHAR(50),
+    p_username VARCHAR(15),
     p_current_user_id UUID DEFAULT NULL
 )
 RETURNS JSON AS $$
@@ -155,10 +155,10 @@ BEGIN
         );
     END IF;
     
-    IF LENGTH(p_username) > 50 THEN
+    IF LENGTH(p_username) > 15 THEN
         RETURN json_build_object(
             'available', false,
-            'error', 'Username must be 50 characters or less'
+            'error', 'Username must be 15 characters or less'
         );
     END IF;
     

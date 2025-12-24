@@ -160,7 +160,7 @@ export default function ChangeUsernamePage() {
                   placeholder="new_username"
                   pattern="[a-zA-Z0-9_-]+"
                   minLength={3}
-                  maxLength={50}
+                  maxLength={15}
                   required
                 />
                 
@@ -179,7 +179,7 @@ export default function ChangeUsernamePage() {
               </div>
               
               <p className="text-xs text-gray-500 mt-2">
-                Only letters, numbers, underscores, and hyphens. 3-50 characters.
+                Only letters, numbers, underscores, and hyphens. 3-15 characters.
               </p>
               
               {/* Availability Status */}
