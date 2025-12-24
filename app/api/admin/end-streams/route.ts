@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    let allowlistMatch = false;
+    let allowlistMatch: boolean = false;
     const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
     const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     const hardcodedIds = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
     if (verifiedUserId || verifiedEmail) {
       const userId = verifiedUserId || '';
       const userEmail = (verifiedEmail || '').toLowerCase();
-      const idMatch = userId && (envIds.includes(userId) || hardcodedIds.includes(userId));
-      const emailMatch = userEmail && (envEmails.includes(userEmail) || hardcodedEmails.includes(userEmail));
+      const idMatch: boolean = !!(userId && (envIds.includes(userId) || hardcodedIds.includes(userId)));
+      const emailMatch: boolean = !!(userEmail && (envEmails.includes(userEmail) || hardcodedEmails.includes(userEmail)));
       allowlistMatch = idMatch || emailMatch;
 
       // Check admin_allowlist table if exists
