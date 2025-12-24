@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -7,25 +8,56 @@ import { NextRequest, NextResponse } from 'next/server';
  * Body: { targetProfileId: string }
  */
 export async function POST(request: NextRequest) {
-  const supabase = createServerSupabaseClient();
-  
   try {
     console.log('=== FOLLOW API DEBUG ===');
-    console.log('Headers:', Object.fromEntries(request.headers.entries()));
-    console.log('Has cookie header:', request.headers.has('cookie'));
-    console.log('Cookie header:', request.headers.get('cookie'));
     
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Try to get auth token from Authorization header first
+    const authHeader = request.headers.get('authorization');
+    let user = null;
+    let supabase;
     
-    console.log('Auth result:', { 
-      hasUser: !!user, 
-      userId: user?.id, 
-      error: authError?.message 
-    });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Use token from header
+      const token = authHeader.replace('Bearer ', '');
+      console.log('Using Authorization header token');
+      
+      supabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: {
+            headers: {
+              Authorization: authHeader
+            }
+          }
+        }
+      );
+      
+      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token);
+      
+      if (tokenUser && !tokenError) {
+        user = tokenUser;
+        console.log('Auth via token successful:', user.id);
+      } else {
+        console.error('Token auth failed:', tokenError);
+      }
+    }
     
-    if (authError || !user) {
-      console.error('Auth error in follow API:', authError);
+    // Fallback to cookie-based auth
+    if (!user) {
+      console.log('Trying cookie-based auth');
+      supabase = createServerSupabaseClient();
+      const { data: { user: cookieUser }, error: cookieError } = await supabase.auth.getUser();
+      
+      if (cookieUser && !cookieError) {
+        user = cookieUser;
+        console.log('Auth via cookies successful:', user.id);
+      } else {
+        console.error('Cookie auth failed:', cookieError);
+      }
+    }
+    
+    if (!user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized - Please log in' },
         { status: 401 }

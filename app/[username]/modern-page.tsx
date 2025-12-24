@@ -158,8 +158,8 @@ export default function ModernProfilePage() {
     if (!profileData || followLoading) return;
     
     // Check if user is logged in
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { user, session } } = await supabase.auth.getSession();
+    if (!user || !session) {
       alert('Please log in to follow users');
       router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
       return;
@@ -171,7 +171,10 @@ export default function ModernProfilePage() {
       
       const response = await fetch('/api/profile/follow', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}` // Pass token explicitly
+        },
         body: JSON.stringify({ targetProfileId: profileData.profile.id })
       });
       
