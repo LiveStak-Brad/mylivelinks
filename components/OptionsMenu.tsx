@@ -13,6 +13,7 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
   const supabase = createClient();
   const [showMenu, setShowMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [endingAllStreams, setEndingAllStreams] = useState(false);
   const [muteAllTiles, setMuteAllTiles] = useState(false);
   const [autoplayTiles, setAutoplayTiles] = useState(true);
   const [showPreviewLabels, setShowPreviewLabels] = useState(true);
@@ -51,6 +52,27 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
       
       // For now, check if username is 'owner' or 'admin'
       setIsAdmin((profile as any)?.username === 'owner' || (profile as any)?.username === 'admin');
+    }
+  };
+
+  const handleEndAllStreams = async () => {
+    if (!isAdmin) return;
+    const confirmed = window.confirm('End ALL live streams now? This will stop everyone immediately.');
+    if (!confirmed) return;
+    setEndingAllStreams(true);
+    try {
+      const res = await fetch('/api/admin/end-streams', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to end streams');
+      }
+      alert('All streams have been ended.');
+      setShowMenu(false);
+    } catch (err: any) {
+      console.error('Failed to end all streams', err);
+      alert(err.message || 'Failed to end all streams');
+    } finally {
+      setEndingAllStreams(false);
     }
   };
 
@@ -235,6 +257,13 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
                     className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
                   >
                     Manage Gift Types / Coin Packs
+                  </button>
+                  <button
+                    onClick={handleEndAllStreams}
+                    disabled={endingAllStreams}
+                    className="w-full text-left px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded transition disabled:opacity-60"
+                  >
+                    {endingAllStreams ? 'Ending all streams...' : 'End ALL streams'}
                   </button>
                 </div>
               </div>
