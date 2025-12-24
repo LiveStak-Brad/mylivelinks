@@ -59,7 +59,7 @@ export function useLiveKitPublisher({
       const existingTracks = Array.from(room.localParticipant.trackPublications.values())
         .filter(pub => {
           const source = pub.source;
-          return (source === 'camera' || source === 'microphone') && pub.track;
+          return (source === Track.Source.Camera || source === Track.Source.Microphone) && pub.track;
         })
         .map(pub => pub.track!);
       
@@ -241,7 +241,7 @@ export function useLiveKitPublisher({
             .filter(pub => {
               // Only unpublish camera/microphone tracks (not screen share, etc.)
               const source = pub.source;
-              return (source === 'camera' || source === 'microphone') && pub.track;
+              return (source === Track.Source.Camera || source === Track.Source.Microphone) && pub.track;
             })
             .map(pub => pub.track!);
           
@@ -333,7 +333,8 @@ export function useLiveKitPublisher({
       toggleTimeoutRef.current = null;
     }
 
-    // Debounce rapid toggles (wait 300ms before acting on changes)
+    // Debounce rapid toggles (wait 500ms before acting on changes)
+    // Increased from 300ms to 500ms to better handle rapid state changes
     toggleTimeoutRef.current = setTimeout(() => {
       // Only start if enabled, room connected, and not already publishing
       if (enabledRef.current && isRoomConnected && room && room.state === 'connected' && !isPublishingStateRef.current) {
@@ -345,7 +346,7 @@ export function useLiveKitPublisher({
         console.log('Stopping publisher (enabled=false)...');
         stopPublishing();
       }
-    }, 300); // 300ms debounce to prevent rapid toggling
+    }, 500); // 500ms debounce to prevent rapid toggling
 
     return () => {
       if (toggleTimeoutRef.current) {
