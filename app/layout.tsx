@@ -3,6 +3,7 @@ import { ThemeProvider } from 'next-themes';
 import './globals.css';
 import ClientThemeProvider from '@/components/ClientThemeProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import AgeVerificationModal from '@/components/AgeVerificationModal';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <ErrorBoundary>
           <ClientThemeProvider>
+            <AgeVerificationModal />
             {children}
           </ClientThemeProvider>
         </ErrorBoundary>
