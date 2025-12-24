@@ -12,6 +12,20 @@ export default function ComingSoonLanding() {
 
   useEffect(() => {
     setMounted(true);
+    
+    // Enable scrolling for landing page (override global styles)
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    
+    return () => {
+      // Restore original styles when leaving landing page
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.style.height = '100vh';
+      document.body.style.overflow = 'hidden';
+      document.body.style.height = '100vh';
+    };
   }, []);
 
   const scrollToFeatures = () => {
@@ -113,9 +127,9 @@ export default function ComingSoonLanding() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-auto">
+    <div className="relative w-full overflow-x-hidden overflow-y-auto">
       {/* Blurred Live Room Background - Hidden on mobile for performance */}
-      <div className="hidden md:block fixed inset-0 z-0">
+      <div className="hidden md:block fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 blur-md scale-105 opacity-40">
           <LiveRoom />
         </div>
@@ -124,10 +138,10 @@ export default function ComingSoonLanding() {
       </div>
       
       {/* Solid background for mobile */}
-      <div className="md:hidden fixed inset-0 z-0 bg-gradient-to-b from-gray-900 via-black to-black"></div>
+      <div className="md:hidden fixed inset-0 z-0 bg-gradient-to-b from-gray-900 via-black to-black pointer-events-none"></div>
 
       {/* Content */}
-      <div className="relative z-10">
+      <div className="relative z-10 w-full">
         {/* Hero Section */}
         <div className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-12 sm:py-20">
           <div className="text-center max-w-4xl mx-auto">
@@ -179,8 +193,8 @@ export default function ComingSoonLanding() {
         </div>
 
         {/* Features Section */}
-        <div id="features-section" className="bg-gradient-to-b from-black/90 to-black py-12 sm:py-16 md:py-20 px-4 min-h-screen">
-          <div className="max-w-7xl mx-auto">
+        <div id="features-section" className="bg-gradient-to-b from-black/90 to-black py-12 sm:py-16 md:py-20 px-4 w-full">
+          <div className="max-w-7xl mx-auto w-full">
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center text-white mb-3 sm:mb-4">
               Revolutionary Features
             </h2>
