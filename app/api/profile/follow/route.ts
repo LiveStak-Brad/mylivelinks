@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * Body: { targetProfileId: string }
  */
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = createServerSupabaseClient();
   
   try {
     // Get current user
