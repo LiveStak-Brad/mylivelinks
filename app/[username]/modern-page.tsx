@@ -492,31 +492,32 @@ export default function ModernProfilePage() {
         />
         
         {/* Premium Branding Footer - Powered by MyLiveLinks */}
-        <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 text-center`} style={cardStyle}>
-          <div className="space-y-3">
-            <div className="flex items-center justify-center gap-2">
+        <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 sm:p-8 text-center`} style={cardStyle}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-center">
               <Image
                 src="/branding/mylivelinkstransparent.png"
                 alt="MyLiveLinks"
-                width={120}
-                height={30}
-                className="h-8 w-auto"
+                width={240}
+                height={60}
+                className="h-12 sm:h-16 w-auto"
+                priority
               />
             </div>
             
-            <p className="text-xs text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto">
               Create your own stunning profile, go live, and connect with your audience.
             </p>
             
             <Link
               href="/signup"
-              className="inline-block px-6 py-2.5 rounded-lg font-semibold text-white text-sm transition shadow-lg hover:shadow-xl transform hover:scale-105"
+              className="inline-block px-8 py-3 rounded-lg font-semibold text-white text-base transition shadow-lg hover:shadow-xl transform hover:scale-105"
               style={{ backgroundColor: accentColor }}
             >
               Create Your Free Profile
             </Link>
             
-            <p className="text-xs text-gray-500 dark:text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-500">
               All-in-one platform: Live streaming • Links • Social • Monetization
             </p>
           </div>
