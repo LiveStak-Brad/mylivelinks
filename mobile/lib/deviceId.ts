@@ -1,12 +1,14 @@
 /**
  * Device ID Management
  * Persists a stable device identifier for multi-device session tracking
+ * Safe for startup: uses in-memory fallback if SecureStore unavailable
  */
-
-import * as SecureStore from 'expo-secure-store';
 
 const DEVICE_ID_KEY = 'mylivelinks_device_id';
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
+
+// In-memory cache (fallback if SecureStore fails)
+let cachedDeviceId: string | null = null;
 
 /**
  * Generate a UUID v4
@@ -22,12 +24,22 @@ function generateUUID(): string {
 /**
  * Get or create a stable device ID
  * Persists to SecureStore so it survives app uninstall/reinstall on same device
+ * Safe for startup: returns in-memory ID immediately if SecureStore fails
  */
 export async function getDeviceId(): Promise<string> {
+  // Return cached if available
+  if (cachedDeviceId) {
+    return cachedDeviceId;
+  }
+
   try {
+    // Lazy-load SecureStore only when needed
+    const SecureStore = await import('expo-secure-store');
+    
     // Try to get existing device ID
     const existing = await SecureStore.getItemAsync(DEVICE_ID_KEY);
     if (existing) {
+      cachedDeviceId = existing;
       if (DEBUG) {
         console.log('[DEVICE] Retrieved existing ID:', existing.substring(0, 8) + '...');
       }
@@ -37,6 +49,7 @@ export async function getDeviceId(): Promise<string> {
     // Generate new device ID
     const newDeviceId = generateUUID();
     await SecureStore.setItemAsync(DEVICE_ID_KEY, newDeviceId);
+    cachedDeviceId = newDeviceId;
     
     if (DEBUG) {
       console.log('[DEVICE] Generated new ID:', newDeviceId.substring(0, 8) + '...');
@@ -44,13 +57,15 @@ export async function getDeviceId(): Promise<string> {
     
     return newDeviceId;
   } catch (error) {
-    console.error('[DEVICE] SecureStore error:', error);
+    console.error('[DEVICE] SecureStore error, using in-memory fallback:', error);
     // Fallback to session-only UUID if SecureStore fails
-    const fallbackId = generateUUID();
+    if (!cachedDeviceId) {
+      cachedDeviceId = generateUUID();
+    }
     if (DEBUG) {
       console.warn('[DEVICE] Using session-only fallback ID');
     }
-    return fallbackId;
+    return cachedDeviceId;
   }
 }
 
@@ -70,7 +85,9 @@ export function generateSessionId(): string {
  * Clear device ID (for testing/reset)
  */
 export async function clearDeviceId(): Promise<void> {
+  cachedDeviceId = null;
   try {
+    const SecureStore = await import('expo-secure-store');
     await SecureStore.deleteItemAsync(DEVICE_ID_KEY);
     if (DEBUG) {
       console.log('[DEVICE] Cleared device ID');

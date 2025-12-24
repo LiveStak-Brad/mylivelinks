@@ -124,11 +124,16 @@ export const Tile: React.FC<TileProps> = ({
       <Animated.View style={[containerStyle, animatedStyle]}>
       {/* Video surface - LiveKit VideoRenderer */}
       {videoTrack ? (
-        <VideoRenderer
-          track={videoTrack}
-          style={styles.videoRenderer}
-          objectFit="cover"
-        />
+        (() => {
+          console.log('[VIDEO] Rendering VideoRenderer for participant', participant?.identity);
+          return (
+            <VideoRenderer
+              track={videoTrack}
+              style={styles.videoRenderer}
+              objectFit="cover"
+            />
+          );
+        })()
       ) : (
         <View style={styles.videoPlaceholder}>
           <Text style={styles.placeholderText}>📹</Text>

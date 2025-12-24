@@ -34,12 +34,21 @@ interface UseLiveRoomParticipantsReturn {
   room: Room | null;
 }
 
+interface UseLiveRoomParticipantsOptions {
+  enabled?: boolean; // gate connect until login/device/env ready
+}
+
 /**
  * Real LiveKit integration hook
  * Connects to room and subscribes to remote video tracks
  * Uses Agent 3's selection engine for stable 12-tile grid
  */
-export function useLiveRoomParticipants(): UseLiveRoomParticipantsReturn {
+export function useLiveRoomParticipants(
+  options: UseLiveRoomParticipantsOptions = {}
+): UseLiveRoomParticipantsReturn {
+  console.log('[ROOM] useLiveRoomParticipants invoked');
+  
+  const { enabled = true } = options;
   const [allParticipants, setAllParticipants] = useState<RemoteParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -54,22 +63,24 @@ export function useLiveRoomParticipants(): UseLiveRoomParticipantsReturn {
   const [sortMode] = useState<SortMode>('random');
   
   // Stable random seed (persisted across app relaunches)
-  const [randomSeed, setRandomSeed] = useState<number>(0);
+  // Initialize with in-memory default immediately
+  const [randomSeed, setRandomSeed] = useState<number>(() => Math.floor(Date.now() / 1000));
+  
   useEffect(() => {
     const loadOrCreateSeed = async () => {
       try {
-        const { getItemAsync, setItemAsync } = await import('expo-secure-store');
-        const stored = await getItemAsync('mylivelinks_random_seed');
+        const SecureStore = await import('expo-secure-store');
+        const stored = await SecureStore.getItemAsync('mylivelinks_random_seed');
         if (stored) {
           setRandomSeed(parseInt(stored, 10));
         } else {
           const newSeed = Math.floor(Date.now() / 1000);
-          await setItemAsync('mylivelinks_random_seed', String(newSeed));
+          await SecureStore.setItemAsync('mylivelinks_random_seed', String(newSeed));
           setRandomSeed(newSeed);
         }
       } catch (error) {
-        console.warn('[SEED] SecureStore error, using session seed:', error);
-        setRandomSeed(Math.floor(Date.now() / 1000));
+        console.warn('[SEED] SecureStore unavailable, using in-memory seed:', error);
+        // Already initialized with in-memory seed, no action needed
       }
     };
     loadOrCreateSeed();
@@ -217,6 +228,22 @@ export function useLiveRoomParticipants(): UseLiveRoomParticipantsReturn {
       return;
     }
 
+    // Gate connection until explicitly enabled (after login/device/env ready)
+    if (!enabled) {
+      if (DEBUG) {
+        console.log('[ROOM] Skipping connect (not enabled yet; wait for login/device/env)');
+      }
+      return;
+    }
+
+    // Ensure env is present
+    if (!TOKEN_ENDPOINT) {
+      if (DEBUG) {
+        console.log('[ROOM] Skipping connect (missing TOKEN_ENDPOINT / API URL)');
+      }
+      return;
+    }
+
     isConnectingRef.current = true;
 
     const connectToRoom = async () => {
@@ -228,6 +255,8 @@ export function useLiveRoomParticipants(): UseLiveRoomParticipantsReturn {
         // Fetch token
         const { token, url } = await fetchToken(identity);
 
+        console.log('[ROOM] Creating LiveKit Room instance');
+        
         // Create room
         const room = new Room({
           adaptiveStream: true,
@@ -316,10 +345,12 @@ export function useLiveRoomParticipants(): UseLiveRoomParticipantsReturn {
           });
         }
 
+        console.log('[ROOM] About to call room.connect()');
         await room.connect(url, token);
+        console.log('[ROOM] Connected successfully');
 
       } catch (error: any) {
-        console.error('[ROOM] Connection error:', error.message);
+        console.error('[ROOM] Connection error', error);
         isConnectingRef.current = false;
         hasConnectedRef.current = false;
       }

@@ -1,0 +1,6 @@
+# Ignore docs and non-essential files during build
+*.md
+.DS_Store
+.vscode/
+.idea/
+

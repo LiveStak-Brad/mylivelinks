@@ -24,7 +24,13 @@ import { useLiveRoomParticipants } from '../hooks/useLiveRoomParticipants';
 
 const SWIPE_THRESHOLD = 50;
 
-export const LiveRoomScreen: React.FC = () => {
+type LiveRoomScreenProps = {
+  enabled?: boolean;
+};
+
+export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = true }) => {
+  console.log('[LIVE] LiveRoomScreen render start');
+  
   // UI state management
   const { 
     state, 
@@ -36,8 +42,10 @@ export const LiveRoomScreen: React.FC = () => {
     initializeTileSlots,
   } = useLiveRoomUI();
   
+  console.log('[LIVE] Before LiveKit hooks');
+  
   // LiveKit streaming hook
-  const { participants, isConnected, tileCount, room } = useLiveRoomParticipants();
+  const { participants, isConnected, tileCount, room } = useLiveRoomParticipants({ enabled });
 
   /**
    * Swipe gesture handler

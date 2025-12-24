@@ -38,6 +38,16 @@ export function useLiveKitPublisher({
 
   // Start publishing (creates tracks and publishes to shared room)
   const startPublishing = useCallback(async (reason: string = 'unknown') => {
+    console.log('🎥 [PUBLISH] startPublishing called', {
+      reason,
+      hasRoom: !!room,
+      isRoomConnected,
+      roomState: room?.state,
+      enabled,
+      videoDeviceId,
+      audioDeviceId,
+    });
+    
     if (DEBUG_LIVEKIT) {
       console.log('[PUBLISH] GoLive clicked', {
         reason,
@@ -49,6 +59,13 @@ export function useLiveKitPublisher({
     // Must have a connected room
     if (!room || !isRoomConnected || room.state !== 'connected') {
       const err = new Error('Room not connected. Cannot publish.');
+      console.error('❌ [PUBLISH] BLOCKED - Room not ready', {
+        hasRoom: !!room,
+        isRoomConnected,
+        roomState: room?.state,
+        reason: !room ? 'No room object' : !isRoomConnected ? 'isRoomConnected=false' : 'Room state not connected',
+      });
+      
       if (DEBUG_LIVEKIT) {
         console.log('[PUBLISH] start requested', {
           reason,

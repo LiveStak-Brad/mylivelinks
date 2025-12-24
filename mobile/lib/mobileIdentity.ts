@@ -1,13 +1,14 @@
 /**
  * Mobile Identity Management
  * Persists a stable identity for LiveKit connections
- * Uses Expo SecureStore for persistence
+ * Safe for startup: uses in-memory fallback if SecureStore unavailable
  */
-
-import * as SecureStore from 'expo-secure-store';
 
 const IDENTITY_KEY = 'mylivelinks_mobile_identity';
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
+
+// In-memory cache (fallback if SecureStore fails)
+let cachedIdentity: string | null = null;
 
 /**
  * Generate a stable mobile identity
@@ -22,12 +23,22 @@ function generateMobileIdentity(): string {
 /**
  * Get or create a stable mobile identity
  * Persists to SecureStore so it survives app restarts
+ * Safe for startup: returns in-memory identity immediately if SecureStore fails
  */
 export async function getMobileIdentity(): Promise<string> {
+  // Return cached if available
+  if (cachedIdentity) {
+    return cachedIdentity;
+  }
+
   try {
+    // Lazy-load SecureStore only when needed
+    const SecureStore = await import('expo-secure-store');
+    
     // Try to get existing identity
     const existing = await SecureStore.getItemAsync(IDENTITY_KEY);
     if (existing) {
+      cachedIdentity = existing;
       if (DEBUG) {
         console.log('[IDENTITY] Retrieved existing:', existing.substring(0, 20) + '...');
       }
@@ -37,6 +48,7 @@ export async function getMobileIdentity(): Promise<string> {
     // Generate new identity
     const newIdentity = generateMobileIdentity();
     await SecureStore.setItemAsync(IDENTITY_KEY, newIdentity);
+    cachedIdentity = newIdentity;
     
     if (DEBUG) {
       console.log('[IDENTITY] Generated new:', newIdentity);
@@ -44,9 +56,12 @@ export async function getMobileIdentity(): Promise<string> {
     
     return newIdentity;
   } catch (error) {
-    console.error('[IDENTITY] SecureStore error:', error);
+    console.error('[IDENTITY] SecureStore error, using in-memory fallback:', error);
     // Fallback to in-memory identity if SecureStore fails
-    return generateMobileIdentity();
+    if (!cachedIdentity) {
+      cachedIdentity = generateMobileIdentity();
+    }
+    return cachedIdentity;
   }
 }
 
@@ -54,7 +69,9 @@ export async function getMobileIdentity(): Promise<string> {
  * Clear stored identity (for testing/logout)
  */
 export async function clearMobileIdentity(): Promise<void> {
+  cachedIdentity = null;
   try {
+    const SecureStore = await import('expo-secure-store');
     await SecureStore.deleteItemAsync(IDENTITY_KEY);
     if (DEBUG) {
       console.log('[IDENTITY] Cleared');

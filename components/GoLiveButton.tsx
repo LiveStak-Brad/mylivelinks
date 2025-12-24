@@ -409,6 +409,14 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       return;
     }
 
+    console.log('🎬 [GO LIVE] Starting live stream...', {
+      hasRoom: !!sharedRoom,
+      isRoomConnected,
+      roomState: sharedRoom?.state,
+      selectedVideoDevice: selectedVideoDevice.substring(0, 20) + '...',
+      selectedAudioDevice: selectedAudioDevice.substring(0, 20) + '...',
+    });
+
     setLoading(true);
     setPermissionError(null);
     

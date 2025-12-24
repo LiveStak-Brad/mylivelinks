@@ -3,12 +3,12 @@
     "name": "MyLiveLinks",
     "slug": "mylivelinks-mobile",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#000000"
     },
     "ios": {
@@ -16,14 +16,11 @@
       "bundleIdentifier": "com.mylivelinks.app",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs camera access for live streaming (future feature).",
-        "NSMicrophoneUsageDescription": "This app needs microphone access for live streaming (future feature)."
+        "NSMicrophoneUsageDescription": "This app needs microphone access for live streaming (future feature).",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#000000"
-      },
       "package": "com.mylivelinks.app",
       "permissions": [
         "CAMERA",
@@ -31,12 +28,14 @@
         "MODIFY_AUDIO_SETTINGS"
       ]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
     "plugins": [
-      "react-native-reanimated/plugin"
-    ]
+      "expo-dev-client",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "072e779c-b3fb-4124-b990-149c59626efe"
+      }
+    }
   }
 }
-

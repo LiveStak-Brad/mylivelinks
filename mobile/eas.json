@@ -38,6 +38,12 @@
     }
   },
   "submit": {
+    "development": {
+      "ios": {}
+    },
+    "preview": {
+      "ios": {}
+    },
     "production": {
       "ios": {
         "appleId": "your-apple-id@example.com",
