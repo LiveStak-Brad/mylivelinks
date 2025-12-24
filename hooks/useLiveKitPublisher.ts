@@ -339,12 +339,16 @@ export function useLiveKitPublisher({
     }
   }, [room, onUnpublished]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount - only stop if actually publishing
   useEffect(() => {
     return () => {
-      stopPublishing();
+      // Only stop if we're actually publishing (user navigated away while live)
+      if (isPublishingRef.current && room && room.state === 'connected') {
+        console.log('Component unmounting, stopping publishing...');
+        stopPublishing();
+      }
     };
-  }, [stopPublishing]);
+  }, [stopPublishing, room]);
 
   // Auto-start when enabled and room is connected
   // CRITICAL: Only auto-START publishing, NEVER auto-STOP
