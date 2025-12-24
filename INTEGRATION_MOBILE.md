@@ -38,18 +38,39 @@ Authorization: Bearer <SUPABASE_ACCESS_TOKEN>  (optional, for authenticated user
 {
   "roomName": "live_central",
   "participantName": "<USER_ID_OR_DEVICE_ID>",
-  "canPublish": true,
+  "userId": "<USER_ID_OR_ANON_ID>",
+  "displayName": "<DISPLAY_NAME>",
+  "deviceType": "mobile",
+  "deviceId": "<STABLE_DEVICE_UUID>",
+  "sessionId": "<PER_CONNECTION_UUID>",
+  "role": "viewer",
+  "canPublish": false,
   "canSubscribe": true
 }
 ```
 
 **Field Descriptions:**
 - `roomName`: Must be `"live_central"` (hardcoded constant)
-- `participantName`: Unique identifier for this client
-  - **Authenticated users**: Use Supabase user UUID (e.g., `"2b4a1178-3c39-4179-94ea-314dd824a818"`)
-  - **Anonymous users**: Use device-specific ID (e.g., `"device-ios-<UUID>"` or `"device-android-<UUID>"`)
-- `canPublish`: Set to `true` if user can stream (streamers)
+- `participantName`: Display name for UI (legacy, still required)
+- `userId`: Supabase user UUID or anonymous ID
+- `displayName`: User-friendly name for UI
+- `deviceType`: `"web"` or `"mobile"` (required for device-scoped identity)
+- `deviceId`: Stable UUID per device/install (stored in device storage)
+- `sessionId`: Unique UUID per connection attempt (generated fresh each time)
+- `role`: `"viewer"` or `"publisher"` (viewers don't publish)
+- `canPublish`: Set to `true` only for streamers
 - `canSubscribe`: Always `true` for viewing streams
+
+**Device-Scoped Identity:**
+The server builds the LiveKit identity as:
+```
+u_<userId>:<deviceType>:<deviceId>:<sessionId>
+```
+
+This allows the same user account to:
+- Stream on web (`u_123:web:abc:xyz`)
+- View on mobile (`u_123:mobile:def:uvw`)
+- Without identity collisions or reconnect loops
 
 ### Response (Success)
 ```json
@@ -73,7 +94,21 @@ Authorization: Bearer <SUPABASE_ACCESS_TOKEN>  (optional, for authenticated user
 ### 1. Get LiveKit Token
 ```typescript
 // Example (TypeScript/React Native)
-const token = await fetch('https://mylivelinks.com/api/livekit/token', {
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
+
+// Get or create device ID (stable per install)
+let deviceId = await AsyncStorage.getItem('mylivelinks_device_id');
+if (!deviceId) {
+  deviceId = uuidv4();
+  await AsyncStorage.setItem('mylivelinks_device_id', deviceId);
+}
+
+// Generate session ID (unique per connection)
+const sessionId = uuidv4();
+
+const response = await fetch('https://mylivelinks.com/api/livekit/token', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -82,12 +117,18 @@ const token = await fetch('https://mylivelinks.com/api/livekit/token', {
   body: JSON.stringify({
     roomName: 'live_central',
     participantName: userId || deviceId,
+    userId: userId || `anon-${deviceId}`,
+    displayName: userDisplayName || 'Mobile Viewer',
+    deviceType: 'mobile',
+    deviceId: deviceId,
+    sessionId: sessionId,
+    role: isStreamer ? 'publisher' : 'viewer',
     canPublish: isStreamer,
     canSubscribe: true,
   }),
 });
 
-const { token: livekitToken, wsUrl } = await token.json();
+const { token: livekitToken, url: wsUrl } = await response.json();
 ```
 
 ### 2. Connect to Room

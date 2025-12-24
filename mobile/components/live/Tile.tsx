@@ -1,23 +1,28 @@
 /**
  * Single tile component for the 12-tile grid
- * Displays participant info + placeholder for video surface
+ * Displays participant info + LiveKit video track
  * 
  * Gestures:
  * - Long-press (450ms) → Enter edit mode
  * - Double-tap → Focus mode
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, withSpring, useSharedValue } from 'react-native-reanimated';
+import { VideoRenderer } from '@livekit/react-native';
 import type { TileItem } from '../../types/live';
+import type { Room } from 'livekit-client';
+
+const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
 interface TileProps {
   item: TileItem;
   isEditMode: boolean;
   isFocused: boolean;
   isMinimized: boolean;
+  room: Room | null;
   onLongPress?: () => void;
   onDoubleTap?: () => void;
 }
@@ -27,6 +32,7 @@ export const Tile: React.FC<TileProps> = ({
   isEditMode,
   isFocused,
   isMinimized,
+  room,
   onLongPress,
   onDoubleTap,
 }) => {
@@ -35,6 +41,27 @@ export const Tile: React.FC<TileProps> = ({
   // Animation values for edit mode
   const scale = useSharedValue(1);
   const borderWidth = useSharedValue(0);
+
+  // Get video track from room
+  const videoTrack = useMemo(() => {
+    if (!room || !participant) return null;
+
+    const remoteParticipant = room.remoteParticipants.get(participant.identity);
+    if (!remoteParticipant) return null;
+
+    // Find first video track publication
+    const videoPublication = Array.from(remoteParticipant.videoTrackPublications.values())[0];
+    if (!videoPublication || !videoPublication.isSubscribed) return null;
+
+    if (DEBUG) {
+      console.log('[TRACK] Rendering video for:', {
+        identity: participant.identity,
+        trackSid: videoPublication.trackSid,
+      });
+    }
+
+    return videoPublication.track;
+  }, [room, participant]);
 
   // Long-press gesture (450ms)
   const longPressGesture = Gesture.LongPress()
@@ -95,10 +122,18 @@ export const Tile: React.FC<TileProps> = ({
   return (
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[containerStyle, animatedStyle]}>
-      {/* Video surface placeholder - LiveKit will render video here */}
-      <View style={styles.videoPlaceholder}>
-        <Text style={styles.placeholderText}>📹</Text>
-      </View>
+      {/* Video surface - LiveKit VideoRenderer */}
+      {videoTrack ? (
+        <VideoRenderer
+          track={videoTrack}
+          style={styles.videoRenderer}
+          objectFit="cover"
+        />
+      ) : (
+        <View style={styles.videoPlaceholder}>
+          <Text style={styles.placeholderText}>📹</Text>
+        </View>
+      )}
 
       {/* LIVE badge - top left */}
       <View style={styles.liveBadge}>
@@ -156,6 +191,10 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#555',
     fontSize: 12,
+  },
+  videoRenderer: {
+    flex: 1,
+    backgroundColor: '#000',
   },
   videoPlaceholder: {
     flex: 1,

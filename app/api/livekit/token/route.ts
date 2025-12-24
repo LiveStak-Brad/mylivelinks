@@ -164,7 +164,18 @@ export async function POST(request: NextRequest) {
 
     // Get request body
     const body = await request.json();
-    const { roomName, participantName, participantMetadata, canPublish, canSubscribe, userId: clientUserId } = body;
+    const { 
+      roomName, 
+      participantName, 
+      participantMetadata, 
+      canPublish, 
+      canSubscribe, 
+      userId: clientUserId,
+      deviceType,
+      deviceId,
+      sessionId,
+      role,
+    } = body;
 
     // Validate required fields
     if (!roomName || !participantName) {
@@ -174,6 +185,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate device-scoped identity fields (strongly recommended)
+    if (!deviceType || !deviceId || !sessionId) {
+      console.warn('Missing device-scoped identity fields:', { deviceType, deviceId, sessionId });
+    }
+
     // Get user's profile for metadata
     const { data: profile } = await supabase
       .from('profiles')
@@ -181,10 +197,32 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    // Create LiveKit access token
-    // Ensure identity is a string (UUIDs from Supabase are already strings, but be safe)
-    const identity = String(user.id);
+    // Create LiveKit access token with device-scoped identity
+    // Format: u_<userId>:<deviceType>:<deviceId>:<sessionId>
+    // This allows same user on multiple devices without collision
+    const userId = String(user.id);
+    const effectiveDeviceType = deviceType || 'web';
+    const effectiveDeviceId = deviceId || 'unknown';
+    const effectiveSessionId = sessionId || Date.now().toString();
+    
+    // Build device-scoped identity (DO NOT use displayName in identity)
+    const identity = `u_${userId}:${effectiveDeviceType}:${effectiveDeviceId}:${effectiveSessionId}`;
+    
+    // Display name for UI (separate from identity)
     const name = participantName || profile?.display_name || profile?.username || user.email || 'Anonymous';
+    const effectiveRole = role || (canPublish ? 'publisher' : 'viewer');
+    
+    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    
+    if (DEBUG_LIVEKIT) {
+      console.log('[TOKEN] room=' + roomName + 
+                  ' user=' + userId + 
+                  ' deviceType=' + effectiveDeviceType + 
+                  ' deviceId=' + effectiveDeviceId.substring(0, 8) + '...' +
+                  ' sessionId=' + effectiveSessionId.substring(0, 8) + '...' +
+                  ' identity=' + identity + 
+                  ' role=' + effectiveRole);
+    }
     
     console.log('Generating LiveKit token:', {
       identity,
@@ -192,6 +230,8 @@ export async function POST(request: NextRequest) {
       roomName,
       canPublish,
       canSubscribe,
+      deviceType: effectiveDeviceType,
+      role: effectiveRole,
     });
 
     // Validate API key/secret format (they should be strings)

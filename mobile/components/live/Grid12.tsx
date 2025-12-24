@@ -11,12 +11,14 @@ import React, { useMemo, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { Tile } from './Tile';
 import type { Participant, TileItem } from '../../types/live';
+import type { Room } from 'livekit-client';
 
 interface Grid12Props {
   participants: Participant[];
   isEditMode: boolean;
   focusedIdentity: string | null;
   tileSlots: string[];
+  room: Room | null;
   onLongPress: (identity: string) => void;
   onDoubleTap: (identity: string) => void;
   onExitEditMode: () => void;
@@ -85,6 +87,7 @@ export const Grid12: React.FC<Grid12Props> = ({
   isEditMode,
   focusedIdentity,
   tileSlots,
+  room,
   onLongPress,
   onDoubleTap,
   onExitEditMode,
@@ -150,6 +153,7 @@ export const Grid12: React.FC<Grid12Props> = ({
               isEditMode={false}
               isFocused={true}
               isMinimized={false}
+              room={room}
               onDoubleTap={() => onDoubleTap(focusedItem.participant!.identity)}
             />
           )}
@@ -164,6 +168,7 @@ export const Grid12: React.FC<Grid12Props> = ({
                 isEditMode={false}
                 isFocused={false}
                 isMinimized={true}
+                room={room}
                 onDoubleTap={() => onDoubleTap(item.participant!.identity)}
               />
             </View>
@@ -192,6 +197,7 @@ export const Grid12: React.FC<Grid12Props> = ({
                 isEditMode={isEditMode}
                 isFocused={false}
                 isMinimized={false}
+                room={room}
                 onLongPress={
                   item.participant
                     ? () => onLongPress(item.participant!.identity)

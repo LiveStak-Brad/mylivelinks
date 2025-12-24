@@ -10,7 +10,7 @@
  * - Grid never unmounts when overlays appear
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Grid12 } from '../components/live/Grid12';
@@ -36,8 +36,8 @@ export const LiveRoomScreen: React.FC = () => {
     initializeTileSlots,
   } = useLiveRoomUI();
   
-  // Placeholder streaming hook
-  const { participants, isConnected, tileCount } = useLiveRoomParticipants();
+  // LiveKit streaming hook
+  const { participants, isConnected, tileCount, room } = useLiveRoomParticipants();
 
   /**
    * Swipe gesture handler
@@ -108,17 +108,42 @@ export const LiveRoomScreen: React.FC = () => {
       // Double-tap focused tile → exit focus mode
       console.log('[GESTURE] Double-tap focused tile → exit focus mode');
       setFocusedIdentity(null);
-      // TODO: Unmute all audio tracks (streaming team will implement)
-      console.log('[AUDIO] Exit focus → restore all audio');
+      
+      // Unmute all audio tracks
+      if (room) {
+        let unmutedCount = 0;
+        room.remoteParticipants.forEach((participant) => {
+          participant.audioTrackPublications.forEach((publication) => {
+            if (publication.track && publication.track.isMuted) {
+              publication.track.setMuted(false);
+              unmutedCount++;
+            }
+          });
+        });
+        console.log(`[AUDIO] Exit focus → restored audio for ${unmutedCount} tracks`);
+      }
     } else {
       // Double-tap different tile → enter focus mode
       console.log(`[GESTURE] Double-tap → focus identity=${identity}`);
       setFocusedIdentity(identity);
-      // TODO: Mute all other audio tracks locally (streaming team will implement)
-      const otherCount = participants.length - 1;
-      console.log(`[AUDIO] Focus mode → muted others count=${otherCount}`);
+      
+      // Mute all other audio tracks locally
+      if (room) {
+        let mutedCount = 0;
+        room.remoteParticipants.forEach((participant) => {
+          if (participant.identity !== identity) {
+            participant.audioTrackPublications.forEach((publication) => {
+              if (publication.track && !publication.track.isMuted) {
+                publication.track.setMuted(true);
+                mutedCount++;
+              }
+            });
+          }
+        });
+        console.log(`[AUDIO] Focus mode → muted others count=${mutedCount}`);
+      }
     }
-  }, [state.focusedIdentity, setFocusedIdentity, participants.length]);
+  }, [state.focusedIdentity, setFocusedIdentity, room]);
 
   const handleExitEditMode = useCallback(() => {
     console.log('[GESTURE] Exit edit mode → restore normal interaction');
@@ -128,8 +153,35 @@ export const LiveRoomScreen: React.FC = () => {
   const handleExitFocus = useCallback(() => {
     console.log('[GESTURE] Exit focus mode → restore grid');
     setFocusedIdentity(null);
-    console.log('[AUDIO] Exit focus → restore all audio');
-  }, [setFocusedIdentity]);
+    
+    // Unmute all audio tracks
+    if (room) {
+      let unmutedCount = 0;
+      room.remoteParticipants.forEach((participant) => {
+        participant.audioTrackPublications.forEach((publication) => {
+          if (publication.track && publication.track.isMuted) {
+            publication.track.setMuted(false);
+            unmutedCount++;
+          }
+        });
+      });
+      console.log(`[AUDIO] Exit focus → restored audio for ${unmutedCount} tracks`);
+    }
+  }, [setFocusedIdentity, room]);
+
+  // Auto-exit focus if focused participant leaves
+  useEffect(() => {
+    if (state.focusedIdentity && room) {
+      const focusedExists = participants.some(
+        p => p.identity === state.focusedIdentity
+      );
+      if (!focusedExists) {
+        console.log('[GESTURE] Focused participant left → auto-exit focus');
+        setFocusedIdentity(null);
+        // Audio will be restored automatically since participant is gone
+      }
+    }
+  }, [participants, state.focusedIdentity, setFocusedIdentity, room]);
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -141,6 +193,7 @@ export const LiveRoomScreen: React.FC = () => {
             isEditMode={state.isEditMode}
             focusedIdentity={state.focusedIdentity}
             tileSlots={state.tileSlots}
+            room={room}
             onLongPress={handleLongPress}
             onDoubleTap={handleDoubleTap}
             onExitEditMode={handleExitEditMode}

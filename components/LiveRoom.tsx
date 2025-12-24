@@ -154,23 +154,42 @@ export default function LiveRoom() {
           return;
         }
 
-        // UNIQUE PARTICIPANT IDENTITY
+        // UNIQUE PARTICIPANT IDENTITY - Device-scoped
+        let deviceId = '';
         let anonId = '';
+        
         if (typeof window !== 'undefined') {
+          // Get or create device ID (stable per browser/install)
+          deviceId = localStorage.getItem('mylivelinks_device_id') || '';
+          if (!deviceId) {
+            deviceId = crypto.randomUUID();
+            localStorage.setItem('mylivelinks_device_id', deviceId);
+          }
+          
+          // Get or create anonymous ID for non-authenticated users
           anonId = localStorage.getItem('mylivelinks_anon_id') || '';
           if (!anonId) {
             anonId = `anon-${crypto.randomUUID()}`;
             localStorage.setItem('mylivelinks_anon_id', anonId);
           }
         }
+        
+        // Generate session ID (unique per connection)
+        const sessionId = crypto.randomUUID();
+        
+        const userId = user?.id || anonId || 'anonymous';
         const participantIdentity = user?.id || anonId || 'anonymous';
         const participantDisplayName = user?.email || user?.id || anonId || 'Viewer';
+        const deviceType = 'web';
 
         if (DEBUG_LIVEKIT) {
           console.log('[TOKEN] Requesting token:', {
             endpoint: TOKEN_ENDPOINT,
             roomName: LIVEKIT_ROOM_NAME,
-            identity: participantIdentity,
+            userId: userId,
+            deviceType: deviceType,
+            deviceId: deviceId.substring(0, 8) + '...',
+            sessionId: sessionId.substring(0, 8) + '...',
             canPublish: true,
             canSubscribe: true,
           });
@@ -188,8 +207,13 @@ export default function LiveRoom() {
             participantName: participantIdentity,
             canPublish: true, // CRITICAL: Must be true so streamers can publish on shared room
             canSubscribe: true,
-            userId: participantIdentity,
+            userId: userId,
             displayName: participantDisplayName,
+            // Device-scoped identity fields
+            deviceType: deviceType,
+            deviceId: deviceId,
+            sessionId: sessionId,
+            role: 'viewer', // Will be 'publisher' when Go Live is clicked
           }),
         });
 
