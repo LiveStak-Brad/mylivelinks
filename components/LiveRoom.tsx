@@ -298,7 +298,6 @@ export default function LiveRoom() {
         roomRef.current = newRoom;
 
         // Connect to room
-        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
         if (DEBUG_LIVEKIT) {
           const tokenHashShort = token ? token.substring(0, 8) + '...' : 'none';
           console.log('[ROOM] connect called', {
