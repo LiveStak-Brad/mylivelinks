@@ -649,26 +649,6 @@ export default function Tile({
     setIsActuallySubscribed(!!(videoTrack || audioTrack));
   }, [videoTrack, audioTrack]);
   
-  // CRITICAL: Stable watch session key - only changes when slot changes streamer
-  // Format: viewer_id:slot_index:live_stream_id
-  // This prevents heartbeat cleanup when tile rerenders with same streamer
-  const [watchSessionKey, setWatchSessionKey] = useState<string | undefined>(undefined);
-  
-  useEffect(() => {
-    if (liveStreamId && slotIndex) {
-      // Get viewer ID for watch session key
-      supabase.auth.getUser().then(({ data }: { data: { user: any } | null }) => {
-        const user = data?.user;
-        if (user) {
-          const key = `${user.id}:${slotIndex}:${liveStreamId}`;
-          setWatchSessionKey(key);
-        }
-      });
-    } else {
-      setWatchSessionKey(undefined);
-    }
-  }, [liveStreamId, slotIndex, supabase]);
-  
   // CRITICAL: Only enable heartbeat if we have a valid liveStreamId
   // Passing 0 causes issues - heartbeat should only run for valid streams
   useViewerHeartbeat({
@@ -678,7 +658,6 @@ export default function Tile({
     isVisible: isVisible,
     isSubscribed: isActuallySubscribed, // Use actual subscription state, not hardcoded
     enabled: shouldSendHeartbeat && !!liveStreamId, // CRITICAL: Only enable if we have valid liveStreamId
-    watchSessionKey, // CRITICAL: Stable key prevents cleanup on rerender
   });
 
   // Track visibility for heartbeat
