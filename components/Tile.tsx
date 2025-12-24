@@ -301,7 +301,8 @@ export default function Tile({
         }
       });
       
-      if (DEBUG_LIVEKIT && !foundParticipant) {
+      if (!foundParticipant) {
+        // Always log this (not just in DEBUG mode) to help diagnose subscription issues
         console.log('[DEBUG] Remote participant NOT found for tile:', {
           slotIndex,
           streamerId,
@@ -309,6 +310,16 @@ export default function Tile({
           remoteParticipantsCount: sharedRoom.remoteParticipants.size,
           remoteParticipantIdentities: Array.from(sharedRoom.remoteParticipants.values()).map(p => p.identity),
         });
+      } else {
+        // Log when participant IS found (even if no tracks yet)
+        if (DEBUG_LIVEKIT) {
+          console.log('[DEBUG] Participant found, subscribed to publications:', {
+            slotIndex,
+            streamerId,
+            trackCount,
+            publicationsSubscribed: Array.from(sharedRoom.remoteParticipants.get(streamerId)?.trackPublications.values() || []).filter(p => p.isSubscribed).length,
+          });
+        }
       }
     };
     
