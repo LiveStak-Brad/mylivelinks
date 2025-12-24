@@ -18,11 +18,23 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Check if already logged in
-    supabase.auth.getUser().then(({ data: { user } }: { data: { user: any } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }: { data: { user: any } }) => {
       if (user) {
-        // Redirect to returnUrl if provided, otherwise to /live
-        const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
-        router.push(returnUrl);
+        // Check if profile is complete
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, date_of_birth')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.username && profile?.date_of_birth) {
+          // Profile complete, redirect to return URL or live
+          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
+          router.push(returnUrl);
+        } else {
+          // Profile incomplete, redirect to onboarding
+          router.push('/onboarding');
+        }
       }
     });
   }, [router, supabase]);
@@ -103,9 +115,9 @@ export default function LoginPage() {
           }
 
           setMessage('Account created successfully! Redirecting...');
-          // Redirect to profile settings to complete setup
+          // Redirect to onboarding to complete profile setup
           setTimeout(() => {
-            router.push('/settings/profile');
+            router.push('/onboarding');
           }, 1000);
         }
       } else {
@@ -120,9 +132,22 @@ export default function LoginPage() {
         if (data.user) {
           // Clear any mock user data
           localStorage.removeItem('mock_user');
-          // Redirect to returnUrl if provided, otherwise to /live
-          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
-          router.push(returnUrl);
+          
+          // Check if profile is complete
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username, date_of_birth')
+            .eq('id', data.user.id)
+            .single();
+          
+          if (profile?.username && profile?.date_of_birth) {
+            // Profile complete, redirect to return URL or live
+            const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
+            router.push(returnUrl);
+          } else {
+            // Profile incomplete, redirect to onboarding
+            router.push('/onboarding');
+          }
         }
       }
     } catch (err: any) {
