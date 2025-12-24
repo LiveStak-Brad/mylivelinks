@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Palette, Layout, Type, Link2 } from 'lucide-react';
+import { Palette, Layout, Type, Link2, Upload, X } from 'lucide-react';
+import { createClient } from '@/lib/supabase';
+import Image from 'next/image';
 
 interface ProfileCustomizationProps {
   initialSettings: {
@@ -23,6 +25,63 @@ export default function ProfileCustomization({
 }: ProfileCustomizationProps) {
   const [settings, setSettings] = useState(initialSettings);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const supabase = createClient();
+  
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be less than 5MB');
+      return;
+    }
+    
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      // Create unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `profile-backgrounds/${fileName}`;
+      
+      // Upload to Supabase Storage
+      const { error: uploadError, data } = await supabase.storage
+        .from('avatars') // Reusing existing bucket
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+      
+      setSettings({ ...settings, profile_bg_url: publicUrl });
+      alert('Background image uploaded successfully!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload background image');
+    } finally {
+      setUploading(false);
+    }
+  };
+  
+  const handleRemoveBackground = () => {
+    setSettings({ ...settings, profile_bg_url: '' });
+  };
   
   const handleSave = async () => {
     setSaving(true);
@@ -56,16 +115,46 @@ export default function ProfileCustomization({
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-semibold mb-2">
-              Background Image URL
+              Background Image
             </label>
-            <input
-              type="url"
-              value={settings.profile_bg_url || ''}
-              onChange={(e) => setSettings({ ...settings, profile_bg_url: e.target.value })}
-              placeholder="https://example.com/background.jpg"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
-            />
-            <p className="text-xs text-gray-500 mt-1">
+            
+            {/* Preview */}
+            {settings.profile_bg_url && (
+              <div className="relative w-full h-48 mb-3 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600">
+                <Image
+                  src={settings.profile_bg_url}
+                  alt="Background preview"
+                  fill
+                  className="object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveBackground}
+                  className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition"
+                  title="Remove background"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+            
+            {/* Upload Button */}
+            <label className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg cursor-pointer transition disabled:opacity-50">
+              <Upload size={20} />
+              {uploading ? 'Uploading...' : settings.profile_bg_url ? 'Change Background' : 'Upload Background'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleBackgroundUpload}
+                disabled={uploading}
+                className="hidden"
+              />
+            </label>
+            
+            <p className="text-xs text-gray-500 mt-2">
+              Recommended: 1920x1080px or larger. Max 5MB. JPG, PNG, or WebP.
+            </p>
+            <p className="text-xs text-gray-500">
               Leave empty for default gradient background
             </p>
           </div>
