@@ -78,9 +78,17 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
     if (!confirmed) return;
     setEndingAllStreams(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('No auth session. Please log in again.');
+      }
       const res = await fetch('/api/admin/end-streams', {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
       const data = await res.json();
       if (!res.ok) {
