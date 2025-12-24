@@ -18,6 +18,63 @@ export default function UserStatsSection() {
     loadUserStats();
   }, []);
 
+  // Real-time subscription for balance updates
+  useEffect(() => {
+    let channel: any = null;
+
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Subscribe to profile changes for this user
+      channel = supabase
+        .channel(`user-balance-updates:${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${user.id}`,
+          },
+          (payload: any) => {
+            // Update balances in realtime when profile changes
+            const updatedProfile = payload.new;
+            setCoinBalance(updatedProfile.coin_balance || 0);
+            setDiamondBalance(updatedProfile.earnings_balance || 0);
+            setGifterLevel(updatedProfile.gifter_level || 0);
+            
+            // Reload badge info if level changed
+            if (updatedProfile.gifter_level !== gifterLevel) {
+              supabase
+                .from('gifter_levels')
+                .select('*')
+                .eq('level', updatedProfile.gifter_level)
+                .single()
+                .then(({ data }) => {
+                  if (data) setBadgeInfo(data);
+                });
+            }
+            
+            console.log('[BALANCE] Real-time update:', {
+              coins: updatedProfile.coin_balance,
+              diamonds: updatedProfile.earnings_balance,
+              level: updatedProfile.gifter_level,
+            });
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeSubscription();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [gifterLevel, supabase]);
+
   const loadUserStats = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();

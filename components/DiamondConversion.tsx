@@ -20,6 +20,49 @@ export default function DiamondConversion() {
     loadBalances();
   }, []);
 
+  // Real-time subscription for balance updates
+  useEffect(() => {
+    let channel: any = null;
+
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Subscribe to profile changes for this user
+      channel = supabase
+        .channel(`conversion-balance-updates:${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${user.id}`,
+          },
+          (payload: any) => {
+            // Update balances in realtime when profile changes
+            const updatedProfile = payload.new;
+            setCoinBalance(updatedProfile.coin_balance || 0);
+            setDiamondBalance(updatedProfile.earnings_balance || 0);
+            
+            console.log('[CONVERSION] Real-time balance update:', {
+              coins: updatedProfile.coin_balance,
+              diamonds: updatedProfile.earnings_balance,
+            });
+          }
+        )
+        .subscribe();
+    };
+
+    setupRealtimeSubscription();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [supabase]);
+
   const loadBalances = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
