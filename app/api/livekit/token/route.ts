@@ -11,6 +11,8 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 // CORS headers for mobile app requests
+// TODO: Tighten CORS allowlist for production (restrict to specific mobile app domains/origins)
+// Current: Allow all origins for initial mobile build compatibility
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*', // Allow all origins (can restrict to specific domains if needed)
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -313,11 +315,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Grant permissions
+    // CRITICAL: Respect explicit canPublish/canSubscribe from request
+    // Default to false for security (require explicit opt-in)
     at.addGrant({
       room: roomName,
       roomJoin: true,
-      canPublish: canPublish !== false, // Default to true, can be overridden
-      canSubscribe: canSubscribe !== false, // Default to true, can be overridden
+      canPublish: canPublish === true, // Explicit true required for publishing
+      canSubscribe: canSubscribe !== false, // Default to true (viewing is safe)
       canPublishData: true,
       canUpdateOwnMetadata: true,
     });
