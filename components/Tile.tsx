@@ -87,23 +87,15 @@ export default function Tile({
       console.log('[SUB] subscribe attempt', {
         slotIndex,
         streamerId,
+        isCurrentUser,
         hasSharedRoom: !!sharedRoom,
         isRoomConnected,
         alreadySubscribed: subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId,
       });
     }
     
-    // CRITICAL: Skip subscription for current user - they use local preview
-    if (isCurrentUser) {
-      if (DEBUG_LIVEKIT) {
-        console.log('[SUB] subscribe attempt', {
-          slotIndex,
-          participantIdentityFound: false,
-          reason: 'current user (using local preview)',
-        });
-      }
-      return;
-    }
+    // NO PREVIEW MODE: Current user subscribes to their own remote tracks like everyone else
+    // This allows streamers to see themselves broadcasting
     
     // Must have room, connection, and streamerId
     if (!sharedRoom || !isRoomConnected || !streamerId) {
