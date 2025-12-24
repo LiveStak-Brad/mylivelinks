@@ -264,6 +264,19 @@ export default function LiveRoom() {
               isLocal: participant === newRoom.localParticipant,
             });
           }
+          
+          // CRITICAL: When a new participant connects and starts publishing, 
+          // trigger auto-fill to add them to empty slots immediately
+          if (!participant.isLocal && participant.trackPublications.size > 0) {
+            console.log('[GRID] New participant with tracks connected, triggering auto-fill reload');
+            // Reload streamers list from DB (to get profile info) then auto-fill
+            setTimeout(() => {
+              loadLiveStreamers().then(() => {
+                // Auto-fill will run via the effect when liveStreamers updates
+                console.log('[GRID] Streamers reloaded after participant connect');
+              });
+            }, 1000); // Small delay to ensure DB is updated
+          }
         };
 
         const handleParticipantDisconnected = (participant: any) => {
@@ -1540,6 +1553,27 @@ export default function LiveRoom() {
       return updatedSlots;
     });
   }, [liveStreamers, saveGridLayout]);
+
+  // Auto-fill empty slots whenever liveStreamers changes
+  // This ensures new streamers automatically appear in empty boxes
+  useEffect(() => {
+    if (liveStreamers.length > 0 && gridSlots.length > 0) {
+      const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+      if (DEBUG_LIVEKIT) {
+        console.log('[GRID] liveStreamers updated, checking for auto-fill', {
+          streamersCount: liveStreamers.length,
+          emptySlots: gridSlots.filter(s => s.isEmpty).length,
+        });
+      }
+      
+      // Small delay to ensure state is fully updated
+      const timer = setTimeout(() => {
+        autoFillGrid();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [liveStreamers, gridSlots, autoFillGrid]);
 
   const handleGoLive = async (liveStreamId: number, profileId: string) => {
     try {

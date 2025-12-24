@@ -749,23 +749,21 @@ export default function Tile({
         </div>
       )}
 
-      {/* Bottom Overlay */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowMiniProfile(true)}
-              className="text-white font-medium text-sm truncate hover:text-blue-300 transition cursor-pointer"
-            >
-              {streamerUsername}
-            </button>
-            <GifterBadge
-              level={gifterLevel}
-              badgeName={badgeName}
-              badgeColor={badgeColor}
-              size="sm"
-            />
-          </div>
+      {/* Bottom Right Overlay - Username and Badge */}
+      <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+        <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+          <button
+            onClick={() => setShowMiniProfile(true)}
+            className="text-white font-medium text-sm truncate hover:text-blue-300 transition cursor-pointer"
+          >
+            {streamerUsername}
+          </button>
+          <GifterBadge
+            level={gifterLevel}
+            badgeName={badgeName}
+            badgeColor={badgeColor}
+            size="sm"
+          />
         </div>
       </div>
 
