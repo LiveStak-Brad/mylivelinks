@@ -771,6 +771,40 @@ export default function LiveRoom() {
                     newStreamers: streamers.map(s => ({ username: s.username, profile_id: s.profile_id, is_published: s.is_published })),
                   });
                 }
+                
+                // CRITICAL: Auto-remove streamers who went offline
+                // Check if any streamers in the grid are no longer live
+                const liveStreamerIds = new Set(streamers.map(s => s.profile_id));
+                setGridSlots(prevSlots => {
+                  let hasChanges = false;
+                  const updatedSlots = prevSlots.map(slot => {
+                    if (slot.streamer && !liveStreamerIds.has(slot.streamer.profile_id)) {
+                      // Streamer is in grid but no longer live - remove them
+                      if (DEBUG_LIVEKIT) {
+                        console.log('[GRID] Auto-removing offline streamer from slot', {
+                          slotIndex: slot.slotIndex,
+                          username: slot.streamer.username,
+                          profile_id: slot.streamer.profile_id,
+                        });
+                      }
+                      hasChanges = true;
+                      return {
+                        ...slot,
+                        streamer: null,
+                        isEmpty: true,
+                      };
+                    }
+                    return slot;
+                  });
+                  
+                  if (hasChanges) {
+                    // Save the updated grid
+                    saveGridLayout(updatedSlots);
+                    return updatedSlots;
+                  }
+                  return prevSlots;
+                });
+                
                 return streamers; // Changed, update - this triggers useEffect that calls autoFillGrid
               });
               // Auto-fill is now triggered by useEffect when liveStreamers changes
