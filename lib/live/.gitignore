@@ -1,0 +1,12 @@
+# Test coverage
+coverage/
+*.coverage
+
+# Test artifacts
+*.test.js
+*.spec.js
+
+# Build artifacts
+*.js.map
+*.d.ts.map
+

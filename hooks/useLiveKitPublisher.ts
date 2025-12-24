@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Room, RoomEvent, LocalTrack, createLocalTracks, Track } from 'livekit-client';
+import { DEBUG_LIVEKIT } from '@/lib/livekit-constants';
 
 interface UseLiveKitPublisherOptions {
   room: Room | null; // Shared room connection (must already be connected)
@@ -37,7 +38,13 @@ export function useLiveKitPublisher({
 
   // Start publishing (creates tracks and publishes to shared room)
   const startPublishing = useCallback(async (reason: string = 'unknown') => {
-    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    if (DEBUG_LIVEKIT) {
+      console.log('[PUBLISH] GoLive clicked', {
+        reason,
+        roomConnected: isRoomConnected,
+        roomState: room?.state,
+      });
+    }
     
     // Must have a connected room
     if (!room || !isRoomConnected || room.state !== 'connected') {
@@ -232,10 +239,21 @@ export function useLiveKitPublisher({
             throw new Error('No tracks were published - verification failed');
           }
           
+          const videoCount = verifiedPublishedTracks.filter(p => p.source === Track.Source.Camera).length;
+          const audioCount = verifiedPublishedTracks.filter(p => p.source === Track.Source.Microphone).length;
+          
           console.log('Publishing verified:', {
-            cameraTracks: verifiedPublishedTracks.filter(p => p.source === Track.Source.Camera).length,
-            microphoneTracks: verifiedPublishedTracks.filter(p => p.source === Track.Source.Microphone).length,
+            cameraTracks: videoCount,
+            microphoneTracks: audioCount,
           });
+          
+          if (DEBUG_LIVEKIT) {
+            console.log('[PUBLISH] after publish pubs:', {
+              video: videoCount,
+              audio: audioCount,
+              total: verifiedPublishedTracks.length,
+            });
+          }
           
           console.log('All tracks published successfully');
           // Only update state if it actually changed

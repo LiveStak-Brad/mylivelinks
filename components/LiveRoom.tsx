@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import SmartBrandLogo from './SmartBrandLogo';
+import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT } from '@/lib/livekit-constants';
 import Tile from './Tile';
 import Chat from './Chat';
 import ViewerList from './ViewerList';
@@ -165,7 +166,17 @@ export default function LiveRoom() {
         const participantIdentity = user?.id || anonId || 'anonymous';
         const participantDisplayName = user?.email || user?.id || anonId || 'Viewer';
 
-        const response = await fetch('/api/livekit/token', {
+        if (DEBUG_LIVEKIT) {
+          console.log('[TOKEN] Requesting token:', {
+            endpoint: TOKEN_ENDPOINT,
+            roomName: LIVEKIT_ROOM_NAME,
+            identity: participantIdentity,
+            canPublish: true,
+            canSubscribe: true,
+          });
+        }
+
+        const response = await fetch(TOKEN_ENDPOINT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -173,7 +184,7 @@ export default function LiveRoom() {
           },
           credentials: 'include',
           body: JSON.stringify({
-            roomName: 'live_central',
+            roomName: LIVEKIT_ROOM_NAME,
             participantName: participantIdentity,
             canPublish: true, // CRITICAL: Must be true so streamers can publish on shared room
             canSubscribe: true,
@@ -187,6 +198,16 @@ export default function LiveRoom() {
         }
 
         const { token, url } = await response.json();
+        
+        if (DEBUG_LIVEKIT) {
+          console.log('[TOKEN] fetched token', {
+            identity: participantIdentity,
+            room: LIVEKIT_ROOM_NAME,
+            hasToken: !!token,
+            hasUrl: !!url,
+            tokenLength: token?.length,
+          });
+        }
         
         console.log('[ROOM] Token received', {
           hasToken: !!token,
@@ -205,11 +226,11 @@ export default function LiveRoom() {
         // CRITICAL: Track room instance creation - prove only ONE instance
         roomInstanceIdRef.current += 1;
         const currentInstanceId = roomInstanceIdRef.current;
-        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
         
         if (DEBUG_LIVEKIT) {
           console.log('[ROOM] created', {
             roomInstanceId: currentInstanceId,
+            room: LIVEKIT_ROOM_NAME,
             timestamp: new Date().toISOString(),
             stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n'),
           });
@@ -224,6 +245,17 @@ export default function LiveRoom() {
         
         const handleConnected = () => {
           if (mounted) {
+            if (DEBUG_LIVEKIT) {
+              console.log('[ROOM] connected', {
+                room: LIVEKIT_ROOM_NAME,
+                identity: newRoom.localParticipant.identity,
+                roomState: newRoom.state,
+                localParticipantSid: newRoom.localParticipant.sid,
+                remoteParticipantsCount: newRoom.remoteParticipants.size,
+                canPublish: newRoom.localParticipant.permissions?.canPublish,
+                canSubscribe: newRoom.localParticipant.permissions?.canSubscribe,
+              });
+            }
             console.log('[ROOM] ✅ Connected successfully', {
               roomState: newRoom.state,
               roomName: newRoom.name,
