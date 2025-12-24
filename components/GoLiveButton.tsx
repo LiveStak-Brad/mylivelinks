@@ -335,7 +335,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
 
         // Stop LiveKit publishing (await it)
         try {
-          await stopPublishing('user clicked stop live');
+          await stopPublishing();
           console.log('LiveKit publishing stopped');
         } catch (err) {
           console.error('Error stopping publishing:', err);
