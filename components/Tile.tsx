@@ -347,9 +347,7 @@ export default function Tile({
     // Check immediately
     checkForTracks();
     
-    // If tracks not found and streamer is live_available but not yet published, retry
-    // This handles the race condition where heartbeat triggers publishing but tracks aren't ready yet
-    // Also handles cases where publications appear after participant connects
+    // If tracks not found yet, retry briefly to catch late publications
     let retryAttempts = 0;
     const maxRetryAttempts = 20; // Increased to handle slower publishing
     const retryInterval = 500; // 500ms between retries = ~10 seconds total
@@ -636,13 +634,10 @@ export default function Tile({
   }, [audioTrack, isMuted, volume, isCurrentUser, isCurrentUserPublishing]);
 
   // Manage viewer heartbeat when tile is active and not muted
-  // CRITICAL: Enable heartbeat for ALL live_available streamers (not just is_published)
-  // This ensures that when a viewer places a streamer in a tile, heartbeat creates active_viewers entry
-  // which triggers is_published to become true, which then starts publishing
+  // Heartbeat is analytics-only; do not gate publishing/subscribing
   const shouldSendHeartbeat = !!(
     liveStreamId !== undefined && 
-    !isMuted &&
-    isLiveAvailable // Enable for ANY live_available streamer (published or waiting)
+    !isMuted
   );
   
   // CRITICAL: Track actual subscription state for heartbeat (not hardcoded true)
@@ -716,9 +711,8 @@ export default function Tile({
     }
   }, [volume, isMuted]);
 
-  // Determine tile state - ALWAYS show as 'live' when live_available (hide preview mode from users)
-  // Preview mode is internal technical state only - users should never see it
-  const tileState = isLiveAvailable ? 'live' : 'offline';
+  // Determine tile state from track presence (no preview mode)
+  const tileState = videoTrack ? 'live' : 'offline';
 
   return (
     <div

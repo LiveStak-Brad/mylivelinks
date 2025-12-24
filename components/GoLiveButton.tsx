@@ -11,7 +11,6 @@ interface GoLiveButtonProps {
   onLiveStatusChange?: (isLive: boolean) => void;
   onPublishingChange?: (isPublishing: boolean) => void; // NEW: Report publishing state
   onGoLive?: (liveStreamId: number, profileId: string) => void;
-  roomPresenceCountMinusSelf?: number; // ROOM-DEMAND: Count of others in room (excluding self)
 }
 
 interface DeviceInfo {
@@ -19,7 +18,7 @@ interface DeviceInfo {
   label: string;
 }
 
-export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, roomPresenceCountMinusSelf = 0 }: GoLiveButtonProps) {
+export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive }: GoLiveButtonProps) {
   const [isLive, setIsLive] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -243,38 +242,26 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     }
   };
 
-  // ROOM-DEMAND: Publisher enable logic
-  // NEW RULE: Publish when live_available=true AND room has others present (roomPresenceCountMinusSelf > 0)
-  // This replaces tile-demand (active_viewers) to prevent circular dependencies and flapping
-  // CRITICAL: NOT tied to active_viewers / is_published / tile placement
+  // Publisher enable logic: Go Live publishes immediately when room connected + devices ready
+  // NOT tied to viewer counts, presence, is_published, or tile placement
   const shouldEnablePublisher = useMemo(() => {
     const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
     
-    // Enable publisher if:
-    // 1. User pressed "Go Live" (live_available=true, i.e., isLive=true)
-    // 2. Has devices selected
-    // 3. Room is connected
-    // 4. Room has others present (roomPresenceCountMinusSelf > 0)
-    // NOTE: When alone (roomPresenceCountMinusSelf === 0), show preview only (local preview), no publishing
     const hasRequiredDevices = !!(selectedVideoDevice && selectedAudioDevice && liveStreamId);
-    const roomHasOthers = roomPresenceCountMinusSelf > 0;
-    const enabled = !!(isLive && hasRequiredDevices && isRoomConnected && sharedRoom && roomHasOthers);
+    const enabled = !!(isLive && hasRequiredDevices && isRoomConnected && sharedRoom);
     
     if (DEBUG_LIVEKIT) {
-      console.log('[PUBLISH] enable check (ROOM-DEMAND)', {
+      console.log('[PUBLISH] enable check (GO-LIVE)', {
         enabled,
         isLive, // This is live_available from DB
         hasRequiredDevices,
-        roomPresenceCountMinusSelf,
-        roomHasOthers,
         isRoomConnected,
         hasSharedRoom: !!sharedRoom,
-        // NOTE: is_published is NOT in this check - that's correct!
-        // NOTE: active_viewers is NOT in this check - room-demand replaces tile-demand!
+        reason: 'GoLive clicked -> publish immediately',
       });
     }
     return enabled;
-  }, [isLive, selectedVideoDevice, selectedAudioDevice, liveStreamId, isRoomConnected, sharedRoom, roomPresenceCountMinusSelf]);
+  }, [isLive, selectedVideoDevice, selectedAudioDevice, liveStreamId, isRoomConnected, sharedRoom]);
   const [isPublishingState, setIsPublishingState] = useState(false);
   
   const { isPublishing, error, startPublishing, stopPublishing } = useLiveKitPublisher({
