@@ -259,13 +259,20 @@ export default function ProfileSettingsPage() {
       if (links.length > 0) {
         const linksToInsert = links
           .filter(link => link.title.trim() && link.url.trim())
-          .map((link, index) => ({
-            profile_id: currentUserId,
-            title: link.title,
-            url: link.url,
-            display_order: index,
-            is_active: true,
-          }));
+          .map((link, index) => {
+            let url = link.url.trim();
+            // Auto-add https:// if no protocol specified
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              url = 'https://' + url;
+            }
+            return {
+              profile_id: currentUserId,
+              title: link.title,
+              url: url,
+              display_order: index,
+              is_active: true,
+            };
+          });
 
         if (linksToInsert.length > 0) {
           const { error: linksError } = await (supabase.from('user_links') as any)
