@@ -107,6 +107,21 @@ export default function LiveRoom() {
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const roomConnectionRef = useRef<{ connecting: boolean; connected: boolean }>({ connecting: false, connected: false });
   const roomRef = useRef<Room | null>(null);
+  
+  // Expose room to window for debugging
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).sharedRoom = sharedRoom;
+      (window as any).debugLiveRoom = {
+        room: sharedRoom,
+        isRoomConnected,
+        currentUserId,
+        isCurrentUserPublishing,
+        gridSlots,
+        liveStreamers,
+      };
+    }
+  }, [sharedRoom, isRoomConnected, currentUserId, isCurrentUserPublishing, gridSlots, liveStreamers]);
   // CRITICAL: Track room instance ID for debugging - prove only ONE instance exists
   const roomInstanceIdRef = useRef<number>(0);
   // Store handlers in ref so cleanup can access them
@@ -677,14 +692,34 @@ export default function LiveRoom() {
         }
         
         if (userLiveStream) {
+          console.log('[DEBUG] User is live, ensuring in slot 1:', {
+            currentUserId,
+            liveStreamId: userLiveStream.id,
+            is_published: userLiveStream.is_published,
+            live_available: userLiveStream.live_available,
+          });
+          
           // User is live - ensure they're in slot 1
           const currentSlots = gridSlotsRef.current;
           const slot1 = currentSlots.find(s => s.slotIndex === 1);
           const userInSlot1 = slot1?.streamer?.profile_id === currentUserId;
           
+          console.log('[DEBUG] Slot 1 status:', {
+            userInSlot1,
+            slot1StreamerId: slot1?.streamer?.id,
+            slot1StreamerProfileId: slot1?.streamer?.profile_id,
+            slot1Empty: slot1?.isEmpty,
+          });
+          
           if (!userInSlot1) {
             // Find user's streamer data
             const userStreamer = liveStreamers.find(s => s.profile_id === currentUserId);
+            console.log('[DEBUG] Looking for user in liveStreamers:', {
+              found: !!userStreamer,
+              liveStreamersCount: liveStreamers.length,
+              userStreamerData: userStreamer,
+            });
+            
             if (userStreamer) {
               addUserToSlot1(userStreamer);
             } else {
@@ -694,6 +729,8 @@ export default function LiveRoom() {
                 .select('username, avatar_url, gifter_level')
                 .eq('id', currentUserId)
                 .single();
+              
+              console.log('[DEBUG] Loaded user profile:', { userProfile });
               
               if (userProfile) {
                 let badgeInfo = null;
@@ -719,9 +756,12 @@ export default function LiveRoom() {
                   badge_color: badgeInfo?.badge_color,
                 };
                 
+                console.log('[DEBUG] Created ownStream object:', ownStream);
                 addUserToSlot1(ownStream);
               }
             }
+          } else {
+            console.log('[DEBUG] User already in slot 1, no action needed');
           }
         }
       } catch (error) {
@@ -1804,12 +1844,21 @@ export default function LiveRoom() {
   };
 
   const addUserToSlot1 = (streamer: LiveStreamer) => {
+    console.log('[DEBUG] addUserToSlot1 called with:', {
+      streamerId: streamer.id,
+      profileId: streamer.profile_id,
+      username: streamer.username,
+      is_published: streamer.is_published,
+      live_available: streamer.live_available,
+    });
+    
     // Use current grid slots from state
     const currentSlots = [...gridSlots];
     
     // Check if user is already in slot 1
     const slot1 = currentSlots.find(s => s.slotIndex === 1);
     if (slot1 && slot1.streamer?.profile_id === streamer.profile_id) {
+      console.log('[DEBUG] User already in slot 1, updating data');
       // Already in slot 1, but update streamer data in case it changed
       const slot1Index = currentSlots.findIndex(s => s.slotIndex === 1);
       if (slot1Index !== -1) {
@@ -1823,6 +1872,7 @@ export default function LiveRoom() {
       return;
     }
 
+    console.log('[DEBUG] Adding user to slot 1');
     const slot1Index = currentSlots.findIndex(s => s.slotIndex === 1);
     
     // Remove user from any other slot they might be in
