@@ -100,6 +100,14 @@ export default function Tile({
       });
     }
     
+    // CRITICAL: Skip subscription for current user - they use local preview
+    if (isCurrentUser) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[DEBUG] Tile skipping subscription (current user, using local preview):', { slotIndex, streamerId });
+      }
+      return;
+    }
+    
     // Must have room, connection, liveStreamId, streamerId, and streamer must be live_available
     if (!sharedRoom || !isRoomConnected || !liveStreamId || !streamerId || !isLiveAvailable) {
       if (DEBUG_LIVEKIT) {
@@ -332,7 +340,8 @@ export default function Tile({
     // Removed isLive from deps - subscription should work regardless of is_published state
     // The subscriptionRef guard prevents re-subscription when streamerId hasn't changed
     // CRITICAL: Subscription must work even if streamer is live_available but not yet is_published
-  }, [sharedRoom, isRoomConnected, liveStreamId, streamerId, isLiveAvailable]);
+    // CRITICAL: Include isCurrentUser in deps so we skip subscription when it's the current user
+  }, [sharedRoom, isRoomConnected, liveStreamId, streamerId, isLiveAvailable, isCurrentUser]);
 
   // Check if this is the current user's tile
   useEffect(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLiveKitPublisher } from '@/hooks/useLiveKitPublisher';
 import { createClient } from '@/lib/supabase';
 import { LocalVideoTrack, LocalAudioTrack, Room } from 'livekit-client';
@@ -231,7 +231,10 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   };
 
   // LiveKit publisher hook - only enable when we have everything ready AND room is connected
-  const shouldEnablePublisher = !!(isLive && selectedVideoDevice && selectedAudioDevice && liveStreamId && isRoomConnected && sharedRoom);
+  // CRITICAL: Use useMemo to stabilize this value and prevent rapid toggling
+  const shouldEnablePublisher = useMemo(() => {
+    return !!(isLive && selectedVideoDevice && selectedAudioDevice && liveStreamId && isRoomConnected && sharedRoom);
+  }, [isLive, selectedVideoDevice, selectedAudioDevice, liveStreamId, isRoomConnected, sharedRoom]);
   const [isPublishingState, setIsPublishingState] = useState(false);
   
   const { isPublishing, error, startPublishing, stopPublishing } = useLiveKitPublisher({

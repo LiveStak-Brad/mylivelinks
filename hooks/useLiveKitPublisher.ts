@@ -53,6 +53,34 @@ export function useLiveKitPublisher({
       return;
     }
 
+    // CRITICAL: Clean up any existing tracks before creating new ones
+    // This prevents "publishing a second track with the same source" errors
+    if (room.localParticipant) {
+      const existingTracks = Array.from(room.localParticipant.trackPublications.values())
+        .filter(pub => {
+          const source = pub.source;
+          return (source === 'camera' || source === 'microphone') && pub.track;
+        })
+        .map(pub => pub.track!);
+      
+      if (existingTracks.length > 0) {
+        console.log('Cleaning up existing tracks before creating new ones:', existingTracks.length);
+        for (const track of existingTracks) {
+          try {
+            if (track.sid) {
+              await room.localParticipant.unpublishTrack(track);
+            }
+            track.stop();
+            track.detach();
+          } catch (err) {
+            console.warn('Error cleaning up existing track:', err);
+          }
+        }
+        // Clear tracksRef to ensure we start fresh
+        tracksRef.current = [];
+      }
+    }
+
     try {
       setError(null);
       
@@ -285,9 +313,10 @@ export function useLiveKitPublisher({
   }, [stopPublishing]);
 
   // Auto-start when enabled and room is connected
-  // Use refs to prevent rapid toggling
+  // Use refs and debouncing to prevent rapid toggling
   const enabledRef = useRef(enabled);
   const isPublishingStateRef = useRef(isPublishing);
+  const toggleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     enabledRef.current = enabled;
@@ -298,16 +327,32 @@ export function useLiveKitPublisher({
   }, [isPublishing]);
   
   useEffect(() => {
-    // Only start if enabled, room connected, and not already publishing
-    if (enabledRef.current && isRoomConnected && room && room.state === 'connected' && !isPublishingStateRef.current) {
-      console.log('Auto-starting publisher (enabled=true, room connected)...');
-      startPublishing();
-    } 
-    // Only stop if disabled AND currently publishing (prevent rapid toggling)
-    else if (!enabledRef.current && isPublishingStateRef.current) {
-      console.log('Stopping publisher (enabled=false)...');
-      stopPublishing();
+    // Clear any pending toggle
+    if (toggleTimeoutRef.current) {
+      clearTimeout(toggleTimeoutRef.current);
+      toggleTimeoutRef.current = null;
     }
+
+    // Debounce rapid toggles (wait 300ms before acting on changes)
+    toggleTimeoutRef.current = setTimeout(() => {
+      // Only start if enabled, room connected, and not already publishing
+      if (enabledRef.current && isRoomConnected && room && room.state === 'connected' && !isPublishingStateRef.current) {
+        console.log('Auto-starting publisher (enabled=true, room connected)...');
+        startPublishing();
+      } 
+      // Only stop if disabled AND currently publishing (prevent rapid toggling)
+      else if (!enabledRef.current && isPublishingStateRef.current) {
+        console.log('Stopping publisher (enabled=false)...');
+        stopPublishing();
+      }
+    }, 300); // 300ms debounce to prevent rapid toggling
+
+    return () => {
+      if (toggleTimeoutRef.current) {
+        clearTimeout(toggleTimeoutRef.current);
+        toggleTimeoutRef.current = null;
+      }
+    };
   }, [enabled, isRoomConnected, room, isPublishing, startPublishing, stopPublishing]);
 
   return {
