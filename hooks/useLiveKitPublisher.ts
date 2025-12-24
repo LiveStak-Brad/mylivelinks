@@ -152,7 +152,9 @@ export function useLiveKitPublisher({
             throw new Error('Room not connected');
           }
           
-          await Promise.all(tracks.map(track => {
+          // CRITICAL: Publish tracks sequentially, not in parallel
+          // This prevents race conditions and ensures each track is fully published before the next
+          for (const track of tracks) {
             const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
             if (DEBUG_LIVEKIT) {
               console.log('[DEBUG] Publishing track:', {
@@ -160,27 +162,52 @@ export function useLiveKitPublisher({
                 attempt: publishAttempts + 1,
                 roomState: room.state,
                 localParticipantSid: room.localParticipant.sid,
+                trackSid: track.sid,
               });
             }
             console.log('Publishing track:', track.kind, `(attempt ${publishAttempts + 1})`);
-            return room.localParticipant.publishTrack(track);
-          }));
+            await room.localParticipant.publishTrack(track);
+            
+            // Wait a moment between tracks to ensure proper registration
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
           
           const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
           if (DEBUG_LIVEKIT) {
             const publishedTracks = Array.from(room.localParticipant.trackPublications.values())
-              .filter(pub => pub.track && pub.source === 'camera' || pub.source === 'microphone')
+              .filter(pub => {
+                const source = pub.source;
+                return (source === Track.Source.Camera || source === Track.Source.Microphone) && pub.track;
+              })
               .map(pub => ({
                 kind: pub.track?.kind,
                 sid: pub.trackSid,
                 source: pub.source,
                 isSubscribed: pub.isSubscribed,
+                hasTrack: !!pub.track,
               }));
             console.log('[DEBUG] Publishing complete, local tracks:', {
               publishedTracksCount: publishedTracks.length,
               publishedTracks,
+              allPublicationsCount: room.localParticipant.trackPublications.size,
             });
           }
+          
+          // CRITICAL: Verify tracks are actually published before marking as publishing
+          const verifiedPublishedTracks = Array.from(room.localParticipant.trackPublications.values())
+            .filter(pub => {
+              const source = pub.source;
+              return (source === Track.Source.Camera || source === Track.Source.Microphone) && pub.track;
+            });
+          
+          if (verifiedPublishedTracks.length === 0) {
+            throw new Error('No tracks were published - verification failed');
+          }
+          
+          console.log('Publishing verified:', {
+            cameraTracks: verifiedPublishedTracks.filter(p => p.source === Track.Source.Camera).length,
+            microphoneTracks: verifiedPublishedTracks.filter(p => p.source === Track.Source.Microphone).length,
+          });
           
           console.log('All tracks published successfully');
           // Only update state if it actually changed
