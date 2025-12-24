@@ -571,7 +571,17 @@ export default function LiveRoom() {
             // Grid layout reload causes disconnections
             loadLiveStreamers().then((streamers) => {
               // Update streamer list but preserve current grid
-              setLiveStreamers(streamers);
+              // Use functional update to compare and prevent unnecessary re-renders
+              setLiveStreamers((prevStreamers) => {
+                if (prevStreamers.length === streamers.length) {
+                  const prevIds = prevStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
+                  const newIds = streamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
+                  if (prevIds === newIds) {
+                    return prevStreamers; // No change, prevent re-render
+                  }
+                }
+                return streamers; // Changed, update
+              });
               // Only auto-fill empty slots, don't reload entire layout
               autoFillGrid();
             });
@@ -959,7 +969,22 @@ export default function LiveRoom() {
         }
       }
 
-      setLiveStreamers(streamersWithBadges);
+      // CRITICAL: Only update state if streamers actually changed (prevent unnecessary re-renders)
+      // Compare by profile_id and key properties to avoid creating new array reference unnecessarily
+      setLiveStreamers((prevStreamers) => {
+        // Quick check: same length and same IDs in same order?
+        if (prevStreamers.length === streamersWithBadges.length) {
+          const prevIds = prevStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
+          const newIds = streamersWithBadges.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
+          if (prevIds === newIds) {
+            // Data hasn't changed, return previous array to prevent re-render
+            return prevStreamers;
+          }
+        }
+        // Data changed, return new array
+        return streamersWithBadges;
+      });
+      
       // If no streamers found, still set loading to false
       if (!streamersWithBadges || streamersWithBadges.length === 0) {
         setLoading(false);
