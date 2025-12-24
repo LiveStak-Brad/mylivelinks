@@ -27,7 +27,6 @@ interface SocialMediaBarProps {
     social_onlyfans?: string;
   };
   accentColor?: string;
-  className?: string;
 }
 
 interface SocialLink {
@@ -38,7 +37,7 @@ interface SocialLink {
   color: string;
 }
 
-export default function SocialMediaBar({ socials, accentColor = '#3B82F6', className = '' }: SocialMediaBarProps) {
+export default function SocialMediaBar({ socials, accentColor = '#3B82F6' }: SocialMediaBarProps) {
   const socialLinks: SocialLink[] = [];
 
   // Instagram
@@ -195,7 +194,7 @@ export default function SocialMediaBar({ socials, accentColor = '#3B82F6', class
   }
 
   return (
-    <div className={`flex flex-wrap items-center justify-center gap-3 ${className}`}>
+    <div className="flex flex-wrap items-center justify-center gap-3">
       {socialLinks.map((social) => (
         <a
           key={social.platform}

@@ -414,11 +414,30 @@ export default function ModernProfilePage() {
         </div>
         
         {/* Social Media Bar */}
-        <SocialMediaBar
-          socials={profile}
-          accentColor={accentColor}
-          className={`${borderRadiusClass} overflow-hidden shadow-lg mb-6 p-6`}
-        />
+        {(profile.social_instagram || profile.social_twitter || profile.social_youtube || 
+          profile.social_tiktok || profile.social_facebook || profile.social_twitch ||
+          profile.social_discord || profile.social_snapchat || profile.social_linkedin ||
+          profile.social_github || profile.social_spotify || profile.social_onlyfans) && (
+          <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-6 p-6`} style={cardStyle}>
+            <SocialMediaBar
+              socials={{
+                social_instagram: profile.social_instagram,
+                social_twitter: profile.social_twitter,
+                social_youtube: profile.social_youtube,
+                social_tiktok: profile.social_tiktok,
+                social_facebook: profile.social_facebook,
+                social_twitch: profile.social_twitch,
+                social_discord: profile.social_discord,
+                social_snapchat: profile.social_snapchat,
+                social_linkedin: profile.social_linkedin,
+                social_github: profile.social_github,
+                social_spotify: profile.social_spotify,
+                social_onlyfans: profile.social_onlyfans
+              }}
+              accentColor={accentColor}
+            />
+          </div>
+        )}
         
         {/* Links Section */}
         {profileData.links.length > 0 && (
