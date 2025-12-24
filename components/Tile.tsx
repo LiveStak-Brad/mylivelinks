@@ -4,9 +4,18 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import GifterBadge from './GifterBadge';
 import GiftModal from './GiftModal';
 import MiniProfile from './MiniProfile';
+import GiftAnimation from './GiftAnimation';
 import { useViewerHeartbeat } from '@/hooks/useViewerHeartbeat';
 import { RemoteTrack, TrackPublication, RemoteParticipant, Track, RoomEvent, Room } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
+
+interface GiftAnimationData {
+  id: string;
+  giftName: string;
+  giftIcon?: string;
+  senderUsername: string;
+  coinAmount: number;
+}
 
 interface TileProps {
   streamerId: string;
@@ -69,6 +78,7 @@ export default function Tile({
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
   const [audioTrack, setAudioTrack] = useState<RemoteTrack | null>(null);
   const [isCurrentUser, setIsCurrentUser] = useState(false);
+  const [activeGiftAnimations, setActiveGiftAnimations] = useState<GiftAnimationData[]>([]);
   const supabase = createClient();
 
   // Track subscription state to prevent re-subscriptions
@@ -670,6 +680,69 @@ export default function Tile({
     };
   }, [slotIndex]);
 
+  // Subscribe to gift animations for this streamer (realtime)
+  useEffect(() => {
+    if (!streamerId || !liveStreamId) return;
+
+    // Subscribe to gifts table for this recipient
+    const giftsChannel = supabase
+      .channel(`gifts:recipient:${streamerId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'gifts',
+          filter: `recipient_id=eq.${streamerId}`,
+        },
+        async (payload) => {
+          const gift = payload.new as any;
+          
+          // Only show animation if gift was sent to this stream slot
+          if (gift.slot_index && gift.slot_index !== slotIndex) {
+            return;
+          }
+          
+          // Fetch sender username and gift type details
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', gift.sender_id)
+            .single();
+          
+          const { data: giftType } = await supabase
+            .from('gift_types')
+            .select('name, icon_url')
+            .eq('id', gift.gift_type_id)
+            .single();
+          
+          if (senderProfile && giftType) {
+            const animationData: GiftAnimationData = {
+              id: `${gift.id}-${Date.now()}`,
+              giftName: giftType.name,
+              giftIcon: giftType.icon_url,
+              senderUsername: senderProfile.username,
+              coinAmount: gift.coin_amount,
+            };
+            
+            setActiveGiftAnimations(prev => [...prev, animationData]);
+            
+            // Also post to chat
+            await supabase.from('chat_messages').insert({
+              profile_id: gift.sender_id,
+              message: `sent ${giftType.name} to ${streamerUsername}! +${gift.coin_amount} coins`,
+              message_type: 'gift',
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      giftsChannel.unsubscribe();
+    };
+  }, [streamerId, liveStreamId, slotIndex, streamerUsername, supabase]);
+
   // Apply volume to audio element when it changes
   useEffect(() => {
     if (audioRef.current) {
@@ -734,6 +807,20 @@ export default function Tile({
 
         {/* No preview overlays - preview mode is invisible to users */}
         {/* No "Connecting..." UI - streamer should never see this */}
+        
+        {/* Gift Animations Overlay */}
+        {activeGiftAnimations.map((gift) => (
+          <GiftAnimation
+            key={gift.id}
+            giftName={gift.giftName}
+            giftIcon={gift.giftIcon}
+            senderUsername={gift.senderUsername}
+            coinAmount={gift.coinAmount}
+            onComplete={() => {
+              setActiveGiftAnimations(prev => prev.filter(g => g.id !== gift.id));
+            }}
+          />
+        ))}
       </div>
 
       {/* State Indicator - Show LIVE badge when video track exists */}

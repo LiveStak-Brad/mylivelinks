@@ -1,0 +1,55 @@
+/* Gift animations */
+@keyframes gift-bounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  25% {
+    transform: translateY(-20px) scale(1.1);
+  }
+  50% {
+    transform: translateY(0) scale(1);
+  }
+  75% {
+    transform: translateY(-10px) scale(1.05);
+  }
+}
+
+@keyframes gift-spin {
+  0% {
+    transform: rotate(0deg) scale(0);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes sparkle {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-50px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100px) scale(0);
+  }
+}
+
+.animate-gift-bounce {
+  animation: gift-bounce 3s ease-in-out;
+}
+
+.animate-gift-spin {
+  animation: gift-spin 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.animate-sparkle {
+  animation: sparkle linear infinite;
+}
+
