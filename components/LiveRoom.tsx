@@ -1534,7 +1534,6 @@ export default function LiveRoom() {
         s => !usedStreamerIds.has(s.profile_id) && !closedIds.has(s.profile_id)
       );
       
-      const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
       if (DEBUG_LIVEKIT) {
         console.log('[GRID] Deduplication check', {
           totalStreamers: liveStreamers.length,
