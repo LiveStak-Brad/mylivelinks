@@ -98,8 +98,21 @@ export default function GiftModal({
       // Refresh balance
       await loadUserBalance();
 
-      // Emit chat event (optional - handled by backend trigger)
-      // You can also emit a real-time event here
+      // Post chat message: "sender sent 'gift' to recipient +points"
+      // Get sender's username
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+      
+      if (senderProfile) {
+        await supabase.from('chat_messages').insert({
+          profile_id: user.id,
+          message: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername} +${selectedGift.coin_cost} coins`,
+          message_type: 'gift',
+        });
+      }
 
       onGiftSent();
       onClose();

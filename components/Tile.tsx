@@ -698,10 +698,12 @@ export default function Tile({
         async (payload: any) => {
           const gift = payload.new as any;
           
-          // Only show animation if gift was sent to this stream slot
-          if (gift.slot_index && gift.slot_index !== slotIndex) {
-            return;
-          }
+          // CRITICAL: Show animation for ALL viewers of this streamer (including the streamer themselves)
+          // Remove slot_index filter so gift shows on every tile displaying this recipient
+          // This ensures:
+          // 1. Recipient sees it when viewing themselves
+          // 2. All viewers of the recipient see it
+          // 3. Animation is consistent across all viewers
           
           // Fetch sender username and gift type details
           const { data: senderProfile } = await supabase
@@ -726,13 +728,6 @@ export default function Tile({
             };
             
             setActiveGiftAnimations(prev => [...prev, animationData]);
-            
-            // Also post to chat
-            await supabase.from('chat_messages').insert({
-              profile_id: gift.sender_id,
-              message: `sent ${giftType.name} to ${streamerUsername}! +${gift.coin_amount} coins`,
-              message_type: 'gift',
-            });
           }
         }
       )
