@@ -261,10 +261,15 @@ export default function ProfileSettingsPage() {
           .filter(link => link.title.trim() && link.url.trim())
           .map((link, index) => {
             let url = link.url.trim();
+            
+            // Clean up URL - remove our domain if it was accidentally prepended
+            url = url.replace(/^https?:\/\/(www\.)?mylivelinks\.com\//gi, '');
+            
             // Auto-add https:// if no protocol specified
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
               url = 'https://' + url;
             }
+            
             return {
               profile_id: currentUserId,
               title: link.title,

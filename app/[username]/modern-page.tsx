@@ -495,12 +495,13 @@ export default function ModernProfilePage() {
         <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 text-center`} style={cardStyle}>
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
-                ML
-              </div>
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                Powered by MyLiveLinks
-              </span>
+              <Image
+                src="/branding/mylivelinkstransparent.png"
+                alt="MyLiveLinks"
+                width={120}
+                height={30}
+                className="h-8 w-auto"
+              />
             </div>
             
             <p className="text-xs text-gray-600 dark:text-gray-400 max-w-md mx-auto">
