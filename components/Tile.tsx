@@ -92,6 +92,19 @@ export default function Tile({
   // CRITICAL: Don't return early if live_available=true but is_published=false - wait for tracks
   const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
   
+  // Helper to extract user ID from device-scoped identity
+  // Identity format: u_<userId>:web:<deviceId>:<sessionId>
+  const extractUserId = (identity: string): string => {
+    if (identity.startsWith('u_')) {
+      // Format: u_<userId>:web:device:session
+      const parts = identity.split(':');
+      if (parts.length >= 1) {
+        return parts[0].substring(2); // Remove "u_" prefix
+      }
+    }
+    return identity;
+  };
+  
   useEffect(() => {
     if (DEBUG_LIVEKIT) {
       console.log('[SUB] subscribe attempt', {
@@ -142,7 +155,9 @@ export default function Tile({
 
     const handleTrackSubscribed = (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
       // Only subscribe to tracks from this specific streamer
-      if (participant.identity === streamerId) {
+      // Compare using extracted user IDs since identities are device-scoped
+      const participantUserId = extractUserId(participant.identity);
+      if (participantUserId === streamerId) {
         const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
         if (DEBUG_LIVEKIT) {
           console.log('[SUB] trackSubscribed', {
@@ -194,7 +209,8 @@ export default function Tile({
           participantStillInRoom: sharedRoom.remoteParticipants.has(participant.identity),
         });
       }
-      if (participant.identity === streamerId) {
+      const participantUserId = extractUserId(participant.identity);
+      if (participantUserId === streamerId) {
         // Check if participant is still in room
         const participantStillInRoom = sharedRoom.remoteParticipants.has(participant.identity);
         
@@ -249,8 +265,11 @@ export default function Tile({
       let isLocalParticipant = false;
       
       // CRITICAL: Check if this is the current user's own tile
+      // Identity format: u_<userId>:web:<deviceId>:<sessionId>
+      // streamerId is just the userId, so extract it from identity
+      
       // If so, use local participant's published tracks instead of remote
-      if (sharedRoom.localParticipant && sharedRoom.localParticipant.identity === streamerId) {
+      if (sharedRoom.localParticipant && extractUserId(sharedRoom.localParticipant.identity) === streamerId) {
         foundParticipant = true;
         isLocalParticipant = true;
         const localParticipant = sharedRoom.localParticipant;
@@ -317,7 +336,8 @@ export default function Tile({
       
       // Not the current user - check remote participants
       sharedRoom.remoteParticipants.forEach((participant) => {
-        if (participant.identity === streamerId) {
+        const participantUserId = extractUserId(participant.identity);
+        if (participantUserId === streamerId) {
           foundParticipant = true;
           trackCount = participant.trackPublications.size;
           
