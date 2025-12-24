@@ -250,9 +250,16 @@ export function useLiveKitPublisher({
   }, [room, isRoomConnected, videoDeviceId, audioDeviceId, onPublished, onError]);
 
   // Stop publishing (unpublishes tracks but does NOT disconnect room)
+  // CRITICAL: This should ONLY be called from explicit user actions:
+  // - User clicks "Stop Live" button
+  // - User closes their own box
+  // - Component unmounts (navigate away)
   const stopPublishing = useCallback(async () => {
+    // Mark that user explicitly stopped (prevents auto-restart)
+    userExplicitlyStoppedRef.current = true;
+    
     try {
-      console.log('Stopping publishing...', {
+      console.log('Stopping publishing (explicit user action)...', {
         hasRoom: !!room,
         tracksCount: tracksRef.current.length,
         roomState: room?.state,
@@ -340,13 +347,19 @@ export function useLiveKitPublisher({
   }, [stopPublishing]);
 
   // Auto-start when enabled and room is connected
-  // Use refs and debouncing to prevent rapid toggling
+  // CRITICAL: Only auto-START publishing, NEVER auto-STOP
+  // stopPublishing should ONLY be called by explicit user actions (stop button, close box, navigate away)
   const enabledRef = useRef(enabled);
   const isPublishingStateRef = useRef(isPublishing);
   const toggleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const userExplicitlyStoppedRef = useRef(false); // Track if user explicitly stopped
   
   useEffect(() => {
     enabledRef.current = enabled;
+    // Reset explicit stop flag when enabled becomes true (user wants to go live again)
+    if (enabled) {
+      userExplicitlyStoppedRef.current = false;
+    }
   }, [enabled]);
   
   useEffect(() => {
@@ -361,29 +374,21 @@ export function useLiveKitPublisher({
     }
 
     // Debounce rapid toggles (wait 500ms before acting on changes)
-    // Increased from 300ms to 500ms to better handle rapid state changes
     toggleTimeoutRef.current = setTimeout(() => {
-      // CRITICAL: Check if we should be publishing but aren't
-      // This handles the case where isLive becomes true before room connects
-      if (enabledRef.current && isRoomConnected && room && room.state === 'connected' && !isPublishingStateRef.current) {
+      // CRITICAL: Only auto-START publishing when enabled becomes true
+      // NEVER auto-stop - that should only happen from explicit user actions
+      if (enabledRef.current && isRoomConnected && room && room.state === 'connected' && !isPublishingStateRef.current && !userExplicitlyStoppedRef.current) {
         console.log('Auto-starting publisher (enabled=true, room connected):', {
           enabled: enabledRef.current,
           isRoomConnected,
           roomState: room.state,
           isPublishing: isPublishingStateRef.current,
+          userExplicitlyStopped: userExplicitlyStoppedRef.current,
         });
         startPublishing().catch((err) => {
           console.error('Failed to start publishing:', err);
           setError(err);
         });
-      } 
-      // Only stop if disabled AND currently publishing (prevent rapid toggling)
-      else if (!enabledRef.current && isPublishingStateRef.current) {
-        console.log('Stopping publisher (enabled=false):', {
-          enabled: enabledRef.current,
-          isPublishing: isPublishingStateRef.current,
-        });
-        stopPublishing();
       }
       // If enabled but room not connected yet, log for debugging
       else if (enabledRef.current && (!isRoomConnected || !room || room.state !== 'connected')) {
@@ -394,6 +399,8 @@ export function useLiveKitPublisher({
           roomState: room?.state,
         });
       }
+      // NOTE: We intentionally do NOT auto-stop when enabled becomes false
+      // stopPublishing should only be called from explicit user actions
     }, 500); // 500ms debounce to prevent rapid toggling
 
     return () => {
@@ -402,7 +409,7 @@ export function useLiveKitPublisher({
         toggleTimeoutRef.current = null;
       }
     };
-  }, [enabled, isRoomConnected, room, isPublishing, startPublishing, stopPublishing]);
+  }, [enabled, isRoomConnected, room, isPublishing, startPublishing]);
 
   return {
     isPublishing,
