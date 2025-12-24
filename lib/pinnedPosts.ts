@@ -53,6 +53,9 @@ export async function upsertPinnedPost(
         media_url: mediaUrl,
         media_type: mediaType,
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'profile_id', // Specify the unique constraint column
+        ignoreDuplicates: false    // Update on conflict, don't ignore
       })
       .select()
       .single();
