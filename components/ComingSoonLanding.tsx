@@ -5,10 +5,37 @@ import LiveRoom from '@/components/LiveRoom';
 
 export default function ComingSoonLanding() {
   const [mounted, setMounted] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [email, setEmail] = useState('');
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const scrollToFeatures = () => {
+    const featuresSection = document.getElementById('features-section');
+    if (featuresSection) {
+      featuresSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
+    
+    // TODO: Save to database or send to email service
+    console.log('Email submitted:', email);
+    setEmailSubmitted(true);
+    setTimeout(() => {
+      setShowEmailModal(false);
+      setEmailSubmitted(false);
+      setEmail('');
+    }, 2000);
+  };
 
   const features = [
     {
@@ -93,26 +120,35 @@ export default function ComingSoonLanding() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <button className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg shadow-purple-500/50">
+              <button 
+                onClick={() => setShowEmailModal(true)}
+                className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg shadow-purple-500/50"
+              >
                 Notify Me at Launch
               </button>
-              <button className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-semibold rounded-lg hover:bg-white/20 transition-all border border-white/20">
+              <button 
+                onClick={scrollToFeatures}
+                className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-semibold rounded-lg hover:bg-white/20 transition-all border border-white/20"
+              >
                 Learn More
               </button>
             </div>
 
             {/* Scroll Indicator */}
-            <div className="animate-bounce mt-16">
+            <button 
+              onClick={scrollToFeatures}
+              className="animate-bounce mt-16 cursor-pointer hover:text-white/80 transition"
+            >
               <svg className="w-6 h-6 mx-auto text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
               </svg>
               <p className="text-white/60 text-sm mt-2">Scroll to explore features</p>
-            </div>
+            </button>
           </div>
         </div>
 
         {/* Features Section */}
-        <div className="bg-gradient-to-b from-black/90 to-black py-20 px-4">
+        <div id="features-section" className="bg-gradient-to-b from-black/90 to-black py-20 px-4 min-h-screen">
           <div className="max-w-7xl mx-auto">
             <h2 className="text-4xl md:text-5xl font-bold text-center text-white mb-4">
               Revolutionary Features
@@ -168,7 +204,10 @@ export default function ComingSoonLanding() {
               <p className="text-white/70 text-lg mb-8 max-w-2xl mx-auto">
                 Join the waitlist and be among the first to experience the future of live streaming.
               </p>
-              <button className="px-12 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold text-lg rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-2xl shadow-purple-500/50">
+              <button 
+                onClick={() => setShowEmailModal(true)}
+                className="px-12 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold text-lg rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-2xl shadow-purple-500/50"
+              >
                 Get Early Access
               </button>
             </div>
@@ -182,6 +221,55 @@ export default function ComingSoonLanding() {
           </div>
         </div>
       </div>
+
+      {/* Email Collection Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-gradient-to-br from-gray-900 to-black border border-white/20 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            {!emailSubmitted ? (
+              <>
+                <h3 className="text-3xl font-bold text-white mb-2">Join the Waitlist</h3>
+                <p className="text-white/70 mb-6">
+                  Be the first to know when we launch! We'll send you an email with exclusive early access.
+                </p>
+                <form onSubmit={handleEmailSubmit}>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 mb-4 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50"
+                    required
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
+                    >
+                      Notify Me
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailModal(false)}
+                      className="px-6 py-3 bg-white/10 text-white font-semibold rounded-lg hover:bg-white/20 transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <div className="text-6xl mb-4">✅</div>
+                <h3 className="text-2xl font-bold text-white mb-2">You're on the list!</h3>
+                <p className="text-white/70">
+                  We'll email you when we launch. Get ready for something amazing!
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes fadeInUp {
