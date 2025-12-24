@@ -51,7 +51,7 @@ export default function UserStatsSection() {
                 .select('*')
                 .eq('level', updatedProfile.gifter_level)
                 .single()
-                .then(({ data }) => {
+                .then(({ data }: any) => {
                   if (data) setBadgeInfo(data);
                 });
             }
