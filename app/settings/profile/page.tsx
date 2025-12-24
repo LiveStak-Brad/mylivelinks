@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase';
 import { getPinnedPost, upsertPinnedPost, deletePinnedPost, PinnedPost } from '@/lib/pinnedPosts';
 import { uploadAvatar, uploadPinnedPostMedia, deleteAvatar, deletePinnedPostMedia } from '@/lib/storage';
 import Image from 'next/image';
+import ProfileCustomization from '@/components/profile/ProfileCustomization';
 
 interface UserLink {
   id?: number;
@@ -45,6 +46,18 @@ export default function ProfileSettingsPage() {
   
   // Links
   const [links, setLinks] = useState<UserLink[]>([]);
+  
+  // Customization fields
+  const [customization, setCustomization] = useState({
+    profile_bg_url: '',
+    profile_bg_overlay: 'dark-medium',
+    card_color: '#FFFFFF',
+    card_opacity: 0.95,
+    card_border_radius: 'medium',
+    font_preset: 'modern',
+    accent_color: '#3B82F6',
+    links_section_title: 'My Links'
+  });
   
   // Pinned post
   const [pinnedPost, setPinnedPost] = useState<PinnedPost | null>(null);
@@ -113,6 +126,18 @@ export default function ProfileSettingsPage() {
         setSocialGithub(p.social_github || '');
         setSocialSpotify(p.social_spotify || '');
         setSocialOnlyfans(p.social_onlyfans || '');
+        
+        // Load customization fields
+        setCustomization({
+          profile_bg_url: p.profile_bg_url || '',
+          profile_bg_overlay: p.profile_bg_overlay || 'dark-medium',
+          card_color: p.card_color || '#FFFFFF',
+          card_opacity: p.card_opacity || 0.95,
+          card_border_radius: p.card_border_radius || 'medium',
+          font_preset: p.font_preset || 'modern',
+          accent_color: p.accent_color || '#3B82F6',
+          links_section_title: p.links_section_title || 'My Links'
+        });
       }
 
       // Load links
@@ -204,6 +229,15 @@ export default function ProfileSettingsPage() {
           social_github: socialGithub.trim() || null,
           social_spotify: socialSpotify.trim() || null,
           social_onlyfans: socialOnlyfans.trim() || null,
+          // Customization fields
+          profile_bg_url: customization.profile_bg_url || null,
+          profile_bg_overlay: customization.profile_bg_overlay,
+          card_color: customization.card_color,
+          card_opacity: customization.card_opacity,
+          card_border_radius: customization.card_border_radius,
+          font_preset: customization.font_preset,
+          accent_color: customization.accent_color,
+          links_section_title: customization.links_section_title,
           updated_at: new Date().toISOString(),
         })
         .eq('id', currentUserId)
@@ -548,6 +582,15 @@ export default function ProfileSettingsPage() {
             </div>
           </div>
         </div>
+        
+        {/* Profile Customization */}
+        <ProfileCustomization
+          initialSettings={customization}
+          onSave={async (settings) => {
+            setCustomization(settings);
+            // Auto-save will happen on main save button
+          }}
+        />
 
         {/* Pinned Post */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
