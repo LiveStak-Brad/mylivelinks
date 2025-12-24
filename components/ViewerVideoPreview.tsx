@@ -21,7 +21,7 @@ export default function ViewerVideoPreview({
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
 
   // Use single global room for all streamers
-  const roomName = 'live_central';
+  const roomName = LIVEKIT_ROOM_NAME;
 
   // Only connect if the viewer is actually publishing (isLive = true)
   const { room, isConnected } = useLiveKit({
