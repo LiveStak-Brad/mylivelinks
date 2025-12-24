@@ -529,7 +529,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       setTimeout(async () => {
         try {
           console.log('Attempting manual start...');
-          await startPublishing('manual start from handleStartLive');
+          await startPublishing();
           // If we get here, check if publishing started
           setTimeout(() => {
             if (!isPublishing && loading) {
