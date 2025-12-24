@@ -299,8 +299,8 @@ export default function ProfileSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 overflow-y-auto">
-      <div className="max-w-2xl mx-auto px-4 pb-8">
+    <div className="min-h-screen max-h-screen bg-gray-50 dark:bg-gray-900 py-8 overflow-y-auto">
+      <div className="max-w-2xl mx-auto px-4 pb-20">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
