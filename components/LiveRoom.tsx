@@ -80,6 +80,7 @@ export default function LiveRoom() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCurrentUserPublishing, setIsCurrentUserPublishing] = useState(false); // Track if current user is publishing
   const [roomPresenceCountMinusSelf, setRoomPresenceCountMinusSelf] = useState<number>(0); // Room-demand: count of others in room
+  const closedStreamersRef = useRef<Set<string>>(new Set()); // Streamers closed by viewer (do not auto-refill)
   
   // Live Grid Sort Mode
   type LiveSortMode = 'random' | 'most_viewed' | 'most_gifted' | 'newest';
@@ -1453,9 +1454,10 @@ export default function LiveRoom() {
           .map(s => s.streamer!.profile_id)
       );
 
-      // Get available streamers not already in grid
+      // Get available streamers not already in grid and not closed by viewer
+      const closedIds = closedStreamersRef.current;
       const availableStreamers = liveStreamers.filter(
-        s => !usedStreamerIds.has(s.profile_id)
+        s => !usedStreamerIds.has(s.profile_id) && !closedIds.has(s.profile_id)
       );
 
       if (availableStreamers.length === 0) {
@@ -1922,6 +1924,10 @@ export default function LiveRoom() {
         } catch (err) {
           console.error('Error stopping live when closing own box:', err);
         }
+      }
+      // Prevent auto-refill of this streamer in this viewer's grid
+      if (slot.streamer) {
+        closedStreamersRef.current.add(slot.streamer.profile_id);
       }
       
       slot.streamer = null;
