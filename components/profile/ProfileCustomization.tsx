@@ -49,31 +49,38 @@ export default function ProfileCustomization({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
       
-      // Create unique filename
+      // Create unique filename with timestamp
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `profile-backgrounds/${fileName}`;
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`;
       
-      // Upload to Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
-        .from('avatars') // Reusing existing bucket
-        .upload(filePath, file, {
+      // Try to upload directly to root of avatars bucket (same as avatar uploads)
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: true // Allow overwriting if same filename
         });
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        throw new Error(uploadError.message || 'Upload failed');
+      }
       
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
-        .getPublicUrl(filePath);
+        .getPublicUrl(fileName);
+      
+      if (!publicUrl) {
+        throw new Error('Failed to get public URL');
+      }
       
       setSettings({ ...settings, profile_bg_url: publicUrl });
       alert('Background image uploaded successfully!');
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload background image');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload background image';
+      alert(`Upload failed: ${errorMessage}\n\nPlease check browser console for details.`);
     } finally {
       setUploading(false);
     }
