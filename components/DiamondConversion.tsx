@@ -14,7 +14,7 @@ export default function DiamondConversion() {
 
   const supabase = createClient();
   const MIN_DIAMONDS = 3; // Minimum diamonds required
-  const CONVERSION_RATE = 0.70; // 70% (30% platform fee)
+  const CONVERSION_RATE = 0.60; // 60% (40% platform fee)
 
   useEffect(() => {
     loadBalances();
@@ -205,7 +205,7 @@ export default function DiamondConversion() {
             <span className="font-bold text-blue-600">{conversion.coins} coins</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span>Platform fee (30%):</span>
+            <span>Platform fee (40%):</span>
             <span className="text-gray-600">{conversion.fee} diamonds</span>
           </div>
         </div>
@@ -220,8 +220,8 @@ export default function DiamondConversion() {
       </button>
 
       <p className="mt-4 text-xs text-gray-500">
-        Platform fee: 30%. Minimum {MIN_DIAMONDS} diamonds required. 
-        Conversion rate: 1 diamond = 0.70 coins (after fee).
+        Platform fee: 40%. Minimum {MIN_DIAMONDS} diamonds required. 
+        Conversion rate: 1 diamond = 0.60 coins (after fee).
       </p>
     </div>
   );
