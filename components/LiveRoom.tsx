@@ -152,6 +152,18 @@ export default function LiveRoom() {
           return;
         }
 
+        // UNIQUE PARTICIPANT IDENTITY
+        let anonId = '';
+        if (typeof window !== 'undefined') {
+          anonId = localStorage.getItem('mylivelinks_anon_id') || '';
+          if (!anonId) {
+            anonId = `anon-${crypto.randomUUID()}`;
+            localStorage.setItem('mylivelinks_anon_id', anonId);
+          }
+        }
+        const participantIdentity = user?.id || anonId || 'anonymous';
+        const participantDisplayName = user?.email || user?.id || anonId || 'Viewer';
+
         const response = await fetch('/api/livekit/token', {
           method: 'POST',
           headers: {
@@ -161,10 +173,11 @@ export default function LiveRoom() {
           credentials: 'include',
           body: JSON.stringify({
             roomName: 'live_central',
-            participantName: 'Viewer',
+            participantName: participantIdentity,
             canPublish: true, // CRITICAL: Must be true so streamers can publish on shared room
             canSubscribe: true,
-            userId: user?.id || 'anonymous',
+            userId: participantIdentity,
+            displayName: participantDisplayName,
           }),
         });
 
@@ -724,46 +737,11 @@ export default function LiveRoom() {
     let lastFullReload = 0;
     const MIN_RELOAD_INTERVAL = 5000; // Max once every 5 seconds
     
-    const activeViewersChannel = supabase
-      .channel('active-viewers-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'active_viewers',
-        },
-        async () => {
-          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-          if (DEBUG_LIVEKIT) {
-            console.log('[HEARTBEAT] active_viewers change detected (analytics only, NOT controlling publish)');
-          }
-          
-          // ROOM-DEMAND: Do NOT call update_publish_state_from_viewers() - publishing is controlled by room presence
-          // Only update viewer counts for display/analytics
-          updateViewerCountsOnly();
-          
-          // Debounced full reload (max once every 5 seconds) for viewer count updates
-          const now = Date.now();
-          if (now - lastFullReload >= MIN_RELOAD_INTERVAL) {
-            if (fullReloadTimeout) {
-              clearTimeout(fullReloadTimeout);
-            }
-            fullReloadTimeout = setTimeout(async () => {
-              lastFullReload = Date.now();
-              if (DEBUG_LIVEKIT) {
-                console.log('[GRID] Full reload triggered by active_viewers change (analytics only)');
-              }
-              await loadLiveStreamers();
-            }, 1000);
-          }
-        }
-      )
-      .subscribe();
+    // NOTE: active_viewers changes should NOT reload grid or affect publishing/subscribing
+    // We only keep viewer counts via explicit calls (updateViewerCountsOnly) when needed
 
     return () => {
       supabase.removeChannel(channel);
-      supabase.removeChannel(activeViewersChannel);
     };
   }, [sortMode, mounted]); // Reload when sort mode or mount state changes
 

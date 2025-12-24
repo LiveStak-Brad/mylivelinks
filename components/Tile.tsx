@@ -88,12 +88,9 @@ export default function Tile({
   
   useEffect(() => {
     if (DEBUG_LIVEKIT) {
-      console.log('[DEBUG] Tile subscription effect:', {
+      console.log('[SUB] subscribe attempt', {
         slotIndex,
         streamerId,
-        liveStreamId,
-        isLiveAvailable,
-        isLive,
         hasSharedRoom: !!sharedRoom,
         isRoomConnected,
         alreadySubscribed: subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId,
@@ -103,31 +100,25 @@ export default function Tile({
     // CRITICAL: Skip subscription for current user - they use local preview
     if (isCurrentUser) {
       if (DEBUG_LIVEKIT) {
-        console.log('[DEBUG] Tile skipping subscription (current user, using local preview):', { slotIndex, streamerId });
+        console.log('[SUB] subscribe attempt', {
+          slotIndex,
+          participantIdentityFound: false,
+          reason: 'current user (using local preview)',
+        });
       }
       return;
     }
     
-    // Must have room, connection, liveStreamId, streamerId, and streamer must be live_available
-    if (!sharedRoom || !isRoomConnected || !liveStreamId || !streamerId || !isLiveAvailable) {
+    // Must have room, connection, and streamerId
+    if (!sharedRoom || !isRoomConnected || !streamerId) {
       if (DEBUG_LIVEKIT) {
         console.log('[DEBUG] Tile subscription blocked (missing requirements):', {
           slotIndex,
           streamerId,
           hasSharedRoom: !!sharedRoom,
           isRoomConnected,
-          hasLiveStreamId: !!liveStreamId,
           hasStreamerId: !!streamerId,
-          isLiveAvailable,
         });
-      }
-      // Only clear tracks if streamer is no longer live_available (not just because room disconnected temporarily)
-      if (!isLiveAvailable && subscriptionRef.current.subscribed && subscriptionRef.current.streamerId === streamerId) {
-        setVideoTrack(null);
-        setAudioTrack(null);
-        hasTracksRef.current = { video: false, audio: false };
-        subscriptionRef.current.subscribed = false;
-        subscriptionRef.current.streamerId = null;
       }
       return;
     }
@@ -154,16 +145,13 @@ export default function Tile({
     const handleTrackSubscribed = (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
       // Only subscribe to tracks from this specific streamer
       if (participant.identity === streamerId) {
+        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
         if (DEBUG_LIVEKIT) {
-          console.log('[DEBUG] Tile track subscribed:', {
+          console.log('[SUB] trackSubscribed', {
             slotIndex,
-            streamerId,
+            participantIdentity: participant.identity,
             trackKind: track.kind,
             trackSid: track.sid,
-            hasVideoRef: !!videoRef.current,
-            hasAudioRef: !!audioRef.current,
-            alreadyHasVideo: hasTracksRef.current.video,
-            alreadyHasAudio: hasTracksRef.current.audio,
           });
         }
         if (track.kind === Track.Kind.Video) {
@@ -198,6 +186,16 @@ export default function Tile({
       // CRITICAL: Only clear tracks if participant is ACTUALLY LEAVING the room
       // LiveKit fires unsubscription events for many reasons (adaptive streaming, network, etc.)
       // We must be very defensive and only clear when participant is gone
+      const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+      if (DEBUG_LIVEKIT) {
+        console.log('[SUB] Track unsubscribed', {
+          slotIndex,
+          participantIdentity: participant.identity,
+          trackKind: track.kind,
+          trackSid: track.sid,
+          participantStillInRoom: sharedRoom.remoteParticipants.has(participant.identity),
+        });
+      }
       if (participant.identity === streamerId) {
         // Check if participant is still in room
         const participantStillInRoom = sharedRoom.remoteParticipants.has(participant.identity);
@@ -321,19 +319,23 @@ export default function Tile({
       });
       
       if (!foundParticipant) {
-        // Always log this (not just in DEBUG mode) to help diagnose subscription issues
-        console.log('[DEBUG] Remote participant NOT found for tile:', {
-          slotIndex,
-          streamerId,
-          liveStreamId,
-          remoteParticipantsCount: sharedRoom.remoteParticipants.size,
-          remoteParticipantIdentities: Array.from(sharedRoom.remoteParticipants.values()).map(p => p.identity),
-        });
+        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+        if (DEBUG_LIVEKIT) {
+          console.log('[SUB] subscribe attempt', {
+            slotIndex,
+            participantIdentityFound: false,
+            streamerId,
+            liveStreamId,
+            remoteParticipantsCount: sharedRoom.remoteParticipants.size,
+            remoteParticipantIdentities: Array.from(sharedRoom.remoteParticipants.values()).map(p => p.identity),
+          });
+        }
       } else {
         // Log when participant IS found (even if no tracks yet)
         if (DEBUG_LIVEKIT) {
-          console.log('[DEBUG] Participant found, subscribed to publications:', {
+          console.log('[SUB] subscribe attempt', {
             slotIndex,
+            participantIdentityFound: true,
             streamerId,
             trackCount,
             publicationsSubscribed: Array.from(sharedRoom.remoteParticipants.get(streamerId)?.trackPublications.values() || []).filter(p => p.isSubscribed).length,
@@ -354,7 +356,7 @@ export default function Tile({
     
     const retryTimer = setInterval(() => {
       // Stop retrying if conditions changed
-      if (!sharedRoom || !isRoomConnected || !liveStreamId || !streamerId || !isLiveAvailable) {
+      if (!sharedRoom || !isRoomConnected || !streamerId) {
         clearInterval(retryTimer);
         return;
       }
@@ -465,12 +467,12 @@ export default function Tile({
         subscriptionRef.current.streamerId = null;
       }
     };
-    // CRITICAL: Depend on streamerId and liveStreamId for identity
-    // Removed isLive from deps - subscription should work regardless of is_published state
+    // CRITICAL: Depend ONLY on primitive values to prevent reruns on object reference changes
+    // Use roomState/roomName instead of sharedRoom object to detect when room actually changes
     // The subscriptionRef guard prevents re-subscription when streamerId hasn't changed
     // CRITICAL: Subscription must work even if streamer is live_available but not yet is_published
     // CRITICAL: Include isCurrentUser in deps so we skip subscription when it's the current user
-  }, [sharedRoom, isRoomConnected, liveStreamId, streamerId, isLiveAvailable, isCurrentUser]);
+  }, [isRoomConnected, streamerId, isCurrentUser, sharedRoom]);
 
   // Check if this is the current user's tile
   useEffect(() => {
@@ -652,13 +654,36 @@ export default function Tile({
     setIsActuallySubscribed(!!(videoTrack || audioTrack));
   }, [videoTrack, audioTrack]);
   
+  // CRITICAL: Stable watch session key - only changes when slot changes streamer
+  // Format: viewer_id:slot_index:live_stream_id
+  // This prevents heartbeat cleanup when tile rerenders with same streamer
+  const [watchSessionKey, setWatchSessionKey] = useState<string | undefined>(undefined);
+  
+  useEffect(() => {
+    if (liveStreamId && slotIndex) {
+      // Get viewer ID for watch session key
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) {
+          const key = `${user.id}:${slotIndex}:${liveStreamId}`;
+          setWatchSessionKey(key);
+        }
+      });
+    } else {
+      setWatchSessionKey(undefined);
+    }
+  }, [liveStreamId, slotIndex, supabase]);
+  
+  // CRITICAL: Only enable heartbeat if we have a valid liveStreamId
+  // Passing 0 causes issues - heartbeat should only run for valid streams
   useViewerHeartbeat({
-    liveStreamId: liveStreamId || 0,
+    liveStreamId: liveStreamId || 0, // Keep 0 fallback for type safety, but enabled check prevents actual use
     isActive: isActive && !isMuted,
     isUnmuted: !isMuted,
     isVisible: isVisible,
     isSubscribed: isActuallySubscribed, // Use actual subscription state, not hardcoded
-    enabled: shouldSendHeartbeat,
+    enabled: shouldSendHeartbeat && !!liveStreamId, // CRITICAL: Only enable if we have valid liveStreamId
+    slotIndex,
+    watchSessionKey, // CRITICAL: Stable key prevents cleanup on rerender
   });
 
   // Track visibility for heartbeat
