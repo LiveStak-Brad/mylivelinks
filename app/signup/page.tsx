@@ -17,8 +17,10 @@ export default function SignUpPage() {
 
   useEffect(() => {
     // Check if already logged in
-    supabase.auth.getUser().then(async (response) => {
-      const user = response.data?.user;
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user;
+      
       if (user) {
         // Check if profile is complete
         const { data: profile } = await supabase
@@ -33,7 +35,9 @@ export default function SignUpPage() {
           router.push('/onboarding');
         }
       }
-    });
+    };
+    
+    checkAuth();
   }, [router, supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
