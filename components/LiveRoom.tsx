@@ -2302,15 +2302,6 @@ export default function LiveRoom() {
 
           {/* Sort Buttons Group - Positioned halfway between Apply and Logo */}
           <div className="flex items-center gap-3 flex-shrink-0 z-10 absolute left-[25%] transform -translate-x-1/2">
-            {/* Unmute All Button - Prominent for audio control */}
-            <button
-              onClick={handleUnmuteAll}
-              className="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition whitespace-nowrap text-sm sm:text-base font-semibold shadow-md flex-shrink-0"
-              title="Unmute all tiles to enable sound"
-            >
-              🔊 Unmute All
-            </button>
-            
             <button
               onClick={handleRandomize}
               className={`px-6 py-3 rounded-lg transition whitespace-nowrap text-base sm:text-lg font-semibold shadow-md flex-shrink-0 ${
@@ -2370,7 +2361,7 @@ export default function LiveRoom() {
             </a>
           </div>
 
-          {/* Right Section - Go Live, Focus Mode, Options and Login grouped together */}
+          {/* Right Section - Go Live, Unmute All, Focus Mode, Options and Login grouped together */}
           <div className="flex items-center gap-3 flex-shrink-0 z-10">
             <GoLiveButton 
               sharedRoom={sharedRoom} 
@@ -2378,6 +2369,13 @@ export default function LiveRoom() {
               onGoLive={handleGoLive}
               onPublishingChange={setIsCurrentUserPublishing}
             />
+            <button
+              onClick={handleUnmuteAll}
+              className="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition whitespace-nowrap text-sm sm:text-base font-semibold shadow-md flex-shrink-0"
+              title="Unmute all tiles to enable sound"
+            >
+              🔊 Unmute All
+            </button>
             <button
               onClick={toggleFocusMode}
               className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-sm sm:text-base font-medium shadow-md"
