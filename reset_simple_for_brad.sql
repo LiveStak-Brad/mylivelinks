@@ -16,11 +16,22 @@ TRUNCATE TABLE gifts RESTART IDENTITY CASCADE;
 TRUNCATE TABLE diamond_conversions RESTART IDENTITY CASCADE;
 TRUNCATE TABLE coin_ledger RESTART IDENTITY CASCADE;
 
--- Step 3: Clear ALL leaderboard caches
--- This includes: top_streamers, top_gifters, top_earners (all periods: daily, weekly, alltime)
+-- Step 3: Show what leaderboards exist before clearing
+SELECT 
+  leaderboard_type, 
+  COUNT(*) as entries
+FROM leaderboard_cache
+GROUP BY leaderboard_type
+ORDER BY leaderboard_type;
+
+-- Clear ALL leaderboard caches
+-- This includes:
+-- - top_streamers_daily, top_streamers_weekly, top_streamers_alltime
+-- - top_gifters_daily, top_gifters_weekly, top_gifters_alltime  
+-- - top_earners_daily, top_earners_weekly, top_earners_alltime
 DELETE FROM leaderboard_cache WHERE TRUE;
 
--- Verify leaderboards are empty
+-- Verify ALL leaderboards are empty (should show 0)
 SELECT COUNT(*) as remaining_leaderboard_entries FROM leaderboard_cache;
 
 -- Step 4: Give Brad 100,000 coins
