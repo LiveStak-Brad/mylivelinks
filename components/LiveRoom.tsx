@@ -665,7 +665,17 @@ export default function LiveRoom() {
         })
       );
       
-      setLiveStreamers(updatedStreamers);
+      // Only update if viewer counts actually changed
+      setLiveStreamers((prevStreamers) => {
+        if (prevStreamers.length === updatedStreamers.length) {
+          const prevCounts = prevStreamers.map(s => `${s.profile_id}:${s.viewer_count}`).join(',');
+          const newCounts = updatedStreamers.map(s => `${s.profile_id}:${s.viewer_count}`).join(',');
+          if (prevCounts === newCounts) {
+            return prevStreamers; // No change, prevent re-render
+          }
+        }
+        return updatedStreamers; // Changed, update
+      });
     } catch (error) {
       console.error('Error updating viewer counts:', error);
     }
