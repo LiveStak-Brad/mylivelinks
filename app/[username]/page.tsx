@@ -1,3 +1,11 @@
+// Modern profile page implementation
+// This is the main entry point for profile pages
+// The actual implementation is in modern-page.tsx
+
+export { default } from './modern-page';
+
+// Legacy implementation below (kept for reference, not used)
+/*
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -17,7 +25,7 @@ interface Profile {
   is_live: boolean;
 }
 
-export default function ProfilePage() {
+function LegacyProfilePage() {
   const params = useParams();
   const router = useRouter();
   const username = params.username as string;
@@ -268,3 +276,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+*/
