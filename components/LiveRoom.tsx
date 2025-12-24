@@ -200,7 +200,6 @@ export default function LiveRoom() {
         });
 
         // Set up event handlers BEFORE connecting
-        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
         
         const handleConnected = () => {
           if (mounted) {
