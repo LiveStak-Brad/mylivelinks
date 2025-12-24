@@ -1,0 +1,50 @@
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_DEBUG_LIVE": "1",
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_DEBUG_LIVE": "0",
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_DEBUG_LIVE": "0",
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "your-app-store-connect-app-id",
+        "appleTeamId": "your-team-id"
+      }
+    }
+  }
+}
+

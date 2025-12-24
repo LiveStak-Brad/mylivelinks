@@ -20,12 +20,99 @@ LIVEKIT_ROOM_NAME=live_central
 
 ---
 
+## Environment Configuration
+
+### API Base URL
+
+**Mobile apps must configure the API base URL to work on physical devices (not localhost).**
+
+#### Development vs Production
+
+| Environment | Base URL | Usage |
+|-------------|----------|-------|
+| **Development** | `https://mylivelinks.com` | Local dev with Expo Go |
+| **Preview** | `https://mylivelinks.com` | TestFlight/Internal builds |
+| **Production** | `https://mylivelinks.com` | App Store builds |
+
+#### Environment Variable Setup
+
+**Mobile (EAS Build)** - Configured in `mobile/eas.json`:
+```json
+{
+  "build": {
+    "development": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com",
+        "EXPO_PUBLIC_DEBUG_LIVE": "1"
+      }
+    },
+    "preview": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com",
+        "EXPO_PUBLIC_DEBUG_LIVE": "0"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com",
+        "EXPO_PUBLIC_DEBUG_LIVE": "0"
+      }
+    }
+  }
+}
+```
+
+**Mobile Code** - Uses environment variable with fallback:
+```typescript
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com';
+const TOKEN_ENDPOINT = `${API_BASE_URL}/api/livekit/token`;
+```
+
+**Important Notes:**
+- ✅ **Never use `localhost` or `127.0.0.1` in mobile builds** - physical devices can't reach localhost
+- ✅ **Use production URL for all builds** - ensures token endpoint is always reachable
+- ✅ **CORS is enabled on API routes** - mobile apps can make requests from any origin
+- ✅ **Fallback is built-in** - if env var is missing, defaults to production URL
+
+#### Local Development Options
+
+If you need to test against a local Next.js server (e.g., `http://192.168.1.10:3000`):
+
+1. **Find your local machine's IP address:**
+   ```bash
+   # macOS/Linux
+   ipconfig getifaddr en0
+   
+   # Windows
+   ipconfig
+   ```
+
+2. **Set environment variable in mobile app:**
+   ```typescript
+   // For Expo Go development only
+   const API_BASE_URL = __DEV__ 
+     ? 'http://192.168.1.10:3000'  // Your local IP
+     : 'https://mylivelinks.com';
+   ```
+
+3. **Update Next.js to allow connections:**
+   ```bash
+   # Run Next.js on all network interfaces
+   npm run dev -- -H 0.0.0.0
+   ```
+
+**⚠️ Warning:** Local IP testing only works on the same WiFi network and is not recommended for production builds.
+
+---
+
 ## Token Endpoint
 
 ### API Endpoint
 ```
 POST https://mylivelinks.com/api/livekit/token
 ```
+
+**CORS Support:** ✅ Enabled for mobile requests
 
 ### Request Headers
 ```

@@ -163,7 +163,7 @@ All logs use `DEBUG` flag (`EXPO_PUBLIC_DEBUG_LIVE=1`):
 
 ### Environment Variables
 
-**File**: `mobile/.env`
+**File**: `mobile/.env` (optional, EAS builds use `eas.json` instead)
 
 ```bash
 # Debug mode
@@ -174,6 +174,12 @@ EXPO_PUBLIC_API_URL=https://mylivelinks.com
 
 # LiveKit URL (from server response, not needed here)
 ```
+
+**Important for Physical Devices:**
+- ✅ **CORS is enabled** on `/api/livekit/token` for mobile requests
+- ✅ **Never use `localhost`** in mobile builds - use production URL or local IP (same WiFi network only)
+- ✅ **EAS Build configuration** in `mobile/eas.json` automatically sets `EXPO_PUBLIC_API_URL` for all build profiles
+- ✅ **Fallback built-in**: If env var missing, code defaults to `https://mylivelinks.com`
 
 ### Token Authentication
 

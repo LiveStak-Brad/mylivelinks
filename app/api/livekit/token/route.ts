@@ -10,6 +10,18 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
+// CORS headers for mobile app requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*', // Allow all origins (can restrict to specific domains if needed)
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// Handle OPTIONS preflight request
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Validate environment variables with detailed error messages
@@ -397,12 +409,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       token,
       url: wsUrl,
-    });
+    }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('Error generating LiveKit token:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to generate token' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }

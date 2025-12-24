@@ -13,14 +13,23 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mylivelinks.app"
+      "bundleIdentifier": "com.mylivelinks.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app needs camera access for live streaming (future feature).",
+        "NSMicrophoneUsageDescription": "This app needs microphone access for live streaming (future feature)."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.mylivelinks.app"
+      "package": "com.mylivelinks.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
