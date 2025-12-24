@@ -354,14 +354,81 @@ export default function Tile({
       checkForTracks();
     }, retryInterval);
 
-    // Listen for new tracks
+    // Listen for new tracks being subscribed
     sharedRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
     sharedRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+    
+    // CRITICAL: Also listen for when participants connect and when they publish tracks
+    // This ensures we subscribe to tracks even if they're published after the Tile mounts
+    const handleParticipantConnected = (participant: RemoteParticipant) => {
+      if (participant.identity === streamerId) {
+        if (DEBUG_LIVEKIT) {
+          console.log('[DEBUG] Target participant connected, checking for publications:', {
+            slotIndex,
+            streamerId,
+            trackPublicationsCount: participant.trackPublications.size,
+          });
+        }
+        // Immediately check and subscribe to any existing publications
+        checkForTracks();
+        
+        // Also listen for when this participant publishes new tracks
+        // Note: LiveKit may not have a direct 'trackPublished' event, so we'll use a polling approach
+        // Check publications periodically to catch new ones
+        let lastPublicationCount = participant.trackPublications.size;
+        const checkPublicationsInterval = setInterval(() => {
+          const currentCount = participant.trackPublications.size;
+          if (currentCount > lastPublicationCount) {
+            // New publications detected - subscribe to them
+            if (DEBUG_LIVEKIT) {
+              console.log('[DEBUG] New publications detected, re-checking:', {
+                slotIndex,
+                streamerId,
+                oldCount: lastPublicationCount,
+                newCount: currentCount,
+              });
+            }
+            checkForTracks();
+            lastPublicationCount = currentCount;
+          }
+        }, 1000); // Check every second for new publications
+        
+        // Store cleanup function
+        return () => {
+          clearInterval(checkPublicationsInterval);
+        };
+      }
+      return null;
+    };
+    
+    // Track cleanup functions for participant listeners
+    const participantCleanups: Array<() => void> = [];
+    
+    // Check if participant is already connected
+    sharedRoom.remoteParticipants.forEach((participant) => {
+      const cleanup = handleParticipantConnected(participant);
+      if (cleanup) {
+        participantCleanups.push(cleanup);
+      }
+    });
+    
+    // Listen for new participants connecting
+    const roomParticipantConnectedHandler = (participant: RemoteParticipant) => {
+      const cleanup = handleParticipantConnected(participant);
+      if (cleanup) {
+        participantCleanups.push(cleanup);
+      }
+    };
+    sharedRoom.on(RoomEvent.ParticipantConnected, roomParticipantConnectedHandler);
 
     return () => {
       clearInterval(retryTimer);
       sharedRoom.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       sharedRoom.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      sharedRoom.off(RoomEvent.ParticipantConnected, roomParticipantConnectedHandler);
+      // Clean up participant-level listeners
+      participantCleanups.forEach(cleanup => cleanup());
+      participantCleanups.length = 0;
       // Only mark as unsubscribed if this is the same streamer
       if (subscriptionRef.current.streamerId === streamerId) {
         subscriptionRef.current.subscribed = false;
