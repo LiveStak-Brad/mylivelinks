@@ -30,6 +30,20 @@ export default function ProfileSettingsPage() {
   const [bio, setBio] = useState('');
   const [username, setUsername] = useState('');
   
+  // Social media fields
+  const [socialInstagram, setSocialInstagram] = useState('');
+  const [socialTwitter, setSocialTwitter] = useState('');
+  const [socialYoutube, setSocialYoutube] = useState('');
+  const [socialTiktok, setSocialTiktok] = useState('');
+  const [socialFacebook, setSocialFacebook] = useState('');
+  const [socialTwitch, setSocialTwitch] = useState('');
+  const [socialDiscord, setSocialDiscord] = useState('');
+  const [socialSnapchat, setSocialSnapchat] = useState('');
+  const [socialLinkedin, setSocialLinkedin] = useState('');
+  const [socialGithub, setSocialGithub] = useState('');
+  const [socialSpotify, setSocialSpotify] = useState('');
+  const [socialOnlyfans, setSocialOnlyfans] = useState('');
+  
   // Links
   const [links, setLinks] = useState<UserLink[]>([]);
   
@@ -98,6 +112,20 @@ export default function ProfileSettingsPage() {
         setDisplayName(p.display_name || '');
         setBio(p.bio || '');
         setUsername(p.username || '');
+        
+        // Load social media fields
+        setSocialInstagram(p.social_instagram || '');
+        setSocialTwitter(p.social_twitter || '');
+        setSocialYoutube(p.social_youtube || '');
+        setSocialTiktok(p.social_tiktok || '');
+        setSocialFacebook(p.social_facebook || '');
+        setSocialTwitch(p.social_twitch || '');
+        setSocialDiscord(p.social_discord || '');
+        setSocialSnapchat(p.social_snapchat || '');
+        setSocialLinkedin(p.social_linkedin || '');
+        setSocialGithub(p.social_github || '');
+        setSocialSpotify(p.social_spotify || '');
+        setSocialOnlyfans(p.social_onlyfans || '');
         
         // Load customization fields
         setCustomization({
@@ -188,6 +216,19 @@ export default function ProfileSettingsPage() {
           display_name: displayName,
           bio: bio,
           avatar_url: finalAvatarUrl,
+          // Social media fields
+          social_instagram: socialInstagram.trim() || null,
+          social_twitter: socialTwitter.trim() || null,
+          social_youtube: socialYoutube.trim() || null,
+          social_tiktok: socialTiktok.trim() || null,
+          social_facebook: socialFacebook.trim() || null,
+          social_twitch: socialTwitch.trim() || null,
+          social_discord: socialDiscord.trim() || null,
+          social_snapchat: socialSnapchat.trim() || null,
+          social_linkedin: socialLinkedin.trim() || null,
+          social_github: socialGithub.trim() || null,
+          social_spotify: socialSpotify.trim() || null,
+          social_onlyfans: socialOnlyfans.trim() || null,
           // Customization fields
           profile_bg_url: customization.profile_bg_url || null,
           profile_bg_overlay: customization.profile_bg_overlay,
@@ -415,6 +456,136 @@ export default function ProfileSettingsPage() {
                 maxLength={500}
               />
               <p className="text-xs text-gray-500 mt-1">{bio.length}/500</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Social Media */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Social Media</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Add your social media usernames (without @). These will appear as icons on your profile.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Instagram</label>
+              <input
+                type="text"
+                value={socialInstagram}
+                onChange={(e) => setSocialInstagram(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Twitter/X</label>
+              <input
+                type="text"
+                value={socialTwitter}
+                onChange={(e) => setSocialTwitter(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">YouTube</label>
+              <input
+                type="text"
+                value={socialYoutube}
+                onChange={(e) => setSocialYoutube(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="@username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">TikTok</label>
+              <input
+                type="text"
+                value={socialTiktok}
+                onChange={(e) => setSocialTiktok(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Facebook</label>
+              <input
+                type="text"
+                value={socialFacebook}
+                onChange={(e) => setSocialFacebook(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Twitch</label>
+              <input
+                type="text"
+                value={socialTwitch}
+                onChange={(e) => setSocialTwitch(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Discord</label>
+              <input
+                type="text"
+                value={socialDiscord}
+                onChange={(e) => setSocialDiscord(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="invite code or username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Snapchat</label>
+              <input
+                type="text"
+                value={socialSnapchat}
+                onChange={(e) => setSocialSnapchat(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">LinkedIn</label>
+              <input
+                type="text"
+                value={socialLinkedin}
+                onChange={(e) => setSocialLinkedin(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">GitHub</label>
+              <input
+                type="text"
+                value={socialGithub}
+                onChange={(e) => setSocialGithub(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Spotify</label>
+              <input
+                type="text"
+                value={socialSpotify}
+                onChange={(e) => setSocialSpotify(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="artist/profile ID"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">OnlyFans</label>
+              <input
+                type="text"
+                value={socialOnlyfans}
+                onChange={(e) => setSocialOnlyfans(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                placeholder="username"
+              />
             </div>
           </div>
         </div>
