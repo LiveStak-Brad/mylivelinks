@@ -2034,6 +2034,12 @@ export default function LiveRoom() {
     // Note: Volume is per-viewer preference, not saved to database
   };
 
+  const handleUnmuteAll = () => {
+    // Unmute all tiles to enable sound
+    setGridSlots(prev => prev.map(slot => ({ ...slot, isMuted: false })));
+    console.log('[AUDIO] All tiles unmuted');
+  };
+
   const handleRandomize = () => {
     // Clear any active filter when randomizing
     setSortMode('random');
@@ -2186,6 +2192,15 @@ export default function LiveRoom() {
 
           {/* Sort Buttons Group - Positioned halfway between Apply and Logo */}
           <div className="flex items-center gap-3 flex-shrink-0 z-10 absolute left-[25%] transform -translate-x-1/2">
+            {/* Unmute All Button - Prominent for audio control */}
+            <button
+              onClick={handleUnmuteAll}
+              className="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition whitespace-nowrap text-sm sm:text-base font-semibold shadow-md flex-shrink-0"
+              title="Unmute all tiles to enable sound"
+            >
+              🔊 Unmute All
+            </button>
+            
             <button
               onClick={handleRandomize}
               className={`px-6 py-3 rounded-lg transition whitespace-nowrap text-base sm:text-lg font-semibold shadow-md flex-shrink-0 ${

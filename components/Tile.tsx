@@ -593,6 +593,19 @@ export default function Tile({
       // Other tiles are never affected by echo prevention
       const finalMute = isMuted || shouldMuteForEcho;
       audioRef.current.volume = finalMute ? 0 : volume;
+      
+      if (DEBUG_LIVEKIT) {
+        console.log('[AUDIO] Volume applied', {
+          slotIndex,
+          streamerId,
+          isCurrentUser,
+          isMuted,
+          shouldMuteForEcho,
+          finalMute,
+          volume,
+          finalVolume: audioRef.current.volume,
+        });
+      }
     } else if (!audioTrack && attachedAudioTrackRef.current && audioRef.current) {
       // Clean up if track is removed
       attachedAudioTrackRef.current.detach();
@@ -711,15 +724,13 @@ export default function Tile({
           </div>
         )}
 
-        {/* Audio element for LiveKit audio track */}
-        {isLive && (
-          <audio
-            ref={audioRef}
-            autoPlay
-            playsInline
-            className="hidden"
-          />
-        )}
+        {/* Audio element for LiveKit audio track - always render when we have a streamer */}
+        <audio
+          ref={audioRef}
+          autoPlay
+          playsInline
+          className="hidden"
+        />
 
         {/* No preview overlays - preview mode is invisible to users */}
         {/* No "Connecting..." UI - streamer should never see this */}
