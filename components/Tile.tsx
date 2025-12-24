@@ -695,7 +695,7 @@ export default function Tile({
           table: 'gifts',
           filter: `recipient_id=eq.${streamerId}`,
         },
-        async (payload) => {
+        async (payload: any) => {
           const gift = payload.new as any;
           
           // Only show animation if gift was sent to this stream slot
