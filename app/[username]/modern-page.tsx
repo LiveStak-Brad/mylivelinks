@@ -157,16 +157,27 @@ export default function ModernProfilePage() {
   const handleFollow = async () => {
     if (!profileData || followLoading) return;
     
-    // Check if user is logged in
-    const { data: { user, session } } = await supabase.auth.getSession();
-    if (!user || !session) {
-      alert('Please log in to follow users');
-      router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
-      return;
-    }
-    
     setFollowLoading(true);
     try {
+      // Check if user is logged in
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      console.log('Session check:', { 
+        hasSession: !!session, 
+        hasUser: !!session?.user,
+        error: sessionError 
+      });
+      
+      if (!session || !session.user) {
+        setFollowLoading(false);
+        alert('Please log in to follow users. Redirecting to login...');
+        // Use a timeout to prevent loop
+        setTimeout(() => {
+          router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
+        }, 100);
+        return;
+      }
+      
       console.log('Attempting to follow:', profileData.profile.id);
       
       const response = await fetch('/api/profile/follow', {
