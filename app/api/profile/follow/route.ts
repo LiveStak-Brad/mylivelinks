@@ -14,7 +14,9 @@ export async function POST(request: NextRequest) {
     // Try to get auth token from Authorization header first
     const authHeader = request.headers.get('authorization');
     let user = null;
-    let supabase;
+    
+    // Initialize supabase client
+    let supabase = createServerSupabaseClient();
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       // Use token from header
