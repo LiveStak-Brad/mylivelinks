@@ -276,6 +276,12 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     },
   });
 
+  // Store stopPublishing function in ref so realtime handler can access it
+  // CRITICAL: This must be AFTER useLiveKitPublisher hook call
+  useEffect(() => {
+    stopPublishingRef.current = stopPublishing;
+  }, [stopPublishing]);
+
   const handleGoLive = async () => {
     if (isLive) {
       // Stop live
