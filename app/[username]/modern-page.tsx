@@ -184,20 +184,24 @@ export default function ModernProfilePage() {
   
   const handleShare = async () => {
     const url = `${window.location.origin}/${username}`;
+    const title = `${profileData?.profile.display_name || username} on MyLiveLinks`;
+    const text = `Check out ${profileData?.profile.display_name || username}'s profile on MyLiveLinks - Live streaming, links, and exclusive content! 🔥`;
     
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${profileData?.profile.display_name || username}'s Profile`,
+          title,
+          text,
           url
         });
       } catch (error) {
         // User cancelled share
       }
     } else {
-      // Fallback: copy to clipboard
-      navigator.clipboard.writeText(url);
-      alert('Profile link copied to clipboard!');
+      // Fallback: copy to clipboard with better message
+      const shareText = `${text}\n${url}`;
+      navigator.clipboard.writeText(shareText);
+      alert('Profile link and message copied to clipboard! 🎉');
     }
   };
   
@@ -486,6 +490,36 @@ export default function ModernProfilePage() {
           borderRadiusClass={borderRadiusClass}
           accentColor={accentColor}
         />
+        
+        {/* Premium Branding Footer - Powered by MyLiveLinks */}
+        <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 text-center`} style={cardStyle}>
+          <div className="space-y-3">
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
+                ML
+              </div>
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Powered by MyLiveLinks
+              </span>
+            </div>
+            
+            <p className="text-xs text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+              Create your own stunning profile, go live, and connect with your audience.
+            </p>
+            
+            <Link
+              href="/signup"
+              className="inline-block px-6 py-2.5 rounded-lg font-semibold text-white text-sm transition shadow-lg hover:shadow-xl transform hover:scale-105"
+              style={{ backgroundColor: accentColor }}
+            >
+              Create Your Free Profile
+            </Link>
+            
+            <p className="text-xs text-gray-500 dark:text-gray-500">
+              All-in-one platform: Live streaming • Links • Social • Monetization
+            </p>
+          </div>
+        </div>
       </div>
       
       {/* Modals */}

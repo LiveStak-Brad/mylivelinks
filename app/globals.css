@@ -26,13 +26,10 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
-  overflow: hidden; /* Prevent page scroll */
-  height: 100vh; /* Lock to viewport */
 }
 
 html {
-  overflow: hidden; /* Prevent page scroll */
-  height: 100vh; /* Lock to viewport */
+  scroll-behavior: smooth;
 }
 
 /* Preview Mode Banner */
