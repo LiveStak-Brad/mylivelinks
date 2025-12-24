@@ -580,14 +580,15 @@ export default function LiveRoom() {
               // Update streamer list but preserve current grid
               // Use functional update to compare and prevent unnecessary re-renders
               setLiveStreamers((prevStreamers) => {
-                // CRITICAL: Don't clear streamers if we get an empty array - might be temporary error
-                // Use ref to check current state (more reliable than prevStreamers in rapid updates)
+                // CRITICAL: ABSOLUTE GUARD - Never clear streamers if we have existing ones
                 const currentStreamers = liveStreamersRef.current.length > 0 ? liveStreamersRef.current : prevStreamers;
                 
+                // STRICT: If we have streamers and new data is empty, ALWAYS keep existing
                 if (streamers.length === 0 && currentStreamers.length > 0) {
-                  console.warn('Realtime: loadLiveStreamers returned empty array but we have existing streamers - keeping existing', {
+                  console.warn('[GUARD] Realtime: Blocking empty array - keeping existing streamers', {
                     currentCount: currentStreamers.length,
                     prevCount: prevStreamers.length,
+                    refCount: liveStreamersRef.current.length,
                   });
                   return currentStreamers; // Keep existing streamers to prevent Tile unmounting
                 }
@@ -600,8 +601,12 @@ export default function LiveRoom() {
                   }
                 }
                 
-                // Update ref with new data
+                // Update ref with new data BEFORE returning
                 liveStreamersRef.current = streamers;
+                console.log('[UPDATE] Realtime: liveStreamers updated:', {
+                  oldCount: currentStreamers.length,
+                  newCount: streamers.length,
+                });
                 return streamers; // Changed, update
               });
               // Only auto-fill empty slots, don't reload entire layout
