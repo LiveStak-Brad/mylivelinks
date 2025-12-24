@@ -308,6 +308,28 @@ export default function LiveRoom() {
             });
           }
         };
+        
+        const handleTrackPublished = (publication: any, participant: any) => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[DEBUG] Track published:', {
+              participantIdentity: participant.identity,
+              trackKind: publication.kind,
+              trackSid: publication.trackSid,
+              isLocal: participant === newRoom.localParticipant,
+            });
+          }
+          
+          // CRITICAL: When someone publishes a track, trigger auto-fill to add them to empty slots
+          // This ensures new streamers appear immediately without waiting for DB polling
+          if (!participant.isLocal) {
+            console.log('[GRID] Remote track published, triggering auto-fill reload');
+            setTimeout(() => {
+              loadLiveStreamers().then(() => {
+                console.log('[GRID] Streamers reloaded after track publish');
+              });
+            }, 1000);
+          }
+        };
 
         // Store handlers in ref so cleanup can access them
         handlersRef.current = {
@@ -317,7 +339,8 @@ export default function LiveRoom() {
           handleParticipantDisconnected,
           handleTrackSubscribed,
           handleTrackUnsubscribed,
-        };
+          handleTrackPublished,
+        } as any;
 
         newRoom.on(RoomEvent.Connected, handleConnected);
         newRoom.on(RoomEvent.Disconnected, handleDisconnected);
@@ -325,6 +348,7 @@ export default function LiveRoom() {
         newRoom.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
         newRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
         newRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+        newRoom.on(RoomEvent.TrackPublished, handleTrackPublished);
         
         // Store room ref AFTER adding listeners
         roomRef.current = newRoom;
@@ -386,6 +410,9 @@ export default function LiveRoom() {
         roomRef.current.off(RoomEvent.ParticipantDisconnected, handlers.handleParticipantDisconnected);
         roomRef.current.off(RoomEvent.TrackSubscribed, handlers.handleTrackSubscribed);
         roomRef.current.off(RoomEvent.TrackUnsubscribed, handlers.handleTrackUnsubscribed);
+        if ((handlers as any).handleTrackPublished) {
+          roomRef.current.off(RoomEvent.TrackPublished, (handlers as any).handleTrackPublished);
+        }
         handlersRef.current = null;
         roomRef.current.disconnect().catch(console.error);
         roomRef.current = null;
@@ -736,14 +763,17 @@ export default function LiveRoom() {
                 
                 // Update ref with new data BEFORE returning
                 liveStreamersRef.current = streamers;
-                console.log('[UPDATE] Realtime: liveStreamers updated:', {
-                  oldCount: currentStreamers.length,
-                  newCount: streamers.length,
-                });
-                return streamers; // Changed, update
+                const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+                if (DEBUG_LIVEKIT) {
+                  console.log('[GRID] liveStreamers updated (realtime)', {
+                    oldCount: currentStreamers.length,
+                    newCount: streamers.length,
+                    newStreamers: streamers.map(s => ({ username: s.username, profile_id: s.profile_id, is_published: s.is_published })),
+                  });
+                }
+                return streamers; // Changed, update - this triggers useEffect that calls autoFillGrid
               });
-              // Only auto-fill empty slots, don't reload entire layout
-              autoFillGrid();
+              // Auto-fill is now triggered by useEffect when liveStreamers changes
             });
           }, 2000); // 2 second debounce
         }
@@ -1490,7 +1520,7 @@ export default function LiveRoom() {
         return currentSlots;
       }
 
-      // Get streamers already in grid
+      // CRITICAL: Deduplicate - get ALL streamers already in grid (across all slots)
       const usedStreamerIds = new Set(
         currentSlots
           .filter(s => s.streamer)
@@ -1498,10 +1528,21 @@ export default function LiveRoom() {
       );
 
       // Get available streamers not already in grid and not closed by viewer
+      // CRITICAL: This prevents same person appearing in multiple tiles (bandwidth waste)
       const closedIds = closedStreamersRef.current;
       const availableStreamers = liveStreamers.filter(
         s => !usedStreamerIds.has(s.profile_id) && !closedIds.has(s.profile_id)
       );
+      
+      const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+      if (DEBUG_LIVEKIT) {
+        console.log('[GRID] Deduplication check', {
+          totalStreamers: liveStreamers.length,
+          alreadyInGrid: usedStreamerIds.size,
+          closedByViewer: closedIds.size,
+          availableToAdd: availableStreamers.length,
+        });
+      }
 
       if (availableStreamers.length === 0) {
         // No new streamers to add
@@ -1559,21 +1600,27 @@ export default function LiveRoom() {
   useEffect(() => {
     if (liveStreamers.length > 0 && gridSlots.length > 0) {
       const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+      const emptyCount = gridSlots.filter(s => s.isEmpty).length;
+      
       if (DEBUG_LIVEKIT) {
         console.log('[GRID] liveStreamers updated, checking for auto-fill', {
           streamersCount: liveStreamers.length,
-          emptySlots: gridSlots.filter(s => s.isEmpty).length,
+          emptySlots: emptyCount,
         });
       }
       
-      // Small delay to ensure state is fully updated
-      const timer = setTimeout(() => {
-        autoFillGrid();
-      }, 500);
-      
-      return () => clearTimeout(timer);
+      // Only trigger if there are actually empty slots to fill
+      if (emptyCount > 0) {
+        // Small delay to ensure state is fully updated
+        const timer = setTimeout(() => {
+          console.log('[GRID] Triggering auto-fill due to streamer changes');
+          autoFillGrid();
+        }, 500);
+        
+        return () => clearTimeout(timer);
+      }
     }
-  }, [liveStreamers, gridSlots, autoFillGrid]);
+  }, [liveStreamers, autoFillGrid]); // Removed gridSlots to prevent excessive re-runs
 
   const handleGoLive = async (liveStreamId: number, profileId: string) => {
     try {
@@ -2056,6 +2103,36 @@ export default function LiveRoom() {
   };
 
   const handleAddStreamer = async (slotIndex: number, streamerId: string) => {
+    const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+    
+    // CRITICAL: Deduplicate - remove this streamer from any other slots first
+    // This prevents same person appearing in multiple tiles (bandwidth waste)
+    setGridSlots(prev => {
+      const otherSlotWithSameStreamer = prev.findIndex(
+        s => s.streamer?.profile_id === streamerId && s.slotIndex !== slotIndex
+      );
+      
+      if (otherSlotWithSameStreamer !== -1) {
+        if (DEBUG_LIVEKIT) {
+          console.log('[GRID] Removing duplicate streamer from another slot', {
+            streamerId,
+            oldSlot: prev[otherSlotWithSameStreamer].slotIndex,
+            newSlot: slotIndex,
+          });
+        }
+        
+        const updated = [...prev];
+        // Clear the other slot
+        updated[otherSlotWithSameStreamer] = {
+          ...updated[otherSlotWithSameStreamer],
+          streamer: null,
+          isEmpty: true,
+        };
+        return updated;
+      }
+      return prev;
+    });
+    
     // Check if this is the current user going live
     let user = null;
     if (!authDisabled) {
