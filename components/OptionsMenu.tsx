@@ -40,15 +40,17 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
     };
   }, [showMenu]);
 
-  const isAllowedAdmin = (userId?: string | null, email?: string | null, username?: string | null) => {
+  const isAllowedAdmin = (
+    userId?: string | null,
+    email?: string | null,
+  ) => {
     const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
     const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
     const hardcodedIds = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
     const hardcodedEmails = ['wcba.mo@gmail.com'];
     const idMatch = userId && (envIds.includes(userId) || hardcodedIds.includes(userId));
     const emailMatch = email && (envEmails.includes(email.toLowerCase()) || hardcodedEmails.includes(email.toLowerCase()));
-    const usernameMatch = username === 'owner' || username === 'admin'; // legacy fallback
-    return !!(idMatch || emailMatch || usernameMatch);
+    return !!(idMatch || emailMatch);
   };
 
   const checkAdminStatus = async () => {
@@ -57,7 +59,7 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
       // Check if user is admin (you can customize this logic)
       const { data: profile } = await supabase
         .from('profiles')
-        .select('username, email')
+        .select('username, email, role')
         .eq('id', user.id)
         .single();
       
@@ -65,7 +67,6 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
         isAllowedAdmin(
           user.id,
           (profile as any)?.email || user.email || null,
-          (profile as any)?.username
         )
       );
     }
@@ -77,7 +78,10 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
     if (!confirmed) return;
     setEndingAllStreams(true);
     try {
-      const res = await fetch('/api/admin/end-streams', { method: 'POST' });
+      const res = await fetch('/api/admin/end-streams', {
+        method: 'POST',
+        credentials: 'include',
+      });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to end streams');
