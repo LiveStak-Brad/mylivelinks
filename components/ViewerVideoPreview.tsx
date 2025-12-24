@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveKit } from '@/hooks/useLiveKit';
 import { RemoteTrack, Track } from 'livekit-client';
+import { LIVEKIT_ROOM_NAME } from '@/lib/livekit-constants';
 
 interface ViewerVideoPreviewProps {
   viewerId: string;
