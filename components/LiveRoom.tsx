@@ -65,6 +65,12 @@ export default function LiveRoom() {
   );
   const [liveStreamers, setLiveStreamers] = useState<LiveStreamer[]>([]);
   const liveStreamersRef = useRef<LiveStreamer[]>([]); // Track current streamers to prevent clearing
+  
+  // Sync ref with state changes
+  useEffect(() => {
+    liveStreamersRef.current = liveStreamers;
+  }, [liveStreamers]);
+  
   const [loading, setLoading] = useState(false); // Start as false to render immediately
   const [draggedSlot, setDraggedSlot] = useState<number | null>(null);
   const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
