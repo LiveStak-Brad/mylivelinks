@@ -167,7 +167,7 @@ export default function SocialMediaBar({ socials, accentColor = '#3B82F6' }: Soc
     socialLinks.push({
       platform: 'Spotify',
       username: socials.social_spotify,
-      url: `https://open.spotify.com/user/${socials.social_spotify}`,
+      url: `https://open.spotify.com/artist/${socials.social_spotify}`,
       icon: <Music size={24} />,
       color: '#1DB954'
     });
