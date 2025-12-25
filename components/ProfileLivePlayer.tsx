@@ -428,38 +428,33 @@ export default function ProfileLivePlayer({
           <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/50 to-transparent z-10">
             <div className="flex items-center justify-between gap-2">
               {/* Volume Control - Expandable */}
-              <div className="relative">
+              <div 
+                className="relative flex items-center gap-2"
+                onMouseEnter={() => setShowVolumeSlider(true)}
+                onMouseLeave={() => setShowVolumeSlider(false)}
+              >
                 <button
-                  onClick={() => setShowVolumeSlider(!showVolumeSlider)}
-                  onMouseEnter={() => setShowVolumeSlider(true)}
+                  onClick={() => setIsMuted(!isMuted)}
                   className="flex items-center justify-center w-8 h-8 bg-black/60 backdrop-blur-sm text-white rounded-full hover:bg-black/80 transition-all"
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
                   {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
                 
-                {/* Expandable Volume Slider */}
+                {/* Expandable Horizontal Volume Slider */}
                 {showVolumeSlider && (
                   <div 
-                    className="absolute bottom-full left-0 mb-2 bg-black/80 backdrop-blur-sm rounded-lg px-2 py-4 shadow-xl transition-all w-10"
-                    onMouseLeave={() => setShowVolumeSlider(false)}
+                    className="absolute left-full ml-2 bottom-0 bg-black/80 backdrop-blur-sm rounded-full px-3 py-2 shadow-xl transition-all flex items-center gap-2"
                   >
-                    <div className="flex flex-col items-center gap-3">
-                      {/* Vertical slider */}
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={volume}
-                        onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                        className="h-24 w-1 appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:w-1 [&::-webkit-slider-runnable-track]:h-24 [&::-webkit-slider-runnable-track]:bg-white/30 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:-ml-1"
-                        style={{
-                          writingMode: 'vertical-lr' as any,
-                          direction: 'rtl',
-                        }}
-                      />
-                      <span className="text-white text-xs font-medium">{volume}%</span>
-                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={volume}
+                      onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+                      className="w-20 h-1 appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:bg-white/30 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500"
+                    />
+                    <span className="text-white text-xs font-medium min-w-[2rem] text-center">{volume}%</span>
                   </div>
                 )}
               </div>
