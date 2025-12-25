@@ -2714,9 +2714,10 @@ export default function LiveRoom() {
                           );
                         }
                       
-                      return (
-                      <div
-                        key={slot.slotIndex}
+                        try {
+                          return (
+                          <div
+                            key={slot.slotIndex}
                         draggable={!slot.isEmpty && volumeSliderOpenSlot !== slot.slotIndex}
                         onDragStart={() => {
                           if (volumeSliderOpenSlot !== slot.slotIndex) {
