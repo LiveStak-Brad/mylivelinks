@@ -14,6 +14,7 @@ import ModernLinksSection from '@/components/profile/ModernLinksSection';
 import AdultLinksSection from '@/components/adult/AdultLinksSection';
 import FollowersModal from '@/components/profile/FollowersModal';
 import SocialMediaBar from '@/components/profile/SocialMediaBar';
+import ProfileLivePlayer from '@/components/ProfileLivePlayer';
 
 interface ProfileData {
   profile: {
@@ -362,6 +363,17 @@ export default function ModernProfilePage() {
       
       {/* Content - Scrollable */}
       <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20">
+        {/* Live Video Player (if live) */}
+        {profile.is_live && (
+          <div className={`${borderRadiusClass} overflow-hidden shadow-2xl mb-4 sm:mb-6`}>
+            <ProfileLivePlayer
+              profileId={profile.id}
+              username={profile.username}
+              className="w-full aspect-video"
+            />
+          </div>
+        )}
+        
         {/* Hero Section */}
         <div className={`${borderRadiusClass} overflow-hidden shadow-2xl mb-4 sm:mb-6`} style={cardStyle}>
           <div className="p-4 sm:p-8">
