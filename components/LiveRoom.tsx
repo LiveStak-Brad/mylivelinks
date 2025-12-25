@@ -2697,16 +2697,22 @@ export default function LiveRoom() {
                   
                   console.log('[GRID RENDER] Using slots:', finalSlots.length, finalSlots);
                   
-                  return finalSlots
-                    .filter((slot: GridSlot | null | undefined): slot is GridSlot => 
-                      slot != null && typeof slot === 'object' && typeof slot.slotIndex === 'number'
-                    )
-                    .map((slot: GridSlot) => {
-                      // CRITICAL: Validate slot structure before rendering
-                      if (!slot || typeof slot.slotIndex !== 'number') {
-                        console.error('[GRID RENDER] Invalid slot detected:', slot);
-                        return null;
-                      }
+                  // CRITICAL: Wrap map in try-catch to prevent crashes and log detailed errors
+                  try {
+                    return finalSlots
+                      .filter((slot: GridSlot | null | undefined): slot is GridSlot => 
+                        slot != null && typeof slot === 'object' && typeof slot.slotIndex === 'number'
+                      )
+                      .map((slot: GridSlot, index: number) => {
+                        // CRITICAL: Validate slot structure before rendering
+                        if (!slot || typeof slot !== 'object' || typeof slot.slotIndex !== 'number') {
+                          console.error('[GRID RENDER] Invalid slot detected:', { slot, index, finalSlots });
+                          return (
+                            <div key={`error-${index}`} className="aspect-[3/2] bg-red-200 dark:bg-red-800 rounded-lg border-2 border-red-500 flex flex-col items-center justify-center">
+                              <span className="text-red-600 text-sm">Error: Invalid Slot</span>
+                            </div>
+                          );
+                        }
                       
                       return (
                       <div
@@ -2862,10 +2868,24 @@ export default function LiveRoom() {
                         onReplace={() => setSelectedSlotForReplacement(slot.slotIndex)}
                         />
                           );
-                        })()}
-                    </div>
-                  );
-                  }).filter((element) => element !== null);
+                        } catch (error) {
+                          console.error('[GRID RENDER] Error rendering slot:', error, { slot, index, finalSlots });
+                          return (
+                            <div key={`error-${slot.slotIndex}`} className="aspect-[3/2] bg-red-200 dark:bg-red-800 rounded-lg border-2 border-red-500 flex flex-col items-center justify-center">
+                              <span className="text-red-600 text-sm">Render Error</span>
+                            </div>
+                          );
+                        }
+                      });
+                  } catch (error) {
+                    console.error('[GRID RENDER] Fatal error rendering grid:', error, { finalSlots });
+                    // Return empty slots as fallback
+                    return Array.from({ length: 12 }, (_, i) => (
+                      <div key={`fallback-${i}`} className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
+                        <span className="text-gray-400 text-sm">Error Loading</span>
+                      </div>
+                    ));
+                  }
                 })()}
             </div>
           </div>
