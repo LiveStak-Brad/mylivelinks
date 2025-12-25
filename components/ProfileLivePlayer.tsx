@@ -59,6 +59,8 @@ export default function ProfileLivePlayer({
 
   const connectToRoom = async () => {
     try {
+      console.log('[PROFILE_LIVE] Connecting for user:', profileId);
+      
       // Get LiveKit token as viewer
       const response = await fetch('/api/livekit/token', {
         method: 'POST',
@@ -86,24 +88,32 @@ export default function ProfileLivePlayer({
       setRoom(newRoom);
       setIsConnected(true);
 
+      console.log('[PROFILE_LIVE] Connected to room, participants:', newRoom.remoteParticipants.size);
+
       // Subscribe to remote participant tracks (the streamer)
       subscribeToParticipant(newRoom, profileId);
 
       // Listen for new participants
       newRoom.on('participantConnected', (participant: RemoteParticipant) => {
+        console.log('[PROFILE_LIVE] Participant connected:', participant.identity);
         const participantUserId = extractUserId(participant.identity);
         if (participantUserId === profileId) {
+          console.log('[PROFILE_LIVE] Target user connected!');
           subscribeToParticipant(newRoom, profileId);
         }
       });
 
       // Handle track subscribed
       newRoom.on('trackSubscribed', (track: RemoteTrack, publication, participant: RemoteParticipant) => {
+        console.log('[PROFILE_LIVE] Track subscribed:', track.kind, 'from', participant.identity);
         const participantUserId = extractUserId(participant.identity);
         if (participantUserId === profileId) {
+          console.log('[PROFILE_LIVE] Track is from target user!');
           if (track.kind === Track.Kind.Video) {
+            console.log('[PROFILE_LIVE] Setting video track');
             setVideoTrack(track);
           } else if (track.kind === Track.Kind.Audio) {
+            console.log('[PROFILE_LIVE] Setting audio track');
             setAudioTrack(track);
           }
         }
@@ -129,16 +139,31 @@ export default function ProfileLivePlayer({
   const subscribeToParticipant = (room: Room, userId: string) => {
     const participants = Array.from(room.remoteParticipants.values());
     
+    console.log('[PROFILE_LIVE] Looking for user:', userId);
+    console.log('[PROFILE_LIVE] Available participants:', participants.map(p => ({
+      identity: p.identity,
+      extractedId: extractUserId(p.identity),
+      hasVideo: Array.from(p.trackPublications.values()).some(pub => pub.kind === Track.Kind.Video),
+      hasAudio: Array.from(p.trackPublications.values()).some(pub => pub.kind === Track.Kind.Audio)
+    })));
+    
     for (const participant of participants) {
       const participantUserId = extractUserId(participant.identity);
       
+      console.log('[PROFILE_LIVE] Checking participant:', participantUserId, 'vs', userId);
+      
       if (participantUserId === userId) {
+        console.log('[PROFILE_LIVE] Found matching participant!');
+        
         // Subscribe to video track
         const videoPublication = Array.from(participant.trackPublications.values()).find(
           pub => pub.kind === Track.Kind.Video
         );
         if (videoPublication && videoPublication.track) {
+          console.log('[PROFILE_LIVE] Found video track, subscribing...');
           setVideoTrack(videoPublication.track as RemoteTrack);
+        } else {
+          console.log('[PROFILE_LIVE] No video track found');
         }
 
         // Subscribe to audio track
@@ -146,7 +171,10 @@ export default function ProfileLivePlayer({
           pub => pub.kind === Track.Kind.Audio
         );
         if (audioPublication && audioPublication.track) {
+          console.log('[PROFILE_LIVE] Found audio track, subscribing...');
           setAudioTrack(audioPublication.track as RemoteTrack);
+        } else {
+          console.log('[PROFILE_LIVE] No audio track found');
         }
         break;
       }
