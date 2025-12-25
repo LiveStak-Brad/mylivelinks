@@ -12,20 +12,9 @@ export async function GET(request: NextRequest) {
     const bio = searchParams.get('bio') || 'Follow me on MyLiveLinks';
     const avatarUrl = searchParams.get('avatarUrl') || '';
     
-    // Fetch avatar as base64 if provided (for edge runtime compatibility)
-    let avatarDataUrl = avatarUrl;
-    if (avatarUrl && avatarUrl.startsWith('http')) {
-      try {
-        const avatarResponse = await fetch(avatarUrl);
-        const avatarBlob = await avatarResponse.arrayBuffer();
-        const base64 = Buffer.from(avatarBlob).toString('base64');
-        const mimeType = avatarResponse.headers.get('content-type') || 'image/jpeg';
-        avatarDataUrl = `data:${mimeType};base64,${base64}`;
-      } catch (e) {
-        console.error('Error fetching avatar:', e);
-        avatarDataUrl = '';
-      }
-    }
+    // For edge runtime, we'll skip avatar embedding for now (causes issues)
+    // Just use the first letter fallback
+    const avatarDataUrl = '';
     
     return new ImageResponse(
       (
