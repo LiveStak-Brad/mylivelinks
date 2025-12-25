@@ -61,13 +61,26 @@ export default function ProfileLivePlayer({
     try {
       console.log('[PROFILE_LIVE] Connecting for user:', profileId);
       
+      // Get current user session
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('[PROFILE_LIVE] User not authenticated');
+        return;
+      }
+
       // Get LiveKit token as viewer
       const response = await fetch('/api/livekit/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          room: 'live_central',
+          roomName: 'live_central',
+          participantName: user.email || `viewer_${user.id.substring(0, 8)}`,
           canPublish: false, // Viewer only
+          canSubscribe: true,
+          deviceType: 'web',
+          deviceId: `profile_viewer_${Date.now()}`,
+          sessionId: `session_${Date.now()}`,
         }),
       });
 
