@@ -176,18 +176,8 @@ export function getLogoPath(
   theme: 'light' | 'dark' | 'auto',
   iconOnly: boolean = false
 ): string {
-  const resolvedTheme = theme === 'auto' ? 'light' : theme; // Default fallback
-  
-  // Use actual file paths from /branding/ folder
-  if (iconOnly) {
-    return resolvedTheme === 'dark' 
-      ? '/branding/mylivelinksdarklogo.png'
-      : '/branding/mylivelinkslightlogo.png';
-  }
-  
-  return resolvedTheme === 'dark'
-    ? '/branding/mylivelinksdarklogo.png'
-    : '/branding/mylivelinkslightlogo.png';
+  // Always use transparent logo
+  return '/branding/mylivelinkstransparent.png';
 }
 
 /**

@@ -39,9 +39,8 @@ export default function SmartBrandLogo({
 
   useEffect(() => {
     if (mounted) {
-      // Try SVG first
-      let path = getLogoPath(isDark ? 'dark' : 'light', iconOnly);
-      setImgSrc(path);
+      // Use the transparent logo that actually exists
+      setImgSrc('/branding/mylivelinkstransparent.png');
     }
   }, [mounted, isDark, iconOnly]);
 

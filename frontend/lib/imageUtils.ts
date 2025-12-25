@@ -176,16 +176,8 @@ export function getLogoPath(
   theme: 'light' | 'dark' | 'auto',
   iconOnly: boolean = false
 ): string {
-  const resolvedTheme = theme === 'auto' ? 'light' : theme; // Default fallback
-  
-  // Check what files actually exist - use PNG fallback since we have PNG files
-  if (iconOnly) {
-    // Try SVG first, fallback to PNG
-    return `/branding/logo/logo-icon-${resolvedTheme}.png`;
-  }
-  
-  // Try SVG first, fallback to PNG
-  return `/branding/logo/logo-${resolvedTheme}.png`;
+  // Always use transparent logo
+  return '/branding/mylivelinkstransparent.png';
 }
 
 /**

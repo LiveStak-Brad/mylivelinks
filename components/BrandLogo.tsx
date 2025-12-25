@@ -37,9 +37,8 @@ export default function BrandLogo({
     );
   }
 
-  const logoPath = iconOnly
-    ? `/branding/logo/logo-icon-${isDark ? 'dark' : 'light'}.svg`
-    : `/branding/logo/logo-${isDark ? 'dark' : 'light'}.svg`;
+  // Use the transparent logo that actually exists
+  const logoPath = '/branding/mylivelinkstransparent.png';
 
   return (
     <Image
@@ -49,11 +48,6 @@ export default function BrandLogo({
       height={size}
       className={className}
       priority={priority}
-      onError={(e) => {
-        // Fallback to PNG if SVG fails
-        const target = e.target as HTMLImageElement;
-        target.src = logoPath.replace('.svg', '.png');
-      }}
     />
   );
 }

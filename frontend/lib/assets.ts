@@ -5,14 +5,14 @@
 
 export const ASSETS = {
   logo: {
-    light: '/branding/mylivelinkslightlogo.png',
-    dark: '/branding/mylivelinksdarklogo.png',
+    light: '/branding/mylivelinkstransparent.png',
+    dark: '/branding/mylivelinkstransparent.png',
     icon: {
-      light: '/branding/mylivelinkslightlogo.png',
-      dark: '/branding/mylivelinksdarklogo.png',
+      light: '/branding/mylivelinkstransparent.png',
+      dark: '/branding/mylivelinkstransparent.png',
       any: '/branding/mylivelinkstransparent.png',
     },
-    fallback: '/branding/mylivelinkslightlogo.png',
+    fallback: '/branding/mylivelinkstransparent.png',
   },
   banner: {
     live: {
