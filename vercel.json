@@ -5,20 +5,7 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["iad1"],
-  "public": true,
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.mylivelinks.com"
-        }
-      ],
-      "destination": "https://mylivelinks.com/:path*",
-      "permanent": true
-    }
-  ]
+  "public": true
 }
 
 

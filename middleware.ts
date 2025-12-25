@@ -2,15 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  // 1. Handle www → apex redirect (301 permanent redirect)
-  const hostname = request.headers.get('host') || '';
-  if (hostname.startsWith('www.')) {
-    const url = request.nextUrl.clone();
-    url.host = hostname.replace('www.', '');
-    return NextResponse.redirect(url, { status: 301 });
-  }
-
-  // 2. Handle Supabase auth session refresh
+  // Handle Supabase auth session refresh
   let response = NextResponse.next({
     request: {
       headers: request.headers,
