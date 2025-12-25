@@ -45,8 +45,34 @@ export default function ProfileLivePlayer({
       loadViewerCount();
     }, 10000);
     
+    // Subscribe to real-time updates for stream status
+    const channel = supabase
+      .channel(`profile_live_${profileId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'live_streams',
+          filter: `profile_id=eq.${profileId}`,
+        },
+        (payload: any) => {
+          console.log('[PROFILE_LIVE] Stream status changed:', payload);
+          
+          // If stream ended (live_available = false), disconnect
+          if (payload.new && payload.new.live_available === false) {
+            console.log('[PROFILE_LIVE] Stream ended, disconnecting...');
+            disconnect();
+            // Notify parent to hide player
+            window.location.reload();
+          }
+        }
+      )
+      .subscribe();
+    
     return () => {
       clearInterval(interval);
+      supabase.removeChannel(channel);
       disconnect();
     };
   }, [profileId]);

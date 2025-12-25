@@ -130,6 +130,32 @@ export default function ModernProfilePage() {
   
   useEffect(() => {
     loadProfile();
+    
+    // Subscribe to real-time updates for live status
+    const channel = supabase
+      .channel(`profile_live_status_${username}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'live_streams',
+          filter: `profile_id=eq.${profileData?.profile?.id}`,
+        },
+        (payload) => {
+          console.log('[PROFILE] Live stream status changed:', payload);
+          
+          // Reload profile to get updated live status
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+            loadProfile();
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [username]);
   
   const loadProfile = async () => {
