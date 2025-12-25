@@ -2756,31 +2756,67 @@ export default function LiveRoom() {
                             <span className="text-gray-400 text-sm mb-2">Empty Slot</span>
                             <span className="text-gray-500 text-xs">Click to add streamer</span>
                           </div>
-                        ) : slot.streamer && slot.streamer.profile_id && slot.streamer.username ? (
-                          <Tile
-                            streamerId={slot.streamer.profile_id}
-                            streamerUsername={slot.streamer.username}
-                            streamerAvatar={slot.streamer.avatar_url}
-                            isLive={slot.streamer.live_available}
-                            viewerCount={slot.streamer.viewer_count || 0}
-                            gifterLevel={slot.streamer.gifter_level || 0}
-                            badgeName={slot.streamer.badge_name}
-                            badgeColor={slot.streamer.badge_color}
-                            slotIndex={slot.slotIndex}
-                            liveStreamId={slot.streamer.id && slot.streamer.live_available ? (() => {
-                              try {
-                                const idStr = slot.streamer.id.toString();
+                        ) : (() => {
+                          // CRITICAL: Validate streamer properties are valid strings/numbers before rendering
+                          const streamer = slot.streamer;
+                          if (!streamer) return null;
+                          
+                          // Ensure profile_id and username are strings, not arrays or null
+                          const profileId = Array.isArray(streamer.profile_id) 
+                            ? (streamer.profile_id[0] || null)
+                            : (typeof streamer.profile_id === 'string' ? streamer.profile_id : null);
+                          
+                          const username = Array.isArray(streamer.username)
+                            ? (streamer.username[0] || null)
+                            : (typeof streamer.username === 'string' ? streamer.username : null);
+                          
+                          if (!profileId || !username) {
+                            console.warn('[GRID RENDER] Invalid streamer data:', { 
+                              slotIndex: slot.slotIndex, 
+                              profileId, 
+                              username, 
+                              streamer 
+                            });
+                            return (
+                              <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
+                                <span className="text-gray-400 text-sm">Invalid Streamer Data</span>
+                              </div>
+                            );
+                          }
+                          
+                          // Parse liveStreamId safely
+                          let liveStreamId: number | undefined = undefined;
+                          if (streamer.id && streamer.live_available) {
+                            try {
+                              // Handle array case
+                              const idValue = Array.isArray(streamer.id) ? streamer.id[0] : streamer.id;
+                              if (idValue != null) {
+                                const idStr = String(idValue);
                                 // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
-                                if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) {
-                                  return undefined;
+                                if (!idStr.startsWith('stream-') && !idStr.startsWith('seed-')) {
+                                  const parsed = parseInt(idStr);
+                                  if (parsed > 0) {
+                                    liveStreamId = parsed;
+                                  }
                                 }
-                                const parsed = parseInt(idStr);
-                                return parsed > 0 ? parsed : undefined;
-                              } catch (e) {
-                                console.error('[GRID RENDER] Error parsing liveStreamId:', e, slot.streamer);
-                                return undefined;
                               }
-                            })() : undefined}
+                            } catch (e) {
+                              console.error('[GRID RENDER] Error parsing liveStreamId:', e, streamer);
+                            }
+                          }
+                          
+                          return (
+                            <Tile
+                              streamerId={profileId}
+                              streamerUsername={username}
+                              streamerAvatar={typeof streamer.avatar_url === 'string' ? streamer.avatar_url : undefined}
+                              isLive={!!streamer.live_available}
+                              viewerCount={typeof streamer.viewer_count === 'number' ? streamer.viewer_count : 0}
+                              gifterLevel={typeof streamer.gifter_level === 'number' ? streamer.gifter_level : 0}
+                              badgeName={typeof streamer.badge_name === 'string' ? streamer.badge_name : undefined}
+                              badgeColor={typeof streamer.badge_color === 'string' ? streamer.badge_color : undefined}
+                              slotIndex={slot.slotIndex}
+                              liveStreamId={liveStreamId}
                         sharedRoom={sharedRoom}
                         isRoomConnected={isRoomConnected}
                         isCurrentUserPublishing={isCurrentUserPublishing}
@@ -2795,7 +2831,8 @@ export default function LiveRoom() {
                         }}
                         onReplace={() => setSelectedSlotForReplacement(slot.slotIndex)}
                         />
-                      ) : (
+                          );
+                        })() : (
                         <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
                           <span className="text-gray-400 text-sm">Invalid Streamer Data</span>
                         </div>
