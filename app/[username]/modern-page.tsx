@@ -159,39 +159,18 @@ export default function ModernProfilePage() {
     
     setFollowLoading(true);
     try {
-      // Get session to verify client thinks user is logged in
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      console.log('[FOLLOW] Starting request:', { 
-        hasSession: !!session, 
-        userId: session?.user?.id || 'null',
-        targetProfileId: profileData.profile.id,
-        url: '/api/profile/follow'
-      });
-      
       const response = await fetch('/api/profile/follow', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // CRITICAL: Send cookies to server
+        credentials: 'include',
         body: JSON.stringify({ targetProfileId: profileData.profile.id })
-      });
-      
-      console.log('[FOLLOW] Response received:', { 
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
       });
       
       const data = await response.json();
       
-      console.log('[FOLLOW] Response data:', data);
-      
-      // Check for authentication errors
       if (response.status === 401) {
-        // Not authenticated - redirect to login
         alert('Please log in to follow users');
         router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
         return;
