@@ -3,6 +3,18 @@
  * 
  * This is a mobile-specific copy of the gifter-tiers configuration.
  * Keep in sync with lib/gifter-tiers.ts on the web side.
+ * 
+ * FINAL TIER THRESHOLDS (cumulative lifetime coins gifted):
+ * Starter:      0          → 60,000
+ * Supporter:    60,000     → 300,000
+ * Contributor:  300,000    → 900,000
+ * Elite:        900,000    → 2,400,000
+ * Patron:       2,400,000  → 6,000,000
+ * Power:        6,000,000  → 15,000,000
+ * VIP:          15,000,000 → 30,000,000
+ * Legend:       30,000,000 → 45,000,000
+ * Mythic:       45,000,000 → 60,000,000
+ * Diamond:      60,000,000 → ∞
  */
 
 // ============================================================================
@@ -37,7 +49,8 @@ export interface GifterStatus {
 }
 
 // ============================================================================
-// TIER CONFIGURATION
+// TIER CONFIGURATION - FINAL SPEC
+// Diamond unlock MUST be 60,000,000 lifetime coins gifted
 // ============================================================================
 
 export const GIFTER_TIERS: GifterTier[] = [
@@ -49,7 +62,7 @@ export const GIFTER_TIERS: GifterTier[] = [
     order: 1,
     levelMax: 50,
     minLifetimeCoins: 0,
-    maxLifetimeCoins: 999,
+    maxLifetimeCoins: 59_999,
     isDiamond: false,
   },
   {
@@ -59,8 +72,8 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '🤝',
     order: 2,
     levelMax: 50,
-    minLifetimeCoins: 1000,
-    maxLifetimeCoins: 4999,
+    minLifetimeCoins: 60_000,
+    maxLifetimeCoins: 299_999,
     isDiamond: false,
   },
   {
@@ -70,8 +83,8 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '⭐',
     order: 3,
     levelMax: 50,
-    minLifetimeCoins: 5000,
-    maxLifetimeCoins: 14999,
+    minLifetimeCoins: 300_000,
+    maxLifetimeCoins: 899_999,
     isDiamond: false,
   },
   {
@@ -81,8 +94,8 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '👑',
     order: 4,
     levelMax: 50,
-    minLifetimeCoins: 15000,
-    maxLifetimeCoins: 49999,
+    minLifetimeCoins: 900_000,
+    maxLifetimeCoins: 2_399_999,
     isDiamond: false,
   },
   {
@@ -92,8 +105,8 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '💎',
     order: 5,
     levelMax: 50,
-    minLifetimeCoins: 50000,
-    maxLifetimeCoins: 149999,
+    minLifetimeCoins: 2_400_000,
+    maxLifetimeCoins: 5_999_999,
     isDiamond: false,
   },
   {
@@ -103,8 +116,8 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '⚡',
     order: 6,
     levelMax: 50,
-    minLifetimeCoins: 150000,
-    maxLifetimeCoins: 499999,
+    minLifetimeCoins: 6_000_000,
+    maxLifetimeCoins: 14_999_999,
     isDiamond: false,
   },
   {
@@ -114,8 +127,8 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '🔥',
     order: 7,
     levelMax: 50,
-    minLifetimeCoins: 500000,
-    maxLifetimeCoins: 1499999,
+    minLifetimeCoins: 15_000_000,
+    maxLifetimeCoins: 29_999_999,
     isDiamond: false,
   },
   {
@@ -125,8 +138,8 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '🌟',
     order: 8,
     levelMax: 50,
-    minLifetimeCoins: 1500000,
-    maxLifetimeCoins: 4999999,
+    minLifetimeCoins: 30_000_000,
+    maxLifetimeCoins: 44_999_999,
     isDiamond: false,
   },
   {
@@ -136,8 +149,8 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '🔮',
     order: 9,
     levelMax: 50,
-    minLifetimeCoins: 5000000,
-    maxLifetimeCoins: 14999999,
+    minLifetimeCoins: 45_000_000,
+    maxLifetimeCoins: 59_999_999,
     isDiamond: false,
   },
   {
@@ -147,7 +160,7 @@ export const GIFTER_TIERS: GifterTier[] = [
     icon: '💠',
     order: 10,
     levelMax: Infinity,
-    minLifetimeCoins: 15000000,
+    minLifetimeCoins: 60_000_000, // Diamond Level 1 begins at exactly 60,000,000 coins
     maxLifetimeCoins: null,
     isDiamond: true,
   },
@@ -180,11 +193,13 @@ export function getVisibleTiers(
 }
 
 export function formatCoinAmount(coins: number): string {
-  if (coins >= 1000000) {
-    return `${(coins / 1000000).toFixed(1)}M`;
+  if (coins >= 1_000_000) {
+    const m = coins / 1_000_000;
+    return `${m.toFixed(1)}M`;
   }
-  if (coins >= 1000) {
-    return `${(coins / 1000).toFixed(0)}K`;
+  if (coins >= 1_000) {
+    const k = coins / 1_000;
+    return `${k.toFixed(0)}K`;
   }
   return coins.toLocaleString();
 }
@@ -201,7 +216,8 @@ export function getTierCoinRange(tier: GifterTier): string {
   if (tier.maxLifetimeCoins === null) {
     return `${min}+`;
   }
-  const max = formatCoinAmount(tier.maxLifetimeCoins);
+  // Add 1 to maxLifetimeCoins for display since we store as max-1
+  const max = formatCoinAmount(tier.maxLifetimeCoins + 1);
   return `${min} – ${max}`;
 }
 
@@ -219,8 +235,8 @@ export const MOCK_GIFTER_STATUS_STARTER: GifterStatus = {
   tier_level_max: 50,
   is_diamond: false,
   progress_pct: 65,
-  lifetime_coins: 250,
-  next_level_coins: 50,
+  lifetime_coins: 15_000,
+  next_level_coins: 3_000,
   show_locked_tiers: false,
 };
 
@@ -234,8 +250,7 @@ export const MOCK_GIFTER_STATUS_DIAMOND: GifterStatus = {
   tier_level_max: Infinity,
   is_diamond: true,
   progress_pct: 35,
-  lifetime_coins: 25000000,
-  next_level_coins: 100000,
+  lifetime_coins: 85_000_000,
+  next_level_coins: 3_000_000,
   show_locked_tiers: true,
 };
-
