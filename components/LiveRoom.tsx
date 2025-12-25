@@ -677,7 +677,7 @@ export default function LiveRoom() {
         // Use maybeSingle() instead of single() to handle no-row case gracefully
         const { data: userLiveStream, error: queryError } = await supabase
           .from('live_streams')
-          .select('id, is_published, live_available')
+          .select('id, live_available')
           .eq('profile_id', currentUserId)
           .eq('live_available', true)
           .maybeSingle();
@@ -1014,7 +1014,7 @@ export default function LiveRoom() {
           // Final fallback: direct query from live_streams
           const directResult = await supabase
             .from('live_streams')
-            .select('id, profile_id, is_published, live_available')
+            .select('id, profile_id, live_available')
             .eq('live_available', true)
             .order('published_at', { ascending: false, nullsFirst: false })
             .limit(50);
@@ -1121,7 +1121,7 @@ export default function LiveRoom() {
           profile_id: stream.streamer_id,
           username: stream.username,
           avatar_url: stream.avatar_url,
-          is_published: stream.is_published || false, // Only true when actually publishing
+          is_published: true, // If in RPC result, they're live
           live_available: true, // RPC only returns live_available = true
           viewer_count: stream.viewer_count || 0,
           gifter_level: badgeInfo?.level || 0,
@@ -1135,9 +1135,8 @@ export default function LiveRoom() {
       if (user) {
         const { data: waitingStreams } = await supabase
           .from('live_streams')
-          .select('id, profile_id, is_published, live_available')
-          .eq('live_available', true)
-          .eq('is_published', false);
+          .select('id, profile_id, live_available')
+          .eq('live_available', true);
 
         if (waitingStreams && waitingStreams.length > 0) {
           const waitingProfileIds = waitingStreams.map((s: any) => s.profile_id);
@@ -1197,7 +1196,7 @@ export default function LiveRoom() {
                     profile_id: stream.profile_id,
                     username: profile.username,
                     avatar_url: profile.avatar_url,
-                    is_published: false,
+                    is_published: true, // If they're in waiting list, assume publishing
                     live_available: true,
                     viewer_count: viewerCount,
                     gifter_level: badgeInfo?.level || 0,
@@ -1402,7 +1401,7 @@ export default function LiveRoom() {
       // Check if user is live - if so, ensure they're in slot 1
       const { data: userLiveStream } = await supabase
         .from('live_streams')
-        .select('id, is_published, live_available')
+        .select('id, live_available')
         .eq('profile_id', user.id)
         .eq('live_available', true)
         .single();
@@ -1779,7 +1778,7 @@ export default function LiveRoom() {
           .single(),
         supabase
           .from('live_streams')
-          .select('id, is_published, live_available')
+          .select('id, live_available')
           .eq('id', liveStreamId)
           .single(),
       ]);
@@ -2084,20 +2083,15 @@ export default function LiveRoom() {
       if (!streamId) {
         const { data: streamData } = await supabase
           .from('live_streams')
-          .select('id, is_published')
+          .select('id')
           .eq('profile_id', profileId)
           .eq('live_available', true)
           .single();
         streamId = streamData?.id;
-        isPublished = streamData?.is_published || false;
+        isPublished = true; // If live_available=true, they're publishing
       } else {
-        // If we have streamId, fetch is_published status
-        const { data: streamData } = await supabase
-          .from('live_streams')
-          .select('is_published')
-          .eq('id', streamId)
-          .single();
-        isPublished = streamData?.is_published || false;
+        // If they have a live stream, they're publishing
+        isPublished = true;
       }
 
       // Get badge info
@@ -2285,7 +2279,7 @@ export default function LiveRoom() {
       // Check if user is live
       const { data: liveStream } = await supabase
         .from('live_streams')
-        .select('id, is_published, live_available')
+        .select('id, live_available')
         .eq('profile_id', user.id)
         .eq('live_available', true)
         .single();
@@ -2319,7 +2313,7 @@ export default function LiveRoom() {
       // Get live stream ID if available
       const { data: liveStream } = await supabase
         .from('live_streams')
-        .select('id, is_published')
+        .select('id')
         .eq('profile_id', streamerId)
         .eq('live_available', true)
         .single();
@@ -2353,7 +2347,7 @@ export default function LiveRoom() {
             profile_id: profile.id,
             username: profile.username,
             avatar_url: profile.avatar_url,
-            is_published: false,
+            is_published: true, // Local placeholder
             live_available: false,
             viewer_count: 0,
             gifter_level: badgeInfo?.level || 0,
