@@ -1553,20 +1553,29 @@ export default function LiveRoom() {
         const emptySlots = sortedSlots.filter(s => s.isEmpty);
         if (emptySlots.length > 0 && availableStreamers.length > 0) {
           // Get streamers not already in grid
-          const usedStreamerIds = new Set(sortedSlots.filter(s => s.streamer).map(s => s.streamer!.profile_id));
-          const unusedStreamers = availableStreamers.filter(s => !usedStreamerIds.has(s.profile_id));
+          // CRITICAL: Add null checks to prevent "Cannot read properties of null" errors
+          const usedStreamerIds = new Set(
+            sortedSlots
+              .filter(s => s && s.streamer && s.streamer.profile_id)
+              .map(s => s.streamer!.profile_id)
+          );
+          const unusedStreamers = (availableStreamers || []).filter(s => s && s.profile_id && !usedStreamerIds.has(s.profile_id));
           
           // Fill empty slots with available streamers (prioritize live_available, then viewer count)
           const sortedStreamers = unusedStreamers.sort((a, b) => {
+            if (!a || !b) return 0;
             if (a.live_available !== b.live_available) return a.live_available ? -1 : 1;
-            return b.viewer_count - a.viewer_count;
+            return (b.viewer_count || 0) - (a.viewer_count || 0);
           });
           
-          sortedStreamers.slice(0, emptySlots.length).forEach((streamer, index) => {
+          // CRITICAL: Ensure we don't access array indices that don't exist
+          const maxFill = Math.min(sortedStreamers.length, emptySlots.length);
+          for (let index = 0; index < maxFill; index++) {
+            const streamer = sortedStreamers[index];
             const emptySlot = emptySlots[index];
-            if (emptySlot) {
-              const slotIndex = sortedSlots.findIndex(s => s.slotIndex === emptySlot.slotIndex);
-              if (slotIndex >= 0) {
+            if (streamer && emptySlot && streamer.profile_id && emptySlot.slotIndex) {
+              const slotIndex = sortedSlots.findIndex(s => s && s.slotIndex === emptySlot.slotIndex);
+              if (slotIndex >= 0 && sortedSlots[slotIndex]) {
                 sortedSlots[slotIndex] = {
                   ...sortedSlots[slotIndex],
                   streamer,
@@ -1574,7 +1583,7 @@ export default function LiveRoom() {
                 };
               }
             }
-          });
+          }
         }
 
         setGridSlots(sortedSlots);
@@ -2585,74 +2594,88 @@ export default function LiveRoom() {
                   
                   console.log('[GRID RENDER] Using slots:', finalSlots?.length, finalSlots);
                   
-                  return finalSlots.map((slot: GridSlot) => (
-                  <div
-                    key={slot.slotIndex}
-                    draggable={!slot.isEmpty && volumeSliderOpenSlot !== slot.slotIndex}
-                    onDragStart={() => {
-                      if (volumeSliderOpenSlot !== slot.slotIndex) {
-                        handleDragStart(slot.slotIndex);
+                  return finalSlots
+                    .filter((slot: GridSlot | null | undefined): slot is GridSlot => slot != null && typeof slot.slotIndex === 'number')
+                    .map((slot: GridSlot) => {
+                      // CRITICAL: Validate slot structure before rendering
+                      if (!slot || typeof slot.slotIndex !== 'number') {
+                        console.error('[GRID RENDER] Invalid slot detected:', slot);
+                        return null;
                       }
-                    }}
-                    onDragOver={(e) => {
-                      if (volumeSliderOpenSlot !== slot.slotIndex) {
-                        handleDragOver(e, slot.slotIndex);
-                      }
-                    }}
-                    onDrop={(e) => {
-                      if (volumeSliderOpenSlot !== slot.slotIndex) {
-                        handleDrop(e, slot.slotIndex);
-                      }
-                    }}
-                    onDragEnd={() => {
-                      setDraggedSlot(null);
-                      setHoveredSlot(null);
-                    }}
-                    className={`
-                      transition-all duration-200
-                      ${draggedSlot === slot.slotIndex ? 'opacity-50 scale-95' : ''}
-                      ${hoveredSlot === slot.slotIndex ? 'ring-4 ring-blue-500' : ''}
-                    `}
-                  >
-                      {slot.isEmpty || !slot.streamer ? (
-                      <div 
-                        className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition"
-                        onClick={() => setSelectedSlotForReplacement(slot.slotIndex)}
+                      
+                      return (
+                      <div
+                        key={slot.slotIndex}
+                        draggable={!slot.isEmpty && volumeSliderOpenSlot !== slot.slotIndex}
+                        onDragStart={() => {
+                          if (volumeSliderOpenSlot !== slot.slotIndex) {
+                            handleDragStart(slot.slotIndex);
+                          }
+                        }}
                         onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          e.dataTransfer.dropEffect = 'move';
-                          setHoveredSlot(slot.slotIndex);
+                          if (volumeSliderOpenSlot !== slot.slotIndex) {
+                            handleDragOver(e, slot.slotIndex);
+                          }
                         }}
                         onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleDrop(e, slot.slotIndex);
-                        }}
-                      >
-                        <span className="text-gray-400 text-sm mb-2">Empty Slot</span>
-                        <span className="text-gray-500 text-xs">Click to add streamer</span>
-                      </div>
-                    ) : slot.streamer ? (
-                      <Tile
-                        streamerId={slot.streamer.profile_id}
-                        streamerUsername={slot.streamer.username}
-                        streamerAvatar={slot.streamer.avatar_url}
-                        isLive={slot.streamer.live_available}
-                        viewerCount={slot.streamer.viewer_count}
-                        gifterLevel={slot.streamer.gifter_level}
-                        badgeName={slot.streamer.badge_name}
-                        badgeColor={slot.streamer.badge_color}
-                        slotIndex={slot.slotIndex}
-                        liveStreamId={slot.streamer.id && slot.streamer.live_available ? (() => {
-                          const idStr = slot.streamer.id.toString();
-                          // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
-                          if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) {
-                            return undefined;
+                          if (volumeSliderOpenSlot !== slot.slotIndex) {
+                            handleDrop(e, slot.slotIndex);
                           }
-                          const parsed = parseInt(idStr);
-                          return parsed > 0 ? parsed : undefined;
-                        })() : undefined}
+                        }}
+                        onDragEnd={() => {
+                          setDraggedSlot(null);
+                          setHoveredSlot(null);
+                        }}
+                        className={`
+                          transition-all duration-200
+                          ${draggedSlot === slot.slotIndex ? 'opacity-50 scale-95' : ''}
+                          ${hoveredSlot === slot.slotIndex ? 'ring-4 ring-blue-500' : ''}
+                        `}
+                      >
+                          {slot.isEmpty || !slot.streamer ? (
+                          <div 
+                            className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 transition"
+                            onClick={() => setSelectedSlotForReplacement(slot.slotIndex)}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              e.dataTransfer.dropEffect = 'move';
+                              setHoveredSlot(slot.slotIndex);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDrop(e, slot.slotIndex);
+                            }}
+                          >
+                            <span className="text-gray-400 text-sm mb-2">Empty Slot</span>
+                            <span className="text-gray-500 text-xs">Click to add streamer</span>
+                          </div>
+                        ) : slot.streamer && slot.streamer.profile_id && slot.streamer.username ? (
+                          <Tile
+                            streamerId={slot.streamer.profile_id}
+                            streamerUsername={slot.streamer.username}
+                            streamerAvatar={slot.streamer.avatar_url}
+                            isLive={slot.streamer.live_available}
+                            viewerCount={slot.streamer.viewer_count || 0}
+                            gifterLevel={slot.streamer.gifter_level || 0}
+                            badgeName={slot.streamer.badge_name}
+                            badgeColor={slot.streamer.badge_color}
+                            slotIndex={slot.slotIndex}
+                            liveStreamId={slot.streamer.id && slot.streamer.live_available ? (() => {
+                              try {
+                                const idStr = slot.streamer.id.toString();
+                                // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
+                                if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) {
+                                  return undefined;
+                                }
+                                const parsed = parseInt(idStr);
+                                return parsed > 0 ? parsed : undefined;
+                              } catch (e) {
+                                console.error('[GRID RENDER] Error parsing liveStreamId:', e, slot.streamer);
+                                return undefined;
+                              }
+                            })() : undefined}
                         sharedRoom={sharedRoom}
                         isRoomConnected={isRoomConnected}
                         isCurrentUserPublishing={isCurrentUserPublishing}
@@ -2666,10 +2689,15 @@ export default function LiveRoom() {
                           setVolumeSliderOpenSlot(isOpen ? slot.slotIndex : null);
                         }}
                         onReplace={() => setSelectedSlotForReplacement(slot.slotIndex)}
-                      />
-                    ) : null}
-                  </div>
-                  ));
+                        />
+                      ) : (
+                        <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
+                          <span className="text-gray-400 text-sm">Invalid Streamer Data</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                  }).filter((element) => element !== null);
                 })()}
             </div>
           </div>
