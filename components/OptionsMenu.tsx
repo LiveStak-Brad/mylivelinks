@@ -56,17 +56,11 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
   const checkAdminStatus = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      // Check if user is admin (you can customize this logic)
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username, email, role')
-        .eq('id', user.id)
-        .single();
-      
+      // Check if user is admin - email comes from auth.users, not profiles
       setIsAdmin(
         isAllowedAdmin(
           user.id,
-          (profile as any)?.email || user.email || null,
+          user.email || null,
         )
       );
     }
