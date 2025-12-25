@@ -157,25 +157,34 @@ export default function ModernProfilePage() {
   const handleFollow = async () => {
     if (!profileData || followLoading) return;
     
+    const DEBUG_AUTH = process.env.NEXT_PUBLIC_DEBUG_AUTH === '1';
+    
     setFollowLoading(true);
     try {
-      // Get session for token
+      // Get session to verify client thinks user is logged in
       const { data: { session } } = await supabase.auth.getSession();
       
-      console.log('Follow clicked - Has session:', !!session);
+      if (DEBUG_AUTH) {
+        console.log('[FOLLOW] Client check:', { 
+          hasSession: !!session, 
+          userId: session?.user?.id || 'null' 
+        });
+      }
       
       const response = await fetch('/api/profile/follow', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
         },
-        credentials: 'include', // Ensure cookies are sent
+        credentials: 'include', // CRITICAL: Send cookies to server
         body: JSON.stringify({ targetProfileId: profileData.profile.id })
       });
       
       const data = await response.json();
-      console.log('Follow response:', { status: response.status, data });
+      
+      if (DEBUG_AUTH) {
+        console.log('[FOLLOW] Response:', { status: response.status, data });
+      }
       
       // Check for authentication errors
       if (response.status === 401) {

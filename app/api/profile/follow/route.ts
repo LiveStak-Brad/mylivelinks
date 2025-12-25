@@ -1,6 +1,7 @@
-import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { NextRequest, NextResponse } from 'next/server';
+
+const DEBUG_AUTH = process.env.NEXT_PUBLIC_DEBUG_AUTH === '1';
 
 /**
  * POST /api/profile/follow
@@ -9,53 +10,24 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== FOLLOW API DEBUG ===');
+    // Create Supabase client with proper request cookie handling
+    const supabase = createRouteHandlerClient(request);
     
-    // Initialize with server client by default (uses cookies)
-    let supabase = createServerSupabaseClient();
-    let user = null;
+    // Get authenticated user from cookies
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    // First, try cookie-based auth (most reliable in Next.js)
-    const { data: { user: cookieUser }, error: cookieError } = await supabase.auth.getUser();
-    
-    if (cookieUser && !cookieError) {
-      user = cookieUser;
-      console.log('Auth via cookies successful:', user.id);
-    } else {
-      console.log('Cookie auth failed, trying Authorization header');
-      
-      // Fallback to Authorization header token
-      const authHeader = request.headers.get('authorization');
-      
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.replace('Bearer ', '');
-        console.log('Using Authorization header token');
-        
-        supabase = createSupabaseClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          {
-            global: {
-              headers: {
-                Authorization: authHeader
-              }
-            }
-          }
-        );
-        
-        const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token);
-        
-        if (tokenUser && !tokenError) {
-          user = tokenUser;
-          console.log('Auth via token successful:', user.id);
-        } else {
-          console.error('Token auth failed:', tokenError);
-        }
-      }
+    if (DEBUG_AUTH) {
+      console.log('[AUTH] Follow API - User check:', { 
+        userId: user?.id || 'null', 
+        error: authError?.message || 'none',
+        hasCookies: request.cookies.getAll().length > 0
+      });
     }
     
-    if (!user) {
-      console.error('Authentication failed - no user found via cookies or token');
+    if (!user || authError) {
+      if (DEBUG_AUTH) {
+        console.log('[AUTH] Authentication failed - returning 401');
+      }
       return NextResponse.json(
         { success: false, error: 'Unauthorized - Please log in' },
         { status: 401 }
@@ -66,17 +38,18 @@ export async function POST(request: NextRequest) {
     const { targetProfileId } = body;
     
     if (!targetProfileId) {
-      console.error('Missing targetProfileId in follow request');
       return NextResponse.json(
         { success: false, error: 'Missing targetProfileId' },
         { status: 400 }
       );
     }
     
-    console.log('Follow request:', {
-      userId: user.id,
-      targetProfileId,
-    });
+    if (DEBUG_AUTH) {
+      console.log('[FOLLOW] Request:', {
+        userId: user.id,
+        targetProfileId,
+      });
+    }
     
     // Call RPC function to toggle follow
     const { data, error } = await supabase.rpc('toggle_follow', {
@@ -84,10 +57,8 @@ export async function POST(request: NextRequest) {
       p_followee_id: targetProfileId
     });
     
-    console.log('RPC toggle_follow result:', { data, error });
-    
     if (error) {
-      console.error('Follow toggle RPC error:', error);
+      console.error('[FOLLOW] RPC error:', error);
       return NextResponse.json(
         { success: false, error: `Database error: ${error.message}` },
         { status: 500 }
@@ -95,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (!data) {
-      console.error('No data returned from toggle_follow');
+      console.error('[FOLLOW] No data returned from toggle_follow');
       return NextResponse.json(
         { success: false, error: 'No response from database' },
         { status: 500 }
@@ -103,21 +74,23 @@ export async function POST(request: NextRequest) {
     }
     
     if (data?.error) {
-      console.error('Follow toggle returned error:', data.error);
+      console.error('[FOLLOW] Toggle returned error:', data.error);
       return NextResponse.json(
         { success: false, error: data.error },
         { status: 400 }
       );
     }
     
-    console.log('Follow successful:', data);
+    if (DEBUG_AUTH) {
+      console.log('[FOLLOW] Success:', data);
+    }
+    
     return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
-    console.error('Follow API exception:', error);
+    console.error('[FOLLOW] Exception:', error);
     return NextResponse.json(
       { success: false, error: `Internal server error: ${error.message}` },
       { status: 500 }
     );
   }
 }
-
