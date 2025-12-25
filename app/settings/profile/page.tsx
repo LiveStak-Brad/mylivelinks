@@ -116,19 +116,19 @@ export default function ProfileSettingsPage() {
         setBio(p.bio || '');
         setUsername(p.username || '');
         
-        // Load social media fields
-        setSocialInstagram(p.social_instagram || '');
-        setSocialTwitter(p.social_twitter || '');
-        setSocialYoutube(p.social_youtube || '');
-        setSocialTiktok(p.social_tiktok || '');
-        setSocialFacebook(p.social_facebook || '');
-        setSocialTwitch(p.social_twitch || '');
+        // Load social media fields (strip @ if present)
+        setSocialInstagram((p.social_instagram || '').replace(/^@/, ''));
+        setSocialTwitter((p.social_twitter || '').replace(/^@/, ''));
+        setSocialYoutube((p.social_youtube || '').replace(/^@/, ''));
+        setSocialTiktok((p.social_tiktok || '').replace(/^@/, ''));
+        setSocialFacebook((p.social_facebook || '').replace(/^@/, ''));
+        setSocialTwitch((p.social_twitch || '').replace(/^@/, ''));
         setSocialDiscord(p.social_discord || '');
-        setSocialSnapchat(p.social_snapchat || '');
-        setSocialLinkedin(p.social_linkedin || '');
-        setSocialGithub(p.social_github || '');
+        setSocialSnapchat((p.social_snapchat || '').replace(/^@/, ''));
+        setSocialLinkedin((p.social_linkedin || '').replace(/^@/, ''));
+        setSocialGithub((p.social_github || '').replace(/^@/, ''));
         setSocialSpotify(p.social_spotify || '');
-        setSocialOnlyfans(p.social_onlyfans || '');
+        setSocialOnlyfans((p.social_onlyfans || '').replace(/^@/, ''));
         
         // Load display preferences
         setHideStreamingStats(p.hide_streaming_stats || false);
