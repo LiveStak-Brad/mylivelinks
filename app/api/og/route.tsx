@@ -10,11 +10,9 @@ export async function GET(request: NextRequest) {
     const username = searchParams.get('username') || 'User';
     const displayName = searchParams.get('displayName') || username;
     const bio = searchParams.get('bio') || 'Follow me on MyLiveLinks';
-    const avatarUrl = searchParams.get('avatarUrl') || '';
     
-    // For edge runtime, we'll skip avatar embedding for now (causes issues)
-    // Just use the first letter fallback
-    const avatarDataUrl = '';
+    // Get first letter for avatar
+    const firstLetter = displayName.charAt(0).toUpperCase();
     
     return new ImageResponse(
       (
@@ -23,27 +21,11 @@ export async function GET(request: NextRequest) {
             width: '100%',
             height: '100%',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            fontFamily: 'system-ui, sans-serif',
-            position: 'relative',
           }}
         >
-          {/* Background Pattern */}
-          <div
-            style={{
-              position: 'absolute',
-              width: '100%',
-              height: '100%',
-              opacity: 0.1,
-              backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)',
-              backgroundSize: '30px 30px',
-            }}
-          />
-          
-          {/* Content Container */}
           <div
             style={{
               display: 'flex',
@@ -52,71 +34,36 @@ export async function GET(request: NextRequest) {
               justifyContent: 'center',
               backgroundColor: 'rgba(255, 255, 255, 0.95)',
               borderRadius: '32px',
-              padding: '60px 80px',
-              boxShadow: '0 40px 100px rgba(0, 0, 0, 0.3)',
-              maxWidth: '1000px',
-              textAlign: 'center',
+              padding: '60px',
+              maxWidth: '900px',
             }}
           >
-            {/* Profile Photo */}
-            {avatarDataUrl && (
-              <div
-                style={{
-                  width: '180px',
-                  height: '180px',
-                  borderRadius: '50%',
-                  overflow: 'hidden',
-                  border: '6px solid white',
-                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-                  marginBottom: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                }}
-              >
-                <img
-                  src={avatarDataUrl}
-                  alt={displayName}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                />
-              </div>
-            )}
-            
-            {!avatarDataUrl && (
-              <div
-                style={{
-                  width: '180px',
-                  height: '180px',
-                  borderRadius: '50%',
-                  border: '6px solid white',
-                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
-                  marginBottom: '30px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  fontSize: '80px',
-                  color: 'white',
-                  fontWeight: 'bold',
-                }}
-              >
-                {displayName[0]?.toUpperCase() || '?'}
-              </div>
-            )}
+            {/* Avatar Circle */}
+            <div
+              style={{
+                width: '160px',
+                height: '160px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                fontSize: '72px',
+                color: 'white',
+                fontWeight: 'bold',
+                marginBottom: '24px',
+              }}
+            >
+              {firstLetter}
+            </div>
             
             {/* Display Name */}
             <div
               style={{
-                fontSize: '56px',
+                fontSize: '48px',
                 fontWeight: 'bold',
                 color: '#1a202c',
-                marginBottom: '12px',
-                lineHeight: 1.2,
+                marginBottom: '8px',
               }}
             >
               {displayName}
@@ -125,65 +72,42 @@ export async function GET(request: NextRequest) {
             {/* Username */}
             <div
               style={{
-                fontSize: '32px',
+                fontSize: '28px',
                 color: '#718096',
-                marginBottom: '30px',
+                marginBottom: '24px',
               }}
             >
               @{username}
             </div>
             
             {/* Bio */}
-            {bio && bio.length > 0 && (
-              <div
-                style={{
-                  fontSize: '28px',
-                  color: '#4a5568',
-                  marginBottom: '40px',
-                  maxWidth: '800px',
-                  lineHeight: 1.5,
-                }}
-              >
-                {bio.substring(0, 120)}
-                {bio.length > 120 ? '...' : ''}
-              </div>
-            )}
+            <div
+              style={{
+                fontSize: '24px',
+                color: '#4a5568',
+                marginBottom: '32px',
+                maxWidth: '700px',
+                textAlign: 'center',
+              }}
+            >
+              {bio.substring(0, 120)}
+            </div>
             
-            {/* CTA Badge */}
+            {/* CTA */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '16px',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: 'white',
-                padding: '20px 40px',
+                padding: '16px 32px',
                 borderRadius: '50px',
-                fontSize: '32px',
+                fontSize: '28px',
                 fontWeight: 'bold',
-                boxShadow: '0 10px 30px rgba(102, 126, 234, 0.4)',
               }}
             >
-              <span style={{ fontSize: '40px' }}>🔥</span>
-              Follow me on MyLiveLinks
+              🔥 Follow me on MyLiveLinks
             </div>
-          </div>
-          
-          {/* Bottom Brand */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '16px',
-              color: 'white',
-              fontSize: '28px',
-              fontWeight: 'bold',
-            }}
-          >
-            <span style={{ fontSize: '36px' }}>⭐</span>
-            MyLiveLinks.com
           </div>
         </div>
       ),
@@ -193,9 +117,30 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (e: any) {
-    console.error('Error generating OG image:', e);
-    return new Response(`Failed to generate image: ${e.message}`, {
-      status: 500,
-    });
+    console.error('OG Image Error:', e);
+    
+    // Return a simple error image
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#667eea',
+            color: 'white',
+            fontSize: '32px',
+          }}
+        >
+          MyLiveLinks Profile
+        </div>
+      ),
+      {
+        width: 1200,
+        height: 630,
+      }
+    );
   }
 }
