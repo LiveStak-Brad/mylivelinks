@@ -2634,8 +2634,7 @@ export default function LiveRoom() {
                 <div className={`grid ${uiPanels.focusMode ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6'} ${uiPanels.focusMode ? 'gap-1.5 max-w-[90%]' : 'gap-2'} w-full ${uiPanels.focusMode ? 'h-auto' : 'h-full'}`}>
                 {(() => {
                   // DEBUG: Log grid rendering (only in debug mode to avoid performance issues)
-                  const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-                  if (DEBUG_LIVEKIT) {
+                  if (process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1') {
                     console.log('[GRID RENDER]', {
                       hasGridSlots: !!gridSlots,
                       isArray: Array.isArray(gridSlots),
