@@ -535,7 +535,7 @@ export default function Chat() {
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {msg.username?.[0].toUpperCase()}
+                      {msg.username?.[0]?.toUpperCase() || '?'}
                     </div>
                   )}
                 </>
