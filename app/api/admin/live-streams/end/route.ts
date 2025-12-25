@@ -12,12 +12,22 @@ function authErrorToResponse(err: unknown) {
 export async function POST(request: NextRequest) {
   try {
     await requireAdmin(request);
-    const supabase = createRouteHandlerClient(request);
-    const { data, error } = await supabase.rpc('admin_end_all_streams');
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const body = await request.json().catch(() => null);
+    const streamId = body?.stream_id;
+
+    if (!streamId) {
+      return NextResponse.json({ error: 'Missing stream_id' }, { status: 400 });
     }
-    return NextResponse.json({ success: true, ended: data ?? 0 });
+
+    const supabase = createRouteHandlerClient(request);
+    const { error } = await supabase.rpc('admin_end_stream', {
+      p_stream_id: Number(streamId),
+    });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    return NextResponse.json({ success: true });
   } catch (err) {
     return authErrorToResponse(err);
   }

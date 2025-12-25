@@ -146,8 +146,8 @@ export default function OwnerPanel() {
   const supabase = createClient();
   
   const [loading, setLoading] = useState(true);
-  const [isOwner, setIsOwner] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // Data states
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -166,30 +166,17 @@ export default function OwnerPanel() {
   const [userFilter, setUserFilter] = useState<'all' | 'banned' | 'muted' | 'streamers' | 'verified'>('all');
   const [reportFilter, setReportFilter] = useState<'all' | 'pending' | 'resolved' | 'dismissed'>('pending');
 
-  // Owner IDs
-  const OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
-  const OWNER_EMAILS = ['wcba.mo@gmail.com'];
-
   useEffect(() => {
-    checkOwnerAndLoad();
+    bootstrap();
   }, []);
 
-  const checkOwnerAndLoad = async () => {
+  const bootstrap = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-
-      const ownerStatus = OWNER_IDS.includes(user.id) || OWNER_EMAILS.includes(user.email?.toLowerCase() || '');
-      setIsOwner(ownerStatus);
-
-      if (ownerStatus) {
-        await loadAllData();
-      }
+      setLoadError(null);
+      await loadAllData();
     } catch (error) {
-      console.error('Error checking owner:', error);
+      console.error('Error loading owner panel:', error);
+      setLoadError('Failed to load admin data');
     } finally {
       setLoading(false);
     }
@@ -198,7 +185,7 @@ export default function OwnerPanel() {
   const loadAllData = async () => {
     setRefreshing(true);
     await Promise.all([
-      loadStats(),
+      loadOverview(),
       loadUsers(),
       loadLiveStreams(),
       loadReports(),
@@ -210,69 +197,74 @@ export default function OwnerPanel() {
     setRefreshing(false);
   };
 
-  const loadStats = async () => {
+  const loadOverview = async () => {
     try {
-      // Get total users
-      const { count: totalUsers } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      // Get new users today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const { count: newUsersToday } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', today.toISOString());
-
-      // Get active streams
-      const { count: activeStreams } = await supabase
-        .from('live_streams')
-        .select('*', { count: 'exact', head: true })
-        .eq('live_available', true);
-
-      // Get total gifts
-      const { count: totalGiftsSent } = await supabase
-        .from('gifts')
-        .select('*', { count: 'exact', head: true });
-
-      // Get pending reports
-      const { count: pendingReports } = await supabase
-        .from('reports')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
-      // Get pending applications
-      const { count: pendingApplications } = await supabase
-        .from('room_applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
+      setLoadError(null);
+      const res = await fetch('/api/admin/overview', { cache: 'no-store' });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => 'Failed to load overview');
+        throw new Error(msg);
+      }
+      const data = await res.json();
 
       setStats({
-        totalUsers: totalUsers || 0,
-        newUsersToday: newUsersToday || 0,
-        activeStreams: activeStreams || 0,
-        totalGiftsSent: totalGiftsSent || 0,
-        totalRevenue: 0, // Would need to calculate from Stripe
-        pendingReports: pendingReports || 0,
-        pendingApplications: pendingApplications || 0,
+        totalUsers: Number(data?.totals?.users ?? 0),
+        newUsersToday: 0,
+        activeStreams: Number(data?.totals?.live_streams_active ?? 0),
+        totalGiftsSent: Number(data?.totals?.gifts_sent_24h ?? 0),
+        totalRevenue: 0,
+        pendingReports: Number(data?.totals?.pending_reports ?? 0),
+        pendingApplications: Number(stats?.pendingApplications ?? 0),
       });
+
+      if (Array.isArray(data?.live_now)) {
+        setLiveStreams(
+          data.live_now.map((s: any) => ({
+            id: String(s.stream_id),
+            room_name: String(s.stream_id),
+            live_available: true,
+            started_at: s.started_at,
+            viewer_count: Number(s.viewer_count ?? 0),
+            profile: {
+              username: s.host_name,
+              display_name: null,
+              avatar_url: null,
+            },
+          }))
+        );
+      }
+
+      if (Array.isArray(data?.recent_reports)) {
+        setReports(
+          data.recent_reports.map((r: any) => ({
+            id: String(r.report_id),
+            report_type: 'report',
+            report_reason: String(r.reason ?? 'unknown'),
+            report_details: null,
+            status: String(r.status ?? 'pending'),
+            created_at: r.created_at,
+            reporter: r.reporter_name ? { username: String(r.reporter_name) } : null,
+            reported_user: r.target_name ? { id: '', username: String(r.target_name) } : null,
+          }))
+        );
+      }
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error('Error loading overview:', error);
+      setLoadError('Failed to load overview');
     }
   };
 
   const loadUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const url = new URL('/api/admin/users', window.location.origin);
+      url.searchParams.set('limit', '100');
+      url.searchParams.set('offset', '0');
+      if (searchQuery) url.searchParams.set('q', searchQuery);
 
-      if (!error && data) {
-        setUsers(data);
-      }
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load users');
+      const json = await res.json();
+      setUsers(json.users || []);
     } catch (error) {
       console.error('Error loading users:', error);
     }
@@ -280,18 +272,15 @@ export default function OwnerPanel() {
 
   const loadLiveStreams = async () => {
     try {
-      const { data, error } = await supabase
-        .from('live_streams')
-        .select(`
-          *,
-          profile:profiles(username, display_name, avatar_url)
-        `)
-        .eq('live_available', true)
-        .order('started_at', { ascending: false });
+      const url = new URL('/api/admin/live-streams', window.location.origin);
+      url.searchParams.set('status', 'active');
+      url.searchParams.set('limit', '100');
+      url.searchParams.set('offset', '0');
 
-      if (!error && data) {
-        setLiveStreams(data);
-      }
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load live streams');
+      const json = await res.json();
+      setLiveStreams(json.live_streams || []);
     } catch (error) {
       console.error('Error loading streams:', error);
     }
@@ -299,19 +288,15 @@ export default function OwnerPanel() {
 
   const loadReports = async () => {
     try {
-      const { data, error } = await supabase
-        .from('reports')
-        .select(`
-          *,
-          reporter:profiles!reports_reporter_id_fkey(username),
-          reported_user:profiles!reports_reported_user_id_fkey(id, username)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(200);
+      const url = new URL('/api/admin/reports', window.location.origin);
+      url.searchParams.set('status', reportFilter === 'all' ? 'all' : reportFilter);
+      url.searchParams.set('limit', '100');
+      url.searchParams.set('offset', '0');
 
-      if (!error && data) {
-        setReports(data);
-      }
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load reports');
+      const json = await res.json();
+      setReports(json.reports || []);
     } catch (error) {
       console.error('Error loading reports:', error);
     }
@@ -319,17 +304,17 @@ export default function OwnerPanel() {
 
   const loadApplications = async () => {
     try {
-      const { data, error } = await supabase
-        .from('room_applications')
-        .select(`
-          *,
-          profile:profiles(username, avatar_url)
-        `)
-        .order('created_at', { ascending: false });
+      const url = new URL('/api/admin/applications', window.location.origin);
+      url.searchParams.set('status', 'all');
+      url.searchParams.set('limit', '100');
+      url.searchParams.set('offset', '0');
 
-      if (!error && data) {
-        setApplications(data);
-      }
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load applications');
+      const json = await res.json();
+      setApplications(json.applications || []);
+      const pending = (json.applications || []).filter((a: any) => a.status === 'pending').length;
+      setStats((prev) => (prev ? { ...prev, pendingApplications: pending } : prev));
     } catch (error) {
       console.error('Error loading applications:', error);
     }
@@ -367,29 +352,13 @@ export default function OwnerPanel() {
 
   const loadTransactions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('gifts')
-        .select(`
-          id,
-          coins_spent,
-          diamonds_awarded,
-          created_at,
-          from_profile:profiles!gifts_from_profile_id_fkey(username),
-          to_profile:profiles!gifts_to_profile_id_fkey(username)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (!error && data) {
-        setTransactions(data.map((g: any) => ({
-          id: g.id,
-          type: 'gift',
-          amount: g.coins_spent,
-          created_at: g.created_at,
-          from_user: g.from_profile?.username,
-          to_user: g.to_profile?.username,
-        })));
-      }
+      const url = new URL('/api/admin/transactions', window.location.origin);
+      url.searchParams.set('limit', '100');
+      url.searchParams.set('offset', '0');
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load transactions');
+      const json = await res.json();
+      setTransactions(json.transactions || []);
     } catch (error) {
       console.error('Error loading transactions:', error);
     }
@@ -450,9 +419,13 @@ export default function OwnerPanel() {
     if (!confirm('End this stream?')) return;
     setActionLoading(streamId);
     try {
-      await supabase.from('live_streams').update({ live_available: false, ended_at: new Date().toISOString() }).eq('id', streamId);
-      setLiveStreams(liveStreams.filter(s => s.id !== streamId));
-      if (stats) setStats({ ...stats, activeStreams: stats.activeStreams - 1 });
+      await fetch('/api/admin/live-streams/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stream_id: streamId }),
+      });
+      await loadOverview();
+      await loadLiveStreams();
     } catch (error) {
       alert('Failed to end stream');
     } finally {
@@ -464,17 +437,10 @@ export default function OwnerPanel() {
     if (!confirm('END ALL STREAMS? This will stop every live stream immediately.')) return;
     setActionLoading('all-streams');
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (!accessToken) throw new Error('No session');
-      
-      await fetch('/api/admin/end-streams', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      
-      setLiveStreams([]);
-      if (stats) setStats({ ...stats, activeStreams: 0 });
+      const res = await fetch('/api/admin/live-streams/end-all', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed');
+      await loadOverview();
+      await loadLiveStreams();
       alert('All streams ended');
     } catch (error) {
       alert('Failed to end all streams');
@@ -486,9 +452,13 @@ export default function OwnerPanel() {
   const handleResolveReport = async (reportId: string, status: 'resolved' | 'dismissed') => {
     setActionLoading(reportId);
     try {
-      await supabase.from('reports').update({ status }).eq('id', reportId);
-      setReports(reports.map(r => r.id === reportId ? { ...r, status } : r));
-      if (stats) setStats({ ...stats, pendingReports: Math.max(0, stats.pendingReports - 1) });
+      await fetch('/api/admin/reports/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report_id: reportId, resolution: status === 'dismissed' ? 'dismissed' : 'actioned' }),
+      });
+      await loadOverview();
+      await loadReports();
     } catch (error) {
       alert('Failed to update report');
     } finally {
@@ -499,12 +469,12 @@ export default function OwnerPanel() {
   const handleApplicationStatus = async (appId: string, profileId: string, status: 'approved' | 'rejected') => {
     setActionLoading(appId);
     try {
-      await supabase.from('room_applications').update({ status, reviewed_at: new Date().toISOString() }).eq('id', appId);
-      if (status === 'approved') {
-        await supabase.from('profiles').update({ can_stream: true, room_approved: true }).eq('id', profileId);
-      }
-      setApplications(applications.map(a => a.id === appId ? { ...a, status } : a));
-      if (stats) setStats({ ...stats, pendingApplications: Math.max(0, stats.pendingApplications - 1) });
+      await fetch('/api/admin/applications/decide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: appId, decision: status }),
+      });
+      await loadApplications();
     } catch (error) {
       alert('Failed to update application');
     } finally {
@@ -585,25 +555,6 @@ export default function OwnerPanel() {
     );
   }
 
-  // Access denied
-  if (!isOwner) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <div className="text-center">
-          <Shield className="w-20 h-20 text-red-500 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-white mb-2">Access Denied</h1>
-          <p className="text-gray-400 mb-6">This panel is restricted to the platform owner.</p>
-          <button
-            onClick={() => router.push('/live')}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-          >
-            Back to Live
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Tabs configuration
   const tabs: { id: TabType; label: string; icon: any; badge?: number }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -633,6 +584,12 @@ export default function OwnerPanel() {
             </div>
           </div>
         </div>
+
+        {loadError && (
+          <div className="mb-6 bg-red-900/20 border border-red-500/30 text-red-200 rounded-lg px-4 py-3">
+            {loadError}
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 py-4 overflow-y-auto">

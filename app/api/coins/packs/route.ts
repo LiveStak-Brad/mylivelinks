@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
@@ -26,11 +24,13 @@ export async function GET(request: NextRequest) {
   try {
     const adminSupabase = getSupabaseAdmin();
     
-    // Query all active coin packs
+    // Query all active *Stripe-backed* coin packs (must have a Stripe price_id to be purchasable)
     const { data: packs, error } = await adminSupabase
       .from('coin_packs')
       .select('*')
       .or('active.eq.true,is_active.eq.true')
+      .not('stripe_price_id', 'is', null)
+      .neq('stripe_price_id', '')
       .order('display_order', { ascending: true });
 
     if (error) {
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // Normalize pack data to consistent shape
     const normalized = packs.map((pack: any) => ({
       sku: pack.sku || `pack_${pack.id}`,
-      price_id: pack.stripe_price_id || '',
+      price_id: pack.stripe_price_id,
       usd_amount: pack.price_cents ? pack.price_cents / 100 : (pack.price_usd || 0),
       coins_awarded: pack.coins_amount || pack.coins || 0,
       pack_name: pack.name || pack.pack_name || 'Coin Pack',

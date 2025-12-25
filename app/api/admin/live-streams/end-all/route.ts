@@ -12,11 +12,12 @@ function authErrorToResponse(err: unknown) {
 export async function POST(request: NextRequest) {
   try {
     await requireAdmin(request);
+
     const supabase = createRouteHandlerClient(request);
     const { data, error } = await supabase.rpc('admin_end_all_streams');
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
     return NextResponse.json({ success: true, ended: data ?? 0 });
   } catch (err) {
     return authErrorToResponse(err);

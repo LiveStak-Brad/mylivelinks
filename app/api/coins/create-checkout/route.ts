@@ -4,6 +4,9 @@ import { cookies } from 'next/headers';
 import { createCoinCheckoutSession, logStripeAction } from '@/lib/stripe';
 import { getCoinPackByPriceId, getCoinPackBySku } from '@/lib/supabase-admin';
 
+const OWNER_IDS = new Set(['2b4a1178-3c39-4179-94ea-314dd824a818']);
+const OWNER_EMAILS = new Set(['wcba.mo@gmail.com']);
+
 /**
  * POST /api/coins/create-checkout
  * Create Stripe Checkout Session for coin purchase
@@ -66,6 +69,57 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid coin pack' },
         { status: 400 }
       );
+    }
+
+    if (!pack.stripe_price_id) {
+      logStripeAction('create-checkout-missing-price-id', {
+        requestId,
+        userId: user.id,
+        packSku: pack.sku,
+      });
+      return NextResponse.json(
+        { error: 'Coin pack is not purchasable' },
+        { status: 400 }
+      );
+    }
+
+    const email = (user.email || '').toLowerCase();
+    const isOwner = OWNER_IDS.has(user.id) || OWNER_EMAILS.has(email);
+
+    if (!isOwner && (pack.vip_tier ?? 0) > 0) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('vip_tier')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) {
+        logStripeAction('create-checkout-vip-tier-read-error', {
+          requestId,
+          userId: user.id,
+          error: profileError.message,
+        });
+        return NextResponse.json(
+          { error: 'Unable to verify VIP tier' },
+          { status: 500 }
+        );
+      }
+
+      const userTier = profile?.vip_tier || 0;
+      const requiredTier = pack.vip_tier || 0;
+      if (userTier < requiredTier) {
+        logStripeAction('create-checkout-vip-tier-blocked', {
+          requestId,
+          userId: user.id,
+          userTier,
+          requiredTier,
+          packSku: pack.sku,
+        });
+        return NextResponse.json(
+          { error: 'VIP tier required for this coin pack' },
+          { status: 403 }
+        );
+      }
     }
 
     // Create Checkout Session

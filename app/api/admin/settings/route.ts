@@ -9,15 +9,24 @@ function authErrorToResponse(err: unknown) {
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     await requireAdmin(request);
+
     const supabase = createRouteHandlerClient(request);
-    const { data, error } = await supabase.rpc('admin_end_all_streams');
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+
+    // Primary: platform_settings key/value store (if present)
+    const { data, error } = await supabase
+      .from('platform_settings')
+      .select('key, value, updated_at')
+      .order('key', { ascending: true });
+
+    if (!error) {
+      return NextResponse.json({ settings: data ?? [], source: 'platform_settings' });
     }
-    return NextResponse.json({ success: true, ended: data ?? 0 });
+
+    // Fallback: nothing configured yet
+    return NextResponse.json({ settings: [], source: 'none' });
   } catch (err) {
     return authErrorToResponse(err);
   }
