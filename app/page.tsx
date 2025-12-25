@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Search, Video, Users, TrendingUp, Link2 } from 'lucide-react';
+import ProfileCarousel from '@/components/ProfileCarousel';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -134,61 +135,69 @@ export default function LandingPage() {
               <Search className="absolute right-5 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
             </div>
 
-            {/* Search Results */}
-            {searchQuery && (
-              <div className="mt-4 max-h-96 overflow-y-auto">
-                {searching ? (
-                  <div className="text-center py-8 text-gray-500">
-                    Searching...
-                  </div>
-                ) : searchResults.length > 0 ? (
-                  <div className="space-y-2">
-                    {searchResults.map((profile) => (
-                      <Link
-                        key={profile.id}
-                        href={`/${profile.username}`}
-                        className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition group"
-                      >
-                        {profile.avatar_url ? (
-                          <img
-                            src={profile.avatar_url}
-                            alt={profile.username}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
-                            {profile.username.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-gray-900 group-hover:text-purple-600 transition">
-                              {profile.display_name || profile.username}
-                            </p>
-                            {profile.is_live && (
-                              <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                                LIVE
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-500">@{profile.username}</p>
-                          {profile.bio && (
-                            <p className="text-sm text-gray-600 truncate mt-1">
-                              {profile.bio}
-                            </p>
+          {/* Search Results */}
+          {searchQuery && (
+            <div className="mt-4 max-h-96 overflow-y-auto">
+              {searching ? (
+                <div className="text-center py-8 text-gray-500">
+                  Searching...
+                </div>
+              ) : searchResults.length > 0 ? (
+                <div className="space-y-2">
+                  {searchResults.map((profile) => (
+                    <Link
+                      key={profile.id}
+                      href={`/${profile.username}`}
+                      className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition group"
+                    >
+                      {profile.avatar_url ? (
+                        <img
+                          src={profile.avatar_url}
+                          alt={profile.username}
+                          className="w-12 h-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+                          {profile.username.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900 group-hover:text-purple-600 transition">
+                            {profile.display_name || profile.username}
+                          </p>
+                          {profile.is_live && (
+                            <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                              LIVE
+                            </span>
                           )}
                         </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No profiles found. Try a different search term.
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                        <p className="text-sm text-gray-500">@{profile.username}</p>
+                        {profile.bio && (
+                          <p className="text-sm text-gray-600 truncate mt-1">
+                            {profile.bio}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No profiles found. Try a different search term.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Recommended Profiles Carousel */}
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          <ProfileCarousel 
+            title={currentUser ? "Recommended for You" : "Popular Creators"} 
+            currentUserId={currentUser?.id || null}
+          />
+        </div>
 
           {/* Features Grid */}
           <div className="grid md:grid-cols-2 gap-6 mb-12">
