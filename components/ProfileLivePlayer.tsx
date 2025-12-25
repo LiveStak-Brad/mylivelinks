@@ -127,7 +127,7 @@ export default function ProfileLivePlayer({
   };
 
   const subscribeToParticipant = (room: Room, userId: string) => {
-    const participants = Array.from(room.participants.values());
+    const participants = Array.from(room.remoteParticipants.values());
     
     for (const participant of participants) {
       const participantUserId = extractUserId(participant.identity);
