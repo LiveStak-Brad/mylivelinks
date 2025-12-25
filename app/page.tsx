@@ -113,13 +113,13 @@ export default function LandingPage() {
           </div>
 
           {/* Search Bar */}
-          <div className="bg-white rounded-2xl shadow-2xl p-8 mb-12">
+          <div className="bg-card rounded-2xl shadow-2xl p-8 mb-12 border border-border/50">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                <Search className="w-6 h-6 text-purple-600" />
+              <h2 className="text-2xl font-bold text-foreground mb-2 flex items-center gap-2">
+                <Search className="w-6 h-6 text-primary" />
                 Find Creators
               </h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 Search for profiles, discover new content, and connect with creators
               </p>
             </div>
@@ -130,16 +130,16 @@ export default function LandingPage() {
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 placeholder="Search by username or name..."
-                className="w-full px-6 py-4 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition"
+                className="w-full px-6 py-4 text-lg border-2 border-border rounded-xl focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition bg-background text-foreground"
               />
-              <Search className="absolute right-5 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
+              <Search className="absolute right-5 top-1/2 -translate-y-1/2 w-6 h-6 text-muted-foreground" />
             </div>
 
           {/* Search Results */}
           {searchQuery && (
             <div className="mt-4 max-h-96 overflow-y-auto">
               {searching ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-muted-foreground">
                   Searching...
                 </div>
               ) : searchResults.length > 0 ? (
@@ -148,7 +148,7 @@ export default function LandingPage() {
                     <Link
                       key={profile.id}
                       href={`/${profile.username}`}
-                      className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition group"
+                      className="flex items-center gap-4 p-4 hover:bg-muted rounded-xl transition group"
                     >
                       {profile.avatar_url ? (
                         <img
@@ -163,7 +163,7 @@ export default function LandingPage() {
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-gray-900 group-hover:text-purple-600 transition">
+                          <p className="font-semibold text-foreground group-hover:text-primary transition">
                             {profile.display_name || profile.username}
                           </p>
                           {profile.is_live && (
@@ -172,9 +172,9 @@ export default function LandingPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-500">@{profile.username}</p>
+                        <p className="text-sm text-muted-foreground">@{profile.username}</p>
                         {profile.bio && (
-                          <p className="text-sm text-gray-600 truncate mt-1">
+                          <p className="text-sm text-muted-foreground truncate mt-1">
                             {profile.bio}
                           </p>
                         )}
@@ -183,7 +183,7 @@ export default function LandingPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-muted-foreground">
                   No profiles found. Try a different search term.
                 </div>
               )}
@@ -192,7 +192,7 @@ export default function LandingPage() {
         </div>
 
         {/* Recommended Profiles Carousel - More prominent */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 mb-12">
+        <div className="bg-card rounded-2xl shadow-2xl p-8 mb-12 border border-border/50">
           <ProfileCarousel 
             title={currentUser ? "Recommended for You" : "Popular Creators"} 
             currentUserId={currentUser?.id || null}
@@ -243,8 +243,8 @@ export default function LandingPage() {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          <div className="bg-card rounded-2xl shadow-2xl p-8 text-center border border-border/50">
+            <h2 className="text-2xl font-bold text-foreground mb-6">
               Ready to Get Started?
             </h2>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -265,7 +265,7 @@ export default function LandingPage() {
               )}
               <Link
                 href="/live"
-                className="px-8 py-4 bg-white border-2 border-purple-500 text-purple-600 font-semibold rounded-xl hover:bg-purple-50 transition"
+                className="px-8 py-4 bg-card border-2 border-primary text-primary font-semibold rounded-xl hover:bg-primary/10 transition"
               >
                 Browse Live Streams
               </Link>

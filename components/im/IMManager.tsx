@@ -33,6 +33,43 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
   const [focusedChatId, setFocusedChatId] = useState<string | null>(null);
   const supabase = createClient();
 
+  const markConversationRead = useCallback(
+    async (otherUserId: string) => {
+      if (!currentUserId) return;
+
+      try {
+        const readAt = new Date().toISOString();
+        const { error } = await supabase
+          .from('instant_messages')
+          .update({ read_at: readAt })
+          .eq('recipient_id', currentUserId)
+          .eq('sender_id', otherUserId)
+          .is('read_at', null);
+
+        if (error) {
+          console.error('[IM] Error marking messages read:', error);
+          return;
+        }
+
+        setChatWindows(prev =>
+          prev.map(c =>
+            c.recipientId === otherUserId
+              ? {
+                  ...c,
+                  messages: c.messages.map(m =>
+                    m.senderId === otherUserId && m.status !== 'read' ? { ...m, status: 'read' as const } : m
+                  ),
+                }
+              : c
+          )
+        );
+      } catch (error) {
+        console.error('[IM] Error marking messages read:', error);
+      }
+    },
+    [currentUserId, supabase]
+  );
+
   // Calculate initial position for new windows (stack from bottom right)
   const getNewWindowPosition = useCallback((index: number) => {
     const baseX = typeof window !== 'undefined' ? window.innerWidth - 340 : 100;
@@ -89,7 +126,7 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
         .from('instant_messages')
         .select('*')
         .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${recipientId}),and(sender_id.eq.${recipientId},recipient_id.eq.${currentUserId})`)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) {
@@ -97,7 +134,8 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
         return;
       }
 
-      const messages: IMMessage[] = (data || []).map((m: any) => ({
+      const rows = [...(data || [])].reverse();
+      const messages: IMMessage[] = rows.map((m: any) => ({
         id: m.id.toString(),
         senderId: m.sender_id,
         content: m.content,
@@ -108,6 +146,8 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
       setChatWindows(prev => prev.map(c => 
         c.chatId === chatId ? { ...c, messages } : c
       ));
+
+      await markConversationRead(recipientId);
     } catch (error) {
       console.error('[IM] Error loading messages:', error);
     }
@@ -191,7 +231,11 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
   // Focus a chat
   const focusChat = useCallback((chatId: string) => {
     setFocusedChatId(chatId);
-  }, []);
+    const chat = chatWindows.find(c => c.chatId === chatId);
+    if (chat) {
+      void markConversationRead(chat.recipientId);
+    }
+  }, [chatWindows, markConversationRead]);
 
   // Subscribe to real-time messages
   useEffect(() => {

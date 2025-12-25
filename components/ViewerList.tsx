@@ -223,31 +223,10 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
             {viewers.map((viewer) => (
               <div
                 key={viewer.profile_id}
-                draggable={viewer.is_live_available}
-                onDragStart={(e) => {
-                  if (viewer.is_live_available) {
-                    e.dataTransfer.effectAllowed = 'move';
-                    const dragData = {
-                      type: 'viewer',
-                      profile_id: viewer.profile_id,
-                      username: viewer.username,
-                      avatar_url: viewer.avatar_url,
-                      live_stream_id: viewer.live_stream_id,
-                    };
-                    e.dataTransfer.setData('application/json', JSON.stringify(dragData));
-                    e.dataTransfer.setData('text/plain', viewer.profile_id); // Fallback
-                    console.log('Drag started:', dragData);
-                    if (onDragStart) {
-                      onDragStart(viewer);
-                    }
-                  } else {
-                    e.preventDefault();
-                  }
-                }}
                 className={`
                   flex items-center gap-2 p-2 rounded transition cursor-pointer
                   ${viewer.is_live_available 
-                    ? 'hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-grab active:cursor-grabbing' 
+                    ? 'hover:bg-blue-50 dark:hover:bg-blue-900/20' 
                     : 'hover:bg-gray-50 dark:hover:bg-gray-900 cursor-default'
                   }
                 `}
@@ -298,7 +277,9 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         setSelectedProfile({
                           profileId: viewer.profile_id,
                           username: viewer.username,
@@ -307,6 +288,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                           isLive: viewer.is_live_available,
                         });
                       }}
+                      draggable={false}
                       className={`text-sm font-medium truncate hover:text-blue-500 dark:hover:text-blue-400 transition cursor-pointer ${viewer.is_live_available ? 'text-red-600 dark:text-red-400' : ''}`}
                     >
                       {viewer.username}
@@ -335,6 +317,37 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                     )}
                   </div>
                 </div>
+
+                {viewer.is_live_available ? (
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      e.dataTransfer.effectAllowed = 'move';
+                      const dragData = {
+                        type: 'viewer',
+                        profile_id: viewer.profile_id,
+                        username: viewer.username,
+                        avatar_url: viewer.avatar_url,
+                        live_stream_id: viewer.live_stream_id,
+                      };
+                      e.dataTransfer.setData('application/json', JSON.stringify(dragData));
+                      e.dataTransfer.setData('text/plain', viewer.profile_id);
+                      if (onDragStart) {
+                        onDragStart(viewer);
+                      }
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="flex-shrink-0 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 cursor-grab active:cursor-grabbing"
+                    title="Drag to add to grid"
+                  >
+                    <span className="text-xs font-semibold text-red-600 dark:text-red-400">Drag</span>
+                  </button>
+                ) : null}
 
                 {/* Active Indicator */}
                 {viewer.is_active && (

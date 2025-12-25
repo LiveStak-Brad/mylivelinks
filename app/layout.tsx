@@ -6,6 +6,8 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import AgeVerificationModal from '@/components/AgeVerificationModal';
 import GlobalHeader from '@/components/GlobalHeader';
 import { IMProvider } from '@/components/im';
+import { NotiesProvider } from '@/components/noties';
+import { MessagesProvider } from '@/components/messages';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,15 +29,17 @@ export default function RootLayout({
       <body className={inter.className}>
         <ErrorBoundary>
           <ClientThemeProvider>
-            <GlobalHeader />
-            <AgeVerificationModal />
-            <IMProvider />
-            {children}
+            <NotiesProvider>
+              <MessagesProvider>
+                <GlobalHeader />
+                <AgeVerificationModal />
+                <IMProvider />
+                {children}
+              </MessagesProvider>
+            </NotiesProvider>
           </ClientThemeProvider>
         </ErrorBoundary>
       </body>
     </html>
   );
 }
-
-

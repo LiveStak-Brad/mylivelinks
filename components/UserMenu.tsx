@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
+import ThemeToggle from './ThemeToggle';
 
 interface UserMenuProps {
   className?: string;
@@ -106,13 +107,13 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
       </button>
 
       {showMenu && (
-        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50">
+        <div className="absolute right-0 mt-2 w-48 bg-card rounded-lg shadow-xl border border-border py-2 z-50 animate-scale-in">
           {profile && (
-            <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+            <div className="px-4 py-2 border-b border-border">
+              <p className="text-sm font-semibold text-foreground">
                 {profile.display_name || profile.username}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 @{profile.username}
               </p>
             </div>
@@ -121,7 +122,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
           <a
             href={`/${profile?.username || 'settings/profile'}`}
             onClick={() => setShowMenu(false)}
-            className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            className="block px-4 py-2 text-sm text-foreground hover:bg-muted transition"
           >
             View Profile
           </a>
@@ -129,16 +130,20 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
           <a
             href="/settings/profile"
             onClick={() => setShowMenu(false)}
-            className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            className="block px-4 py-2 text-sm text-foreground hover:bg-muted transition"
           >
             Edit Profile
           </a>
           
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+          <div className="border-t border-border my-1" />
+          
+          <ThemeToggle variant="menu-item" />
+          
+          <div className="border-t border-border my-1" />
           
           <button
             onClick={handleLogout}
-            className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            className="w-full text-left px-4 py-2 text-sm text-destructive hover:bg-muted transition"
           >
             Logout
           </button>
