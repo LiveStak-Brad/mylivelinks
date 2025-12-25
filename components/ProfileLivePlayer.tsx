@@ -429,22 +429,22 @@ export default function ProfileLivePlayer({
             <div className="flex items-center justify-between gap-2">
               {/* Volume Control - Expandable */}
               <div 
-                className="relative flex items-center gap-2"
+                className="relative flex items-center"
                 onMouseEnter={() => setShowVolumeSlider(true)}
                 onMouseLeave={() => setShowVolumeSlider(false)}
               >
                 <button
                   onClick={() => setIsMuted(!isMuted)}
-                  className="flex items-center justify-center w-8 h-8 bg-black/60 backdrop-blur-sm text-white rounded-full hover:bg-black/80 transition-all"
+                  className="flex items-center justify-center w-8 h-8 bg-black/60 backdrop-blur-sm text-white rounded-full hover:bg-black/80 transition-all z-10"
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
                   {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
                 
-                {/* Expandable Horizontal Volume Slider */}
+                {/* Expandable Horizontal Volume Slider - seamlessly connected */}
                 {showVolumeSlider && (
                   <div 
-                    className="absolute left-full ml-2 bottom-0 bg-black/80 backdrop-blur-sm rounded-full px-3 py-2 shadow-xl transition-all flex items-center gap-2"
+                    className="absolute left-6 bottom-0 bg-black/80 backdrop-blur-sm rounded-r-full pl-4 pr-3 py-2 shadow-xl transition-all flex items-center gap-2"
                   >
                     <input
                       type="range"
