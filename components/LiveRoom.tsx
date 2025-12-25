@@ -1039,7 +1039,7 @@ export default function LiveRoom() {
             .from('live_streams')
             .select('id, profile_id, live_available')
             .eq('live_available', true)
-            .order('published_at', { ascending: false, nullsFirst: false })
+            .order('id', { ascending: false }) // Order by id DESC (newest first) since published_at not selected
             .limit(50);
           
           if (directResult.error) {
