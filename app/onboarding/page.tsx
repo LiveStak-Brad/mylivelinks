@@ -47,15 +47,35 @@ export default function OnboardingPage() {
     
     setUserId(user.id);
     
-    // Check if profile already complete
-    const { data: profile } = await supabase
+    // Check if profile exists
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('username, date_of_birth')
       .eq('id', user.id)
-      .single();
+      .maybeSingle(); // Use maybeSingle() instead of single() to avoid error if no row
+    
+    // If profile doesn't exist at all, create a minimal one
+    if (!profile && !profileError) {
+      console.log('[ONBOARDING] No profile found, creating minimal profile...');
+      const { error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.id,
+          username: null, // Will be set in onboarding
+          coin_balance: 0,
+          earnings_balance: 0,
+          gifter_level: 0
+        });
+      
+      if (createError) {
+        console.error('[ONBOARDING] Failed to create minimal profile:', createError);
+        // Continue anyway - upsert will handle it later
+      }
+    }
     
     if (profile?.username && profile?.date_of_birth) {
-      router.push('/live');
+      // Profile complete, redirect to homepage
+      router.push('/');
       return;
     }
     
@@ -87,8 +107,8 @@ export default function OnboardingPage() {
           setError('Username is required');
           return false;
         }
-        if (formData.username.length < 3) {
-          setError('Username must be at least 3 characters');
+        if (formData.username.length < 4) {
+          setError('Username must be at least 4 characters');
           return false;
         }
         if (!/^[a-zA-Z0-9_-]+$/.test(formData.username)) {
@@ -166,20 +186,28 @@ export default function OnboardingPage() {
     try {
       const age = calculateAge(formData.dateOfBirth);
       
-      // Update profile
+      // UPSERT profile (create if doesn't exist, update if it does)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: userId, // Important: include ID for upsert
           username: formData.username.trim(),
           display_name: formData.displayName.trim() || null,
           bio: formData.bio.trim() || null,
           date_of_birth: formData.dateOfBirth,
           adult_verified_at: age >= 18 ? new Date().toISOString() : null,
-          adult_verified_method: age >= 18 ? 'self_attested' : null
-        })
-        .eq('id', userId);
+          adult_verified_method: age >= 18 ? 'self_attested' : null,
+          coin_balance: 0,
+          earnings_balance: 0,
+          gifter_level: 0
+        }, {
+          onConflict: 'id'
+        });
       
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Profile upsert error:', profileError);
+        throw new Error(`Failed to create profile: ${profileError.message}`);
+      }
       
       // If user is 18+ and accepted adult disclaimer, set up user_settings
       if (age >= 18 && formData.acceptAdultDisclaimer) {
@@ -201,8 +229,8 @@ export default function OnboardingPage() {
         }
       }
       
-      // Redirect to profile or live room
-      router.push('/live');
+      // Redirect to homepage (will show search/features)
+      router.push('/');
     } catch (err: any) {
       console.error('Onboarding error:', err);
       setError(err.message || 'Failed to complete profile setup');

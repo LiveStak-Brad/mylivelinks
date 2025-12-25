@@ -5,11 +5,16 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Search, Video, Users, TrendingUp, Link2 } from 'lucide-react';
 
 export default function LandingPage() {
   const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     checkUser();
@@ -19,22 +24,66 @@ export default function LandingPage() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      // Check if profile is complete
-      const { data: profile } = await supabase
+      // Check if profile is complete - use maybeSingle() to avoid error if no row
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('username, date_of_birth')
+        .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
+      
+      // If profile doesn't exist, create minimal one and redirect to onboarding
+      if (!profile && !profileError) {
+        console.log('[LANDING] No profile found, creating minimal profile...');
+        await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            username: null,
+            coin_balance: 0,
+            earnings_balance: 0,
+            gifter_level: 0
+          });
+        router.push('/onboarding');
+        return;
+      }
       
       if (profile?.username && profile?.date_of_birth) {
-        // Profile complete, redirect to live room
-        router.push('/live');
+        // Profile complete, show homepage
+        setCurrentUser(profile);
+        setLoading(false);
       } else {
         // Profile incomplete, redirect to onboarding
         router.push('/onboarding');
       }
     } else {
-      setLoading(false);
+      // Not logged in, redirect to login
+      router.push('/login');
+    }
+  };
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url, bio, is_live')
+        .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+        .limit(10);
+
+      if (!error && data) {
+        setSearchResults(data);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setSearching(false);
     }
   };
 
@@ -49,149 +98,169 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600">
       {/* Hero Section */}
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto text-center text-white">
-          {/* Logo/Brand */}
-          <div className="mb-8">
-            <h1 className="text-6xl md:text-8xl font-bold mb-4 drop-shadow-lg">
-              MyLiveLinks
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto">
+          {/* Welcome Message */}
+          <div className="text-center mb-12">
+            <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">
+              Welcome to MyLiveLinks
             </h1>
-            <p className="text-2xl md:text-3xl font-light opacity-90">
-              Stream Live. Share Links. Build Community.
+            <p className="text-xl md:text-2xl text-white/90 mb-2">
+              Your all-in-one platform for live streaming and link sharing
+            </p>
+            <p className="text-lg text-white/80">
+              Stream live, share your links, and build your community — all in one place! 🚀
             </p>
           </div>
 
+          {/* Search Bar */}
+          <div className="bg-white rounded-2xl shadow-2xl p-8 mb-12">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <Search className="w-6 h-6 text-purple-600" />
+                Find Creators
+              </h2>
+              <p className="text-gray-600">
+                Search for profiles, discover new content, and connect with creators
+              </p>
+            </div>
+
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Search by username or name..."
+                className="w-full px-6 py-4 text-lg border-2 border-gray-300 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none transition"
+              />
+              <Search className="absolute right-5 top-1/2 -translate-y-1/2 w-6 h-6 text-gray-400" />
+            </div>
+
+            {/* Search Results */}
+            {searchQuery && (
+              <div className="mt-4 max-h-96 overflow-y-auto">
+                {searching ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Searching...
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div className="space-y-2">
+                    {searchResults.map((profile) => (
+                      <Link
+                        key={profile.id}
+                        href={`/${profile.username}`}
+                        className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition group"
+                      >
+                        {profile.avatar_url ? (
+                          <img
+                            src={profile.avatar_url}
+                            alt={profile.username}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+                            {profile.username.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-gray-900 group-hover:text-purple-600 transition">
+                              {profile.display_name || profile.username}
+                            </p>
+                            {profile.is_live && (
+                              <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                                LIVE
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500">@{profile.username}</p>
+                          {profile.bio && (
+                            <p className="text-sm text-gray-600 truncate mt-1">
+                              {profile.bio}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    No profiles found. Try a different search term.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Features Grid */}
-          <div className="grid md:grid-cols-3 gap-8 my-16">
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 hover:bg-white/20 transition">
-              <div className="text-5xl mb-4">🎥</div>
-              <h3 className="text-2xl font-bold mb-2">Live Streaming</h3>
-              <p className="opacity-80">
-                Go live instantly with high-quality video streaming powered by LiveKit
+          <div className="grid md:grid-cols-2 gap-6 mb-12">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 text-white">
+              <div className="bg-white/20 w-14 h-14 rounded-full flex items-center justify-center mb-4">
+                <Video className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Live Streaming</h3>
+              <p className="text-white/90">
+                Go live instantly with high-quality video streaming. Connect with your audience in real-time.
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 hover:bg-white/20 transition">
-              <div className="text-5xl mb-4">🔗</div>
-              <h3 className="text-2xl font-bold mb-2">Custom Links</h3>
-              <p className="opacity-80">
-                Share your social media, stores, and content in one beautiful profile
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 text-white">
+              <div className="bg-white/20 w-14 h-14 rounded-full flex items-center justify-center mb-4">
+                <Link2 className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Link Hub</h3>
+              <p className="text-white/90">
+                Share all your important links in one beautiful profile. Your personal link tree, supercharged!
               </p>
             </div>
 
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 hover:bg-white/20 transition">
-              <div className="text-5xl mb-4">💎</div>
-              <h3 className="text-2xl font-bold mb-2">Earn & Gift</h3>
-              <p className="opacity-80">
-                Monetize your content with gifts, tips, and viewer support
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 text-white">
+              <div className="bg-white/20 w-14 h-14 rounded-full flex items-center justify-center mb-4">
+                <Users className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Community</h3>
+              <p className="text-white/90">
+                Follow creators, chat live, send gifts, and build your community all in one place.
+              </p>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 text-white">
+              <div className="bg-white/20 w-14 h-14 rounded-full flex items-center justify-center mb-4">
+                <TrendingUp className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Monetization</h3>
+              <p className="text-white/90">
+                Earn from your content through gifts, tips, and viewer support. Turn your passion into income.
               </p>
             </div>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mt-12">
-            <Link
-              href="/signup"
-              className="bg-white text-purple-600 px-10 py-4 rounded-full text-xl font-bold hover:bg-gray-100 transition shadow-2xl hover:scale-105 transform"
-            >
-              Create Account
-            </Link>
-            
-            <Link
-              href="/login"
-              className="bg-white/20 backdrop-blur-md text-white px-10 py-4 rounded-full text-xl font-bold hover:bg-white/30 transition border-2 border-white/50"
-            >
-              Sign In
-            </Link>
-          </div>
-
-          {/* Quick Browse */}
-          <div className="mt-12">
-            <Link
-              href="/live"
-              className="text-white/80 hover:text-white underline text-lg"
-            >
-              Browse Live Streams →
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Features Section */}
-      <div className="bg-white/10 backdrop-blur-md py-16">
-        <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-4xl font-bold text-white text-center mb-12">
-              Why MyLiveLinks?
+          {/* Quick Actions */}
+          <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              Ready to Get Started?
             </h2>
-            
-            <div className="grid md:grid-cols-2 gap-8 text-white">
-              <div className="flex gap-4">
-                <div className="text-3xl">✨</div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Beautiful Profiles</h3>
-                  <p className="opacity-80">Customize your profile with backgrounds, colors, and themes</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-3xl">🎁</div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Virtual Gifts</h3>
-                  <p className="opacity-80">Send and receive gifts during live streams</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-3xl">👥</div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Social Features</h3>
-                  <p className="opacity-80">Follow, message, and connect with creators</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-3xl">📱</div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Mobile & Web</h3>
-                  <p className="opacity-80">Stream and browse on any device</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-3xl">💰</div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Monetization</h3>
-                  <p className="opacity-80">Turn your passion into income with our creator economy</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="text-3xl">🔒</div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Safe & Secure</h3>
-                  <p className="opacity-80">Age-verified platform with strong moderation</p>
-                </div>
-              </div>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                href={`/${currentUser?.username}`}
+                className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition shadow-lg"
+              >
+                View My Profile
+              </Link>
+              <Link
+                href="/live"
+                className="px-8 py-4 bg-white border-2 border-purple-500 text-purple-600 font-semibold rounded-xl hover:bg-purple-50 transition"
+              >
+                Browse Live Streams
+              </Link>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Footer CTA */}
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h2 className="text-4xl font-bold text-white mb-4">
-          Ready to Get Started?
-        </h2>
-        <p className="text-xl text-white/80 mb-8">
-          Join thousands of creators and viewers today
-        </p>
-        <Link
-          href="/signup"
-          className="inline-block bg-white text-purple-600 px-12 py-5 rounded-full text-2xl font-bold hover:bg-gray-100 transition shadow-2xl hover:scale-105 transform"
-        >
-          Sign Up Free
-        </Link>
+      {/* Footer */}
+      <div className="container mx-auto px-4 py-8 text-center text-white/60 text-sm">
+        <p>© 2025 MyLiveLinks. All rights reserved.</p>
       </div>
     </div>
   );

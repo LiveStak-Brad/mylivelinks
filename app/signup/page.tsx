@@ -22,15 +22,28 @@ export default function SignUpPage() {
       const user = data?.user;
       
       if (user) {
-        // Check if profile is complete
-        const { data: profile } = await supabase
+        // Check if profile is complete - use maybeSingle() to avoid error if no row
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('username, date_of_birth')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+        
+        // If no profile exists, create minimal one
+        if (!profile && !profileError) {
+          await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              username: null,
+              coin_balance: 0,
+              earnings_balance: 0,
+              gifter_level: 0
+            });
+        }
         
         if (profile?.username && profile?.date_of_birth) {
-          router.push('/live');
+          router.push('/');
         } else {
           router.push('/onboarding');
         }

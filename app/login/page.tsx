@@ -20,16 +20,29 @@ export default function LoginPage() {
     // Check if already logged in
     supabase.auth.getUser().then(async ({ data: { user } }: { data: { user: any } }) => {
       if (user) {
-        // Check if profile is complete
-        const { data: profile } = await supabase
+        // Check if profile is complete - use maybeSingle() to avoid error if no row
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('username, date_of_birth')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+        
+        // If no profile exists, create minimal one
+        if (!profile && !profileError) {
+          await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              username: null,
+              coin_balance: 0,
+              earnings_balance: 0,
+              gifter_level: 0
+            });
+        }
         
         if (profile?.username && profile?.date_of_birth) {
-          // Profile complete, redirect to return URL or live
-          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
+          // Profile complete, redirect to return URL or user's own profile
+          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || `/${profile.username}`;
           router.push(returnUrl);
         } else {
           // Profile incomplete, redirect to onboarding
@@ -51,8 +64,8 @@ export default function LoginPage() {
 
       if (isSignUp) {
         // Validate username
-        if (!username || username.length < 3) {
-          throw new Error('Username must be at least 3 characters');
+        if (!username || username.length < 4) {
+          throw new Error('Username must be at least 4 characters');
         }
         
         // Validate username format (alphanumeric and underscores only)
@@ -141,8 +154,8 @@ export default function LoginPage() {
             .single();
           
           if (profile?.username && profile?.date_of_birth) {
-            // Profile complete, redirect to return URL or live
-            const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/live';
+            // Profile complete, redirect to return URL or user's own profile
+            const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || `/${profile.username}`;
             router.push(returnUrl);
           } else {
             // Profile incomplete, redirect to onboarding

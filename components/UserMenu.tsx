@@ -53,12 +53,12 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
     if (authUser) {
       setUser(authUser);
       
-      // Load profile
+      // Load profile - use maybeSingle() to avoid error if no profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('username, avatar_url, display_name')
         .eq('id', authUser.id)
-        .single();
+        .maybeSingle();
       
       setProfile(profileData);
     } else {
@@ -70,7 +70,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setShowMenu(false);
-    router.push('/live');
+    router.push('/login');
   };
 
   if (!user) {
