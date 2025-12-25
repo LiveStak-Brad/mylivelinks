@@ -131,22 +131,32 @@ export default function GiftModal({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Call RPC function
-      const { data, error: rpcError } = await (supabase.rpc as any)('process_gift', {
-        p_sender_id: user.id,
-        p_recipient_id: recipientId,
-        p_gift_type_id: selectedGift.id,
-        p_slot_index: slotIndex || null,
-        p_live_stream_id: liveStreamId || null,
+      // Call new API endpoint (40% platform fee, 60% diamonds to recipient)
+      const response = await fetch('/api/gifts/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toUserId: recipientId,
+          coinsAmount: selectedGift.coin_cost,
+          giftTypeId: selectedGift.id,
+          streamId: liveStreamId || null,
+        }),
       });
 
-      if (rpcError) throw rpcError;
+      const data = await response.json();
 
-      // Refresh balance
-      await loadUserBalance();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send gift');
+      }
 
-      // Post chat message: "sender sent 'gift' to recipient +points"
-      // Get sender's username
+      // Update local balance from response
+      if (data.senderBalance) {
+        setUserCoinBalance(data.senderBalance.coins);
+      } else {
+        await loadUserBalance();
+      }
+
+      // Post chat message: "sender sent 'gift' to recipient"
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('username')
@@ -154,9 +164,11 @@ export default function GiftModal({
         .single();
       
       if (senderProfile) {
+        // Calculate diamonds awarded (60% of coins spent)
+        const diamondsAwarded = data.diamondsAwarded || Math.floor(selectedGift.coin_cost * 0.60);
         await supabase.from('chat_messages').insert({
           profile_id: user.id,
-          message: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername} +${selectedGift.coin_cost} coins`,
+          content: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername} 💎+${diamondsAwarded}`,
           message_type: 'gift',
         });
       }
@@ -236,7 +248,7 @@ export default function GiftModal({
               </div>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-              ✨ Recipient will earn {selectedGift.coin_cost} diamonds (1:1)
+              ✨ Recipient will earn {Math.floor(selectedGift.coin_cost * 0.60)} diamonds (60%)
             </p>
           </div>
         )}
