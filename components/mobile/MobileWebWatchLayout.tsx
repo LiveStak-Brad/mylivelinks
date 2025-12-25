@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { ArrowLeft, Users, Volume2, VolumeX, Gift, Maximize2, Minimize2, AlertTriangle, Grid3X3, Video } from 'lucide-react';
+import { ArrowLeft, Users, Volume2, VolumeX, Gift, Maximize2, Minimize2, AlertTriangle, LayoutGrid, Video } from 'lucide-react';
 import { Room } from 'livekit-client';
 import Tile from '@/components/Tile';
 import GiftModal from '@/components/GiftModal';
@@ -242,7 +242,7 @@ export default function MobileWebWatchLayout({
               onClick={handleExitFocus}
               className="flex items-center gap-1 text-white/90 hover:text-white transition p-2 -mr-2"
             >
-              <Grid3X3 size={18} />
+              <LayoutGrid size={18} />
               <span className="text-xs">Grid</span>
             </button>
           )}

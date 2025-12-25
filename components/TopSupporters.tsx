@@ -2,15 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import GifterBadge from './GifterBadge';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
+import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 
 interface Supporter {
   profile_id: string;
   username: string;
   avatar_url?: string;
-  gifter_level: number;
-  badge_name?: string;
-  badge_color?: string;
   total_gifted: number; // Total coins gifted to current user
   gift_count: number; // Number of gifts sent
 }
@@ -18,6 +17,7 @@ interface Supporter {
 export default function TopSupporters() {
   const [supporters, setSupporters] = useState<Supporter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatus>>({});
   const supabase = createClient();
 
   useEffect(() => {
@@ -95,8 +95,7 @@ export default function TopSupporters() {
           sender:profiles!gifts_sender_id_fkey (
             id,
             username,
-            avatar_url,
-            gifter_level
+            avatar_url
           )
         `)
         .eq('recipient_id', user.id)
@@ -109,25 +108,6 @@ export default function TopSupporters() {
         return;
       }
 
-      // Get unique gifter levels and load badges
-      const uniqueLevels = [...new Set(
-        data?.map((gift: any) => gift.sender?.gifter_level).filter((l: any) => l !== null && l > 0) || []
-      )];
-      const badgeMap: Record<number, any> = {};
-      
-      if (uniqueLevels.length > 0) {
-        const { data: badges } = await supabase
-          .from('gifter_levels')
-          .select('*')
-          .in('level', uniqueLevels);
-        
-        if (badges) {
-          badges.forEach((badge: any) => {
-            badgeMap[badge.level] = badge;
-          });
-        }
-      }
-
       // Aggregate by sender
       const supporterMap = new Map<string, Supporter>();
       
@@ -136,8 +116,6 @@ export default function TopSupporters() {
         const profile = gift.sender;
         
         if (!profile) return;
-
-        const badgeInfo = profile.gifter_level ? badgeMap[profile.gifter_level] : null;
 
         if (supporterMap.has(senderId)) {
           const existing = supporterMap.get(senderId)!;
@@ -148,9 +126,6 @@ export default function TopSupporters() {
             profile_id: senderId,
             username: profile.username || 'Unknown',
             avatar_url: profile.avatar_url,
-            gifter_level: profile.gifter_level || 0,
-            badge_name: badgeInfo?.badge_name,
-            badge_color: badgeInfo?.badge_color,
             total_gifted: gift.coin_amount || 0,
             gift_count: 1,
           });
@@ -163,6 +138,9 @@ export default function TopSupporters() {
         .slice(0, 10);
 
       setSupporters(topSupporters);
+
+      const statusMap = await fetchGifterStatuses(topSupporters.map((s) => s.profile_id));
+      setGifterStatusMap(statusMap);
     } catch (error) {
       console.error('Error loading top supporters:', error);
     } finally {
@@ -228,14 +206,17 @@ export default function TopSupporters() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-medium truncate">{supporter.username}</span>
-                {supporter.badge_name && (
-                  <GifterBadge
-                    level={supporter.gifter_level}
-                    badgeName={supporter.badge_name}
-                    badgeColor={supporter.badge_color}
-                    size="sm"
-                  />
-                )}
+                {(() => {
+                  const status = gifterStatusMap[supporter.profile_id];
+                  if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
+                  return (
+                    <TierBadge
+                      tier_key={status.tier_key}
+                      level={status.level_in_tier}
+                      size="sm"
+                    />
+                  );
+                })()}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {supporter.total_gifted.toLocaleString()} coins • {supporter.gift_count} {supporter.gift_count === 1 ? 'gift' : 'gifts'}

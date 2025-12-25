@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import GifterBadge from './GifterBadge';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
+import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import MiniProfile from './MiniProfile';
 
 interface Viewer {
@@ -10,8 +12,6 @@ interface Viewer {
   username: string;
   avatar_url?: string;
   gifter_level: number;
-  badge_name?: string;
-  badge_color?: string;
   is_active: boolean;
   last_active_at: string;
   is_live_available?: boolean; // Whether they're live streaming/available
@@ -28,14 +28,13 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [roomOwnerId, setRoomOwnerId] = useState<string | null>(null);
+  const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatus>>({});
   const [selectedProfile, setSelectedProfile] = useState<{
     profileId: string;
     username: string;
     displayName?: string;
     avatarUrl?: string;
-    gifterLevel?: number;
-    badgeName?: string;
-    badgeColor?: string;
+    gifterStatus?: GifterStatus | null;
     isLive?: boolean;
   } | null>(null);
   const supabase = createClient();
@@ -150,16 +149,6 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
           const profile = profileMap.get(presence.profile_id) as { id: string; username: string; avatar_url?: string; gifter_level: number | null } | undefined;
           if (!profile) return null;
 
-          let badgeInfo = null;
-          if (profile.gifter_level !== null && profile.gifter_level > 0) {
-            const { data: badge } = await supabase
-              .from('gifter_levels')
-              .select('*')
-              .eq('level', profile.gifter_level)
-              .single();
-            badgeInfo = badge;
-          }
-
           const liveInfo = liveStreamMap.get(presence.profile_id) as { 
             isLiveAvailable: boolean; 
             streamId: number 
@@ -170,8 +159,6 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
             username: presence.username || profile.username,
             avatar_url: profile.avatar_url,
             gifter_level: profile.gifter_level || 0,
-            badge_name: badgeInfo?.badge_name,
-            badge_color: badgeInfo?.badge_color,
             is_active: true,
             last_active_at: presence.last_seen_at,
             is_live_available: presence.is_live_available || liveInfo?.isLiveAvailable || false,
@@ -198,6 +185,9 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         });
 
       setViewers(sortedViewers);
+
+      const statusMap = await fetchGifterStatuses(sortedViewers.map((v) => v.profile_id));
+      setGifterStatusMap(statusMap);
     } catch (error) {
       console.error('Error loading viewers:', error);
       // No fallback needed - room_presence is the source of truth for viewer list
@@ -313,9 +303,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                           profileId: viewer.profile_id,
                           username: viewer.username,
                           avatarUrl: viewer.avatar_url,
-                          gifterLevel: viewer.gifter_level,
-                          badgeName: viewer.badge_name,
-                          badgeColor: viewer.badge_color,
+                          gifterStatus: gifterStatusMap[viewer.profile_id] || null,
                           isLive: viewer.is_live_available,
                         });
                       }}
@@ -323,14 +311,17 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                     >
                       {viewer.username}
                     </button>
-                    {viewer.gifter_level > 0 && (
-                      <GifterBadge
-                        level={viewer.gifter_level}
-                        badgeName={viewer.badge_name}
-                        badgeColor={viewer.badge_color}
-                        size="sm"
-                      />
-                    )}
+                    {(() => {
+                      const status = gifterStatusMap[viewer.profile_id];
+                      if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
+                      return (
+                        <TierBadge
+                          tier_key={status.tier_key}
+                          level={status.level_in_tier}
+                          size="sm"
+                        />
+                      );
+                    })()}
                     {/* Room Owner and Current User Badges */}
                     {viewer.profile_id === roomOwnerId && (
                       <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-purple-500 text-white rounded">
@@ -362,9 +353,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
           username={selectedProfile.username}
           displayName={selectedProfile.displayName}
           avatarUrl={selectedProfile.avatarUrl}
-          gifterLevel={selectedProfile.gifterLevel}
-          badgeName={selectedProfile.badgeName}
-          badgeColor={selectedProfile.badgeColor}
+          gifterStatus={selectedProfile.gifterStatus}
           isLive={selectedProfile.isLive}
           onClose={() => setSelectedProfile(null)}
         />

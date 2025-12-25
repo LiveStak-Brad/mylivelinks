@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import GifterBadge from './GifterBadge';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
 import GiftModal from './GiftModal';
 import MiniProfile from './MiniProfile';
 import GiftAnimation from './GiftAnimation';
@@ -26,6 +27,7 @@ interface TileProps {
   gifterLevel: number;
   badgeName?: string;
   badgeColor?: string;
+  gifterStatus?: GifterStatus | null;
   slotIndex: number;
   liveStreamId?: number;
   sharedRoom?: Room | null; // Shared LiveKit room connection
@@ -52,6 +54,7 @@ export default function Tile({
   gifterLevel,
   badgeName,
   badgeColor,
+  gifterStatus,
   slotIndex,
   liveStreamId,
   sharedRoom,
@@ -893,16 +896,17 @@ export default function Tile({
         <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
           <button
             onClick={() => setShowMiniProfile(true)}
-            className="text-white font-medium text-sm truncate hover:text-blue-300 transition cursor-pointer"
+            className="text-white text-sm font-semibold hover:text-blue-200 transition"
           >
             {streamerUsername}
           </button>
-          <GifterBadge
-            level={gifterLevel}
-            badgeName={badgeName}
-            badgeColor={badgeColor}
-            size="sm"
-          />
+          {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
+            <TierBadge
+              tier_key={gifterStatus.tier_key}
+              level={gifterStatus.level_in_tier}
+              size="sm"
+            />
+          )}
         </div>
       </div>
 
@@ -1039,13 +1043,11 @@ export default function Tile({
           profileId={streamerId}
           username={streamerUsername}
           avatarUrl={streamerAvatar}
-          gifterLevel={gifterLevel}
-          badgeName={badgeName}
-          badgeColor={badgeColor}
+          gifterStatus={gifterStatus}
           isLive={isLive}
           onClose={() => setShowMiniProfile(false)}
           onLeaveChannel={() => {
-            onClose();
+            // Close mini profile
             setShowMiniProfile(false);
           }}
           onDisconnect={() => {

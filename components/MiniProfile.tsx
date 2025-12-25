@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import GifterBadge from './GifterBadge';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
 import Image from 'next/image';
 
 interface MiniProfileProps {
@@ -11,9 +12,7 @@ interface MiniProfileProps {
   username: string;
   displayName?: string;
   avatarUrl?: string;
-  gifterLevel?: number;
-  badgeName?: string;
-  badgeColor?: string;
+  gifterStatus?: GifterStatus | null;
   isLive?: boolean;
   onClose: () => void;
   position?: { x: number; y: number };
@@ -26,9 +25,7 @@ export default function MiniProfile({
   username,
   displayName,
   avatarUrl,
-  gifterLevel = 0,
-  badgeName,
-  badgeColor,
+  gifterStatus,
   isLive = false,
   onClose,
   position,
@@ -197,12 +194,11 @@ export default function MiniProfile({
                 )}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 truncate">@{username}</p>
-              {gifterLevel > 0 && (
+              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
                 <div className="mt-1">
-                  <GifterBadge
-                    level={gifterLevel}
-                    badgeName={badgeName}
-                    badgeColor={badgeColor}
+                  <TierBadge
+                    tier_key={gifterStatus.tier_key}
+                    level={gifterStatus.level_in_tier}
                     size="sm"
                   />
                 </div>
