@@ -343,6 +343,80 @@
 }
 
 /* ============================================================================
+   GIFTER BADGE - DIAMOND TIER ANIMATIONS
+   ============================================================================
+   Diamond tier has a subtle shimmer animation with soft glow.
+   Respects "prefers-reduced-motion" for accessibility.
+   ============================================================================ */
+
+/* Shimmer keyframes - subtle light sweep across badge */
+@keyframes diamond-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Soft pulse glow for diamond */
+@keyframes diamond-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.4), 
+                0 0 16px rgba(34, 211, 238, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.6), 
+                0 0 24px rgba(34, 211, 238, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Diamond badge styling with shimmer and glow */
+.gifter-badge-diamond {
+  position: relative;
+  overflow: hidden;
+  animation: diamond-glow-pulse 3s ease-in-out infinite;
+}
+
+/* Shimmer overlay pseudo-element */
+.gifter-badge-diamond::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 45%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.15) 55%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: diamond-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .gifter-badge-diamond {
+    animation: none;
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  
+  .gifter-badge-diamond::before {
+    animation: none;
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ============================================================================
    MOBILE WEB SPECIFIC STYLES
    ============================================================================ */
 

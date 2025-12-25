@@ -283,12 +283,40 @@ DECLARE
     v_diamonds_awarded BIGINT;
     v_platform_fee BIGINT;
     v_gift_id BIGINT;
+    v_request_id VARCHAR(255);
     v_sender_idempotency_key VARCHAR(255);
     v_recipient_idempotency_key VARCHAR(255);
+    v_existing_provider_ref VARCHAR(255);
+    v_existing_gift_id BIGINT;
+    v_existing_coins_spent BIGINT;
+    v_existing_diamonds_awarded BIGINT;
+    v_existing_platform_fee BIGINT;
 BEGIN
-    -- Generate idempotency keys
-    v_sender_idempotency_key := 'gift:sender:' || COALESCE(p_request_id, gen_random_uuid()::text);
-    v_recipient_idempotency_key := 'gift:recipient:' || COALESCE(p_request_id, gen_random_uuid()::text);
+    v_request_id := COALESCE(p_request_id, gen_random_uuid()::text);
+    v_sender_idempotency_key := 'gift:sender:' || v_request_id;
+    v_recipient_idempotency_key := 'gift:recipient:' || v_request_id;
+    
+    SELECT provider_ref
+    INTO v_existing_provider_ref
+    FROM ledger_entries
+    WHERE idempotency_key = v_sender_idempotency_key
+    LIMIT 1;
+    
+    IF v_existing_provider_ref IS NOT NULL THEN
+        v_existing_gift_id := NULLIF(split_part(v_existing_provider_ref, ':', 2), '')::bigint;
+        
+        SELECT coins_spent, diamonds_awarded, platform_fee_coins
+        INTO v_existing_coins_spent, v_existing_diamonds_awarded, v_existing_platform_fee
+        FROM gifts
+        WHERE id = v_existing_gift_id;
+        
+        RETURN jsonb_build_object(
+            'gift_id', v_existing_gift_id,
+            'coins_spent', v_existing_coins_spent,
+            'diamonds_awarded', v_existing_diamonds_awarded,
+            'platform_fee', v_existing_platform_fee
+        );
+    END IF;
     
     -- Lock sender wallet
     SELECT coin_balance INTO v_sender_balance

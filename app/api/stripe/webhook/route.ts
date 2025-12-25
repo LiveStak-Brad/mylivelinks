@@ -7,6 +7,9 @@ import {
 } from '@/lib/supabase-admin';
 import Stripe from 'stripe';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/stripe/webhook
  * Handle Stripe webhook events (LIVE)
@@ -49,12 +52,13 @@ export async function POST(request: NextRequest) {
     try {
       event = constructWebhookEvent(payload, signature, webhookSecret);
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown';
       logStripeAction('webhook-signature-failed', {
         requestId,
-        error: err instanceof Error ? err.message : 'Unknown',
+        error: message,
       });
       return NextResponse.json(
-        { error: 'Signature verification failed' },
+        { error: 'Signature verification failed', message },
         { status: 400 }
       );
     }
@@ -145,13 +149,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown';
     logStripeAction('webhook-error', {
       requestId,
-      error: error instanceof Error ? error.message : 'Unknown',
+      error: message,
     });
     console.error('[WEBHOOK] Unhandled error:', error);
     return NextResponse.json(
-      { error: 'Webhook processing failed' },
+      { error: 'Webhook processing failed', message },
       { status: 500 }
     );
   }

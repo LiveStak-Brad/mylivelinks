@@ -1,12 +1,38 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Crown } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
+import { createClient } from '@/lib/supabase';
+
+// Owner credentials
+const OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
+const OWNER_EMAILS = ['wcba.mo@gmail.com'];
 
 export default function GlobalHeader() {
   const pathname = usePathname();
+  const [isOwner, setIsOwner] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    checkOwnerStatus();
+  }, []);
+
+  const checkOwnerStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const ownerStatus = OWNER_IDS.includes(user.id) || 
+          OWNER_EMAILS.includes(user.email?.toLowerCase() || '');
+        setIsOwner(ownerStatus);
+      }
+    } catch (error) {
+      // Silent fail
+    }
+  };
   
   // Don't show header on certain pages
   const hideHeader = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
@@ -36,20 +62,35 @@ export default function GlobalHeader() {
             >
               Home
             </Link>
-            <div className="relative group">
-              <span
-                className="text-sm font-medium text-gray-400 dark:text-gray-500 cursor-not-allowed"
-              >
-                Live Streams
-              </span>
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                Coming Soon! 🚀
-              </div>
-            </div>
+            <Link
+              href="/live"
+              className={`text-sm font-medium transition ${
+                pathname === '/live'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+              }`}
+            >
+              Live Streams
+            </Link>
           </nav>
 
-          {/* User Menu */}
-          <UserMenu />
+          {/* Right side - Owner button + User Menu */}
+          <div className="flex items-center gap-3">
+            {/* Owner Panel Quick Access */}
+            {isOwner && (
+              <Link
+                href="/owner"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-pink-700 transition shadow-md"
+                title="Owner Panel"
+              >
+                <Crown className="w-4 h-4" />
+                <span className="hidden sm:inline">Owner</span>
+              </Link>
+            )}
+
+            {/* User Menu */}
+            <UserMenu />
+          </div>
         </div>
 
         {/* Mobile Navigation */}
@@ -64,19 +105,18 @@ export default function GlobalHeader() {
           >
             Home
           </Link>
-          <div className="relative group">
-            <span
-              className="text-sm font-medium text-gray-400 dark:text-gray-500 cursor-not-allowed whitespace-nowrap"
-            >
-              Live Streams
-            </span>
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              Coming Soon! 🚀
-            </div>
-          </div>
+          <Link
+            href="/live"
+            className={`text-sm font-medium whitespace-nowrap transition ${
+              pathname === '/live'
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-gray-700 dark:text-gray-300'
+            }`}
+          >
+            Live Streams
+          </Link>
         </nav>
       </div>
     </header>
   );
 }
-
