@@ -2759,16 +2759,37 @@ export default function LiveRoom() {
                         ) : (() => {
                           // CRITICAL: Validate streamer properties are valid strings/numbers before rendering
                           const streamer = slot.streamer;
-                          if (!streamer) return null;
+                          if (!streamer || typeof streamer !== 'object') {
+                            return (
+                              <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
+                                <span className="text-gray-400 text-sm">Invalid Streamer Data</span>
+                              </div>
+                            );
+                          }
                           
-                          // Ensure profile_id and username are strings, not arrays or null
-                          const profileId = Array.isArray(streamer.profile_id) 
-                            ? (streamer.profile_id[0] || null)
-                            : (typeof streamer.profile_id === 'string' ? streamer.profile_id : null);
+                          // CRITICAL: Safely extract profile_id - handle null, arrays, and strings
+                          let profileId: string | null = null;
+                          if (streamer.profile_id != null) {
+                            if (Array.isArray(streamer.profile_id)) {
+                              profileId = (streamer.profile_id.length > 0 && streamer.profile_id[0] != null) 
+                                ? String(streamer.profile_id[0]) 
+                                : null;
+                            } else if (typeof streamer.profile_id === 'string') {
+                              profileId = streamer.profile_id;
+                            }
+                          }
                           
-                          const username = Array.isArray(streamer.username)
-                            ? (streamer.username[0] || null)
-                            : (typeof streamer.username === 'string' ? streamer.username : null);
+                          // CRITICAL: Safely extract username - handle null, arrays, and strings
+                          let username: string | null = null;
+                          if (streamer.username != null) {
+                            if (Array.isArray(streamer.username)) {
+                              username = (streamer.username.length > 0 && streamer.username[0] != null) 
+                                ? String(streamer.username[0]) 
+                                : null;
+                            } else if (typeof streamer.username === 'string') {
+                              username = streamer.username;
+                            }
+                          }
                           
                           if (!profileId || !username) {
                             console.warn('[GRID RENDER] Invalid streamer data:', { 
