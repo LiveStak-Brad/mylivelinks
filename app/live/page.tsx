@@ -15,6 +15,7 @@ export default function LiveComingSoonPage() {
   const supabase = createClient();
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   useEffect(() => {
     checkOwner();
@@ -46,6 +47,25 @@ export default function LiveComingSoonPage() {
     }
   };
 
+  const handleEnableAudio = async () => {
+    // Resume AudioContext on user gesture
+    try {
+      // @ts-ignore - AudioContext is available in browser
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (AudioContext) {
+        const ctx = new AudioContext();
+        if (ctx.state === 'suspended') {
+          await ctx.resume();
+        }
+        ctx.close();
+        console.log('[AUDIO] AudioContext resumed after user gesture');
+      }
+    } catch (error) {
+      console.warn('[AUDIO] Could not resume AudioContext:', error);
+    }
+    setAudioEnabled(true);
+  };
+
   // Show loading state
   if (loading) {
     return (
@@ -55,8 +75,33 @@ export default function LiveComingSoonPage() {
     );
   }
 
-  // If owner, show the actual LiveRoom
-  if (isOwner) {
+  // If owner but audio not enabled, show audio enable screen
+  if (isOwner && !audioEnabled) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-8 text-center">
+          <div className="bg-purple-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-4">Enable Audio</h2>
+          <p className="text-white/80 mb-6">
+            Click below to enable audio for the live stream. This is required by your browser&apos;s autoplay policy.
+          </p>
+          <button
+            onClick={handleEnableAudio}
+            className="w-full px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+          >
+            Enable Audio & Enter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If owner and audio enabled, show the actual LiveRoom
+  if (isOwner && audioEnabled) {
     return (
       <LiveRoomErrorBoundary>
         <LiveRoom />
