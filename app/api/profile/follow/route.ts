@@ -10,24 +10,28 @@ const DEBUG_AUTH = process.env.NEXT_PUBLIC_DEBUG_AUTH === '1';
  */
 export async function POST(request: NextRequest) {
   try {
+    // Debug: Log ALL cookies received
+    const allCookies = request.cookies.getAll();
+    console.log('[AUTH] Cookies received:', {
+      count: allCookies.length,
+      names: allCookies.map(c => c.name),
+      hasAuthCookie: allCookies.some(c => c.name.includes('auth'))
+    });
+    
     // Create Supabase client with proper request cookie handling
     const supabase = createRouteHandlerClient(request);
     
     // Get authenticated user from cookies
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (DEBUG_AUTH) {
-      console.log('[AUTH] Follow API - User check:', { 
-        userId: user?.id || 'null', 
-        error: authError?.message || 'none',
-        hasCookies: request.cookies.getAll().length > 0
-      });
-    }
+    console.log('[AUTH] User check result:', { 
+      userId: user?.id || 'NULL', 
+      error: authError?.message || 'none',
+      errorStatus: authError?.status || 'none'
+    });
     
     if (!user || authError) {
-      if (DEBUG_AUTH) {
-        console.log('[AUTH] Authentication failed - returning 401');
-      }
+      console.error('[AUTH] AUTHENTICATION FAILED - Returning 401');
       return NextResponse.json(
         { success: false, error: 'Unauthorized - Please log in' },
         { status: 401 }
@@ -44,12 +48,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (DEBUG_AUTH) {
-      console.log('[FOLLOW] Request:', {
-        userId: user.id,
-        targetProfileId,
-      });
-    }
+    console.log('[FOLLOW] Proceeding with user:', user.id);
     
     // Call RPC function to toggle follow
     const { data, error } = await supabase.rpc('toggle_follow', {
@@ -81,10 +80,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (DEBUG_AUTH) {
-      console.log('[FOLLOW] Success:', data);
-    }
-    
+    console.log('[FOLLOW] Success');
     return NextResponse.json(data, { status: 200 });
   } catch (error: any) {
     console.error('[FOLLOW] Exception:', error);
