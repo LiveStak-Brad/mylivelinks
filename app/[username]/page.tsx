@@ -22,11 +22,11 @@ export async function generateMetadata({ params }: { params: { username: string 
     
     const displayName = profile.display_name || profile.username;
     const bio = profile.bio || `Check out ${displayName}'s profile on MyLiveLinks - Live streaming, links, and exclusive content all in one place.`;
-    const avatarUrl = profile.avatar_url || 'https://mylivelinks.com/default-avatar.png';
-    const profileUrl = `https://mylivelinks.com/${profile.username}`;
+    const avatarUrl = profile.avatar_url || '';
+    const profileUrl = `https://www.mylivelinks.com/${profile.username}`;
     
     // Generate dynamic OG image URL
-    const ogImageUrl = `https://mylivelinks.com/api/og?username=${encodeURIComponent(profile.username)}&displayName=${encodeURIComponent(displayName)}&bio=${encodeURIComponent(bio.substring(0, 120))}&avatarUrl=${encodeURIComponent(avatarUrl)}`;
+    const ogImageUrl = `https://www.mylivelinks.com/api/og?username=${encodeURIComponent(profile.username)}&displayName=${encodeURIComponent(displayName)}&bio=${encodeURIComponent(bio.substring(0, 120))}&avatarUrl=${encodeURIComponent(avatarUrl)}`;
     
     return {
       title: `${displayName} (@${profile.username}) | MyLiveLinks`,
