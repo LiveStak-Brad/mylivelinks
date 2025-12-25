@@ -8,9 +8,6 @@ import {
   TierList,
   GIFTER_TIERS,
   MOCK_GIFTER_STATUS_VIP,
-  MOCK_GIFTER_STATUS_STARTER,
-  MOCK_GIFTER_STATUS_ELITE,
-  MOCK_GIFTER_STATUS_DIAMOND,
   GifterStatus,
   formatCoinAmount,
 } from '@/components/gifter';
@@ -18,7 +15,7 @@ import {
 /**
  * Gifter Levels - Public explainer page
  * 
- * Accessible at: /demo/gifter-tiers (consider moving to /gifter-levels)
+ * Accessible at: /gifter-levels
  */
 export default function GifterLevelsPage() {
   // In production, this would come from the user's actual gifter status
@@ -136,7 +133,7 @@ export default function GifterLevelsPage() {
             
             {/* Tier Rows */}
             <div className="divide-y divide-border">
-              {GIFTER_TIERS.map((tier, index) => (
+              {GIFTER_TIERS.map((tier) => (
                 <div 
                   key={tier.key}
                   className={`
@@ -259,3 +256,4 @@ export default function GifterLevelsPage() {
     </div>
   );
 }
+
