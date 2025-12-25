@@ -159,20 +159,10 @@ export default function ModernProfilePage() {
     
     setFollowLoading(true);
     try {
-      // First verify the user is actually logged in
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        // User is not logged in - redirect to login
-        alert('Please log in to follow users');
-        router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
-        return;
-      }
-      
       // Get session for token
       const { data: { session } } = await supabase.auth.getSession();
       
-      console.log('User logged in:', user.id, 'Has session:', !!session);
+      console.log('Follow clicked - Has session:', !!session);
       
       const response = await fetch('/api/profile/follow', {
         method: 'POST',
@@ -185,20 +175,13 @@ export default function ModernProfilePage() {
       });
       
       const data = await response.json();
-      console.log('Follow response:', data);
+      console.log('Follow response:', { status: response.status, data });
       
       // Check for authentication errors
       if (response.status === 401) {
-        // Authentication failed on server - try to refresh session
-        const { error: refreshError } = await supabase.auth.refreshSession();
-        
-        if (refreshError) {
-          alert('Session expired. Please log in again.');
-          router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
-        } else {
-          // Session refreshed, retry the follow action
-          alert('Session refreshed. Please try again.');
-        }
+        // Not authenticated - redirect to login
+        alert('Please log in to follow users');
+        router.push('/login?returnUrl=' + encodeURIComponent(`/${username}`));
         return;
       }
       
