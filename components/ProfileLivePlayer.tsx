@@ -452,7 +452,6 @@ export default function ProfileLivePlayer({
                         max="100"
                         value={volume}
                         onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                        orient="vertical"
                         className="h-24 w-1 appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:w-1 [&::-webkit-slider-runnable-track]:h-24 [&::-webkit-slider-runnable-track]:bg-white/30 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:-ml-1"
                         style={{
                           writingMode: 'vertical-lr' as any,
