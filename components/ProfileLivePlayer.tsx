@@ -66,16 +66,21 @@ export default function ProfileLivePlayer({
   useEffect(() => {
     if (audioTrack && audioRef.current) {
       audioTrack.attach(audioRef.current);
-      // Apply volume settings
-      audioRef.current.volume = isMuted ? 0 : volume / 100;
-      audioRef.current.muted = isMuted;
     }
     return () => {
       if (audioTrack && audioRef.current) {
         audioTrack.detach(audioRef.current);
       }
     };
-  }, [audioTrack, isMuted, volume]);
+  }, [audioTrack]);
+  
+  // Apply volume settings whenever they change
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume / 100;
+      audioRef.current.muted = isMuted;
+    }
+  }, [isMuted, volume]);
 
   const loadViewerCount = async () => {
     if (!liveStreamId) return;
@@ -98,17 +103,23 @@ export default function ProfileLivePlayer({
   };
 
   const toggleMute = () => {
-    setIsMuted(!isMuted);
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
     if (audioRef.current) {
-      audioRef.current.muted = !isMuted;
-      audioRef.current.volume = isMuted ? volume / 100 : 0;
+      audioRef.current.muted = newMuted;
+      audioRef.current.volume = newMuted ? 0 : volume / 100;
     }
   };
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
-    if (audioRef.current && !isMuted) {
+    if (audioRef.current) {
       audioRef.current.volume = newVolume / 100;
+      // Unmute if changing volume from 0
+      if (newVolume > 0 && isMuted) {
+        setIsMuted(false);
+        audioRef.current.muted = false;
+      }
     }
   };
 

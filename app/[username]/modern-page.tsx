@@ -123,28 +123,12 @@ export default function ModernProfilePage() {
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showFollowingModal, setShowFollowingModal] = useState(false);
   const [showFriendsModal, setShowFriendsModal] = useState(false);
+  const [liveStreamId, setLiveStreamId] = useState<number | undefined>(undefined);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   
   const supabase = createClient();
   
   useEffect(() => {
-    // Fetch live_stream_id if user is live
-    const fetchLiveStreamId = async () => {
-      if (profile.is_live && !liveStreamId) {
-        const { data } = await supabase
-          .from('live_streams')
-          .select('id')
-          .eq('profile_id', profile.id)
-          .eq('live_available', true)
-          .maybeSingle();
-        
-        if (data) {
-          setLiveStreamId(data.id);
-        }
-      }
-    };
-    
-    fetchLiveStreamId();
-  }, [profile.is_live, profile.id]);
     loadProfile();
   }, [username]);
   
@@ -154,6 +138,31 @@ export default function ModernProfilePage() {
       
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+      
+      // Fetch profile via API
+      const response = await fetch(`/api/profile/${username}`);
+      const data = await response.json();
+      
+      if (data.error) {
+        console.error('Profile error:', data.error);
+        setProfileData(null);
+        return;
+      }
+      
+      // Fetch live_stream_id if user is live
+      if (data.profile.is_live) {
+        const { data: liveStream } = await supabase
+          .from('live_streams')
+          .select('id')
+          .eq('profile_id', data.profile.id)
+          .eq('live_available', true)
+          .maybeSingle();
+        
+        if (liveStream) {
+          setLiveStreamId(liveStream.id);
+        }
+      }
       
       // Fetch profile via API
       const response = await fetch(`/api/profile/${username}`);
@@ -382,8 +391,31 @@ export default function ModernProfilePage() {
       
       {/* Content - Scrollable */}
       <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20">
-        {/* Live Video Player (if live) */}
-        {profile.is_live && (
+        {/* Login to See Live Banner (if not logged in and profile is live) */}
+        {profile.is_live && !currentUser && (
+          <div className="mb-4 sm:mb-6">
+            <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-lg p-4 shadow-lg flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-full">
+                  <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                  <span className="font-bold text-white text-sm">LIVE NOW</span>
+                </div>
+                <p className="text-white font-semibold">
+                  {profile.display_name || profile.username} is streaming live!
+                </p>
+              </div>
+              <Link
+                href={`/login?returnTo=/${profile.username}`}
+                className="bg-white text-red-500 font-bold px-4 py-2 rounded-full hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg whitespace-nowrap"
+              >
+                Login to Watch
+              </Link>
+            </div>
+          </div>
+        )}
+        
+        {/* Live Video Player (if live and logged in) */}
+        {profile.is_live && currentUser && (
           <div className={`${borderRadiusClass} overflow-hidden shadow-2xl mb-4 sm:mb-6`}>
             <ProfileLivePlayer
               profileId={profile.id}
