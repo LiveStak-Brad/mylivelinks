@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { UserPlus, Check, ExternalLink } from 'lucide-react';
@@ -22,9 +22,39 @@ interface ProfileCardProps {
 
 export default function ProfileCard({ profile, currentUserId, onFollow }: ProfileCardProps) {
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followsYou, setFollowsYou] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const supabase = createClient();
+
+  // Check follow status on mount
+  useEffect(() => {
+    if (!currentUserId) return;
+    
+    const checkFollowStatus = async () => {
+      // Check if you follow them
+      const { data: youFollowThem } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', currentUserId)
+        .eq('followee_id', profile.id)
+        .maybeSingle();
+      
+      setIsFollowing(!!youFollowThem);
+
+      // Check if they follow you
+      const { data: theyFollowYou } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', profile.id)
+        .eq('followee_id', currentUserId)
+        .maybeSingle();
+      
+      setFollowsYou(!!theyFollowYou);
+    };
+    
+    checkFollowStatus();
+  }, [currentUserId, profile.id, supabase]);
 
   const handleFollow = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -122,6 +152,8 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
                 className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition ${
                   isFollowing
                     ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                    : followsYou
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
                     : 'bg-purple-600 text-white hover:bg-purple-700'
                 } disabled:opacity-50`}
               >
@@ -131,6 +163,11 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
                   <>
                     <Check className="w-3 h-3" />
                     Following
+                  </>
+                ) : followsYou ? (
+                  <>
+                    <UserPlus className="w-3 h-3" />
+                    Follow Back
                   </>
                 ) : (
                   <>
