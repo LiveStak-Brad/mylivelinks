@@ -35,32 +35,37 @@ export default function GifterTiersDemoPage() {
           </p>
         </div>
 
-        {/* Mock Status Selector */}
-        <div className="p-6 rounded-xl border border-border bg-card">
-          <h2 className="text-lg font-semibold mb-4">Test Different User States</h2>
-          <div className="flex flex-wrap gap-3">
-            {[
-              { label: 'Starter (Lv 5)', status: MOCK_GIFTER_STATUS_STARTER },
-              { label: 'Elite (Lv 25)', status: MOCK_GIFTER_STATUS_ELITE },
-              { label: 'VIP (Lv 25)', status: MOCK_GIFTER_STATUS_VIP },
-              { label: 'Diamond (Lv 73)', status: MOCK_GIFTER_STATUS_DIAMOND },
-            ].map(({ label, status }) => (
-              <button
-                key={status.tier_key}
-                onClick={() => setSelectedMock(status)}
-                className={`
-                  px-4 py-2 rounded-lg font-medium transition-all
-                  ${selectedMock.tier_key === status.tier_key
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted hover:bg-muted/80 text-foreground'
-                  }
-                `}
-              >
-                {label}
-              </button>
-            ))}
+        {/* Mock Status Selector - DEV ONLY */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="p-6 rounded-xl border border-amber-500/50 bg-amber-500/10">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              🔧 Test Different User States
+              <span className="text-xs font-normal text-amber-600 dark:text-amber-400">(DEV ONLY)</span>
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { label: 'Starter (Lv 5)', status: MOCK_GIFTER_STATUS_STARTER },
+                { label: 'Elite (Lv 25)', status: MOCK_GIFTER_STATUS_ELITE },
+                { label: 'VIP (Lv 25)', status: MOCK_GIFTER_STATUS_VIP },
+                { label: 'Diamond (Lv 73)', status: MOCK_GIFTER_STATUS_DIAMOND },
+              ].map(({ label, status }) => (
+                <button
+                  key={status.tier_key}
+                  onClick={() => setSelectedMock(status)}
+                  className={`
+                    px-4 py-2 rounded-lg font-medium transition-all
+                    ${selectedMock.tier_key === status.tier_key
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-muted/80 text-foreground'
+                    }
+                  `}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Badge Showcase */}
         <div className="p-6 rounded-xl border border-border bg-card">
@@ -149,26 +154,37 @@ export default function GifterTiersDemoPage() {
           <TierList gifterStatus={selectedMock} />
         </div>
 
-        {/* Current Status Debug */}
-        <div className="p-6 rounded-xl border border-border bg-card">
-          <h2 className="text-lg font-semibold mb-4">Current GifterStatus Object</h2>
-          <pre className="bg-muted/50 p-4 rounded-lg text-xs overflow-x-auto font-mono">
-            {JSON.stringify(selectedMock, null, 2)}
-          </pre>
-        </div>
+        {/* Debug sections - DEV ONLY */}
+        {process.env.NODE_ENV === 'development' && (
+          <>
+            {/* Current Status Debug */}
+            <div className="p-6 rounded-xl border border-amber-500/50 bg-amber-500/10">
+              <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                🔧 Debug: GifterStatus Object
+                <span className="text-xs font-normal text-amber-600 dark:text-amber-400">(DEV ONLY)</span>
+              </h2>
+              <pre className="bg-muted/50 p-4 rounded-lg text-xs overflow-x-auto font-mono">
+                {JSON.stringify(selectedMock, null, 2)}
+              </pre>
+            </div>
 
-        {/* Implementation Notes */}
-        <div className="p-6 rounded-xl border border-border bg-muted/30">
-          <h2 className="text-lg font-semibold mb-4">📋 Implementation Notes</h2>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li>• <strong>10 Tiers:</strong> Starter → Diamond, each with 50 levels (Diamond is unlimited)</li>
-            <li>• <strong>Badge scales</strong> slightly larger for higher tiers</li>
-            <li>• <strong>Diamond tier</strong> has animated shimmer + glow (respects reduced motion)</li>
-            <li>• <strong>Locked tiers</strong> show as &quot;???&quot; when show_locked_tiers = false</li>
-            <li>• <strong>Click any tier</strong> in the list to see TierDetail modal</li>
-            <li>• <strong>Mobile:</strong> React Native versions in mobile/components/gifter/</li>
-          </ul>
-        </div>
+            {/* Implementation Notes */}
+            <div className="p-6 rounded-xl border border-amber-500/50 bg-amber-500/10">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                📋 Implementation Notes
+                <span className="text-xs font-normal text-amber-600 dark:text-amber-400">(DEV ONLY)</span>
+              </h2>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li>• <strong>10 Tiers:</strong> Starter → Diamond, each with 50 levels (Diamond is unlimited)</li>
+                <li>• <strong>Badge scales</strong> slightly larger for higher tiers</li>
+                <li>• <strong>Diamond tier</strong> has animated shimmer + glow (respects reduced motion)</li>
+                <li>• <strong>Locked tiers</strong> show as &quot;???&quot; when show_locked_tiers = false</li>
+                <li>• <strong>Click any tier</strong> in the list to see TierDetail modal</li>
+                <li>• <strong>Mobile:</strong> React Native versions in mobile/components/gifter/</li>
+              </ul>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

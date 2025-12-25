@@ -133,18 +133,23 @@ export function getGifterStatus(lifetimeCoins: number, viewerContext?: ViewerCon
   const isDiamond = lifetime >= DIAMOND_UNLOCK_COINS;
 
   const tier = (() => {
+    if (isDiamond) {
+      return TIERS.find((t) => t.key === 'diamond')!;
+    }
+
     for (const t of TIERS) {
-      if (t.end === null) return t;
+      if (t.end === null) continue;
       if (lifetime >= t.start && lifetime < t.end) return t;
     }
-    return TIERS[TIERS.length - 1];
+
+    return TIERS[0];
   })();
 
   let levelInTier = 1;
   let levelStartCoins = tier.start;
   let nextLevelCoins: number | null = tier.end;
 
-  if (tier.key === 'diamond') {
+  if (isDiamond) {
     const d = computeDiamond(lifetime);
     levelInTier = d.level;
     levelStartCoins = d.levelStart;
@@ -175,8 +180,8 @@ export function getGifterStatus(lifetimeCoins: number, viewerContext?: ViewerCon
     tier_name: tier.name,
     tier_color: null,
     tier_icon: null,
-    is_diamond: tier.key === 'diamond',
-    tier_level_max: tier.levelCount,
+    is_diamond: isDiamond,
+    tier_level_max: isDiamond ? null : tier.levelCount,
     level_in_tier: levelInTier,
     lifetime_coins: lifetime,
     tier_start_coins: tier.start,
