@@ -145,6 +145,9 @@ export default function ProfileLivePlayer({
         console.error('[PROFILE_LIVE] User not authenticated');
         return;
       }
+      
+      const isOwnProfile = user.id === profileId;
+      console.log('[PROFILE_LIVE] Is own profile:', isOwnProfile);
 
       // Get LiveKit token as viewer
       const response = await fetch('/api/livekit/token', {
@@ -178,20 +181,56 @@ export default function ProfileLivePlayer({
       setRoom(newRoom);
       setIsConnected(true);
 
-      console.log('[PROFILE_LIVE] Connected to room, participants:', newRoom.remoteParticipants.size);
-
-      // Subscribe to remote participant tracks (the streamer)
-      subscribeToParticipant(newRoom, profileId);
-
-      // Listen for new participants
-      newRoom.on('participantConnected', (participant: RemoteParticipant) => {
-        console.log('[PROFILE_LIVE] Participant connected:', participant.identity);
-        const participantUserId = extractUserId(participant.identity);
-        if (participantUserId === profileId) {
-          console.log('[PROFILE_LIVE] Target user connected!');
-          subscribeToParticipant(newRoom, profileId);
-        }
+      console.log('[PROFILE_LIVE] Connected to room', {
+        remoteParticipants: newRoom.remoteParticipants.size,
+        localParticipant: newRoom.localParticipant.identity,
+        isOwnProfile,
       });
+      
+      // If viewing own profile, subscribe to local participant (yourself)
+      if (isOwnProfile) {
+        console.log('[PROFILE_LIVE] Subscribing to own tracks (local participant)');
+        const localParticipant = newRoom.localParticipant;
+        
+        // Subscribe to your own published tracks
+        localParticipant.trackPublications.forEach((publication) => {
+          if (publication.track) {
+            console.log('[PROFILE_LIVE] Found local track:', publication.track.kind);
+            if (publication.track.kind === 'video') {
+              setVideoTrack(publication.track as any);
+            } else if (publication.track.kind === 'audio') {
+              setAudioTrack(publication.track as any);
+            }
+          }
+        });
+        
+        // Listen for new local tracks being published
+        localParticipant.on('trackPublished', (publication) => {
+          console.log('[PROFILE_LIVE] Local track published:', publication.kind);
+          if (publication.track) {
+            if (publication.track.kind === 'video') {
+              setVideoTrack(publication.track as any);
+            } else if (publication.track.kind === 'audio') {
+              setAudioTrack(publication.track as any);
+            }
+          }
+        });
+      } else {
+        // Subscribe to remote participant tracks (the streamer)
+        subscribeToParticipant(newRoom, profileId);
+      }
+
+      // Listen for new participants (when not own profile)
+      if (!isOwnProfile) {
+        newRoom.on('participantConnected', (participant: RemoteParticipant) => {
+          console.log('[PROFILE_LIVE] Participant connected:', participant.identity);
+          const participantUserId = extractUserId(participant.identity);
+          if (participantUserId === profileId) {
+            console.log('[PROFILE_LIVE] Target user connected!');
+            subscribeToParticipant(newRoom, profileId);
+          }
+        });
+      }
 
       // Handle track subscribed
       newRoom.on('trackSubscribed', (track: RemoteTrack, publication, participant: RemoteParticipant) => {
