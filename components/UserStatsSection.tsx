@@ -64,7 +64,7 @@ export default function UserStatsSection() {
         supabase.removeChannel(channel);
       }
     };
-  }, [gifterLevel, supabase]);
+  }, [supabase]);
 
   const loadUserStats = async () => {
     try {
