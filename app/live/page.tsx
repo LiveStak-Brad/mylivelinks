@@ -21,13 +21,26 @@ export default function LiveComingSoonPage() {
 
   const checkOwner = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      console.log('[LIVE PAGE] Auth check:', {
+        hasUser: !!user,
+        userId: user?.id,
+        ownerUuid: OWNER_UUID,
+        isMatch: user?.id === OWNER_UUID,
+        error: error
+      });
       
       if (user && user.id === OWNER_UUID) {
+        console.log('[LIVE PAGE] ✅ Owner confirmed, showing LiveRoom');
         setIsOwner(true);
+      } else if (user) {
+        console.log('[LIVE PAGE] ❌ Logged in but not owner');
+      } else {
+        console.log('[LIVE PAGE] ❌ No user logged in');
       }
     } catch (error) {
-      console.error('Error checking owner:', error);
+      console.error('[LIVE PAGE] Error checking owner:', error);
     } finally {
       setLoading(false);
     }
