@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { ArrowLeft, Sparkles, TrendingUp, Gift, Crown } from 'lucide-react';
 import {
   GifterBadge,
+  TierDetail,
   TierList,
   GIFTER_TIERS,
   MOCK_GIFTER_STATUS_VIP,
   GifterStatus,
+  GifterTier,
   formatCoinAmount,
 } from '@/components/gifter';
 
@@ -18,8 +20,8 @@ import {
  * Accessible at: /gifter-levels
  */
 export default function GifterLevelsPage() {
-  // In production, this would come from the user's actual gifter status
   const [demoStatus] = useState<GifterStatus>(MOCK_GIFTER_STATUS_VIP);
+  const [selectedTier, setSelectedTier] = useState<GifterTier | null>(null);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
@@ -92,24 +94,63 @@ export default function GifterLevelsPage() {
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-bold text-foreground">Exclusive Badges</h2>
             <p className="text-muted-foreground">
-              Each tier has a unique badge that displays next to your name
+              Each tier has a unique badge — <strong>higher tiers have larger badges!</strong>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Click any badge to see tier details
             </p>
           </div>
           
           <div className="p-8 rounded-2xl bg-card border border-border">
-            <div className="flex flex-wrap justify-center gap-4">
+            <div className="flex flex-wrap justify-center items-end gap-4">
               {GIFTER_TIERS.map((tier) => (
-                <div key={tier.key} className="text-center space-y-2">
-                  <GifterBadge
-                    tier_key={tier.key}
-                    level={25}
-                    size="lg"
-                  />
+                <button
+                  key={tier.key}
+                  onClick={() => setSelectedTier(tier)}
+                  className="text-center space-y-2 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group"
+                >
+                  <div className="transform group-hover:scale-110 transition-transform">
+                    <GifterBadge
+                      tier_key={tier.key}
+                      level={25}
+                      size={tier.order <= 3 ? 'sm' : tier.order <= 7 ? 'md' : 'lg'}
+                    />
+                  </div>
                   <p className="text-xs font-medium" style={{ color: tier.color }}>
                     {tier.name}
                   </p>
-                </div>
+                </button>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Badge Size Showcase */}
+        <div className="space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold text-foreground">Badges Scale With Your Tier</h2>
+            <p className="text-muted-foreground">
+              As you climb higher, your badge grows to match your status
+            </p>
+          </div>
+          
+          <div className="p-8 rounded-2xl bg-card border border-border">
+            <div className="flex justify-center items-end gap-8">
+              <div className="text-center space-y-3">
+                <GifterBadge tier_key="starter" level={10} size="sm" />
+                <p className="text-xs text-muted-foreground">Starter</p>
+                <p className="text-[10px] text-muted-foreground/70">Small</p>
+              </div>
+              <div className="text-center space-y-3">
+                <GifterBadge tier_key="elite" level={25} size="md" />
+                <p className="text-xs text-muted-foreground">Elite</p>
+                <p className="text-[10px] text-muted-foreground/70">Medium</p>
+              </div>
+              <div className="text-center space-y-3">
+                <GifterBadge tier_key="diamond" level={50} size="lg" />
+                <p className="text-xs text-muted-foreground">Diamond</p>
+                <p className="text-[10px] text-muted-foreground/70">Large</p>
+              </div>
             </div>
           </div>
         </div>
@@ -119,7 +160,7 @@ export default function GifterLevelsPage() {
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-bold text-foreground">All Tiers</h2>
             <p className="text-muted-foreground">
-              50 levels per tier • Diamond has unlimited levels
+              50 levels per tier • Diamond has unlimited levels • Click any tier for details
             </p>
           </div>
           
@@ -134,11 +175,12 @@ export default function GifterLevelsPage() {
             {/* Tier Rows */}
             <div className="divide-y divide-border">
               {GIFTER_TIERS.map((tier) => (
-                <div 
+                <button 
                   key={tier.key}
+                  onClick={() => setSelectedTier(tier)}
                   className={`
-                    grid grid-cols-[1fr_100px_140px] gap-4 px-6 py-4
-                    transition-colors hover:bg-muted/30
+                    w-full grid grid-cols-[1fr_100px_140px] gap-4 px-6 py-4
+                    transition-colors hover:bg-muted/30 text-left cursor-pointer
                     ${tier.isDiamond ? 'bg-gradient-to-r from-cyan-500/5 via-purple-500/5 to-cyan-500/5' : ''}
                   `}
                 >
@@ -180,7 +222,7 @@ export default function GifterLevelsPage() {
                       }
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -192,7 +234,10 @@ export default function GifterLevelsPage() {
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl" />
           
           <div className="relative flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-shrink-0">
+            <button 
+              onClick={() => setSelectedTier(GIFTER_TIERS.find(t => t.isDiamond) || null)}
+              className="flex-shrink-0 hover:scale-105 transition-transform cursor-pointer"
+            >
               <div 
                 className="w-24 h-24 rounded-full flex items-center justify-center text-5xl animate-pulse"
                 style={{
@@ -203,7 +248,7 @@ export default function GifterLevelsPage() {
               >
                 💎
               </div>
-            </div>
+            </button>
             
             <div className="text-center md:text-left space-y-3">
               <h3 className="text-2xl font-bold text-cyan-400">
@@ -241,6 +286,16 @@ export default function GifterLevelsPage() {
         </div>
       </div>
 
+      {/* TierDetail Modal */}
+      {selectedTier && (
+        <TierDetail
+          tier={selectedTier}
+          gifterStatus={demoStatus}
+          isOpen={true}
+          onClose={() => setSelectedTier(null)}
+        />
+      )}
+
       {/* Dev-only debug section */}
       {process.env.NODE_ENV === 'development' && (
         <div className="max-w-4xl mx-auto px-6 pb-12 space-y-6">
@@ -256,4 +311,3 @@ export default function GifterLevelsPage() {
     </div>
   );
 }
-
