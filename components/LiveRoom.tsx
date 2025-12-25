@@ -938,6 +938,11 @@ export default function LiveRoom() {
   // Update viewer counts only (without full reload) to prevent re-subscription loops
   const updateViewerCountsOnly = async () => {
     try {
+      // Safety check: ensure liveStreamers is an array
+      if (!liveStreamers || !Array.isArray(liveStreamers) || liveStreamers.length === 0) {
+        return;
+      }
+      
       // Update viewer counts for all current streamers without reloading everything
       const updatedStreamers = await Promise.all(
         liveStreamers.map(async (streamer) => {
