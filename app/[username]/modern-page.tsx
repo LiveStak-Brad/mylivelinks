@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase-client';
+import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
 import Link from 'next/link';
 import { UserPlus, UserCheck, Users, Share2, MessageCircle } from 'lucide-react';

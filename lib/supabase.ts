@@ -1,52 +1,59 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
+import { SupabaseClient } from '@supabase/supabase-js';
 
-// Singleton client instance to avoid multiple GoTrueClient warnings
-let clientInstance: any = null;
+/**
+ * SINGLETON Supabase client for browser usage
+ * Prevents multiple GoTrueClient instances
+ * Uses @supabase/ssr for Next.js App Router compatibility
+ */
+let clientInstance: SupabaseClient | null = null;
 
-export function createClient(): any {
-  // Re-check env vars at runtime (they're available in Next.js)
+export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
-  // During build time, return a mock client to prevent build failures
-  // The actual error will occur at runtime when the client is used
+  // Build-time mock for SSR (prevents build failures)
   if (!url || !key) {
-    // Check if we're in a build context (server-side during build)
     if (typeof window === 'undefined') {
-      // Return a minimal mock client for build time
-      // This prevents build failures but will fail at runtime if env vars aren't set
+      // Return mock client for server-side build
       return {
         auth: {
           getUser: async () => ({ data: { user: null }, error: { message: 'Missing Supabase environment variables' } }),
+          getSession: async () => ({ data: { session: null }, error: null }),
           signUp: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
           signInWithPassword: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
           signOut: async () => ({ error: { message: 'Missing Supabase environment variables' } }),
-          onAuthStateChange: () => ({ data: { subscription: null }, error: null }),
+          onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
         },
         from: () => ({
-          select: () => ({ single: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }) }),
-          insert: () => ({ error: { message: 'Missing Supabase environment variables' } }),
-          update: () => ({ error: { message: 'Missing Supabase environment variables' } }),
-          delete: () => ({ error: { message: 'Missing Supabase environment variables' } }),
+          select: () => ({ 
+            single: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
+            eq: () => ({ single: async () => ({ data: null, error: null }) }),
+          }),
+          insert: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
+          update: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
+          delete: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
         }),
-        rpc: () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
+        rpc: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
         channel: () => ({
-          on: () => ({ subscribe: () => {} }),
-          subscribe: () => {},
+          on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }),
         }),
         removeChannel: () => {},
-      };
+      } as any;
     }
     
-    // At runtime in browser, throw error so user knows what's wrong
-    console.error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required');
-    throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required');
+    // Runtime browser error
+    console.error('Missing Supabase environment variables');
+    throw new Error('Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
   
-  // Reuse existing client instance if available
-  if (!clientInstance) {
-    clientInstance = createSupabaseClient(url, key);
+  // Return existing singleton instance
+  if (clientInstance) {
+    return clientInstance;
   }
+  
+  // Create singleton instance using SSR-compatible client
+  clientInstance = createBrowserClient(url, key);
   
   return clientInstance;
 }
