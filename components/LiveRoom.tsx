@@ -2832,11 +2832,7 @@ export default function LiveRoom() {
                         onReplace={() => setSelectedSlotForReplacement(slot.slotIndex)}
                         />
                           );
-                        })() : (
-                        <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
-                          <span className="text-gray-400 text-sm">Invalid Streamer Data</span>
-                        </div>
-                      )}
+                        })()}
                     </div>
                   );
                   }).filter((element) => element !== null);
