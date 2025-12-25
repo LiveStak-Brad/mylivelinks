@@ -147,11 +147,11 @@ export default function ReportModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
       onClick={handleClose}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Success State */}

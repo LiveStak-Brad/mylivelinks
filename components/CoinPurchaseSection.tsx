@@ -197,11 +197,11 @@ export default function CoinPurchaseSection() {
   const userCanSeeAllVip = userInfo?.isOwner || (userInfo?.vip_tier || 0) >= 2;
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
-      <h3 className="text-base font-semibold mb-2 text-gray-900 dark:text-white">💰 Purchase Coins</h3>
+    <div className="bg-muted/50 rounded-lg p-3">
+      <h3 className="text-base font-semibold mb-2 text-foreground">💰 Purchase Coins</h3>
       
       {error && (
-        <div className="mb-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-sm">
+        <div className="mb-2 p-2 bg-destructive/10 text-destructive rounded-lg text-sm">
           {error}
         </div>
       )}
@@ -209,11 +209,11 @@ export default function CoinPurchaseSection() {
       {packsLoading ? (
         <div className="grid grid-cols-2 gap-2">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-20 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+            <div key={i} className="h-20 bg-muted rounded-lg animate-pulse" />
           ))}
         </div>
       ) : visiblePacks.length === 0 ? (
-        <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+        <div className="text-center py-6 text-muted-foreground">
           <p className="text-sm">No coin packs available</p>
           <p className="text-xs mt-1">Please try again later</p>
         </div>
@@ -282,8 +282,8 @@ export default function CoinPurchaseSection() {
 
           {/* Locked VIP message for non-qualified users */}
           {hasVipPacks && !userCanSeeAllVip && (
-            <div className="mt-3 p-2 bg-gradient-to-r from-amber-50 to-purple-50 dark:from-amber-900/20 dark:to-purple-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+            <div className="mt-3 p-2 bg-warning/10 border border-warning/20 rounded-lg">
+              <div className="flex items-center gap-2 text-xs text-warning">
                 <span>🔒</span>
                 <span>Unlock higher VIP Coin Packs by purchasing VIP tiers</span>
               </div>
@@ -294,12 +294,12 @@ export default function CoinPurchaseSection() {
       
       <a 
         href="/wallet" 
-        className="block mt-3 text-xs text-purple-600 dark:text-purple-400 hover:underline text-center font-medium"
+        className="block mt-3 text-xs text-primary hover:underline text-center font-medium"
       >
         Open Full Wallet →
       </a>
       
-      <p className="mt-1 text-[10px] text-gray-500 dark:text-gray-400 text-center">
+      <p className="mt-1 text-[10px] text-muted-foreground text-center">
         Secure payments via Stripe
       </p>
     </div>

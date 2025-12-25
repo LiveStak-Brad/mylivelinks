@@ -21,6 +21,10 @@ import GoLiveButton from './GoLiveButton';
 import Image from 'next/image';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
 import { Room, RoomEvent } from 'livekit-client';
+import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
+import { useOrientation } from '@/hooks/useOrientation';
+import MobileWebWatchLayout from './mobile/MobileWebWatchLayout';
+import RotatePhoneOverlay from './mobile/RotatePhoneOverlay';
 
 interface LiveStreamer {
   id: string;
@@ -113,6 +117,18 @@ export default function LiveRoom() {
     viewersOpen: true,
     rightStackOpen: true,
   });
+
+  // MOBILE WEB: Detect mobile web browser and orientation
+  const isMobileWeb = useIsMobileWeb();
+  const { isLandscape, isPortrait } = useOrientation();
+  const [mobilePortraitDismissed, setMobilePortraitDismissed] = useState(false);
+  
+  // Reset dismiss state when orientation changes to landscape (user rotated)
+  useEffect(() => {
+    if (isLandscape) {
+      setMobilePortraitDismissed(false);
+    }
+  }, [isLandscape]);
 
   // CRITICAL: Memoize Supabase client to prevent recreation on every render
   // This prevents effects from re-running and causing LiveKit disconnect/reconnect loops

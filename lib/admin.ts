@@ -40,39 +40,29 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
     throw new Error('UNAUTHORIZED');
   }
 
-  const admin = getSupabaseAdmin();
+  // Preferred: use DB RBAC helper (SECURITY DEFINER) so we don't require service role.
+  const supabase = request ? createRouteHandlerClient(request) : createServerSupabaseClient();
+  const { data: isAdmin, error: isAdminError } = await supabase.rpc('is_admin', {
+    uid: user.id,
+  });
 
-  // Prefer profiles.role authorization. If the column doesn't exist yet, fall back to legacy flags.
-  const { data: profile, error } = await admin
-    .from('profiles')
-    .select('role, is_admin, is_owner')
-    .eq('id', user.id)
-    .single();
-
-  if (error) {
-    const msg = (error as any)?.message || '';
-    if (typeof msg === 'string' && msg.toLowerCase().includes('column') && msg.toLowerCase().includes('role')) {
-      const legacy = await admin
-        .from('profiles')
-        .select('is_admin, is_owner')
-        .eq('id', user.id)
-        .single();
-      if (legacy.error) throw new Error('FORBIDDEN');
-      const isLegacyAllowed = !!(legacy.data as any)?.is_admin || !!(legacy.data as any)?.is_owner;
-      if (!isLegacyAllowed) throw new Error('FORBIDDEN');
-      return { user };
-    }
-
-    throw new Error('FORBIDDEN');
+  if (!isAdminError && isAdmin) {
+    return { user };
   }
 
-  const role = String((profile as any)?.role || '').toLowerCase();
-  const isRoleAllowed = role === 'admin' || role === 'moderator';
-  const isLegacyAllowed = !!(profile as any)?.is_admin || !!(profile as any)?.is_owner;
+  // Fallback: service role direct profile flags (useful during migrations / if RPC missing).
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('is_admin, is_owner')
+      .eq('id', user.id)
+      .single();
 
-  if (!isRoleAllowed && !isLegacyAllowed) {
+    const legacyAllowed = !!(profile as any)?.is_admin || !!(profile as any)?.is_owner;
+    if (!legacyAllowed) throw new Error('FORBIDDEN');
+    return { user };
+  } catch {
     throw new Error('FORBIDDEN');
   }
-
-  return { user };
 }
