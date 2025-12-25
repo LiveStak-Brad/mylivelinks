@@ -48,21 +48,41 @@ export default function GifterBadge({
 
 // Hook to fetch gifter level info
 export async function getGifterLevelInfo(level: number, supabase: any) {
-  const { data, error } = await supabase
-    .from('gifter_levels')
-    .select('*')
-    .eq('level', level)
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from('gifter_levels')
+      .select('*')
+      .eq('level', level)
+      .single();
 
-  if (error || !data) {
-    return {
-      level,
-      badge_name: `Level ${level}`,
-      badge_color: '#94A3B8',
-    };
+    if (!error && data) {
+      return data;
+    }
+  } catch {
   }
 
-  return data;
+  try {
+    const res = await fetch('/api/gifter-levels', { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      const levels = Array.isArray(json?.levels) ? json.levels : [];
+      const match = levels.find((l: any) => Number(l?.level) === Number(level));
+      if (match) {
+        return {
+          level: Number(match.level),
+          badge_name: String(match.name ?? `Level ${level}`),
+          badge_color: String(match.color ?? '#94A3B8'),
+        };
+      }
+    }
+  } catch {
+  }
+
+  return {
+    level,
+    badge_name: `Level ${level}`,
+    badge_color: '#94A3B8',
+  };
 }
 
 

@@ -118,7 +118,24 @@ export default function GiftsAdminPage() {
         .order('price_usd', { ascending: true });
 
       if (!error && data) {
-        setCoinPacks(data);
+        const normalized = (data as any[]).map((row: any) => {
+          const coins = Number(row?.coins ?? row?.coins_amount ?? 0);
+          const priceUsd = row?.price_usd ?? (row?.price_cents ? Number(row.price_cents) / 100 : 0);
+          const active = row?.is_active ?? row?.active;
+
+          return {
+            id: String(row?.id ?? row?.sku ?? ''),
+            name: String(row?.name ?? row?.pack_name ?? row?.sku ?? 'Coin Pack'),
+            coins,
+            price_usd: Number(priceUsd ?? 0),
+            bonus_coins: Number(row?.bonus_coins ?? 0),
+            is_popular: Boolean(row?.is_popular ?? row?.is_vip ?? false),
+            is_active: Boolean(active ?? true),
+            stripe_price_id: (row?.stripe_price_id ?? null) as any,
+          } as CoinPack;
+        });
+
+        setCoinPacks(normalized);
       }
     } catch (error) {
       console.error('Error loading coin packs:', error);

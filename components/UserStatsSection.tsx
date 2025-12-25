@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import GifterBadge from './GifterBadge';
+import GifterBadge, { getGifterLevelInfo } from './GifterBadge';
 
 export default function UserStatsSection() {
   const [coinBalance, setCoinBalance] = useState<number>(0);
@@ -46,14 +46,9 @@ export default function UserStatsSection() {
             
             // Reload badge info if level changed
             if (updatedProfile.gifter_level !== gifterLevel) {
-              supabase
-                .from('gifter_levels')
-                .select('*')
-                .eq('level', updatedProfile.gifter_level)
-                .single()
-                .then(({ data }: any) => {
-                  if (data) setBadgeInfo(data);
-                });
+              getGifterLevelInfo(updatedProfile.gifter_level, supabase).then((data: any) => {
+                if (data) setBadgeInfo(data);
+              });
             }
             
             console.log('[BALANCE] Real-time update:', {
@@ -102,11 +97,7 @@ export default function UserStatsSection() {
 
       // Load badge info
       if (profile.gifter_level !== null) {
-        const { data: badge } = await supabase
-          .from('gifter_levels')
-          .select('*')
-          .eq('level', profile.gifter_level)
-          .single();
+        const badge = await getGifterLevelInfo(profile.gifter_level, supabase);
         setBadgeInfo(badge);
       }
     } catch (error) {

@@ -337,14 +337,28 @@ export default function OwnerPanel() {
 
   const loadCoinPacks = async () => {
     try {
-      const { data, error } = await supabase
-        .from('coin_packs')
-        .select('*')
-        .order('price_usd', { ascending: true });
+      const res = await fetch('/api/coins/packs', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load coin packs');
+      const json = await res.json();
+      const packs = Array.isArray(json?.packs) ? json.packs : [];
 
-      if (!error && data) {
-        setCoinPacks(data);
-      }
+      const normalized = packs.map((pack: any) => {
+        const coins = Number(pack?.coins_awarded ?? pack?.coins_amount ?? pack?.coins ?? 0);
+        const price = Number(pack?.usd_amount ?? pack?.price_usd ?? 0);
+        const isVip = pack?.is_vip === true;
+
+        return {
+          id: String(pack?.sku ?? pack?.price_id ?? pack?.pack_name ?? ''),
+          name: String(pack?.pack_name ?? pack?.name ?? 'Coin Pack'),
+          coins,
+          price_usd: price,
+          bonus_coins: 0,
+          is_popular: isVip,
+          is_active: true,
+        } as CoinPack;
+      });
+
+      setCoinPacks(normalized);
     } catch (error) {
       console.error('Error loading coin packs:', error);
     }
