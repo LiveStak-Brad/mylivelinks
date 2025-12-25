@@ -918,22 +918,15 @@ export default function LiveRoom() {
               // Load user's streamer data
               const { data: userProfile } = await supabase
                 .from('profiles')
-                .select('username, avatar_url, gifter_level')
+                .select('username, avatar_url')
                 .eq('id', currentUserId)
                 .single();
               
               console.log('[DEBUG] Loaded user profile:', { userProfile });
               
               if (userProfile) {
-                let badgeInfo = null;
-                if (userProfile.gifter_level) {
-                  const { data: badge } = await supabase
-                    .from('gifter_levels')
-                    .select('*')
-                    .eq('level', userProfile.gifter_level)
-                    .single();
-                  badgeInfo = badge;
-                }
+                const ownStatusMap = await fetchGifterStatuses([currentUserId]);
+                const ownStatus = ownStatusMap[currentUserId] || null;
                 
                 const ownStream: LiveStreamer = {
                   id: userLiveStream.id.toString(),
@@ -942,9 +935,8 @@ export default function LiveRoom() {
                   avatar_url: userProfile.avatar_url,
                   live_available: userLiveStream.live_available,
                   viewer_count: 0,
-                  gifter_level: badgeInfo?.level || 0,
-                  badge_name: badgeInfo?.badge_name,
-                  badge_color: badgeInfo?.badge_color,
+                  gifter_level: 0,
+                  gifter_status: ownStatus,
                 };
                 
                 console.log('[DEBUG] Created ownStream object:', ownStream);
@@ -1582,20 +1574,13 @@ export default function LiveRoom() {
         if (userLiveStream) {
           const { data: userProfile } = await supabase
             .from('profiles')
-            .select('username, avatar_url, gifter_level')
+            .select('username, avatar_url')
             .eq('id', user.id)
             .single();
           
           if (userProfile) {
-            let badgeInfo = null;
-            if (userProfile.gifter_level) {
-              const { data: badge } = await supabase
-                .from('gifter_levels')
-                .select('*')
-                .eq('level', userProfile.gifter_level)
-                .single();
-              badgeInfo = badge;
-            }
+            const ownStatusMap = await fetchGifterStatuses([user.id]);
+            const ownStatus = ownStatusMap[user.id] || null;
             
             const ownStream: LiveStreamer = {
               id: userLiveStream.id.toString(),
@@ -1604,9 +1589,8 @@ export default function LiveRoom() {
               avatar_url: userProfile.avatar_url,
               live_available: userLiveStream.live_available,
               viewer_count: 0,
-              gifter_level: badgeInfo?.level || 0,
-              badge_name: badgeInfo?.badge_name,
-              badge_color: badgeInfo?.badge_color,
+              gifter_level: 0,
+              gifter_status: ownStatus,
             };
             
             // CRITICAL: Force user into slot 1 (self-pinning) - override any saved layout
@@ -1964,7 +1948,7 @@ export default function LiveRoom() {
       const [profileResult, liveStreamResult] = await Promise.all([
         supabase
           .from('profiles')
-          .select('username, avatar_url, gifter_level')
+          .select('username, avatar_url')
           .eq('id', profileId)
           .single(),
         supabase
@@ -1987,16 +1971,8 @@ export default function LiveRoom() {
       const profile = profileResult.data;
       const liveStream = liveStreamResult.data;
 
-      // Get badge if they have one
-      let badgeInfo = null;
-      if (profile.gifter_level) {
-        const { data: badge } = await supabase
-          .from('gifter_levels')
-          .select('*')
-          .eq('level', profile.gifter_level)
-          .single();
-        badgeInfo = badge;
-      }
+      const statusMap = await fetchGifterStatuses([profileId]);
+      const status = statusMap[profileId] || null;
 
       // Create streamer object
       const ownStream: LiveStreamer = {
@@ -2006,9 +1982,8 @@ export default function LiveRoom() {
         avatar_url: profile.avatar_url,
         live_available: liveStream.live_available,
         viewer_count: 0, // Will be updated by realtime
-        gifter_level: badgeInfo?.level || 0,
-        badge_name: badgeInfo?.badge_name,
-        badge_color: badgeInfo?.badge_color,
+        gifter_level: 0,
+        gifter_status: status,
       };
 
       // Add to liveStreamers list if not already there
@@ -2283,16 +2258,8 @@ export default function LiveRoom() {
         isPublished = true;
       }
 
-      // Get badge info
-      let badgeInfo = null;
-      if (profile.gifter_level !== null) {
-        const { data: badge } = await supabase
-          .from('gifter_levels')
-          .select('*')
-          .eq('level', profile.gifter_level)
-          .single();
-        badgeInfo = badge;
-      }
+      const statusMap = await fetchGifterStatuses([profileId]);
+      const status = statusMap[profileId] || null;
 
       // Get viewer count - must match the same criteria as update_publish_state_from_viewers
       // Count only active viewers: is_active + unmuted + visible + subscribed + heartbeat within 60 seconds
@@ -2317,9 +2284,8 @@ export default function LiveRoom() {
         avatar_url: profile.avatar_url,
         live_available: !!streamId, // true if they have a live stream
         viewer_count: viewerCount,
-        gifter_level: profile.gifter_level || 0,
-        badge_name: badgeInfo?.badge_name,
-        badge_color: badgeInfo?.badge_color,
+        gifter_level: 0,
+        gifter_status: status,
       };
 
       // Add to liveStreamers list if not already there
@@ -2741,8 +2707,6 @@ export default function LiveRoom() {
                   isLive={expandedSlot.streamer.live_available}
                   viewerCount={expandedSlot.streamer.viewer_count}
                   gifterLevel={expandedSlot.streamer.gifter_level}
-                  badgeName={expandedSlot.streamer.badge_name}
-                  badgeColor={expandedSlot.streamer.badge_color}
                   gifterStatus={expandedSlot.streamer.gifter_status}
                   slotIndex={expandedSlot.slotIndex}
                   liveStreamId={expandedSlot.streamer.id && expandedSlot.streamer.live_available ? (() => {
@@ -3086,8 +3050,7 @@ export default function LiveRoom() {
                               isLive={!!streamer.live_available}
                               viewerCount={typeof streamer.viewer_count === 'number' ? streamer.viewer_count : 0}
                               gifterLevel={typeof streamer.gifter_level === 'number' ? streamer.gifter_level : 0}
-                              badgeName={typeof streamer.badge_name === 'string' ? streamer.badge_name : undefined}
-                              badgeColor={typeof streamer.badge_color === 'string' ? streamer.badge_color : undefined}
+                              gifterStatus={(streamer as any).gifter_status || null}
                               slotIndex={slot.slotIndex}
                               liveStreamId={liveStreamId}
                         sharedRoom={sharedRoom}

@@ -125,7 +125,11 @@ export default function Chat() {
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       ));
 
-      const profileIds = [...new Set(messagesWithBadges.map((m: any) => m.profile_id).filter((id: any) => typeof id === 'string'))];
+      const profileIds: string[] = [...new Set(
+        messagesWithBadges
+          .map((m: any) => m.profile_id)
+          .filter((id: any): id is string => typeof id === 'string')
+      )] as string[];
       const statusMap = await fetchGifterStatuses(profileIds);
       setGifterStatusMap(statusMap);
     } catch (error) {
@@ -166,7 +170,11 @@ export default function Chat() {
         
         setMessages(messagesWithProfiles);
 
-        const profileIds = [...new Set(messagesWithProfiles.map((m: any) => m.profile_id).filter((id: any) => typeof id === 'string'))];
+        const profileIds = [...new Set(
+          messagesWithProfiles
+            .map((m: any) => m.profile_id)
+            .filter((id: any): id is string => typeof id === 'string')
+        )];
         const statusMap = await fetchGifterStatuses(profileIds);
         setGifterStatusMap(statusMap);
       }
