@@ -145,6 +145,12 @@ export default function ModernProfilePage() {
         return;
       }
       
+      console.log('[PROFILE] Loaded:', {
+        username: data.profile.username,
+        relationship: data.relationship,
+        isOwnProfile: user?.id === data.profile.id
+      });
+      
       setProfileData(data);
       setIsOwnProfile(user?.id === data.profile.id);
     } catch (error) {
@@ -187,13 +193,31 @@ export default function ModernProfilePage() {
         const wasFollowing = profileData.relationship !== 'none';
         const isFollowingNow = data.status !== 'none';
         
-        setProfileData(prev => prev ? {
-          ...prev,
-          relationship: data.status,
-          follower_count: isFollowingNow 
-            ? (wasFollowing ? prev.follower_count : prev.follower_count + 1)
-            : prev.follower_count - 1
-        } : null);
+        console.log('[FOLLOW] Updating state:', {
+          oldRelationship: profileData.relationship,
+          newRelationship: data.status,
+          wasFollowing,
+          isFollowingNow
+        });
+        
+        setProfileData(prev => {
+          if (!prev) return null;
+          
+          const updated = {
+            ...prev,
+            relationship: data.status,
+            follower_count: isFollowingNow 
+              ? (wasFollowing ? prev.follower_count : prev.follower_count + 1)
+              : prev.follower_count - 1
+          };
+          
+          console.log('[FOLLOW] State updated:', {
+            relationship: updated.relationship,
+            follower_count: updated.follower_count
+          });
+          
+          return updated;
+        });
       } else {
         console.error('Follow unsuccessful:', data);
         alert(data.error || 'Failed to follow/unfollow');
