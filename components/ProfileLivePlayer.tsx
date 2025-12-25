@@ -65,12 +65,31 @@ export default function ProfileLivePlayer({
 
   useEffect(() => {
     if (audioTrack && audioRef.current) {
-      console.log('[PROFILE_LIVE] Attaching audio track');
-      audioTrack.attach(audioRef.current);
-      // Ensure audio is enabled
-      audioRef.current.muted = false;
-      audioRef.current.volume = volume / 100;
-      console.log('[PROFILE_LIVE] Audio attached, volume:', volume, 'muted:', false);
+      console.log('[PROFILE_LIVE] Attaching audio track', {
+        trackKind: audioTrack.kind,
+        audioElement: !!audioRef.current,
+      });
+      
+      // Detach first to avoid conflicts
+      audioTrack.detach();
+      
+      // Attach to audio element
+      const element = audioTrack.attach(audioRef.current);
+      
+      // CRITICAL: Ensure audio is enabled and playing
+      if (audioRef.current) {
+        audioRef.current.muted = false;
+        audioRef.current.volume = volume / 100;
+        audioRef.current.play().catch(err => {
+          console.warn('[PROFILE_LIVE] Audio autoplay blocked:', err);
+        });
+      }
+      
+      console.log('[PROFILE_LIVE] Audio attached successfully', {
+        volume: audioRef.current?.volume,
+        muted: audioRef.current?.muted,
+        paused: audioRef.current?.paused,
+      });
     }
     return () => {
       if (audioTrack && audioRef.current) {
@@ -342,12 +361,13 @@ export default function ProfileLivePlayer({
         className="w-full h-full object-cover"
       />
 
-      {/* Audio Element (hidden) - Remote tracks attach here */}
+      {/* Audio Element - MUST be visible for autoplay */}
       <audio 
         ref={audioRef} 
         autoPlay 
         playsInline
-        className="hidden"
+        muted={false}
+        style={{ position: 'absolute', bottom: 0, left: 0, width: '1px', height: '1px', opacity: 0 }}
       />
 
       {/* Loading indicator */}
