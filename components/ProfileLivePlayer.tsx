@@ -65,10 +65,16 @@ export default function ProfileLivePlayer({
 
   useEffect(() => {
     if (audioTrack && audioRef.current) {
+      console.log('[PROFILE_LIVE] Attaching audio track');
       audioTrack.attach(audioRef.current);
+      // Ensure audio is enabled
+      audioRef.current.muted = false;
+      audioRef.current.volume = volume / 100;
+      console.log('[PROFILE_LIVE] Audio attached, volume:', volume, 'muted:', false);
     }
     return () => {
       if (audioTrack && audioRef.current) {
+        console.log('[PROFILE_LIVE] Detaching audio track');
         audioTrack.detach(audioRef.current);
       }
     };
@@ -76,11 +82,16 @@ export default function ProfileLivePlayer({
   
   // Apply volume settings whenever they change
   useEffect(() => {
-    if (audioRef.current) {
+    if (audioRef.current && audioTrack) {
       audioRef.current.volume = isMuted ? 0 : volume / 100;
       audioRef.current.muted = isMuted;
+      console.log('[PROFILE_LIVE] Volume updated:', {
+        volume: audioRef.current.volume,
+        muted: audioRef.current.muted,
+        hasAudioTrack: !!audioTrack,
+      });
     }
-  }, [isMuted, volume]);
+  }, [isMuted, volume, audioTrack]);
 
   const loadViewerCount = async () => {
     if (!liveStreamId) return;
@@ -292,8 +303,13 @@ export default function ProfileLivePlayer({
         className="w-full h-full object-cover"
       />
 
-      {/* Audio Element (hidden) */}
-      <audio ref={audioRef} autoPlay />
+      {/* Audio Element (hidden) - Remote tracks attach here */}
+      <audio 
+        ref={audioRef} 
+        autoPlay 
+        playsInline
+        className="hidden"
+      />
 
       {/* Loading indicator */}
       {isConnected && !videoTrack && (
@@ -340,19 +356,22 @@ export default function ProfileLivePlayer({
                 {/* Expandable Volume Slider */}
                 {showVolumeSlider && (
                   <div 
-                    className="absolute bottom-full left-0 mb-2 bg-black/80 backdrop-blur-sm rounded-lg p-2 shadow-xl transition-all"
+                    className="absolute bottom-full left-0 mb-2 bg-black/80 backdrop-blur-sm rounded-lg px-3 py-4 shadow-xl transition-all"
                     onMouseLeave={() => setShowVolumeSlider(false)}
                   >
-                    <div className="flex flex-col items-center gap-2 py-2">
+                    <div className="flex flex-col items-center gap-3">
+                      {/* Vertical slider */}
                       <input
                         type="range"
                         min="0"
                         max="100"
                         value={volume}
                         onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                        className="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer transform -rotate-90 origin-center"
+                        orient="vertical"
+                        className="h-24 w-2 appearance-none bg-white/30 rounded-lg cursor-pointer slider-vertical"
                         style={{
-                          background: `linear-gradient(to right, white ${volume}%, rgba(255,255,255,0.3) ${volume}%)`,
+                          writingMode: 'bt-lr',
+                          WebkitAppearance: 'slider-vertical',
                         }}
                       />
                       <span className="text-white text-xs font-medium">{volume}%</span>
