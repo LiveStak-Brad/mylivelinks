@@ -142,20 +142,20 @@ export default function ModernProfilePage() {
       
       // Fetch profile via API
       const response = await fetch(`/api/profile/${username}`);
-      const data = await response.json();
+      const profileData = await response.json();
       
-      if (data.error) {
-        console.error('Profile error:', data.error);
+      if (profileData.error) {
+        console.error('Profile error:', profileData.error);
         setProfileData(null);
         return;
       }
       
       // Fetch live_stream_id if user is live
-      if (data.profile.is_live) {
+      if (profileData.profile.is_live) {
         const { data: liveStream } = await supabase
           .from('live_streams')
           .select('id')
-          .eq('profile_id', data.profile.id)
+          .eq('profile_id', profileData.profile.id)
           .eq('live_available', true)
           .maybeSingle();
         
@@ -164,24 +164,14 @@ export default function ModernProfilePage() {
         }
       }
       
-      // Fetch profile via API
-      const response = await fetch(`/api/profile/${username}`);
-      const data = await response.json();
-      
-      if (data.error) {
-        console.error('Profile error:', data.error);
-        setProfileData(null);
-        return;
-      }
-      
       console.log('[PROFILE] Loaded:', {
-        username: data.profile.username,
-        relationship: data.relationship,
-        isOwnProfile: user?.id === data.profile.id
+        username: profileData.profile.username,
+        relationship: profileData.relationship,
+        isOwnProfile: user?.id === profileData.profile.id
       });
       
-      setProfileData(data);
-      setIsOwnProfile(user?.id === data.profile.id);
+      setProfileData(profileData);
+      setIsOwnProfile(user?.id === profileData.profile.id);
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
