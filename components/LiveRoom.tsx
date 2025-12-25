@@ -2489,21 +2489,13 @@ export default function LiveRoom() {
         // Not live, just load profile
         const { data: profile } = await supabase
           .from('profiles')
-          .select('id, username, avatar_url, gifter_level')
+          .select('id, username, avatar_url')
           .eq('id', streamerId)
           .single();
         
         if (profile) {
-          // Get badge if they have one
-          let badgeInfo = null;
-          if (profile.gifter_level) {
-            const { data: badge } = await supabase
-              .from('gifter_levels')
-              .select('*')
-              .eq('level', profile.gifter_level)
-              .single();
-            badgeInfo = badge;
-          }
+          const statusMap = await fetchGifterStatuses([profile.id]);
+          const status = statusMap[profile.id] || null;
           
           streamer = {
             id: profile.id,
@@ -2512,9 +2504,8 @@ export default function LiveRoom() {
             avatar_url: profile.avatar_url,
             live_available: false,
             viewer_count: 0,
-            gifter_level: badgeInfo?.level || 0,
-            badge_name: badgeInfo?.badge_name,
-            badge_color: badgeInfo?.badge_color,
+            gifter_level: 0,
+            gifter_status: status,
           } as LiveStreamer;
         } else {
           console.error('Profile not found:', streamerId);

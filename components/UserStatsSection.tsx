@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import GifterBadge, { getGifterLevelInfo } from './GifterBadge';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
+import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 
 export default function UserStatsSection() {
   const [coinBalance, setCoinBalance] = useState<number>(0);
   const [diamondBalance, setDiamondBalance] = useState<number>(0);
   const [username, setUsername] = useState<string>('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [gifterLevel, setGifterLevel] = useState<number>(0);
-  const [badgeInfo, setBadgeInfo] = useState<any>(null);
+  const [gifterStatus, setGifterStatus] = useState<GifterStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -42,14 +43,9 @@ export default function UserStatsSection() {
             const updatedProfile = payload.new;
             setCoinBalance(updatedProfile.coin_balance || 0);
             setDiamondBalance(updatedProfile.earnings_balance || 0);
-            setGifterLevel(updatedProfile.gifter_level || 0);
-            
-            // Reload badge info if level changed
-            if (updatedProfile.gifter_level !== gifterLevel) {
-              getGifterLevelInfo(updatedProfile.gifter_level, supabase).then((data: any) => {
-                if (data) setBadgeInfo(data);
-              });
-            }
+            fetchGifterStatuses([user.id]).then((m) => {
+              setGifterStatus(m[user.id] || null);
+            });
             
             console.log('[BALANCE] Real-time update:', {
               coins: updatedProfile.coin_balance,
@@ -93,13 +89,9 @@ export default function UserStatsSection() {
       setDiamondBalance(profile.earnings_balance || 0);
       setUsername(profile.username);
       setAvatarUrl(profile.avatar_url);
-      setGifterLevel(profile.gifter_level || 0);
 
-      // Load badge info
-      if (profile.gifter_level !== null) {
-        const badge = await getGifterLevelInfo(profile.gifter_level, supabase);
-        setBadgeInfo(badge);
-      }
+      const statusMap = await fetchGifterStatuses([user.id]);
+      setGifterStatus(statusMap[user.id] || null);
     } catch (error) {
       console.error('Error loading user stats:', error);
     } finally {
@@ -137,11 +129,10 @@ export default function UserStatsSection() {
         )}
         <div className="flex-1">
           <div className="font-semibold">{username}</div>
-          {badgeInfo && (
-            <GifterBadge
-              level={gifterLevel}
-              badgeName={badgeInfo.badge_name}
-              badgeColor={badgeInfo.badge_color}
+          {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
+            <TierBadge
+              tier_key={gifterStatus.tier_key}
+              level={gifterStatus.level_in_tier}
               size="sm"
             />
           )}

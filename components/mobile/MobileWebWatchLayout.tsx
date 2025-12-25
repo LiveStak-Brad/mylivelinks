@@ -6,6 +6,7 @@ import { Room } from 'livekit-client';
 import Tile from '@/components/Tile';
 import GiftModal from '@/components/GiftModal';
 import ReportModal from '@/components/ReportModal';
+import type { GifterStatus } from '@/lib/gifter-status';
 
 interface LiveStreamer {
   id: string;
@@ -15,8 +16,7 @@ interface LiveStreamer {
   live_available: boolean;
   viewer_count: number;
   gifter_level: number;
-  badge_name?: string;
-  badge_color?: string;
+  gifter_status?: GifterStatus | null;
 }
 
 interface GridSlot {
@@ -267,8 +267,7 @@ export default function MobileWebWatchLayout({
               isLive={focusedSlot.streamer.live_available}
               viewerCount={focusedSlot.streamer.viewer_count}
               gifterLevel={focusedSlot.streamer.gifter_level}
-              badgeName={focusedSlot.streamer.badge_name}
-              badgeColor={focusedSlot.streamer.badge_color}
+              gifterStatus={focusedSlot.streamer.gifter_status}
               slotIndex={focusedSlot.slotIndex}
               liveStreamId={focusedSlot.streamer.id && focusedSlot.streamer.live_available 
                 ? (() => {
@@ -353,8 +352,7 @@ export default function MobileWebWatchLayout({
                       isLive={slot.streamer.live_available}
                       viewerCount={slot.streamer.viewer_count}
                       gifterLevel={slot.streamer.gifter_level}
-                      badgeName={slot.streamer.badge_name}
-                      badgeColor={slot.streamer.badge_color}
+                      gifterStatus={slot.streamer.gifter_status}
                       slotIndex={slot.slotIndex}
                       liveStreamId={slot.streamer.id && slot.streamer.live_available 
                         ? (() => {
