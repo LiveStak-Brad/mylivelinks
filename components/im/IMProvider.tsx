@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
+import type { AuthChangeEvent } from '@supabase/supabase-js';
 import IMManager from './IMManager';
 
 /**
@@ -23,7 +24,7 @@ export default function IMProvider() {
     getUser();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session) => {
       setCurrentUserId(session?.user?.id || null);
     });
 
