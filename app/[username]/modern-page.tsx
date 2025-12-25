@@ -142,7 +142,7 @@ export default function ModernProfilePage() {
           table: 'live_streams',
           filter: `profile_id=eq.${profileData?.profile?.id}`,
         },
-        (payload) => {
+        (payload: any) => {
           console.log('[PROFILE] Live stream status changed:', payload);
           
           // Reload profile to get updated live status
