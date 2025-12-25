@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
 import GifterBadge from './GifterBadge';
 import MiniProfile from './MiniProfile';
@@ -39,7 +39,10 @@ export default function Chat() {
     isLive?: boolean;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  // CRITICAL: Memoize Supabase client to prevent recreation on every render
+  const supabase = useMemo(() => createClient(), []);
+  // CRITICAL: Track subscription to prevent duplicates
+  const subscriptionRef = useRef<{ channel: any; subscribed: boolean } | null>(null);
 
   useEffect(() => {
     // Get current user ID and profile
@@ -66,12 +69,24 @@ export default function Chat() {
         setCurrentUserProfile(null);
       }
     });
-  }, []);
+  }, [supabase]);
 
+  // CRITICAL: Store loadMessageWithProfile in ref to avoid stale closures
+  const loadMessageWithProfileRef = useRef(loadMessageWithProfile);
   useEffect(() => {
-    // Load messages immediately (don't wait for currentUserId)
-    loadMessages();
+    loadMessageWithProfileRef.current = loadMessageWithProfile;
+  }, [loadMessageWithProfile]);
 
+  // CRITICAL: Create realtime subscription ONCE on mount, never recreate
+  useEffect(() => {
+    // Prevent duplicate subscriptions
+    if (subscriptionRef.current?.subscribed) {
+      console.warn('[CHAT] ⚠️ Subscription already exists, skipping duplicate');
+      return;
+    }
+
+    console.log('[CHAT] 🔌 Creating realtime subscription');
+    
     // Subscribe to new messages (realtime)
     const channel = supabase
       .channel('chat-messages-realtime')
@@ -83,24 +98,51 @@ export default function Chat() {
           table: 'chat_messages',
         },
         (payload: any) => {
-          // Add new message immediately via realtime
-          loadMessageWithProfile(payload.new as any);
+          // Add new message immediately via realtime - use ref to avoid stale closure
+          if (payload?.new) {
+            loadMessageWithProfileRef.current(payload.new as any);
+          }
         }
       )
-      .subscribe();
+      .subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[CHAT] ✅ Realtime subscription active - ONE subscription exists');
+          subscriptionRef.current = { channel, subscribed: true };
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[CHAT] ❌ Realtime subscription error:', status);
+          subscriptionRef.current = null;
+        } else {
+          console.log('[CHAT] 📡 Subscription status:', status);
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      console.log('[CHAT] 🧹 Cleaning up realtime subscription');
+      if (subscriptionRef.current?.channel) {
+        supabase.removeChannel(subscriptionRef.current.channel);
+        subscriptionRef.current = null;
+      }
     };
-  }, [currentUserId]); // Still depend on currentUserId to reload when user changes
+  }, [supabase]); // Only depend on supabase (memoized, stable)
+
+  // CRITICAL: Load messages when currentUserId changes, but don't recreate subscription
+  useEffect(() => {
+    loadMessages();
+  }, [currentUserId, loadMessages]); // Include loadMessages in deps since it's memoized
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const loadMessages = async () => {
-    // Don't show loading spinner if messages already exist (just refreshing)
-    const isInitialLoad = messages.length === 0;
+  // CRITICAL: Use useCallback to prevent stale closures and ensure stable reference
+  const loadMessages = useCallback(async () => {
+    // Use functional update to get current messages state
+    let isInitialLoad = false;
+    setMessages((currentMessages) => {
+      isInitialLoad = currentMessages.length === 0;
+      return currentMessages; // Don't change state, just read it
+    });
+    
     if (isInitialLoad) {
       setLoading(true);
     }
@@ -166,15 +208,8 @@ export default function Chat() {
       setMessages(messagesWithBadges.sort((a: any, b: any) =>
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       ));
-      
-      if (isInitialLoad) {
-        setLoading(false);
-      }
     } catch (error) {
       console.error('Error loading messages:', error);
-      if (isInitialLoad) {
-        setLoading(false);
-      }
       // Fallback to regular query if RPC fails
       const { data, error: fallbackError } = await supabase
         .from('chat_messages')
@@ -195,9 +230,6 @@ export default function Chat() {
 
       if (!fallbackError && data) {
         // Batch load badges for fallback too
-        if (isInitialLoad) {
-          setLoading(false);
-        }
         const uniqueLevels = [...new Set(data.map((msg: any) => msg.profiles?.gifter_level).filter((l: any) => l !== null && l > 0))];
         const badgeMap: Record<number, any> = {};
         
@@ -237,9 +269,10 @@ export default function Chat() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]); // Only depend on supabase - use functional updates for messages
 
-  const loadMessageWithProfile = async (message: any) => {
+  // CRITICAL: Use useCallback to prevent stale closures
+  const loadMessageWithProfile = useCallback(async (message: any) => {
     if (!message.profile_id) {
       // System message
       setMessages((prev) => {
@@ -342,7 +375,7 @@ export default function Chat() {
         );
       });
     });
-  };
+  }, [supabase]); // Only depend on supabase
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
