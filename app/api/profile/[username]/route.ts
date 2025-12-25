@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -9,7 +9,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { username: string } }
 ) {
-  const supabase = createClient();
+  const supabase = createRouteHandlerClient(request);
   
   try {
     const { username } = params;
@@ -54,4 +54,3 @@ export async function GET(
     );
   }
 }
-
