@@ -175,7 +175,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     if (typeof window === 'undefined') return;
     
     const handleVisibilityChange = async () => {
-      if (document.hidden && isPublishing && stopPublishingRef.current) {
+      // Use ref to check current publishing state (avoids stale closure)
+      if (document.hidden && isPublishingRef.current && stopPublishingRef.current) {
         console.log('[GO_LIVE] Page hidden while publishing - stopping stream');
         try {
           // Stop publishing immediately
@@ -204,7 +205,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isPublishing, supabase]);
+  }, [supabase]);
 
   const loadDevices = async () => {
     try {

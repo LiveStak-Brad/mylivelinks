@@ -85,3 +85,5 @@ COMMENT ON COLUMN profiles.social_onlyfans IS 'OnlyFans username';
 -- Success message
 SELECT 'Social media fields added to profiles table!' AS status;
 
+
+

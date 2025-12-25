@@ -108,6 +108,9 @@ export async function getCoinPackBySku(sku: string): Promise<{
   coins_amount: number;
   price_cents: number;
   stripe_price_id?: string;
+  vip_tier?: number;
+  is_vip?: boolean;
+  description?: string;
 } | null> {
   const supabase = getSupabaseAdmin();
 
@@ -115,6 +118,36 @@ export async function getCoinPackBySku(sku: string): Promise<{
     .from('coin_packs')
     .select('*')
     .eq('sku', sku)
+    .eq('active', true)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * Get coin pack by Stripe price ID
+ */
+export async function getCoinPackByPriceId(priceId: string): Promise<{
+  id: number;
+  sku: string;
+  name: string;
+  coins_amount: number;
+  price_cents: number;
+  stripe_price_id?: string;
+  vip_tier?: number;
+  is_vip?: boolean;
+  description?: string;
+} | null> {
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from('coin_packs')
+    .select('*')
+    .eq('stripe_price_id', priceId)
     .eq('active', true)
     .single();
 
@@ -298,4 +331,6 @@ export async function getUserProfile(userId: string): Promise<{
 
   return data;
 }
+
+
 

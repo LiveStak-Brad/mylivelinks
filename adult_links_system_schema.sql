@@ -594,3 +594,5 @@ SELECT 'Adult Links System Schema Created Successfully!' AS status,
        'CRITICAL: Adult links only visible on WEB to users 18+ who have accepted disclaimer' AS safety_note,
        'Server enforces all rules - client cannot bypass' AS security_note;
 
+
+

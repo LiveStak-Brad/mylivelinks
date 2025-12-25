@@ -15,7 +15,7 @@ if (!stripeSecretKey && typeof window === 'undefined') {
 // Create Stripe client (only if key exists)
 export const stripe = stripeSecretKey
   ? new Stripe(stripeSecretKey, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2025-12-15.clover',
       typescript: true,
     })
   : null;
@@ -49,25 +49,33 @@ export function constructWebhookEvent(
 export async function createCoinCheckoutSession(params: {
   userId: string;
   packSku: string;
+  packName: string;
   priceId?: string;
   priceCents: number;
   coinsAmount: number;
+  vipTier?: number;
   successUrl: string;
   cancelUrl: string;
 }): Promise<Stripe.Checkout.Session> {
   const stripeClient = getStripe();
-  
+
   // Create idempotency key based on user, pack, and 5-minute bucket
   const timestampBucket = Math.floor(Date.now() / (5 * 60 * 1000));
   const idempotencyKey = `checkout:${params.userId}:${params.packSku}:${timestampBucket}`;
-  
+
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: 'payment',
     client_reference_id: params.userId,
     metadata: {
       user_id: params.userId,
       pack_sku: params.packSku,
+      // Locked rule: webhook must read coins_awarded from metadata
+      coins_awarded: String(params.coinsAmount),
+      // Back-compat with older handlers
       coins_amount: String(params.coinsAmount),
+      pack_name: params.packName,
+      ...(params.priceId ? { price_id: params.priceId } : {}),
+      ...(params.vipTier && { vip_tier: String(params.vipTier) }),
     },
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
@@ -78,14 +86,14 @@ export async function createCoinCheckoutSession(params: {
             currency: 'usd',
             unit_amount: params.priceCents,
             product_data: {
-              name: `${params.coinsAmount.toLocaleString()} Coins`,
+              name: params.packName,
               description: 'MyLiveLinks virtual currency',
             },
           },
           quantity: 1,
         }],
   };
-  
+
   return stripeClient.checkout.sessions.create(sessionParams, {
     idempotencyKey,
   });

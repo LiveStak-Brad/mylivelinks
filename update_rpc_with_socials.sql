@@ -195,3 +195,5 @@ COMMENT ON FUNCTION get_public_profile_with_adult_filtering IS 'Fetch profile wi
 -- Success message
 SELECT 'RPC function updated to include social media fields!' AS status;
 
+
+

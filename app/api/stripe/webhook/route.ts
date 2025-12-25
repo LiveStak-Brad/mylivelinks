@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { constructWebhookEvent, logStripeAction } from '@/lib/stripe';
 import {
-  finalizeCoinPurchase,
   recordStripeEvent,
   updateConnectAccountStatus,
+  getSupabaseAdmin,
 } from '@/lib/supabase-admin';
 import Stripe from 'stripe';
 
@@ -159,60 +159,82 @@ export async function POST(request: NextRequest) {
 
 /**
  * Handle checkout.session.completed
- * Credit coins to user wallet
+ * Credit coins to user wallet using cfm_finalize_coin_purchase
  */
-async function handleCheckoutCompleted(
+ async function handleCheckoutCompleted(
   session: Stripe.Checkout.Session,
   requestId: string
 ) {
-  const userId = session.client_reference_id || session.metadata?.user_id;
-  const packSku = session.metadata?.pack_sku;
-  const coinsAmount = session.metadata?.coins_amount;
+  // Locked rule: webhook credits COINS only.
+  // Must read user_id + coins_awarded from metadata (fallbacks allowed for legacy sessions).
+  const userId = session.metadata?.user_id || session.client_reference_id;
+  const coinsStr =
+    session.metadata?.coins_awarded ||
+    session.metadata?.coins_amount ||
+    session.metadata?.coins;
 
-  if (!userId || !coinsAmount) {
+  if (!userId || !coinsStr) {
     logStripeAction('checkout-missing-metadata', {
       requestId,
       sessionId: session.id,
       userId,
-      packSku,
-      coinsAmount,
+      coins_awarded: coinsStr,
     });
     return;
   }
 
-  const amountCents = session.amount_total || 0;
+  const coins = parseInt(coinsStr, 10);
+  if (!Number.isFinite(coins) || coins <= 0) {
+    logStripeAction('checkout-invalid-coins', {
+      requestId,
+      sessionId: session.id,
+      userId,
+      coins_awarded: coinsStr,
+    });
+    return;
+  }
+
+  const usdCents = session.amount_total || 0;
+  const providerRef = session.payment_intent ?? session.id;
+  const idempotencyKey = `stripe:${providerRef}`;
 
   logStripeAction('checkout-processing', {
     requestId,
     sessionId: session.id,
     userId,
-    packSku,
-    coinsAmount: parseInt(coinsAmount),
-    amountCents,
+    coins,
+    usdCents,
+    providerRef,
+    idempotencyKey,
   });
 
-  const result = await finalizeCoinPurchase({
-    userId,
-    coinsAmount: parseInt(coinsAmount),
-    amountCents,
-    sessionId: session.id,
+  // Call RPC to finalize purchase (coins only)
+  const supabase = getSupabaseAdmin();
+  const { data: ledgerId, error } = await supabase.rpc('finalize_coin_purchase', {
+    p_idempotency_key: idempotencyKey,
+    p_user_id: userId,
+    p_coins_amount: coins,
+    p_amount_usd_cents: usdCents,
+    p_provider_ref: providerRef,
   });
 
-  if (result.success) {
-    logStripeAction('checkout-finalized', {
+  if (error) {
+    logStripeAction('checkout-rpc-error', {
       requestId,
       sessionId: session.id,
       userId,
-      ledgerId: result.ledgerId,
+      error: error.message,
     });
-  } else {
-    logStripeAction('checkout-finalize-failed', {
-      requestId,
-      sessionId: session.id,
-      userId,
-      error: result.error,
-    });
+    return;
   }
+
+  logStripeAction('checkout-finalized', {
+    requestId,
+    sessionId: session.id,
+    userId,
+    coinsAwarded: coins,
+    ledgerId,
+  });
 }
 
 /**
@@ -260,11 +282,4 @@ async function handleAccountUpdated(
     });
   }
 }
-
-// Required for Next.js to properly handle raw body
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 

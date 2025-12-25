@@ -3,6 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import WalletModal from './WalletModal';
+import TransactionsModal from './TransactionsModal';
+import RoomRulesModal from './RoomRulesModal';
+import HelpFAQModal from './HelpFAQModal';
+import BlockedUsersModal from './BlockedUsersModal';
+import ReportModal from './ReportModal';
 
 interface OptionsMenuProps {
   className?: string;
@@ -17,10 +23,20 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
   const [muteAllTiles, setMuteAllTiles] = useState(false);
   const [autoplayTiles, setAutoplayTiles] = useState(true);
   const [showPreviewLabels, setShowPreviewLabels] = useState(true);
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Modal states
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [showTransactionsModal, setShowTransactionsModal] = useState(false);
+  const [showRoomRulesModal, setShowRoomRulesModal] = useState(false);
+  const [showHelpFAQModal, setShowHelpFAQModal] = useState(false);
+  const [showBlockedUsersModal, setShowBlockedUsersModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
+    loadCurrentUser();
   }, []);
 
   useEffect(() => {
@@ -39,6 +55,25 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showMenu]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setCurrentUsername(profile.username);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
 
   const isAllowedAdmin = (
     userId?: string | null,
@@ -99,201 +134,230 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
   };
 
   return (
-    <div className={`relative ${className}`} ref={menuRef}>
-      <button
-        onClick={() => setShowMenu(!showMenu)}
-        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-sm sm:text-base font-medium shadow-md flex items-center gap-2"
-      >
-        <span>⚙️</span>
-        <span>Options</span>
-      </button>
+    <>
+      <div className={`relative ${className}`} ref={menuRef}>
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-sm sm:text-base font-medium shadow-md flex items-center gap-2"
+        >
+          <span>⚙️</span>
+          <span>Options</span>
+        </button>
 
-      {showMenu && (
-        <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 max-h-[80vh] overflow-y-auto">
-          {/* Account Section */}
-          <div className="px-4 py-2">
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Account</h3>
-            <div className="space-y-1">
-              <a
-                href="/settings/profile"
-                onClick={() => setShowMenu(false)}
-                className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                My Profile
-              </a>
-              <a
-                href="/settings/profile"
-                onClick={() => setShowMenu(false)}
-                className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                Edit Profile
-              </a>
-              <button
-                onClick={() => {
-                  // Navigate to wallet/coins page
-                  setShowMenu(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                Wallet
-              </button>
-              <button
-                onClick={() => {
-                  // Navigate to transactions page
-                  setShowMenu(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                My Gifts / Transactions
-              </button>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-
-          {/* Room / Live Section */}
-          <div className="px-4 py-2">
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Room / Live</h3>
-            <div className="space-y-1">
-              <a
-                href="/apply"
-                onClick={() => setShowMenu(false)}
-                className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                Apply for a Room
-              </a>
-              <button
-                onClick={() => {
-                  // Navigate to room rules page
-                  setShowMenu(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                Room Rules
-              </button>
-              <button
-                onClick={() => {
-                  // Navigate to help/FAQ page
-                  setShowMenu(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                Help / FAQ
-              </button>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-
-          {/* Preferences Section */}
-          <div className="px-4 py-2">
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Preferences</h3>
-            <div className="space-y-1">
-              <label className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition">
-                <span>Mute All Tiles</span>
-                <input
-                  type="checkbox"
-                  checked={muteAllTiles}
-                  onChange={(e) => setMuteAllTiles(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-              </label>
-              <label className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition">
-                <span>Autoplay Tiles</span>
-                <input
-                  type="checkbox"
-                  checked={autoplayTiles}
-                  onChange={(e) => setAutoplayTiles(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-              </label>
-              <label className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition">
-                <span>Show Preview Mode Labels</span>
-                <input
-                  type="checkbox"
-                  checked={showPreviewLabels}
-                  onChange={(e) => setShowPreviewLabels(e.target.checked)}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-
-          {/* Safety Section */}
-          <div className="px-4 py-2">
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Safety</h3>
-            <div className="space-y-1">
-              <button
-                onClick={() => {
-                  // Open report user modal/page
-                  setShowMenu(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                Report a User
-              </button>
-              <button
-                onClick={() => {
-                  // Navigate to blocked users page
-                  setShowMenu(false);
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-              >
-                Blocked Users
-              </button>
-            </div>
-          </div>
-
-          {/* Admin Section */}
-          {isAdmin && (
-            <>
-              <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-              <div className="px-4 py-2">
-                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Admin</h3>
-                <div className="space-y-1">
-                  <button
-                    onClick={() => {
-                      // Navigate to moderation panel
-                      setShowMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-                  >
-                    Moderation Panel
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Navigate to room applications
-                      setShowMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-                  >
-                    Approve Room Applications
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Navigate to gift/coin management
-                      setShowMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
-                  >
-                    Manage Gift Types / Coin Packs
-                  </button>
-                  <button
-                    onClick={handleEndAllStreams}
-                    disabled={endingAllStreams}
-                    className="w-full text-left px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded transition disabled:opacity-60"
-                  >
-                    {endingAllStreams ? 'Ending all streams...' : 'End ALL streams'}
-                  </button>
-                </div>
+        {showMenu && (
+          <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 max-h-[80vh] overflow-y-auto">
+            {/* Account Section */}
+            <div className="px-4 py-2">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Account</h3>
+              <div className="space-y-1">
+                <a
+                  href={currentUsername ? `/${currentUsername}` : '/settings/profile'}
+                  onClick={() => setShowMenu(false)}
+                  className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  My Profile
+                </a>
+                <a
+                  href="/settings/profile"
+                  onClick={() => setShowMenu(false)}
+                  className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  Edit Profile
+                </a>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowWalletModal(true);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  Wallet
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowTransactionsModal(true);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  My Gifts / Transactions
+                </button>
               </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+
+            {/* Room / Live Section */}
+            <div className="px-4 py-2">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Room / Live</h3>
+              <div className="space-y-1">
+                <a
+                  href="/apply"
+                  onClick={() => setShowMenu(false)}
+                  className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  Apply for a Room
+                </a>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowRoomRulesModal(true);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  Room Rules
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowHelpFAQModal(true);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  Help / FAQ
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+
+            {/* Preferences Section */}
+            <div className="px-4 py-2">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Preferences</h3>
+              <div className="space-y-1">
+                <label className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition">
+                  <span>Mute All Tiles</span>
+                  <input
+                    type="checkbox"
+                    checked={muteAllTiles}
+                    onChange={(e) => setMuteAllTiles(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                </label>
+                <label className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition">
+                  <span>Autoplay Tiles</span>
+                  <input
+                    type="checkbox"
+                    checked={autoplayTiles}
+                    onChange={(e) => setAutoplayTiles(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                </label>
+                <label className="flex items-center justify-between px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer transition">
+                  <span>Show Preview Mode Labels</span>
+                  <input
+                    type="checkbox"
+                    checked={showPreviewLabels}
+                    onChange={(e) => setShowPreviewLabels(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+
+            {/* Safety Section */}
+            <div className="px-4 py-2">
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Safety</h3>
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowReportModal(true);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  Report a User
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowBlockedUsersModal(true);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                >
+                  Blocked Users
+                </button>
+              </div>
+            </div>
+
+            {/* Admin Section */}
+            {isAdmin && (
+              <>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                <div className="px-4 py-2">
+                  <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Admin</h3>
+                  <div className="space-y-1">
+                    <a
+                      href="/owner"
+                      onClick={() => setShowMenu(false)}
+                      className="block px-3 py-2 text-sm text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded transition font-medium"
+                    >
+                      👑 Owner Panel
+                    </a>
+                    <a
+                      href="/admin/moderation"
+                      onClick={() => setShowMenu(false)}
+                      className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                    >
+                      Moderation Panel
+                    </a>
+                    <a
+                      href="/admin/applications"
+                      onClick={() => setShowMenu(false)}
+                      className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                    >
+                      Approve Room Applications
+                    </a>
+                    <a
+                      href="/admin/gifts"
+                      onClick={() => setShowMenu(false)}
+                      className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                    >
+                      Manage Gift Types / Coin Packs
+                    </a>
+                    <button
+                      onClick={handleEndAllStreams}
+                      disabled={endingAllStreams}
+                      className="w-full text-left px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded transition disabled:opacity-60"
+                    >
+                      {endingAllStreams ? 'Ending all streams...' : 'End ALL streams'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      <WalletModal
+        isOpen={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+      />
+      <TransactionsModal
+        isOpen={showTransactionsModal}
+        onClose={() => setShowTransactionsModal(false)}
+      />
+      <RoomRulesModal
+        isOpen={showRoomRulesModal}
+        onClose={() => setShowRoomRulesModal(false)}
+      />
+      <HelpFAQModal
+        isOpen={showHelpFAQModal}
+        onClose={() => setShowHelpFAQModal(false)}
+      />
+      <BlockedUsersModal
+        isOpen={showBlockedUsersModal}
+        onClose={() => setShowBlockedUsersModal(false)}
+      />
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        reportType="user"
+      />
+    </>
   );
 }
-

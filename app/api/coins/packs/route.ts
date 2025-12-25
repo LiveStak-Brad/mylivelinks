@@ -49,29 +49,42 @@ export async function GET(request: NextRequest) {
       // Not authenticated, use tier 0
     }
     
-    // Get packs available to this user's tier
+    // Get packs available to this user's tier (Stripe-backed via coin_packs table)
     const { data: packs, error } = await adminSupabase
       .from('coin_packs')
       .select('*')
       .eq('active', true)
-      .lte('vip_tier', userTier)
+      .not('stripe_price_id', 'is', null)
+      .or(`vip_tier.is.null,vip_tier.lte.${userTier}`)
       .order('display_order');
 
     if (error) {
       throw error;
     }
 
+    const normalized = (packs || []).map((pack: any) => ({
+      sku: pack.sku,
+      price_id: pack.stripe_price_id,
+      usd_amount: pack.price_cents / 100,
+      price_cents: pack.price_cents,
+      coins_awarded: pack.coins_amount,
+      pack_name: pack.name,
+      is_vip: pack.is_vip || false,
+      vip_tier: pack.vip_tier ?? null,
+      description: pack.description,
+    }));
+
+    // Sort order:
+    // - Standard packs first (ascending USD)
+    // - VIP packs after (ascending vip_tier)
+    normalized.sort((a: any, b: any) => {
+      if (a.is_vip !== b.is_vip) return a.is_vip ? 1 : -1;
+      if (!a.is_vip) return (a.price_cents || 0) - (b.price_cents || 0);
+      return (a.vip_tier || 0) - (b.vip_tier || 0) || (a.price_cents || 0) - (b.price_cents || 0);
+    });
+
     return NextResponse.json({
-      packs: (packs || []).map((pack: any) => ({
-        sku: pack.sku,
-        name: pack.name,
-        coins: pack.coins_amount,
-        priceUsd: pack.price_cents / 100,
-        priceCents: pack.price_cents,
-        isVip: pack.is_vip || false,
-        description: pack.description,
-        valuePercent: pack.value_percent || 60,
-      })),
+      packs: normalized.map(({ price_cents, ...rest }: any) => rest),
     });
   } catch (error) {
     console.error('[API] get-packs error:', error);

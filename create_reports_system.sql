@@ -177,3 +177,5 @@ BEGIN
     RAISE NOTICE '4. To make a user admin, run: UPDATE profiles SET is_admin = true WHERE id = ''<user_id>'';';
 END $$;
 
+
+

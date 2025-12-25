@@ -121,6 +121,94 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION get_available_coin_packs TO authenticated;
 
 -- ============================================================================
+-- STRIPE COIN PURCHASE FULFILLMENT SYSTEM
+-- ============================================================================
+
+-- Create the specific RPC function requested: cfm_finalize_coin_purchase
+CREATE OR REPLACE FUNCTION cfm_finalize_coin_purchase(
+    p_provider VARCHAR(50),
+    p_provider_order_id VARCHAR(255),
+    p_idempotency_key VARCHAR(255),
+    p_user_id UUID,
+    p_usd_cents INTEGER,
+    p_coins_awarded BIGINT,
+    p_context JSONB DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_existing_purchase BIGINT;
+    v_purchase_id BIGINT;
+BEGIN
+    -- Check if already processed (idempotency)
+    SELECT id INTO v_existing_purchase
+    FROM coin_purchases
+    WHERE provider_event_id = p_idempotency_key;
+
+    IF v_existing_purchase IS NOT NULL THEN
+        -- Already processed, return duplicate
+        RETURN jsonb_build_object(
+            'ok', true,
+            'duplicate', true,
+            'coins_awarded', 0
+        );
+    END IF;
+
+    -- Insert new coin purchase record
+    INSERT INTO coin_purchases (
+        profile_id,
+        platform,
+        payment_provider,
+        provider_event_id,
+        provider_payment_id,
+        coin_amount,
+        usd_amount,
+        status,
+        confirmed_at,
+        metadata
+    )
+    VALUES (
+        p_user_id,
+        'web',
+        p_provider,
+        p_idempotency_key,
+        p_provider_order_id,
+        p_coins_awarded,
+        p_usd_cents,
+        'confirmed',
+        CURRENT_TIMESTAMP,
+        p_context
+    )
+    RETURNING id INTO v_purchase_id;
+
+    -- Update coin balance using ledger system
+    PERFORM update_coin_balance_via_ledger(
+        p_user_id,
+        p_coins_awarded,
+        'purchase',
+        'coin_purchase',
+        v_purchase_id,
+        'Coin purchase: ' || p_coins_awarded || ' coins'
+    );
+
+    -- Update total_purchased in profiles
+    UPDATE profiles
+    SET total_purchased = COALESCE(total_purchased, 0) + p_coins_awarded,
+        last_transaction_at = CURRENT_TIMESTAMP
+    WHERE id = p_user_id;
+
+    -- Return success
+    RETURN jsonb_build_object(
+        'ok', true,
+        'duplicate', false,
+        'coins_awarded', p_coins_awarded
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+COMMENT ON FUNCTION cfm_finalize_coin_purchase IS 'Idempotent coin purchase fulfillment for Stripe webhooks. Returns {ok: boolean, duplicate: boolean, coins_awarded: number}';
+
+-- ============================================================================
 -- IMPORTANT: After running this SQL, update the stripe_price_id values!
 -- Go to Stripe Dashboard → Products, copy each LIVE Price ID
 -- Then run:

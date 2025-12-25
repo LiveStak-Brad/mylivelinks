@@ -274,3 +274,5 @@ These will be needed for full functionality:
 **Expo SDK**: 50  
 **Build System**: EAS Build
 
+
+
