@@ -2842,14 +2842,17 @@ export default function LiveRoom() {
                           }
                           
                           // CRITICAL: Safely extract profile_id - handle null, arrays, and strings
-                          // NEVER access [0] without checking everything first
+                          // NEVER access [0] without checking everything first - access only once
                           let profileId: string | null = null;
                           try {
                             const profileIdValue = streamer?.profile_id;
                             if (profileIdValue != null && profileIdValue !== undefined) {
-                              // CRITICAL: Check if it's an array AND has elements AND first element exists
-                              if (Array.isArray(profileIdValue) && profileIdValue.length > 0 && profileIdValue[0] != null) {
-                                profileId = String(profileIdValue[0]);
+                              if (Array.isArray(profileIdValue) && profileIdValue.length > 0) {
+                                // CRITICAL: Access [0] only once after verifying array has elements
+                                const firstElement = profileIdValue[0];
+                                if (firstElement != null && firstElement !== undefined) {
+                                  profileId = String(firstElement);
+                                }
                               } else if (typeof profileIdValue === 'string' && profileIdValue.length > 0) {
                                 profileId = profileIdValue;
                               }
@@ -2860,14 +2863,17 @@ export default function LiveRoom() {
                           }
                           
                           // CRITICAL: Safely extract username - handle null, arrays, and strings
-                          // NEVER access [0] without checking everything first
+                          // NEVER access [0] without checking everything first - access only once
                           let username: string | null = null;
                           try {
                             const usernameValue = streamer?.username;
                             if (usernameValue != null && usernameValue !== undefined) {
-                              // CRITICAL: Check if it's an array AND has elements AND first element exists
-                              if (Array.isArray(usernameValue) && usernameValue.length > 0 && usernameValue[0] != null) {
-                                username = String(usernameValue[0]);
+                              if (Array.isArray(usernameValue) && usernameValue.length > 0) {
+                                // CRITICAL: Access [0] only once after verifying array has elements
+                                const firstElement = usernameValue[0];
+                                if (firstElement != null && firstElement !== undefined) {
+                                  username = String(firstElement);
+                                }
                               } else if (typeof usernameValue === 'string' && usernameValue.length > 0) {
                                 username = usernameValue;
                               }
@@ -2896,14 +2902,17 @@ export default function LiveRoom() {
                           if (streamer?.id != null && streamer?.live_available) {
                             try {
                               // CRITICAL: Safely extract id value - handle null, arrays, and other types
-                              // NEVER access [0] without checking everything first
+                              // NEVER access [0] without checking everything first - access only once
                               let idValue: any = null;
                               const idRaw = streamer.id;
                               if (idRaw != null && idRaw !== undefined) {
-                                // CRITICAL: Check if it's an array AND has elements AND first element exists
-                                if (Array.isArray(idRaw) && idRaw.length > 0 && idRaw[0] != null) {
-                                  idValue = idRaw[0];
-                                } else if (idRaw != null && idRaw !== undefined) {
+                                if (Array.isArray(idRaw) && idRaw.length > 0) {
+                                  // CRITICAL: Access [0] only once after verifying array has elements
+                                  const firstElement = idRaw[0];
+                                  if (firstElement != null && firstElement !== undefined) {
+                                    idValue = firstElement;
+                                  }
+                                } else {
                                   idValue = idRaw;
                                 }
                               }
