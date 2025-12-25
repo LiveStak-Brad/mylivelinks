@@ -1,9 +1,12 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Create a Supabase client for client-side usage (React components, hooks)
- * This properly handles cookies in the browser
+ * Singleton Supabase client for browser
+ * Prevents multiple GoTrueClient instances
  */
+let clientInstance: SupabaseClient | null = null;
+
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -12,6 +15,13 @@ export function createClient() {
     throw new Error('Missing Supabase environment variables');
   }
 
-  return createBrowserClient(url, key);
-}
+  // Return existing instance if already created
+  if (clientInstance) {
+    return clientInstance;
+  }
 
+  // Create new instance only if none exists
+  clientInstance = createBrowserClient(url, key);
+  
+  return clientInstance;
+}
