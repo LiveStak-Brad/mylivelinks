@@ -184,12 +184,15 @@ export default function ModernProfilePage() {
       
       if (data.success) {
         // Update relationship status locally
+        const wasFollowing = profileData.relationship !== 'none';
+        const isFollowingNow = data.status !== 'none';
+        
         setProfileData(prev => prev ? {
           ...prev,
           relationship: data.status,
-          follower_count: data.status === 'none' 
-            ? prev.follower_count - 1 
-            : prev.follower_count + 1
+          follower_count: isFollowingNow 
+            ? (wasFollowing ? prev.follower_count : prev.follower_count + 1)
+            : prev.follower_count - 1
         } : null);
       } else {
         console.error('Follow unsuccessful:', data);
