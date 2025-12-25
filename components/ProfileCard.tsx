@@ -151,9 +151,9 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
                 disabled={followLoading}
                 className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition ${
                   isFollowing
-                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-500'
                     : followsYou
-                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300'
+                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 border-2 border-blue-400 dark:border-blue-600'
                     : 'bg-purple-600 text-white hover:bg-purple-700'
                 } disabled:opacity-50`}
               >
