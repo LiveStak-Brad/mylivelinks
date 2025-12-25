@@ -31,7 +31,7 @@ export default function LandingPage() {
         .eq('id', user.id)
         .maybeSingle();
       
-      // If profile doesn't exist, create minimal one and redirect to onboarding
+      // If profile doesn't exist, create minimal one
       if (!profile && !profileError) {
         console.log('[LANDING] No profile found, creating minimal profile...');
         await supabase
@@ -43,18 +43,16 @@ export default function LandingPage() {
             earnings_balance: 0,
             gifter_level: 0
           });
-        router.push('/onboarding');
+        // Show homepage anyway - user can complete onboarding later
+        setCurrentUser({ id: user.id, email: user.email });
+        setLoading(false);
         return;
       }
       
-      if (profile?.username && profile?.date_of_birth) {
-        // Profile complete, show homepage
-        setCurrentUser(profile);
-        setLoading(false);
-      } else {
-        // Profile incomplete, redirect to onboarding
-        router.push('/onboarding');
-      }
+      // Always show homepage for logged-in users
+      // (Even if profile is incomplete - they can access onboarding from menu)
+      setCurrentUser(profile || { id: user.id, email: user.email });
+      setLoading(false);
     } else {
       // Not logged in, redirect to login
       router.push('/login');
@@ -241,12 +239,21 @@ export default function LandingPage() {
               Ready to Get Started?
             </h2>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href={`/${currentUser?.username}`}
-                className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition shadow-lg"
-              >
-                View My Profile
-              </Link>
+              {currentUser?.username ? (
+                <Link
+                  href={`/${currentUser.username}`}
+                  className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition shadow-lg"
+                >
+                  View My Profile
+                </Link>
+              ) : (
+                <Link
+                  href="/settings/profile"
+                  className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition shadow-lg"
+                >
+                  Complete Your Profile
+                </Link>
+              )}
               <Link
                 href="/live"
                 className="px-8 py-4 bg-white border-2 border-purple-500 text-purple-600 font-semibold rounded-xl hover:bg-purple-50 transition"
