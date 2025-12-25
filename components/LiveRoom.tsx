@@ -857,23 +857,48 @@ export default function LiveRoom() {
             // Only update streamer list, don't reload grid layout
             // Grid layout reload causes disconnections
             loadLiveStreamers().then((streamers) => {
-              // Update streamer list but preserve current grid
+              const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+              
+              // CRITICAL: Always run grid cleanup FIRST, regardless of streamer count
+              // This ensures offline streamers are removed from tiles even if all streamers go offline
+              const liveStreamerIds = new Set(streamers.map(s => s.profile_id));
+              setGridSlots(prevSlots => {
+                let hasChanges = false;
+                const updatedSlots = prevSlots.map(slot => {
+                  if (slot.streamer && !liveStreamerIds.has(slot.streamer.profile_id)) {
+                    // Streamer is in grid but no longer live - remove them
+                    if (DEBUG_LIVEKIT) {
+                      console.log('[GRID] Auto-removing offline streamer from slot', {
+                        slotIndex: slot.slotIndex,
+                        username: slot.streamer.username,
+                        profile_id: slot.streamer.profile_id,
+                      });
+                    }
+                    hasChanges = true;
+                    return {
+                      ...slot,
+                      streamer: null,
+                      isEmpty: true,
+                    };
+                  }
+                  return slot;
+                });
+                
+                if (hasChanges) {
+                  // Save the updated grid
+                  saveGridLayout(updatedSlots);
+                  return updatedSlots;
+                }
+                return prevSlots;
+              });
+              
+              // Update streamer list
               // Use functional update to compare and prevent unnecessary re-renders
               setLiveStreamers((prevStreamers) => {
-                // CRITICAL: ABSOLUTE GUARD - Never clear streamers if we have existing ones
                 const currentStreamers = liveStreamersRef.current.length > 0 ? liveStreamersRef.current : prevStreamers;
                 
-                // STRICT: If we have streamers and new data is empty, ALWAYS keep existing
-                if (streamers.length === 0 && currentStreamers.length > 0) {
-                  console.warn('[GUARD] Realtime: Blocking empty array - keeping existing streamers', {
-                    currentCount: currentStreamers.length,
-                    prevCount: prevStreamers.length,
-                    refCount: liveStreamersRef.current.length,
-                  });
-                  return currentStreamers; // Keep existing streamers to prevent Tile unmounting
-                }
-                
-                if (currentStreamers.length === streamers.length) {
+                // Compare to see if anything changed
+                if (currentStreamers.length === streamers.length && streamers.length > 0) {
                   const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.live_available}:${s.viewer_count}`).join(',');
                   const newIds = streamers.map(s => `${s.profile_id}:${s.live_available}:${s.viewer_count}`).join(',');
                   if (prevIds === newIds) {
@@ -883,7 +908,6 @@ export default function LiveRoom() {
                 
                 // Update ref with new data BEFORE returning
                 liveStreamersRef.current = streamers;
-                const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
                 if (DEBUG_LIVEKIT) {
                   console.log('[GRID] liveStreamers updated (realtime)', {
                     oldCount: currentStreamers.length,
@@ -891,39 +915,6 @@ export default function LiveRoom() {
                     newStreamers: streamers.map(s => ({ username: s.username, profile_id: s.profile_id })),
                   });
                 }
-                
-                // CRITICAL: Auto-remove streamers who went offline
-                // Check if any streamers in the grid are no longer live
-                const liveStreamerIds = new Set(streamers.map(s => s.profile_id));
-                setGridSlots(prevSlots => {
-                  let hasChanges = false;
-                  const updatedSlots = prevSlots.map(slot => {
-                    if (slot.streamer && !liveStreamerIds.has(slot.streamer.profile_id)) {
-                      // Streamer is in grid but no longer live - remove them
-                      if (DEBUG_LIVEKIT) {
-                        console.log('[GRID] Auto-removing offline streamer from slot', {
-                          slotIndex: slot.slotIndex,
-                          username: slot.streamer.username,
-                          profile_id: slot.streamer.profile_id,
-                        });
-                      }
-                      hasChanges = true;
-                      return {
-                        ...slot,
-                        streamer: null,
-                        isEmpty: true,
-                      };
-                    }
-                    return slot;
-                  });
-                  
-                  if (hasChanges) {
-                    // Save the updated grid
-                    saveGridLayout(updatedSlots);
-                    return updatedSlots;
-                  }
-                  return prevSlots;
-                });
                 
                 return streamers; // Changed, update - this triggers useEffect that calls autoFillGrid
               });
@@ -2264,10 +2255,19 @@ export default function LiveRoom() {
         try {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
+            // Update live_streams to set live_available = false
             await supabase
               .from('live_streams')
               .update({ live_available: false, ended_at: new Date().toISOString() })
               .eq('profile_id', user.id);
+            
+            // CRITICAL: Also remove from user_grid_slots so others don't see this user
+            console.log('Removing self from all grid slots...');
+            await supabase
+              .from('user_grid_slots')
+              .delete()
+              .eq('streamer_id', user.id);
+            
             // The GoLiveButton will detect the change and stop publishing
           }
         } catch (err) {

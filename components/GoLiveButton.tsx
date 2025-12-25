@@ -329,6 +329,21 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
           throw updateError;
         }
 
+        // CRITICAL: Remove user from all grid slots in database
+        // This ensures they disappear from other viewers' grids immediately
+        console.log('Removing from grid slots...');
+        const { error: gridError } = await supabase
+          .from('user_grid_slots')
+          .delete()
+          .eq('streamer_id', user.id);
+        
+        if (gridError) {
+          console.error('Error removing from grid slots:', gridError);
+          // Don't throw - continue with stopping the stream
+        } else {
+          console.log('Removed from all grid slots');
+        }
+
         console.log('Database updated, stopping LiveKit publishing...');
 
         // Stop LiveKit publishing (await it)
