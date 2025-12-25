@@ -222,19 +222,19 @@ export default function ProfileSettingsPage() {
           display_name: displayName,
           bio: bio,
           avatar_url: finalAvatarUrl,
-          // Social media fields
-          social_instagram: socialInstagram.trim() || null,
-          social_twitter: socialTwitter.trim() || null,
-          social_youtube: socialYoutube.trim() || null,
-          social_tiktok: socialTiktok.trim() || null,
-          social_facebook: socialFacebook.trim() || null,
-          social_twitch: socialTwitch.trim() || null,
+          // Social media fields (strip @ if user included it)
+          social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
+          social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
+          social_youtube: socialYoutube.trim().replace(/^@/, '') || null,
+          social_tiktok: socialTiktok.trim().replace(/^@/, '') || null,
+          social_facebook: socialFacebook.trim().replace(/^@/, '') || null,
+          social_twitch: socialTwitch.trim().replace(/^@/, '') || null,
           social_discord: socialDiscord.trim() || null,
-          social_snapchat: socialSnapchat.trim() || null,
-          social_linkedin: socialLinkedin.trim() || null,
-          social_github: socialGithub.trim() || null,
+          social_snapchat: socialSnapchat.trim().replace(/^@/, '') || null,
+          social_linkedin: socialLinkedin.trim().replace(/^@/, '') || null,
+          social_github: socialGithub.trim().replace(/^@/, '') || null,
           social_spotify: socialSpotify.trim() || null,
-          social_onlyfans: socialOnlyfans.trim() || null,
+          social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
           // Display preferences
           hide_streaming_stats: hideStreamingStats,
           // Customization fields
@@ -528,7 +528,7 @@ export default function ProfileSettingsPage() {
                 value={socialYoutube}
                 onChange={(e) => setSocialYoutube(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="@username"
+                placeholder="username (no @)"
               />
             </div>
             <div>
