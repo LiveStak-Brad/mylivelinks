@@ -49,29 +49,65 @@ export async function GET(request: NextRequest) {
       // Not authenticated, use tier 0
     }
     
-    // Get packs available to this user's tier (Stripe-backed via coin_packs table)
-    const { data: packs, error } = await adminSupabase
+    // Try multiple query approaches for compatibility
+    let packs: any[] = [];
+    let error: any = null;
+
+    // First try with 'active' column
+    const result1 = await adminSupabase
       .from('coin_packs')
       .select('*')
       .eq('active', true)
-      .not('stripe_price_id', 'is', null)
-      .or(`vip_tier.is.null,vip_tier.lte.${userTier}`)
       .order('display_order');
-
-    if (error) {
-      throw error;
+    
+    if (!result1.error && result1.data && result1.data.length > 0) {
+      packs = result1.data;
+    } else {
+      // Try with 'is_active' column
+      const result2 = await adminSupabase
+        .from('coin_packs')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order');
+      
+      if (!result2.error && result2.data && result2.data.length > 0) {
+        packs = result2.data;
+      } else {
+        // Try getting all packs without filter
+        const result3 = await adminSupabase
+          .from('coin_packs')
+          .select('*')
+          .order('display_order');
+        
+        if (!result3.error && result3.data) {
+          // Filter active ones manually
+          packs = result3.data.filter((p: any) => p.active !== false && p.is_active !== false);
+        }
+        error = result3.error;
+      }
     }
 
-    const normalized = (packs || []).map((pack: any) => ({
-      sku: pack.sku,
-      price_id: pack.stripe_price_id,
-      usd_amount: pack.price_cents / 100,
-      price_cents: pack.price_cents,
-      coins_awarded: pack.coins_amount,
-      pack_name: pack.name,
+    if (error) {
+      console.error('[API] coin_packs query error:', error);
+    }
+
+    // Filter by VIP tier
+    const filteredPacks = packs.filter((pack: any) => {
+      const packTier = pack.vip_tier ?? 0;
+      return packTier <= userTier;
+    });
+
+    const normalized = filteredPacks.map((pack: any) => ({
+      sku: pack.sku || pack.id,
+      price_id: pack.stripe_price_id || pack.price_id || '',
+      usd_amount: (pack.price_cents || pack.price_usd * 100 || 0) / 100,
+      price_cents: pack.price_cents || (pack.price_usd || 0) * 100,
+      coins_awarded: pack.coins_amount || pack.coins || 0,
+      pack_name: pack.name || pack.pack_name || 'Coin Pack',
       is_vip: pack.is_vip || false,
       vip_tier: pack.vip_tier ?? null,
       description: pack.description,
+      bonus_coins: pack.bonus_coins || 0,
     }));
 
     // Sort order:
@@ -89,9 +125,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[API] get-packs error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch coin packs' },
+      { error: 'Failed to fetch coin packs', packs: [] },
       { status: 500 }
     );
   }
 }
-
