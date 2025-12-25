@@ -127,6 +127,24 @@ export default function ModernProfilePage() {
   const supabase = createClient();
   
   useEffect(() => {
+    // Fetch live_stream_id if user is live
+    const fetchLiveStreamId = async () => {
+      if (profile.is_live && !liveStreamId) {
+        const { data } = await supabase
+          .from('live_streams')
+          .select('id')
+          .eq('profile_id', profile.id)
+          .eq('live_available', true)
+          .maybeSingle();
+        
+        if (data) {
+          setLiveStreamId(data.id);
+        }
+      }
+    };
+    
+    fetchLiveStreamId();
+  }, [profile.is_live, profile.id]);
     loadProfile();
   }, [username]);
   
@@ -370,7 +388,7 @@ export default function ModernProfilePage() {
             <ProfileLivePlayer
               profileId={profile.id}
               username={profile.username}
-              liveStreamId={profile.live_stream_id}
+              liveStreamId={liveStreamId}
               className="w-full aspect-video"
             />
           </div>
