@@ -2720,16 +2720,49 @@ export default function LiveRoom() {
                     console.log('[GRID RENDER] Using slots:', finalSlots.length, finalSlots);
                   }
                   
+                  // CRITICAL: Ensure finalSlots is always a valid array before mapping
+                  if (!finalSlots || !Array.isArray(finalSlots)) {
+                    console.error('[GRID RENDER] finalSlots is not a valid array:', finalSlots);
+                    return Array.from({ length: 12 }, (_, i) => (
+                      <div key={`fallback-${i}`} className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
+                        <span className="text-gray-400 text-sm">Loading...</span>
+                      </div>
+                    ));
+                  }
+                  
                   // CRITICAL: Wrap map in try-catch to prevent crashes and log detailed errors
                   try {
-                    return finalSlots
-                      .filter((slot: GridSlot | null | undefined): slot is GridSlot => 
-                        slot != null && typeof slot === 'object' && typeof slot.slotIndex === 'number'
-                      )
-                      .map((slot: GridSlot, index: number) => {
-                        // CRITICAL: Validate slot structure before rendering
+                    // CRITICAL: Filter out any null/undefined entries and ensure we have exactly 12 slots
+                    const validSlots = finalSlots
+                      .filter((slot: GridSlot | null | undefined): slot is GridSlot => {
+                        if (slot == null || typeof slot !== 'object') return false;
+                        if (typeof slot.slotIndex !== 'number') return false;
+                        return true;
+                      })
+                      .slice(0, 12); // Ensure we don't exceed 12 slots
+                    
+                    // Fill to 12 slots if needed
+                    const slotsToRender: GridSlot[] = [];
+                    for (let i = 0; i < 12; i++) {
+                      const existingSlot = validSlots.find(s => s.slotIndex === i + 1);
+                      if (existingSlot) {
+                        slotsToRender.push(existingSlot);
+                      } else {
+                        slotsToRender.push({
+                          slotIndex: i + 1,
+                          streamer: null,
+                          isPinned: false,
+                          isMuted: false,
+                          isEmpty: true,
+                          volume: 0.5,
+                        });
+                      }
+                    }
+                    
+                    return slotsToRender.map((slot: GridSlot, index: number) => {
+                        // CRITICAL: Validate slot structure before rendering - double check
                         if (!slot || typeof slot !== 'object' || typeof slot.slotIndex !== 'number') {
-                          console.error('[GRID RENDER] Invalid slot detected:', { slot, index, finalSlots });
+                          console.error('[GRID RENDER] Invalid slot detected in map:', { slot, index, slotsToRender });
                           return (
                             <div key={`error-${index}`} className="aspect-[3/2] bg-red-200 dark:bg-red-800 rounded-lg border-2 border-red-500 flex flex-col items-center justify-center">
                               <span className="text-red-600 text-sm">Error: Invalid Slot</span>
@@ -2809,39 +2842,39 @@ export default function LiveRoom() {
                           }
                           
                           // CRITICAL: Safely extract profile_id - handle null, arrays, and strings
+                          // NEVER access [0] without checking everything first
                           let profileId: string | null = null;
                           try {
-                            const profileIdValue = streamer.profile_id;
+                            const profileIdValue = streamer?.profile_id;
                             if (profileIdValue != null && profileIdValue !== undefined) {
-                              if (Array.isArray(profileIdValue) && profileIdValue.length > 0) {
-                                const firstElement = profileIdValue[0];
-                                if (firstElement != null && firstElement !== undefined) {
-                                  profileId = String(firstElement);
-                                }
+                              // CRITICAL: Check if it's an array AND has elements AND first element exists
+                              if (Array.isArray(profileIdValue) && profileIdValue.length > 0 && profileIdValue[0] != null) {
+                                profileId = String(profileIdValue[0]);
                               } else if (typeof profileIdValue === 'string' && profileIdValue.length > 0) {
                                 profileId = profileIdValue;
                               }
                             }
                           } catch (e) {
-                            console.error('[GRID RENDER] Error extracting profile_id:', e, streamer);
+                            console.error('[GRID RENDER] Error extracting profile_id:', e, { streamer, profileIdValue: streamer?.profile_id });
+                            profileId = null; // Ensure it's null on error
                           }
                           
                           // CRITICAL: Safely extract username - handle null, arrays, and strings
+                          // NEVER access [0] without checking everything first
                           let username: string | null = null;
                           try {
-                            const usernameValue = streamer.username;
+                            const usernameValue = streamer?.username;
                             if (usernameValue != null && usernameValue !== undefined) {
-                              if (Array.isArray(usernameValue) && usernameValue.length > 0) {
-                                const firstElement = usernameValue[0];
-                                if (firstElement != null && firstElement !== undefined) {
-                                  username = String(firstElement);
-                                }
+                              // CRITICAL: Check if it's an array AND has elements AND first element exists
+                              if (Array.isArray(usernameValue) && usernameValue.length > 0 && usernameValue[0] != null) {
+                                username = String(usernameValue[0]);
                               } else if (typeof usernameValue === 'string' && usernameValue.length > 0) {
                                 username = usernameValue;
                               }
                             }
                           } catch (e) {
-                            console.error('[GRID RENDER] Error extracting username:', e, streamer);
+                            console.error('[GRID RENDER] Error extracting username:', e, { streamer, usernameValue: streamer?.username });
+                            username = null; // Ensure it's null on error
                           }
                           
                           if (!profileId || !username) {
@@ -2860,17 +2893,16 @@ export default function LiveRoom() {
                           
                           // Parse liveStreamId safely
                           let liveStreamId: number | undefined = undefined;
-                          if (streamer.id != null && streamer.live_available) {
+                          if (streamer?.id != null && streamer?.live_available) {
                             try {
                               // CRITICAL: Safely extract id value - handle null, arrays, and other types
+                              // NEVER access [0] without checking everything first
                               let idValue: any = null;
                               const idRaw = streamer.id;
                               if (idRaw != null && idRaw !== undefined) {
-                                if (Array.isArray(idRaw) && idRaw.length > 0) {
-                                  const firstElement = idRaw[0];
-                                  if (firstElement != null && firstElement !== undefined) {
-                                    idValue = firstElement;
-                                  }
+                                // CRITICAL: Check if it's an array AND has elements AND first element exists
+                                if (Array.isArray(idRaw) && idRaw.length > 0 && idRaw[0] != null) {
+                                  idValue = idRaw[0];
                                 } else if (idRaw != null && idRaw !== undefined) {
                                   idValue = idRaw;
                                 }
@@ -2887,7 +2919,8 @@ export default function LiveRoom() {
                                 }
                               }
                             } catch (e) {
-                              console.error('[GRID RENDER] Error parsing liveStreamId:', e, streamer);
+                              console.error('[GRID RENDER] Error parsing liveStreamId:', e, { streamer, idRaw: streamer?.id });
+                              liveStreamId = undefined; // Ensure it's undefined on error
                             }
                           }
                           
