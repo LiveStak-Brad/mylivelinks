@@ -510,12 +510,12 @@ export default function LiveRoom() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
-        // Get username for room presence
+        // Get username for room presence - use maybeSingle() to avoid error
         const { data: profile } = await supabase
           .from('profiles')
           .select('username')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         if (profile) {
           setCurrentUsername(profile.username);
         }
