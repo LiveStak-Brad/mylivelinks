@@ -690,7 +690,7 @@ export default function OwnerPanel() {
               Refresh
             </button>
             <a
-              href="/live"
+              href="/"
               className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
             >
               <ExternalLink className="w-4 h-4" />
@@ -1070,7 +1070,7 @@ export default function OwnerPanel() {
                       </div>
                       <div className="flex gap-2">
                         <a
-                          href="/live"
+                          href={`/live?stream=${stream.id}`}
                           target="_blank"
                           className="flex-1 px-3 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-600 transition text-center"
                         >

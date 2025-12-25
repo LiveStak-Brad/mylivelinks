@@ -6,6 +6,13 @@ import SmartBrandLogo from '@/components/SmartBrandLogo';
 
 export default function ApplyPage() {
   const router = useRouter();
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/');
+  };
   const [formData, setFormData] = useState({
     roomName: '',
     why: '',
@@ -21,7 +28,7 @@ export default function ApplyPage() {
     // Mock submit - just show success message
     setTimeout(() => {
       alert('Application submitted! We will review your request and get back to you soon.');
-      router.push('/live');
+      router.push('/');
       setSubmitting(false);
     }, 1000);
   };
@@ -38,19 +45,20 @@ export default function ApplyPage() {
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <a href="/live">
+          <a href="/">
             {typeof SmartBrandLogo !== 'undefined' ? (
               <SmartBrandLogo size={120} className="h-12 sm:h-14 md:h-16 w-auto" iconOnly={false} />
             ) : (
               <div className="h-12 sm:h-14 md:h-16 w-40 bg-gray-300 dark:bg-gray-600 rounded" />
             )}
           </a>
-          <a
-            href="/live"
+          <button
+            type="button"
+            onClick={goBack}
             className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition"
           >
-            Back to Live
-          </a>
+            Back
+          </button>
         </div>
       </header>
 
@@ -144,7 +152,7 @@ export default function ApplyPage() {
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/live')}
+                onClick={goBack}
                 className="px-6 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
               >
                 Cancel

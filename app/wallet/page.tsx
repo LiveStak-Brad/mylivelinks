@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase';
 import CoinPurchaseSection from '@/components/CoinPurchaseSection';
 import DiamondConversion from '@/components/DiamondConversion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface ConnectStatus {
   hasAccount: boolean;
@@ -20,6 +21,14 @@ interface WalletBalance {
 }
 
 export default function WalletPage() {
+  const router = useRouter();
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/');
+  };
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [balance, setBalance] = useState<WalletBalance>({ coins: 0, diamonds: 0 });
@@ -353,9 +362,9 @@ export default function WalletPage() {
 
         {/* Back Link */}
         <div className="text-center">
-          <Link href="/live" className="text-blue-500 hover:underline">
-            ← Back to Live
-          </Link>
+          <button onClick={goBack} className="text-blue-500 hover:underline">
+            ← Back
+          </button>
         </div>
       </div>
     </div>

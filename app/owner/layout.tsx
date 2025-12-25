@@ -21,10 +21,10 @@ export default async function OwnerLayout({
           <h1 className="text-3xl font-bold text-white mb-2">Access Denied</h1>
           <p className="text-gray-400 mb-6">This area is restricted to owner/admin.</p>
           <a
-            href="/live"
+            href="/"
             className="inline-flex px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
           >
-            Back to Live
+            Back to Site
           </a>
         </div>
       </div>

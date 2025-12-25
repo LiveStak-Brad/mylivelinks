@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Shield, Search, AlertTriangle, Ban, Clock, MessageSquare, ArrowLeft, Eye, Check, X } from 'lucide-react';
 
 interface Report {
@@ -35,6 +36,14 @@ interface User {
 }
 
 export default function ModerationPage() {
+  const router = useRouter();
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/');
+  };
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<'reports' | 'users'>('reports');
@@ -218,9 +227,9 @@ export default function ModerationPage() {
           <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
           <p className="text-gray-600 dark:text-gray-400 mb-4">You don't have permission to access this page.</p>
-          <Link href="/live" className="text-blue-500 hover:underline">
-            ← Back to Live
-          </Link>
+          <button onClick={goBack} className="text-blue-500 hover:underline">
+            ← Back
+          </button>
         </div>
       </div>
     );
@@ -232,9 +241,9 @@ export default function ModerationPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Link href="/live" className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
+            <button onClick={goBack} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
               <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </Link>
+            </button>
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                 <Shield className="w-8 h-8 text-purple-500" />
