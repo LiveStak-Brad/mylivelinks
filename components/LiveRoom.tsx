@@ -2549,7 +2549,7 @@ export default function LiveRoom() {
               <div className="max-w-full mx-auto w-full h-full flex items-center justify-center">
                 {/* 12-Tile Grid - 4/4/4 layout in Focus Mode, 6/6 otherwise */}
                 <div className={`grid ${uiPanels.focusMode ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6'} ${uiPanels.focusMode ? 'gap-1.5 max-w-[90%]' : 'gap-2'} w-full ${uiPanels.focusMode ? 'h-auto' : 'h-full'}`}>
-                {(gridSlots.length > 0 ? gridSlots : Array.from({ length: 12 }, (_, i) => ({
+                {((gridSlots && gridSlots.length > 0) ? gridSlots : Array.from({ length: 12 }, (_, i) => ({
                   slotIndex: i + 1,
                   streamer: null,
                   isPinned: false,

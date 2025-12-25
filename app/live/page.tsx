@@ -32,11 +32,10 @@ export default function LiveComingSoonPage() {
         error: error
       });
       
-      if (user && user.id === OWNER_UUID) {
-        console.log('[LIVE PAGE] ✅ Owner confirmed, showing LiveRoom');
+      // Allow all authenticated users for now
+      if (user) {
+        console.log('[LIVE PAGE] ✅ User confirmed, showing LiveRoom');
         setIsOwner(true);
-      } else if (user) {
-        console.log('[LIVE PAGE] ❌ Logged in but not owner');
       } else {
         console.log('[LIVE PAGE] ❌ No user logged in');
       }
