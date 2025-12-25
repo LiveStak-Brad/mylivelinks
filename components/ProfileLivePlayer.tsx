@@ -29,6 +29,7 @@ export default function ProfileLivePlayer({
   const [audioTrack, setAudioTrack] = useState<RemoteTrack | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(100);
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
   const [showGiftModal, setShowGiftModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -296,57 +297,66 @@ export default function ProfileLivePlayer({
       {/* Overlay Controls - Only show when video is playing */}
       {videoTrack && (
         <>
-          {/* Top Bar - Live indicator & Viewer count */}
-          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-10 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Live Badge */}
-              <div className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full shadow-lg">
-                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                <span className="font-semibold text-sm">LIVE</span>
-              </div>
-              
-              {/* Viewer Count */}
-              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm text-white px-3 py-2 rounded-full">
-                <Users className="w-4 h-4" />
-                <span className="font-medium text-sm">{viewerCount}</span>
-              </div>
+          {/* Top Bar - LIVE on left, Viewers on right */}
+          <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/50 to-transparent z-10 flex items-center justify-between">
+            {/* LIVE Badge - Smaller */}
+            <div className="flex items-center gap-1.5 bg-red-500 text-white px-2.5 py-1 rounded-full shadow-lg">
+              <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+              <span className="font-bold text-xs">LIVE</span>
+            </div>
+            
+            {/* Viewer Count - Right side */}
+            <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full">
+              <Users className="w-3.5 h-3.5" />
+              <span className="font-semibold text-xs">{viewerCount}</span>
             </div>
           </div>
 
-          {/* Bottom Bar - Volume & Gift controls */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent z-10">
-            <div className="flex items-center justify-between">
-              {/* Volume Controls */}
-              <div className="flex items-center gap-3 bg-black/40 backdrop-blur-sm rounded-full px-3 py-2">
+          {/* Bottom Bar - Compact controls */}
+          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/50 to-transparent z-10">
+            <div className="flex items-center justify-between gap-2">
+              {/* Volume Control - Expandable */}
+              <div className="relative">
                 <button
-                  onClick={toggleMute}
-                  className="text-white hover:text-blue-400 transition-colors"
+                  onClick={() => setShowVolumeSlider(!showVolumeSlider)}
+                  onMouseEnter={() => setShowVolumeSlider(true)}
+                  className="flex items-center justify-center w-8 h-8 bg-black/60 backdrop-blur-sm text-white rounded-full hover:bg-black/80 transition-all"
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
-                  {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
                 
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={volume}
-                  onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                  className="w-24 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, white ${volume}%, rgba(255,255,255,0.3) ${volume}%)`,
-                  }}
-                />
-                <span className="text-white text-sm font-medium w-8">{volume}%</span>
+                {/* Expandable Volume Slider */}
+                {showVolumeSlider && (
+                  <div 
+                    className="absolute bottom-full left-0 mb-2 bg-black/80 backdrop-blur-sm rounded-lg p-2 shadow-xl transition-all"
+                    onMouseLeave={() => setShowVolumeSlider(false)}
+                  >
+                    <div className="flex flex-col items-center gap-2 py-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={volume}
+                        onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+                        className="w-20 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer transform -rotate-90 origin-center"
+                        style={{
+                          background: `linear-gradient(to right, white ${volume}%, rgba(255,255,255,0.3) ${volume}%)`,
+                        }}
+                      />
+                      <span className="text-white text-xs font-medium">{volume}%</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Gift Button */}
+              {/* Gift Button - Smaller */}
               <button
                 onClick={() => setShowGiftModal(true)}
-                className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 shadow-lg"
+                className="flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-3 py-1.5 rounded-full hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 shadow-lg text-xs font-semibold"
               >
-                <Gift className="w-5 h-5" />
-                <span className="font-semibold">Send Gift</span>
+                <Gift className="w-3.5 h-3.5" />
+                <span>Gift</span>
               </button>
             </div>
           </div>
