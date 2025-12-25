@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
-import GifterBadge from './GifterBadge';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
+import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import MiniProfile from './MiniProfile';
 
 interface ChatMessage {
@@ -23,6 +25,7 @@ export default function Chat() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatus>>({});
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     username: string;
     avatar_url?: string;
@@ -33,9 +36,7 @@ export default function Chat() {
     username: string;
     displayName?: string;
     avatarUrl?: string;
-    gifterLevel?: number;
-    badgeName?: string;
-    badgeColor?: string;
+    gifterStatus?: GifterStatus | null;
     isLive?: boolean;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -106,36 +107,14 @@ export default function Chat() {
 
       if (error) throw error;
 
-      // Batch load badges in parallel
-      const uniqueLevels = [...new Set(
-        (data || []).map((msg: any) => msg.profiles?.gifter_level).filter((l: any) => l !== null && l > 0)
-      )];
-      
-      let badgeMap: Record<number, any> = {};
-      if (uniqueLevels.length > 0) {
-        const { data: badges } = await supabase
-          .from('gifter_levels')
-          .select('*')
-          .in('level', uniqueLevels);
-        
-        if (badges) {
-          badges.forEach((badge: any) => {
-            badgeMap[badge.level] = badge;
-          });
-        }
-      }
-
       const messagesWithBadges = (data || []).map((msg: any) => {
         const profile = msg.profiles;
-        const badgeInfo = profile?.gifter_level ? badgeMap[profile.gifter_level] : null;
         return {
           id: msg.id,
           profile_id: msg.profile_id,
           username: profile?.username || 'Unknown',
           avatar_url: profile?.avatar_url,
           gifter_level: profile?.gifter_level || 0,
-          badge_name: badgeInfo?.badge_name,
-          badge_color: badgeInfo?.badge_color,
           message_type: msg.message_type,
           content: msg.content,
           created_at: msg.created_at,
@@ -145,6 +124,10 @@ export default function Chat() {
       setMessages(messagesWithBadges.sort((a: any, b: any) =>
         new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       ));
+
+      const profileIds = [...new Set(messagesWithBadges.map((m: any) => m.profile_id).filter((id: any) => typeof id === 'string'))];
+      const statusMap = await fetchGifterStatuses(profileIds);
+      setGifterStatusMap(statusMap);
     } catch (error) {
       console.error('Error loading messages:', error);
       // Fallback to regular query if RPC fails
@@ -166,26 +149,8 @@ export default function Chat() {
         .limit(50);
 
       if (!fallbackError && data) {
-        // Batch load badges for fallback too
-        const uniqueLevels = [...new Set(data.map((msg: any) => msg.profiles?.gifter_level).filter((l: any) => l !== null && l > 0))];
-        const badgeMap: Record<number, any> = {};
-        
-        if (uniqueLevels.length > 0) {
-          const { data: badges } = await supabase
-            .from('gifter_levels')
-            .select('*')
-            .in('level', uniqueLevels);
-          
-          if (badges) {
-            badges.forEach((badge: any) => {
-              badgeMap[badge.level] = badge;
-            });
-          }
-        }
-
         const messagesWithProfiles = data.map((msg: any) => {
           const profile = msg.profiles;
-          const badgeInfo = profile?.gifter_level ? badgeMap[profile.gifter_level] : null;
 
           return {
             id: msg.id,
@@ -193,8 +158,6 @@ export default function Chat() {
             username: profile?.username || 'Unknown',
             avatar_url: profile?.avatar_url,
             gifter_level: profile?.gifter_level || 0,
-            badge_name: badgeInfo?.badge_name,
-            badge_color: badgeInfo?.badge_color,
             message_type: msg.message_type,
             content: msg.content,
             created_at: msg.created_at,
@@ -202,6 +165,10 @@ export default function Chat() {
         });
         
         setMessages(messagesWithProfiles);
+
+        const profileIds = [...new Set(messagesWithProfiles.map((m: any) => m.profile_id).filter((id: any) => typeof id === 'string'))];
+        const statusMap = await fetchGifterStatuses(profileIds);
+        setGifterStatusMap(statusMap);
       }
     } finally {
       setLoading(false);
@@ -249,23 +216,16 @@ export default function Chat() {
       return filtered;
     });
 
-    // Load profile and badge in parallel (non-blocking)
+    // Load profile (non-blocking)
     Promise.all([
       supabase
         .from('profiles')
         .select('username, avatar_url, gifter_level')
         .eq('id', message.profile_id)
         .single(),
-      message.gifter_level && message.gifter_level > 0
-        ? supabase
-            .from('gifter_levels')
-            .select('*')
-            .eq('level', message.gifter_level)
-            .single()
-        : Promise.resolve({ data: null })
-    ]).then(([profileResult, badgeResult]) => {
+      fetchGifterStatuses([message.profile_id]).then((m) => m[message.profile_id] || null),
+    ]).then(([profileResult, status]) => {
       const profile = profileResult.data;
-      const badgeInfo = badgeResult.data;
 
       const newMsg = {
         id: message.id,
@@ -273,12 +233,14 @@ export default function Chat() {
         username: (profile as any)?.username || 'Unknown',
         avatar_url: (profile as any)?.avatar_url,
         gifter_level: (profile as any)?.gifter_level || 0,
-        badge_name: (badgeInfo as any)?.badge_name,
-        badge_color: (badgeInfo as any)?.badge_color,
         message_type: message.message_type,
         content: message.content,
         created_at: message.created_at,
       };
+
+      if (status) {
+        setGifterStatusMap((prev) => ({ ...prev, [message.profile_id]: status }));
+      }
       
       setMessages((prev) => {
         // Check if already exists
@@ -551,29 +513,31 @@ export default function Chat() {
                     <div className="flex items-center gap-2 mb-1">
                       <button
                         onClick={() => {
-                          if (msg.profile_id && msg.username) {
-                            setSelectedProfile({
-                              profileId: msg.profile_id,
-                              username: msg.username,
-                              avatarUrl: msg.avatar_url,
-                              gifterLevel: msg.gifter_level,
-                              badgeName: msg.badge_name,
-                              badgeColor: msg.badge_color,
-                            });
-                          }
-                        }}
-                        className="font-semibold text-sm hover:text-blue-500 dark:hover:text-blue-400 transition cursor-pointer"
-                      >
-                        {msg.username}
-                      </button>
-                      {msg.gifter_level !== undefined && msg.gifter_level > 0 && (
-                        <GifterBadge
-                          level={msg.gifter_level}
-                          badgeName={msg.badge_name}
-                          badgeColor={msg.badge_color}
-                          size="sm"
-                        />
-                      )}
+                        if (msg.profile_id && msg.username) {
+                          setSelectedProfile({
+                            profileId: msg.profile_id,
+                            username: msg.username,
+                            avatarUrl: msg.avatar_url,
+                            gifterStatus: gifterStatusMap[msg.profile_id] || null,
+                          });
+                        }
+                      }}
+                      className="font-semibold text-sm hover:text-blue-500 dark:hover:text-blue-400 transition cursor-pointer"
+                    >
+                      {msg.username}
+                    </button>
+                      {(() => {
+                        if (!msg.profile_id) return null;
+                        const status = gifterStatusMap[msg.profile_id];
+                        if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
+                        return (
+                          <TierBadge
+                            tier_key={status.tier_key}
+                            level={status.level_in_tier}
+                            size="sm"
+                          />
+                        );
+                      })()}
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {formatTime(msg.created_at)}
                       </span>
@@ -628,9 +592,7 @@ export default function Chat() {
           username={selectedProfile.username}
           displayName={selectedProfile.displayName}
           avatarUrl={selectedProfile.avatarUrl}
-          gifterLevel={selectedProfile.gifterLevel}
-          badgeName={selectedProfile.badgeName}
-          badgeColor={selectedProfile.badgeColor}
+          gifterStatus={selectedProfile.gifterStatus}
           isLive={selectedProfile.isLive}
           onClose={() => setSelectedProfile(null)}
         />

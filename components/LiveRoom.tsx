@@ -25,6 +25,8 @@ import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
 import { useOrientation } from '@/hooks/useOrientation';
 import MobileWebWatchLayout from './mobile/MobileWebWatchLayout';
 import RotatePhoneOverlay from './mobile/RotatePhoneOverlay';
+import type { GifterStatus } from '@/lib/gifter-status';
+import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 
 interface LiveStreamer {
   id: string;
@@ -34,8 +36,7 @@ interface LiveStreamer {
   live_available: boolean;
   viewer_count: number;
   gifter_level: number;
-  badge_name?: string;
-  badge_color?: string;
+  gifter_status?: GifterStatus | null;
 }
 
 interface GridSlot {
@@ -1276,42 +1277,11 @@ export default function LiveRoom() {
 
       // Batch load gifter levels for badges
       const profileIds = [...new Set(streamerData.map((s: any) => s.streamer_id).filter((id: any) => id != null))];
-      const profileBadgeMap: Record<string, any> = {};
-      
-      if (profileIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, gifter_level')
-          .in('id', profileIds);
-        
-        if (profiles) {
-          const uniqueLevels = [...new Set(profiles.map((p: any) => p.gifter_level).filter((l: any) => l !== null && l > 0))];
-          
-          if (uniqueLevels.length > 0) {
-            const { data: badges } = await supabase
-              .from('gifter_levels')
-              .select('*')
-              .in('level', uniqueLevels);
-            
-            if (badges) {
-              const badgeMap: Record<number, any> = {};
-              badges.forEach((badge: any) => {
-                badgeMap[badge.level] = badge;
-              });
-              
-              profiles.forEach((profile: any) => {
-                if (profile.gifter_level) {
-                  profileBadgeMap[profile.id] = badgeMap[profile.gifter_level];
-                }
-              });
-            }
-          }
-        }
-      }
+      const statusMap = await fetchGifterStatuses(profileIds);
 
       // Map streamers with badge info
       let streamersWithBadges = streamerData.map((stream: any) => {
-        const badgeInfo = profileBadgeMap[stream.streamer_id] || null;
+        const status = statusMap[stream.streamer_id] || null;
 
         return {
           id: stream.live_stream_id?.toString() || stream.streamer_id,
@@ -1320,9 +1290,8 @@ export default function LiveRoom() {
           avatar_url: stream.avatar_url,
           live_available: true, // RPC only returns live_available = true
           viewer_count: stream.viewer_count || 0,
-          gifter_level: badgeInfo?.level || 0,
-          badge_name: badgeInfo?.badge_name,
-          badge_color: badgeInfo?.badge_color,
+          gifter_level: 0,
+          gifter_status: status,
         } as LiveStreamer;
       });
 
@@ -1338,33 +1307,11 @@ export default function LiveRoom() {
           const waitingProfileIds = waitingStreams.map((s: any) => s.profile_id);
           const { data: waitingProfiles } = await supabase
             .from('profiles')
-            .select('id, username, avatar_url, gifter_level')
+            .select('id, username, avatar_url')
             .in('id', waitingProfileIds);
 
           if (waitingProfiles) {
-            // Get badges for waiting streamers
-            const uniqueLevels = [...new Set(waitingProfiles.map((p: any) => p.gifter_level).filter((l: any) => l !== null && l > 0))];
-            const waitingBadgeMap: Record<string, any> = {};
-            
-            if (uniqueLevels.length > 0) {
-              const { data: badges } = await supabase
-                .from('gifter_levels')
-                .select('*')
-                .in('level', uniqueLevels);
-              
-              if (badges) {
-                const badgeMap: Record<number, any> = {};
-                badges.forEach((badge: any) => {
-                  badgeMap[badge.level] = badge;
-                });
-                
-                waitingProfiles.forEach((profile: any) => {
-                  if (profile.gifter_level) {
-                    waitingBadgeMap[profile.id] = badgeMap[profile.gifter_level];
-                  }
-                });
-              }
-            }
+            const waitingStatusMap = await fetchGifterStatuses(waitingProfiles.map((p: any) => p.id));
 
             // Add waiting streamers to the list (if not already present)
             for (const stream of waitingStreams) {
@@ -1372,7 +1319,7 @@ export default function LiveRoom() {
               if (!alreadyExists) {
                 const profile = waitingProfiles.find((p: any) => p.id === stream.profile_id);
                 if (profile) {
-                  const badgeInfo = waitingBadgeMap[profile.id] || null;
+                  const status = waitingStatusMap[profile.id] || null;
                   
                   // Get viewer count for waiting streamers too
                   let viewerCount = 0;
@@ -1394,9 +1341,8 @@ export default function LiveRoom() {
                     avatar_url: profile.avatar_url,
                     live_available: true,
                     viewer_count: viewerCount,
-                    gifter_level: badgeInfo?.level || 0,
-                    badge_name: badgeInfo?.badge_name,
-                    badge_color: badgeInfo?.badge_color,
+                    gifter_level: 0,
+                    gifter_status: status,
                   } as LiveStreamer);
                 }
               }
@@ -1418,21 +1364,13 @@ export default function LiveRoom() {
             // Get user's profile for their own stream
             const { data: ownProfile } = await supabase
               .from('profiles')
-              .select('username, avatar_url, gifter_level')
+              .select('username, avatar_url')
               .eq('id', user.id)
               .single();
 
             if (ownProfile) {
-              // Get badge if they have one
-              let badgeInfo = null;
-              if (ownProfile.gifter_level) {
-                const { data: badge } = await supabase
-                  .from('gifter_levels')
-                  .select('*')
-                  .eq('level', ownProfile.gifter_level)
-                  .single();
-                badgeInfo = badge;
-              }
+              const ownStatusMap = await fetchGifterStatuses([user.id]);
+              const ownStatus = ownStatusMap[user.id] || null;
 
               // Get viewer count for own stream
               let ownViewerCount = 0;
@@ -1454,9 +1392,8 @@ export default function LiveRoom() {
                 avatar_url: ownProfile.avatar_url,
                 live_available: true,
                 viewer_count: ownViewerCount,
-                gifter_level: badgeInfo?.level || 0,
-                badge_name: badgeInfo?.badge_name,
-                badge_color: badgeInfo?.badge_color,
+                gifter_level: 0,
+                gifter_status: ownStatus,
               } as LiveStreamer);
             }
           }
@@ -2806,6 +2743,7 @@ export default function LiveRoom() {
                   gifterLevel={expandedSlot.streamer.gifter_level}
                   badgeName={expandedSlot.streamer.badge_name}
                   badgeColor={expandedSlot.streamer.badge_color}
+                  gifterStatus={expandedSlot.streamer.gifter_status}
                   slotIndex={expandedSlot.slotIndex}
                   liveStreamId={expandedSlot.streamer.id && expandedSlot.streamer.live_available ? (() => {
                     const idStr = expandedSlot.streamer.id.toString();

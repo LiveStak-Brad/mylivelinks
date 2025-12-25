@@ -12,7 +12,12 @@ interface MiniProfileProps {
   username: string;
   displayName?: string;
   avatarUrl?: string;
+  /** New: Full GifterStatus object */
   gifterStatus?: GifterStatus | null;
+  /** Legacy: Individual gifter props (used by Chat) */
+  gifterLevel?: number;
+  badgeName?: string;
+  badgeColor?: string;
   isLive?: boolean;
   onClose: () => void;
   position?: { x: number; y: number };
@@ -26,6 +31,9 @@ export default function MiniProfile({
   displayName,
   avatarUrl,
   gifterStatus,
+  gifterLevel,
+  badgeName,
+  badgeColor,
   isLive = false,
   onClose,
   position,
@@ -194,7 +202,8 @@ export default function MiniProfile({
                 )}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 truncate">@{username}</p>
-              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
+              {/* Gifter Badge - supports both new gifterStatus and legacy props */}
+              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 ? (
                 <div className="mt-1">
                   <TierBadge
                     tier_key={gifterStatus.tier_key}
@@ -202,7 +211,21 @@ export default function MiniProfile({
                     size="sm"
                   />
                 </div>
-              )}
+              ) : gifterLevel && gifterLevel > 0 ? (
+                <div className="mt-1">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full font-medium text-xs px-2 py-1"
+                    style={{
+                      backgroundColor: `${badgeColor || '#94A3B8'}20`,
+                      color: badgeColor || '#94A3B8',
+                      border: `1px solid ${badgeColor || '#94A3B8'}40`,
+                    }}
+                  >
+                    <span className="font-bold">{gifterLevel}</span>
+                    <span>{badgeName || `Level ${gifterLevel}`}</span>
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
