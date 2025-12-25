@@ -108,7 +108,9 @@ export default function LiveRoom() {
     rightStackOpen: true,
   });
 
-  const supabase = createClient();
+  // CRITICAL: Memoize Supabase client to prevent recreation on every render
+  // This prevents effects from re-running and causing LiveKit disconnect/reconnect loops
+  const supabase = useMemo(() => createClient(), []);
 
   // Check if auth is disabled for testing
   const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
@@ -147,7 +149,7 @@ export default function LiveRoom() {
 
   // Connect to shared LiveKit room ONCE on mount
   useEffect(() => {
-    let mounted = true;
+    let isEffectActive = true;
     
     const connectSharedRoom = async () => {
       // CRITICAL: Enforce "connect once" guard - prevent double-connect from:
@@ -155,7 +157,9 @@ export default function LiveRoom() {
       // - Fast refresh / component remount
       // - Route transitions
       if (roomConnectionRef.current.connecting || roomConnectionRef.current.connected) {
-        console.log('Room connection already in progress or connected, skipping');
+        if (DEBUG_LIVEKIT) {
+          console.log('Room connection already in progress or connected, skipping');
+        }
         return;
       }
 
@@ -165,7 +169,9 @@ export default function LiveRoom() {
         
         const { data: { user } } = await supabase.auth.getUser();
         if (!user && !authDisabled) {
-          console.log('No user, skipping room connection');
+          if (DEBUG_LIVEKIT) {
+            console.log('No user, skipping room connection');
+          }
           roomConnectionRef.current.connecting = false; // Reset flag on early return
           return;
         }
@@ -294,7 +300,7 @@ export default function LiveRoom() {
         // Set up event handlers BEFORE connecting
         
         const handleConnected = () => {
-          if (mounted) {
+          if (isEffectActive) {
             if (DEBUG_LIVEKIT) {
               console.log('[ROOM] connected', {
                 room: LIVEKIT_ROOM_NAME,
@@ -322,7 +328,7 @@ export default function LiveRoom() {
         };
 
         const handleDisconnected = () => {
-          if (mounted) {
+          if (isEffectActive) {
             if (DEBUG_LIVEKIT) {
               console.log('[DEBUG] Room disconnected:', {
                 roomState: newRoom.state,
@@ -451,7 +457,7 @@ export default function LiveRoom() {
         // Wait a moment to ensure connection is fully established
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        if (mounted) {
+        if (isEffectActive) {
           // Verify connection before setting state
           if (newRoom.state === 'connected') {
             roomRef.current = newRoom;
@@ -473,7 +479,7 @@ export default function LiveRoom() {
         // CRITICAL: Always reset connecting flag on error to allow retry
         roomConnectionRef.current.connecting = false;
         roomConnectionRef.current.connected = false;
-        if (mounted) {
+        if (isEffectActive) {
           setIsRoomConnected(false);
         }
       }
@@ -482,7 +488,7 @@ export default function LiveRoom() {
     connectSharedRoom();
 
     return () => {
-      mounted = false;
+      isEffectActive = false;
       if (roomRef.current && handlersRef.current) {
         // CRITICAL: Remove ALL event listeners before disconnecting to prevent memory leaks
         const handlers = handlersRef.current;
@@ -994,6 +1000,9 @@ export default function LiveRoom() {
         user = result.data?.user || null;
       }
       
+      // CRITICAL: Get viewer ID safely - handle authDisabled mode
+      const viewerId = authDisabled ? null : user?.id;
+      
       // If auth disabled, still load streamers (just without user filtering)
       if (!authDisabled && !user) {
         setLoading(false);
@@ -1013,48 +1022,60 @@ export default function LiveRoom() {
       let data: any[] = [];
       let error: any = null;
 
-      // Try sorted function first (if it exists and not random mode)
-      if (sortMode !== 'random') {
-        const result = await supabase.rpc('get_live_grid', {
-          p_viewer_id: user.id,
-          p_sort_mode: sortMode,
-        });
-        if (!result.error && result.data) {
-          data = result.data;
-        } else {
-          // Fallback if get_live_grid doesn't exist
-          error = result.error;
+      // CRITICAL: Only call RPCs that require viewer_id if we have one
+      // If authDisabled, skip RPCs and go directly to fallback query
+      if (!authDisabled && viewerId) {
+        // Try sorted function first (if it exists and not random mode)
+        if (sortMode !== 'random') {
+          const result = await supabase.rpc('get_live_grid', {
+            p_viewer_id: viewerId,
+            p_sort_mode: sortMode,
+          });
+          if (!result.error && result.data) {
+            data = result.data;
+          } else {
+            // Fallback if get_live_grid doesn't exist
+            error = result.error;
+          }
+        }
+
+        // If random mode or get_live_grid failed, use fallback RPC
+        if (sortMode === 'random' || error) {
+          const fallbackResult = await supabase.rpc('get_available_streamers_filtered', {
+            p_viewer_id: viewerId,
+          });
+          if (fallbackResult.error) {
+            console.error('RPC error, falling back to direct query:', fallbackResult.error);
+            error = fallbackResult.error;
+          } else if (fallbackResult.data) {
+            data = fallbackResult.data;
+          }
         }
       }
-
-      // If random mode or get_live_grid failed, use fallback RPC
-      if (sortMode === 'random' || error) {
-        const fallbackResult = await supabase.rpc('get_available_streamers_filtered', {
-          p_viewer_id: user.id,
-        });
-        if (fallbackResult.error) {
-          console.error('RPC error, falling back to direct query:', fallbackResult.error);
-          // Final fallback: direct query from live_streams
-          const directResult = await supabase
-            .from('live_streams')
-            .select('id, profile_id, live_available')
-            .eq('live_available', true)
-            .order('id', { ascending: false }) // Order by id DESC (newest first) since published_at not selected
-            .limit(50);
-          
-          if (directResult.error) {
-            console.error('Direct query also failed:', directResult.error);
-            return []; // Return empty array instead of throwing
-          }
-          
-          // Convert to expected format
-          const profileIds = directResult.data?.map((s: any) => s.profile_id) || [];
-          if (profileIds.length === 0) {
-            return [];
-          }
-          
-          // Load profiles
-          const { data: profiles } = await supabase
+      
+      // CRITICAL: If authDisabled or RPCs failed, use direct query fallback
+      if (authDisabled || error || data.length === 0) {
+        // Final fallback: direct query from live_streams
+        const directResult = await supabase
+          .from('live_streams')
+          .select('id, profile_id, live_available')
+          .eq('live_available', true)
+          .order('id', { ascending: false }) // Order by id DESC (newest first) since published_at not selected
+          .limit(50);
+        
+        if (directResult.error) {
+          console.error('Direct query also failed:', directResult.error);
+          return []; // Return empty array instead of throwing
+        }
+        
+        // Convert to expected format
+        const profileIds = directResult.data?.map((s: any) => s.profile_id) || [];
+        if (profileIds.length === 0) {
+          return [];
+        }
+        
+        // Load profiles
+        const { data: profiles } = await supabase
             .from('profiles')
             .select('id, username, avatar_url, gifter_level')
             .in('id', profileIds);
@@ -1089,10 +1110,7 @@ export default function LiveRoom() {
             })
           );
           
-          data = streamersWithCounts.filter((s: any) => s !== null) as any[];
-        } else {
-          data = fallbackResult.data || [];
-        }
+        data = streamersWithCounts.filter((s: any) => s !== null) as any[];
         error = null; // Clear error since fallback succeeded
       }
 
@@ -2615,13 +2633,16 @@ export default function LiveRoom() {
                 {/* 12-Tile Grid - 4/4/4 layout in Focus Mode, 6/6 otherwise */}
                 <div className={`grid ${uiPanels.focusMode ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6'} ${uiPanels.focusMode ? 'gap-1.5 max-w-[90%]' : 'gap-2'} w-full ${uiPanels.focusMode ? 'h-auto' : 'h-full'}`}>
                 {(() => {
-                  // DEBUG: Log grid rendering
-                  console.log('[GRID RENDER]', {
-                    hasGridSlots: !!gridSlots,
-                    isArray: Array.isArray(gridSlots),
-                    length: gridSlots?.length,
-                    gridSlots: gridSlots
-                  });
+                  // DEBUG: Log grid rendering (only in debug mode to avoid performance issues)
+                  const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+                  if (DEBUG_LIVEKIT) {
+                    console.log('[GRID RENDER]', {
+                      hasGridSlots: !!gridSlots,
+                      isArray: Array.isArray(gridSlots),
+                      length: gridSlots?.length,
+                      gridSlots: gridSlots
+                    });
+                  }
                   
                   // CRITICAL: Ensure gridSlots is always a valid array - handle null/undefined cases
                   if (!gridSlots || !Array.isArray(gridSlots)) {
@@ -2695,7 +2716,10 @@ export default function LiveRoom() {
                     }).filter((el) => el !== null);
                   }
                   
-                  console.log('[GRID RENDER] Using slots:', finalSlots.length, finalSlots);
+                  // DEBUG: Only log in debug mode to avoid performance issues
+                  if (process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1') {
+                    console.log('[GRID RENDER] Using slots:', finalSlots.length, finalSlots);
+                  }
                   
                   // CRITICAL: Wrap map in try-catch to prevent crashes and log detailed errors
                   try {
