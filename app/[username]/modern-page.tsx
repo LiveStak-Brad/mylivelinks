@@ -15,6 +15,7 @@ import AdultLinksSection from '@/components/adult/AdultLinksSection';
 import FollowersModal from '@/components/profile/FollowersModal';
 import SocialMediaBar from '@/components/profile/SocialMediaBar';
 import ProfileLivePlayer from '@/components/ProfileLivePlayer';
+import UserConnectionsList from '@/components/UserConnectionsList';
 
 interface ProfileData {
   profile: {
@@ -125,6 +126,7 @@ export default function ModernProfilePage() {
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | undefined>(undefined);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activeConnectionsTab, setActiveConnectionsTab] = useState<'following' | 'followers' | 'friends'>('following');
   
   const supabase = createClient();
   
@@ -588,6 +590,55 @@ export default function ModernProfilePage() {
             />
           </div>
         )}
+        
+        {/* Connections Section - Following, Followers, Friends */}
+        <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
+          <div className="p-4 sm:p-6">
+            {/* Tab Headers */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+              <button
+                onClick={() => setActiveConnectionsTab('following')}
+                className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
+                  activeConnectionsTab === 'following'
+                    ? 'border-purple-500 text-purple-500'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+                style={activeConnectionsTab === 'following' ? { borderColor: accentColor, color: accentColor } : {}}
+              >
+                Following ({profileData.following_count})
+              </button>
+              <button
+                onClick={() => setActiveConnectionsTab('followers')}
+                className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
+                  activeConnectionsTab === 'followers'
+                    ? 'border-purple-500 text-purple-500'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+                style={activeConnectionsTab === 'followers' ? { borderColor: accentColor, color: accentColor } : {}}
+              >
+                Followers ({profileData.follower_count})
+              </button>
+              <button
+                onClick={() => setActiveConnectionsTab('friends')}
+                className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
+                  activeConnectionsTab === 'friends'
+                    ? 'border-purple-500 text-purple-500'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+                style={activeConnectionsTab === 'friends' ? { borderColor: accentColor, color: accentColor } : {}}
+              >
+                Friends ({profileData.friends_count})
+              </button>
+            </div>
+            
+            {/* Tab Content */}
+            <UserConnectionsList
+              userId={profile.id}
+              listType={activeConnectionsTab}
+              currentUserId={currentUser?.id}
+            />
+          </div>
+        </div>
         
         {/* Links Section */}
         {profileData.links.length > 0 && (
