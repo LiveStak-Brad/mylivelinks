@@ -1545,17 +1545,50 @@ export default function LiveRoom() {
         }
 
         // Sort slots by index
-        const sortedSlots = updatedSlots.sort((a, b) => a.slotIndex - b.slotIndex);
+        // CRITICAL: Ensure updatedSlots is valid before sorting
+        if (!updatedSlots || !Array.isArray(updatedSlots)) {
+          console.error('[GRID] updatedSlots is invalid, using defaults');
+          const defaultSlots = Array.from({ length: 12 }, (_, i) => ({
+            slotIndex: i + 1,
+            streamer: null,
+            isPinned: false,
+            isMuted: false,
+            isEmpty: true,
+            volume: 0.5,
+          }));
+          setGridSlots(defaultSlots);
+          autoFillGrid();
+          return;
+        }
+        
+        const sortedSlots = updatedSlots
+          .filter((s): s is GridSlot => s != null && typeof s === 'object' && typeof s.slotIndex === 'number')
+          .sort((a, b) => a.slotIndex - b.slotIndex);
+        
+        // CRITICAL: Ensure sortedSlots has exactly 12 slots
+        const finalSortedSlots: GridSlot[] = sortedSlots.length === 12
+          ? sortedSlots
+          : Array.from({ length: 12 }, (_, i) => {
+              const existing = sortedSlots.find(s => s.slotIndex === i + 1);
+              return existing || {
+                slotIndex: i + 1,
+                streamer: null,
+                isPinned: false,
+                isMuted: false,
+                isEmpty: true,
+                volume: 0.5,
+              };
+            });
         
         // CRITICAL: Autofill empty slots with available streamers (runs on join)
         // This ensures new users see all available cameras immediately
         // This also triggers active_viewers entries which will trigger publishing
-        const emptySlots = sortedSlots.filter(s => s.isEmpty);
+        const emptySlots = finalSortedSlots.filter(s => s.isEmpty);
         if (emptySlots.length > 0 && availableStreamers.length > 0) {
           // Get streamers not already in grid
           // CRITICAL: Add null checks to prevent "Cannot read properties of null" errors
           const usedStreamerIds = new Set(
-            sortedSlots
+            finalSortedSlots
               .filter(s => s && s.streamer && s.streamer.profile_id)
               .map(s => s.streamer!.profile_id)
           );
@@ -1569,25 +1602,27 @@ export default function LiveRoom() {
           });
           
           // CRITICAL: Ensure we don't access array indices that don't exist
-          const maxFill = Math.min(sortedStreamers.length, emptySlots.length);
-          for (let index = 0; index < maxFill; index++) {
-            const streamer = sortedStreamers[index];
-            const emptySlot = emptySlots[index];
-            if (streamer && emptySlot && streamer.profile_id && emptySlot.slotIndex) {
-              const slotIndex = sortedSlots.findIndex(s => s && s.slotIndex === emptySlot.slotIndex);
-              if (slotIndex >= 0 && sortedSlots[slotIndex]) {
-                sortedSlots[slotIndex] = {
-                  ...sortedSlots[slotIndex],
-                  streamer,
-                  isEmpty: false,
-                };
+          if (sortedStreamers && Array.isArray(sortedStreamers) && emptySlots && Array.isArray(emptySlots)) {
+            const maxFill = Math.min(sortedStreamers.length, emptySlots.length);
+            for (let index = 0; index < maxFill; index++) {
+              const streamer = sortedStreamers[index];
+              const emptySlot = emptySlots[index];
+              if (streamer && emptySlot && streamer.profile_id && emptySlot.slotIndex) {
+                const slotIndex = finalSortedSlots.findIndex(s => s && s.slotIndex === emptySlot.slotIndex);
+                if (slotIndex >= 0 && slotIndex < finalSortedSlots.length && finalSortedSlots[slotIndex]) {
+                  finalSortedSlots[slotIndex] = {
+                    ...finalSortedSlots[slotIndex],
+                    streamer,
+                    isEmpty: false,
+                  };
+                }
               }
             }
           }
         }
 
-        setGridSlots(sortedSlots);
-        saveGridLayout(sortedSlots);
+        setGridSlots(finalSortedSlots);
+        saveGridLayout(finalSortedSlots);
       } else {
         // No saved layout - auto-fill with ALL available streamers (both published and waiting)
         // This ensures new users see all cameras that are available
@@ -1656,8 +1691,22 @@ export default function LiveRoom() {
     // CRITICAL: Only fill EMPTY slots, preserve existing tiles
     // This prevents clearing streams when realtime updates fire
     setGridSlots((currentSlots) => {
-      // Find empty slots
-      const emptySlots = currentSlots.filter(s => s.isEmpty);
+      // CRITICAL: Ensure currentSlots is always a valid array
+      if (!currentSlots || !Array.isArray(currentSlots) || currentSlots.length === 0) {
+        console.warn('[GRID] autoFillGrid: currentSlots is invalid, initializing defaults');
+        return Array.from({ length: 12 }, (_, i) => ({
+          slotIndex: i + 1,
+          streamer: null,
+          isPinned: false,
+          isMuted: false,
+          isEmpty: true,
+          volume: 0.5,
+        }));
+      }
+      
+      // Find empty slots - filter out any null/undefined entries
+      const validSlots = currentSlots.filter((s): s is GridSlot => s != null && typeof s === 'object' && typeof s.slotIndex === 'number');
+      const emptySlots = validSlots.filter(s => s.isEmpty);
       
       if (DEBUG_LIVEKIT) {
         console.log('[GRID] Checking for empty slots', {
@@ -1671,13 +1720,13 @@ export default function LiveRoom() {
         if (DEBUG_LIVEKIT) {
           console.log('[GRID] No empty slots to fill');
         }
-        return currentSlots;
+        return validSlots;
       }
 
       // CRITICAL: Deduplicate - get ALL streamers already in grid (across all slots)
       const usedStreamerIds = new Set(
-        currentSlots
-          .filter(s => s.streamer)
+        validSlots
+          .filter(s => s && s.streamer && s.streamer.profile_id)
           .map(s => s.streamer!.profile_id)
       );
 
@@ -1711,14 +1760,23 @@ export default function LiveRoom() {
       });
 
       // Fill empty slots with available streamers
-      const updatedSlots = [...currentSlots];
+      const updatedSlots = [...validSlots];
       let streamerIndex = 0;
       
+      // CRITICAL: Ensure sorted array is valid and we don't access out-of-bounds indices
+      if (!sorted || !Array.isArray(sorted) || sorted.length === 0) {
+        return validSlots;
+      }
+      
       for (let i = 0; i < updatedSlots.length && streamerIndex < sorted.length; i++) {
-        if (updatedSlots[i].isEmpty) {
+        const slot = updatedSlots[i];
+        const streamer = sorted[streamerIndex];
+        
+        // CRITICAL: Validate both slot and streamer before accessing properties
+        if (slot && slot.isEmpty && streamer && streamer.profile_id) {
           updatedSlots[i] = {
-            ...updatedSlots[i],
-            streamer: sorted[streamerIndex],
+            ...slot,
+            streamer: streamer,
             isEmpty: false,
           };
           streamerIndex++;
@@ -2565,24 +2623,43 @@ export default function LiveRoom() {
                     gridSlots: gridSlots
                   });
                   
-                  // CRITICAL: Ensure gridSlots is always a valid array
-                  const slotsToRender = (gridSlots && Array.isArray(gridSlots) && gridSlots.length > 0) 
-                    ? gridSlots.filter((slot: GridSlot | null | undefined) => slot != null)
-                    : Array.from({ length: 12 }, (_, i) => ({
-                        slotIndex: i + 1,
-                        streamer: null,
-                        isPinned: false,
-                        isMuted: false,
-                        isEmpty: true,
-                        volume: 0.5,
-                      }));
+                  // CRITICAL: Ensure gridSlots is always a valid array - handle null/undefined cases
+                  if (!gridSlots || !Array.isArray(gridSlots)) {
+                    console.warn('[GRID RENDER] gridSlots is not a valid array, using defaults');
+                    const defaultSlots = Array.from({ length: 12 }, (_, i) => ({
+                      slotIndex: i + 1,
+                      streamer: null,
+                      isPinned: false,
+                      isMuted: false,
+                      isEmpty: true,
+                      volume: 0.5,
+                    }));
+                    return defaultSlots.map((slot: GridSlot) => {
+                      if (!slot || typeof slot.slotIndex !== 'number') {
+                        return null;
+                      }
+                      return (
+                        <div key={slot.slotIndex} className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
+                          <span className="text-gray-400 text-sm">Empty Slot</span>
+                        </div>
+                      );
+                    }).filter((el) => el !== null);
+                  }
+                  
+                  // Filter out null/undefined slots
+                  const validSlots = gridSlots.filter((slot: GridSlot | null | undefined): slot is GridSlot => 
+                    slot != null && typeof slot === 'object' && typeof slot.slotIndex === 'number'
+                  );
                   
                   // Ensure we always have exactly 12 slots
-                  const finalSlots = slotsToRender.length === 12 
-                    ? slotsToRender 
+                  const finalSlots: GridSlot[] = validSlots.length === 12 
+                    ? validSlots 
                     : Array.from({ length: 12 }, (_, i) => {
-                        const existingSlot = slotsToRender.find((s: GridSlot) => s.slotIndex === i + 1);
-                        return existingSlot || {
+                        const existingSlot = validSlots.find((s: GridSlot) => s && s.slotIndex === i + 1);
+                        if (existingSlot && existingSlot.slotIndex === i + 1) {
+                          return existingSlot;
+                        }
+                        return {
                           slotIndex: i + 1,
                           streamer: null,
                           isPinned: false,
@@ -2592,10 +2669,38 @@ export default function LiveRoom() {
                         };
                       });
                   
-                  console.log('[GRID RENDER] Using slots:', finalSlots?.length, finalSlots);
+                  // CRITICAL: Final validation - ensure finalSlots is never null and always has 12 items
+                  if (!finalSlots || !Array.isArray(finalSlots) || finalSlots.length !== 12) {
+                    console.error('[GRID RENDER] finalSlots validation failed, using defaults', {
+                      finalSlots,
+                      length: finalSlots?.length
+                    });
+                    const defaultSlots = Array.from({ length: 12 }, (_, i) => ({
+                      slotIndex: i + 1,
+                      streamer: null,
+                      isPinned: false,
+                      isMuted: false,
+                      isEmpty: true,
+                      volume: 0.5,
+                    }));
+                    return defaultSlots.map((slot: GridSlot) => {
+                      if (!slot || typeof slot.slotIndex !== 'number') {
+                        return null;
+                      }
+                      return (
+                        <div key={slot.slotIndex} className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
+                          <span className="text-gray-400 text-sm">Empty Slot</span>
+                        </div>
+                      );
+                    }).filter((el) => el !== null);
+                  }
+                  
+                  console.log('[GRID RENDER] Using slots:', finalSlots.length, finalSlots);
                   
                   return finalSlots
-                    .filter((slot: GridSlot | null | undefined): slot is GridSlot => slot != null && typeof slot.slotIndex === 'number')
+                    .filter((slot: GridSlot | null | undefined): slot is GridSlot => 
+                      slot != null && typeof slot === 'object' && typeof slot.slotIndex === 'number'
+                    )
                     .map((slot: GridSlot) => {
                       // CRITICAL: Validate slot structure before rendering
                       if (!slot || typeof slot.slotIndex !== 'number') {
