@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { requireAdmin } from '@/lib/admin';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
@@ -18,9 +18,9 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0);
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
 
-    const supabase = createRouteHandlerClient(request);
+    const admin = getSupabaseAdmin();
 
-    const { data, error } = await supabase
+    const { data, error } = await admin
       .from('gifts')
       .select(
         'id, sender_id, recipient_id, gift_type_id, coin_amount, platform_revenue, streamer_revenue, slot_index, live_stream_id, sent_at, sender:profiles!gifts_sender_id_fkey(username, display_name), recipient:profiles!gifts_recipient_id_fkey(username, display_name)'

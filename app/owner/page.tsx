@@ -207,15 +207,15 @@ export default function OwnerPanel() {
       }
       const data = await res.json();
 
-      setStats({
+      setStats((prev) => ({
         totalUsers: Number(data?.totals?.users ?? 0),
         newUsersToday: 0,
         activeStreams: Number(data?.totals?.live_streams_active ?? 0),
         totalGiftsSent: Number(data?.totals?.gifts_sent_24h ?? 0),
         totalRevenue: 0,
         pendingReports: Number(data?.totals?.pending_reports ?? 0),
-        pendingApplications: Number(stats?.pendingApplications ?? 0),
-      });
+        pendingApplications: Number(prev?.pendingApplications ?? 0),
+      }));
 
       if (Array.isArray(data?.live_now)) {
         setLiveStreams(
@@ -358,7 +358,35 @@ export default function OwnerPanel() {
       const res = await fetch(url.toString(), { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to load transactions');
       const json = await res.json();
-      setTransactions(json.transactions || []);
+      const rows = Array.isArray(json.transactions) ? json.transactions : [];
+      const source = String(json.source || 'unknown');
+
+      const normalized = rows.map((row: any) => {
+        if (source === 'ledger_entries') {
+          const deltaCoins = Number(row.delta_coins ?? 0);
+          const deltaDiamonds = Number(row.delta_diamonds ?? 0);
+          const amount = deltaCoins !== 0 ? deltaCoins : deltaDiamonds;
+          return {
+            id: `le:${row.id}`,
+            type: String(row.entry_type || 'ledger'),
+            amount: Math.abs(amount),
+            created_at: row.created_at,
+            from_user: String(row.user_id || ''),
+            to_user: '',
+          } as Transaction;
+        }
+
+        return {
+          id: `cl:${row.id}`,
+          type: String(row.type || 'ledger'),
+          amount: Math.abs(Number(row.amount ?? 0)),
+          created_at: row.created_at,
+          from_user: String(row.profile_id || ''),
+          to_user: '',
+        } as Transaction;
+      });
+
+      setTransactions(normalized);
     } catch (error) {
       console.error('Error loading transactions:', error);
     }

@@ -2630,7 +2630,48 @@ export default function LiveRoom() {
     saveGridLayout(newSlots);
   };
 
-  // Always render content - no blocking checks
+  // Handle leave room (for mobile web)
+  const handleLeaveRoom = useCallback(() => {
+    router.push('/');
+  }, [router]);
+
+  // ============================================
+  // MOBILE WEB RENDERING
+  // ============================================
+  // On mobile web browsers, show simplified video-only experience
+  // Portrait mode: Show rotate overlay
+  // Landscape mode: Show MobileWebWatchLayout
+  
+  if (isMobileWeb) {
+    // Portrait mode on mobile web: show rotate overlay
+    if (isPortrait && !mobilePortraitDismissed) {
+      return (
+        <RotatePhoneOverlay 
+          onContinue={() => setMobilePortraitDismissed(true)} 
+        />
+      );
+    }
+    
+    // Landscape mode (or portrait dismissed): show mobile watch layout
+    return (
+      <MobileWebWatchLayout
+        gridSlots={gridSlots}
+        sharedRoom={sharedRoom}
+        isRoomConnected={isRoomConnected}
+        currentUserId={currentUserId}
+        isCurrentUserPublishing={isCurrentUserPublishing}
+        viewerCount={roomPresenceCountMinusSelf}
+        onLeave={handleLeaveRoom}
+        onMuteTile={handleMuteTile}
+        onVolumeChange={handleVolumeChange}
+        onCloseTile={handleCloseTile}
+      />
+    );
+  }
+
+  // ============================================
+  // DESKTOP WEB RENDERING (unchanged)
+  // ============================================
 
   return (
     <div className="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col">

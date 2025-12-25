@@ -341,3 +341,99 @@
 .animate-scale-in {
   animation: scale-in 0.2s ease-out;
 }
+
+/* ============================================================================
+   MOBILE WEB SPECIFIC STYLES
+   ============================================================================ */
+
+/* Slow spin animation for rotate overlay */
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* Slow pulse animation */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2s ease-in-out infinite;
+}
+
+/* Mobile web video container - ensure full viewport usage */
+.mobile-video-container {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 9998;
+}
+
+/* Safe area handling for notched phones */
+@supports (padding: max(0px)) {
+  .mobile-safe-top {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+  
+  .mobile-safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  
+  .mobile-safe-left {
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+  }
+  
+  .mobile-safe-right {
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+  }
+}
+
+/* Prevent iOS rubber-banding on mobile watch layout */
+.mobile-no-bounce {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+/* Mobile video grid aspect ratio handling */
+.mobile-video-grid {
+  display: grid;
+  height: 100%;
+  width: 100%;
+  align-content: center;
+  justify-content: center;
+}
+
+/* Hide scrollbars on mobile video grid */
+.mobile-video-grid::-webkit-scrollbar {
+  display: none;
+}
+
+/* Touch-friendly hit targets for mobile buttons */
+.mobile-touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Landscape-only media query helper */
+@media (orientation: landscape) and (max-width: 900px) {
+  .mobile-landscape-only {
+    display: block;
+  }
+  .mobile-portrait-only {
+    display: none;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  .mobile-landscape-only {
+    display: none;
+  }
+  .mobile-portrait-only {
+    display: block;
+  }
+}

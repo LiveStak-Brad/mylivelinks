@@ -40,7 +40,6 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
     throw new Error('UNAUTHORIZED');
   }
 
-  // Preferred: use DB RBAC helper (SECURITY DEFINER) so we don't require service role.
   const supabase = request ? createRouteHandlerClient(request) : createServerSupabaseClient();
   const { data: isAdmin, error: isAdminError } = await supabase.rpc('is_admin', {
     uid: user.id,
@@ -50,7 +49,6 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
     return { user };
   }
 
-  // Fallback: service role direct profile flags (useful during migrations / if RPC missing).
   try {
     const admin = getSupabaseAdmin();
     const { data: profile } = await admin

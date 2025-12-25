@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
 
     const supabase = createRouteHandlerClient(request);
 
-    // Primary: platform_settings key/value store (if present)
     const { data, error } = await supabase
       .from('platform_settings')
       .select('key, value, updated_at')
@@ -25,7 +24,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ settings: data ?? [], source: 'platform_settings' });
     }
 
-    // Fallback: nothing configured yet
     return NextResponse.json({ settings: [], source: 'none' });
   } catch (err) {
     return authErrorToResponse(err);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { requireAdmin } from '@/lib/admin';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
@@ -18,10 +18,9 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0);
     const q = (url.searchParams.get('q') || '').trim().toLowerCase();
 
-    const supabase = createRouteHandlerClient(request);
+    const admin = getSupabaseAdmin();
 
-    // Preferred newer schema: ledger_entries (if it exists).
-    const attemptLedgerEntries = await supabase
+    const attemptLedgerEntries = await admin
       .from('ledger_entries')
       .select('id, user_id, entry_type, delta_coins, delta_diamonds, amount_usd_cents, provider_ref, created_at')
       .order('created_at', { ascending: false })
@@ -35,8 +34,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ transactions: rows, source: 'ledger_entries', limit, offset });
     }
 
-    // Fallback: coin_ledger
-    const attemptCoinLedger = await supabase
+    const attemptCoinLedger = await admin
       .from('coin_ledger')
       .select('id, profile_id, amount, type, description, created_at')
       .order('created_at', { ascending: false })

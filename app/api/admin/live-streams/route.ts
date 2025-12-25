@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { requireAdmin } from '@/lib/admin';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50', 10) || 50, 1), 100);
     const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0);
 
-    const supabase = createRouteHandlerClient(request);
-    let query = supabase
+    const admin = getSupabaseAdmin();
+    let query = admin
       .from('live_streams')
       .select('id, profile_id, live_available, is_published, started_at, ended_at, published_at, unpublished_at, profile:profiles(username, display_name, avatar_url)')
       .order('started_at', { ascending: false })
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     const viewerCounts = new Map<number, number>();
 
     if (ids.length > 0) {
-      const { data: viewers, error: viewersError } = await supabase
+      const { data: viewers, error: viewersError } = await admin
         .from('active_viewers')
         .select('live_stream_id')
         .in('live_stream_id', ids);

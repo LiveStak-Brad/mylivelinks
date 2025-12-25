@@ -76,9 +76,9 @@ export default function MobileWebWatchLayout({
   
   // Report modal state
   const [reportModalTarget, setReportModalTarget] = useState<{
-    targetId: string;
-    targetType: 'user' | 'stream' | 'profile' | 'message';
-    targetName?: string;
+    reportedUserId: string;
+    reportType: 'user' | 'stream' | 'profile' | 'chat';
+    reportedUsername?: string;
   } | null>(null);
   
   // Global mute state
@@ -151,9 +151,9 @@ export default function MobileWebWatchLayout({
     const targetSlot = focusedSlot || activeSlots[0];
     if (targetSlot?.streamer) {
       setReportModalTarget({
-        targetId: targetSlot.streamer.profile_id,
-        targetType: 'stream',
-        targetName: targetSlot.streamer.username,
+        reportedUserId: targetSlot.streamer.profile_id,
+        reportType: 'stream',
+        reportedUsername: targetSlot.streamer.username,
       });
     }
   }, [focusedSlot, activeSlots]);
@@ -169,9 +169,9 @@ export default function MobileWebWatchLayout({
   };
 
   return (
-    <div className="fixed inset-0 bg-black z-[9998] flex flex-col">
-      {/* Top Bar - Minimal controls */}
-      <div className="absolute top-0 left-0 right-0 z-50 px-3 py-2 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+    <div className="fixed inset-0 bg-black z-[9998] flex flex-col mobile-no-bounce">
+      {/* Top Bar - Minimal controls with safe area handling */}
+      <div className="absolute top-0 left-0 right-0 z-50 px-3 py-2 bg-gradient-to-b from-black/80 via-black/40 to-transparent mobile-safe-top mobile-safe-left mobile-safe-right">
         <div className="flex items-center justify-between">
           {/* Left: Back button */}
           <button
@@ -307,8 +307,8 @@ export default function MobileWebWatchLayout({
         )}
       </div>
 
-      {/* Bottom Bar - Gift + Volume controls */}
-      <div className="absolute bottom-0 left-0 right-0 z-50 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+      {/* Bottom Bar - Gift + Volume controls with safe area handling */}
+      <div className="absolute bottom-0 left-0 right-0 z-50 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent mobile-safe-bottom mobile-safe-left mobile-safe-right">
         <div className="flex items-center justify-between">
           {/* Left: Report button */}
           <button
@@ -359,9 +359,10 @@ export default function MobileWebWatchLayout({
       {/* Report Modal */}
       {reportModalTarget && (
         <ReportModal
-          targetId={reportModalTarget.targetId}
-          targetType={reportModalTarget.targetType}
-          targetName={reportModalTarget.targetName}
+          isOpen={true}
+          reportType={reportModalTarget.reportType}
+          reportedUserId={reportModalTarget.reportedUserId}
+          reportedUsername={reportModalTarget.reportedUsername}
           onClose={() => setReportModalTarget(null)}
         />
       )}
