@@ -113,7 +113,6 @@ export default function GifterLevelsPage() {
                     <GifterBadge
                       tier_key={tier.key}
                       level={25}
-                      size={tier.order <= 3 ? 'sm' : tier.order <= 7 ? 'md' : 'lg'}
                     />
                   </div>
                   <p className="text-xs font-medium" style={{ color: tier.color }}>

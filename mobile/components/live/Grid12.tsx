@@ -1,14 +1,19 @@
 /**
- * 12-tile grid component (4 columns × 3 rows)
- * Landscape-first layout, stable mounting (never unmounts when overlays open)
+ * Adaptive grid component for mobile live room
+ * 
+ * Orientation-aware layout:
+ * - Portrait: 3 columns × 4 rows (12 tiles)
+ * - Landscape: 4 columns × 3 rows (12 tiles)
+ * 
+ * Always shows the full grid with empty placeholders when slots aren't filled.
  * 
  * Supports:
  * - Edit mode: Reorder tiles by dragging (UI-only, no streaming changes)
  * - Focus mode: Expand one tile, minimize others (UI-only, local audio muting)
  */
 
-import React, { useMemo, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import React, { useMemo, useEffect, useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
 import { Tile } from './Tile';
 import type { Participant, TileItem } from '../../types/live';
 import type { Room } from 'livekit-client';
@@ -26,9 +31,8 @@ interface Grid12Props {
   onInitializeTileSlots: (identities: string[]) => void;
 }
 
-const GRID_COLS = 4;
-const GRID_ROWS = 3;
-const TOTAL_TILES = GRID_COLS * GRID_ROWS;
+// Landscape: 4 cols × 3 rows | Portrait: 3 cols × 4 rows
+const TOTAL_TILES = 12;
 
 /**
  * Creates 12 tile items from participants, respecting tileSlots order
@@ -94,6 +98,14 @@ export const Grid12: React.FC<Grid12Props> = ({
   onExitFocus,
   onInitializeTileSlots,
 }) => {
+  // Track orientation
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  
+  // Grid dimensions based on orientation
+  const gridCols = isLandscape ? 4 : 3;
+  const gridRows = isLandscape ? 3 : 4;
+  
   // Initialize tileSlots when participants change (only if empty)
   useEffect(() => {
     if (tileSlots.length === 0 && participants.length > 0) {
@@ -116,18 +128,24 @@ export const Grid12: React.FC<Grid12Props> = ({
     return tileItems;
   }, [tileItems, focusedIdentity]);
 
-  // Split into 3 rows of 4 (only in normal mode)
+  // Split into rows based on current orientation
   const rows = useMemo(() => {
     if (focusedIdentity) {
       // Focus mode: different layout (1 large tile)
       return null;
     }
     const result: TileItem[][] = [];
-    for (let i = 0; i < GRID_ROWS; i++) {
-      result.push(displayItems.slice(i * GRID_COLS, (i + 1) * GRID_COLS));
+    for (let i = 0; i < gridRows; i++) {
+      result.push(displayItems.slice(i * gridCols, (i + 1) * gridCols));
     }
     return result;
-  }, [displayItems, focusedIdentity]);
+  }, [displayItems, focusedIdentity, gridRows, gridCols]);
+
+  // Count active participants for display
+  const activeCount = tileItems.filter(item => item.participant !== null).length;
+  
+  // How many minimized tiles to show at bottom in focus mode
+  const maxMinimizedTiles = isLandscape ? 6 : 4;
 
   // Focus mode layout
   if (focusedIdentity) {
@@ -140,10 +158,15 @@ export const Grid12: React.FC<Grid12Props> = ({
 
     return (
       <View style={styles.container}>
-        {/* Exit focus button */}
-        <TouchableOpacity style={styles.exitFocusButton} onPress={onExitFocus}>
-          <Text style={styles.exitFocusText}>✕</Text>
-        </TouchableOpacity>
+        {/* Top bar - active count + exit button */}
+        <View style={styles.focusTopBar}>
+          <View style={styles.activeCountBadge}>
+            <Text style={styles.activeCountText}>🔴 {activeCount} Live</Text>
+          </View>
+          <TouchableOpacity style={styles.exitFocusButton} onPress={onExitFocus}>
+            <Text style={styles.exitFocusText}>⊞ Grid</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Focused tile (large) */}
         <View style={styles.focusedTileContainer}>
@@ -159,21 +182,41 @@ export const Grid12: React.FC<Grid12Props> = ({
           )}
         </View>
 
-        {/* Other tiles (minimized at bottom) */}
-        <View style={styles.minimizedTilesContainer}>
-          {otherItems.slice(0, 4).map((item) => (
-            <View key={item.id} style={styles.minimizedTileWrapper}>
-              <Tile
-                item={item}
-                isEditMode={false}
-                isFocused={false}
-                isMinimized={true}
-                room={room}
-                onDoubleTap={() => onDoubleTap(item.participant!.identity)}
-              />
-            </View>
-          ))}
-        </View>
+        {/* Other tiles (minimized at bottom) - scrollable if many */}
+        {otherItems.length > 0 && (
+          <View style={[
+            styles.minimizedTilesContainer,
+            isLandscape && styles.minimizedTilesLandscape
+          ]}>
+            {otherItems.slice(0, maxMinimizedTiles).map((item) => (
+              <TouchableOpacity 
+                key={item.id} 
+                style={[
+                  styles.minimizedTileWrapper,
+                  isLandscape && styles.minimizedTileWrapperLandscape
+                ]}
+                onPress={() => onDoubleTap(item.participant!.identity)}
+                activeOpacity={0.8}
+              >
+                <Tile
+                  item={item}
+                  isEditMode={false}
+                  isFocused={false}
+                  isMinimized={true}
+                  room={room}
+                  onDoubleTap={() => onDoubleTap(item.participant!.identity)}
+                />
+              </TouchableOpacity>
+            ))}
+            {otherItems.length > maxMinimizedTiles && (
+              <View style={styles.moreIndicator}>
+                <Text style={styles.moreIndicatorText}>
+                  +{otherItems.length - maxMinimizedTiles}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     );
   }
@@ -181,6 +224,13 @@ export const Grid12: React.FC<Grid12Props> = ({
   // Normal grid layout
   return (
     <View style={styles.container}>
+      {/* Grid info overlay - shows active count */}
+      <View style={styles.gridInfoOverlay}>
+        <Text style={styles.gridInfoText}>
+          🔴 {activeCount}/{TOTAL_TILES} Live
+        </Text>
+      </View>
+      
       {/* Exit edit mode button */}
       {isEditMode && (
         <TouchableOpacity style={styles.exitEditButton} onPress={onExitEditMode}>
@@ -221,7 +271,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
-    padding: 8,
+    padding: 4,
   },
   row: {
     flex: 1,
@@ -245,36 +295,92 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  focusTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  activeCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  activeCountText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   focusedTileContainer: {
     flex: 1,
-    padding: 8,
+    padding: 4,
+    marginTop: 44, // Account for top bar
   },
   minimizedTilesContainer: {
     flexDirection: 'row',
-    height: 100,
-    paddingHorizontal: 8,
+    height: 80,
+    paddingHorizontal: 4,
     paddingBottom: 8,
-    gap: 8,
+    gap: 4,
+  },
+  minimizedTilesLandscape: {
+    height: 70,
   },
   minimizedTileWrapper: {
     flex: 1,
+    maxWidth: 100,
   },
-  exitFocusButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  minimizedTileWrapperLandscape: {
+    maxWidth: 90,
+  },
+  moreIndicator: {
+    width: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    marginLeft: 4,
+  },
+  moreIndicatorText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  exitFocusButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   exitFocusText: {
     color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  // Grid info overlay
+  gridInfoOverlay: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    zIndex: 100,
+  },
+  gridInfoText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
   },
 });
 

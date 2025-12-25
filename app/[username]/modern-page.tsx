@@ -198,8 +198,18 @@ export default function ModernProfilePage() {
         relationship: profileData.relationship,
         isOwnProfile: user?.id === profileData.profile.id
       });
-      
-      setProfileData(profileData);
+
+      const cleanedProfileData = {
+        ...profileData,
+        top_supporters: Array.isArray(profileData?.top_supporters)
+          ? profileData.top_supporters.filter((s: any) => Number(s?.total_gifted ?? 0) > 0)
+          : [],
+        top_streamers: Array.isArray(profileData?.top_streamers)
+          ? profileData.top_streamers.filter((s: any) => Number(s?.diamonds_earned_lifetime ?? 0) > 0)
+          : [],
+      };
+
+      setProfileData(cleanedProfileData);
       setIsOwnProfile(user?.id === profileData.profile.id);
     } catch (error) {
       console.error('Error loading profile:', error);

@@ -29,7 +29,7 @@ export default function GifterBadge({
   };
 
   const defaultColor = badgeColor || '#94A3B8'; // Default gray
-  const defaultName = badgeName || `Level ${level}`;
+  const label = 'Gifter';
 
   return (
     <span
@@ -40,8 +40,8 @@ export default function GifterBadge({
         border: `1px solid ${defaultColor}40`, // 40% opacity
       }}
     >
-      {showLevel && <span className="font-bold">{level}</span>}
-      <span>{defaultName}</span>
+      {showLevel && <span className="font-bold">Lv {level}</span>}
+      <span>{label}</span>
     </span>
   );
 }

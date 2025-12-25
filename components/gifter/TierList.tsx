@@ -9,6 +9,7 @@ import {
   getTierLevelRange,
   getTierCoinRange,
   getTierByKey,
+  formatCoinAmount,
 } from '@/lib/gifter-tiers';
 import GifterBadge from './GifterBadge';
 import TierDetail from './TierDetail';
@@ -29,6 +30,7 @@ export interface TierListProps {
  * - Locked tiers show as "???" if show_locked_tiers is false
  * - Diamond tier shows "1+" instead of "1-50"
  * - Click tier to open TierDetail modal
+ * - Mobile-optimized: stacks coin info below tier name on small screens
  */
 export default function TierList({
   gifterStatus,
@@ -56,6 +58,11 @@ export default function TierList({
   const handleTierClick = (tier: GifterTier) => {
     setSelectedTier(tier);
   };
+  
+  // Mobile-friendly coin display: just show the minimum threshold
+  const getMobileCoinDisplay = (tier: GifterTier): string => {
+    return formatCoinAmount(tier.minLifetimeCoins);
+  };
 
   return (
     <div className={`w-full ${className}`}>
@@ -73,11 +80,17 @@ export default function TierList({
       
       {/* Tier Table */}
       <div className="rounded-xl border border-border overflow-hidden">
-        {/* Table Header */}
-        <div className="grid grid-cols-[1fr_80px_120px] gap-2 px-4 py-3 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {/* Table Header - Desktop */}
+        <div className="hidden sm:grid grid-cols-[1fr_60px_auto] gap-2 px-4 py-3 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           <div>Tier</div>
-          <div className="text-center">Levels</div>
-          <div className="text-right">Coins</div>
+          <div className="text-center">Lvls</div>
+          <div className="text-right pr-1">Coins Required</div>
+        </div>
+        
+        {/* Table Header - Mobile */}
+        <div className="sm:hidden flex justify-between px-4 py-3 bg-muted/50 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          <span>Tier</span>
+          <span>Unlock At</span>
         </div>
         
         {/* Tier Rows */}
@@ -92,16 +105,15 @@ export default function TierList({
               return (
                 <div
                   key={tier.key}
-                  className="grid grid-cols-[1fr_80px_120px] gap-2 px-4 py-3 bg-muted/20"
+                  className="flex items-center justify-between px-4 py-3 bg-muted/20"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-sm">
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-sm">
                       ?
                     </span>
                     <span className="font-medium text-muted-foreground">???</span>
                   </div>
-                  <div className="text-center text-muted-foreground">—</div>
-                  <div className="text-right text-muted-foreground">—</div>
+                  <span className="text-muted-foreground text-sm">—</span>
                 </div>
               );
             }
@@ -111,50 +123,84 @@ export default function TierList({
                 key={tier.key}
                 onClick={() => handleTierClick(tier)}
                 className={`
-                  w-full grid grid-cols-[1fr_80px_120px] gap-2 px-4 py-3
-                  transition-colors text-left
-                  hover:bg-muted/50
+                  w-full px-4 py-3 transition-colors text-left hover:bg-muted/50
                   ${isCurrent ? 'bg-primary/5 border-l-4 border-l-primary' : ''}
                 `}
               >
-                {/* Tier Name & Badge Preview */}
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`
-                      w-8 h-8 rounded-full flex items-center justify-center text-base
-                      ${tier.isDiamond ? 'gifter-badge-diamond' : ''}
-                    `}
-                    style={{
-                      backgroundColor: `${tier.color}20`,
-                      border: `2px solid ${tier.color}50`,
-                      boxShadow: tier.isDiamond ? `0 0 8px ${tier.color}40` : 'none',
-                    }}
-                  >
-                    {tier.icon}
-                  </span>
-                  <div className="flex flex-col">
+                {/* Mobile Layout */}
+                <div className="sm:hidden flex items-center justify-between">
+                  <div className="flex items-center gap-3">
                     <span
-                      className="font-semibold"
-                      style={{ color: isCurrent ? tier.color : 'inherit' }}
+                      className={`
+                        w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0
+                        ${tier.isDiamond ? 'gifter-badge-diamond' : ''}
+                      `}
+                      style={{
+                        backgroundColor: `${tier.color}20`,
+                        border: `2px solid ${tier.color}50`,
+                        boxShadow: tier.isDiamond ? `0 0 8px ${tier.color}40` : 'none',
+                      }}
                     >
-                      {tier.name}
+                      {tier.icon}
                     </span>
-                    {isCurrent && (
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                        Current
+                    <div className="flex flex-col min-w-0">
+                      <span
+                        className="font-semibold text-sm truncate"
+                        style={{ color: isCurrent ? tier.color : 'inherit' }}
+                      >
+                        {tier.name}
                       </span>
-                    )}
+                      <span className="text-[10px] text-muted-foreground">
+                        {isCurrent ? 'Current • ' : ''}{getTierLevelRange(tier)} levels
+                      </span>
+                    </div>
                   </div>
+                  <span className="text-xs text-muted-foreground font-mono flex-shrink-0 ml-2">
+                    {tier.minLifetimeCoins === 0 ? 'Free' : getMobileCoinDisplay(tier)}
+                  </span>
                 </div>
                 
-                {/* Level Range */}
-                <div className="text-center text-sm text-muted-foreground self-center">
-                  {getTierLevelRange(tier)}
-                </div>
-                
-                {/* Coin Range */}
-                <div className="text-right text-sm text-muted-foreground self-center font-mono">
-                  {getTierCoinRange(tier)}
+                {/* Desktop Layout */}
+                <div className="hidden sm:grid grid-cols-[1fr_60px_auto] gap-2 items-center">
+                  {/* Tier Name & Badge Preview */}
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`
+                        w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0
+                        ${tier.isDiamond ? 'gifter-badge-diamond' : ''}
+                      `}
+                      style={{
+                        backgroundColor: `${tier.color}20`,
+                        border: `2px solid ${tier.color}50`,
+                        boxShadow: tier.isDiamond ? `0 0 8px ${tier.color}40` : 'none',
+                      }}
+                    >
+                      {tier.icon}
+                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <span
+                        className="font-semibold truncate"
+                        style={{ color: isCurrent ? tier.color : 'inherit' }}
+                      >
+                        {tier.name}
+                      </span>
+                      {isCurrent && (
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Level Range */}
+                  <div className="text-center text-sm text-muted-foreground">
+                    {getTierLevelRange(tier)}
+                  </div>
+                  
+                  {/* Coin Range */}
+                  <div className="text-right text-xs text-muted-foreground font-mono whitespace-nowrap">
+                    {getTierCoinRange(tier)}
+                  </div>
                 </div>
               </button>
             );

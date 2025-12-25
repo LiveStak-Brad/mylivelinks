@@ -2,6 +2,7 @@
  * TierList - React Native version
  * 
  * Vertical list showing all gifter tiers with level ranges and coin requirements
+ * Mobile-optimized: Shows tier name + unlock threshold, tap for details
  */
 
 import React, { useMemo, useState } from 'react';
@@ -12,6 +13,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import {
   GIFTER_TIERS,
@@ -19,8 +21,8 @@ import {
   GifterTier,
   getVisibleTiers,
   getTierLevelRange,
-  getTierCoinRange,
   getTierByKey,
+  formatCoinAmount,
 } from './gifterTiers';
 import GifterBadge from './GifterBadge';
 import TierDetail from './TierDetail';
@@ -31,6 +33,8 @@ export interface TierListProps {
 
 const TierList: React.FC<TierListProps> = ({ gifterStatus }) => {
   const [selectedTier, setSelectedTier] = useState<GifterTier | null>(null);
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 380;
 
   const visibleTiers = useMemo(
     () => getVisibleTiers(gifterStatus.tier_key, gifterStatus.show_locked_tiers),
@@ -46,6 +50,12 @@ const TierList: React.FC<TierListProps> = ({ gifterStatus }) => {
     if (gifterStatus.show_locked_tiers) return false;
     if (!currentTier) return true;
     return tier.order > currentTier.order + 1;
+  };
+  
+  // Mobile-friendly: just show unlock threshold
+  const getUnlockDisplay = (tier: GifterTier): string => {
+    if (tier.minLifetimeCoins === 0) return 'Free';
+    return formatCoinAmount(tier.minLifetimeCoins);
   };
 
   return (
@@ -64,13 +74,12 @@ const TierList: React.FC<TierListProps> = ({ gifterStatus }) => {
 
       {/* Table Header */}
       <View style={styles.tableHeader}>
-        <Text style={[styles.headerCell, styles.tierColumn]}>Tier</Text>
-        <Text style={[styles.headerCell, styles.levelsColumn]}>Levels</Text>
-        <Text style={[styles.headerCell, styles.coinsColumn]}>Coins</Text>
+        <Text style={[styles.headerCell, { flex: 1 }]}>Tier</Text>
+        <Text style={styles.headerCell}>Unlock At</Text>
       </View>
 
       {/* Tier Rows */}
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {GIFTER_TIERS.map((tier) => {
           const locked = isLocked(tier);
           const isCurrent = tier.key === gifterStatus.tier_key;
@@ -80,14 +89,13 @@ const TierList: React.FC<TierListProps> = ({ gifterStatus }) => {
           if (!isVisible && locked) {
             return (
               <View key={tier.key} style={styles.lockedRow}>
-                <View style={styles.tierColumn}>
+                <View style={styles.tierInfo}>
                   <View style={styles.lockedIcon}>
                     <Text style={styles.lockedIconText}>?</Text>
                   </View>
                   <Text style={styles.lockedText}>???</Text>
                 </View>
-                <Text style={[styles.cellText, styles.levelsColumn]}>—</Text>
-                <Text style={[styles.cellText, styles.coinsColumn]}>—</Text>
+                <Text style={styles.unlockText}>—</Text>
               </View>
             );
           }
@@ -103,7 +111,7 @@ const TierList: React.FC<TierListProps> = ({ gifterStatus }) => {
               {isCurrent && <View style={[styles.currentIndicator, { backgroundColor: tier.color }]} />}
 
               {/* Tier Name & Icon */}
-              <View style={[styles.tierColumn, styles.tierInfo]}>
+              <View style={styles.tierInfo}>
                 <View
                   style={[
                     styles.tierIcon,
@@ -113,31 +121,30 @@ const TierList: React.FC<TierListProps> = ({ gifterStatus }) => {
                     },
                   ]}
                 >
-                  <Text style={styles.tierIconText}>{tier.icon}</Text>
+                  <Text style={[styles.tierIconText, isNarrow && { fontSize: 14 }]}>
+                    {tier.icon}
+                  </Text>
                 </View>
-                <View>
+                <View style={styles.tierTextContainer}>
                   <Text
                     style={[
                       styles.tierName,
                       isCurrent && { color: tier.color },
+                      isNarrow && { fontSize: 13 },
                     ]}
+                    numberOfLines={1}
                   >
                     {tier.name}
                   </Text>
-                  {isCurrent && (
-                    <Text style={styles.currentLabel}>Current</Text>
-                  )}
+                  <Text style={styles.tierMeta}>
+                    {isCurrent ? 'Current • ' : ''}{getTierLevelRange(tier)} levels
+                  </Text>
                 </View>
               </View>
 
-              {/* Levels */}
-              <Text style={[styles.cellText, styles.levelsColumn]}>
-                {getTierLevelRange(tier)}
-              </Text>
-
-              {/* Coins */}
-              <Text style={[styles.cellText, styles.coinsColumn, styles.monoText]}>
-                {getTierCoinRange(tier)}
+              {/* Unlock threshold */}
+              <Text style={[styles.unlockText, styles.monoText]}>
+                {getUnlockDisplay(tier)}
               </Text>
             </TouchableOpacity>
           );
@@ -147,7 +154,7 @@ const TierList: React.FC<TierListProps> = ({ gifterStatus }) => {
       {/* Legend */}
       <View style={styles.legend}>
         <Text style={styles.legendText}>
-          💡 Spend coins to level up and unlock higher tiers!
+          💡 Tap any tier for details • Gift coins to level up!
         </Text>
       </View>
 
@@ -189,8 +196,10 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
@@ -202,28 +211,15 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  tierColumn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  levelsColumn: {
-    width: 60,
-    textAlign: 'center',
-  },
-  coinsColumn: {
-    width: 90,
-    textAlign: 'right',
-  },
   scrollView: {
     flex: 1,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
@@ -240,61 +236,69 @@ const styles = StyleSheet.create({
   lockedRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     backgroundColor: 'rgba(255,255,255,0.02)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   lockedIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   lockedIconText: {
     color: 'rgba(255,255,255,0.3)',
-    fontSize: 14,
+    fontSize: 12,
   },
   lockedText: {
     color: 'rgba(255,255,255,0.3)',
     fontWeight: '500',
+    fontSize: 14,
   },
   tierInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   tierIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tierIconText: {
-    fontSize: 16,
+    fontSize: 14,
+  },
+  tierTextContainer: {
+    flex: 1,
+    minWidth: 0,
   },
   tierName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
   },
-  currentLabel: {
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.5)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop: 2,
+  tierMeta: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 1,
   },
-  cellText: {
-    fontSize: 13,
+  unlockText: {
+    fontSize: 12,
     color: 'rgba(255,255,255,0.6)',
+    marginLeft: 8,
   },
   monoText: {
     fontFamily: 'monospace',
-    fontSize: 12,
   },
   legend: {
     paddingHorizontal: 16,
@@ -303,8 +307,9 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.06)',
   },
   legendText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'center',
   },
 });
 

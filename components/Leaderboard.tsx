@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase';
-import GifterBadge from './GifterBadge';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
+import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 
 interface LeaderboardEntry {
   profile_id: string;
@@ -23,7 +25,7 @@ export default function Leaderboard() {
   const [period, setPeriod] = useState<Period>('daily');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [badgeInfo, setBadgeInfo] = useState<Record<number, any>>({});
+  const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatus>>({});
 
   const supabase = createClient();
 
@@ -125,45 +127,24 @@ export default function Leaderboard() {
         .limit(100);
 
       if (!cacheError && cacheData && cacheData.length > 0) {
-        // Batch load all unique gifter levels at once (much faster than N queries)
-        const uniqueLevels = [...new Set(
-          cacheData
-            .map((item: any) => item.profiles?.gifter_level)
-            .filter((l: any) => l !== null && l > 0)
-        )];
-        const badgeMap: Record<number, any> = {};
-        
-        if (uniqueLevels.length > 0) {
-          const { data: badges } = await supabase
-            .from('gifter_levels')
-            .select('*')
-            .in('level', uniqueLevels);
-          
-          if (badges) {
-            badges.forEach((badge: any) => {
-              badgeMap[badge.level] = badge;
-            });
-          }
-        }
-
         // Map entries with badge info from cache
         const entriesWithProfiles = cacheData.map((item: any) => {
           const profile: any = item.profiles;
-          const badgeInfo = profile.gifter_level ? badgeMap[profile.gifter_level] : null;
 
           return {
             profile_id: profile.id,
             username: profile.username,
             avatar_url: profile.avatar_url,
             gifter_level: profile.gifter_level || 0,
-            badge_name: badgeInfo?.badge_name,
-            badge_color: badgeInfo?.badge_color,
             metric_value: item.metric_value,
             rank: item.rank,
           };
-        });
+        }).filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
 
         setEntries(entriesWithProfiles);
+
+        const statusMap = await fetchGifterStatuses(entriesWithProfiles.map((e: any) => e.profile_id));
+        setGifterStatusMap(statusMap);
       } else {
         // Fallback: compute live from source tables
         await computeLiveLeaderboard();
@@ -189,6 +170,7 @@ export default function Leaderboard() {
           .from('profiles')
           .select('id, username, avatar_url, gifter_level, total_gifts_received')
           .not('total_gifts_received', 'is', null)
+          .gt('total_gifts_received', 0)
           .order('total_gifts_received', { ascending: false })
           .limit(100);
         data = result.data || [];
@@ -200,6 +182,7 @@ export default function Leaderboard() {
           .from('profiles')
           .select('id, username, avatar_url, gifter_level, total_spent')
           .not('total_spent', 'is', null)
+          .gt('total_spent', 0)
           .order('total_spent', { ascending: false })
           .limit(100);
         data = result.data || [];
@@ -209,41 +192,22 @@ export default function Leaderboard() {
       if (error) throw error;
 
       // Batch load all unique gifter levels at once (much faster than N queries)
-      const uniqueLevels = [...new Set(
-        data.map((profile: any) => profile.gifter_level).filter((l: any) => l !== null && l > 0)
-      )];
-      const badgeMap: Record<number, any> = {};
-      
-      if (uniqueLevels.length > 0) {
-        const { data: badges } = await supabase
-          .from('gifter_levels')
-          .select('*')
-          .in('level', uniqueLevels);
-        
-        if (badges) {
-          badges.forEach((badge: any) => {
-            badgeMap[badge.level] = badge;
-          });
-        }
-      }
-
       // Map entries with badge info from cache
       const entriesWithBadges = data.map((profile: any, index: number) => {
-        const badgeInfo = profile.gifter_level ? badgeMap[profile.gifter_level] : null;
-
         return {
           profile_id: profile.id,
           username: profile.username,
           avatar_url: profile.avatar_url,
           gifter_level: profile.gifter_level || 0,
-          badge_name: badgeInfo?.badge_name,
-          badge_color: badgeInfo?.badge_color,
           metric_value: type === 'top_streamers' ? profile.total_gifts_received : profile.total_spent,
           rank: index + 1,
         };
-      });
+      }).filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
 
       setEntries(entriesWithBadges);
+
+      const statusMap = await fetchGifterStatuses(entriesWithBadges.map((e: any) => e.profile_id));
+      setGifterStatusMap(statusMap);
     } catch (error) {
       console.error('Error computing live leaderboard:', error);
     }
@@ -355,23 +319,23 @@ export default function Leaderboard() {
                     {(entry.username?.[0] ?? '?').toUpperCase()}
                   </div>
                 )}
-                {/* Gifter Badge Overlay - Top Right */}
-                {entry.gifter_level > 0 && (
-                  <div
-                    className="absolute -top-0.5 -right-0.5 rounded-full px-1 py-0.5 text-[8px] font-bold text-white shadow-sm border border-white dark:border-gray-800"
-                    style={{
-                      backgroundColor: entry.badge_color || '#94A3B8',
-                    }}
-                  >
-                    {entry.gifter_level}
-                  </div>
-                )}
               </div>
 
               {/* User Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="font-medium text-sm truncate">{entry.username}</span>
+                  {(() => {
+                    const status = gifterStatusMap[entry.profile_id];
+                    if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
+                    return (
+                      <TierBadge
+                        tier_key={status.tier_key}
+                        level={status.level_in_tier}
+                        size="sm"
+                      />
+                    );
+                  })()}
                 </div>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400">
                   {type === 'top_streamers' ? 'Diamonds earned' : 'Coins spent'}

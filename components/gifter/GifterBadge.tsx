@@ -3,6 +3,8 @@
 import { useMemo } from 'react';
 import { GIFTER_TIERS, getTierByKey } from '@/lib/gifter-tiers';
 
+const MAX_TIER_ORDER = GIFTER_TIERS.reduce((max, t) => Math.max(max, t.order), 1);
+
 export interface GifterBadgeProps {
   /** Tier key (e.g., 'starter', 'elite', 'diamond') */
   tier_key: string;
@@ -47,8 +49,8 @@ export default function GifterBadge({
 
   const isDiamond = tier.isDiamond;
   
-  // Size-based scaling: higher tiers get slightly larger badges
-  const tierScale = 1 + (tier.order - 1) * 0.02; // 1.0 to 1.18
+  const t = (tier.order - 1) / Math.max(1, MAX_TIER_ORDER - 1);
+  const tierScale = Math.min(1.4, 1 + 0.12 * t + 0.23 * t * t);
   
   const sizeClasses = {
     sm: 'text-[10px] px-1.5 py-0.5 gap-0.5',
@@ -108,6 +110,9 @@ export function GifterBadgeCompact({
   
   if (!tier) return null;
 
+  const t = (tier.order - 1) / Math.max(1, MAX_TIER_ORDER - 1);
+  const tierScale = Math.min(1.4, 1 + 0.12 * t + 0.23 * t * t);
+
   return (
     <span
       className={`
@@ -121,6 +126,8 @@ export function GifterBadgeCompact({
         boxShadow: tier.isDiamond 
           ? `0 0 6px ${tier.color}50` 
           : 'none',
+        transform: `scale(${tierScale})`,
+        transformOrigin: 'center',
       }}
       title={tier.name}
     >

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const admin = getSupabaseAdmin();
     let query = admin
       .from('live_streams')
-      .select('id, profile_id, live_available, is_published, started_at, ended_at, published_at, unpublished_at, profile:profiles(username, display_name, avatar_url)')
+      .select('id, profile_id, live_available, started_at, ended_at, published_at, unpublished_at, profile:profiles(username, display_name, avatar_url)')
       .order('started_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
