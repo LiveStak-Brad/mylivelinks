@@ -60,13 +60,21 @@ export default function CoinPurchaseSection() {
 
         // Load packs from API (single source of truth)
         const response = await fetch('/api/coins/packs');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.packs && Array.isArray(data.packs)) {
-            setPacks(data.packs);
-          }
-        } else {
-          setError('Failed to load coin packs');
+        const data = await response
+          .json()
+          .catch(() => ({} as any));
+
+        if (!response.ok) {
+          const msg =
+            data?.message ||
+            data?.error ||
+            `Failed to load coin packs (HTTP ${response.status})`;
+          setError(msg);
+          return;
+        }
+
+        if (data.packs && Array.isArray(data.packs)) {
+          setPacks(data.packs);
         }
       } catch (err) {
         console.error('Failed to load data:', err);

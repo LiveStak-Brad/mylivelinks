@@ -25,17 +25,72 @@ export async function GET(request: NextRequest) {
     const adminSupabase = getSupabaseAdmin();
     
     // Query all active *Stripe-backed* coin packs (must have a Stripe price_id to be purchasable)
-    const { data: packs, error } = await adminSupabase
-      .from('coin_packs')
-      .select('*')
-      .or('active.eq.true,is_active.eq.true')
-      .not('stripe_price_id', 'is', null)
-      .neq('stripe_price_id', '')
-      .order('display_order', { ascending: true });
+    // Be robust to schema variants across environments.
+    let packs: any[] | null = null;
+    let queryError: any = null;
 
-    if (error) {
-      console.error('[API] coin_packs query error:', error);
-      return NextResponse.json({ packs: [], error: 'Database query failed' }, { status: 500 });
+    const baseQuery = () =>
+      adminSupabase
+        .from('coin_packs')
+        .select('*')
+        .not('stripe_price_id', 'is', null)
+        .neq('stripe_price_id', '');
+
+    const tryQuery = async (mode: 'active' | 'is_active', withOrder: boolean) => {
+      let q = baseQuery().eq(mode, true);
+      if (withOrder) {
+        q = q.order('display_order', { ascending: true });
+      }
+      return q;
+    };
+
+    // Preferred: active + display_order
+    {
+      const { data, error } = await tryQuery('active', true);
+      if (!error) packs = data;
+      else queryError = error;
+    }
+
+    // Fallback: active without display_order
+    if (!packs && queryError) {
+      const { data, error } = await tryQuery('active', false);
+      if (!error) {
+        packs = data;
+        queryError = null;
+      }
+    }
+
+    // Fallback: is_active + display_order
+    if (!packs && queryError) {
+      const { data, error } = await tryQuery('is_active', true);
+      if (!error) {
+        packs = data;
+        queryError = null;
+      }
+    }
+
+    // Fallback: is_active without display_order
+    if (!packs && queryError) {
+      const { data, error } = await tryQuery('is_active', false);
+      if (!error) {
+        packs = data;
+        queryError = null;
+      }
+    }
+
+    if (queryError) {
+      console.error('[API] coin_packs query error:', queryError);
+      return NextResponse.json(
+        {
+          packs: [],
+          error: 'Database query failed',
+          message: queryError?.message,
+          code: queryError?.code,
+          details: queryError?.details,
+          hint: queryError?.hint,
+        },
+        { status: 500 }
+      );
     }
 
     if (!packs || packs.length === 0) {
@@ -66,8 +121,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ packs: normalized });
   } catch (error) {
     console.error('[API] get-packs error:', error);
+    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { packs: [], error: 'Failed to fetch coin packs' },
+      { packs: [], error: 'Failed to fetch coin packs', message },
       { status: 500 }
     );
   }
