@@ -25,8 +25,8 @@ export async function generateMetadata({ params }: { params: { username: string 
     const avatarUrl = profile.avatar_url || '';
     const profileUrl = `https://www.mylivelinks.com/${profile.username}`;
     
-    // Generate dynamic OG image URL
-    const ogImageUrl = `https://www.mylivelinks.com/api/og?username=${encodeURIComponent(profile.username)}&displayName=${encodeURIComponent(displayName)}&bio=${encodeURIComponent(bio.substring(0, 120))}&avatarUrl=${encodeURIComponent(avatarUrl)}`;
+    // Use avatar as OG image if available, otherwise use default MyLiveLinks card
+    const ogImageUrl = avatarUrl || 'https://www.mylivelinks.com/og-default.png';
     
     return {
       title: `${displayName} (@${profile.username}) | MyLiveLinks`,
