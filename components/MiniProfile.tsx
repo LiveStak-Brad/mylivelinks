@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
+import { useIM } from '@/components/im';
 import Image from 'next/image';
 
 interface MiniProfileProps {
@@ -42,6 +43,7 @@ export default function MiniProfile({
 }: MiniProfileProps) {
   const router = useRouter();
   const supabase = createClient();
+  const { openChat } = useIM();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
@@ -131,8 +133,7 @@ export default function MiniProfile({
   };
 
   const handleIM = () => {
-    // TODO: Implement instant messaging
-    alert('Instant messaging coming soon!');
+    openChat(profileId, username, avatarUrl || undefined);
     onClose();
   };
 

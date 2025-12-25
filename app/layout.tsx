@@ -5,6 +5,7 @@ import ClientThemeProvider from '@/components/ClientThemeProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AgeVerificationModal from '@/components/AgeVerificationModal';
 import GlobalHeader from '@/components/GlobalHeader';
+import { IMProvider } from '@/components/im';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -28,6 +29,7 @@ export default function RootLayout({
           <ClientThemeProvider>
             <GlobalHeader />
             <AgeVerificationModal />
+            <IMProvider />
             {children}
           </ClientThemeProvider>
         </ErrorBoundary>

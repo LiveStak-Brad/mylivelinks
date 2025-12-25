@@ -40,6 +40,8 @@ export default function Chat() {
     isLive?: boolean;
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const shouldAutoScrollRef = useRef(true);
   // CRITICAL: Memoize Supabase client to prevent recreation on every render
   const supabase = useMemo(() => createClient(), []);
   // CRITICAL: Track subscription to prevent duplicates
@@ -71,6 +73,17 @@ export default function Chat() {
       }
     });
   }, [supabase]);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  const updateAutoScrollFlag = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    shouldAutoScrollRef.current = distanceFromBottom < 80;
+  }, []);
 
   // CRITICAL: Use useCallback to prevent stale closures and ensure stable reference
   const loadMessages = useCallback(async () => {
@@ -121,9 +134,8 @@ export default function Chat() {
         };
       });
 
-      setMessages(messagesWithBadges.sort((a: any, b: any) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      ));
+      const ordered = [...messagesWithBadges].reverse();
+      setMessages(ordered);
 
       const profileIds = Array.from(
         new Set<string>(
@@ -134,6 +146,10 @@ export default function Chat() {
       );
       const statusMap = await fetchGifterStatuses(profileIds);
       setGifterStatusMap(statusMap);
+
+      if (isInitialLoad) {
+        requestAnimationFrame(() => scrollToBottom('auto'));
+      }
     } catch (error) {
       console.error('Error loading messages:', error);
       // Fallback to regular query if RPC fails
@@ -181,11 +197,15 @@ export default function Chat() {
         );
         const statusMap = await fetchGifterStatuses(profileIds);
         setGifterStatusMap(statusMap);
+
+        if (isInitialLoad) {
+          requestAnimationFrame(() => scrollToBottom('auto'));
+        }
       }
     } finally {
       setLoading(false);
     }
-  }, [supabase]); // Only depend on supabase - use functional updates for messages
+  }, [supabase, scrollToBottom]); // Only depend on stable references
 
   // CRITICAL: Use useCallback to prevent stale closures
   const loadMessageWithProfile = useCallback(async (message: any) => {
@@ -200,33 +220,13 @@ export default function Chat() {
           message_type: message.message_type,
           content: message.content,
           created_at: message.created_at,
-        }].sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
+        }];
       });
-      setTimeout(() => scrollToBottom(), 50);
+      if (shouldAutoScrollRef.current) {
+        requestAnimationFrame(() => scrollToBottom('smooth'));
+      }
       return;
     }
-
-    setMessages((prev) => {
-      // Check if message already exists (prevent duplicates)
-      if (prev.some(m => m.id === message.id)) return prev;
-      
-      // Check if this is replacing an optimistic message (same profile_id + content + recent)
-      const optimisticMatch = prev.find((m: any) =>
-        typeof m.id === 'string' &&
-        m.id.startsWith('temp-') &&
-        m.profile_id === message.profile_id &&
-        m.content === message.content &&
-        Math.abs(new Date(m.created_at).getTime() - new Date(message.created_at).getTime()) < 5000 // Within 5 seconds
-      );
-      
-      // Remove optimistic message if found
-      const filtered = optimisticMatch ? prev.filter(m => m.id !== optimisticMatch.id) : prev;
-      
-      // Will add real message after profile loads
-      return filtered;
-    });
 
     // Load profile (non-blocking)
     Promise.all([
@@ -255,16 +255,28 @@ export default function Chat() {
       }
       
       setMessages((prev) => {
-        // Check if already exists
         if (prev.some(m => m.id === newMsg.id)) return prev;
-        // Add and sort
-        const updated = [...prev, newMsg];
-        return updated.sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+
+        const optimisticIndex = prev.findIndex((m: any) =>
+          typeof m.id === 'string' &&
+          m.id.startsWith('temp-') &&
+          m.profile_id === newMsg.profile_id &&
+          m.content === newMsg.content &&
+          Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 8000
         );
+
+        if (optimisticIndex >= 0) {
+          const next = [...prev];
+          next[optimisticIndex] = newMsg;
+          return next;
+        }
+
+        return [...prev, newMsg];
       });
-      
-      setTimeout(() => scrollToBottom(), 50);
+
+      if (shouldAutoScrollRef.current) {
+        requestAnimationFrame(() => scrollToBottom('smooth'));
+      }
     }).catch((error) => {
       console.error('Error loading message profile:', error);
       // Add message without profile data if query fails
@@ -281,12 +293,10 @@ export default function Chat() {
           message_type: message.message_type,
           content: message.content,
           created_at: message.created_at,
-        }].sort((a, b) => 
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        );
+        }];
       });
     });
-  }, [supabase]); // Only depend on supabase
+  }, [supabase, scrollToBottom]); // Only depend on stable references
 
   // CRITICAL: Store loadMessageWithProfile in ref to avoid stale closures in subscription
   const loadMessageWithProfileRef = useRef(loadMessageWithProfile);
@@ -347,10 +357,6 @@ export default function Chat() {
     loadMessages();
   }, [currentUserId, loadMessages]); // Include loadMessages in deps since it's memoized
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -390,14 +396,12 @@ export default function Chat() {
     
     // Add optimistic message immediately (synchronous)
     setMessages((prev) => {
-      const updated = [...prev, optimisticMsg];
-      return updated.sort((a: ChatMessage, b: ChatMessage) => 
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
+      return [...prev, optimisticMsg];
     });
-    
-    // Scroll immediately
-    setTimeout(() => scrollToBottom(), 50);
+
+    // Always auto-scroll when YOU send a message
+    shouldAutoScrollRef.current = true;
+    requestAnimationFrame(() => scrollToBottom('smooth'));
 
     // Ensure profile exists before sending message
     // This prevents foreign key constraint violations
@@ -463,10 +467,6 @@ export default function Chat() {
       });
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -480,7 +480,11 @@ export default function Chat() {
       </div>
 
       {/* Messages - Flexible height with scroll */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar">
+      <div
+        ref={messagesContainerRef}
+        onScroll={updateAutoScrollFlag}
+        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar"
+      >
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
