@@ -2869,7 +2869,9 @@ export default function LiveRoom() {
                         onReplace={() => setSelectedSlotForReplacement(slot.slotIndex)}
                         />
                           );
-                        })()
+                        })()}
+                      </div>
+                          );
                         } catch (error) {
                           console.error('[GRID RENDER] Error rendering slot:', error, { slot, index, finalSlots });
                           return (
