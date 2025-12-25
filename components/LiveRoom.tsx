@@ -2807,10 +2807,19 @@ export default function LiveRoom() {
                           
                           // Parse liveStreamId safely
                           let liveStreamId: number | undefined = undefined;
-                          if (streamer.id && streamer.live_available) {
+                          if (streamer.id != null && streamer.live_available) {
                             try {
-                              // Handle array case
-                              const idValue = Array.isArray(streamer.id) ? streamer.id[0] : streamer.id;
+                              // CRITICAL: Safely extract id value - handle null, arrays, and other types
+                              let idValue: any = null;
+                              if (Array.isArray(streamer.id)) {
+                                // Only access [0] if array has elements
+                                if (streamer.id.length > 0 && streamer.id[0] != null) {
+                                  idValue = streamer.id[0];
+                                }
+                              } else if (streamer.id != null) {
+                                idValue = streamer.id;
+                              }
+                              
                               if (idValue != null) {
                                 const idStr = String(idValue);
                                 // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
