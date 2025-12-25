@@ -131,7 +131,7 @@ export default function Chat() {
         return {
           id: msg.id,
           profile_id: msg.profile_id,
-          username: profile?.username,
+          username: profile?.username || 'Unknown',
           avatar_url: profile?.avatar_url,
           gifter_level: profile?.gifter_level || 0,
           badge_name: badgeInfo?.badge_name,
@@ -190,7 +190,7 @@ export default function Chat() {
           return {
             id: msg.id,
             profile_id: msg.profile_id,
-            username: profile?.username,
+            username: profile?.username || 'Unknown',
             avatar_url: profile?.avatar_url,
             gifter_level: profile?.gifter_level || 0,
             badge_name: badgeInfo?.badge_name,

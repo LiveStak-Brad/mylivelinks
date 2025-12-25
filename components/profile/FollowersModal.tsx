@@ -128,7 +128,7 @@ export default function FollowersModal({
                       </div>
                     ) : (
                       <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
-                        {user.username[0].toUpperCase()}
+                        {(user.username?.[0] ?? '?').toUpperCase()}
                       </div>
                     )}
                     {user.is_live && (

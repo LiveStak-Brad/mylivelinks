@@ -300,7 +300,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                 ) : (
                   // Default avatar if no image
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {viewer.username[0].toUpperCase()}
+                    {(viewer.username?.[0] ?? '?').toUpperCase()}
                   </div>
                 )}
 

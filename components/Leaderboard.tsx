@@ -352,7 +352,7 @@ export default function Leaderboard() {
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-gray-200 dark:border-gray-700">
-                    {entry.username[0].toUpperCase()}
+                    {(entry.username?.[0] ?? '?').toUpperCase()}
                   </div>
                 )}
                 {/* Gifter Badge Overlay - Top Right */}

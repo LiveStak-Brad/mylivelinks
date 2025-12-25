@@ -128,7 +128,7 @@ export default function ShareProfileModal({
                 />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-lg font-bold">
-                  {(displayName || username).charAt(0).toUpperCase()}
+                  {((displayName || username)?.charAt(0) ?? '?').toUpperCase()}
                 </div>
               )}
               <div className="flex-1 min-w-0">

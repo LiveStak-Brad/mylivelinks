@@ -79,7 +79,7 @@ export default function TopSupportersWidget({
                     className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
                     style={{ backgroundColor: accentColor }}
                   >
-                    {supporter.username[0].toUpperCase()}
+                    {(supporter.username?.[0] ?? '?').toUpperCase()}
                   </div>
                 )}
               </div>

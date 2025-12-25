@@ -183,7 +183,7 @@ export default function MiniProfile({
               </div>
             ) : (
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-                {username[0].toUpperCase()}
+                {(username?.[0] ?? '?').toUpperCase()}
               </div>
             )}
 

@@ -84,7 +84,7 @@ export default function TopStreamersWidget({
                     className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
                     style={{ backgroundColor: accentColor }}
                   >
-                    {streamer.username[0].toUpperCase()}
+                    {(streamer.username?.[0] ?? '?').toUpperCase()}
                   </div>
                 )}
                 {streamer.is_live && (

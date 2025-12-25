@@ -832,7 +832,7 @@ export default function Tile({
               />
             ) : (
               <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                <span className="text-gray-500 text-4xl font-bold">{streamerUsername.charAt(0).toUpperCase()}</span>
+                <span className="text-gray-500 text-4xl font-bold">{(streamerUsername?.charAt(0) ?? '?').toUpperCase()}</span>
               </div>
             )}
           </div>

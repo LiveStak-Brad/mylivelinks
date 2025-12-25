@@ -185,7 +185,7 @@ export default function UserConnectionsList({
               ) : (
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                   <span className="text-white font-bold text-lg">
-                    {user.username.charAt(0).toUpperCase()}
+                    {(user.username?.charAt(0) ?? '?').toUpperCase()}
                   </span>
                 </div>
               )}

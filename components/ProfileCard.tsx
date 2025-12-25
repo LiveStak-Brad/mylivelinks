@@ -118,7 +118,7 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
           ) : (
             <div className="w-28 h-28 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center border-4 border-white shadow-xl">
               <span className="text-4xl font-bold text-purple-600 dark:text-purple-400">
-                {displayName.charAt(0).toUpperCase()}
+                {(displayName?.charAt(0) ?? '?').toUpperCase()}
               </span>
             </div>
           )}
@@ -196,7 +196,7 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
             ) : (
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                 <span className="text-2xl font-bold text-white">
-                  {displayName.charAt(0).toUpperCase()}
+                  {(displayName?.charAt(0) ?? '?').toUpperCase()}
                 </span>
               </div>
             )}
