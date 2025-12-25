@@ -26,7 +26,6 @@ interface LiveStreamer {
   profile_id: string;
   username: string;
   avatar_url?: string;
-  is_published: boolean;
   live_available: boolean;
   viewer_count: number;
   gifter_level: number;
@@ -716,7 +715,6 @@ export default function LiveRoom() {
           console.log('[DEBUG] User is live, ensuring in slot 1:', {
             currentUserId,
             liveStreamId: userLiveStream.id,
-            is_published: userLiveStream.is_published,
             live_available: userLiveStream.live_available,
           });
           
@@ -769,7 +767,6 @@ export default function LiveRoom() {
                   profile_id: currentUserId,
                   username: userProfile.username,
                   avatar_url: userProfile.avatar_url,
-                  is_published: userLiveStream.is_published,
                   live_available: userLiveStream.live_available,
                   viewer_count: 0,
                   gifter_level: badgeInfo?.level || 0,
@@ -871,8 +868,8 @@ export default function LiveRoom() {
                 }
                 
                 if (currentStreamers.length === streamers.length) {
-                  const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
-                  const newIds = streamers.map(s => `${s.profile_id}:${s.is_published}:${s.viewer_count}`).join(',');
+                  const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.live_available}:${s.viewer_count}`).join(',');
+                  const newIds = streamers.map(s => `${s.profile_id}:${s.live_available}:${s.viewer_count}`).join(',');
                   if (prevIds === newIds) {
                     return currentStreamers; // No change, prevent re-render
                   }
@@ -885,7 +882,7 @@ export default function LiveRoom() {
                   console.log('[GRID] liveStreamers updated (realtime)', {
                     oldCount: currentStreamers.length,
                     newCount: streamers.length,
-                    newStreamers: streamers.map(s => ({ username: s.username, profile_id: s.profile_id, is_published: s.is_published })),
+                    newStreamers: streamers.map(s => ({ username: s.username, profile_id: s.profile_id })),
                   });
                 }
                 
@@ -1087,7 +1084,6 @@ export default function LiveRoom() {
                 username: profile.username,
                 avatar_url: profile.avatar_url,
                 live_stream_id: stream.id,
-                is_published: stream.is_published,
                 viewer_count: count || 0,
               };
             })
@@ -1147,7 +1143,6 @@ export default function LiveRoom() {
           profile_id: stream.streamer_id,
           username: stream.username,
           avatar_url: stream.avatar_url,
-          is_published: true, // If in RPC result, they're live
           live_available: true, // RPC only returns live_available = true
           viewer_count: stream.viewer_count || 0,
           gifter_level: badgeInfo?.level || 0,
@@ -1222,7 +1217,6 @@ export default function LiveRoom() {
                     profile_id: stream.profile_id,
                     username: profile.username,
                     avatar_url: profile.avatar_url,
-                    is_published: true, // If they're in waiting list, assume publishing
                     live_available: true,
                     viewer_count: viewerCount,
                     gifter_level: badgeInfo?.level || 0,
@@ -1235,10 +1229,10 @@ export default function LiveRoom() {
           }
         }
 
-        // Always include the current user's own stream if they're live, even if not published yet
+        // Always include the current user's own stream if they're live
         const { data: ownLiveStream } = await supabase
           .from('live_streams')
-          .select('id, profile_id, is_published, live_available')
+          .select('id, profile_id, live_available')
           .eq('profile_id', user.id)
           .eq('live_available', true)
           .single();
@@ -1283,7 +1277,6 @@ export default function LiveRoom() {
                 profile_id: user.id,
                 username: ownProfile.username,
                 avatar_url: ownProfile.avatar_url,
-                is_published: ownLiveStream.is_published,
                 live_available: true,
                 viewer_count: ownViewerCount,
                 gifter_level: badgeInfo?.level || 0,
@@ -1334,10 +1327,10 @@ export default function LiveRoom() {
           }
           
           // ENHANCED: Deep comparison - check if data actually changed
-          // Compare by profile_id, is_published, live_available, and viewer_count
+          // Compare by profile_id, live_available, and viewer_count
           if (currentStreamers.length === streamersWithBadges.length) {
-            const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.is_published}:${s.live_available}:${s.viewer_count}`).join(',');
-            const newIds = streamersWithBadges.map(s => `${s.profile_id}:${s.is_published}:${s.live_available}:${s.viewer_count}`).join(',');
+            const prevIds = currentStreamers.map(s => `${s.profile_id}:${s.live_available}:${s.viewer_count}`).join(',');
+            const newIds = streamersWithBadges.map(s => `${s.profile_id}:${s.live_available}:${s.viewer_count}`).join(',');
             if (prevIds === newIds) {
               // Data hasn't changed, return previous array reference to prevent re-render
               // This is CRITICAL - prevents tile subscription effects from rerunning
@@ -1360,7 +1353,6 @@ export default function LiveRoom() {
                 const newS = streamersWithBadges[i];
                 if (!newS) return { profile_id: s.profile_id, change: 'removed' };
                 const changes: string[] = [];
-                if (s.is_published !== newS.is_published) changes.push('is_published');
                 if (s.viewer_count !== newS.viewer_count) changes.push('viewer_count');
                 if (s.live_available !== newS.live_available) changes.push('live_available');
                 return { profile_id: s.profile_id, changes };
@@ -1498,7 +1490,6 @@ export default function LiveRoom() {
               profile_id: user.id,
               username: userProfile.username,
               avatar_url: userProfile.avatar_url,
-              is_published: userLiveStream.is_published,
               live_available: userLiveStream.live_available,
               viewer_count: 0,
               gifter_level: badgeInfo?.level || 0,
@@ -1565,9 +1556,8 @@ export default function LiveRoom() {
           const usedStreamerIds = new Set(sortedSlots.filter(s => s.streamer).map(s => s.streamer!.profile_id));
           const unusedStreamers = availableStreamers.filter(s => !usedStreamerIds.has(s.profile_id));
           
-          // Fill empty slots with available streamers (prioritize published, then live_available)
+          // Fill empty slots with available streamers (prioritize live_available, then viewer count)
           const sortedStreamers = unusedStreamers.sort((a, b) => {
-            if (a.is_published !== b.is_published) return a.is_published ? -1 : 1;
             if (a.live_available !== b.live_available) return a.live_available ? -1 : 1;
             return b.viewer_count - a.viewer_count;
           });
@@ -1703,11 +1693,8 @@ export default function LiveRoom() {
         return currentSlots;
       }
 
-      // Sort by: published first, then live_available, then by viewer count
+      // Sort by: live_available first, then by viewer count
       const sorted = [...availableStreamers].sort((a, b) => {
-        if (a.is_published !== b.is_published) {
-          return a.is_published ? -1 : 1;
-        }
         if (a.live_available !== b.live_available) {
           return a.live_available ? -1 : 1;
         }
@@ -1738,7 +1725,6 @@ export default function LiveRoom() {
             addedStreamers: sorted.slice(0, streamerIndex).map(s => ({
               username: s.username,
               profile_id: s.profile_id,
-              is_published: s.is_published,
             })),
           });
         }
@@ -1839,7 +1825,6 @@ export default function LiveRoom() {
         profile_id: profileId,
         username: profile.username,
         avatar_url: profile.avatar_url,
-        is_published: liveStream.is_published,
         live_available: liveStream.live_available,
         viewer_count: 0, // Will be updated by realtime
         gifter_level: badgeInfo?.level || 0,
@@ -1873,7 +1858,6 @@ export default function LiveRoom() {
       streamerId: streamer.id,
       profileId: streamer.profile_id,
       username: streamer.username,
-      is_published: streamer.is_published,
       live_available: streamer.live_available,
     });
     
@@ -2152,7 +2136,6 @@ export default function LiveRoom() {
         profile_id: profile.id,
         username: profile.username,
         avatar_url: profile.avatar_url,
-        is_published: isPublished, // Use actual value from database
         live_available: !!streamId, // true if they have a live stream
         viewer_count: viewerCount,
         gifter_level: profile.gifter_level || 0,
@@ -2373,7 +2356,6 @@ export default function LiveRoom() {
             profile_id: profile.id,
             username: profile.username,
             avatar_url: profile.avatar_url,
-            is_published: true, // Local placeholder
             live_available: false,
             viewer_count: 0,
             gifter_level: badgeInfo?.level || 0,
@@ -2527,13 +2509,13 @@ export default function LiveRoom() {
                   streamerId={expandedSlot.streamer.profile_id}
                   streamerUsername={expandedSlot.streamer.username}
                   streamerAvatar={expandedSlot.streamer.avatar_url}
-                  isLive={expandedSlot.streamer.is_published}
+                  isLive={expandedSlot.streamer.live_available}
                   viewerCount={expandedSlot.streamer.viewer_count}
                   gifterLevel={expandedSlot.streamer.gifter_level}
                   badgeName={expandedSlot.streamer.badge_name}
                   badgeColor={expandedSlot.streamer.badge_color}
                   slotIndex={expandedSlot.slotIndex}
-                  liveStreamId={expandedSlot.streamer.id && (expandedSlot.streamer.is_published || expandedSlot.streamer.live_available) ? (() => {
+                  liveStreamId={expandedSlot.streamer.id && expandedSlot.streamer.live_available ? (() => {
                     const idStr = expandedSlot.streamer.id.toString();
                     // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
                     if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) {
@@ -2640,13 +2622,13 @@ export default function LiveRoom() {
                         streamerId={slot.streamer.profile_id}
                         streamerUsername={slot.streamer.username}
                         streamerAvatar={slot.streamer.avatar_url}
-                        isLive={slot.streamer.is_published}
+                        isLive={slot.streamer.live_available}
                         viewerCount={slot.streamer.viewer_count}
                         gifterLevel={slot.streamer.gifter_level}
                         badgeName={slot.streamer.badge_name}
                         badgeColor={slot.streamer.badge_color}
                         slotIndex={slot.slotIndex}
-                        liveStreamId={slot.streamer.id && (slot.streamer.is_published || slot.streamer.live_available) ? (() => {
+                        liveStreamId={slot.streamer.id && slot.streamer.live_available ? (() => {
                           const idStr = slot.streamer.id.toString();
                           // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
                           if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) {
