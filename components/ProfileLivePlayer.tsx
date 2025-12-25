@@ -441,7 +441,7 @@ export default function ProfileLivePlayer({
                 {/* Expandable Volume Slider */}
                 {showVolumeSlider && (
                   <div 
-                    className="absolute bottom-full left-0 mb-2 bg-black/80 backdrop-blur-sm rounded-lg px-3 py-4 shadow-xl transition-all"
+                    className="absolute bottom-full left-0 mb-2 bg-black/80 backdrop-blur-sm rounded-lg px-2 py-4 shadow-xl transition-all w-10"
                     onMouseLeave={() => setShowVolumeSlider(false)}
                   >
                     <div className="flex flex-col items-center gap-3">
@@ -452,11 +452,11 @@ export default function ProfileLivePlayer({
                         max="100"
                         value={volume}
                         onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                        className="h-24 w-2 appearance-none bg-white/30 rounded-lg cursor-pointer slider-vertical"
+                        orient="vertical"
+                        className="h-24 w-1 appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:w-1 [&::-webkit-slider-runnable-track]:h-24 [&::-webkit-slider-runnable-track]:bg-white/30 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:-ml-1"
                         style={{
-                          WebkitAppearance: 'slider-vertical' as any,
-                          transform: 'rotate(-90deg)',
-                          transformOrigin: 'center',
+                          writingMode: 'vertical-lr' as any,
+                          direction: 'rtl',
                         }}
                       />
                       <span className="text-white text-xs font-medium">{volume}%</span>
