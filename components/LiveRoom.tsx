@@ -54,6 +54,7 @@ type UiPanels = {
 export default function LiveRoom() {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(true); // Start as true to render immediately
+  const [initError, setInitError] = useState<string | null>(null); // Track initialization errors
   const [gridSlots, setGridSlots] = useState<GridSlot[]>(() => 
     Array.from({ length: 12 }, (_, i) => ({
       slotIndex: i + 1,
@@ -507,19 +508,28 @@ export default function LiveRoom() {
     }
     
     const initUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-        // Get username for room presence - use maybeSingle() to avoid error
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (profile) {
-          setCurrentUsername(profile.username);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setCurrentUserId(user.id);
+          // Get username for room presence - use maybeSingle() to avoid error
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', user.id)
+            .maybeSingle();
+          if (profile) {
+            setCurrentUsername(profile.username);
+          }
+        } else {
+          setCurrentUserId(null);
+          setCurrentUsername(null);
         }
-      } else {
+        setInitError(null); // Clear any previous errors
+      } catch (error) {
+        console.error('[LiveRoom] Failed to initialize user:', error);
+        setInitError(error instanceof Error ? error.message : 'Failed to load user data');
+        // Set to null to allow viewing as anonymous
         setCurrentUserId(null);
         setCurrentUsername(null);
       }

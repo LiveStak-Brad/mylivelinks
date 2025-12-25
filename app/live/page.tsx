@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Video, Sparkles, Users, TrendingUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import LiveRoom from '@/components/LiveRoom';
+import LiveRoomErrorBoundary from '@/components/LiveRoomErrorBoundary';
 
 const OWNER_UUID = '2b4a1178-3c39-4179-94ea-314dd824a818';
 
@@ -57,7 +58,11 @@ export default function LiveComingSoonPage() {
 
   // If owner, show the actual LiveRoom
   if (isOwner) {
-    return <LiveRoom />;
+    return (
+      <LiveRoomErrorBoundary>
+        <LiveRoom />
+      </LiveRoomErrorBoundary>
+    );
   }
 
   // Everyone else sees "Coming Soon"
