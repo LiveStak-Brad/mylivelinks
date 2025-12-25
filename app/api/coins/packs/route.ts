@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/coins/packs
  * 
@@ -23,6 +26,14 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
 export async function GET(request: NextRequest) {
   try {
     const adminSupabase = getSupabaseAdmin();
+
+    const json = (body: any, init?: { status?: number }) =>
+      NextResponse.json(body, {
+        status: init?.status ?? 200,
+        headers: {
+          'Cache-Control': 'no-store, max-age=0',
+        },
+      });
     
     // Query all active *Stripe-backed* coin packs (must have a Stripe price_id to be purchasable)
     // Be robust to schema variants across environments.
@@ -80,7 +91,7 @@ export async function GET(request: NextRequest) {
 
     if (queryError) {
       console.error('[API] coin_packs query error:', queryError);
-      return NextResponse.json(
+      return json(
         {
           packs: [],
           error: 'Database query failed',
@@ -94,7 +105,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!packs || packs.length === 0) {
-      return NextResponse.json({ packs: [] });
+      return json({ packs: [] });
     }
 
     // Normalize pack data to consistent shape
@@ -118,13 +129,18 @@ export async function GET(request: NextRequest) {
       return a.usd_amount - b.usd_amount;
     });
 
-    return NextResponse.json({ packs: normalized });
+    return json({ packs: normalized });
   } catch (error) {
     console.error('[API] get-packs error:', error);
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
       { packs: [], error: 'Failed to fetch coin packs', message },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, max-age=0',
+        },
+      }
     );
   }
 }
