@@ -452,11 +452,11 @@ export default function ProfileLivePlayer({
                         max="100"
                         value={volume}
                         onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
-                        orient="vertical"
                         className="h-24 w-2 appearance-none bg-white/30 rounded-lg cursor-pointer slider-vertical"
                         style={{
-                          writingMode: 'bt-lr',
-                          WebkitAppearance: 'slider-vertical',
+                          WebkitAppearance: 'slider-vertical' as any,
+                          transform: 'rotate(-90deg)',
+                          transformOrigin: 'center',
                         }}
                       />
                       <span className="text-white text-xs font-medium">{volume}%</span>
