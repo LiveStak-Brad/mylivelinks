@@ -2764,9 +2764,20 @@ export default function LiveRoom() {
                             <span className="text-gray-500 text-xs">Click to add streamer</span>
                           </div>
                         ) : (() => {
+                          // CRITICAL: Validate slot and streamer before accessing properties
+                          if (!slot || typeof slot !== 'object') {
+                            console.error('[GRID RENDER] Invalid slot:', slot);
+                            return (
+                              <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
+                                <span className="text-gray-400 text-sm">Invalid Slot</span>
+                              </div>
+                            );
+                          }
+                          
                           // CRITICAL: Validate streamer properties are valid strings/numbers before rendering
                           const streamer = slot.streamer;
-                          if (!streamer || typeof streamer !== 'object') {
+                          if (!streamer || typeof streamer !== 'object' || streamer === null) {
+                            console.error('[GRID RENDER] Invalid streamer:', streamer, 'slot:', slot);
                             return (
                               <div className="aspect-[3/2] bg-gray-200 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center">
                                 <span className="text-gray-400 text-sm">Invalid Streamer Data</span>
@@ -2776,26 +2787,38 @@ export default function LiveRoom() {
                           
                           // CRITICAL: Safely extract profile_id - handle null, arrays, and strings
                           let profileId: string | null = null;
-                          if (streamer.profile_id != null) {
-                            if (Array.isArray(streamer.profile_id)) {
-                              profileId = (streamer.profile_id.length > 0 && streamer.profile_id[0] != null) 
-                                ? String(streamer.profile_id[0]) 
-                                : null;
-                            } else if (typeof streamer.profile_id === 'string') {
-                              profileId = streamer.profile_id;
+                          try {
+                            const profileIdValue = streamer.profile_id;
+                            if (profileIdValue != null && profileIdValue !== undefined) {
+                              if (Array.isArray(profileIdValue) && profileIdValue.length > 0) {
+                                const firstElement = profileIdValue[0];
+                                if (firstElement != null && firstElement !== undefined) {
+                                  profileId = String(firstElement);
+                                }
+                              } else if (typeof profileIdValue === 'string' && profileIdValue.length > 0) {
+                                profileId = profileIdValue;
+                              }
                             }
+                          } catch (e) {
+                            console.error('[GRID RENDER] Error extracting profile_id:', e, streamer);
                           }
                           
                           // CRITICAL: Safely extract username - handle null, arrays, and strings
                           let username: string | null = null;
-                          if (streamer.username != null) {
-                            if (Array.isArray(streamer.username)) {
-                              username = (streamer.username.length > 0 && streamer.username[0] != null) 
-                                ? String(streamer.username[0]) 
-                                : null;
-                            } else if (typeof streamer.username === 'string') {
-                              username = streamer.username;
+                          try {
+                            const usernameValue = streamer.username;
+                            if (usernameValue != null && usernameValue !== undefined) {
+                              if (Array.isArray(usernameValue) && usernameValue.length > 0) {
+                                const firstElement = usernameValue[0];
+                                if (firstElement != null && firstElement !== undefined) {
+                                  username = String(firstElement);
+                                }
+                              } else if (typeof usernameValue === 'string' && usernameValue.length > 0) {
+                                username = usernameValue;
+                              }
                             }
+                          } catch (e) {
+                            console.error('[GRID RENDER] Error extracting username:', e, streamer);
                           }
                           
                           if (!profileId || !username) {
@@ -2818,21 +2841,24 @@ export default function LiveRoom() {
                             try {
                               // CRITICAL: Safely extract id value - handle null, arrays, and other types
                               let idValue: any = null;
-                              if (Array.isArray(streamer.id)) {
-                                // Only access [0] if array has elements
-                                if (streamer.id.length > 0 && streamer.id[0] != null) {
-                                  idValue = streamer.id[0];
+                              const idRaw = streamer.id;
+                              if (idRaw != null && idRaw !== undefined) {
+                                if (Array.isArray(idRaw) && idRaw.length > 0) {
+                                  const firstElement = idRaw[0];
+                                  if (firstElement != null && firstElement !== undefined) {
+                                    idValue = firstElement;
+                                  }
+                                } else if (idRaw != null && idRaw !== undefined) {
+                                  idValue = idRaw;
                                 }
-                              } else if (streamer.id != null) {
-                                idValue = streamer.id;
                               }
                               
-                              if (idValue != null) {
+                              if (idValue != null && idValue !== undefined) {
                                 const idStr = String(idValue);
                                 // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
                                 if (!idStr.startsWith('stream-') && !idStr.startsWith('seed-')) {
                                   const parsed = parseInt(idStr);
-                                  if (parsed > 0) {
+                                  if (!isNaN(parsed) && parsed > 0) {
                                     liveStreamId = parsed;
                                   }
                                 }
