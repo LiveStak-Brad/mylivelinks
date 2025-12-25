@@ -62,7 +62,7 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
         .select('followee_id')
         .eq('follower_id', userId);
       
-      const followingIds = following?.map(f => f.followee_id) || [];
+      const followingIds = following?.map((f: { followee_id: string }) => f.followee_id) || [];
 
       if (followingIds.length === 0) {
         // If not following anyone, show most popular
@@ -87,7 +87,7 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
       
       // Count occurrences to find most commonly followed
       const followCounts = new Map<string, number>();
-      similarFollows?.forEach(f => {
+      similarFollows?.forEach((f: { followee_id: string }) => {
         followCounts.set(f.followee_id, (followCounts.get(f.followee_id) || 0) + 1);
       });
 
@@ -164,23 +164,28 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
   }
 
   return (
-    <div className="py-8 relative">
+    <div className="py-4 relative">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h2>
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-1">{title}</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Scroll to discover more profiles →
+          </p>
+        </div>
         <div className="flex gap-2">
           <button
             onClick={() => scroll('left')}
-            className="p-2 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            className="p-2 md:p-3 rounded-full bg-purple-600 hover:bg-purple-700 shadow-lg transition"
             aria-label="Scroll left"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            <ChevronLeft className="w-5 h-5 md:w-6 md:h-6 text-white" />
           </button>
           <button
             onClick={() => scroll('right')}
-            className="p-2 rounded-full bg-white dark:bg-gray-800 shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            className="p-2 md:p-3 rounded-full bg-purple-600 hover:bg-purple-700 shadow-lg transition"
             aria-label="Scroll right"
           >
-            <ChevronRight className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            <ChevronRight className="w-5 h-5 md:w-6 md:h-6 text-white" />
           </button>
         </div>
       </div>
@@ -206,6 +211,10 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
           />
         ))}
       </div>
+
+      {/* Gradient indicators on edges */}
+      <div className="absolute left-0 top-20 bottom-0 w-12 bg-gradient-to-r from-white dark:from-gray-800 to-transparent pointer-events-none" />
+      <div className="absolute right-0 top-20 bottom-0 w-12 bg-gradient-to-l from-white dark:from-gray-800 to-transparent pointer-events-none" />
 
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {

@@ -191,8 +191,8 @@ export default function LandingPage() {
           )}
         </div>
 
-        {/* Recommended Profiles Carousel */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        {/* Recommended Profiles Carousel - More prominent */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 mb-12">
           <ProfileCarousel 
             title={currentUser ? "Recommended for You" : "Popular Creators"} 
             currentUserId={currentUser?.id || null}
