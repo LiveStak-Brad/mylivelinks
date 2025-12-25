@@ -21,7 +21,7 @@ export default function GlobalHeader() {
         <div className="flex items-center justify-between h-16">
           {/* Logo/Brand */}
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-            <SmartBrandLogo size="sm" />
+            <SmartBrandLogo size={40} />
           </Link>
 
           {/* Navigation - Desktop */}

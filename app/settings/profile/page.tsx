@@ -494,6 +494,28 @@ export default function ProfileSettingsPage() {
           </div>
         </div>
 
+        {/* Save Button (Top) */}
+        <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-lg p-4 mb-6 sticky top-4 z-10">
+          <div className="flex gap-4 items-center">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+            >
+              {saving ? 'Saving...' : '💾 Save All Changes'}
+            </button>
+            <button
+              onClick={() => router.push(`/${username}`)}
+              className="px-6 py-3 bg-white/20 backdrop-blur text-white rounded-lg font-semibold hover:bg-white/30 transition"
+            >
+              Cancel
+            </button>
+          </div>
+          <p className="text-white/90 text-sm text-center mt-2">
+            Changes will be saved to your profile
+          </p>
+        </div>
+
         {/* Social Media */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">Social Media</h2>
