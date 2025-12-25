@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { createRouteHandlerClient } from '@/lib/supabase-server';
 
 // Trim whitespace from environment variables to prevent issues
 const LIVEKIT_URL = process.env.LIVEKIT_URL?.trim();
@@ -62,85 +62,11 @@ export async function POST(request: NextRequest) {
       apiSecretPrefix: LIVEKIT_API_SECRET?.substring(0, 15) + '...', // First 15 chars to verify
     });
 
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      return NextResponse.json(
-        { error: 'Supabase credentials not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Get auth token from request headers or cookies
-    const authHeader = request.headers.get('authorization');
-    const accessToken = authHeader?.replace('Bearer ', '') || null;
+    // Create Supabase client with proper route handler support
+    const supabase = createRouteHandlerClient(request);
     
-    // Also try to get from cookies (for browser requests)
-    const cookieHeader = request.headers.get('cookie') || '';
-    const cookies = Object.fromEntries(
-      cookieHeader.split('; ').map(c => c.split('='))
-    );
-    const sbAccessToken = cookies['sb-access-token'] || cookies[`sb-${SUPABASE_URL?.split('//')[1]?.split('.')[0]}-auth-token`] || null;
-    
-    console.log('Auth check:', {
-      hasAuthHeader: !!authHeader,
-      hasAccessToken: !!accessToken,
-      hasCookieToken: !!sbAccessToken,
-      cookieKeys: Object.keys(cookies).slice(0, 5), // Limit log size
-    });
-
-    // Create Supabase client with the access token
-    const tokenToUse = accessToken || sbAccessToken;
-    
-    if (!tokenToUse) {
-      console.error('No auth token found in request');
-      return NextResponse.json(
-        { error: 'Unauthorized: No authentication token provided. Please log in first.' },
-        { status: 401 }
-      );
-    }
-
-    // Verify user - try multiple methods
-    let verifiedUser = null;
-    let authError = null;
-
-    // Method 1: Try getUser with token in headers
-    const supabase = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: { Authorization: `Bearer ${tokenToUse}` },
-      },
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-      },
-    });
-
-    try {
-      const userResult = await supabase.auth.getUser();
-      verifiedUser = userResult.data?.user;
-      authError = userResult.error;
-    } catch (err: any) {
-      console.warn('getUser with token failed:', err.message);
-    }
-
-    // Method 2: Decode JWT to extract user ID (fallback)
-    if (!verifiedUser && tokenToUse) {
-      try {
-        const parts = tokenToUse.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-          const userId = payload.sub;
-          
-          if (userId) {
-            verifiedUser = { id: userId } as any;
-            console.log('User ID extracted from JWT token');
-          }
-        }
-      } catch (jwtErr) {
-        console.warn('JWT decode failed:', jwtErr);
-      }
-    }
-
-    const user = verifiedUser;
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     console.log('Auth result:', {
       hasUser: !!user,
@@ -149,30 +75,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (authError || !user) {
-      console.error('Authentication failed:', {
-        error: authError?.message,
-        errorCode: authError?.status,
-        hasToken: !!tokenToUse,
-        tokenPrefix: tokenToUse?.substring(0, 20) + '...',
-        allCookies: Object.keys(cookies),
-      });
-      
-      // More helpful error message
-      let errorMessage = 'Unauthorized: ';
-      if (authError?.message) {
-        errorMessage += authError.message;
-      } else if (!tokenToUse) {
-        errorMessage += 'No authentication token provided. Please log in first.';
-      } else {
-        errorMessage += 'Invalid or expired session. Please log in again.';
-      }
-      
+      console.error('Authentication failed:', authError);
       return NextResponse.json(
-        { 
-          error: errorMessage,
-          details: authError?.status ? `Error code: ${authError.status}` : undefined,
-        },
-        { status: 401 }
+        { error: 'Unauthorized - Please log in' },
+        { status: 401, headers: corsHeaders }
       );
     }
 
