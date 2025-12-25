@@ -170,6 +170,42 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     };
   }, []);
 
+  // BANDWIDTH SAVING: Stop publishing if user leaves the page while streaming
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleVisibilityChange = async () => {
+      if (document.hidden && isPublishing && stopPublishingRef.current) {
+        console.log('[GO_LIVE] Page hidden while publishing - stopping stream');
+        try {
+          // Stop publishing immediately
+          await stopPublishingRef.current('visibility_hidden');
+          
+          // Also update database
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase
+              .from('live_streams')
+              .update({ live_available: false, ended_at: new Date().toISOString() })
+              .eq('profile_id', user.id);
+            
+            await supabase
+              .from('user_grid_slots')
+              .delete()
+              .eq('streamer_id', user.id);
+          }
+        } catch (err) {
+          console.error('[GO_LIVE] Error stopping stream on visibility change:', err);
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isPublishing, supabase]);
+
   const loadDevices = async () => {
     try {
       // Request permissions first

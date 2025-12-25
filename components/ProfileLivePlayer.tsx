@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Room, RemoteTrack, RemoteParticipant, Track } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
 import { Volume2, VolumeX, Gift, Users } from 'lucide-react';
@@ -35,6 +36,43 @@ export default function ProfileLivePlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const supabase = createClient();
+  const router = useRouter();
+  const wasHiddenRef = useRef(false);
+  const roomRef = useRef<Room | null>(null);
+
+  // BANDWIDTH SAVING: Disconnect when user leaves the tab
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleVisibilityChange = () => {
+      const isHidden = document.hidden;
+      console.log('[PROFILE_LIVE] Visibility changed:', { isHidden });
+      
+      if (isHidden) {
+        wasHiddenRef.current = true;
+        // Disconnect to save bandwidth
+        if (roomRef.current) {
+          console.log('[PROFILE_LIVE] Page hidden - disconnecting to save bandwidth');
+          roomRef.current.disconnect();
+          roomRef.current = null;
+          setRoom(null);
+          setIsConnected(false);
+          setVideoTrack(null);
+          setAudioTrack(null);
+        }
+      } else if (wasHiddenRef.current) {
+        // User returned - redirect to refresh the page state
+        console.log('[PROFILE_LIVE] User returned - reloading for fresh connection');
+        wasHiddenRef.current = false;
+        window.location.reload();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     connectToRoom();
@@ -223,6 +261,7 @@ export default function ProfileLivePlayer({
       });
 
       await newRoom.connect(url, token);
+      roomRef.current = newRoom;
       setRoom(newRoom);
       setIsConnected(true);
 
@@ -369,6 +408,7 @@ export default function ProfileLivePlayer({
   const disconnect = () => {
     if (room) {
       room.disconnect();
+      roomRef.current = null;
       setRoom(null);
       setIsConnected(false);
       setVideoTrack(null);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import SmartBrandLogo from './SmartBrandLogo';
@@ -93,6 +94,11 @@ export default function LiveRoom() {
   const [isCurrentUserPublishing, setIsCurrentUserPublishing] = useState(false); // Track if current user is publishing
   const [roomPresenceCountMinusSelf, setRoomPresenceCountMinusSelf] = useState<number>(0); // Room-demand: count of others in room
   const closedStreamersRef = useRef<Set<string>>(new Set()); // Streamers closed by viewer (do not auto-refill)
+  
+  // BANDWIDTH SAVING: Router for redirecting when user leaves/returns
+  const router = useRouter();
+  const wasHiddenRef = useRef(false); // Track if page was hidden
+  const disconnectedDueToVisibilityRef = useRef(false); // Track if we disconnected due to visibility
   
   // Live Grid Sort Mode
   type LiveSortMode = 'random' | 'most_viewed' | 'most_gifted' | 'newest';
@@ -511,6 +517,150 @@ export default function LiveRoom() {
       roomConnectionRef.current = { connecting: false, connected: false };
     };
   }, [supabase, authDisabled]);
+
+  // =============================================================================
+  // BANDWIDTH SAVING: Visibility Change Detection
+  // When user minimizes, switches tabs, or navigates away - disconnect to save bandwidth
+  // When they return, redirect to home (connections are stale anyway)
+  // =============================================================================
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleVisibilityChange = async () => {
+      const isHidden = document.hidden;
+      
+      console.log('[VISIBILITY] Page visibility changed:', { 
+        isHidden, 
+        wasHidden: wasHiddenRef.current,
+        isPublishing: isCurrentUserPublishing,
+        isConnected: isRoomConnected 
+      });
+      
+      if (isHidden) {
+        // Page is now hidden (tab switch, minimize, app switch on mobile)
+        wasHiddenRef.current = true;
+        
+        // If user is streaming, stop their stream to save bandwidth
+        if (isCurrentUserPublishing && currentUserId) {
+          console.log('[VISIBILITY] Streamer left page - stopping live stream');
+          try {
+            // Update database to end live stream
+            await supabase
+              .from('live_streams')
+              .update({ live_available: false, ended_at: new Date().toISOString() })
+              .eq('profile_id', currentUserId);
+            
+            // Remove from grid slots
+            await supabase
+              .from('user_grid_slots')
+              .delete()
+              .eq('streamer_id', currentUserId);
+            
+            console.log('[VISIBILITY] Streamer stream ended due to leaving page');
+          } catch (err) {
+            console.error('[VISIBILITY] Error stopping stream:', err);
+          }
+        }
+        
+        // Disconnect from LiveKit room to save bandwidth
+        if (roomRef.current && roomConnectionRef.current.connected) {
+          console.log('[VISIBILITY] Disconnecting from LiveKit to save bandwidth');
+          try {
+            if (handlersRef.current) {
+              const handlers = handlersRef.current;
+              roomRef.current.off(RoomEvent.Connected, handlers.handleConnected);
+              roomRef.current.off(RoomEvent.Disconnected, handlers.handleDisconnected);
+              roomRef.current.off(RoomEvent.ParticipantConnected, handlers.handleParticipantConnected);
+              roomRef.current.off(RoomEvent.ParticipantDisconnected, handlers.handleParticipantDisconnected);
+              roomRef.current.off(RoomEvent.TrackSubscribed, handlers.handleTrackSubscribed);
+              roomRef.current.off(RoomEvent.TrackUnsubscribed, handlers.handleTrackUnsubscribed);
+            }
+            await roomRef.current.disconnect();
+            disconnectedDueToVisibilityRef.current = true;
+            console.log('[VISIBILITY] Disconnected from LiveKit');
+          } catch (err) {
+            console.error('[VISIBILITY] Error disconnecting:', err);
+          }
+          roomRef.current = null;
+          roomConnectionRef.current = { connecting: false, connected: false };
+          setSharedRoom(null);
+          setIsRoomConnected(false);
+          setIsCurrentUserPublishing(false);
+        }
+      } else {
+        // Page is now visible again
+        if (wasHiddenRef.current && disconnectedDueToVisibilityRef.current) {
+          // User returned after being away - redirect to home for fresh start
+          console.log('[VISIBILITY] User returned after disconnect - redirecting to home');
+          wasHiddenRef.current = false;
+          disconnectedDueToVisibilityRef.current = false;
+          
+          // Show a brief notification and redirect
+          router.push('/');
+        }
+      }
+    };
+    
+    // Handle page unload (closing tab, navigating away completely)
+    const handleBeforeUnload = async () => {
+      console.log('[VISIBILITY] Page unloading - cleaning up connections');
+      
+      // If user is streaming, try to stop their stream
+      if (isCurrentUserPublishing && currentUserId) {
+        // Use sendBeacon for reliable delivery during page unload
+        const payload = JSON.stringify({
+          profile_id: currentUserId,
+          action: 'end_stream'
+        });
+        
+        // Try to update via beacon (may not always work but best effort)
+        navigator.sendBeacon('/api/stream-cleanup', payload);
+      }
+      
+      // Disconnect room synchronously if possible
+      if (roomRef.current) {
+        try {
+          roomRef.current.disconnect();
+        } catch (err) {
+          // Ignore errors during unload
+        }
+      }
+    };
+    
+    // Handle page hide (more reliable than beforeunload on mobile)
+    const handlePageHide = (event: PageTransitionEvent) => {
+      console.log('[VISIBILITY] Page hide event:', { persisted: event.persisted });
+      
+      if (!event.persisted) {
+        // Page is being unloaded (not just cached for back-forward)
+        handleBeforeUnload();
+      }
+    };
+    
+    // Handle window blur (switching to another window)
+    const handleWindowBlur = () => {
+      // Only disconnect if page is also hidden (not just focus lost to another window)
+      // This prevents disconnecting when clicking on browser UI or popups
+      setTimeout(() => {
+        if (document.hidden) {
+          handleVisibilityChange();
+        }
+      }, 100);
+    };
+    
+    // Add all event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('blur', handleWindowBlur);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [supabase, currentUserId, isCurrentUserPublishing, isRoomConnected, router]);
 
   // Get current user ID and track room presence
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
