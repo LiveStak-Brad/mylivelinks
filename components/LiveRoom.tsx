@@ -68,6 +68,17 @@ export default function LiveRoom() {
   const [liveStreamers, setLiveStreamers] = useState<LiveStreamer[]>([]);
   const liveStreamersRef = useRef<LiveStreamer[]>([]); // Track current streamers to prevent clearing
   
+  // DEBUG: Log state changes
+  useEffect(() => {
+    console.log('[DEBUG] liveStreamers changed:', {
+      count: liveStreamers?.length,
+      isArray: Array.isArray(liveStreamers),
+      isNull: liveStreamers === null,
+      isUndefined: liveStreamers === undefined,
+      value: liveStreamers
+    });
+  }, [liveStreamers]);
+  
   // Sync ref with state changes
   useEffect(() => {
     liveStreamersRef.current = liveStreamers;
@@ -2554,14 +2565,29 @@ export default function LiveRoom() {
               <div className="max-w-full mx-auto w-full h-full flex items-center justify-center">
                 {/* 12-Tile Grid - 4/4/4 layout in Focus Mode, 6/6 otherwise */}
                 <div className={`grid ${uiPanels.focusMode ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6'} ${uiPanels.focusMode ? 'gap-1.5 max-w-[90%]' : 'gap-2'} w-full ${uiPanels.focusMode ? 'h-auto' : 'h-full'}`}>
-                {((gridSlots && gridSlots.length > 0) ? gridSlots : Array.from({ length: 12 }, (_, i) => ({
-                  slotIndex: i + 1,
-                  streamer: null,
-                  isPinned: false,
-                  isMuted: false,
-                  isEmpty: true,
-                  volume: 0.5,
-                }))).map((slot) => (
+                {(() => {
+                  // DEBUG: Log grid rendering
+                  console.log('[GRID RENDER]', {
+                    hasGridSlots: !!gridSlots,
+                    isArray: Array.isArray(gridSlots),
+                    length: gridSlots?.length,
+                    gridSlots: gridSlots
+                  });
+                  
+                  const slotsToRender = (gridSlots && Array.isArray(gridSlots) && gridSlots.length > 0) 
+                    ? gridSlots 
+                    : Array.from({ length: 12 }, (_, i) => ({
+                        slotIndex: i + 1,
+                        streamer: null,
+                        isPinned: false,
+                        isMuted: false,
+                        isEmpty: true,
+                        volume: 0.5,
+                      }));
+                  
+                  console.log('[GRID RENDER] Using slots:', slotsToRender?.length, slotsToRender);
+                  
+                  return slotsToRender.map((slot) => (
                   <div
                     key={slot.slotIndex}
                     draggable={!slot.isEmpty && volumeSliderOpenSlot !== slot.slotIndex}
@@ -2645,7 +2671,8 @@ export default function LiveRoom() {
                       />
                     ) : null}
                   </div>
-                ))}
+                  ));
+                })()}
             </div>
           </div>
         </div>

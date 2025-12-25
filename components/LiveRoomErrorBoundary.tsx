@@ -24,6 +24,8 @@ export default class LiveRoomErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: any) {
     console.error('LiveRoom Error:', error, errorInfo);
+    console.error('Error Stack:', error.stack);
+    console.error('Component Stack:', errorInfo.componentStack);
   }
 
   render() {
