@@ -29,7 +29,7 @@ export default function GiftAnimation({
     return () => clearTimeout(timer);
   }, [onComplete]);
 
-  // Map gift names to emojis (fallback if no icon_url)
+  // Map gift names to emojis (fallback if no icon_url - matches GiftModal)
   const getGiftEmoji = (name: string) => {
     const emojiMap: { [key: string]: string } = {
       'Rose': '🌹',
@@ -40,6 +40,38 @@ export default function GiftAnimation({
       'Crown': '👑',
       'Platinum': '💠',
       'Legendary': '🏆',
+      'Fire': '🔥',
+      'Rocket': '🚀',
+      'Rainbow': '🌈',
+      'Unicorn': '🦄',
+      'Party': '🎉',
+      'Confetti': '🎊',
+      'Champagne': '🍾',
+      'Money': '💰',
+      'Cash': '💵',
+      'Gold': '🥇',
+      'Silver': '🥈',
+      'Bronze': '🥉',
+      'Kiss': '💋',
+      'Hug': '🤗',
+      'Love': '💕',
+      'Sparkle': '✨',
+      'Gem': '💎',
+      'Crystal': '🔮',
+      'Music': '🎵',
+      'Microphone': '🎤',
+      'Camera': '📸',
+      'Clap': '👏',
+      'Thumbs Up': '👍',
+      'Wave': '👋',
+      'Flex': '💪',
+      'Cool': '😎',
+      'Hot': '🥵',
+      'VIP': '🎯',
+      'King': '🤴',
+      'Queen': '👸',
+      'Angel': '😇',
+      'Devil': '😈',
     };
     return emojiMap[name] || '🎁';
   };
