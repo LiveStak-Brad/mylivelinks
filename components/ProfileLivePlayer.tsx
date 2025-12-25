@@ -3,10 +3,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { Room, RemoteTrack, RemoteParticipant, Track } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
+import { Volume2, VolumeX, Gift, Users } from 'lucide-react';
+import GiftModal from './GiftModal';
 
 interface ProfileLivePlayerProps {
   profileId: string;
   username: string;
+  liveStreamId?: number;
   className?: string;
 }
 
@@ -17,19 +20,32 @@ interface ProfileLivePlayerProps {
 export default function ProfileLivePlayer({
   profileId,
   username,
+  liveStreamId,
   className = '',
 }: ProfileLivePlayerProps) {
   const [room, setRoom] = useState<Room | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
   const [audioTrack, setAudioTrack] = useState<RemoteTrack | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(100);
+  const [viewerCount, setViewerCount] = useState(0);
+  const [showGiftModal, setShowGiftModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const supabase = createClient();
 
   useEffect(() => {
     connectToRoom();
+    loadViewerCount(); // Initial load
+    
+    // Poll viewer count every 10 seconds
+    const interval = setInterval(() => {
+      loadViewerCount();
+    }, 10000);
+    
     return () => {
+      clearInterval(interval);
       disconnect();
     };
   }, [profileId]);
@@ -49,13 +65,51 @@ export default function ProfileLivePlayer({
   useEffect(() => {
     if (audioTrack && audioRef.current) {
       audioTrack.attach(audioRef.current);
+      // Apply volume settings
+      audioRef.current.volume = isMuted ? 0 : volume / 100;
+      audioRef.current.muted = isMuted;
     }
     return () => {
       if (audioTrack && audioRef.current) {
         audioTrack.detach(audioRef.current);
       }
     };
-  }, [audioTrack]);
+  }, [audioTrack, isMuted, volume]);
+
+  const loadViewerCount = async () => {
+    if (!liveStreamId) return;
+    
+    try {
+      const { count } = await supabase
+        .from('active_viewers')
+        .select('*', { count: 'exact', head: true })
+        .eq('live_stream_id', liveStreamId)
+        .eq('is_active', true)
+        .eq('is_unmuted', true)
+        .eq('is_visible', true)
+        .eq('is_subscribed', true)
+        .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
+      
+      setViewerCount(count || 0);
+    } catch (error) {
+      console.error('[PROFILE_LIVE] Error loading viewer count:', error);
+    }
+  };
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    if (audioRef.current) {
+      audioRef.current.muted = !isMuted;
+      audioRef.current.volume = isMuted ? volume / 100 : 0;
+    }
+  };
+
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    if (audioRef.current && !isMuted) {
+      audioRef.current.volume = newVolume / 100;
+    }
+  };
 
   const connectToRoom = async () => {
     try {
@@ -216,7 +270,7 @@ export default function ProfileLivePlayer({
   };
 
   return (
-    <div className={`relative w-full bg-black ${className}`}>
+    <div className={`relative w-full bg-black rounded-lg overflow-hidden ${className}`}>
       {/* Video Element */}
       <video
         ref={videoRef}
@@ -239,12 +293,78 @@ export default function ProfileLivePlayer({
         </div>
       )}
 
-      {/* Live indicator */}
+      {/* Overlay Controls - Only show when video is playing */}
       {videoTrack && (
-        <div className="absolute top-4 left-4 flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full shadow-lg z-10">
-          <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-          <span className="font-semibold text-sm">LIVE</span>
-        </div>
+        <>
+          {/* Top Bar - Live indicator & Viewer count */}
+          <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/60 to-transparent z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {/* Live Badge */}
+              <div className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-full shadow-lg">
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                <span className="font-semibold text-sm">LIVE</span>
+              </div>
+              
+              {/* Viewer Count */}
+              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm text-white px-3 py-2 rounded-full">
+                <Users className="w-4 h-4" />
+                <span className="font-medium text-sm">{viewerCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar - Volume & Gift controls */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent z-10">
+            <div className="flex items-center justify-between">
+              {/* Volume Controls */}
+              <div className="flex items-center gap-3 bg-black/40 backdrop-blur-sm rounded-full px-3 py-2">
+                <button
+                  onClick={toggleMute}
+                  className="text-white hover:text-blue-400 transition-colors"
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                </button>
+                
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={volume}
+                  onChange={(e) => handleVolumeChange(parseInt(e.target.value))}
+                  className="w-24 h-1 bg-white/30 rounded-lg appearance-none cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, white ${volume}%, rgba(255,255,255,0.3) ${volume}%)`,
+                  }}
+                />
+                <span className="text-white text-sm font-medium w-8">{volume}%</span>
+              </div>
+
+              {/* Gift Button */}
+              <button
+                onClick={() => setShowGiftModal(true)}
+                className="flex items-center gap-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-2 rounded-full hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 shadow-lg"
+              >
+                <Gift className="w-5 h-5" />
+                <span className="font-semibold">Send Gift</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Gift Modal */}
+      {showGiftModal && (
+        <GiftModal
+          recipientId={profileId}
+          recipientUsername={username}
+          liveStreamId={liveStreamId}
+          onGiftSent={() => {
+            console.log('Gift sent!');
+            loadViewerCount(); // Refresh viewer count after gift
+          }}
+          onClose={() => setShowGiftModal(false)}
+        />
       )}
     </div>
   );

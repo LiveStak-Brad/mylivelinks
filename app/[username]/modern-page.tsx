@@ -24,6 +24,7 @@ interface ProfileData {
     avatar_url?: string;
     bio?: string;
     is_live: boolean;
+    live_stream_id?: number;
     follower_count: number;
     total_gifts_received: number;
     total_gifts_sent: number;
@@ -369,6 +370,7 @@ export default function ModernProfilePage() {
             <ProfileLivePlayer
               profileId={profile.id}
               username={profile.username}
+              liveStreamId={profile.live_stream_id}
               className="w-full aspect-video"
             />
           </div>
