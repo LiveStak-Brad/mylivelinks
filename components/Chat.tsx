@@ -71,69 +71,6 @@ export default function Chat() {
     });
   }, [supabase]);
 
-  // CRITICAL: Store loadMessageWithProfile in ref to avoid stale closures
-  const loadMessageWithProfileRef = useRef(loadMessageWithProfile);
-  useEffect(() => {
-    loadMessageWithProfileRef.current = loadMessageWithProfile;
-  }, [loadMessageWithProfile]);
-
-  // CRITICAL: Create realtime subscription ONCE on mount, never recreate
-  useEffect(() => {
-    // Prevent duplicate subscriptions
-    if (subscriptionRef.current?.subscribed) {
-      console.warn('[CHAT] ⚠️ Subscription already exists, skipping duplicate');
-      return;
-    }
-
-    console.log('[CHAT] 🔌 Creating realtime subscription');
-    
-    // Subscribe to new messages (realtime)
-    const channel = supabase
-      .channel('chat-messages-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-        },
-        (payload: any) => {
-          // Add new message immediately via realtime - use ref to avoid stale closure
-          if (payload?.new) {
-            loadMessageWithProfileRef.current(payload.new as any);
-          }
-        }
-      )
-      .subscribe((status: string) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('[CHAT] ✅ Realtime subscription active - ONE subscription exists');
-          subscriptionRef.current = { channel, subscribed: true };
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('[CHAT] ❌ Realtime subscription error:', status);
-          subscriptionRef.current = null;
-        } else {
-          console.log('[CHAT] 📡 Subscription status:', status);
-        }
-      });
-
-    return () => {
-      console.log('[CHAT] 🧹 Cleaning up realtime subscription');
-      if (subscriptionRef.current?.channel) {
-        supabase.removeChannel(subscriptionRef.current.channel);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [supabase]); // Only depend on supabase (memoized, stable)
-
-  // CRITICAL: Load messages when currentUserId changes, but don't recreate subscription
-  useEffect(() => {
-    loadMessages();
-  }, [currentUserId, loadMessages]); // Include loadMessages in deps since it's memoized
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   // CRITICAL: Use useCallback to prevent stale closures and ensure stable reference
   const loadMessages = useCallback(async () => {
     // Use functional update to get current messages state
