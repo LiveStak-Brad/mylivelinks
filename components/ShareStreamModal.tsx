@@ -148,7 +148,7 @@ export default function ShareStreamModal({ isOpen, onClose }: ShareStreamModalPr
           </button>
 
           {/* Native Share (Mobile) */}
-          {typeof navigator !== 'undefined' && navigator.share && (
+          {typeof window !== 'undefined' && 'share' in navigator && (
             <button
               onClick={handleNativeShare}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition"
