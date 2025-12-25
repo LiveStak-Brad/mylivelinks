@@ -254,7 +254,6 @@ RETURNS TABLE (
     display_name VARCHAR(100),
     avatar_url TEXT,
     live_stream_id BIGINT,
-    is_published BOOLEAN,
     viewer_count INTEGER
 ) AS $$
 BEGIN
@@ -265,21 +264,32 @@ BEGIN
         p.display_name,
         p.avatar_url,
         ls.id as live_stream_id,
-        ls.is_published,
-        COUNT(DISTINCT av.viewer_id)::INTEGER as viewer_count
+        COUNT(DISTINCT CASE 
+            WHEN av.is_active = TRUE 
+                AND av.is_unmuted = TRUE 
+                AND av.is_visible = TRUE 
+                AND av.is_subscribed = TRUE
+                AND av.last_active_at > CURRENT_TIMESTAMP - INTERVAL '60 seconds'
+            THEN av.viewer_id 
+        END)::INTEGER as viewer_count
     FROM live_streams ls
     JOIN profiles p ON p.id = ls.profile_id
     LEFT JOIN active_viewers av ON av.live_stream_id = ls.id
-        AND av.last_active_at > CURRENT_TIMESTAMP - INTERVAL '60 seconds'
     WHERE ls.live_available = TRUE
-      AND ls.is_published = TRUE
       AND NOT EXISTS (
           SELECT 1 FROM blocks b
           WHERE (b.blocker_id = p_viewer_id AND b.blocked_id = ls.profile_id)
              OR (b.blocker_id = ls.profile_id AND b.blocked_id = p_viewer_id)
       )
-    GROUP BY ls.profile_id, p.username, p.display_name, p.avatar_url, ls.id, ls.is_published
-    ORDER BY COUNT(DISTINCT av.viewer_id) DESC, ls.published_at DESC;
+    GROUP BY ls.profile_id, p.username, p.display_name, p.avatar_url, ls.id
+    ORDER BY COUNT(DISTINCT CASE 
+        WHEN av.is_active = TRUE 
+            AND av.is_unmuted = TRUE 
+            AND av.is_visible = TRUE 
+            AND av.is_subscribed = TRUE
+            AND av.last_active_at > CURRENT_TIMESTAMP - INTERVAL '60 seconds'
+        THEN av.viewer_id 
+    END) DESC, ls.published_at DESC NULLS LAST;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;

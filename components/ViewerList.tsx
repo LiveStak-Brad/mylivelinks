@@ -126,7 +126,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
 
       const { data: liveStreams } = await supabase
         .from('live_streams')
-        .select('profile_id, id, live_available, is_published')
+        .select('profile_id, id, live_available')
         .in('profile_id', profileIds)
         .eq('live_available', true);
 
@@ -139,7 +139,6 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
           ls.profile_id, 
           { 
             isLiveAvailable: ls.live_available || false, 
-            isPublished: ls.is_published || false,
             streamId: ls.id 
           }
         ])
@@ -163,7 +162,6 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
 
           const liveInfo = liveStreamMap.get(presence.profile_id) as { 
             isLiveAvailable: boolean; 
-            isPublished: boolean;
             streamId: number 
           } | undefined;
 
@@ -177,7 +175,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
             is_active: true,
             last_active_at: presence.last_seen_at,
             is_live_available: presence.is_live_available || liveInfo?.isLiveAvailable || false,
-            is_published: liveInfo?.isPublished || false,
+            is_published: false, // Removed - no longer used
             live_stream_id: liveInfo?.streamId,
           };
         })

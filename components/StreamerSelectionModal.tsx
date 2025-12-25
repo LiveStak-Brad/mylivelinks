@@ -45,15 +45,15 @@ export default function StreamerSelectionModal({
 
           if (error) throw error;
 
-          // Get live_streams to check live_available and is_published
+          // Get live_streams to check live_available
           const { data: liveStreams } = await supabase
             .from('live_streams')
-            .select('profile_id, live_available, is_published');
+            .select('profile_id, live_available');
 
-          const liveMap = new Map<string, { live_available: boolean; is_published: boolean }>(
+          const liveMap = new Map<string, { live_available: boolean }>(
             (liveStreams || []).map((ls: any) => [
               ls.profile_id,
-              { live_available: ls.live_available, is_published: ls.is_published }
+              { live_available: ls.live_available }
             ])
           );
 
@@ -63,7 +63,7 @@ export default function StreamerSelectionModal({
             display_name: profile.display_name,
             avatar_url: profile.avatar_url,
             live_available: liveMap.get(profile.id)?.live_available || false,
-            is_published: liveMap.get(profile.id)?.is_published || false,
+            is_published: false, // Removed - no longer used
           })));
       } catch (error) {
         console.error('Error loading streamers:', error);
@@ -133,11 +133,7 @@ export default function StreamerSelectionModal({
                     </div>
                   </div>
                   {streamer.live_available && (
-                    <div className={`text-xs px-2 py-1 rounded ${
-                      streamer.is_published
-                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                    }`}>
+                    <div className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
                       LIVE
                     </div>
                   )}

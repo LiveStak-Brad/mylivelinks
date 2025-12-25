@@ -1100,7 +1100,7 @@ export default function LiveRoom() {
       const streamerData = data || [];
 
       // Batch load gifter levels for badges
-      const profileIds = [...new Set(streamerData.map((s: any) => s.streamer_id))];
+      const profileIds = [...new Set(streamerData.map((s: any) => s.streamer_id).filter((id: any) => id != null))];
       const profileBadgeMap: Record<string, any> = {};
       
       if (profileIds.length > 0) {
@@ -2556,8 +2556,9 @@ export default function LiveRoom() {
                     gridSlots: gridSlots
                   });
                   
+                  // CRITICAL: Ensure gridSlots is always a valid array
                   const slotsToRender = (gridSlots && Array.isArray(gridSlots) && gridSlots.length > 0) 
-                    ? gridSlots 
+                    ? gridSlots.filter((slot: GridSlot | null | undefined) => slot != null)
                     : Array.from({ length: 12 }, (_, i) => ({
                         slotIndex: i + 1,
                         streamer: null,
@@ -2567,9 +2568,24 @@ export default function LiveRoom() {
                         volume: 0.5,
                       }));
                   
-                  console.log('[GRID RENDER] Using slots:', slotsToRender?.length, slotsToRender);
+                  // Ensure we always have exactly 12 slots
+                  const finalSlots = slotsToRender.length === 12 
+                    ? slotsToRender 
+                    : Array.from({ length: 12 }, (_, i) => {
+                        const existingSlot = slotsToRender.find((s: GridSlot) => s.slotIndex === i + 1);
+                        return existingSlot || {
+                          slotIndex: i + 1,
+                          streamer: null,
+                          isPinned: false,
+                          isMuted: false,
+                          isEmpty: true,
+                          volume: 0.5,
+                        };
+                      });
                   
-                  return slotsToRender.map((slot) => (
+                  console.log('[GRID RENDER] Using slots:', finalSlots?.length, finalSlots);
+                  
+                  return finalSlots.map((slot: GridSlot) => (
                   <div
                     key={slot.slotIndex}
                     draggable={!slot.isEmpty && volumeSliderOpenSlot !== slot.slotIndex}
