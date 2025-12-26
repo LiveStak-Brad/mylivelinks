@@ -1,28 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { requireAdmin } from '@/lib/admin';
 
-// Check if user is admin
-async function isAdmin(supabase: any): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_owner')
-    .eq('id', user.id)
-    .single();
-
-  return profile?.is_owner === true;
+function authErrorToResponse(err: unknown) {
+  const msg = err instanceof Error ? err.message : '';
+  if (msg === 'UNAUTHORIZED') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (msg === 'FORBIDDEN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
 
 // GET /api/admin/rooms - List all rooms (including drafts) for admin
 export async function GET(request: NextRequest) {
   try {
+    await requireAdmin(request);
     const supabase = createRouteHandlerClient(request);
-
-    if (!(await isAdmin(supabase))) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const { data: rooms, error } = await supabase
       .from('coming_soon_rooms')
@@ -36,19 +27,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ rooms: rooms || [] });
   } catch (err) {
-    console.error('[API /admin/rooms] Exception:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return authErrorToResponse(err);
   }
 }
 
 // POST /api/admin/rooms - Create a new room
 export async function POST(request: NextRequest) {
   try {
+    await requireAdmin(request);
     const supabase = createRouteHandlerClient(request);
-
-    if (!(await isAdmin(supabase))) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const body = await request.json();
     const {
@@ -96,7 +83,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ room });
   } catch (err) {
-    console.error('[API /admin/rooms] Exception:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return authErrorToResponse(err);
   }
 }

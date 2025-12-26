@@ -11,12 +11,12 @@ function authErrorToResponse(err: unknown) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
     await requireAdmin(request);
 
-    const roomId = params.roomId;
+    const { roomId } = await params;
     if (!roomId) {
       return NextResponse.json({ error: 'roomId is required' }, { status: 400 });
     }
@@ -32,7 +32,7 @@ export async function POST(
     const supabase = createRouteHandlerClient(request);
 
     const { data, error } = await supabase
-      .from('rooms')
+      .from('coming_soon_rooms')
       .update({ status })
       .eq('id', roomId)
       .select('id, status')

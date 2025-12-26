@@ -4,21 +4,25 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import RoomCard from './RoomCard';
 import RoomPreviewModal from './RoomPreviewModal';
+import { comingSoonRooms as mockRooms } from '@/lib/coming-soon-rooms';
 
-type RoomCategory = 'gaming' | 'music' | 'entertainment';
-type RoomStatus = 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused';
+type RoomCategory = 'gaming' | 'music' | 'entertainment' | 'Gaming' | 'Music' | 'Entertainment';
+type RoomStatus = 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused' | 'coming_soon';
 
 export type ComingSoonRoom = {
   id: string;
-  room_key: string;
+  room_key?: string;
   name: string;
   category: RoomCategory;
   status: RoomStatus;
   description?: string | null;
   image_url: string | null;
-  current_interest_count: number;
-  interest_threshold: number;
-  disclaimer_required: boolean;
+  fallback_gradient?: string;
+  current_interest_count?: number;
+  interest_count?: number;
+  interest_threshold?: number;
+  disclaimer_required?: boolean;
+  special_badge?: string;
 };
 
 export default function RoomsCarousel() {
@@ -33,6 +37,23 @@ export default function RoomsCarousel() {
     return rooms.find((r) => r.id === selectedRoomId) || null;
   }, [rooms, selectedRoomId]);
 
+  // Convert mock rooms to the same format as DB rooms
+  const fallbackRooms: ComingSoonRoom[] = useMemo(() => 
+    mockRooms.map((r) => ({
+      id: r.id,
+      name: r.name,
+      category: r.category,
+      status: r.status,
+      description: r.description,
+      image_url: r.image_url,
+      fallback_gradient: r.fallback_gradient,
+      interest_count: r.interest_count,
+      current_interest_count: r.interest_count,
+      disclaimer_required: !!r.disclaimer,
+      special_badge: r.special_badge,
+    })),
+  []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -41,14 +62,18 @@ export default function RoomsCarousel() {
         const res = await fetch('/api/rooms');
         const json = await res.json().catch(() => null);
         if (!res.ok) {
-          console.error('[ROOMS] failed to load rooms:', json);
+          console.error('[ROOMS] failed to load rooms, using fallback:', json);
+          if (!cancelled) setRooms(fallbackRooms);
           return;
         }
+        const dbRooms = (json?.rooms as ComingSoonRoom[]) ?? [];
         if (!cancelled) {
-          setRooms((json?.rooms as ComingSoonRoom[]) ?? []);
+          // Use DB rooms if available, otherwise fall back to mock data
+          setRooms(dbRooms.length > 0 ? dbRooms : fallbackRooms);
         }
       } catch (err) {
-        console.error('[ROOMS] rooms fetch exception:', err);
+        console.error('[ROOMS] rooms fetch exception, using fallback:', err);
+        if (!cancelled) setRooms(fallbackRooms);
       }
     };
 
@@ -77,7 +102,7 @@ export default function RoomsCarousel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fallbackRooms]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
@@ -101,7 +126,8 @@ export default function RoomsCarousel() {
   const setRoomInterestCount = (roomId: string, newCount: number) => {
     setRooms((prev) => {
       if (!prev) return prev;
-      return prev.map((r) => (r.id === roomId ? { ...r, current_interest_count: newCount } : r));
+      // Update both field names so the UI works regardless of data source
+      return prev.map((r) => (r.id === roomId ? { ...r, current_interest_count: newCount, interest_count: newCount } : r));
     });
   };
 
@@ -121,7 +147,8 @@ export default function RoomsCarousel() {
     }
 
     const prevInterested = interestedRoomIds.has(room.id);
-    const prevCount = room.current_interest_count;
+    // Support both DB format (current_interest_count) and mock format (interest_count)
+    const prevCount = room.current_interest_count ?? room.interest_count ?? 0;
     const optimisticCount = Math.max(prevCount + (nextInterested ? 1 : -1), 0);
 
     setRoomInterested(room.id, nextInterested);

@@ -16,8 +16,11 @@ interface RoomPreviewModalProps {
 // Category color schemes
 const categoryColors: Record<string, { bg: string; text: string; accent: string }> = {
   gaming: { bg: 'from-emerald-600 to-teal-700', text: 'text-emerald-400', accent: 'bg-emerald-500' },
+  Gaming: { bg: 'from-emerald-600 to-teal-700', text: 'text-emerald-400', accent: 'bg-emerald-500' },
   music: { bg: 'from-violet-600 to-purple-700', text: 'text-violet-400', accent: 'bg-violet-500' },
+  Music: { bg: 'from-violet-600 to-purple-700', text: 'text-violet-400', accent: 'bg-violet-500' },
   entertainment: { bg: 'from-rose-600 to-pink-700', text: 'text-rose-400', accent: 'bg-rose-500' },
+  Entertainment: { bg: 'from-rose-600 to-pink-700', text: 'text-rose-400', accent: 'bg-rose-500' },
 };
 
 export default function RoomPreviewModal({ room, interested, isOpen, onClose, onToggleInterest }: RoomPreviewModalProps) {
@@ -51,15 +54,19 @@ export default function RoomPreviewModal({ room, interested, isOpen, onClose, on
 
   const categoryStyle = categoryColors[room.category] || categoryColors.gaming;
   const categoryLabel = useMemo(() => {
-    if (room.category === 'gaming') return 'Gaming';
-    if (room.category === 'music') return 'Music';
+    const cat = room.category?.toLowerCase();
+    if (cat === 'gaming') return 'Gaming';
+    if (cat === 'music') return 'Music';
     return 'Entertainment';
   }, [room.category]);
 
+  // Support both DB format (current_interest_count) and mock format (interest_count)
+  const interestCount = room.current_interest_count ?? room.interest_count ?? 0;
+  const threshold = room.interest_threshold ?? 5000;
+
   const progressPercent = useMemo(() => {
-    const denom = room.interest_threshold || 1;
-    return Math.min((room.current_interest_count / denom) * 100, 100);
-  }, [room.current_interest_count, room.interest_threshold]);
+    return Math.min((interestCount / threshold) * 100, 100);
+  }, [interestCount, threshold]);
 
   const handleInterestClick = async () => {
     onToggleInterest(room, !interested);
@@ -147,10 +154,10 @@ export default function RoomPreviewModal({ room, interested, isOpen, onClose, on
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2 text-muted-foreground">
                 <Users className="w-4 h-4" />
-                {formatInterestCount(room.current_interest_count)} interested
+                {formatInterestCount(interestCount)} interested
               </span>
               <span className="text-muted-foreground">
-                {formatInterestCount(room.interest_threshold)} to open
+                {formatInterestCount(threshold)} to open
               </span>
             </div>
             

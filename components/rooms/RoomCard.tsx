@@ -19,12 +19,27 @@ const categoryColors: Record<string, { bg: string; text: string; border: string 
     text: 'text-emerald-400', 
     border: 'border-emerald-500/30' 
   },
+  Gaming: { 
+    bg: 'bg-emerald-500/20', 
+    text: 'text-emerald-400', 
+    border: 'border-emerald-500/30' 
+  },
   music: { 
     bg: 'bg-violet-500/20', 
     text: 'text-violet-400', 
     border: 'border-violet-500/30' 
   },
+  Music: { 
+    bg: 'bg-violet-500/20', 
+    text: 'text-violet-400', 
+    border: 'border-violet-500/30' 
+  },
   entertainment: { 
+    bg: 'bg-rose-500/20', 
+    text: 'text-rose-400', 
+    border: 'border-rose-500/30' 
+  },
+  Entertainment: { 
     bg: 'bg-rose-500/20', 
     text: 'text-rose-400', 
     border: 'border-rose-500/30' 
@@ -37,15 +52,19 @@ export default function RoomCard({ room, interested, onOpenPreview, onToggleInte
 
   const categoryStyle = categoryColors[room.category] || categoryColors.gaming;
   const categoryLabel = useMemo(() => {
-    if (room.category === 'gaming') return 'Gaming';
-    if (room.category === 'music') return 'Music';
+    const cat = room.category?.toLowerCase();
+    if (cat === 'gaming') return 'Gaming';
+    if (cat === 'music') return 'Music';
     return 'Entertainment';
   }, [room.category]);
 
+  // Support both DB format (current_interest_count) and mock format (interest_count)
+  const interestCount = room.current_interest_count ?? room.interest_count ?? 0;
+  const threshold = room.interest_threshold ?? 5000;
+
   const progressPercent = useMemo(() => {
-    const denom = room.interest_threshold || 1;
-    return Math.min((room.current_interest_count / denom) * 100, 100);
-  }, [room.current_interest_count, room.interest_threshold]);
+    return Math.min((interestCount / threshold) * 100, 100);
+  }, [interestCount, threshold]);
 
   const handleInterestClick = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click
@@ -117,8 +136,8 @@ export default function RoomCard({ room, interested, onOpenPreview, onToggleInte
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{formatInterestCount(room.current_interest_count)} interested</span>
-            <span>{formatInterestCount(room.interest_threshold)} to open</span>
+            <span>{formatInterestCount(interestCount)} interested</span>
+            <span>{formatInterestCount(threshold)} to open</span>
           </div>
           <div className="relative h-2 bg-muted rounded-full overflow-hidden">
             <div
@@ -133,7 +152,7 @@ export default function RoomCard({ room, interested, onOpenPreview, onToggleInte
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Heart className={`w-4 h-4 ${interested ? 'fill-rose-500 text-rose-500' : ''}`} />
             <span className="text-sm font-medium">
-              {formatInterestCount(room.current_interest_count)}
+              {formatInterestCount(interestCount)}
             </span>
           </div>
 

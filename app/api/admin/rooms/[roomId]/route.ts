@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { requireAdmin } from '@/lib/admin';
 
-// Check if user is admin
-async function isAdmin(supabase: any): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_owner')
-    .eq('id', user.id)
-    .single();
-
-  return profile?.is_owner === true;
+function authErrorToResponse(err: unknown) {
+  const msg = err instanceof Error ? err.message : '';
+  if (msg === 'UNAUTHORIZED') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (msg === 'FORBIDDEN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
 
 // GET /api/admin/rooms/[roomId] - Get single room
@@ -23,10 +17,7 @@ export async function GET(
   try {
     const { roomId } = await params;
     const supabase = createRouteHandlerClient(request);
-
-    if (!(await isAdmin(supabase))) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await requireAdmin(request);
 
     const { data: room, error } = await supabase
       .from('coming_soon_rooms')
@@ -40,8 +31,7 @@ export async function GET(
 
     return NextResponse.json({ room });
   } catch (err) {
-    console.error('[API /admin/rooms/[id]] Exception:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return authErrorToResponse(err);
   }
 }
 
@@ -53,10 +43,7 @@ export async function PUT(
   try {
     const { roomId } = await params;
     const supabase = createRouteHandlerClient(request);
-
-    if (!(await isAdmin(supabase))) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await requireAdmin(request);
 
     const body = await request.json();
     const {
@@ -116,10 +103,7 @@ export async function DELETE(
   try {
     const { roomId } = await params;
     const supabase = createRouteHandlerClient(request);
-
-    if (!(await isAdmin(supabase))) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    await requireAdmin(request);
 
     const { error } = await supabase
       .from('coming_soon_rooms')
@@ -133,7 +117,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[API /admin/rooms/[id]] Exception:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return authErrorToResponse(err);
   }
 }
