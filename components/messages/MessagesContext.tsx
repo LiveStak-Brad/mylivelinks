@@ -13,6 +13,7 @@ export interface Message {
   type: MessageType;
   timestamp: Date;
   status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  error?: string;
   // Gift-specific fields
   giftId?: number;
   giftName?: string;
@@ -697,10 +698,20 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           }),
         });
 
-        const data = await response.json();
+        const raw = await response.text();
+        let data: any = null;
+        try {
+          data = raw ? JSON.parse(raw) : null;
+        } catch {
+          data = null;
+        }
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to send gift');
+          const errMsg =
+            (data && typeof data?.error === 'string' && data.error.length ? data.error : null) ||
+            (raw && raw.length ? raw : null) ||
+            'Failed to send gift';
+          throw new Error(errMsg);
         }
 
         const giftContent = encodeGiftContent({
@@ -767,7 +778,10 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         return true;
       } catch (error) {
         console.error('[Messages] Error sending gift:', error);
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        const errText = error instanceof Error ? error.message : 'Failed to send gift';
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, status: 'failed', error: errText } : m))
+        );
         return false;
       } finally {
         sendGiftInFlightRef.current = false;

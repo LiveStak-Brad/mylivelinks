@@ -30,7 +30,7 @@ export function GateScreen({ navigation }: Props) {
     } else if (needsOnboarding || !isComplete) {
       target = 'CreateProfile';
     } else {
-      target = 'HomeDashboard';
+      target = 'MainTabs';
     }
 
     if (lastTargetRef.current === target) return;

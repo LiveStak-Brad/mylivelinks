@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionUser } from '@/lib/admin';
+import { createAuthedRouteHandlerClient, getSessionUser } from '@/lib/admin';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 export async function POST(request: NextRequest, context: { params: { commentId: string } }) {
@@ -9,6 +9,15 @@ export async function POST(request: NextRequest, context: { params: { commentId:
     const user = await getSessionUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const purchasesOwnerOnly = (process.env.PURCHASES_OWNER_ONLY ?? 'true').toLowerCase() !== 'false';
+    const supabase = createAuthedRouteHandlerClient(request);
+    const { data: ownerOk } = await supabase.rpc('is_owner', { p_profile_id: user.id });
+    const isOwner = ownerOk === true;
+
+    if (purchasesOwnerOnly && !isOwner) {
+      return NextResponse.json({ error: 'Purchases are temporarily disabled' }, { status: 403 });
     }
 
     const commentId = context.params.commentId;

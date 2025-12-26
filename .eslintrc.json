@@ -17,6 +17,24 @@
   },
   "overrides": [
     {
+      "files": ["**/scripts/**/*.js"],
+      "rules": {
+        "@typescript-eslint/no-require-imports": "off"
+      }
+    },
+    {
+      "files": ["mobile/**/*"],
+      "rules": {
+        "@next/next/no-html-link-for-pages": "off"
+      }
+    },
+    {
+      "files": ["mobile/**/*.js"],
+      "rules": {
+        "@typescript-eslint/no-require-imports": "off"
+      }
+    },
+    {
       "files": ["**/*.tsx", "**/*.jsx"],
       "excludedFiles": [
         "**/globals.css",

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 
 type Profile = {
   id: string;
@@ -37,6 +37,14 @@ export function useProfile(userId?: string | null): UseProfileReturn {
 
   const load = useCallback(async () => {
     if (!userId) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    // If supabase client is not initialized, skip loading profile
+    if (!supabaseConfigured) {
+      console.warn('[PROFILE] Supabase client not initialized - skipping profile load');
       setProfile(null);
       setLoading(false);
       return;

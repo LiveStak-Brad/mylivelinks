@@ -867,15 +867,7 @@ export default function Tile({
         ))}
       </div>
 
-      {/* State Indicator - Show LIVE badge when video track exists */}
-      <div className="absolute top-2 left-2 flex items-center gap-1.5 z-30">
-        {tileState === 'live' && (
-          <div className="flex items-center gap-1.5 bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-bold shadow-xl border border-red-400">
-            <span className="w-2.5 h-2.5 bg-white rounded-full animate-pulse shadow-sm" />
-            LIVE
-          </div>
-        )}
-      </div>
+      {/* LIVE badge removed - if video is visible, they're already live */}
 
       {/* Stats Overlay - Show viewer count */}
       {viewerCount > 0 && (

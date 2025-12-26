@@ -457,6 +457,11 @@ function MessageBubble({
               </span>
             )}
           </p>
+          {message.status === 'failed' && typeof (message as any)?.error === 'string' && (message as any).error.length > 0 && (
+            <p className={`text-[11px] mt-1 ${isOwn ? 'text-right' : 'text-left'} text-red-600 dark:text-red-400`}>
+              {(message as any).error}
+            </p>
+          )}
         </div>
       </div>
     );

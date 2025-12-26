@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseConfigured } from './supabase';
 
 function getApiBaseUrl() {
   const raw = process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com';
@@ -7,6 +7,7 @@ function getApiBaseUrl() {
 
 export async function signOut() {
   try {
+    if (!supabaseConfigured) return;
     await supabase.auth.signOut();
   } catch {
     // noop
@@ -14,12 +15,18 @@ export async function signOut() {
 }
 
 export async function signInWithPassword(email: string, password: string) {
+  if (!supabaseConfigured) {
+    throw new Error('Supabase client not initialized. Please configure environment variables.');
+  }
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data;
 }
 
 async function getAccessToken() {
+  if (!supabaseConfigured) {
+    throw new Error('Supabase client not initialized. Please configure environment variables.');
+  }
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
   const token = data.session?.access_token;

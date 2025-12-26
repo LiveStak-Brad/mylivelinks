@@ -3,6 +3,7 @@
 import { Gift } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import type { GifterStatus } from '@/lib/gifter-status';
 
 interface Supporter {
   id: string;
@@ -18,13 +19,15 @@ interface TopSupportersWidgetProps {
   cardStyle: React.CSSProperties;
   borderRadiusClass: string;
   accentColor: string;
+  gifterStatuses?: Record<string, GifterStatus>;
 }
 
 export default function TopSupportersWidget({
   supporters,
   cardStyle,
   borderRadiusClass,
-  accentColor
+  accentColor,
+  gifterStatuses
 }: TopSupportersWidgetProps) {
   if (!supporters || supporters.length === 0) {
     return (
@@ -57,6 +60,13 @@ export default function TopSupportersWidget({
         
         <div className="space-y-3">
           {supporters.map((supporter, index) => (
+            (() => {
+              const status = gifterStatuses?.[supporter.id];
+              const level = status && Number(status.lifetime_coins ?? 0) > 0
+                ? Number(status.level_in_tier ?? 0)
+                : Number(supporter.gifter_level ?? 0);
+
+              return (
             <Link
               key={supporter.id}
               href={`/${supporter.username}`}
@@ -93,15 +103,17 @@ export default function TopSupportersWidget({
                 </p>
               </div>
               
-              {supporter.gifter_level > 0 && (
+              {level > 0 && (
                 <div 
                   className="text-xs font-bold px-2 py-1 rounded-full text-white"
                   style={{ backgroundColor: accentColor }}
                 >
-                  Lv.{supporter.gifter_level}
+                  Lv.{level}
                 </div>
               )}
             </Link>
+              );
+            })()
           ))}
         </div>
       </div>

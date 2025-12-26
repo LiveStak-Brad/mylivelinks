@@ -2,7 +2,7 @@
   "expo": {
     "name": "MyLiveLinks",
     "slug": "mylivelinks-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -14,7 +14,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mylivelinks.app",
-      "buildNumber": "15",
+      "buildNumber": "16",
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs camera access for live streaming (future feature).",
         "NSMicrophoneUsageDescription": "This app needs microphone access for live streaming (future feature).",
@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "com.mylivelinks.app",
-      "versionCode": 15,
+      "versionCode": 16,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -32,7 +32,14 @@
     },
     "plugins": [
       "expo-dev-client",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000",
+          "imageWidth": 200
+        }
+      ]
     ],
     "extra": {
       "eas": {

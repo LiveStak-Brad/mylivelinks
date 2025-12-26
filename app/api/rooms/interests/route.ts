@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { createAuthedRouteHandlerClient } from '@/lib/admin';
 
 // GET /api/rooms/interests - Get current user's room interests
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient(request);
+    const supabase = createAuthedRouteHandlerClient(request);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {

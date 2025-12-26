@@ -1,6 +1,8 @@
 'use client';
 
 import { BarChart3, Video, Clock, Eye, TrendingUp, Calendar } from 'lucide-react';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
 
 interface StreamStats {
   total_streams: number;
@@ -16,6 +18,7 @@ interface StreamStats {
 interface StatsCardProps {
   streamStats: StreamStats;
   gifterLevel: number;
+  gifterStatus?: GifterStatus | null;
   totalGiftsSent: number;
   totalGiftsReceived: number;
   cardStyle: React.CSSProperties;
@@ -26,6 +29,7 @@ interface StatsCardProps {
 export default function StatsCard({
   streamStats,
   gifterLevel,
+  gifterStatus,
   totalGiftsSent,
   totalGiftsReceived,
   cardStyle,
@@ -129,8 +133,17 @@ export default function StatsCard({
           </h4>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-800">
-              <div className="text-2xl font-bold">{gifterLevel}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Gifter Level</div>
+              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 ? (
+                <div className="flex flex-col items-center justify-center gap-1">
+                  <TierBadge tier_key={gifterStatus.tier_key} level={gifterStatus.level_in_tier} size="sm" />
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Gifter Level</div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{gifterLevel}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Gifter Level</div>
+                </>
+              )}
             </div>
             
             <div className="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-800">

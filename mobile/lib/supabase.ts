@@ -7,8 +7,14 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+export const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+// Log missing env vars but DON'T crash the app
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables: EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY');
+  console.error('[SUPABASE] Missing environment variables:');
+  if (!supabaseUrl) console.error('  - EXPO_PUBLIC_SUPABASE_URL is not set');
+  if (!supabaseAnonKey) console.error('  - EXPO_PUBLIC_SUPABASE_ANON_KEY is not set');
+  console.error('[SUPABASE] App will run in offline mode. Auth features will not work.');
 }
 
 const ExpoSecureStoreAdapter = {
@@ -17,7 +23,10 @@ const ExpoSecureStoreAdapter = {
   removeItem: (key: string) => SecureStore.deleteItemAsync(key),
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+const safeSupabaseUrl = supabaseUrl ?? 'https://example.supabase.co';
+const safeSupabaseAnonKey = supabaseAnonKey ?? 'public-anon-key-not-set';
+
+export const supabase = createClient(safeSupabaseUrl, safeSupabaseAnonKey, {
   auth: {
     storage: ExpoSecureStoreAdapter,
     autoRefreshToken: true,

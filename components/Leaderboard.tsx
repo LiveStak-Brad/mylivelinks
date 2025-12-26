@@ -47,38 +47,17 @@ export default function Leaderboard() {
       }, 1000); // Wait 1 second before reloading (debounce)
     };
 
-    // Subscribe to realtime updates for profiles (total_gifts_received, total_spent changes)
-    const profilesChannel = supabase
-      .channel('leaderboard-profiles-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-        },
-        (payload: any) => {
-          // Only reload if the relevant field changed
-          if (
-            (type === 'top_streamers' && payload.new.total_gifts_received !== payload.old?.total_gifts_received) ||
-            (type === 'top_gifters' && payload.new.total_spent !== payload.old?.total_spent)
-          ) {
-            debouncedReload();
-          }
-        }
-      )
-      .subscribe();
+    const entryTypeFilter = type === 'top_streamers' ? 'entry_type=eq.diamond_earn' : 'entry_type=eq.coin_spend_gift';
 
-    // Subscribe to leaderboard_cache updates (if cache is refreshed)
-    const cacheChannel = supabase
-      .channel('leaderboard-cache-updates')
+    const ledgerChannel = supabase
+      .channel('leaderboard-ledger-updates')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'leaderboard_cache',
-          filter: `leaderboard_type=eq.${leaderboardKey}`,
+          table: 'ledger_entries',
+          filter: entryTypeFilter,
         },
         () => {
           debouncedReload();
@@ -88,8 +67,7 @@ export default function Leaderboard() {
 
     return () => {
       if (reloadTimer) clearTimeout(reloadTimer);
-      supabase.removeChannel(profilesChannel);
-      supabase.removeChannel(cacheChannel);
+      supabase.removeChannel(ledgerChannel);
     };
   }, [type, period, leaderboardKey]);
 
@@ -159,54 +137,29 @@ export default function Leaderboard() {
 
   const computeLiveLeaderboard = async () => {
     try {
-      // Optimized: Single query with only needed fields, using indexes
-      let data: any[] = [];
-      let error: any = null;
-
-      if (type === 'top_streamers') {
-        // Top streamers: by diamonds earned (total_gifts_received)
-        // Use index: idx_profiles_total_gifts_received
-        const result = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, gifter_level, total_gifts_received')
-          .not('total_gifts_received', 'is', null)
-          .gt('total_gifts_received', 0)
-          .order('total_gifts_received', { ascending: false })
-          .limit(100);
-        data = result.data || [];
-        error = result.error;
-      } else {
-        // Top gifters: by coins spent (total_spent)
-        // Use index: idx_profiles_total_spent
-        const result = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, gifter_level, total_spent')
-          .not('total_spent', 'is', null)
-          .gt('total_spent', 0)
-          .order('total_spent', { ascending: false })
-          .limit(100);
-        data = result.data || [];
-        error = result.error;
-      }
+      const { data, error } = await supabase.rpc('get_leaderboard', {
+        p_type: type,
+        p_period: period,
+        p_limit: 100,
+      });
 
       if (error) throw error;
 
-      // Batch load all unique gifter levels at once (much faster than N queries)
-      // Map entries with badge info from cache
-      const entriesWithBadges = data.map((profile: any, index: number) => {
-        return {
-          profile_id: profile.id,
-          username: profile.username,
-          avatar_url: profile.avatar_url,
-          gifter_level: profile.gifter_level || 0,
-          metric_value: type === 'top_streamers' ? profile.total_gifts_received : profile.total_spent,
-          rank: index + 1,
-        };
-      }).filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
+      const rows = Array.isArray(data) ? data : [];
+      const mapped = rows
+        .map((row: any) => ({
+          profile_id: row.profile_id,
+          username: row.username,
+          avatar_url: row.avatar_url,
+          gifter_level: row.gifter_level || 0,
+          metric_value: Number(row.metric_value ?? 0),
+          rank: Number(row.rank ?? 0),
+        }))
+        .filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
 
-      setEntries(entriesWithBadges);
+      setEntries(mapped);
 
-      const statusMap = await fetchGifterStatuses(entriesWithBadges.map((e: any) => e.profile_id));
+      const statusMap = await fetchGifterStatuses(mapped.map((e: any) => e.profile_id));
       setGifterStatusMap(statusMap);
     } catch (error) {
       console.error('Error computing live leaderboard:', error);
@@ -338,7 +291,7 @@ export default function Leaderboard() {
                   })()}
                 </div>
                 <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                  {type === 'top_streamers' ? 'Diamonds earned' : 'Coins spent'}
+                  {type === 'top_streamers' ? 'Diamonds earned' : 'Coins gifted'}
                 </p>
               </div>
 

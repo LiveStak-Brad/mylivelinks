@@ -58,36 +58,25 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
   const loadLeaderboard = async () => {
     setLoading(true);
     try {
-      let data: any[] = [];
+      const { data, error } = await supabase.rpc('get_leaderboard', {
+        p_type: type,
+        p_period: period,
+        p_limit: 50,
+      });
 
-      if (type === 'top_streamers') {
-        const result = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, gifter_level, total_gifts_received')
-          .not('total_gifts_received', 'is', null)
-          .gt('total_gifts_received', 0)
-          .order('total_gifts_received', { ascending: false })
-          .limit(50);
-        data = result.data || [];
-      } else {
-        const result = await supabase
-          .from('profiles')
-          .select('id, username, avatar_url, gifter_level, total_spent')
-          .not('total_spent', 'is', null)
-          .gt('total_spent', 0)
-          .order('total_spent', { ascending: false })
-          .limit(50);
-        data = result.data || [];
-      }
+      if (error) throw error;
 
-      const entriesWithBadges = data.map((profile: any, index: number) => ({
-        profile_id: profile.id,
-        username: profile.username,
-        avatar_url: profile.avatar_url,
-        gifter_level: profile.gifter_level || 0,
-        metric_value: type === 'top_streamers' ? profile.total_gifts_received : profile.total_spent,
-        rank: index + 1,
-      })).filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
+      const rows = Array.isArray(data) ? data : [];
+      const entriesWithBadges = rows
+        .map((row: any) => ({
+          profile_id: row.profile_id,
+          username: row.username,
+          avatar_url: row.avatar_url,
+          gifter_level: row.gifter_level || 0,
+          metric_value: Number(row.metric_value ?? 0),
+          rank: Number(row.rank ?? 0),
+        }))
+        .filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
 
       setEntries(entriesWithBadges);
 
@@ -257,7 +246,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`font-semibold truncate ${entry.rank <= 3 ? 'text-foreground' : 'text-foreground/80'}`}>
-                        {entry.username}
+                        @{entry.username}
                       </span>
                       {(() => {
                         const status = gifterStatusMap[entry.profile_id];
@@ -275,13 +264,22 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
 
                   {/* Metric */}
                   <div className="flex-shrink-0 text-right">
-                    <div className={`font-bold ${entry.rank <= 3 ? 'text-lg' : 'text-base'} ${
-                      type === 'top_streamers' ? 'text-cyan-500' : 'text-amber-500'
-                    }`}>
+                    <div className={`font-bold ${entry.rank <= 3 ? 'text-foreground' : 'text-foreground/90'}`}>
                       {formatMetric(entry.metric_value)}
                     </div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
-                      {type === 'top_streamers' ? 'diamonds' : 'coins'}
+                    <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
+                      {type === 'top_streamers' ? (
+                        <>
+                          <Gem className="w-3 h-3" /> diamonds
+                        </>
+                      ) : (
+                        <>
+                          <Coins className="w-3 h-3" /> coins
+                        </>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground/80">
+                      {type === 'top_streamers' ? 'Diamonds earned' : 'Coins gifted'}
                     </div>
                   </div>
                 </Link>

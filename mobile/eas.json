@@ -1,9 +1,11 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
+      "autoIncrement": true,
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
@@ -12,7 +14,9 @@
       },
       "env": {
         "EXPO_PUBLIC_DEBUG_LIVE": "1",
-        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com"
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dfiyrmqobjfsdsgklweg.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmaXlybXFvYmpmc2RzZ2tsd2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzUzOTAsImV4cCI6MjA4MTkxMTM5MH0.2oZG3_v0_0elcjLm19b0kk92QCG_yxZ2iieJ2haJzPw"
       }
     },
     "preview": {
@@ -22,9 +26,14 @@
         "simulator": false,
         "buildConfiguration": "Release"
       },
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_DEBUG_LIVE": "0",
-        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com"
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dfiyrmqobjfsdsgklweg.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmaXlybXFvYmpmc2RzZ2tsd2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzUzOTAsImV4cCI6MjA4MTkxMTM5MH0.2oZG3_v0_0elcjLm19b0kk92QCG_yxZ2iieJ2haJzPw"
       }
     },
     "production": {
@@ -34,22 +43,29 @@
         "simulator": false,
         "buildConfiguration": "Release"
       },
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "EXPO_PUBLIC_DEBUG_LIVE": "0",
-        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com"
+        "EXPO_PUBLIC_API_URL": "https://mylivelinks.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dfiyrmqobjfsdsgklweg.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmaXlybXFvYmpmc2RzZ2tsd2VnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzUzOTAsImV4cCI6MjA4MTkxMTM5MH0.2oZG3_v0_0elcjLm19b0kk92QCG_yxZ2iieJ2haJzPw"
       }
     }
   },
   "submit": {
     "development": {
-      "ios": {}
+      "ios": {},
+      "android": {}
     },
     "preview": {
-      "ios": {}
+      "ios": {},
+      "android": {}
     },
     "production": {
-      "ios": {}
+      "ios": {},
+      "android": {}
     }
   }
 }
-

@@ -214,9 +214,24 @@ BEGIN
   )
   ON CONFLICT (idempotency_key) DO NOTHING;
 
-  -- IMPORTANT: Do NOT update cached profile balances/totals here.
-  -- Production DB uses triggers to recompute profiles balances from ledger_entries
-  -- and to update gift totals from gifts inserts. Updating profiles here would double-credit.
+  -- Cache fields used by leaderboards / UI.
+  -- In some environments we do not have triggers recomputing these from the ledger.
+  UPDATE public.profiles
+  SET total_spent = COALESCE(total_spent, 0) + p_coins_amount,
+      total_gifts_sent = COALESCE(total_gifts_sent, 0) + p_coins_amount,
+      lifetime_coins_gifted = COALESCE(lifetime_coins_gifted, 0) + p_coins_amount,
+      last_transaction_at = CURRENT_TIMESTAMP
+  WHERE id = p_sender_id;
+
+  UPDATE public.profiles
+  SET total_gifts_received = COALESCE(total_gifts_received, 0) + p_coins_amount,
+      lifetime_diamonds_earned = COALESCE(lifetime_diamonds_earned, 0) + v_diamonds_awarded,
+      last_transaction_at = CURRENT_TIMESTAMP
+  WHERE id = p_recipient_id;
+
+  IF to_regprocedure('public.update_gifter_level(uuid)') IS NOT NULL THEN
+    PERFORM public.update_gifter_level(p_sender_id);
+  END IF;
 
   RETURN jsonb_build_object(
     'gift_id', v_gift_id,

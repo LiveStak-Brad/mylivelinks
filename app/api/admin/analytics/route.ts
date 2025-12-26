@@ -141,6 +141,10 @@ export async function GET(request: NextRequest) {
       .limit(5000);
 
     const purchaseRows = (purchasesQuery.error ? [] : purchasesQuery.data ?? []) as any[];
+    const completedPurchases = purchaseRows.filter((p) => {
+      const s = String(p?.status ?? '').toLowerCase();
+      return s !== 'failed' && s !== 'pending';
+    });
     const succeededPurchases = purchaseRows.filter((p) => {
       const s = String(p?.status ?? '').toLowerCase();
       if (s === 'failed' || s === 'pending') return false;
@@ -150,12 +154,12 @@ export async function GET(request: NextRequest) {
 
     const grossRevenueUsd = centsToUsd(
       safeNumber(overview?.gross_revenue_cents) ||
-        succeededPurchases.reduce((sum, p) => sum + safeNumber(p.amount_usd_cents ?? safeNumber(p.usd_amount) * 100), 0)
+        completedPurchases.reduce((sum, p) => sum + safeNumber(p.amount_usd_cents ?? safeNumber(p.usd_amount) * 100), 0)
     );
 
     const stripeFeesUsd = centsToUsd(
       safeNumber(overview?.stripe_fees_cents) ||
-        succeededPurchases.reduce((sum, p) => sum + safeNumber(p.stripe_fee_cents), 0)
+        completedPurchases.reduce((sum, p) => sum + safeNumber(p.stripe_fee_cents), 0)
     );
 
     const refundsUsd = centsToUsd(
@@ -180,7 +184,7 @@ export async function GET(request: NextRequest) {
         0
       );
 
-    const totalChargesCount = safeNumber(overview?.charges_count) || succeededPurchases.length;
+    const totalChargesCount = safeNumber(overview?.charges_count) || completedPurchases.length;
 
     // Circulation + outstanding balances (fallback: sum cached balances in profiles)
     let coinsInCirculation = safeNumber(overview?.coins_in_circulation);
@@ -275,7 +279,7 @@ export async function GET(request: NextRequest) {
         })
       : (() => {
           const buckets = new Map<number, { grossCents: number; netCents: number }>();
-          for (const p of succeededPurchases) {
+          for (const p of completedPurchases) {
             const t = new Date(p.confirmed_at ?? p.created_at);
             const b = bucketStartFor(t, bucket);
             const key = b.getTime();

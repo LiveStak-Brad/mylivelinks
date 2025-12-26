@@ -6,7 +6,7 @@ import type {
   SignUpWithPasswordCredentials,
 } from '@supabase/supabase-js';
 
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 
 type UseAuthReturn = {
   user: User | null;
@@ -23,6 +23,13 @@ export function useAuth(): UseAuthReturn {
 
   useEffect(() => {
     let mounted = true;
+
+    // If supabase client is not initialized, return offline mode
+    if (!supabaseConfigured) {
+      console.warn('[AUTH] Supabase client not initialized - running in offline mode');
+      setLoading(false);
+      return;
+    }
 
     const bootstrap = async () => {
       try {
@@ -58,6 +65,9 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    if (!supabaseConfigured) {
+      throw new Error('Supabase client not initialized. Please configure environment variables.');
+    }
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -67,6 +77,9 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, username?: string) => {
+    if (!supabaseConfigured) {
+      throw new Error('Supabase client not initialized. Please configure environment variables.');
+    }
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -77,6 +90,9 @@ export function useAuth(): UseAuthReturn {
   }, []);
 
   const signOut = useCallback(async () => {
+    if (!supabaseConfigured) {
+      throw new Error('Supabase client not initialized. Please configure environment variables.');
+    }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }, []);

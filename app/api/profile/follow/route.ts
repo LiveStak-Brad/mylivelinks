@@ -1,4 +1,4 @@
-import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { createAuthedRouteHandlerClient } from '@/lib/admin';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient(request);
+    const supabase = createAuthedRouteHandlerClient(request);
     
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     

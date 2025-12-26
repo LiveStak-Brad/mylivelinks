@@ -441,11 +441,11 @@ BEGIN
   ),
   sums AS (
     SELECT
-      COALESCE(SUM(CASE WHEN status_normalized = 'succeeded' THEN amount_usd_cents ELSE 0 END), 0)::bigint AS gross_revenue_cents,
-      COALESCE(SUM(CASE WHEN status_normalized = 'succeeded' THEN stripe_fee_cents ELSE 0 END), 0)::bigint AS stripe_fees_cents,
-      COALESCE(SUM(CASE WHEN status_normalized IN ('refunded') THEN refunded_cents ELSE 0 END), 0)::bigint AS refunds_cents,
-      COALESCE(SUM(CASE WHEN status_normalized IN ('disputed') THEN disputed_cents ELSE 0 END), 0)::bigint AS disputes_cents,
-      COALESCE(COUNT(*) FILTER (WHERE status_normalized = 'succeeded'), 0)::bigint AS charges_count,
+      COALESCE(SUM(CASE WHEN status_normalized IN ('succeeded', 'refunded', 'disputed') THEN amount_usd_cents ELSE 0 END), 0)::bigint AS gross_revenue_cents,
+      COALESCE(SUM(CASE WHEN status_normalized IN ('succeeded', 'refunded', 'disputed') THEN stripe_fee_cents ELSE 0 END), 0)::bigint AS stripe_fees_cents,
+      COALESCE(SUM(CASE WHEN status_normalized = 'refunded' THEN refunded_cents ELSE 0 END), 0)::bigint AS refunds_cents,
+      COALESCE(SUM(CASE WHEN status_normalized = 'disputed' THEN disputed_cents ELSE 0 END), 0)::bigint AS disputes_cents,
+      COALESCE(COUNT(*) FILTER (WHERE status_normalized IN ('succeeded', 'refunded', 'disputed')), 0)::bigint AS charges_count,
       COALESCE(COUNT(*) FILTER (WHERE status_normalized = 'refunded'), 0)::bigint AS refunds_count,
       COALESCE(COUNT(*) FILTER (WHERE status_normalized = 'disputed'), 0)::bigint AS disputes_count
     FROM purchases
@@ -607,11 +607,11 @@ BEGIN
   agg AS (
     SELECT
       bucket_start,
-      COALESCE(SUM(CASE WHEN status_normalized = 'succeeded' THEN amount_usd_cents ELSE 0 END), 0)::bigint AS gross_revenue_cents,
-      COALESCE(SUM(CASE WHEN status_normalized = 'succeeded' THEN stripe_fee_cents ELSE 0 END), 0)::bigint AS stripe_fees_cents,
+      COALESCE(SUM(CASE WHEN status_normalized IN ('succeeded', 'refunded', 'disputed') THEN amount_usd_cents ELSE 0 END), 0)::bigint AS gross_revenue_cents,
+      COALESCE(SUM(CASE WHEN status_normalized IN ('succeeded', 'refunded', 'disputed') THEN stripe_fee_cents ELSE 0 END), 0)::bigint AS stripe_fees_cents,
       COALESCE(SUM(CASE WHEN status_normalized = 'refunded' THEN refunded_cents ELSE 0 END), 0)::bigint AS refunds_cents,
       COALESCE(SUM(CASE WHEN status_normalized = 'disputed' THEN disputed_cents ELSE 0 END), 0)::bigint AS disputes_cents,
-      COALESCE(COUNT(*) FILTER (WHERE status_normalized = 'succeeded'), 0)::bigint AS charges_count
+      COALESCE(COUNT(*) FILTER (WHERE status_normalized IN ('succeeded', 'refunded', 'disputed')), 0)::bigint AS charges_count
     FROM base
     GROUP BY bucket_start
   )

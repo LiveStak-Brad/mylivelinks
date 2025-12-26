@@ -17,6 +17,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const purchasesOwnerOnly = (process.env.PURCHASES_OWNER_ONLY ?? 'true').toLowerCase() !== 'false';
+    const { data: ownerOk } = await supabase.rpc('is_owner', { p_profile_id: user.id });
+    const isOwner = ownerOk === true;
+
+    if (purchasesOwnerOnly && !isOwner) {
+      return NextResponse.json({ error: 'Purchases are temporarily disabled' }, { status: 403 });
+    }
+
     let body: any = null;
     try {
       body = await request.json();
@@ -80,76 +88,38 @@ export async function POST(request: NextRequest) {
 
     const adminSupabase = getSupabaseAdmin();
 
-    const { data: giftResult, error: giftError } = await adminSupabase.rpc('send_gift_v2', {
-      p_sender_id: user.id,
-      p_recipient_id: otherProfileId,
-      p_coins_amount: coinsAmount,
-      p_gift_type_id: giftTypeId,
-      p_stream_id: streamId,
-      p_request_id: messageRequestId,
-    });
-
-    if (giftError) {
-      return NextResponse.json({ error: giftError.message }, { status: 400 });
-    }
-
-    let giftName: string | null = null;
-    if (giftTypeId) {
-      const { data: giftType } = await adminSupabase
-        .from('gift_types')
-        .select('name')
-        .eq('id', giftTypeId)
-        .single();
-      giftName = (giftType as any)?.name ?? null;
-    }
-
-    const insertPayload: any = {
-      conversation_id: conversationId,
-      sender_id: user.id,
-      type: 'gift',
-      gift_id: giftResult?.gift_id ?? null,
-      gift_name: giftName,
-      gift_coins: typeof giftResult?.coins_spent === 'number' ? giftResult.coins_spent : coinsAmount,
-      gift_tx_id: messageRequestId,
-      request_id: messageRequestId,
-    };
-
-    const { data: inserted, error: insertError } = await supabase
-      .from('messages')
-      .insert(insertPayload)
-      .select('*');
-
-    if (insertError) {
-      if ((insertError as any).code === '23505') {
-        const { data: existing, error: selectError } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('conversation_id', conversationId)
-          .eq('request_id', messageRequestId)
-          .limit(1);
-
-        if (selectError) {
-          return NextResponse.json({ error: selectError.message }, { status: 500 });
-        }
-
-        return NextResponse.json(
-          {
-            message: (existing ?? [])[0] ?? null,
-            alreadyExisted: true,
-            gift: giftResult,
-            conversationId,
-          },
-          { status: 200 }
-        );
+    const { data: giftMessageResult, error: giftMessageError } = await adminSupabase.rpc(
+      'send_gift_v2_with_message',
+      {
+        p_sender_id: user.id,
+        p_recipient_id: otherProfileId,
+        p_conversation_id: conversationId,
+        p_coins_amount: coinsAmount,
+        p_gift_type_id: giftTypeId,
+        p_stream_id: streamId,
+        p_request_id: messageRequestId,
       }
+    );
 
-      return NextResponse.json({ error: insertError.message }, { status: 400 });
+    if (giftMessageError) {
+      return NextResponse.json({ error: giftMessageError.message }, { status: 400 });
+    }
+
+    const messageId = (giftMessageResult as any)?.message_id ?? null;
+    const { data: messages, error: messageFetchError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('id', messageId)
+      .limit(1);
+
+    if (messageFetchError) {
+      return NextResponse.json({ error: messageFetchError.message }, { status: 500 });
     }
 
     return NextResponse.json(
       {
-        message: (inserted ?? [])[0] ?? null,
-        gift: giftResult,
+        message: (messages ?? [])[0] ?? null,
+        gift: (giftMessageResult as any)?.gift ?? giftMessageResult,
         conversationId,
       },
       { status: 200 }

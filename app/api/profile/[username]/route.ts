@@ -1,5 +1,6 @@
-import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { createAuthedRouteHandlerClient } from '@/lib/admin';
 import { NextRequest, NextResponse } from 'next/server';
+import { getGifterStatus } from '@/lib/gifter-status';
 
 /**
  * GET /api/profile/[username]
@@ -9,7 +10,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { username: string } }
 ) {
-  const supabase = createRouteHandlerClient(request);
+  const supabase = createAuthedRouteHandlerClient(request);
   
   try {
     const { username } = params;
@@ -17,6 +18,16 @@ export async function GET(
     // Get current user (optional - for relationship status)
     const { data: { user } } = await supabase.auth.getUser();
     const viewerId = user?.id || null;
+
+    let viewerIsAdmin = false;
+    if (viewerId) {
+      try {
+        const { data: isAdmin } = await supabase.rpc('is_admin', { uid: viewerId });
+        viewerIsAdmin = isAdmin === true;
+      } catch {
+        viewerIsAdmin = false;
+      }
+    }
     
     // Detect platform from user agent (mobile vs web)
     const userAgent = request.headers.get('user-agent') || '';
@@ -48,6 +59,39 @@ export async function GET(
     const profileId = String((data as any)?.profile?.id ?? '');
     const totalSpent = Number((data as any)?.profile?.total_spent ?? 0);
     const totalGiftsReceived = Number((data as any)?.profile?.total_gifts_received ?? 0);
+
+    const gifter_statuses: Record<string, any> = {};
+    try {
+      const topSupporters = Array.isArray((data as any)?.top_supporters)
+        ? ((data as any).top_supporters as any[])
+        : [];
+      const ids = Array.from(
+        new Set([
+          profileId,
+          ...topSupporters
+            .map((s) => String((s as any)?.id ?? ''))
+            .filter((id) => typeof id === 'string' && id.length > 0),
+        ].filter((id) => typeof id === 'string' && id.length > 0))
+      );
+
+      if (ids.length > 0) {
+        const { data: rows, error: rowsErr } = await supabase
+          .from('profiles')
+          .select('id, lifetime_coins_gifted')
+          .in('id', ids);
+
+        if (!rowsErr && Array.isArray(rows)) {
+          for (const row of rows) {
+            const id = String((row as any)?.id ?? '');
+            if (!id) continue;
+            const lifetimeCoins = Number((row as any)?.lifetime_coins_gifted ?? 0);
+            gifter_statuses[id] = getGifterStatus(lifetimeCoins, { is_admin: viewerIsAdmin });
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
 
     let gifter_rank = 0;
     let streamer_rank = 0;
@@ -152,6 +196,7 @@ export async function GET(
     return NextResponse.json(
       {
         ...(data as any),
+        gifter_statuses,
         streak_days,
         gifter_rank,
         streamer_rank,

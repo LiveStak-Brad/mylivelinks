@@ -1,11 +1,49 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../types/navigation';
 import ProfileScreen from './ProfileScreen';
+import { useAuthContext } from '../contexts/AuthContext';
+import { useTopBarState } from '../hooks/topbar/useTopBarState';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'ProfileRoute'>;
 
-export function ProfileRouteScreen({ navigation }: Props) {
-  return <ProfileScreen onBack={() => navigation.goBack()} />;
+export function ProfileRouteScreen({ navigation, route }: Props) {
+  const { session } = useAuthContext();
+  const topBar = useTopBarState();
+
+  const [authToken, setAuthToken] = useState<string | undefined>();
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+
+  // Get username from route params or use a default
+  const username = route.params?.username || 'demo';
+
+  useEffect(() => {
+    const token = session?.access_token;
+    const uid = session?.user?.id;
+    setAuthToken(token);
+    setCurrentUserId(uid);
+  }, [session?.access_token, session?.user?.id]);
+
+  const isOwnProfile = !!topBar.username && topBar.username === username;
+
+  return (
+    <ProfileScreen
+      username={username}
+      isOwnProfile={isOwnProfile}
+      apiBaseUrl="https://mylivelinks.com"
+      authToken={authToken}
+      onBack={() => navigation.goBack()}
+      onEditProfile={() => {
+        navigation.getParent?.()?.navigate?.('EditProfile');
+      }}
+      onMessage={(profileId) => {
+        // TODO: Navigate to messenger with this profile
+        console.log('Message:', profileId);
+      }}
+      onStats={(username) => {
+        navigation.getParent?.()?.navigate?.('MyAnalytics');
+      }}
+    />
+  );
 }

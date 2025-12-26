@@ -59,6 +59,7 @@ interface ProfileData {
     coin_balance?: number;
     earnings_balance?: number;
   };
+  gifter_statuses?: Record<string, any>;
   links: Array<{
     id: number;
     title: string;
@@ -205,6 +206,10 @@ export default function ModernProfilePage() {
 
       const cleanedProfileData = {
         ...profileData,
+        gifter_statuses:
+          profileData && typeof profileData === 'object' && typeof (profileData as any).gifter_statuses === 'object'
+            ? (profileData as any).gifter_statuses
+            : {},
         top_supporters: Array.isArray(profileData?.top_supporters)
           ? profileData.top_supporters.filter((s: any) => Number(s?.total_gifted ?? 0) > 0)
           : [],
@@ -630,6 +635,7 @@ export default function ModernProfilePage() {
               cardStyle={cardStyle}
               borderRadiusClass={borderRadiusClass}
               accentColor={accentColor}
+              gifterStatuses={profileData.gifter_statuses}
             />
             
             <TopStreamersWidget
@@ -763,6 +769,7 @@ export default function ModernProfilePage() {
           <StatsCard
             streamStats={profileData.stream_stats}
             gifterLevel={profile.gifter_level}
+            gifterStatus={(profileData as any)?.gifter_statuses?.[profile.id] ?? null}
             totalGiftsSent={profile.total_gifts_sent}
             totalGiftsReceived={profile.total_gifts_received}
             cardStyle={cardStyle}

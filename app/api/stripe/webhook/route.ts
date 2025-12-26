@@ -214,7 +214,40 @@ export async function POST(request: NextRequest) {
   }
 
   const usdCents = session.amount_total || 0;
-  const providerRef = session.payment_intent ?? session.id;
+  let paymentIntentId: string | null = null;
+  if (typeof session.payment_intent === 'string') {
+    paymentIntentId = session.payment_intent;
+  } else if (
+    session.payment_intent &&
+    typeof session.payment_intent === 'object' &&
+    'id' in session.payment_intent
+  ) {
+    const raw = (session.payment_intent as any)?.id;
+    paymentIntentId = raw ? String(raw) : null;
+  }
+
+  // If the session payload didn't include a payment_intent (or it was missing), try to retrieve it.
+  // This prevents double-crediting when both checkout.session.* and payment_intent.succeeded fire.
+  if (!paymentIntentId) {
+    try {
+      const stripe = getStripe();
+      const refreshed = await stripe.checkout.sessions.retrieve(String(session.id), {
+        expand: ['payment_intent'],
+      });
+      const pi = (refreshed as any)?.payment_intent;
+      if (typeof pi === 'string') paymentIntentId = pi;
+      else if (pi && typeof pi === 'object' && pi.id) paymentIntentId = String(pi.id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown';
+      logStripeAction('checkout-session-retrieve-failed', {
+        requestId,
+        sessionId: session.id,
+        error: message,
+      });
+    }
+  }
+
+  const providerRef = paymentIntentId ?? String(session.id);
   const idempotencyKey = `stripe:${providerRef}`;
 
   const supabase = getSupabaseAdmin();
@@ -277,6 +310,47 @@ export async function POST(request: NextRequest) {
     providerRef,
     idempotencyKey,
   });
+
+  // Pre-flight guard against double-crediting:
+  // If we previously finalized with stripe:<sessionId> (older code) or stripe:<paymentIntentId>,
+  // skip calling finalize_coin_purchase again.
+  try {
+    const existing = await supabase
+      .from('ledger_entries')
+      .select('id')
+      .or(
+        [
+          `idempotency_key.eq.${idempotencyKey}`,
+          `idempotency_key.eq.stripe:${String(session.id)}`,
+          `provider_ref.eq.${String(session.id)}`,
+          paymentIntentId ? `provider_ref.eq.${String(paymentIntentId)}` : null,
+        ]
+          .filter(Boolean)
+          .join(',')
+      )
+      .limit(1)
+      .maybeSingle();
+
+    if (!existing.error && existing.data?.id) {
+      logStripeAction('checkout-skip-existing-finalization', {
+        requestId,
+        sessionId: session.id,
+        paymentIntentId,
+        providerRef,
+        idempotencyKey,
+        ledgerId: existing.data.id,
+      });
+      return;
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown';
+    logStripeAction('checkout-finalization-guard-error', {
+      requestId,
+      sessionId: session.id,
+      paymentIntentId,
+      error: message,
+    });
+  }
 
   // Call RPC to finalize purchase (coins only)
   const { data: ledgerId, error } = await supabase.rpc('finalize_coin_purchase', {
@@ -434,6 +508,29 @@ async function handlePaymentIntentSucceeded(
       coins_awarded: coinsStr,
     });
     return;
+  }
+
+  // Guard against double-crediting:
+  // If checkout.session.* finalized using the session id (stripe:<sessionId>) and then
+  // payment_intent.succeeded fires, we'd otherwise create a 2nd ledger entry.
+  if (sessionId) {
+    const supabase = getSupabaseAdmin();
+    const existing = await supabase
+      .from('ledger_entries')
+      .select('id')
+      .or(`idempotency_key.eq.stripe:${sessionId},provider_ref.eq.${sessionId}`)
+      .limit(1)
+      .maybeSingle();
+
+    if (!existing.error && existing.data?.id) {
+      logStripeAction('payment-intent-skip-existing-session-finalization', {
+        requestId,
+        paymentIntentId: providerRef,
+        sessionId,
+        ledgerId: existing.data.id,
+      });
+      return;
+    }
   }
 
   const supabase = getSupabaseAdmin();

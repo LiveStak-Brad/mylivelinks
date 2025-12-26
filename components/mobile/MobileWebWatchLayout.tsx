@@ -232,14 +232,10 @@ export default function MobileWebWatchLayout({
             <span className="text-sm font-medium">Leave</span>
           </button>
 
-          {/* Center: Live indicator + grid info */}
+          {/* Center: Grid info (LIVE badge removed - if visible, they're live) */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-red-600 text-white px-2.5 py-1 rounded-full text-xs font-bold">
-              <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-              LIVE
-            </div>
-            <div className="flex items-center gap-1 text-white/70 text-xs">
-              <Video size={12} />
+            <div className="flex items-center gap-1 text-white/90 text-sm">
+              <Video size={14} />
               <span>{activeCount}/{totalSlots}</span>
             </div>
           </div>
