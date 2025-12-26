@@ -145,6 +145,7 @@ function generateStubData(dateRange: DateRange): AnalyticsData {
     const type = types[Math.floor(Math.random() * types.length)];
     const amount = Math.floor(Math.random() * 100 + 5) * 100; // cents
     const fees = Math.floor(amount * 0.029 + 30);
+    const status: StripeEvent['status'] = type === 'charge' ? 'succeeded' : type === 'refund' ? 'refunded' : 'disputed';
     
     return {
       id: `evt_${i}`,
@@ -152,7 +153,7 @@ function generateStubData(dateRange: DateRange): AnalyticsData {
       amount: amount / 100,
       fees: fees / 100,
       net: type === 'charge' ? (amount - fees) / 100 : -(amount / 100),
-      status: type === 'charge' ? 'succeeded' : type === 'refund' ? 'refunded' : 'disputed',
+      status,
       type,
     };
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -755,4 +756,5 @@ export default function AnalyticsPage() {
     </div>
   );
 }
+
 
