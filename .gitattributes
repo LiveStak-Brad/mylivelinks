@@ -1,0 +1,3 @@
+# Ensure patch-package patches have consistent LF line endings on macOS build servers
+*.patch text eol=lf
+mobile/patches/*.patch text eol=lf

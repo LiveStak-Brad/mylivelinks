@@ -6,14 +6,13 @@
  */
 
 export { FeedComposer } from './FeedComposer';
-export type { FeedComposerProps } from './FeedComposer';
-
 export { FeedPostCard } from './FeedPostCard';
-export type { FeedPostCardProps } from './FeedPostCard';
-
 export { FeedEmptyState } from './FeedEmptyState';
-export type { FeedEmptyStateProps } from './FeedEmptyState';
-
 export { FeedSkeleton, FeedComposerSkeleton, FeedSkeletonList } from './FeedSkeleton';
+
+// Re-export types
+export type { FeedComposerProps } from './FeedComposer';
+export type { FeedPostCardProps } from './FeedPostCard';
+export type { FeedEmptyStateProps } from './FeedEmptyState';
 export type { FeedSkeletonProps, FeedSkeletonListProps } from './FeedSkeleton';
 

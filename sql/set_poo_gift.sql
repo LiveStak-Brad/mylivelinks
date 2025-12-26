@@ -19,3 +19,4 @@ WHERE NOT EXISTS (SELECT 1 FROM gift_types WHERE coin_cost = 1);
 -- Verify the gift was set
 SELECT * FROM gift_types WHERE name = 'Poo';
 
+

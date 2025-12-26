@@ -177,5 +177,4 @@ const FeedPostCard = memo(function FeedPostCard({
 FeedPostCard.displayName = 'FeedPostCard';
 
 export { FeedPostCard };
-export type { FeedPostCardProps };
 

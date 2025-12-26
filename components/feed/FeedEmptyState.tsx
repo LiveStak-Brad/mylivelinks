@@ -99,5 +99,4 @@ const FeedEmptyState = memo(function FeedEmptyState({
 FeedEmptyState.displayName = 'FeedEmptyState';
 
 export { FeedEmptyState };
-export type { FeedEmptyStateProps };
 

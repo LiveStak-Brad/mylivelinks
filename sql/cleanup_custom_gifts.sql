@@ -47,3 +47,4 @@ INSERT INTO gift_types (name, emoji, coin_cost, tier, display_order, is_active) 
   ('Legendary', '👑', 10000, 5, 10, true);
 */
 
+

@@ -216,3 +216,4 @@ function DetailPageSkeleton({ hasSidebar }: { hasSidebar: boolean }) {
 
 export default DetailPage;
 
+
