@@ -49,7 +49,10 @@ import {
   Sparkles,
   Image,
   Heart,
+  UserCog,
 } from 'lucide-react';
+
+import { RoleUserRow, AddRoleModal, RoomRolesPanel, RoleUser } from '@/components/admin';
 
 // Types
 interface User {
@@ -161,7 +164,7 @@ interface DashboardStats {
   pendingApplications: number;
 }
 
-type TabType = 'dashboard' | 'users' | 'streams' | 'reports' | 'applications' | 'gifts' | 'transactions' | 'rooms' | 'analytics' | 'settings';
+type TabType = 'dashboard' | 'users' | 'streams' | 'reports' | 'applications' | 'gifts' | 'transactions' | 'rooms' | 'roles' | 'analytics' | 'settings';
 
 export default function OwnerPanel() {
   const router = useRouter();
@@ -183,6 +186,13 @@ export default function OwnerPanel() {
   const [rooms, setRooms] = useState<ComingSoonRoom[]>([]);
   const [editingRoom, setEditingRoom] = useState<ComingSoonRoom | null>(null);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  
+  // Roles state
+  const [appAdmins, setAppAdmins] = useState<RoleUser[]>([]);
+  const [roomRoles, setRoomRoles] = useState<Map<string, { admins: RoleUser[], moderators: RoleUser[] }>>(new Map());
+  const [selectedRoomForRoles, setSelectedRoomForRoles] = useState<ComingSoonRoom | null>(null);
+  const [showAddAppAdminModal, setShowAddAppAdminModal] = useState(false);
+  const [rolesSubTab, setRolesSubTab] = useState<'app' | 'rooms'>('app');
   
   // UI states
   const [searchQuery, setSearchQuery] = useState('');
@@ -219,6 +229,7 @@ export default function OwnerPanel() {
       loadCoinPacks(),
       loadTransactions(),
       loadRooms(),
+      loadRoles(),
     ]);
     setRefreshing(false);
   };
@@ -443,6 +454,41 @@ export default function OwnerPanel() {
     }
   };
 
+  const loadRoles = async () => {
+    try {
+      // Load App Admins
+      const res = await fetch('/api/admin/roles', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        setAppAdmins(json.app_admins || []);
+        
+        // Build room roles map
+        const rolesMap = new Map<string, { admins: RoleUser[], moderators: RoleUser[] }>();
+        for (const room of json.rooms || []) {
+          rolesMap.set(room.id, {
+            admins: room.admins || [],
+            moderators: room.moderators || [],
+          });
+        }
+        setRoomRoles(rolesMap);
+      }
+    } catch (error) {
+      console.error('Error loading roles:', error);
+      // Set mock data for development
+      setAppAdmins([
+        {
+          id: 'owner-1',
+          profile_id: 'owner-1',
+          username: 'brad',
+          display_name: 'Brad Morris',
+          avatar_url: null,
+          role: 'owner',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    }
+  };
+
   // Action handlers
   const handleBanUser = async (userId: string, ban: boolean) => {
     if (!confirm(`Are you sure you want to ${ban ? 'ban' : 'unban'} this user?`)) return;
@@ -626,6 +672,113 @@ export default function OwnerPanel() {
     }
   };
 
+  // Role handlers
+  const handleAddAppAdmin = async (userId: string, username: string) => {
+    setActionLoading('add-app-admin');
+    try {
+      const res = await fetch('/api/admin/roles/app-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (!res.ok) throw new Error('Failed to add app admin');
+      
+      // Optimistic update
+      const newAdmin: RoleUser = {
+        id: `temp-${Date.now()}`,
+        profile_id: userId,
+        username,
+        display_name: null,
+        avatar_url: null,
+        role: 'app_admin',
+        created_at: new Date().toISOString(),
+      };
+      setAppAdmins([...appAdmins, newAdmin]);
+      setShowAddAppAdminModal(false);
+      await loadRoles();
+    } catch (error) {
+      alert('Failed to add app admin');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRemoveAppAdmin = async (adminId: string) => {
+    if (!confirm('Remove this App Admin?')) return;
+    setActionLoading(adminId);
+    try {
+      const res = await fetch(`/api/admin/roles/app-admin/${adminId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to remove');
+      setAppAdmins(appAdmins.filter(a => a.id !== adminId));
+    } catch (error) {
+      alert('Failed to remove app admin');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAddRoomAdmin = async (roomId: string, userId: string, username: string) => {
+    setActionLoading('add-room-admin');
+    try {
+      const res = await fetch(`/api/admin/roles/room/${roomId}/admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (!res.ok) throw new Error('Failed to add room admin');
+      await loadRoles();
+    } catch (error) {
+      alert('Failed to add room admin');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRemoveRoomAdmin = async (roomId: string, adminId: string) => {
+    if (!confirm('Remove this Room Admin?')) return;
+    setActionLoading(adminId);
+    try {
+      const res = await fetch(`/api/admin/roles/room/${roomId}/admin/${adminId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to remove');
+      await loadRoles();
+    } catch (error) {
+      alert('Failed to remove room admin');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAddRoomModerator = async (roomId: string, userId: string, username: string) => {
+    setActionLoading('add-room-mod');
+    try {
+      const res = await fetch(`/api/admin/roles/room/${roomId}/moderator`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+      if (!res.ok) throw new Error('Failed to add moderator');
+      await loadRoles();
+    } catch (error) {
+      alert('Failed to add moderator');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRemoveRoomModerator = async (roomId: string, modId: string) => {
+    if (!confirm('Remove this Moderator?')) return;
+    setActionLoading(modId);
+    try {
+      const res = await fetch(`/api/admin/roles/room/${roomId}/moderator/${modId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to remove');
+      await loadRoles();
+    } catch (error) {
+      alert('Failed to remove moderator');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
@@ -687,6 +840,7 @@ export default function OwnerPanel() {
     { id: 'reports', label: 'Reports', icon: AlertTriangle, badge: stats?.pendingReports },
     { id: 'applications', label: 'Applications', icon: FileCheck, badge: stats?.pendingApplications },
     { id: 'rooms', label: 'Coming Soon Rooms', icon: Sparkles, badge: rooms.length },
+    { id: 'roles', label: 'Roles', icon: UserCog, badge: appAdmins.length },
     { id: 'gifts', label: 'Gifts & Coins', icon: Gift },
     { id: 'transactions', label: 'Transactions', icon: Wallet },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -772,6 +926,7 @@ export default function OwnerPanel() {
               {activeTab === 'reports' && 'Review and handle user reports'}
               {activeTab === 'applications' && 'Approve or reject room applications'}
               {activeTab === 'rooms' && 'Manage Coming Soon rooms and their images'}
+              {activeTab === 'roles' && 'Manage App Admins and Room Roles'}
               {activeTab === 'gifts' && 'Manage gift types and coin packs'}
               {activeTab === 'transactions' && 'View all platform transactions'}
               {activeTab === 'analytics' && 'Platform analytics and insights'}
@@ -1709,6 +1864,235 @@ export default function OwnerPanel() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Roles Tab */}
+        {activeTab === 'roles' && (
+          <div className="space-y-6">
+            {/* Sub-tabs */}
+            <div className="flex gap-2 border-b border-gray-700 pb-4">
+              <button
+                onClick={() => { setRolesSubTab('app'); setSelectedRoomForRoles(null); }}
+                className={`px-4 py-2 rounded-lg font-medium transition ${
+                  rolesSubTab === 'app'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  App Admins
+                </div>
+              </button>
+              <button
+                onClick={() => { setRolesSubTab('rooms'); setSelectedRoomForRoles(null); }}
+                className={`px-4 py-2 rounded-lg font-medium transition ${
+                  rolesSubTab === 'rooms'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Room Roles
+                </div>
+              </button>
+            </div>
+
+            {/* App Admins Sub-tab */}
+            {rolesSubTab === 'app' && (
+              <div className="space-y-6">
+                {/* Info Banner */}
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+                  <Crown className="w-6 h-6 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-400 font-medium">Owner has full privileges everywhere</p>
+                    <p className="text-amber-400/70 text-sm mt-1">
+                      The Owner account cannot be removed and has admin + moderation privileges across all rooms.
+                    </p>
+                  </div>
+                </div>
+
+                {/* App Admins List */}
+                <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Shield className="w-5 h-5 text-purple-400" />
+                      <h4 className="font-semibold text-white">App Admins</h4>
+                      <span className="px-2 py-0.5 bg-gray-700 text-gray-300 text-xs rounded-full">
+                        {appAdmins.length}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setShowAddAppAdminModal(true)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add App Admin
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {appAdmins.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400">
+                        <Shield className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>No app admins yet</p>
+                        <p className="text-sm mt-1">Add admins to help manage the platform</p>
+                      </div>
+                    ) : (
+                      appAdmins.map((admin) => (
+                        <RoleUserRow
+                          key={admin.id}
+                          user={admin}
+                          onRemove={() => handleRemoveAppAdmin(admin.id)}
+                          canRemove={admin.role !== 'owner'}
+                          isLoading={actionLoading === admin.id}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Role Permissions Info */}
+                <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
+                  <h5 className="font-medium text-white mb-4">Role Permissions</h5>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="p-4 bg-gray-700/30 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Crown className="w-5 h-5 text-amber-400" />
+                        <span className="font-medium text-amber-400">Owner</span>
+                      </div>
+                      <ul className="text-sm text-gray-400 space-y-1">
+                        <li>• Full access to all features</li>
+                        <li>• Can add/remove App Admins</li>
+                        <li>• Admin + moderation everywhere</li>
+                        <li>• Cannot be removed</li>
+                      </ul>
+                    </div>
+                    <div className="p-4 bg-gray-700/30 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="w-5 h-5 text-purple-400" />
+                        <span className="font-medium text-purple-400">App Admin</span>
+                      </div>
+                      <ul className="text-sm text-gray-400 space-y-1">
+                        <li>• Manage app-level settings</li>
+                        <li>• Manage all rooms globally</li>
+                        <li>• Add/remove Room Admins & Mods</li>
+                        <li>• Cannot remove Owner</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Room Roles Sub-tab */}
+            {rolesSubTab === 'rooms' && !selectedRoomForRoles && (
+              <div className="space-y-6">
+                <p className="text-gray-400">
+                  Select a room to manage its admins and moderators.
+                </p>
+
+                {/* Rooms Grid */}
+                {rooms.length === 0 ? (
+                  <div className="bg-gray-800 rounded-xl p-16 text-center border border-gray-700">
+                    <Sparkles className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-400 text-lg">No rooms available</p>
+                    <p className="text-gray-500 text-sm mt-2">Create rooms first in the "Coming Soon Rooms" tab</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {rooms.map((room) => {
+                      const roles = roomRoles.get(room.id) || { admins: [], moderators: [] };
+                      const totalRoles = roles.admins.length + roles.moderators.length;
+                      
+                      return (
+                        <button
+                          key={room.id}
+                          onClick={() => setSelectedRoomForRoles(room)}
+                          className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden hover:border-purple-500/50 transition text-left"
+                        >
+                          {/* Room Image */}
+                          <div className="h-24 relative">
+                            {room.image_url ? (
+                              <img
+                                src={room.image_url}
+                                alt={room.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className={`w-full h-full bg-gradient-to-br ${room.fallback_gradient}`} />
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-gray-800 via-transparent to-transparent" />
+                            
+                            {/* Status Badge */}
+                            <div className={`absolute top-2 right-2 px-2 py-0.5 text-[10px] font-medium rounded ${
+                              room.status === 'live' ? 'bg-red-500 text-white' :
+                              room.status === 'interest' ? 'bg-amber-500/80 text-white' :
+                              'bg-gray-600 text-gray-300'
+                            }`}>
+                              {room.status.replace('_', ' ').toUpperCase()}
+                            </div>
+                          </div>
+
+                          {/* Room Info */}
+                          <div className="p-4">
+                            <h4 className="font-medium text-white truncate">{room.name}</h4>
+                            <div className="flex items-center gap-3 mt-2 text-sm">
+                              <span className="text-blue-400 flex items-center gap-1">
+                                <Shield className="w-3.5 h-3.5" />
+                                {roles.admins.length} admins
+                              </span>
+                              <span className="text-green-400 flex items-center gap-1">
+                                <Users className="w-3.5 h-3.5" />
+                                {roles.moderators.length} mods
+                              </span>
+                            </div>
+                            <div className="mt-3 flex items-center justify-between">
+                              <span className="text-gray-400 text-sm capitalize">{room.category}</span>
+                              <span className="text-purple-400 text-sm font-medium">Manage →</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Selected Room Roles Panel */}
+            {rolesSubTab === 'rooms' && selectedRoomForRoles && (
+              <RoomRolesPanel
+                room={{
+                  id: selectedRoomForRoles.id,
+                  name: selectedRoomForRoles.name,
+                  image_url: selectedRoomForRoles.image_url,
+                  status: selectedRoomForRoles.status,
+                  category: selectedRoomForRoles.category,
+                }}
+                roomAdmins={roomRoles.get(selectedRoomForRoles.id)?.admins || []}
+                roomModerators={roomRoles.get(selectedRoomForRoles.id)?.moderators || []}
+                onBack={() => setSelectedRoomForRoles(null)}
+                onAddAdmin={handleAddRoomAdmin}
+                onAddModerator={handleAddRoomModerator}
+                onRemoveAdmin={handleRemoveRoomAdmin}
+                onRemoveModerator={handleRemoveRoomModerator}
+                canManageAdmins={true}
+                canManageModerators={true}
+                isLoading={actionLoading !== null}
+              />
+            )}
+
+            {/* Add App Admin Modal */}
+            <AddRoleModal
+              isOpen={showAddAppAdminModal}
+              onClose={() => setShowAddAppAdminModal(false)}
+              onConfirm={handleAddAppAdmin}
+              roleType="app_admin"
+              existingUserIds={appAdmins.map((a) => a.profile_id)}
+              isLoading={actionLoading === 'add-app-admin'}
+            />
           </div>
         )}
 

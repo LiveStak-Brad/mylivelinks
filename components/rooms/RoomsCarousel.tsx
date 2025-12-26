@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import RoomCard from './RoomCard';
 import RoomPreviewModal from './RoomPreviewModal';
-import { comingSoonRooms as mockRooms } from '@/lib/coming-soon-rooms';
 
 type RoomCategory = 'gaming' | 'music' | 'entertainment' | 'Gaming' | 'Music' | 'Entertainment';
 type RoomStatus = 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused' | 'coming_soon';
@@ -37,23 +36,6 @@ export default function RoomsCarousel() {
     return rooms.find((r) => r.id === selectedRoomId) || null;
   }, [rooms, selectedRoomId]);
 
-  // Convert mock rooms to the same format as DB rooms
-  const fallbackRooms: ComingSoonRoom[] = useMemo(() => 
-    mockRooms.map((r) => ({
-      id: r.id,
-      name: r.name,
-      category: r.category,
-      status: r.status,
-      description: r.description,
-      image_url: r.image_url,
-      fallback_gradient: r.fallback_gradient,
-      interest_count: r.interest_count,
-      current_interest_count: r.interest_count,
-      disclaimer_required: !!r.disclaimer,
-      special_badge: r.special_badge,
-    })),
-  []);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -62,18 +44,15 @@ export default function RoomsCarousel() {
         const res = await fetch('/api/rooms');
         const json = await res.json().catch(() => null);
         if (!res.ok) {
-          console.error('[ROOMS] failed to load rooms, using fallback:', json);
-          if (!cancelled) setRooms(fallbackRooms);
+          console.error('[ROOMS] failed to load rooms:', json);
+          if (!cancelled) setRooms([]);
           return;
         }
         const dbRooms = (json?.rooms as ComingSoonRoom[]) ?? [];
-        if (!cancelled) {
-          // Use DB rooms if available, otherwise fall back to mock data
-          setRooms(dbRooms.length > 0 ? dbRooms : fallbackRooms);
-        }
+        if (!cancelled) setRooms(dbRooms);
       } catch (err) {
-        console.error('[ROOMS] rooms fetch exception, using fallback:', err);
-        if (!cancelled) setRooms(fallbackRooms);
+        console.error('[ROOMS] rooms fetch exception:', err);
+        if (!cancelled) setRooms([]);
       }
     };
 
@@ -102,7 +81,7 @@ export default function RoomsCarousel() {
     return () => {
       cancelled = true;
     };
-  }, [fallbackRooms]);
+  }, []);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
