@@ -16,8 +16,8 @@ export interface ComingSoonRoom {
   disclaimer?: string;
 }
 
-// Placeholder images using gradient patterns and Unsplash for demo
-// These would be replaced with actual branded images in production
+// Curated Unsplash images for each room theme
+// All images are free to use (Unsplash license)
 export const comingSoonRooms: ComingSoonRoom[] = [
   // Gaming Rooms
   {
@@ -25,8 +25,9 @@ export const comingSoonRooms: ComingSoonRoom[] = [
     name: 'Call of Duty Room',
     description: 'Join the ultimate CoD community. Watch epic plays, discuss loadouts, and compete with fellow soldiers.',
     category: 'Gaming',
-    image_url: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&h=400&fit=crop',
-    fallback_gradient: 'from-orange-600 via-red-700 to-black',
+    // Military/tactical dark moody aesthetic
+    image_url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&h=400&fit=crop',
+    fallback_gradient: 'from-stone-800 via-zinc-900 to-black',
     interest_count: 2847,
     status: 'coming_soon',
   },
@@ -35,7 +36,8 @@ export const comingSoonRooms: ComingSoonRoom[] = [
     name: 'Fortnite Room',
     description: 'Drop in with the Fortnite community! Watch victory royales, discuss strategies, and flex your skins.',
     category: 'Gaming',
-    image_url: 'https://images.unsplash.com/photo-1589241062272-c0a000072dfa?w=600&h=400&fit=crop',
+    // Colorful gaming setup with purple/blue neon vibes
+    image_url: 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=600&h=400&fit=crop',
     fallback_gradient: 'from-purple-600 via-blue-500 to-cyan-400',
     interest_count: 3156,
     status: 'coming_soon',
@@ -45,8 +47,9 @@ export const comingSoonRooms: ComingSoonRoom[] = [
     name: 'GTA RP Room',
     description: 'Roleplay with the best. Watch cinematic storylines, bank heists, and the craziest RP moments.',
     category: 'Gaming',
-    image_url: 'https://images.unsplash.com/photo-1614465000772-1b302f406c47?w=600&h=400&fit=crop',
-    fallback_gradient: 'from-lime-500 via-green-600 to-emerald-800',
+    // City nightlife, neon urban vibes
+    image_url: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=600&h=400&fit=crop',
+    fallback_gradient: 'from-purple-900 via-pink-700 to-orange-500',
     interest_count: 1923,
     status: 'coming_soon',
   },
@@ -55,7 +58,8 @@ export const comingSoonRooms: ComingSoonRoom[] = [
     name: 'Valorant Room',
     description: 'Tactical shooters unite! Discuss agents, watch clutch plays, and learn from the pros.',
     category: 'Gaming',
-    image_url: 'https://images.unsplash.com/photo-1552820728-8b83bb6b2b0c?w=600&h=400&fit=crop',
+    // Esports/competitive gaming with red accent
+    image_url: 'https://images.unsplash.com/photo-1542751110-97427bbecf20?w=600&h=400&fit=crop',
     fallback_gradient: 'from-red-600 via-rose-500 to-pink-400',
     interest_count: 2134,
     status: 'coming_soon',
@@ -65,8 +69,9 @@ export const comingSoonRooms: ComingSoonRoom[] = [
     name: '2K / Madden Room',
     description: 'Sports gaming at its finest. NBA 2K, Madden, FIFA — all the sports gaming content in one place.',
     category: 'Gaming',
-    image_url: 'https://images.unsplash.com/photo-1493711662062-fa541f7f2f19?w=600&h=400&fit=crop',
-    fallback_gradient: 'from-amber-500 via-orange-600 to-red-700',
+    // Basketball court / sports arena vibes
+    image_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=600&h=400&fit=crop',
+    fallback_gradient: 'from-orange-500 via-red-600 to-rose-700',
     interest_count: 1456,
     status: 'coming_soon',
   },
@@ -77,8 +82,9 @@ export const comingSoonRooms: ComingSoonRoom[] = [
     name: 'Rap Battle Room',
     description: 'Bars on bars. Watch live rap battles, freestyle sessions, and discover raw talent.',
     category: 'Music',
-    image_url: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&h=400&fit=crop',
-    fallback_gradient: 'from-yellow-500 via-amber-600 to-orange-700',
+    // Hip-hop microphone / concert vibes
+    image_url: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=600&h=400&fit=crop',
+    fallback_gradient: 'from-yellow-600 via-amber-700 to-orange-800',
     interest_count: 1789,
     status: 'coming_soon',
   },
@@ -87,8 +93,9 @@ export const comingSoonRooms: ComingSoonRoom[] = [
     name: 'Open Mic Room',
     description: 'Your stage awaits. Singers, musicians, poets — share your art with a live audience.',
     category: 'Music',
-    image_url: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=600&h=400&fit=crop',
-    fallback_gradient: 'from-violet-600 via-purple-600 to-indigo-700',
+    // Stage with spotlight / microphone
+    image_url: 'https://images.unsplash.com/photo-1478147427282-58a87a120781?w=600&h=400&fit=crop',
+    fallback_gradient: 'from-violet-600 via-purple-700 to-indigo-800',
     interest_count: 1234,
     status: 'coming_soon',
   },
@@ -99,8 +106,9 @@ export const comingSoonRooms: ComingSoonRoom[] = [
     name: 'Roast Room',
     description: 'Think you can handle the heat? Watch and participate in comedy roasts with consenting participants.',
     category: 'Entertainment',
-    image_url: 'https://images.unsplash.com/photo-1527224857830-43a7acc85260?w=600&h=400&fit=crop',
-    fallback_gradient: 'from-red-700 via-rose-600 to-pink-500',
+    // Comedy stage / fire theme
+    image_url: 'https://images.unsplash.com/photo-1585699324551-f6c309eedeca?w=600&h=400&fit=crop',
+    fallback_gradient: 'from-red-700 via-orange-600 to-yellow-500',
     interest_count: 2567,
     status: 'coming_soon',
     special_badge: 'Comedy / Roast',

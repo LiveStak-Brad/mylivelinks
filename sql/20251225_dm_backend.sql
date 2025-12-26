@@ -222,6 +222,8 @@ BEGIN
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.get_or_create_dm_conversation(uuid) TO authenticated;
+
 -- List conversations for the current user (1:1 only)
 CREATE OR REPLACE FUNCTION public.get_dm_conversations()
 RETURNS TABLE (
@@ -273,6 +275,8 @@ AS $$
   ORDER BY COALESCE(c.last_message_at, c.updated_at, c.created_at) DESC;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.get_dm_conversations() TO authenticated;
+
 -- Mark messages seen by the recipient; starts 24h delete timer
 CREATE OR REPLACE FUNCTION public.mark_dm_seen(
   p_conversation_id uuid,
@@ -315,6 +319,8 @@ BEGIN
 END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.mark_dm_seen(uuid, uuid[], timestamptz) TO authenticated;
+
 -- Soft-delete messages whose delete_at has passed
 CREATE OR REPLACE FUNCTION public.cfm_prune_seen_messages()
 RETURNS int
@@ -335,6 +341,8 @@ BEGIN
   RETURN v_updated;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.cfm_prune_seen_messages() TO service_role;
 
 -- ============================================================================
 -- Realtime publication (optional)

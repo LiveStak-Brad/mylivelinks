@@ -46,6 +46,9 @@ import {
   Zap,
   Crown,
   Star,
+  Sparkles,
+  Image,
+  Heart,
 } from 'lucide-react';
 
 // Types
@@ -129,6 +132,25 @@ interface Transaction {
   to_user?: string;
 }
 
+interface ComingSoonRoom {
+  id: string;
+  room_key: string;
+  name: string;
+  description: string | null;
+  category: 'gaming' | 'music' | 'entertainment';
+  image_url: string | null;
+  fallback_gradient: string;
+  interest_threshold: number;
+  current_interest_count: number;
+  status: 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused';
+  display_order: number;
+  disclaimer_required: boolean;
+  disclaimer_text: string | null;
+  special_badge: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface DashboardStats {
   totalUsers: number;
   newUsersToday: number;
@@ -139,7 +161,7 @@ interface DashboardStats {
   pendingApplications: number;
 }
 
-type TabType = 'dashboard' | 'users' | 'streams' | 'reports' | 'applications' | 'gifts' | 'transactions' | 'analytics' | 'settings';
+type TabType = 'dashboard' | 'users' | 'streams' | 'reports' | 'applications' | 'gifts' | 'transactions' | 'rooms' | 'analytics' | 'settings';
 
 export default function OwnerPanel() {
   const router = useRouter();
@@ -158,6 +180,9 @@ export default function OwnerPanel() {
   const [giftTypes, setGiftTypes] = useState<GiftType[]>([]);
   const [coinPacks, setCoinPacks] = useState<CoinPack[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [rooms, setRooms] = useState<ComingSoonRoom[]>([]);
+  const [editingRoom, setEditingRoom] = useState<ComingSoonRoom | null>(null);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   
   // UI states
   const [searchQuery, setSearchQuery] = useState('');
@@ -193,6 +218,7 @@ export default function OwnerPanel() {
       loadGiftTypes(),
       loadCoinPacks(),
       loadTransactions(),
+      loadRooms(),
     ]);
     setRefreshing(false);
   };
@@ -406,6 +432,17 @@ export default function OwnerPanel() {
     }
   };
 
+  const loadRooms = async () => {
+    try {
+      const res = await fetch('/api/admin/rooms', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load rooms');
+      const json = await res.json();
+      setRooms(json.rooms || []);
+    } catch (error) {
+      console.error('Error loading rooms:', error);
+    }
+  };
+
   // Action handlers
   const handleBanUser = async (userId: string, ban: boolean) => {
     if (!confirm(`Are you sure you want to ${ban ? 'ban' : 'unban'} this user?`)) return;
@@ -544,6 +581,51 @@ export default function OwnerPanel() {
     }
   };
 
+  // Room handlers
+  const handleSaveRoom = async (room: Partial<ComingSoonRoom> & { id?: string }) => {
+    setActionLoading(room.id || 'new-room');
+    try {
+      const isNew = !room.id;
+      const url = isNew ? '/api/admin/rooms' : `/api/admin/rooms/${room.id}`;
+      const method = isNew ? 'POST' : 'PUT';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(room),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save room');
+      }
+
+      await loadRooms();
+      setEditingRoom(null);
+      setIsCreatingRoom(false);
+      alert(isNew ? 'Room created!' : 'Room updated!');
+    } catch (error: any) {
+      alert(error.message || 'Failed to save room');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteRoom = async (roomId: string) => {
+    if (!confirm('Are you sure you want to delete this room?')) return;
+    setActionLoading(roomId);
+    try {
+      const res = await fetch(`/api/admin/rooms/${roomId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      await loadRooms();
+      alert('Room deleted');
+    } catch (error) {
+      alert('Failed to delete room');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
@@ -604,6 +686,7 @@ export default function OwnerPanel() {
     { id: 'streams', label: 'Live Streams', icon: Radio, badge: liveStreams.length },
     { id: 'reports', label: 'Reports', icon: AlertTriangle, badge: stats?.pendingReports },
     { id: 'applications', label: 'Applications', icon: FileCheck, badge: stats?.pendingApplications },
+    { id: 'rooms', label: 'Coming Soon Rooms', icon: Sparkles, badge: rooms.length },
     { id: 'gifts', label: 'Gifts & Coins', icon: Gift },
     { id: 'transactions', label: 'Transactions', icon: Wallet },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -688,6 +771,7 @@ export default function OwnerPanel() {
               {activeTab === 'streams' && 'Monitor and control live streams'}
               {activeTab === 'reports' && 'Review and handle user reports'}
               {activeTab === 'applications' && 'Approve or reject room applications'}
+              {activeTab === 'rooms' && 'Manage Coming Soon rooms and their images'}
               {activeTab === 'gifts' && 'Manage gift types and coin packs'}
               {activeTab === 'transactions' && 'View all platform transactions'}
               {activeTab === 'analytics' && 'Platform analytics and insights'}
@@ -1285,6 +1369,345 @@ export default function OwnerPanel() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {/* Rooms Tab */}
+        {activeTab === 'rooms' && (
+          <div className="space-y-6">
+            {/* Actions */}
+            <div className="flex justify-between items-center">
+              <p className="text-gray-400">{rooms.length} rooms configured</p>
+              <button
+                onClick={() => {
+                  setIsCreatingRoom(true);
+                  setEditingRoom({
+                    id: '',
+                    room_key: '',
+                    name: '',
+                    description: '',
+                    category: 'gaming',
+                    image_url: '',
+                    fallback_gradient: 'from-purple-600 to-pink-600',
+                    interest_threshold: 5000,
+                    current_interest_count: 0,
+                    status: 'interest',
+                    display_order: rooms.length + 1,
+                    disclaimer_required: false,
+                    disclaimer_text: '',
+                    special_badge: '',
+                    created_at: '',
+                    updated_at: '',
+                  });
+                }}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Room
+              </button>
+            </div>
+
+            {/* Room Editor Modal */}
+            {(editingRoom || isCreatingRoom) && editingRoom && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-white">
+                      {isCreatingRoom ? 'Create New Room' : 'Edit Room'}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setEditingRoom(null);
+                        setIsCreatingRoom(false);
+                      }}
+                      className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    {/* Preview */}
+                    <div className="rounded-xl overflow-hidden h-40 relative">
+                      {editingRoom.image_url ? (
+                        <img
+                          src={editingRoom.image_url}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className={`w-full h-full bg-gradient-to-br ${editingRoom.fallback_gradient || 'from-purple-600 to-pink-600'}`} />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute bottom-4 left-4">
+                        <p className="text-white font-bold text-xl">{editingRoom.name || 'Room Name'}</p>
+                        <p className="text-white/80 text-sm">{editingRoom.category}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Room Key (URL slug)</label>
+                        <input
+                          type="text"
+                          value={editingRoom.room_key}
+                          onChange={(e) => setEditingRoom({ ...editingRoom, room_key: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+                          placeholder="e.g., call-of-duty-room"
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
+                        <input
+                          type="text"
+                          value={editingRoom.name}
+                          onChange={(e) => setEditingRoom({ ...editingRoom, name: e.target.value })}
+                          placeholder="Call of Duty Room"
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+                      <textarea
+                        value={editingRoom.description || ''}
+                        onChange={(e) => setEditingRoom({ ...editingRoom, description: e.target.value })}
+                        placeholder="Describe what this room is about..."
+                        rows={2}
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">
+                        <Image className="w-4 h-4 inline mr-1" />
+                        Image URL
+                      </label>
+                      <input
+                        type="text"
+                        value={editingRoom.image_url || ''}
+                        onChange={(e) => setEditingRoom({ ...editingRoom, image_url: e.target.value })}
+                        placeholder="https://example.com/image.jpg"
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Recommended: 600x400px. Use Unsplash, Imgur, or your own hosted images.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Category</label>
+                        <select
+                          value={editingRoom.category}
+                          onChange={(e) => setEditingRoom({ ...editingRoom, category: e.target.value as any })}
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="gaming">Gaming</option>
+                          <option value="music">Music</option>
+                          <option value="entertainment">Entertainment</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Status</label>
+                        <select
+                          value={editingRoom.status}
+                          onChange={(e) => setEditingRoom({ ...editingRoom, status: e.target.value as any })}
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="draft">Draft (Hidden)</option>
+                          <option value="interest">Collecting Interest</option>
+                          <option value="opening_soon">Opening Soon</option>
+                          <option value="live">Live</option>
+                          <option value="paused">Paused</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Interest Threshold</label>
+                        <input
+                          type="number"
+                          value={editingRoom.interest_threshold}
+                          onChange={(e) => setEditingRoom({ ...editingRoom, interest_threshold: parseInt(e.target.value) || 5000 })}
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Display Order</label>
+                        <input
+                          type="number"
+                          value={editingRoom.display_order}
+                          onChange={(e) => setEditingRoom({ ...editingRoom, display_order: parseInt(e.target.value) || 0 })}
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Fallback Gradient (Tailwind classes)</label>
+                      <input
+                        type="text"
+                        value={editingRoom.fallback_gradient}
+                        onChange={(e) => setEditingRoom({ ...editingRoom, fallback_gradient: e.target.value })}
+                        placeholder="from-purple-600 to-pink-600"
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Special Badge</label>
+                        <input
+                          type="text"
+                          value={editingRoom.special_badge || ''}
+                          onChange={(e) => setEditingRoom({ ...editingRoom, special_badge: e.target.value })}
+                          placeholder="e.g., Comedy / Roast"
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editingRoom.disclaimer_required}
+                            onChange={(e) => setEditingRoom({ ...editingRoom, disclaimer_required: e.target.checked })}
+                            className="w-5 h-5 rounded border-gray-600 bg-gray-700 text-purple-500 focus:ring-purple-500"
+                          />
+                          <span className="text-gray-300">Requires Disclaimer</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {editingRoom.disclaimer_required && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Disclaimer Text</label>
+                        <input
+                          type="text"
+                          value={editingRoom.disclaimer_text || ''}
+                          onChange={(e) => setEditingRoom({ ...editingRoom, disclaimer_text: e.target.value })}
+                          placeholder="All participants must provide consent..."
+                          className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-6 py-4 border-t border-gray-700 flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setEditingRoom(null);
+                        setIsCreatingRoom(false);
+                      }}
+                      className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleSaveRoom(isCreatingRoom ? { ...editingRoom, id: undefined } : editingRoom)}
+                      disabled={actionLoading === (editingRoom.id || 'new-room')}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      {isCreatingRoom ? 'Create Room' : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Rooms Grid */}
+            {rooms.length === 0 ? (
+              <div className="bg-gray-800 rounded-xl p-16 text-center border border-gray-700">
+                <Sparkles className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg">No rooms yet</p>
+                <p className="text-gray-500 text-sm mt-2">Add your first Coming Soon room above</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {rooms.map((room) => (
+                  <div key={room.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                    {/* Room Image */}
+                    <div className="h-36 relative">
+                      {room.image_url ? (
+                        <img
+                          src={room.image_url}
+                          alt={room.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={`w-full h-full bg-gradient-to-br ${room.fallback_gradient} ${room.image_url ? 'hidden' : ''} absolute inset-0`} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-800 via-transparent to-transparent" />
+                      
+                      {/* Status Badge */}
+                      <div className={`absolute top-3 right-3 px-2 py-1 text-xs font-medium rounded ${
+                        room.status === 'draft' ? 'bg-gray-600 text-gray-300' :
+                        room.status === 'interest' ? 'bg-amber-500/80 text-white' :
+                        room.status === 'opening_soon' ? 'bg-green-500/80 text-white' :
+                        room.status === 'live' ? 'bg-red-500 text-white' :
+                        'bg-gray-500 text-white'
+                      }`}>
+                        {room.status === 'interest' ? 'Collecting Interest' : room.status.replace('_', ' ').toUpperCase()}
+                      </div>
+
+                      {/* Category Badge */}
+                      <div className="absolute top-3 left-3 px-2 py-1 bg-black/50 text-xs font-medium text-white rounded capitalize">
+                        {room.category}
+                      </div>
+                    </div>
+
+                    {/* Room Info */}
+                    <div className="p-4">
+                      <h3 className="font-bold text-white text-lg mb-1">{room.name}</h3>
+                      <p className="text-gray-400 text-sm line-clamp-2 mb-3">{room.description}</p>
+                      
+                      {/* Stats */}
+                      <div className="flex items-center gap-4 text-sm text-gray-400 mb-4">
+                        <span className="flex items-center gap-1">
+                          <Heart className="w-4 h-4 text-pink-400" />
+                          {room.current_interest_count.toLocaleString()}
+                        </span>
+                        <span>/ {room.interest_threshold.toLocaleString()} to open</span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div className="h-2 bg-gray-700 rounded-full overflow-hidden mb-4">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                          style={{ width: `${Math.min((room.current_interest_count / room.interest_threshold) * 100, 100)}%` }}
+                        />
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingRoom(room);
+                            setIsCreatingRoom(false);
+                          }}
+                          className="flex-1 px-3 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-600 transition flex items-center justify-center gap-2"
+                        >
+                          <Edit className="w-4 h-4" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRoom(room.id)}
+                          disabled={actionLoading === room.id}
+                          className="px-3 py-2 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

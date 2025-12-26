@@ -1,33 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { createClient } from '@/lib/supabase-server';
 
-export async function GET(request: NextRequest) {
+// GET /api/rooms/interests - Get current user's room interests
+export async function GET() {
   try {
-    const supabase = createRouteHandlerClient(request);
+    const supabase = await createClient();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (!user || authError) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data, error } = await supabase
-      .from('room_interest')
+    const { data: interests, error } = await supabase
+      .from('room_interests')
       .select('room_id')
-      .eq('profile_id', user.id);
+      .eq('user_id', user.id);
 
     if (error) {
-      console.error('[ROOMS] interests error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[API /rooms/interests] Error:', error);
+      return NextResponse.json({ error: 'Failed to fetch interests' }, { status: 500 });
     }
 
-    const roomIds = (data ?? []).map((r: any) => r.room_id);
-    return NextResponse.json({ room_ids: roomIds }, { status: 200 });
-  } catch (error: any) {
-    console.error('[ROOMS] interests exception:', error);
-    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
+    const roomIds = (interests || []).map((i: { room_id: string }) => i.room_id);
+
+    return NextResponse.json({ room_ids: roomIds });
+  } catch (err) {
+    console.error('[API /rooms/interests] Exception:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,80 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { createClient } from '@/lib/supabase-server';
 
+// POST /api/rooms/[roomId]/interest - Toggle interest for a room
 export async function POST(
   request: NextRequest,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
-    const supabase = createRouteHandlerClient(request);
+    const { roomId } = await params;
+    const supabase = await createClient();
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (!user || authError) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const roomId = params.roomId;
-    if (!roomId) {
-      return NextResponse.json({ error: 'roomId is required' }, { status: 400 });
-    }
-
-    const body = await request.json().catch(() => null);
-    const interested = !!body?.interested;
+    const body = await request.json().catch(() => ({}));
+    const interested = body.interested === true;
 
     if (interested) {
-      const { error } = await supabase
-        .from('room_interest')
-        .upsert(
-          {
-            room_id: roomId,
-            profile_id: user.id,
-          },
-          {
-            onConflict: 'room_id,profile_id',
-          }
-        );
+      // Add interest
+      const { error: insertError } = await supabase
+        .from('room_interests')
+        .upsert({
+          room_id: roomId,
+          user_id: user.id,
+          notify_on_open: true,
+        }, { onConflict: 'room_id,user_id' });
 
-      if (error) {
-        console.error('[ROOMS] interest upsert error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      if (insertError) {
+        console.error('[API /rooms/interest] Insert error:', insertError);
+        return NextResponse.json({ error: 'Failed to add interest' }, { status: 500 });
       }
     } else {
-      const { error } = await supabase
-        .from('room_interest')
+      // Remove interest
+      const { error: deleteError } = await supabase
+        .from('room_interests')
         .delete()
         .eq('room_id', roomId)
-        .eq('profile_id', user.id);
+        .eq('user_id', user.id);
 
-      if (error) {
-        console.error('[ROOMS] interest delete error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+      if (deleteError) {
+        console.error('[API /rooms/interest] Delete error:', deleteError);
+        return NextResponse.json({ error: 'Failed to remove interest' }, { status: 500 });
       }
     }
 
-    const { data: room, error: roomError } = await supabase
-      .from('rooms')
+    // Fetch updated room to get new interest count
+    const { data: room } = await supabase
+      .from('coming_soon_rooms')
       .select('current_interest_count')
       .eq('id', roomId)
       .single();
 
-    if (roomError) {
-      console.error('[ROOMS] read count error:', roomError);
-      return NextResponse.json({ error: roomError.message }, { status: 500 });
-    }
-
-    return NextResponse.json(
-      {
-        current_interest_count: room?.current_interest_count ?? 0,
-        interested,
-      },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error('[ROOMS] interest exception:', error);
-    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({
+      interested,
+      current_interest_count: room?.current_interest_count ?? 0,
+    });
+  } catch (err) {
+    console.error('[API /rooms/interest] Exception:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
