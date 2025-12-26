@@ -33,11 +33,13 @@ interface NavItem {
 export default function BottomNav() {
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { totalUnreadCount: unreadMessages } = useMessages();
   const { unreadCount: unreadNoties } = useNoties();
   const supabase = createClient();
 
   useEffect(() => {
+    setMounted(true);
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
@@ -92,7 +94,7 @@ export default function BottomNav() {
       label: 'Messages',
       icon: MessageCircle,
       matchType: 'prefix',
-      badge: unreadMessages,
+      badge: mounted && unreadMessages > 0 ? unreadMessages : undefined,
       requiresAuth: true,
     },
     {
@@ -100,7 +102,7 @@ export default function BottomNav() {
       label: 'Noties',
       icon: Bell,
       matchType: 'exact',
-      badge: unreadNoties,
+      badge: mounted && unreadNoties > 0 ? unreadNoties : undefined,
       requiresAuth: true,
     },
   ];
@@ -134,9 +136,9 @@ export default function BottomNav() {
               <div className="relative">
                 <Icon />
                 
-                {/* Dot indicator for unread items */}
-                {item.badge && item.badge > 0 && (
-                  <span className="bottom-nav-badge-dot" />
+                {/* Dot indicator for unread items - NEVER show count as text */}
+                {mounted && item.badge && item.badge > 0 && (
+                  <span className="bottom-nav-badge-dot" aria-label={`${item.badge} unread`} />
                 )}
               </div>
               
