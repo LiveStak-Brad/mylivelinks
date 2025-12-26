@@ -147,6 +147,60 @@ CREATE POLICY "Users can delete own pinned post"
     AND (storage.foldername(name))[1] = auth.uid()::text
   );
 
+DROP POLICY IF EXISTS "Public read room images" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can upload room images" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can update room images" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can delete room images" ON storage.objects;
+
+CREATE POLICY "Public read room images"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'room-images');
+
+CREATE POLICY "Admins can upload room images"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'room-images'
+    AND auth.uid() IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND (profiles.is_admin = true OR profiles.is_owner = true)
+    )
+  );
+
+CREATE POLICY "Admins can update room images"
+  ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'room-images'
+    AND auth.uid() IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND (profiles.is_admin = true OR profiles.is_owner = true)
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'room-images'
+    AND auth.uid() IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND (profiles.is_admin = true OR profiles.is_owner = true)
+    )
+  );
+
+CREATE POLICY "Admins can delete room images"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'room-images'
+    AND auth.uid() IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND (profiles.is_admin = true OR profiles.is_owner = true)
+    )
+  );
+
 -- ============================================================================
 -- SETUP INSTRUCTIONS
 -- ============================================================================

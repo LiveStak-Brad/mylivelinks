@@ -85,6 +85,31 @@ export async function uploadPinnedPostMedia(
   return urlData.publicUrl;
 }
 
+export async function uploadRoomImage(roomKeyOrId: string, file: File): Promise<string> {
+  const supabase = createClient();
+
+  const extRaw = file.name.split('.').pop() || (file.type.startsWith('image/') ? file.type.split('/')[1] : 'jpg');
+  const ext = String(extRaw).toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+  const filePath = `${roomKeyOrId}/cover-${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage.from('room-images').upload(filePath, file, {
+    cacheControl: '3600',
+    upsert: true,
+  });
+
+  if (error) {
+    console.error('Error uploading room image:', error);
+    throw new Error(`Failed to upload room image: ${error.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from('room-images').getPublicUrl(filePath);
+  if (!urlData?.publicUrl) {
+    throw new Error('Failed to get room image URL');
+  }
+
+  return urlData.publicUrl;
+}
+
 /**
  * Delete avatar from Supabase Storage
  */

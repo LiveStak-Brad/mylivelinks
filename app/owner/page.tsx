@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { uploadRoomImage } from '@/lib/storage';
 import {
   LayoutDashboard,
   Users,
@@ -200,6 +201,9 @@ export default function OwnerPanel() {
   const [refreshing, setRefreshing] = useState(false);
   const [userFilter, setUserFilter] = useState<'all' | 'banned' | 'muted' | 'streamers' | 'verified'>('all');
   const [reportFilter, setReportFilter] = useState<'all' | 'pending' | 'resolved' | 'dismissed'>('pending');
+  const [roomImageUploading, setRoomImageUploading] = useState(false);
+  const [roomImageUploadError, setRoomImageUploadError] = useState<string | null>(null);
+  const roomImageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bootstrap();
@@ -500,6 +504,42 @@ export default function OwnerPanel() {
       alert('Failed to update ban status');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleRoomImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setRoomImageUploadError(null);
+
+    if (!file.type.startsWith('image/')) {
+      setRoomImageUploadError('Please select an image file.');
+      return;
+    }
+
+    if (!editingRoom) {
+      setRoomImageUploadError('No room is being edited.');
+      return;
+    }
+
+    const key = String(editingRoom.room_key || '').trim();
+    if (!key) {
+      setRoomImageUploadError('Set Room Key before uploading an image.');
+      return;
+    }
+
+    setRoomImageUploading(true);
+    try {
+      const publicUrl = await uploadRoomImage(key, file);
+      setEditingRoom((prev) => (prev ? { ...prev, image_url: publicUrl } : prev));
+    } catch (err) {
+      setRoomImageUploadError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRoomImageUploading(false);
+      if (roomImageInputRef.current) {
+        roomImageInputRef.current.value = '';
+      }
     }
   };
 
@@ -1642,14 +1682,49 @@ export default function OwnerPanel() {
                         <Image className="w-4 h-4 inline mr-1" />
                         Image URL
                       </label>
-                      <input
-                        type="text"
-                        value={editingRoom.image_url || ''}
-                        onChange={(e) => setEditingRoom({ ...editingRoom, image_url: e.target.value })}
-                        placeholder="https://example.com/image.jpg"
-                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Recommended: 600x400px. Use Unsplash, Imgur, or your own hosted images.</p>
+                      <div className="flex items-center gap-3">
+                        <input
+                          ref={roomImageInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleRoomImageSelected}
+                          disabled={roomImageUploading}
+                          className="hidden"
+                          id="room-image-upload"
+                        />
+
+                        <label
+                          htmlFor="room-image-upload"
+                          className={`px-4 py-2 rounded-lg transition text-sm font-medium ${
+                            roomImageUploading
+                              ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                              : 'bg-gray-700 text-white hover:bg-gray-600 cursor-pointer'
+                          }`}
+                        >
+                          {roomImageUploading ? 'Uploading...' : 'Upload Photo'}
+                        </label>
+
+                        {editingRoom.image_url ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditingRoom({ ...editingRoom, image_url: null })}
+                            disabled={roomImageUploading}
+                            className="px-4 py-2 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {roomImageUploadError ? (
+                        <p className="text-xs text-red-400 mt-1">{roomImageUploadError}</p>
+                      ) : null}
+
+                      {editingRoom.image_url ? (
+                        <p className="text-xs text-gray-500 mt-1 break-all">{editingRoom.image_url}</p>
+                      ) : (
+                        <p className="text-xs text-gray-500 mt-1">Recommended: 600x400px.</p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
