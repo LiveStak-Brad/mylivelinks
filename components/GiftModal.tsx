@@ -8,6 +8,7 @@ interface GiftType {
   name: string;
   coin_cost: number;
   icon_url?: string;
+  emoji?: string;
   tier: number;
 }
 
@@ -131,6 +132,8 @@ export default function GiftModal({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      const requestId = crypto.randomUUID();
+
       // Call new API endpoint (40% platform fee, 60% diamonds to recipient)
       const response = await fetch('/api/gifts/send', {
         method: 'POST',
@@ -140,6 +143,7 @@ export default function GiftModal({
           coinsAmount: selectedGift.coin_cost,
           giftTypeId: selectedGift.id,
           streamId: liveStreamId || null,
+          requestId,
         }),
       });
 
@@ -164,8 +168,7 @@ export default function GiftModal({
         .single();
       
       if (senderProfile) {
-        // Calculate diamonds awarded (60% of coins spent)
-        const diamondsAwarded = data.diamondsAwarded || Math.floor(selectedGift.coin_cost * 0.60);
+        const diamondsAwarded = data.diamondsAwarded || selectedGift.coin_cost;
         await supabase.from('chat_messages').insert({
           profile_id: user.id,
           content: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername} 💎+${diamondsAwarded}`,
@@ -219,7 +222,7 @@ export default function GiftModal({
                 <img src={gift.icon_url} alt={gift.name} className="w-12 h-12 mx-auto mb-1 drop-shadow-lg" />
               ) : (
                 <div className="w-12 h-12 mx-auto mb-1 flex items-center justify-center text-4xl drop-shadow-lg">
-                  {getGiftEmoji(gift.name)}
+                  {gift.emoji || getGiftEmoji(gift.name)}
                 </div>
               )}
               <p className="text-xs font-medium truncate">{gift.name}</p>
@@ -235,7 +238,7 @@ export default function GiftModal({
                 {selectedGift.icon_url ? (
                   <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-10 h-10" />
                 ) : (
-                  getGiftEmoji(selectedGift.name)
+                  selectedGift.emoji || getGiftEmoji(selectedGift.name)
                 )}
               </div>
               <div>
@@ -248,7 +251,7 @@ export default function GiftModal({
               </div>
             </div>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-              ✨ Recipient will earn {Math.floor(selectedGift.coin_cost * 0.60)} diamonds (60%)
+              ✨ Recipient will earn {selectedGift.coin_cost} diamonds
             </p>
           </div>
         )}

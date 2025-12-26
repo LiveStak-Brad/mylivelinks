@@ -9,6 +9,7 @@ interface GiftType {
   name: string;
   coin_cost: number;
   icon_url?: string;
+  emoji?: string;
 }
 
 interface GiftPickerMiniProps {
@@ -174,7 +175,7 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
                     {gift.icon_url ? (
                       <img src={gift.icon_url} alt={gift.name} className="w-8 h-8 mx-auto" />
                     ) : (
-                      getGiftEmoji(gift.name)
+                      gift.emoji || getGiftEmoji(gift.name)
                     )}
                   </div>
                   <p className="text-[10px] font-medium text-foreground truncate text-center">{gift.name}</p>
@@ -193,13 +194,13 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
         <div className="px-4 py-3 border-t border-border bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">
-                {selectedGift.icon_url ? (
-                  <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-6 h-6" />
-                ) : (
-                  getGiftEmoji(selectedGift.name)
-                )}
-              </span>
+            <span className="text-xl">
+              {selectedGift.icon_url ? (
+                <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-6 h-6" />
+              ) : (
+                selectedGift.emoji || getGiftEmoji(selectedGift.name)
+              )}
+            </span>
               <div>
                 <p className="text-xs font-medium text-foreground">{selectedGift.name}</p>
                 <p className="text-[10px] text-muted-foreground">
