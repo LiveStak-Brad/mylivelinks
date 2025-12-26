@@ -114,7 +114,7 @@ function HeaderIcons() {
   return (
     <div className="flex items-center gap-1" onKeyDown={handleKeyDown}>
       {/* Messages Icon */}
-      <div className="relative">
+      <div className="relative z-[70]">
         <IconButton
           ref={messagesButtonRef}
           onClick={() => {
@@ -140,7 +140,7 @@ function HeaderIcons() {
       </div>
 
       {/* Noties Icon */}
-      <div className="relative">
+      <div className="relative z-[70]">
         <IconButton
           ref={notiesButtonRef}
           onClick={() => {

@@ -103,7 +103,7 @@
 /* Icon button labels (for mobile) */
 .icon-label {
   position: absolute;
-  bottom: -1.25rem;
+  bottom: -0.875rem;
   left: 50%;
   transform: translateX(-50%);
   font-size: 0.625rem;
@@ -111,6 +111,7 @@
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
+  z-index: 61; /* Above header z-60, ensures labels stay above page content */
 }
 
 @media (max-width: 640px) {
