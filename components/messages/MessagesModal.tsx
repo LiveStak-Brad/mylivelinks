@@ -5,6 +5,7 @@ import { X, MessageCircle, Edit } from 'lucide-react';
 import { useMessages, Conversation } from './MessagesContext';
 import ConversationList from './ConversationList';
 import MessageThread from './MessageThread';
+import FriendsList from './FriendsList';
 
 interface MessagesModalProps {
   isOpen: boolean;
@@ -139,8 +140,9 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
                 </div>
               </div>
               
-              {/* Conversation List */}
-              <div className="flex-1 h-[calc(100%-60px)] bg-background">
+              {/* Friends List + Conversation List */}
+              <div className="flex-1 h-[calc(100%-60px)] bg-background overflow-y-auto">
+                <FriendsList onSelectFriend={() => setShowThread(true)} />
                 <ConversationList onSelectConversation={handleSelectConversation} />
               </div>
             </>
@@ -176,7 +178,10 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
             </button>
           </div>
           
-          {/* List */}
+          {/* Friends List */}
+          <FriendsList onSelectFriend={() => {}} />
+          
+          {/* Conversations List */}
           <div className="flex-1 overflow-hidden">
             <ConversationList onSelectConversation={handleSelectConversation} />
           </div>

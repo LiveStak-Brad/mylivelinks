@@ -48,13 +48,55 @@ export default function WalletPage() {
   // Check for purchase success/cancel in URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('purchase') === 'success') {
-      setMessage({ type: 'success', text: '🎉 Coins purchased successfully! Your balance has been updated.' });
-      // Clear URL params
-      window.history.replaceState({}, '', '/wallet');
-      // Refresh balance
-      setTimeout(() => loadUserData(), 1000);
-    } else if (params.get('purchase') === 'cancelled') {
+    const purchaseStatus = params.get('purchase');
+    const sessionId = params.get('session_id');
+
+    if (purchaseStatus === 'success') {
+      if (!sessionId) {
+        setMessage({
+          type: 'error',
+          text: 'Purchase completed but missing session_id. Please contact support.',
+        });
+        window.history.replaceState({}, '', '/wallet');
+        return;
+      }
+
+      (async () => {
+        try {
+          const resp = await fetch('/api/coins/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId }),
+          });
+
+          const data = await resp.json().catch(() => ({} as any));
+
+          if (!resp.ok) {
+            setMessage({
+              type: 'error',
+              text:
+                data?.error ||
+                data?.message ||
+                'Purchase completed but failed to credit coins. Please contact support.',
+            });
+            return;
+          }
+
+          setMessage({
+            type: 'success',
+            text: '🎉 Coins purchased successfully! Your balance has been updated.',
+          });
+          await loadUserData();
+        } catch (e) {
+          setMessage({
+            type: 'error',
+            text: 'Purchase completed but failed to confirm coins. Please contact support.',
+          });
+        } finally {
+          window.history.replaceState({}, '', '/wallet');
+        }
+      })();
+    } else if (purchaseStatus === 'cancelled') {
       setMessage({ type: 'error', text: 'Purchase was cancelled.' });
       window.history.replaceState({}, '', '/wallet');
     } else if (params.get('connect') === 'complete') {
