@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import ThemeToggle from './ThemeToggle';
+import LeaderboardModal from './LeaderboardModal';
 import { createClient } from '@/lib/supabase';
 import { useNoties } from './noties';
 import { useMessages } from './messages';
@@ -120,6 +121,7 @@ export default function GlobalHeader() {
   const pathname = usePathname();
   const [isOwner, setIsOwner] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   
   const supabase = createClient();
 
@@ -166,10 +168,24 @@ export default function GlobalHeader() {
     <header className="sticky top-0 z-[60] bg-background/95 backdrop-blur-sm border-b border-border shadow-sm">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo/Brand - Larger size */}
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-            <SmartBrandLogo size={120} />
-          </Link>
+          {/* Logo/Brand + Trophy */}
+          <div className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
+              <SmartBrandLogo size={120} />
+            </Link>
+            
+            {/* Trophy - Leaderboard Button */}
+            <button
+              onClick={() => setShowLeaderboard(true)}
+              className="relative p-2 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 group"
+              title="Leaderboards"
+              aria-label="View Leaderboards"
+            >
+              <Trophy className="w-5 h-5" />
+              {/* Shine effect */}
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            </button>
+          </div>
 
           {/* Navigation - Desktop */}
           <nav className="hidden md:flex items-center gap-6">
@@ -244,6 +260,12 @@ export default function GlobalHeader() {
           </Link>
         </nav>
       </div>
+      
+      {/* Leaderboard Modal */}
+      <LeaderboardModal
+        isOpen={showLeaderboard}
+        onClose={() => setShowLeaderboard(false)}
+      />
     </header>
   );
 }
