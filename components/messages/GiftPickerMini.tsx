@@ -22,6 +22,7 @@ interface GiftPickerMiniProps {
 // Map gift names to emojis
 const getGiftEmoji = (name: string) => {
   const emojiMap: { [key: string]: string } = {
+    'Poo': '💩',
     'Rose': '🌹',
     'Heart': '❤️',
     'Star': '⭐',
