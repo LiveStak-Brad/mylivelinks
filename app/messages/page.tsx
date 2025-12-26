@@ -23,7 +23,7 @@ function MessagesPageContent() {
     sendGift,
     sendImage,
     markConversationRead,
-    loading 
+    isLoading 
   } = useMessages();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,14 +77,14 @@ function MessagesPageContent() {
 
           {/* Conversations */}
           <div className="flex-1 overflow-y-auto">
-            {loading ? (
+            {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : filteredConversations.length === 0 ? (
               <div className="p-6">
                 <EmptyState
-                  icon={MessageCircle}
+                  icon={<MessageCircle className="w-16 h-16" />}
                   title={searchQuery ? "No conversations found" : "No messages yet"}
                   description={
                     searchQuery
@@ -229,7 +229,7 @@ function MessagesPageContent() {
           ) : (
             <div className="flex-1 flex items-center justify-center p-6">
               <EmptyState
-                icon={MessageCircle}
+                icon={<MessageCircle className="w-16 h-16" />}
                 title="Select a conversation"
                 description="Choose a conversation from the list to start messaging"
               />

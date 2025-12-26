@@ -166,7 +166,7 @@ export default function RoomsPage() {
         {!loading && filteredRooms.length === 0 && (
           <div className="animate-fade-in">
             <EmptyState
-              icon={Video}
+              icon={<Video className="w-16 h-16" />}
               title={filterLiveOnly ? "No rooms are live right now" : "No rooms found"}
               description={
                 searchQuery
@@ -176,16 +176,15 @@ export default function RoomsPage() {
                   : "Rooms will appear here once they're created"
               }
               action={
-                filterLiveOnly || searchQuery ? (
-                  <Button
-                    onClick={() => {
-                      setFilterLiveOnly(false);
-                      setSearchQuery('');
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                ) : undefined
+                filterLiveOnly || searchQuery
+                  ? {
+                      label: "Clear Filters",
+                      onClick: () => {
+                        setFilterLiveOnly(false);
+                        setSearchQuery('');
+                      }
+                    }
+                  : undefined
               }
             />
           </div>
