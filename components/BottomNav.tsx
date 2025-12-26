@@ -132,7 +132,7 @@ export default function BottomNav() {
               aria-current={isActive ? 'page' : undefined}
             >
               <div className="relative">
-                <Icon className="w-6 h-6" />
+                <Icon />
                 
                 {/* Dot indicator for unread items */}
                 {item.badge && item.badge > 0 && (

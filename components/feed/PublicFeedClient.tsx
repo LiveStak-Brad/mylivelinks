@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { MessageCircle, Gift, RefreshCw } from 'lucide-react';
+import { MessageCircle, Gift, RefreshCw, Upload, X } from 'lucide-react';
 import { Button, Card, Modal, Textarea } from '@/components/ui';
+import { createClient } from '@/lib/supabase';
+import { uploadPostMedia } from '@/lib/storage';
 
 type FeedAuthor = {
   id: string;
@@ -35,6 +37,10 @@ type FeedResponse = {
   limit: number;
 };
 
+type PublicFeedClientProps = {
+  username?: string;
+};
+
 function formatDateTime(value: string) {
   try {
     const d = new Date(value);
@@ -45,7 +51,7 @@ function formatDateTime(value: string) {
   }
 }
 
-export default function PublicFeedClient() {
+export default function PublicFeedClient({ username }: PublicFeedClientProps) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [nextCursor, setNextCursor] = useState<FeedResponse['nextCursor']>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +59,14 @@ export default function PublicFeedClient() {
 
   const [composerText, setComposerText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [composerMediaFile, setComposerMediaFile] = useState<File | null>(null);
+  const [composerMediaPreviewUrl, setComposerMediaPreviewUrl] = useState<string | null>(null);
+  const [composerMediaKind, setComposerMediaKind] = useState<'image' | 'video' | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const shouldShowComposer = !username || (currentUsername && currentUsername === username);
 
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [commentsByPost, setCommentsByPost] = useState<Record<string, FeedComment[]>>({});
@@ -78,6 +92,7 @@ export default function PublicFeedClient() {
       const cursor = mode === 'append' ? nextCursor : null;
       const params = new URLSearchParams();
       params.set('limit', '20');
+      if (username) params.set('username', username);
       if (cursor?.before_created_at) params.set('before_created_at', cursor.before_created_at);
       if (cursor?.before_id) params.set('before_id', cursor.before_id);
 
@@ -98,7 +113,40 @@ export default function PublicFeedClient() {
     } finally {
       setIsLoading(false);
     }
-  }, [nextCursor]);
+  }, [nextCursor, username]);
+
+  useEffect(() => {
+    let canceled = false;
+    const loadMe = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.auth.getUser();
+        if (error) return;
+        if (!data?.user) return;
+        if (canceled) return;
+
+        setCurrentUserId(data.user.id);
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (canceled) return;
+        if (profile && typeof (profile as any).username === 'string') {
+          setCurrentUsername(String((profile as any).username));
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    void loadMe();
+    return () => {
+      canceled = true;
+    };
+  }, []);
 
   useEffect(() => {
     void loadFeed('replace');
@@ -108,12 +156,22 @@ export default function PublicFeedClient() {
     const text = composerText.trim();
     if (!text) return;
 
+    if (composerMediaFile && !currentUserId) {
+      setLoadError('Please log in to upload media.');
+      return;
+    }
+
     setIsPosting(true);
     try {
+      let mediaUrl: string | null = null;
+      if (composerMediaFile && currentUserId) {
+        mediaUrl = await uploadPostMedia(currentUserId, composerMediaFile);
+      }
+
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text_content: text }),
+        body: JSON.stringify({ text_content: text, media_url: mediaUrl }),
       });
 
       const json = (await res.json()) as any;
@@ -124,13 +182,47 @@ export default function PublicFeedClient() {
       }
 
       setComposerText('');
+      if (composerMediaPreviewUrl) URL.revokeObjectURL(composerMediaPreviewUrl);
+      setComposerMediaFile(null);
+      setComposerMediaPreviewUrl(null);
+      setComposerMediaKind(null);
       await loadFeed('replace');
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to create post');
     } finally {
       setIsPosting(false);
     }
-  }, [composerText, loadFeed]);
+  }, [composerMediaFile, composerMediaPreviewUrl, composerText, currentUserId, loadFeed]);
+
+  const onComposerFileChange = useCallback((file: File | null) => {
+    if (!file) return;
+
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    if (!isImage && !isVideo) {
+      setLoadError('Please select an image or video file');
+      return;
+    }
+
+    const maxBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setLoadError(isVideo ? 'Video must be 50MB or less' : 'Image must be 10MB or less');
+      return;
+    }
+
+    if (composerMediaPreviewUrl) URL.revokeObjectURL(composerMediaPreviewUrl);
+    setComposerMediaFile(file);
+    setComposerMediaKind(isVideo ? 'video' : 'image');
+    setComposerMediaPreviewUrl(URL.createObjectURL(file));
+  }, [composerMediaPreviewUrl]);
+
+  const clearComposerMedia = useCallback(() => {
+    if (composerMediaPreviewUrl) URL.revokeObjectURL(composerMediaPreviewUrl);
+    setComposerMediaFile(null);
+    setComposerMediaPreviewUrl(null);
+    setComposerMediaKind(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [composerMediaPreviewUrl]);
 
   const toggleComments = useCallback(
     async (postId: string) => {
@@ -273,18 +365,64 @@ export default function PublicFeedClient() {
       <Card className="overflow-hidden">
         <div className="p-4 sm:p-5 space-y-3">
           <div className="text-sm font-medium text-foreground">Create a post</div>
-          <Textarea
-            textareaSize="md"
-            placeholder="Share something with the community..."
-            value={composerText}
-            onChange={(e) => setComposerText(e.target.value)}
-            disabled={isPosting}
-          />
-          <div className="flex justify-end">
-            <Button onClick={createPost} disabled={isPosting || !composerText.trim()} isLoading={isPosting}>
-              Post
-            </Button>
-          </div>
+          {shouldShowComposer ? (
+            <>
+              <Textarea
+                textareaSize="md"
+                placeholder="Share something with the community..."
+                value={composerText}
+                onChange={(e) => setComposerText(e.target.value)}
+                disabled={isPosting}
+              />
+
+              {composerMediaPreviewUrl && composerMediaKind && (
+                <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
+                  {composerMediaKind === 'video' ? (
+                    <video src={composerMediaPreviewUrl} controls className="w-full max-h-[420px] object-contain" />
+                  ) : (
+                    <img src={composerMediaPreviewUrl} alt="Selected media" className="w-full max-h-[420px] object-contain" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={clearComposerMedia}
+                    className="absolute top-2 right-2 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-background/80 backdrop-blur border border-border text-xs"
+                    disabled={isPosting}
+                  >
+                    <X className="w-4 h-4" />
+                    Remove
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    className="hidden"
+                    onChange={(e) => onComposerFileChange(e.target.files?.[0] ?? null)}
+                    disabled={isPosting}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isPosting}
+                    leftIcon={<Upload className="w-4 h-4" />}
+                  >
+                    Add photo/video
+                  </Button>
+                </div>
+                <Button onClick={createPost} disabled={isPosting || !composerText.trim()} isLoading={isPosting}>
+                  Post
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="text-sm text-muted-foreground">This feed is view-only.</div>
+          )}
         </div>
       </Card>
 
@@ -317,6 +455,16 @@ export default function PublicFeedClient() {
                   </div>
 
                   <div className="text-foreground whitespace-pre-wrap">{post.text_content}</div>
+
+                  {post.media_url && (
+                    <div className="rounded-xl overflow-hidden border border-border bg-muted/20">
+                      {/(\.mp4|\.webm|\.mov|\.m4v)(\?|$)/i.test(post.media_url) ? (
+                        <video src={post.media_url} controls className="w-full max-h-[520px] object-contain" />
+                      ) : (
+                        <img src={post.media_url} alt="Post media" className="w-full max-h-[520px] object-contain" />
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <div>{post.gift_total_coins} coins gifted</div>
