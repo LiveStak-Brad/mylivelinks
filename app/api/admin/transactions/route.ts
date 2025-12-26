@@ -34,22 +34,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ transactions: rows, source: 'ledger_entries', limit, offset });
     }
 
-    const attemptCoinLedger = await admin
-      .from('coin_ledger')
-      .select('id, profile_id, amount, type, description, created_at')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (attemptCoinLedger.error) {
-      return NextResponse.json({ error: attemptCoinLedger.error.message }, { status: 500 });
-    }
-
-    let rows = (attemptCoinLedger.data ?? []) as any[];
-    if (q) {
-      rows = rows.filter((r) => String(r.profile_id || '').toLowerCase().includes(q) || String(r.type || '').toLowerCase().includes(q));
-    }
-
-    return NextResponse.json({ transactions: rows, source: 'coin_ledger', limit, offset });
+    return NextResponse.json({ error: attemptLedgerEntries.error.message }, { status: 500 });
   } catch (err) {
     return authErrorToResponse(err);
   }

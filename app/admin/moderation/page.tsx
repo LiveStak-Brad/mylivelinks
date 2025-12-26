@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Shield, Search, AlertTriangle, Ban, Clock, MessageSquare, ArrowLeft, Eye, Check, X } from 'lucide-react';
+import { Shield, Search, AlertTriangle, Ban, Clock, MessageSquare, Eye, Check, X, Users } from 'lucide-react';
+import { DashboardPage, DashboardSection, type DashboardTab } from '@/components/layout';
+import { Button, IconButton, Input, Badge, Skeleton } from '@/components/ui';
 
 interface Report {
   id: string;
@@ -37,13 +39,6 @@ interface User {
 
 export default function ModerationPage() {
   const router = useRouter();
-  const goBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-      return;
-    }
-    router.push('/');
-  };
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<'reports' | 'users'>('reports');
@@ -227,253 +222,207 @@ export default function ModerationPage() {
     });
   };
 
+  const pendingReports = reports.filter(r => r.status === 'pending');
+
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full"></div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground">Loading moderation panel...</p>
+        </div>
       </div>
     );
   }
 
+  // Access denied state
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="text-center">
-          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">You don't have permission to access this page.</p>
-          <button onClick={goBack} className="text-blue-500 hover:underline">
-            ← Back
-          </button>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-8 h-8 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+          <p className="text-muted-foreground mb-6">You don't have permission to access this page.</p>
+          <Button variant="ghost" onClick={() => router.back()}>
+            ← Go Back
+          </Button>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <button onClick={goBack} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
-              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <Shield className="w-8 h-8 text-purple-500" />
-                Moderation Panel
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">Manage reports and user moderation</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-4 mb-6">
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`px-6 py-3 rounded-lg font-medium transition ${
-              activeTab === 'reports'
-                ? 'bg-purple-600 text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            <AlertTriangle className="w-4 h-4 inline mr-2" />
-            Reports ({reports.filter(r => r.status === 'pending').length})
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`px-6 py-3 rounded-lg font-medium transition ${
-              activeTab === 'users'
-                ? 'bg-purple-600 text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            <Ban className="w-4 h-4 inline mr-2" />
-            Users
-          </button>
-        </div>
-
-        {/* Reports Tab */}
-        {activeTab === 'reports' && (
-          <div className="space-y-4">
-            {reports.length === 0 ? (
-              <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center">
-                <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">No reports yet</p>
-              </div>
-            ) : (
-              reports.map((report) => (
-                <div
-                  key={report.id}
-                  className={`bg-white dark:bg-gray-800 rounded-xl p-6 shadow ${
-                    report.status === 'pending' ? 'border-l-4 border-amber-500' : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className={`px-2 py-1 text-xs font-medium rounded ${
-                          report.status === 'pending'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-                            : report.status === 'resolved'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
-                        }`}>
-                          {report.status.toUpperCase()}
-                        </span>
-                        <span className="text-sm text-gray-500">{report.report_type}</span>
-                        <span className="text-sm text-gray-400">{formatDate(report.created_at)}</span>
-                      </div>
-                      <p className="font-medium text-gray-900 dark:text-white mb-1">
-                        Reason: {report.report_reason.replace(/_/g, ' ')}
-                      </p>
-                      {report.report_details && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          "{report.report_details}"
-                        </p>
-                      )}
-                      <div className="text-sm text-gray-500">
-                        <span>Reported by: @{report.reporter?.username || 'unknown'}</span>
-                        {report.reported_user && (
-                          <span className="ml-4">
-                            Against: <a href={`/${report.reported_user.username}`} className="text-blue-500 hover:underline">@{report.reported_user.username}</a>
-                          </span>
-                        )}
-                      </div>
+  // Build tabs
+  const tabs: DashboardTab[] = [
+    {
+      id: 'reports',
+      label: `Reports (${pendingReports.length})`,
+      icon: <AlertTriangle className="w-4 h-4" />,
+      content: (
+        <div className="space-y-4">
+          {reports.length === 0 ? (
+            <DashboardSection className="text-center py-12">
+              <AlertTriangle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No reports yet</p>
+            </DashboardSection>
+          ) : (
+            reports.map((report) => (
+              <DashboardSection
+                key={report.id}
+                className={report.status === 'pending' ? 'border-l-4 border-l-warning' : ''}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <Badge
+                        variant={
+                          report.status === 'pending' ? 'warning' :
+                          report.status === 'resolved' ? 'success' :
+                          'default'
+                        }
+                        size="sm"
+                      >
+                        {report.status.toUpperCase()}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">{report.report_type}</span>
+                      <span className="text-sm text-muted-foreground">{formatDate(report.created_at)}</span>
                     </div>
-                    {report.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleResolveReport(report.id, 'resolved')}
-                          disabled={actionLoading === report.id}
-                          className="p-2 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition disabled:opacity-50"
-                          title="Resolve"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleResolveReport(report.id, 'dismissed')}
-                          disabled={actionLoading === report.id}
-                          className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
-                          title="Dismiss"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
+                    <p className="font-medium text-foreground mb-1">
+                      Reason: {report.report_reason.replace(/_/g, ' ')}
+                    </p>
+                    {report.report_details && (
+                      <p className="text-sm text-muted-foreground mb-2 italic">
+                        "{report.report_details}"
+                      </p>
                     )}
+                    <div className="text-sm text-muted-foreground">
+                      <span>Reported by: @{report.reporter?.username || 'unknown'}</span>
+                      {report.reported_user && (
+                        <span className="ml-4">
+                          Against:{' '}
+                          <Link href={`/${report.reported_user.username}`} className="text-primary hover:underline">
+                            @{report.reported_user.username}
+                          </Link>
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  {report.status === 'pending' && (
+                    <div className="flex gap-2 flex-shrink-0">
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        icon={<Check className="w-4 h-4" />}
+                        onClick={() => handleResolveReport(report.id, 'resolved')}
+                        disabled={actionLoading === report.id}
+                        aria-label="Resolve report"
+                        className="text-success hover:bg-success/10"
+                      />
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
+                        icon={<X className="w-4 h-4" />}
+                        onClick={() => handleResolveReport(report.id, 'dismissed')}
+                        disabled={actionLoading === report.id}
+                        aria-label="Dismiss report"
+                        className="text-muted-foreground hover:bg-muted"
+                      />
+                    </div>
+                  )}
                 </div>
-              ))
-            )}
-          </div>
-        )}
+              </DashboardSection>
+            ))
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'users',
+      label: 'Users',
+      icon: <Users className="w-4 h-4" />,
+      content: (
+        <div className="space-y-4">
+          {/* Search */}
+          <Input
+            placeholder="Search users..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            leftIcon={<Search className="w-4 h-4" />}
+            size="lg"
+          />
 
-        {/* Users Tab */}
-        {activeTab === 'users' && (
-          <div className="space-y-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search users..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500"
-              />
-            </div>
-
-            {/* User List */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          {/* User Table */}
+          <DashboardSection>
+            <div className="overflow-x-auto -mx-6 px-6">
+              <table className="w-full min-w-[600px]">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">User</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Joined</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-border">
                   {filteredUsers.map((user) => (
-                    <tr key={user.id}>
-                      <td className="px-6 py-4">
+                    <tr key={user.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-4">
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
+                          <p className="font-medium text-foreground">
                             {user.display_name || user.username}
                           </p>
-                          <p className="text-sm text-gray-500">@{user.username}</p>
+                          <p className="text-sm text-muted-foreground">@{user.username}</p>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
                           {user.is_banned && (
-                            <span className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 rounded">
-                              Banned
-                            </span>
+                            <Badge variant="destructive" size="sm">Banned</Badge>
                           )}
                           {user.is_muted && (
-                            <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded">
-                              Muted
-                            </span>
+                            <Badge variant="warning" size="sm">Muted</Badge>
                           )}
                           {!user.is_banned && !user.is_muted && (
-                            <span className="text-sm text-gray-500">Active</span>
+                            <span className="text-sm text-muted-foreground">Active</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      <td className="px-4 py-4 text-sm text-muted-foreground">
                         {formatDate(user.created_at)}
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <a
-                            href={`/${user.username}`}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
-                            title="View Profile"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </a>
-                          {!user.is_muted ? (
-                            <button
-                              onClick={() => handleMuteUser(user.id, true, 60)}
-                              disabled={actionLoading === user.id}
-                              className="p-2 text-yellow-600 hover:bg-yellow-50 rounded transition disabled:opacity-50"
-                              title="Mute (1 hour)"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleMuteUser(user.id, false)}
-                              disabled={actionLoading === user.id}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded transition disabled:opacity-50"
-                              title="Unmute"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                            </button>
-                          )}
-                          {!user.is_banned ? (
-                            <button
-                              onClick={() => handleBanUser(user.id, true)}
-                              disabled={actionLoading === user.id}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded transition disabled:opacity-50"
-                              title="Ban User"
-                            >
-                              <Ban className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleBanUser(user.id, false)}
-                              disabled={actionLoading === user.id}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded transition disabled:opacity-50"
-                              title="Unban User"
-                            >
-                              <Ban className="w-4 h-4" />
-                            </button>
-                          )}
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex justify-end gap-1">
+                          <IconButton
+                            variant="ghost"
+                            size="sm"
+                            icon={<Eye className="w-4 h-4" />}
+                            onClick={() => router.push(`/${user.username}`)}
+                            aria-label="View profile"
+                            className="text-primary"
+                          />
+                          <IconButton
+                            variant="ghost"
+                            size="sm"
+                            icon={<MessageSquare className="w-4 h-4" />}
+                            onClick={() => user.is_muted 
+                              ? handleMuteUser(user.id, false) 
+                              : handleMuteUser(user.id, true, 60)
+                            }
+                            disabled={actionLoading === user.id}
+                            aria-label={user.is_muted ? 'Unmute user' : 'Mute user (1 hour)'}
+                            className={user.is_muted ? 'text-success' : 'text-warning'}
+                          />
+                          <IconButton
+                            variant="ghost"
+                            size="sm"
+                            icon={<Ban className="w-4 h-4" />}
+                            onClick={() => handleBanUser(user.id, !user.is_banned)}
+                            disabled={actionLoading === user.id}
+                            aria-label={user.is_banned ? 'Unban user' : 'Ban user'}
+                            className={user.is_banned ? 'text-success' : 'text-destructive'}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -481,10 +430,22 @@ export default function ModerationPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+          </DashboardSection>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <DashboardPage
+      title="Moderation Panel"
+      description="Manage reports and user moderation"
+      icon={<Shield className="w-6 h-6" />}
+      tabs={tabs}
+      defaultTab="reports"
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as 'reports' | 'users')}
+      showRefresh={false}
+    />
   );
 }
-

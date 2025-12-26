@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { UserPlus, Check, ExternalLink } from 'lucide-react';
+import { UserPlus, Check, ExternalLink, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
+import { StatusBadge, LiveDot } from '@/components/ui';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface ProfileCardProps {
   profile: {
@@ -103,75 +105,113 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
       {/* Card */}
       <Link
         href={`/${profile.username}`}
-        className="block bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border-2 border-transparent hover:border-purple-500"
+        className="block bg-card rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-border hover:border-primary/50 group-hover:scale-[1.02]"
       >
         {/* Avatar & Live Badge */}
-        <div className="relative h-48 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 flex items-center justify-center">
-          {profile.avatar_url ? (
-            <Image
-              src={profile.avatar_url}
-              alt={displayName}
-              width={120}
-              height={120}
-              className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-xl"
+        <div className="relative h-48 bg-gradient-to-br from-primary via-accent to-primary flex items-center justify-center overflow-hidden">
+          {/* Background pattern */}
+          <div className="absolute inset-0 opacity-20">
+            <div 
+              className="absolute inset-0" 
+              style={{
+                backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+                backgroundSize: '24px 24px',
+              }}
             />
-          ) : (
-            <div className="w-28 h-28 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center border-4 border-white shadow-xl">
-              <span className="text-4xl font-bold text-purple-600 dark:text-purple-400">
-                {(displayName?.charAt(0) ?? '?').toUpperCase()}
-              </span>
-            </div>
-          )}
+          </div>
           
+          {/* Avatar */}
+          <div className="relative">
+            {profile.avatar_url ? (
+              <Image
+                src={profile.avatar_url}
+                alt={displayName}
+                width={120}
+                height={120}
+                className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-white/20"
+              />
+            ) : (
+              <div className="w-28 h-28 rounded-full bg-card flex items-center justify-center border-4 border-white shadow-xl ring-4 ring-white/20">
+                <span className="text-4xl font-bold gradient-text">
+                  {(displayName?.charAt(0) ?? '?').toUpperCase()}
+                </span>
+              </div>
+            )}
+            
+            {/* Live indicator on avatar */}
+            {profile.is_live && (
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-card border-2 border-red-500 flex items-center justify-center">
+                <LiveDot />
+              </div>
+            )}
+          </div>
+          
+          {/* Status Badge */}
           {profile.is_live && (
-            <div className="absolute top-4 right-4 px-3 py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse shadow-lg">
-              🔴 LIVE
+            <div className="absolute top-4 right-4">
+              <StatusBadge variant="live" size="sm" />
             </div>
           )}
         </div>
 
         {/* Info */}
-        <div className="p-4">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white truncate mb-1">
-            {displayName}
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate mb-2">
-            @{profile.username}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-3">
+        <div className="p-5 space-y-3">
+          <div>
+            <h3 className="text-lg font-bold text-foreground truncate group-hover:text-primary transition-colors">
+              {displayName}
+            </h3>
+            <p className="text-sm text-muted-foreground truncate">
+              @{profile.username}
+            </p>
+          </div>
+          
+          <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
             {truncatedBio}
           </p>
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {profile.follower_count.toLocaleString()} followers
-            </span>
+          
+          <div className="flex items-center justify-between pt-2 border-t border-border/50">
+            <Tooltip content={`${profile.follower_count.toLocaleString()} followers`} position="bottom">
+              <div className="flex items-center gap-1.5 text-muted-foreground cursor-help">
+                <Users className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {profile.follower_count >= 1000 
+                    ? `${(profile.follower_count / 1000).toFixed(1)}K` 
+                    : profile.follower_count.toLocaleString()
+                  }
+                </span>
+              </div>
+            </Tooltip>
+            
             {currentUserId && currentUserId !== profile.id && (
               <button
                 onClick={handleFollow}
                 disabled={followLoading}
-                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold transition ${
-                  isFollowing
-                    ? 'bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-500'
+                className={`
+                  flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all duration-200
+                  ${isFollowing
+                    ? 'bg-muted text-foreground hover:bg-muted/80'
                     : followsYou
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 border-2 border-blue-400 dark:border-blue-600'
-                    : 'bg-purple-600 text-white hover:bg-purple-700'
-                } disabled:opacity-50`}
+                    ? 'bg-primary/10 text-primary border-2 border-primary/30 hover:bg-primary/20'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md shadow-primary/20'
+                  } 
+                  disabled:opacity-50 hover:scale-105 active:scale-95
+                `}
               >
                 {followLoading ? (
-                  '...'
+                  <span className="animate-pulse">...</span>
                 ) : isFollowing ? (
                   <>
-                    <Check className="w-3 h-3" />
+                    <Check className="w-3.5 h-3.5" />
                     Following
                   </>
                 ) : followsYou ? (
                   <>
-                    <UserPlus className="w-3 h-3" />
+                    <UserPlus className="w-3.5 h-3.5" />
                     Follow Back
                   </>
                 ) : (
                   <>
-                    <UserPlus className="w-3 h-3" />
+                    <UserPlus className="w-3.5 h-3.5" />
                     Follow
                   </>
                 )}
@@ -183,46 +223,50 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
 
       {/* Hover Popup - Desktop Only */}
       {showPopup && (
-        <div className="hidden md:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-4 z-50 pointer-events-none">
-          <div className="flex items-start gap-3 mb-3">
+        <div className="hidden md:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 w-80 bg-card rounded-2xl shadow-2xl border border-border p-5 z-50 pointer-events-none animate-fade-in">
+          {/* Arrow */}
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-card border-r border-b border-border rotate-45" />
+          
+          <div className="flex items-start gap-4 mb-4">
             {profile.avatar_url ? (
               <Image
                 src={profile.avatar_url}
                 alt={displayName}
                 width={60}
                 height={60}
-                className="w-16 h-16 rounded-full object-cover"
+                className="w-16 h-16 rounded-full object-cover ring-2 ring-border"
               />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center ring-2 ring-border">
                 <span className="text-2xl font-bold text-white">
                   {(displayName?.charAt(0) ?? '?').toUpperCase()}
                 </span>
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <h4 className="font-bold text-gray-900 dark:text-white truncate">
+              <h4 className="font-bold text-foreground truncate">
                 {displayName}
               </h4>
-              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 @{profile.username}
               </p>
               {profile.is_live && (
-                <span className="inline-block mt-1 px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded">
-                  🔴 LIVE NOW
-                </span>
+                <StatusBadge variant="live" size="xs" className="mt-2" />
               )}
             </div>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+          
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
             {profile.bio || 'No bio yet'}
           </p>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500 dark:text-gray-400">
-              {profile.follower_count.toLocaleString()} followers
-            </span>
-            <span className="text-purple-600 dark:text-purple-400 flex items-center gap-1">
-              View Profile <ExternalLink className="w-3 h-3" />
+          
+          <div className="flex items-center justify-between text-sm pt-3 border-t border-border">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Users className="w-4 h-4" />
+              <span>{profile.follower_count.toLocaleString()} followers</span>
+            </div>
+            <span className="text-primary flex items-center gap-1 font-medium">
+              View Profile <ExternalLink className="w-3.5 h-3.5" />
             </span>
           </div>
         </div>
@@ -230,4 +274,3 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
     </div>
   );
 }
-

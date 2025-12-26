@@ -29,13 +29,11 @@ function centsToUsd(cents: unknown) {
   return n / 100;
 }
 
-type LedgerSource = 'ledger_entries' | 'coin_ledger' | null;
+type LedgerSource = 'ledger_entries' | null;
 
 async function detectLedgerSource(admin: ReturnType<typeof getSupabaseAdmin>): Promise<LedgerSource> {
   const attemptLedgerEntries = await admin.from('ledger_entries').select('id').limit(1);
   if (!attemptLedgerEntries.error) return 'ledger_entries';
-  const attemptCoinLedger = await admin.from('coin_ledger').select('id').limit(1);
-  if (!attemptCoinLedger.error) return 'coin_ledger';
   return null;
 }
 
@@ -237,15 +235,6 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: true })
         .limit(10000);
       ledgerRows = (le.error ? [] : (le.data ?? [])) as any[];
-    } else if (ledgerSource === 'coin_ledger') {
-      const cl = await admin
-        .from('coin_ledger')
-        .select('created_at, type, asset_type, amount, profile_id')
-        .gte('created_at', startDate.toISOString())
-        .lt('created_at', endDate.toISOString())
-        .order('created_at', { ascending: true })
-        .limit(10000);
-      ledgerRows = (cl.error ? [] : (cl.data ?? [])) as any[];
     }
 
     if (!totalCoinsSpent) {
@@ -253,10 +242,6 @@ export async function GET(request: NextRequest) {
         totalCoinsSpent = ledgerRows
           .filter((r) => r.entry_type === 'coin_spend_gift')
           .reduce((sum, r) => sum + Math.max(0, -safeNumber(r.delta_coins)), 0);
-      } else if (ledgerSource === 'coin_ledger') {
-        totalCoinsSpent = ledgerRows
-          .filter((r) => (r.asset_type ?? 'coin') === 'coin' && r.type === 'gift_sent')
-          .reduce((sum, r) => sum + Math.max(0, -safeNumber(r.amount)), 0);
       }
     }
 
@@ -265,10 +250,6 @@ export async function GET(request: NextRequest) {
         totalDiamondsMinted = ledgerRows
           .filter((r) => r.entry_type === 'diamond_earn')
           .reduce((sum, r) => sum + Math.max(0, safeNumber(r.delta_diamonds)), 0);
-      } else if (ledgerSource === 'coin_ledger') {
-        totalDiamondsMinted = ledgerRows
-          .filter((r) => (r.asset_type ?? 'coin') === 'diamond' && r.type === 'gift_earn')
-          .reduce((sum, r) => sum + Math.max(0, safeNumber(r.amount)), 0);
       }
     }
 
@@ -338,12 +319,6 @@ export async function GET(request: NextRequest) {
               if (r.entry_type === 'coin_purchase') cur.purchased += Math.max(0, safeNumber(r.delta_coins));
               if (r.entry_type === 'coin_spend_gift') cur.spent += Math.max(0, -safeNumber(r.delta_coins));
               cur.delta += safeNumber(r.delta_coins);
-            } else if (ledgerSource === 'coin_ledger') {
-              const asset = (r.asset_type ?? 'coin') as string;
-              if (asset !== 'coin') continue;
-              if (r.type === 'purchase') cur.purchased += Math.max(0, safeNumber(r.amount));
-              if (r.type === 'gift_sent') cur.spent += Math.max(0, -safeNumber(r.amount));
-              cur.delta += safeNumber(r.amount);
             }
             buckets.set(key, cur);
           }
@@ -377,10 +352,6 @@ export async function GET(request: NextRequest) {
         if (ledgerSource === 'ledger_entries') {
           if (r.entry_type === 'diamond_earn') cur.minted += Math.max(0, safeNumber(r.delta_diamonds));
           if (r.entry_type === 'diamond_debit_cashout') cur.cashed += Math.max(0, -safeNumber(r.delta_diamonds));
-        } else if (ledgerSource === 'coin_ledger') {
-          const asset = (r.asset_type ?? 'coin') as string;
-          if (asset !== 'diamond') continue;
-          if (r.type === 'gift_earn') cur.minted += Math.max(0, safeNumber(r.amount));
         }
 
         buckets.set(key, cur);
@@ -501,11 +472,6 @@ export async function GET(request: NextRequest) {
               const id = String(r.user_id ?? '');
               if (!id) continue;
               byProfile.set(id, (byProfile.get(id) ?? 0) + Math.max(0, safeNumber(r.delta_diamonds)));
-            } else if (ledgerSource === 'coin_ledger') {
-              if ((r.asset_type ?? 'coin') !== 'diamond' || r.type !== 'gift_earn') continue;
-              const id = String(r.profile_id ?? '');
-              if (!id) continue;
-              byProfile.set(id, (byProfile.get(id) ?? 0) + Math.max(0, safeNumber(r.amount)));
             }
           }
 

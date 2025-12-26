@@ -48,6 +48,9 @@ export default function RootLayout({
                 <GlobalHeader />
                 <AgeVerificationModal />
                 <IMProvider />
+                {/* Note: Pages should wrap content in PageShell which provides <main id="main">
+                    for skip-link accessibility. If not using PageShell, ensure you have a 
+                    <main id="main" tabIndex={-1}> landmark element. */}
                 {children}
               </MessagesProvider>
             </NotiesProvider>

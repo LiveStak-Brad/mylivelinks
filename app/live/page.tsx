@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Video, Sparkles, Users, TrendingUp } from 'lucide-react';
+import { Video, Sparkles, Users, TrendingUp, Bell, Zap, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { canAccessLive } from '@/lib/livekit-constants';
 import LiveRoom from '@/components/LiveRoom';
 import LiveRoomErrorBoundary from '@/components/LiveRoomErrorBoundary';
+import { Button, Card, StatusBadge } from '@/components/ui';
 
 const OWNER_UUID = '2b4a1178-3c39-4179-94ea-314dd824a818';
 
@@ -70,8 +71,13 @@ export default function LiveComingSoonPage() {
   // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center animate-pulse">
+            <Video className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-muted-foreground animate-pulse">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -79,24 +85,37 @@ export default function LiveComingSoonPage() {
   // If owner but audio not enabled, show audio enable screen
   if (isOwner && !audioEnabled) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 p-8 text-center">
-          <div className="bg-purple-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-            </svg>
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center border-0 shadow-2xl overflow-hidden">
+          {/* Header gradient */}
+          <div className="h-2 bg-gradient-to-r from-primary via-accent to-primary" />
+          
+          <div className="p-8">
+            <div className="relative mx-auto mb-8">
+              {/* Glow effect */}
+              <div className="absolute inset-0 -m-4 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full blur-xl animate-pulse" />
+              
+              {/* Icon */}
+              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/30">
+                <Zap className="w-10 h-10 text-white" />
+              </div>
+            </div>
+            
+            <h2 className="text-2xl font-bold text-foreground mb-3">Enable Audio</h2>
+            <p className="text-muted-foreground mb-8 leading-relaxed">
+              Click below to enable audio for the live stream. This is required by your browser's autoplay policy.
+            </p>
+            
+            <Button
+              onClick={handleEnableAudio}
+              size="lg"
+              className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg shadow-primary/30"
+            >
+              <Zap className="w-5 h-5 mr-2" />
+              Enable Audio & Enter
+            </Button>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-4">Enable Audio</h2>
-          <p className="text-white/80 mb-6">
-            Click below to enable audio for the live stream. This is required by your browser&apos;s autoplay policy.
-          </p>
-          <button
-            onClick={handleEnableAudio}
-            className="w-full px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            Enable Audio & Enter
-          </button>
-        </div>
+        </Card>
       </div>
     );
   }
@@ -110,99 +129,139 @@ export default function LiveComingSoonPage() {
     );
   }
 
-  // Everyone else sees "Coming Soon"
+  // Everyone else sees "Coming Soon" - Premium version
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full">
-        {/* Main Card */}
-        <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-8 text-center">
-            <div className="flex justify-center mb-6">
-              <div className="bg-white/20 p-6 rounded-full animate-pulse">
-                <Video className="w-16 h-16 text-white" />
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] bg-accent/10 rounded-full blur-3xl" />
+        
+        {/* Grid pattern */}
+        <div 
+          className="absolute inset-0 opacity-[0.02]" 
+          style={{
+            backgroundImage: `
+              linear-gradient(hsl(var(--primary)) 1px, transparent 1px),
+              linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)
+            `,
+            backgroundSize: '80px 80px',
+          }}
+        />
+      </div>
+
+      <div className="relative max-w-5xl mx-auto px-4 py-12 md:py-20">
+        {/* Hero Section */}
+        <div className="text-center mb-16">
+          {/* Status badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
+            <StatusBadge variant="coming-soon" size="sm" pulse={false}>
+              COMING SOON
+            </StatusBadge>
+          </div>
+          
+          {/* Main icon */}
+          <div className="relative mx-auto mb-8 w-fit">
+            <div className="absolute inset-0 -m-8 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full blur-2xl animate-pulse" />
+            <div className="relative w-28 h-28 rounded-3xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-2xl shadow-primary/30">
+              <Video className="w-14 h-14 text-white" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+          </div>
+          
+          <h1 className="text-4xl md:text-6xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent">
               Live Streaming
-            </h1>
-            <p className="text-2xl md:text-3xl font-semibold text-white/90">
-              Coming Soon! 🚀
-            </p>
-          </div>
-
-          {/* Content */}
-          <div className="p-8 md:p-12">
-            <p className="text-xl text-white/90 text-center mb-12">
-              We're building something amazing! Live streaming will be available very soon. Get ready to go live and connect with your audience in real-time.
-            </p>
-
-            {/* Features Grid */}
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
-              <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10 text-center">
-                <div className="bg-purple-500/20 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Video className="w-7 h-7 text-purple-300" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">HD Streaming</h3>
-                <p className="text-sm text-white/70">
-                  Broadcast in stunning high quality with low latency
-                </p>
-              </div>
-
-              <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10 text-center">
-                <div className="bg-pink-500/20 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-7 h-7 text-pink-300" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">Real-Time Interaction</h3>
-                <p className="text-sm text-white/70">
-                  Chat, gifts, and engagement with your fans
-                </p>
-              </div>
-
-              <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10 text-center">
-                <div className="bg-blue-500/20 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <TrendingUp className="w-7 h-7 text-blue-300" />
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-2">Monetization</h3>
-                <p className="text-sm text-white/70">
-                  Earn from gifts, tips, and supporter badges
-                </p>
-              </div>
-            </div>
-
-            {/* CTA Section */}
-            <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl p-8 border border-white/10 text-center mb-8">
-              <Sparkles className="w-12 h-12 text-yellow-300 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-white mb-3">
-                Meanwhile, set up your profile!
-              </h3>
-              <p className="text-white/80 mb-6">
-                Get your profile ready so you can start streaming as soon as we launch.
-              </p>
-              <Link
-                href="/settings/profile"
-                className="inline-block px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-full hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 shadow-lg"
-              >
-                Customize Your Profile
-              </Link>
-            </div>
-
-            {/* Back Link */}
-            <div className="text-center">
-              <Link
-                href="/"
-                className="text-white/70 hover:text-white transition-colors inline-flex items-center gap-2"
-              >
-                ← Back to Home
-              </Link>
-            </div>
-          </div>
+            </span>
+          </h1>
+          
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+            We're building something amazing! Go live and connect with your audience in real-time.
+          </p>
         </div>
 
-        {/* Footer Note */}
-        <p className="text-center text-white/60 mt-8 text-sm">
-          Stay tuned for updates! Live streaming is launching soon.
-        </p>
+        {/* Features Grid */}
+        <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {[
+            {
+              icon: Video,
+              title: 'HD Streaming',
+              description: 'Broadcast in stunning high quality with ultra-low latency',
+              color: 'from-violet-500 to-purple-600',
+            },
+            {
+              icon: Users,
+              title: 'Real-Time Interaction',
+              description: 'Chat, gifts, and live engagement with your fans',
+              color: 'from-rose-500 to-pink-600',
+            },
+            {
+              icon: TrendingUp,
+              title: 'Monetization',
+              description: 'Earn from gifts, tips, and supporter badges',
+              color: 'from-amber-500 to-orange-600',
+            },
+          ].map((feature, i) => (
+            <Card 
+              key={i} 
+              className="group border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden"
+            >
+              <div className="p-6 text-center">
+                <div className={`
+                  w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br ${feature.color} 
+                  flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300
+                `}>
+                  <feature.icon className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-foreground mb-2">{feature.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {feature.description}
+                </p>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        {/* CTA Section */}
+        <Card className="border-0 shadow-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 p-8 md:p-12 text-center">
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <Sparkles className="w-8 h-8 text-white" />
+              </div>
+            </div>
+            
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
+              Get Ready for Launch! 🚀
+            </h2>
+            <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
+              Set up your profile now so you're ready to stream as soon as we launch.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/settings/profile">
+                <Button size="lg" className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg shadow-primary/30">
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Customize Your Profile
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+              
+              <Link href="/">
+                <Button variant="outline" size="lg">
+                  Back to Home
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </Card>
+
+        {/* Notify section */}
+        <div className="text-center mt-12">
+          <p className="text-muted-foreground text-sm flex items-center justify-center gap-2">
+            <Bell className="w-4 h-4" />
+            Stay tuned — live streaming launches soon!
+          </p>
+        </div>
       </div>
     </div>
   );

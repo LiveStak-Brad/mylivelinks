@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
+import SmartBrandLogo from '@/components/SmartBrandLogo';
+import { Button, Input, Card, CardContent } from '@/components/ui';
+import { AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -118,117 +121,126 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4">
+    <main id="main" className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-800 mb-2">Create Account</h1>
-            <p className="text-gray-600">Join MyLiveLinks today</p>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Success Message */}
-          {message && (
-            <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg text-green-700 text-sm">
-              {message}
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"
-                placeholder="you@example.com"
-              />
+        <Card className="shadow-xl border-0">
+          <CardContent className="p-8">
+            {/* Logo */}
+            <div className="flex justify-center mb-8">
+              <SmartBrandLogo />
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"
-                placeholder="••••••••"
-              />
-              <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+            {/* Header */}
+            <h1 className="text-3xl font-bold text-center mb-2 text-foreground">Create Account</h1>
+            <p className="text-center text-muted-foreground mb-8">Join MyLiveLinks today</p>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {message && (
+              <div className="mb-4 p-3 rounded-lg bg-success/10 border border-success/30 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-success">{message}</p>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                  Email Address
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+                  Password
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="••••••••"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Minimum 6 characters</p>
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-2">
+                  Confirm Password
+                </label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                isLoading={loading}
+                size="lg"
+                className="w-full"
+              >
+                Create Account
+              </Button>
+            </form>
+
+            {/* Sign In Link */}
+            <div className="mt-6 text-center">
+              <p className="text-muted-foreground">
+                Already have an account?{' '}
+                <Link href="/login" className="text-primary hover:text-primary/80 font-semibold transition-colors">
+                  Sign In
+                </Link>
+              </p>
             </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"
-                placeholder="••••••••"
-              />
+            {/* Terms */}
+            <div className="mt-6 text-center">
+              <p className="text-xs text-muted-foreground">
+                By signing up, you agree to our{' '}
+                <Link href="#" className="text-primary hover:underline">Terms of Service</Link>
+                {' '}and{' '}
+                <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>
+              </p>
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-            >
-              {loading ? 'Creating Account...' : 'Create Account'}
-            </button>
-          </form>
-
-          {/* Sign In Link */}
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              Already have an account?{' '}
-              <Link href="/login" className="text-purple-600 hover:text-purple-700 font-semibold">
-                Sign In
-              </Link>
-            </p>
-          </div>
-
-          {/* Terms */}
-          <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">
-              By signing up, you agree to our{' '}
-              <a href="#" className="text-purple-600 hover:underline">Terms of Service</a>
-              {' '}and{' '}
-              <a href="#" className="text-purple-600 hover:underline">Privacy Policy</a>
-            </p>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Back to Home */}
         <div className="text-center mt-4">
-          <Link href="/" className="text-white hover:text-gray-200 text-sm">
-            ← Back to Home
+          <Link 
+            href="/" 
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
-

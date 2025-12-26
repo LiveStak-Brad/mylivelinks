@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FileCheck, ArrowLeft, Shield, Check, X, Clock, User, Eye, ExternalLink } from 'lucide-react';
+import { FileCheck, ArrowLeft, Shield, Check, X, Clock, User, ExternalLink, Inbox } from 'lucide-react';
+import { PageShell, PageHeader, PageSection } from '@/components/layout';
+import { Button, Card, CardContent, Badge, Skeleton, EmptyState, IconButton } from '@/components/ui';
 
 interface Application {
   id: string;
@@ -152,136 +154,144 @@ export default function ApplicationsPage() {
     });
   };
 
+  const pendingCount = applications.filter(a => a.status === 'pending').length;
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full"></div>
-      </div>
+      <PageShell maxWidth="xl" padding="lg">
+        <div className="space-y-4">
+          <Skeleton className="h-12 w-64" />
+          <Skeleton className="h-6 w-48" />
+          <div className="flex gap-2 mt-6">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-10 w-24" />
+            ))}
+          </div>
+          <div className="space-y-4 mt-6">
+            {[1, 2, 3].map(i => (
+              <Skeleton key={i} className="h-40 w-full rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </PageShell>
     );
   }
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="text-center">
-          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">You don't have permission to access this page.</p>
-          <button onClick={goBack} className="text-blue-500 hover:underline">
-            ← Back
-          </button>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="pt-12 pb-8">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-destructive/10 flex items-center justify-center">
+              <Shield className="w-10 h-10 text-destructive" />
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+            <p className="text-muted-foreground mb-6">You don't have permission to access this page.</p>
+            <Button onClick={goBack} variant="outline">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Go Back
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <button onClick={goBack} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
-              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <FileCheck className="w-8 h-8 text-green-500" />
-                Room Applications
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">Review and approve streamer applications</p>
-            </div>
-          </div>
-        </div>
+    <PageShell maxWidth="xl" padding="lg">
+      <PageHeader 
+        title="Room Applications"
+        description="Review and approve streamer applications"
+        backLink="/owner"
+        backLabel="Back to Owner Panel"
+        icon={<FileCheck className="w-8 h-8 text-success" />}
+      />
 
-        {/* Filters */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg font-medium transition capitalize ${
-                filter === status
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
+      {/* Filters */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
+          <Button
+            key={status}
+            onClick={() => setFilter(status)}
+            variant={filter === status ? 'primary' : 'secondary'}
+            size="sm"
+          >
+            <span className="capitalize">{status}</span>
+            {status === 'pending' && pendingCount > 0 && (
+              <Badge variant="warning" className="ml-2">{pendingCount}</Badge>
+            )}
+          </Button>
+        ))}
+      </div>
+
+      {/* Applications List */}
+      <div className="space-y-4">
+        {filteredApplications.length === 0 ? (
+          <Card>
+            <CardContent className="py-12">
+              <EmptyState
+                icon={<Inbox className="w-8 h-8" />}
+                title={`No ${filter !== 'all' ? filter : ''} applications`}
+                description="When users apply for streaming rooms, they will appear here."
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          filteredApplications.map((app) => (
+            <Card
+              key={app.id}
+              className={app.status === 'pending' ? 'border-l-4 border-l-warning' : ''}
             >
-              {status}
-              {status === 'pending' && (
-                <span className="ml-2 px-2 py-0.5 bg-amber-500 text-white text-xs rounded-full">
-                  {applications.filter(a => a.status === 'pending').length}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Applications List */}
-        <div className="space-y-4">
-          {filteredApplications.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-12 text-center">
-              <FileCheck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">
-                No {filter !== 'all' ? filter : ''} applications
-              </p>
-            </div>
-          ) : (
-            filteredApplications.map((app) => (
-              <div
-                key={app.id}
-                className={`bg-white dark:bg-gray-800 rounded-xl p-6 shadow ${
-                  app.status === 'pending' ? 'border-l-4 border-amber-500' : ''
-                }`}
-              >
+              <CardContent className="py-6">
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
-                  <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-muted flex-shrink-0">
                     {app.profile?.avatar_url ? (
                       <img src={app.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <User className="w-8 h-8 text-gray-400" />
+                        <User className="w-8 h-8 text-muted-foreground" />
                       </div>
                     )}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                      <h3 className="font-bold text-lg text-foreground">
                         {app.display_name || app.profile?.display_name || 'Unknown'}
                       </h3>
-                      <a
+                      <Link
                         href={`/${app.profile?.username}`}
-                        className="text-sm text-blue-500 hover:underline flex items-center gap-1"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
                       >
                         @{app.profile?.username}
                         <ExternalLink className="w-3 h-3" />
-                      </a>
-                      <span className={`px-2 py-1 text-xs font-medium rounded ${
-                        app.status === 'pending'
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-                          : app.status === 'approved'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                      }`}>
+                      </Link>
+                      <Badge 
+                        variant={
+                          app.status === 'pending' ? 'warning' : 
+                          app.status === 'approved' ? 'success' : 
+                          'destructive'
+                        }
+                      >
                         {app.status.toUpperCase()}
-                      </span>
+                      </Badge>
                     </div>
 
                     {app.bio && (
-                      <p className="text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                      <p className="text-muted-foreground mb-3 line-clamp-2">
                         {app.bio}
                       </p>
                     )}
 
                     {app.social_links && (
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mb-3">
+                      <p className="text-sm text-muted-foreground mb-3">
                         <strong>Social:</strong> {app.social_links}
                       </p>
                     )}
 
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="w-4 h-4" />
                         Applied: {formatDate(app.created_at)}
@@ -296,32 +306,35 @@ export default function ApplicationsPage() {
 
                   {/* Actions */}
                   {app.status === 'pending' && (
-                    <div className="flex gap-2">
-                      <button
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
                         onClick={() => handleUpdateStatus(app.id, app.profile_id, 'approved')}
                         disabled={actionLoading === app.id}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
+                        isLoading={actionLoading === app.id}
+                        variant="primary"
+                        size="sm"
+                        leftIcon={<Check className="w-4 h-4" />}
+                        className="bg-success hover:bg-success/90"
                       >
-                        <Check className="w-4 h-4" />
                         Approve
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => handleUpdateStatus(app.id, app.profile_id, 'rejected')}
                         disabled={actionLoading === app.id}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+                        variant="destructive"
+                        size="sm"
+                        leftIcon={<X className="w-4 h-4" />}
                       >
-                        <X className="w-4 h-4" />
                         Reject
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
-    </div>
+    </PageShell>
   );
 }
-

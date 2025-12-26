@@ -1,0 +1,156 @@
+/* =============================================================================
+   LAYOUT UTILITIES
+   
+   Page structure, shells, grids, and spacing utilities.
+   Uses CSS tokens defined in globals.css
+============================================================================= */
+
+/* Page Layout Tokens */
+:root {
+  /* Page max-widths for PageShell */
+  --page-max-width-sm: 32rem;   /* 512px */
+  --page-max-width-md: 42rem;   /* 672px */
+  --page-max-width-lg: 56rem;   /* 896px */
+  --page-max-width-xl: 72rem;   /* 1152px */
+  --page-max-width-2xl: 84rem;  /* 1344px */
+  
+  /* Gutters (horizontal padding) */
+  --page-gutter: 1rem;          /* 16px mobile */
+  --page-gutter-sm: 1.5rem;     /* 24px tablet */
+  --page-gutter-lg: 2rem;       /* 32px desktop */
+  
+  /* Header height for min-h-page calc */
+  --header-height: 4rem;        /* 64px mobile */
+  --header-height-lg: 4.5rem;   /* 72px desktop */
+
+  /* Card tokens */
+  --card-padding: 1.5rem;
+  --card-padding-sm: 1rem;
+  --card-radius: 0.75rem;
+  --card-shadow: var(--shadow-sm);
+  --card-header-padding: 1.5rem;
+  --card-footer-padding: 1rem 1.5rem;
+  
+  /* Modal tokens */
+  --modal-sm: 24rem;    /* 384px */
+  --modal-md: 28rem;    /* 448px */
+  --modal-lg: 32rem;    /* 512px */
+  --modal-xl: 36rem;    /* 576px */
+  --modal-2xl: 42rem;   /* 672px */
+  --modal-full: 56rem;  /* 896px */
+  --modal-padding: 1.5rem;
+  --modal-padding-mobile: 1rem;
+  --modal-header-height: 4rem;
+  --modal-footer-height: 4rem;
+}
+
+/* Page minimum height (accounts for header) */
+.min-h-page {
+  min-height: calc(100vh - var(--header-height));
+  min-height: calc(100dvh - var(--header-height));
+}
+
+@media (min-width: 1024px) {
+  .min-h-page {
+    min-height: calc(100vh - var(--header-height-lg));
+    min-height: calc(100dvh - var(--header-height-lg));
+  }
+}
+
+/* Page padding variants */
+.page-padding {
+  padding-top: 1.5rem;
+  padding-bottom: 2rem;
+}
+
+.page-padding-sm {
+  padding-top: 1rem;
+  padding-bottom: 1.5rem;
+}
+
+@media (min-width: 640px) {
+  .page-padding {
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+  }
+  
+  .page-padding-sm {
+    padding-top: 1.5rem;
+    padding-bottom: 2rem;
+  }
+}
+
+/* Section spacing */
+.section-spacing {
+  margin-bottom: 2rem;
+}
+
+.section-spacing-sm {
+  margin-bottom: 1.5rem;
+}
+
+.section-spacing-lg {
+  margin-bottom: 3rem;
+}
+
+@media (min-width: 640px) {
+  .section-spacing {
+    margin-bottom: 3rem;
+  }
+  
+  .section-spacing-sm {
+    margin-bottom: 2rem;
+  }
+  
+  .section-spacing-lg {
+    margin-bottom: 4rem;
+  }
+}
+
+/* Container widths */
+.container-sm { max-width: var(--page-max-width-sm); }
+.container-md { max-width: var(--page-max-width-md); }
+.container-lg { max-width: var(--page-max-width-lg); }
+.container-xl { max-width: var(--page-max-width-xl); }
+.container-2xl { max-width: var(--page-max-width-2xl); }
+
+/* Responsive grid layouts */
+.grid-auto-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.grid-auto-fill {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Full bleed utility (break out of container) */
+.full-bleed {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+}
+
+/* Stack layouts */
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.stack > * + * {
+  margin-top: var(--space-4, 1rem);
+}
+
+.stack-sm > * + * {
+  margin-top: var(--space-2, 0.5rem);
+}
+
+.stack-lg > * + * {
+  margin-top: var(--space-6, 1.5rem);
+}

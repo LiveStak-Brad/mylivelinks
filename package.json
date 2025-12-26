@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint",
+    "lint:ui": "node scripts/ui-drift-detector.js",
     "test": "jest",
     "test:watch": "jest --watch"
   },

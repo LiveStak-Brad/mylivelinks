@@ -65,9 +65,9 @@ WHERE profile_id = 'RECIPIENT_USER_ID';  -- ⚠️ REPLACE THIS
 -- ============================================================================
 -- If you sent 100k coins in gifts:
 --   - Recipient gets 100k diamonds
---   - Recipient converts 100k diamonds at 40% fee
---   - Recipient should get: 100k * 0.60 = 60k coins
---   - Recipient should have: 60k coins, 0 diamonds
+--   - Recipient converts 100k diamonds at 30% fee
+--   - Recipient should get: 100k * 0.70 = 70k coins
+--   - Recipient should have: 70k coins, 0 diamonds
 --
 -- If they have 170k coins, they got an extra 110k from somewhere!
 -- ============================================================================

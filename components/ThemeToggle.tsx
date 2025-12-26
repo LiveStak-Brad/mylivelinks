@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Monitor } from 'lucide-react';
+import { Sun, Moon, Monitor, Check } from 'lucide-react';
 
 interface ThemeToggleProps {
   variant?: 'icon' | 'full' | 'menu-item';
@@ -21,7 +21,10 @@ export default function ThemeToggle({ variant = 'icon', className = '' }: ThemeT
   if (!mounted) {
     // Return placeholder to avoid layout shift
     return (
-      <div className={`w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse ${className}`} />
+      <div 
+        className={`w-10 h-10 rounded-xl bg-muted animate-pulse ${className}`} 
+        aria-hidden="true"
+      />
     );
   }
 
@@ -57,11 +60,20 @@ export default function ThemeToggle({ variant = 'icon', className = '' }: ThemeT
     return (
       <button
         onClick={cycleTheme}
-        className={`relative p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all duration-300 hover:scale-105 active:scale-95 group ${className}`}
+        className={`
+          relative p-2.5 rounded-xl 
+          bg-muted/60 hover:bg-muted 
+          text-muted-foreground hover:text-foreground
+          transition-all duration-200 
+          hover:scale-105 active:scale-95 
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
+          group ${className}
+        `}
         title={`Theme: ${getLabel()} (click to change)`}
-        aria-label={`Current theme: ${getLabel()}. Click to change.`}
+        aria-label={`Current theme: ${getLabel()}. Click to cycle through themes.`}
+        role="button"
       >
-        <div className="relative">
+        <div className="relative w-5 h-5">
           {/* Sun icon */}
           <Sun 
             className={`w-5 h-5 transition-all duration-300 absolute inset-0 ${
@@ -69,6 +81,7 @@ export default function ThemeToggle({ variant = 'icon', className = '' }: ThemeT
                 ? 'opacity-100 rotate-0 scale-100' 
                 : 'opacity-0 -rotate-90 scale-50'
             }`}
+            aria-hidden="true"
           />
           {/* Moon icon */}
           <Moon 
@@ -77,6 +90,7 @@ export default function ThemeToggle({ variant = 'icon', className = '' }: ThemeT
                 ? 'opacity-100 rotate-0 scale-100' 
                 : 'opacity-0 rotate-90 scale-50'
             }`}
+            aria-hidden="true"
           />
           {/* Monitor icon for system */}
           <Monitor 
@@ -85,15 +99,19 @@ export default function ThemeToggle({ variant = 'icon', className = '' }: ThemeT
                 ? 'opacity-100 scale-100' 
                 : 'opacity-0 scale-50'
             }`}
+            aria-hidden="true"
           />
         </div>
         
         {/* Subtle glow effect */}
-        <div className={`absolute inset-0 rounded-xl transition-opacity duration-300 ${
-          resolvedTheme === 'dark' 
-            ? 'bg-blue-500/10 opacity-0 group-hover:opacity-100' 
-            : 'bg-amber-500/10 opacity-0 group-hover:opacity-100'
-        }`} />
+        <div 
+          className={`absolute inset-0 rounded-xl transition-opacity duration-300 pointer-events-none ${
+            resolvedTheme === 'dark' 
+              ? 'bg-primary/10 opacity-0 group-hover:opacity-100' 
+              : 'bg-warning/10 opacity-0 group-hover:opacity-100'
+          }`} 
+          aria-hidden="true"
+        />
       </button>
     );
   }
@@ -101,13 +119,40 @@ export default function ThemeToggle({ variant = 'icon', className = '' }: ThemeT
   // Menu item style for dropdowns
   if (variant === 'menu-item') {
     return (
-      <button
-        onClick={cycleTheme}
-        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition ${className}`}
-      >
-        {getIcon()}
-        <span>Theme: {getLabel()}</span>
-      </button>
+      <div className={`px-1 py-1 ${className}`}>
+        <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Theme
+        </p>
+        <div className="space-y-0.5">
+          {(['light', 'dark', 'system'] as const).map((themeOption) => {
+            const isActive = theme === themeOption;
+            const Icon = themeOption === 'light' ? Sun : themeOption === 'dark' ? Moon : Monitor;
+            const label = themeOption.charAt(0).toUpperCase() + themeOption.slice(1);
+            
+            return (
+              <button
+                key={themeOption}
+                onClick={() => setTheme(themeOption)}
+                className={`
+                  w-full flex items-center gap-3 px-2 py-2 text-sm rounded-lg
+                  transition-all duration-150
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset
+                  ${isActive 
+                    ? 'bg-primary/10 text-primary font-medium' 
+                    : 'text-foreground hover:bg-muted'
+                  }
+                `}
+                role="menuitemradio"
+                aria-checked={isActive}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} aria-hidden="true" />
+                <span className="flex-1 text-left">{label}</span>
+                {isActive && <Check className="w-4 h-4 text-primary" aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     );
   }
 
@@ -115,12 +160,18 @@ export default function ThemeToggle({ variant = 'icon', className = '' }: ThemeT
   return (
     <button
       onClick={cycleTheme}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all duration-200 ${className}`}
+      className={`
+        flex items-center gap-2 px-4 py-2 rounded-xl
+        bg-muted/60 hover:bg-muted 
+        text-foreground
+        transition-all duration-200
+        focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
+        ${className}
+      `}
+      aria-label={`Current theme: ${getLabel()}. Click to change.`}
     >
       {getIcon()}
       <span className="text-sm font-medium">{getLabel()}</span>
     </button>
   );
 }
-
-

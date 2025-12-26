@@ -1,0 +1,162 @@
+/* ============================================================================
+   DESIGN TOKENS - Single Source of Truth
+   ============================================================================
+   All spacing, sizing, and effects should reference these tokens.
+   Access via: var(--token-name)
+   ============================================================================ */
+
+:root {
+  /* ==========================================================================
+     SPACING SCALE
+     ========================================================================== 
+     Based on 4px grid. Use these for margins, paddings, gaps.
+     Naming: --space-{size}
+  */
+  --space-0: 0;
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+  --space-20: 5rem;     /* 80px */
+  --space-24: 6rem;     /* 96px */
+
+  /* ==========================================================================
+     PAGE LAYOUT
+     ==========================================================================
+     Consistent page structure values.
+  */
+  --page-gutter: var(--space-4);
+  --page-gutter-sm: var(--space-6);
+  --page-gutter-lg: var(--space-8);
+  
+  --page-max-width-sm: 36rem;    /* 576px - forms, narrow content */
+  --page-max-width-md: 48rem;    /* 768px - standard content */
+  --page-max-width-lg: 64rem;    /* 1024px - wide content */
+  --page-max-width-xl: 80rem;    /* 1280px - dashboard layouts */
+  --page-max-width-2xl: 96rem;   /* 1536px - full-width */
+  
+  --header-height: 4rem;         /* 64px - global header */
+  --header-height-mobile: 3.5rem; /* 56px - mobile header */
+
+  /* ==========================================================================
+     BORDER RADIUS
+     ==========================================================================
+     Consistent rounding for UI elements.
+  */
+  --radius-none: 0;
+  --radius-sm: 0.25rem;    /* 4px - small elements */
+  --radius-md: 0.5rem;     /* 8px - buttons, inputs */
+  --radius-lg: 0.75rem;    /* 12px - cards, modals */
+  --radius-xl: 1rem;       /* 16px - large cards */
+  --radius-2xl: 1.5rem;    /* 24px - hero sections */
+  --radius-full: 9999px;   /* Fully rounded */
+
+  /* ==========================================================================
+     SHADOWS
+     ==========================================================================
+     Elevation levels for depth.
+  */
+  --shadow-none: none;
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+
+  /* ==========================================================================
+     MODAL SIZES
+     ==========================================================================
+     Standardized modal dimensions.
+  */
+  --modal-sm: 24rem;       /* 384px */
+  --modal-md: 28rem;       /* 448px */
+  --modal-lg: 32rem;       /* 512px */
+  --modal-xl: 36rem;       /* 576px */
+  --modal-2xl: 42rem;      /* 672px */
+  --modal-full: 56rem;     /* 896px */
+  
+  --modal-padding: var(--space-6);
+  --modal-padding-mobile: var(--space-4);
+  --modal-header-height: 4rem;
+  --modal-footer-height: 4.5rem;
+
+  /* ==========================================================================
+     CARD RHYTHM
+     ==========================================================================
+     Consistent card structure.
+  */
+  --card-padding: var(--space-6);
+  --card-padding-sm: var(--space-4);
+  --card-padding-lg: var(--space-8);
+  
+  --card-header-padding: var(--space-4) var(--space-6);
+  --card-footer-padding: var(--space-4) var(--space-6);
+  --card-content-gap: var(--space-4);
+  
+  --card-radius: var(--radius-xl);
+  --card-shadow: var(--shadow-sm);
+
+  /* ==========================================================================
+     GRID GAPS
+     ==========================================================================
+     Consistent spacing for grid layouts.
+  */
+  --grid-gap-sm: var(--space-3);
+  --grid-gap-md: var(--space-4);
+  --grid-gap-lg: var(--space-6);
+  
+  /* ==========================================================================
+     Z-INDEX SCALE
+     ==========================================================================
+     Layering system for stacking contexts.
+  */
+  --z-base: 0;
+  --z-dropdown: 50;
+  --z-sticky: 100;
+  --z-fixed: 200;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+  --z-toast: 800;
+  --z-max: 9999;
+
+  /* ==========================================================================
+     TRANSITIONS
+     ==========================================================================
+     Consistent animation timing.
+  */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+  --transition-slower: 500ms ease;
+
+  /* ==========================================================================
+     BREAKPOINTS (for reference - use Tailwind classes)
+     ==========================================================================
+  */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/* Dark mode shadow adjustments */
+.dark {
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.25);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+}
+

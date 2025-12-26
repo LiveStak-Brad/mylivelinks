@@ -169,10 +169,15 @@ export default function GiftModal({
         .single();
       
       if (senderProfile) {
-        const diamondsAwarded = data.diamondsAwarded || selectedGift.coin_cost;
+        const diamondsAwarded =
+          typeof data?.diamondsAwarded === 'number'
+            ? data.diamondsAwarded
+            : (typeof data?.diamonds_awarded === 'number' ? data.diamonds_awarded : null);
+
+        const diamondsSuffix = typeof diamondsAwarded === 'number' ? ` 💎+${diamondsAwarded}` : '';
         await supabase.from('chat_messages').insert({
           profile_id: user.id,
-          content: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername} 💎+${diamondsAwarded}`,
+          content: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername}${diamondsSuffix}`,
           message_type: 'gift',
         });
       }

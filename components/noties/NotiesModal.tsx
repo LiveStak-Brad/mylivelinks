@@ -134,10 +134,10 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
     return (
       <>
         {/* Backdrop - solid background to prevent content bleeding through */}
-        <div className="fixed inset-0 z-[70] bg-background" aria-hidden="true" />
+        <div className="fixed inset-0 z-[9999] bg-background" aria-hidden="true" />
         
         {/* Modal Content */}
-        <div className="fixed inset-0 z-[70] flex flex-col bg-background animate-slide-up">
+        <div className="fixed inset-0 z-[9999] flex flex-col bg-background animate-slide-up">
           {/* Mobile Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0">
             <h2 className="text-lg font-bold text-foreground">Noties</h2>
@@ -208,7 +208,7 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
   return (
     <div
       ref={modalRef}
-      className="absolute right-0 top-full mt-2 w-96 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-scale-in z-[70]"
+      className="fixed right-4 top-16 mt-2 w-96 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-scale-in z-[9999]"
       style={{ maxHeight: 'calc(100vh - 120px)' }}
     >
       {/* Header */}

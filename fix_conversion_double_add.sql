@@ -18,7 +18,7 @@ DECLARE
     v_diamond_balance BIGINT;
     v_coins_out BIGINT;
     v_fee_amount BIGINT;
-    v_conversion_rate DECIMAL(5, 4) := 0.6000; -- 60% (40% platform fee)
+    v_conversion_rate DECIMAL(5, 4) := 0.7000; -- 70% (30% platform fee)
     v_min_diamonds BIGINT := 3;
     v_conversion_id BIGINT;
 BEGIN
@@ -39,7 +39,7 @@ BEGIN
         RAISE EXCEPTION 'Minimum % diamonds required', v_min_diamonds;
     END IF;
     
-    -- Calculate: 100k diamonds * 0.60 = 60k coins (40% fee)
+    -- Calculate: 100k diamonds * 0.70 = 70k coins (30% fee)
     v_coins_out := FLOOR(p_diamonds_in * v_conversion_rate);
     v_fee_amount := p_diamonds_in - v_coins_out;
     
@@ -71,21 +71,21 @@ BEGIN
         (p_profile_id, v_coins_out, 'coin', 'convert_in', 'diamond_conversion', v_conversion_id,
          'Diamond conversion: ' || v_coins_out || ' coins received'),
         (p_profile_id, -v_fee_amount, 'diamond', 'convert_fee', 'diamond_conversion', v_conversion_id,
-         'Platform fee: ' || v_fee_amount || ' diamonds (40%)');
+         'Platform fee: ' || v_fee_amount || ' diamonds (30%)');
     
     RETURN v_conversion_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;
 
-SELECT 'Conversion function fixed - 40% fee, no double-add' as status;
+SELECT 'Conversion function fixed - 30% fee, no double-add' as status;
 
 -- ============================================================================
 -- WHAT THIS FIXES:
 -- ============================================================================
 -- 1. Direct balance updates (no double-adding)
--- 2. 40% platform fee (0.60 conversion rate) - CORRECT
+-- 2. 30% platform fee (0.70 conversion rate)
 -- 3. Ledger is for tracking only, doesn't affect balances
--- 4. Math: 100k diamonds → 60k coins (correct!)
+-- 4. Math: 100k diamonds → 70k coins
 -- ============================================================================
 

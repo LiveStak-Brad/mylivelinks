@@ -116,16 +116,16 @@ ADD COLUMN IF NOT EXISTS coins_spent BIGINT,
 ADD COLUMN IF NOT EXISTS diamonds_awarded BIGINT,
 ADD COLUMN IF NOT EXISTS platform_fee_coins BIGINT;
 
--- Migrate existing data if needed (set diamonds_awarded = 60% of coin_amount)
+-- Migrate existing data if needed (gifts are 1:1 coins -> diamonds, platform fee = 0)
 UPDATE gifts 
 SET coins_spent = coin_amount,
-    diamonds_awarded = FLOOR(coin_amount * 0.60),
-    platform_fee_coins = coin_amount - FLOOR(coin_amount * 0.60)
+    diamonds_awarded = coin_amount,
+    platform_fee_coins = 0
 WHERE coins_spent IS NULL AND coin_amount IS NOT NULL;
 
 COMMENT ON COLUMN gifts.coins_spent IS 'Total coins spent by sender';
-COMMENT ON COLUMN gifts.diamonds_awarded IS 'Diamonds awarded to recipient (60% of coins_spent)';
-COMMENT ON COLUMN gifts.platform_fee_coins IS 'Platform fee (40% of coins_spent)';
+COMMENT ON COLUMN gifts.diamonds_awarded IS 'Diamonds awarded to recipient (1:1 with coins_spent)';
+COMMENT ON COLUMN gifts.platform_fee_coins IS 'Platform fee (coins) for gifts (0 in 1:1 model)';
 
 -- ============================================================================
 -- 5. STRIPE CONNECT ACCOUNTS TABLE

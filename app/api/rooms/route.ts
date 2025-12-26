@@ -6,16 +6,21 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient(request);
 
-    const { data: rooms, error } = await supabase
-      .from('coming_soon_rooms')
+    const { data: rows, error } = await supabase
+      .from('v_rooms_public')
       .select('*')
-      .neq('status', 'draft')
       .order('display_order', { ascending: true });
 
     if (error) {
       console.error('[API /rooms] Error fetching rooms:', error);
       return NextResponse.json({ error: 'Failed to fetch rooms' }, { status: 500 });
     }
+
+    const rooms = (rows || []).map((r: any) => ({
+      ...r,
+      // UI compatibility: existing components expect interest_threshold
+      interest_threshold: r.effective_interest_threshold,
+    }));
 
     return NextResponse.json({ rooms: rooms || [] });
   } catch (err) {

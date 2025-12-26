@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const [{ data: rooms, error: roomsError }, { data: appRoles, error: appRolesError }, { data: roomRoles, error: roomRolesError }] =
       await Promise.all([
         supabase
-          .from('coming_soon_rooms')
+          .from('rooms')
           .select('id, name')
           .order('display_order', { ascending: true }),
         supabase

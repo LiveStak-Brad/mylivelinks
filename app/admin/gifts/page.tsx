@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Gift, ArrowLeft, Shield, Plus, Trash2, Edit, Save, X, Coins, DollarSign } from 'lucide-react';
+import { Gift, Shield, Plus, Trash2, Edit, Save, X, Coins } from 'lucide-react';
+import { DashboardPage, DashboardSection, type DashboardTab } from '@/components/layout';
+import { Button, IconButton, Input, Badge } from '@/components/ui';
 
 interface GiftType {
   id: number | string;
@@ -31,13 +32,6 @@ interface CoinPack {
 
 export default function GiftsAdminPage() {
   const router = useRouter();
-  const goBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-      return;
-    }
-    router.push('/');
-  };
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState<'gifts' | 'coins'>('gifts');
@@ -477,220 +471,184 @@ export default function GiftsAdminPage() {
     }
   };
 
+  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full"></div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground">Loading gifts admin...</p>
+        </div>
       </div>
     );
   }
 
+  // Access denied state
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-        <div className="text-center">
-          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">You don't have permission to access this page.</p>
-          <button onClick={goBack} className="text-blue-500 hover:underline">
-            ← Back
-          </button>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-8 h-8 text-destructive" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+          <p className="text-muted-foreground mb-6">You don't have permission to access this page.</p>
+          <Button variant="ghost" onClick={() => router.back()}>
+            ← Go Back
+          </Button>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <button onClick={goBack} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition">
-              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <Gift className="w-8 h-8 text-pink-500" />
-                Gift & Coin Management
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">Manage gift types and coin packs</p>
+  // Build tabs
+  const tabs: DashboardTab[] = [
+    {
+      id: 'gifts',
+      label: 'Gift Types',
+      icon: <Gift className="w-4 h-4" />,
+      content: (
+        <div className="space-y-6">
+          {/* Add New Gift */}
+          <DashboardSection title="Add New Gift Type">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Input
+                placeholder="Emoji (e.g. 🎁)"
+                value={newGift.emoji}
+                onChange={(e) => setNewGift({ ...newGift, emoji: e.target.value })}
+                className="text-center text-2xl"
+                maxLength={2}
+              />
+              <Input
+                placeholder="Gift Name"
+                value={newGift.name}
+                onChange={(e) => setNewGift({ ...newGift, name: e.target.value })}
+              />
+              <Input
+                type="number"
+                placeholder="Coin Cost"
+                value={newGift.coin_cost}
+                onChange={(e) => setNewGift({ ...newGift, coin_cost: parseInt(e.target.value) || 0 })}
+                min={1}
+              />
+              <Button
+                onClick={handleAddGift}
+                disabled={actionLoading}
+                leftIcon={<Plus className="w-4 h-4" />}
+              >
+                Add Gift
+              </Button>
             </div>
-          </div>
-        </div>
+          </DashboardSection>
 
-        {errorMessage && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="flex gap-4 mb-6">
-          <button
-            onClick={() => setActiveTab('gifts')}
-            className={`px-6 py-3 rounded-lg font-medium transition flex items-center gap-2 ${
-              activeTab === 'gifts'
-                ? 'bg-pink-600 text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            <Gift className="w-4 h-4" />
-            Gift Types
-          </button>
-          <button
-            onClick={() => setActiveTab('coins')}
-            className={`px-6 py-3 rounded-lg font-medium transition flex items-center gap-2 ${
-              activeTab === 'coins'
-                ? 'bg-yellow-600 text-white'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            <Coins className="w-4 h-4" />
-            Coin Packs
-          </button>
-        </div>
-
-        {/* Gift Types Tab */}
-        {activeTab === 'gifts' && (
-          <div className="space-y-6">
-            {/* Add New Gift */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-              <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white">Add New Gift Type</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <input
-                  type="text"
-                  placeholder="Emoji (e.g. 🎁)"
-                  value={newGift.emoji}
-                  onChange={(e) => setNewGift({ ...newGift, emoji: e.target.value })}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-center text-2xl"
-                  maxLength={2}
-                />
-                <input
-                  type="text"
-                  placeholder="Gift Name"
-                  value={newGift.name}
-                  onChange={(e) => setNewGift({ ...newGift, name: e.target.value })}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                />
-                <input
-                  type="number"
-                  placeholder="Coin Cost"
-                  value={newGift.coin_cost}
-                  onChange={(e) => setNewGift({ ...newGift, coin_cost: parseInt(e.target.value) || 0 })}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                  min="1"
-                />
-                <button
-                  onClick={handleAddGift}
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Gift
-                </button>
-              </div>
-            </div>
-
-            {/* Gift Types List */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emoji</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+          {/* Gift Types List */}
+          <DashboardSection>
+            <div className="overflow-x-auto -mx-6 px-6">
+              <table className="w-full min-w-[600px]">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Emoji</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Cost</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-border">
                   {giftTypes.map((gift) => (
-                    <tr key={gift.id}>
-                      <td className="px-6 py-4 text-2xl">
+                    <tr key={gift.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-4 text-2xl">
                         {editingGift?.id === gift.id ? (
-                          <input
-                            type="text"
+                          <Input
                             value={editingGift.emoji}
                             onChange={(e) => setEditingGift({ ...editingGift, emoji: e.target.value })}
-                            className="w-16 px-2 py-1 border rounded text-center"
+                            className="w-16 text-center"
                             maxLength={2}
+                            size="sm"
                           />
                         ) : (
                           gift.emoji
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         {editingGift?.id === gift.id ? (
-                          <input
-                            type="text"
+                          <Input
                             value={editingGift.name}
                             onChange={(e) => setEditingGift({ ...editingGift, name: e.target.value })}
-                            className="px-2 py-1 border rounded"
+                            size="sm"
                           />
                         ) : (
-                          <span className="font-medium text-gray-900 dark:text-white">{gift.name}</span>
+                          <span className="font-medium text-foreground">{gift.name}</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         {editingGift?.id === gift.id ? (
-                          <input
+                          <Input
                             type="number"
                             value={editingGift.coin_cost}
                             onChange={(e) => setEditingGift({ ...editingGift, coin_cost: parseInt(e.target.value) || 0 })}
-                            className="w-24 px-2 py-1 border rounded"
-                            min="1"
+                            className="w-24"
+                            size="sm"
+                            min={1}
                           />
                         ) : (
-                          <span className="text-yellow-600">🪙 {gift.coin_cost}</span>
+                          <span className="text-warning">🪙 {gift.coin_cost}</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         {editingGift?.id === gift.id ? (
-                          <label className="flex items-center gap-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
                               checked={editingGift.is_active}
                               onChange={(e) => setEditingGift({ ...editingGift, is_active: e.target.checked })}
+                              className="rounded"
                             />
-                            Active
+                            <span className="text-sm">Active</span>
                           </label>
                         ) : (
-                          <span className={`px-2 py-1 text-xs rounded ${gift.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                          <Badge variant={gift.is_active ? 'success' : 'default'} size="sm">
                             {gift.is_active ? 'Active' : 'Inactive'}
-                          </span>
+                          </Badge>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-4 text-right">
                         {editingGift?.id === gift.id ? (
-                          <div className="flex justify-end gap-2">
-                            <button
+                          <div className="flex justify-end gap-1">
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Save className="w-4 h-4" />}
                               onClick={handleUpdateGift}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded"
-                            >
-                              <Save className="w-4 h-4" />
-                            </button>
-                            <button
+                              aria-label="Save changes"
+                              className="text-success"
+                            />
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<X className="w-4 h-4" />}
                               onClick={() => setEditingGift(null)}
-                              className="p-2 text-gray-600 hover:bg-gray-50 rounded"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                              aria-label="Cancel editing"
+                            />
                           </div>
                         ) : (
-                          <div className="flex justify-end gap-2">
-                            <button
+                          <div className="flex justify-end gap-1">
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Edit className="w-4 h-4" />}
                               onClick={() => setEditingGift(gift)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
+                              aria-label="Edit gift"
+                              className="text-primary"
+                            />
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Trash2 className="w-4 h-4" />}
                               onClick={() => handleDeleteGift(gift.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              aria-label="Delete gift"
+                              className="text-destructive"
+                            />
                           </div>
                         )}
                       </td>
@@ -699,143 +657,145 @@ export default function GiftsAdminPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-
-        {/* Coin Packs Tab */}
-        {activeTab === 'coins' && (
-          <div className="space-y-6">
-            {/* Add New Pack */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-              <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white">Add New Coin Pack</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-                <input
-                  type="text"
-                  placeholder="Pack Name"
-                  value={newPack.name}
-                  onChange={(e) => setNewPack({ ...newPack, name: e.target.value })}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                />
-                <input
-                  type="number"
-                  placeholder="Coins"
-                  value={newPack.coins}
-                  onChange={(e) => setNewPack({ ...newPack, coins: parseInt(e.target.value) || 0 })}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                  min="1"
-                />
-                <input
-                  type="number"
-                  placeholder="Price (USD)"
-                  value={newPack.price_usd}
-                  onChange={(e) => setNewPack({ ...newPack, price_usd: parseFloat(e.target.value) || 0 })}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                  min="0.01"
-                  step="0.01"
-                />
-                <input
-                  type="number"
-                  placeholder="Bonus Coins"
-                  value={newPack.bonus_coins}
-                  onChange={(e) => setNewPack({ ...newPack, bonus_coins: parseInt(e.target.value) || 0 })}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
-                  min="0"
-                />
-                <button
-                  onClick={handleAddCoinPack}
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Pack
-                </button>
-              </div>
+          </DashboardSection>
+        </div>
+      ),
+    },
+    {
+      id: 'coins',
+      label: 'Coin Packs',
+      icon: <Coins className="w-4 h-4" />,
+      content: (
+        <div className="space-y-6">
+          {/* Add New Pack */}
+          <DashboardSection title="Add New Coin Pack">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <Input
+                placeholder="Pack Name"
+                value={newPack.name}
+                onChange={(e) => setNewPack({ ...newPack, name: e.target.value })}
+              />
+              <Input
+                type="number"
+                placeholder="Coins"
+                value={newPack.coins}
+                onChange={(e) => setNewPack({ ...newPack, coins: parseInt(e.target.value) || 0 })}
+                min={1}
+              />
+              <Input
+                type="number"
+                placeholder="Price (USD)"
+                value={newPack.price_usd}
+                onChange={(e) => setNewPack({ ...newPack, price_usd: parseFloat(e.target.value) || 0 })}
+                min={0.01}
+                step={0.01}
+              />
+              <Input
+                type="number"
+                placeholder="Bonus Coins"
+                value={newPack.bonus_coins}
+                onChange={(e) => setNewPack({ ...newPack, bonus_coins: parseInt(e.target.value) || 0 })}
+                min={0}
+              />
+              <Button
+                onClick={handleAddCoinPack}
+                disabled={actionLoading}
+                leftIcon={<Plus className="w-4 h-4" />}
+              >
+                Add Pack
+              </Button>
             </div>
+          </DashboardSection>
 
-            {/* Coin Packs List */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coins</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bonus</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+          {/* Coin Packs List */}
+          <DashboardSection>
+            <div className="overflow-x-auto -mx-6 px-6">
+              <table className="w-full min-w-[700px]">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Coins</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Bonus</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Price</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-border">
                   {coinPacks.map((pack) => (
-                    <tr key={pack.id}>
-                      <td className="px-6 py-4">
+                    <tr key={pack.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-4">
                         {editingPack?.id === pack.id ? (
-                          <input
-                            type="text"
+                          <Input
                             value={editingPack.name}
                             onChange={(e) => setEditingPack({ ...editingPack, name: e.target.value })}
-                            className="px-2 py-1 border rounded"
+                            size="sm"
                           />
                         ) : (
-                          <span className="font-medium text-gray-900 dark:text-white">{pack.name}</span>
+                          <span className="font-medium text-foreground">{pack.name}</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         {editingPack?.id === pack.id ? (
-                          <input
+                          <Input
                             type="number"
                             value={editingPack.coins}
                             onChange={(e) => setEditingPack({ ...editingPack, coins: parseInt(e.target.value) || 0 })}
-                            className="w-24 px-2 py-1 border rounded"
+                            className="w-24"
+                            size="sm"
                           />
                         ) : (
-                          <span className="text-yellow-600">🪙 {pack.coins.toLocaleString()}</span>
+                          <span className="text-warning">🪙 {pack.coins.toLocaleString()}</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         {editingPack?.id === pack.id ? (
-                          <input
+                          <Input
                             type="number"
                             value={editingPack.bonus_coins}
                             onChange={(e) => setEditingPack({ ...editingPack, bonus_coins: parseInt(e.target.value) || 0 })}
-                            className="w-24 px-2 py-1 border rounded"
+                            className="w-24"
+                            size="sm"
                           />
                         ) : pack.bonus_coins > 0 ? (
-                          <span className="text-green-600">+{pack.bonus_coins.toLocaleString()}</span>
+                          <span className="text-success">+{pack.bonus_coins.toLocaleString()}</span>
                         ) : (
-                          <span className="text-gray-400">-</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         {editingPack?.id === pack.id ? (
-                          <input
+                          <Input
                             type="number"
                             value={editingPack.price_usd}
                             onChange={(e) => setEditingPack({ ...editingPack, price_usd: parseFloat(e.target.value) || 0 })}
-                            className="w-24 px-2 py-1 border rounded"
-                            step="0.01"
+                            className="w-24"
+                            size="sm"
+                            step={0.01}
                           />
                         ) : (
-                          <span className="text-gray-900 dark:text-white">${pack.price_usd}</span>
+                          <span className="text-foreground">${pack.price_usd}</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-2">
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap gap-2">
                           {editingPack?.id === pack.id ? (
                             <>
-                              <label className="flex items-center gap-1 text-xs">
+                              <label className="flex items-center gap-1 text-xs cursor-pointer">
                                 <input
                                   type="checkbox"
                                   checked={editingPack.is_active}
                                   onChange={(e) => setEditingPack({ ...editingPack, is_active: e.target.checked })}
+                                  className="rounded"
                                 />
                                 Active
                               </label>
-                              <label className="flex items-center gap-1 text-xs">
+                              <label className="flex items-center gap-1 text-xs cursor-pointer">
                                 <input
                                   type="checkbox"
                                   checked={editingPack.is_popular}
                                   onChange={(e) => setEditingPack({ ...editingPack, is_popular: e.target.checked })}
+                                  className="rounded"
                                 />
                                 Popular
                               </label>
@@ -843,47 +803,52 @@ export default function GiftsAdminPage() {
                           ) : (
                             <>
                               {pack.is_popular && (
-                                <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">Popular</span>
+                                <Badge variant="primary" size="sm">Popular</Badge>
                               )}
-                              {pack.is_active ? (
-                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Active</span>
-                              ) : (
-                                <span className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">Inactive</span>
-                              )}
+                              <Badge variant={pack.is_active ? 'success' : 'default'} size="sm">
+                                {pack.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
                             </>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 py-4 text-right">
                         {editingPack?.id === pack.id ? (
-                          <div className="flex justify-end gap-2">
-                            <button
+                          <div className="flex justify-end gap-1">
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Save className="w-4 h-4" />}
                               onClick={handleUpdatePack}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded"
-                            >
-                              <Save className="w-4 h-4" />
-                            </button>
-                            <button
+                              aria-label="Save changes"
+                              className="text-success"
+                            />
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<X className="w-4 h-4" />}
                               onClick={() => setEditingPack(null)}
-                              className="p-2 text-gray-600 hover:bg-gray-50 rounded"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                              aria-label="Cancel editing"
+                            />
                           </div>
                         ) : (
-                          <div className="flex justify-end gap-2">
-                            <button
+                          <div className="flex justify-end gap-1">
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Edit className="w-4 h-4" />}
                               onClick={() => setEditingPack(pack)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button
+                              aria-label="Edit pack"
+                              className="text-primary"
+                            />
+                            <IconButton
+                              variant="ghost"
+                              size="sm"
+                              icon={<Trash2 className="w-4 h-4" />}
                               onClick={() => handleDeletePack(pack.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              aria-label="Delete pack"
+                              className="text-destructive"
+                            />
                           </div>
                         )}
                       </td>
@@ -892,10 +857,23 @@ export default function GiftsAdminPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+          </DashboardSection>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <DashboardPage
+      title="Gift & Coin Management"
+      description="Manage gift types and coin packs"
+      icon={<Gift className="w-6 h-6" />}
+      tabs={tabs}
+      defaultTab="gifts"
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as 'gifts' | 'coins')}
+      showRefresh={false}
+      error={errorMessage}
+    />
   );
 }
-

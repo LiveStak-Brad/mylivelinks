@@ -1,15 +1,17 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy, Menu, X } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import ThemeToggle from './ThemeToggle';
 import LeaderboardModal from './LeaderboardModal';
+import { IconButton } from './ui';
 import { createClient } from '@/lib/supabase';
 import { LIVE_LAUNCH_ENABLED } from '@/lib/livekit-constants';
+import { isRouteActive, MAIN_NAV_ITEMS, type NavItem } from '@/lib/navigation';
 import { useNoties } from './noties';
 import { useMessages } from './messages';
 import NotiesModal from './noties/NotiesModal';
@@ -18,6 +20,57 @@ import MessagesModal from './messages/MessagesModal';
 // Owner credentials
 const OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
 const OWNER_EMAILS = ['wcba.mo@gmail.com'];
+
+// Notification badge component
+function NotificationBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  
+  return (
+    <span 
+      className="notification-badge"
+      aria-label={`${count} ${count === 1 ? 'notification' : 'notifications'}`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
+// Premium nav link component with consistent styling
+function NavLink({ 
+  item,
+  isActive, 
+  disabled = false,
+  onClick,
+}: { 
+  item: NavItem;
+  isActive: boolean; 
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  if (disabled) {
+    return (
+      <span
+        className="nav-link nav-link-disabled"
+        title="Coming soon"
+        aria-disabled="true"
+      >
+        {item.label}
+      </span>
+    );
+  }
+
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={`nav-link ${isActive ? 'nav-link-active' : 'nav-link-inactive'}`}
+      aria-current={isActive ? 'page' : undefined}
+    >
+      {item.label}
+      {isActive && <span className="nav-link-indicator" />}
+    </Link>
+  );
+}
 
 // Header icons component that uses the contexts
 function HeaderIcons() {
@@ -33,6 +86,7 @@ function HeaderIcons() {
   const { unreadCount: unreadNoties } = useNoties();
   const { totalUnreadCount: unreadMessages, openConversationWith } = useMessages();
 
+  // Handle ?dm= query param to open messages
   useEffect(() => {
     const dm = searchParams?.get('dm');
     if (!dm) return;
@@ -49,32 +103,34 @@ function HeaderIcons() {
     })();
   }, [openConversationWith, pathname, router, searchParams]);
 
+  // Keyboard handler for closing modals
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setShowNotiesModal(false);
+      setShowMessagesModal(false);
+    }
+  }, []);
+
   return (
-    <>
+    <div className="flex items-center gap-1" onKeyDown={handleKeyDown}>
       {/* Messages Icon */}
       <div className="relative">
-        <button
+        <IconButton
           ref={messagesButtonRef}
           onClick={() => {
             setShowMessagesModal(!showMessagesModal);
             setShowNotiesModal(false);
           }}
-          className={`relative p-2 rounded-full transition ${
-            showMessagesModal
-              ? 'bg-primary/10 text-primary'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-          }`}
-          title="Messages"
+          variant={showMessagesModal ? 'primary' : 'ghost'}
+          size="md"
+          aria-label={`Messages${unreadMessages > 0 ? `, ${unreadMessages} unread` : ''}`}
+          aria-expanded={showMessagesModal}
+          aria-haspopup="dialog"
         >
           <MessageCircle className="w-5 h-5" />
-          
-          {/* Unread Badge */}
-          {unreadMessages > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-              {unreadMessages > 99 ? '99+' : unreadMessages}
-            </span>
-          )}
-        </button>
+        </IconButton>
+        <NotificationBadge count={unreadMessages} />
+        <span className="icon-label">Messages</span>
         
         <MessagesModal
           isOpen={showMessagesModal}
@@ -85,28 +141,22 @@ function HeaderIcons() {
 
       {/* Noties Icon */}
       <div className="relative">
-        <button
+        <IconButton
           ref={notiesButtonRef}
           onClick={() => {
             setShowNotiesModal(!showNotiesModal);
             setShowMessagesModal(false);
           }}
-          className={`relative p-2 rounded-full transition ${
-            showNotiesModal
-              ? 'bg-primary/10 text-primary'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-          }`}
-          title="Noties"
+          variant={showNotiesModal ? 'primary' : 'ghost'}
+          size="md"
+          aria-label={`Noties${unreadNoties > 0 ? `, ${unreadNoties} unread` : ''}`}
+          aria-expanded={showNotiesModal}
+          aria-haspopup="dialog"
         >
           <Bell className="w-5 h-5" />
-          
-          {/* Unread Badge */}
-          {unreadNoties > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-              {unreadNoties > 99 ? '99+' : unreadNoties}
-            </span>
-          )}
-        </button>
+        </IconButton>
+        <NotificationBadge count={unreadNoties} />
+        <span className="icon-label">Noties</span>
         
         <NotiesModal
           isOpen={showNotiesModal}
@@ -114,7 +164,7 @@ function HeaderIcons() {
           anchorRef={notiesButtonRef}
         />
       </div>
-    </>
+    </div>
   );
 }
 
@@ -123,8 +173,10 @@ export default function GlobalHeader() {
   const [isOwner, setIsOwner] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const supabase = createClient();
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     checkOwnerStatus();
@@ -157,6 +209,53 @@ export default function GlobalHeader() {
       subscription.unsubscribe();
     };
   }, [supabase]);
+
+  // Scroll lock when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.classList.add('scroll-lock');
+      return () => {
+        document.body.classList.remove('scroll-lock');
+      };
+    }
+  }, [mobileMenuOpen]);
+
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    if (mobileMenuOpen) {
+      // Small delay to prevent immediate close on the same click that opened it
+      const timer = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 10);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [mobileMenuOpen]);
+
+  // Close mobile menu on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [mobileMenuOpen]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
   
   // Don't show header on certain pages
   const hideHeader = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
@@ -168,125 +267,153 @@ export default function GlobalHeader() {
   const canOpenLive = LIVE_LAUNCH_ENABLED || isOwner;
 
   return (
-    <header className="sticky top-0 z-[60] bg-background/95 backdrop-blur-sm border-b border-border shadow-sm">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo/Brand + Trophy */}
-          <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-              <SmartBrandLogo size={120} />
-            </Link>
-            
-            {/* Trophy - Leaderboard Button */}
-            <button
-              onClick={() => setShowLeaderboard(true)}
-              className="relative p-2 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 group"
-              title="Leaderboards"
-              aria-label="View Leaderboards"
-            >
-              <Trophy className="w-5 h-5" />
-              {/* Shine effect */}
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-tr from-white/0 via-white/30 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-            </button>
-          </div>
+    <>
+      {/* Skip Link for accessibility */}
+      <a href="#main" className="skip-link">
+        Skip to main content
+      </a>
 
-          {/* Navigation - Desktop */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="/"
-              className={`text-sm font-medium transition ${
-                pathname === '/'
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Home
-            </Link>
-            {canOpenLive ? (
-              <Link
-                href="/live"
-                className={`text-sm font-medium transition ${
-                  pathname === '/live'
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+      <header 
+        className="sticky top-0 z-[60] bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
+        role="banner"
+      >
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16 lg:h-[72px]">
+            {/* Left section: Logo + Nav */}
+            <div className="flex items-center gap-4 lg:gap-6">
+              {/* Logo/Brand */}
+              <Link 
+                href="/" 
+                className="flex items-center gap-2 hover:opacity-90 transition-opacity focus-visible-ring rounded-lg"
+                aria-label="MyLiveLinks Home"
               >
-                Live Streams
+                <SmartBrandLogo size={110} />
               </Link>
-            ) : (
-              <span
-                className="text-sm font-medium text-muted-foreground/50 cursor-not-allowed"
-                title="Live streaming coming soon"
+              
+              {/* Trophy - Leaderboard Button */}
+              <IconButton
+                onClick={() => setShowLeaderboard(true)}
+                variant="primary"
+                size="md"
+                aria-label="View Leaderboards"
+                className="bg-gradient-to-br from-amber-400 to-yellow-500 text-white hover:from-amber-500 hover:to-yellow-600 shadow-md hover:shadow-lg"
               >
-                Live Streams
-              </span>
-            )}
-          </nav>
+                <Trophy className="w-5 h-5" />
+              </IconButton>
 
-          {/* Right side - Theme + Icons + Owner button + User Menu */}
-          <div className="flex items-center gap-1 sm:gap-2">
-            {/* Theme Toggle */}
-            <ThemeToggle variant="icon" />
-            
-            {/* Messages & Noties Icons - Only show when logged in */}
-            {isLoggedIn && <HeaderIcons />}
-
-            {/* Owner Panel Quick Access */}
-            {isOwner && (
-              <Link
-                href="/owner"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-medium rounded-lg hover:from-purple-700 hover:to-pink-700 transition shadow-md ml-1"
-                title="Owner Panel"
+              {/* Navigation - Desktop */}
+              <nav 
+                className="hidden md:flex items-center gap-1" 
+                role="navigation" 
+                aria-label="Main navigation"
               >
-                <Crown className="w-4 h-4" />
-                <span className="hidden sm:inline">Owner</span>
-              </Link>
-            )}
+                {MAIN_NAV_ITEMS.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    isActive={isRouteActive(pathname, item.href, { 
+                      matchType: item.matchType,
+                      excludePaths: item.excludePaths,
+                    })}
+                    disabled={item.requiresLive && !canOpenLive}
+                  />
+                ))}
+              </nav>
+            </div>
 
-            {/* User Menu */}
-            <UserMenu />
+            {/* Right section: Actions + User */}
+            <div className="flex items-center gap-2 lg:gap-3">
+              {/* Theme Toggle */}
+              <ThemeToggle variant="icon" />
+              
+              {/* Messages & Noties Icons - Only show when logged in */}
+              {isLoggedIn && <HeaderIcons />}
+
+              {/* Owner Panel Quick Access */}
+              {isOwner && (
+                <Link
+                  href="/owner"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-medium rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-md hover:shadow-lg focus-visible-ring"
+                  title="Owner Panel"
+                >
+                  <Crown className="w-4 h-4" />
+                  <span>Owner</span>
+                </Link>
+              )}
+
+              {/* User Menu */}
+              <UserMenu />
+
+              {/* Mobile Menu Toggle */}
+              <IconButton
+                className="md:hidden"
+                variant="ghost"
+                size="md"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-menu"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </IconButton>
+            </div>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
-        <nav className="md:hidden flex items-center gap-4 pb-3 pt-1 overflow-x-auto">
-          <Link
-            href="/"
-            className={`text-sm font-medium whitespace-nowrap transition ${
-              pathname === '/'
-                ? 'text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Home
-          </Link>
-          {canOpenLive ? (
-            <Link
-              href="/live"
-              className={`text-sm font-medium whitespace-nowrap transition ${
-                pathname === '/live'
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+        {/* Mobile Navigation Overlay */}
+        {mobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <div 
+              className="mobile-menu-backdrop md:hidden animate-fade-in" 
+              aria-hidden="true"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            
+            {/* Menu Container */}
+            <div 
+              ref={mobileMenuRef}
+              id="mobile-menu"
+              className="md:hidden absolute top-full left-0 right-0 bg-background border-b border-border shadow-xl animate-slide-down z-[56]"
+              role="navigation"
+              aria-label="Mobile navigation"
             >
-              Live Streams
-            </Link>
-          ) : (
-            <span
-              className="text-sm font-medium whitespace-nowrap text-muted-foreground/50 cursor-not-allowed"
-              title="Live streaming coming soon"
-            >
-              Live Streams
-            </span>
-          )}
-        </nav>
-      </div>
+              <nav className="container mx-auto px-4 py-4 flex flex-col gap-1">
+                {MAIN_NAV_ITEMS.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    isActive={isRouteActive(pathname, item.href, {
+                      matchType: item.matchType,
+                      excludePaths: item.excludePaths,
+                    })}
+                    disabled={item.requiresLive && !canOpenLive}
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                ))}
+                
+                {/* Owner link in mobile menu */}
+                {isOwner && (
+                  <Link
+                    href="/owner"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+                  >
+                    <Crown className="w-4 h-4" />
+                    Owner Panel
+                  </Link>
+                )}
+              </nav>
+            </div>
+          </>
+        )}
+      </header>
       
       {/* Leaderboard Modal */}
       <LeaderboardModal
         isOpen={showLeaderboard}
         onClose={() => setShowLeaderboard(false)}
       />
-    </header>
+    </>
   );
 }

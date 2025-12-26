@@ -185,7 +185,7 @@ DECLARE
     v_diamonds_to_convert BIGINT;
     v_coins_out BIGINT;
     v_fee_amount BIGINT;
-    v_conversion_rate DECIMAL(5, 4) := 0.6000; -- 60% (1 - 0.40 fee)
+    v_conversion_rate DECIMAL(5, 4) := 0.7000; -- 70% (1 - 0.30 fee)
     v_min_diamonds BIGINT := 2; -- Minimum diamonds required (ensures at least 1 coin after fee)
     v_conversion_id BIGINT;
     v_has_coin_ledger BOOLEAN;
@@ -194,7 +194,7 @@ DECLARE
 BEGIN
     -- Validate minimum threshold
     IF p_diamonds_in < v_min_diamonds THEN
-        RAISE EXCEPTION 'Minimum conversion is % diamonds (yields at least 1 coin after 40%% fee)', v_min_diamonds;
+        RAISE EXCEPTION 'Minimum conversion is % diamonds (yields at least 1 coin after 30%% fee)', v_min_diamonds;
     END IF;
     
     -- Check diamond balance
@@ -213,7 +213,7 @@ BEGIN
         RAISE EXCEPTION 'Insufficient diamond balance. You have % diamonds, minimum conversion is %', v_diamond_balance, v_min_diamonds;
     END IF;
     
-    -- Calculate conversion: coins_out = floor(diamonds_in * 0.60)
+    -- Calculate conversion: coins_out = floor(diamonds_in * 0.70)
     v_coins_out := FLOOR(v_diamonds_to_convert * v_conversion_rate);
     v_fee_amount := v_diamonds_to_convert - v_coins_out;
     
@@ -350,7 +350,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;
 
-COMMENT ON FUNCTION convert_diamonds_to_coins IS 'Convert diamonds to coins with 40% platform fee. Minimum 2 diamonds required. Returns conversion_id.';
+COMMENT ON FUNCTION convert_diamonds_to_coins IS 'Convert diamonds to coins with 30% platform fee. Minimum 2 diamonds required. Returns conversion_id.';
 
 -- ============================================================================
 -- 8. UPDATE PROCESS_GIFT RPC: GIVE DIAMONDS 1:1 (NOT COINS)

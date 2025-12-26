@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
+import { PageShell, PageHeader, PageSection, SkeletonCard } from '@/components/layout';
 import TemplateCard, { RoomTemplate } from '@/components/owner/TemplateCard';
 
 export default function OwnerTemplatesPage() {
@@ -149,33 +150,25 @@ export default function OwnerTemplatesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto p-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/owner/rooms" 
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Room Templates</h1>
-              <p className="text-muted-foreground">Create reusable templates for quick room setup</p>
-            </div>
-          </div>
-          
+    <PageShell maxWidth="xl" padding="md">
+      <PageHeader
+        title="Room Templates"
+        description="Create reusable templates for quick room setup"
+        backLink="/owner/rooms"
+        backLabel="Rooms"
+        actions={
           <Link href="/owner/templates/new">
             <Button className="gap-2">
               <Plus className="w-4 h-4" />
               New Template
             </Button>
           </Link>
-        </div>
+        }
+      />
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg mb-6 w-fit">
+      {/* Tabs */}
+      <PageSection>
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
           <Link
             href="/owner/rooms"
             className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground transition"
@@ -190,9 +183,11 @@ export default function OwnerTemplatesPage() {
             Templates ({templates.length})
           </button>
         </div>
+      </PageSection>
 
-        {/* Search & Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      {/* Search & Actions */}
+      <PageSection>
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -213,12 +208,14 @@ export default function OwnerTemplatesPage() {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </div>
+      </PageSection>
 
-        {/* Templates Grid */}
+      {/* Templates Grid */}
+      <PageSection>
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="card-grid">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-64 bg-muted animate-pulse rounded-xl" />
+              <SkeletonCard key={i} showImage imageAspect="video" textLines={2} />
             ))}
           </div>
         ) : error ? (
@@ -248,7 +245,7 @@ export default function OwnerTemplatesPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="card-grid">
             {filteredTemplates.map((template) => (
               <TemplateCard
                 key={template.id}
@@ -262,6 +259,7 @@ export default function OwnerTemplatesPage() {
             ))}
           </div>
         )}
+      </PageSection>
 
         {/* Create Room Modal */}
         <Modal
@@ -315,8 +313,7 @@ export default function OwnerTemplatesPage() {
             </div>
           </div>
         </Modal>
-      </div>
-    </div>
+    </PageShell>
   );
 }
 

@@ -4,7 +4,7 @@
 -- This script will:
 -- 1. Wipe all coins and diamonds from all profiles
 -- 2. Give you 100,000 coins for testing
--- 3. Fix conversion rate to 60% (40% fee, not 30%)
+-- 3. Fix conversion rate to 70% (30% fee)
 -- ============================================================================
 
 -- Step 1: Reset ALL balances to zero
@@ -29,7 +29,7 @@ TRUNCATE TABLE gifts RESTART IDENTITY CASCADE;
 TRUNCATE TABLE diamond_conversions RESTART IDENTITY CASCADE;
 TRUNCATE TABLE coin_ledger RESTART IDENTITY CASCADE;
 
--- Step 4: Fix conversion rate from 70% to 60% (40% fee instead of 30%)
+-- Step 4: Fix conversion rate to 70% (30% fee)
 CREATE OR REPLACE FUNCTION convert_diamonds_to_coins(
     p_profile_id UUID,
     p_diamonds_in BIGINT
@@ -39,13 +39,13 @@ DECLARE
     v_diamond_balance BIGINT;
     v_coins_out BIGINT;
     v_fee_amount BIGINT;
-    v_conversion_rate DECIMAL(5, 4) := 0.6000; -- 60% (1 - 0.40 fee) -- CHANGED FROM 0.7000
+    v_conversion_rate DECIMAL(5, 4) := 0.7000; -- 70% (1 - 0.30 fee)
     v_min_diamonds BIGINT := 3; -- Minimum diamonds required
     v_conversion_id BIGINT;
 BEGIN
     -- Validate minimum threshold
     IF p_diamonds_in < v_min_diamonds THEN
-        RAISE EXCEPTION 'Minimum conversion is % diamonds (yields at least 1 coin after 40%% fee)', v_min_diamonds;
+        RAISE EXCEPTION 'Minimum conversion is % diamonds (yields at least 1 coin after 30%% fee)', v_min_diamonds;
     END IF;
     
     -- Check diamond balance
@@ -57,7 +57,7 @@ BEGIN
         RAISE EXCEPTION 'Insufficient diamond balance. You have % diamonds, trying to convert %', v_diamond_balance, p_diamonds_in;
     END IF;
     
-    -- Calculate conversion: coins_out = floor(diamonds_in * 0.60)  -- CHANGED FROM 0.70
+    -- Calculate conversion: coins_out = floor(diamonds_in * 0.70)
     v_coins_out := FLOOR(p_diamonds_in * v_conversion_rate);
     v_fee_amount := p_diamonds_in - v_coins_out;
     
@@ -96,7 +96,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;
 
 -- Verify the changes
-SELECT 'Conversion rate updated to 60% (40% fee)' as status;
+SELECT 'Conversion rate updated to 70% (30% fee)' as status;
 
 -- Show your new balance
 SELECT username, coin_balance, earnings_balance as diamond_balance
@@ -114,13 +114,13 @@ WHERE coin_balance > 0 OR earnings_balance > 0;
 -- 3. Run this entire script in Supabase SQL Editor
 --
 -- 4. After deployment, the frontend will show:
---    "Platform fee: 40%" (was 30%)
---    "Conversion rate: 1 diamond = 0.60 coins" (was 0.70)
+--    "Platform fee: 30%"
+--    "Conversion rate: 1 diamond = 0.70 coins"
 --
 -- EXAMPLE FLOW:
 -- - You have 100,000 coins
 -- - Send 100 coin gift → Recipient gets 100 diamonds (1:1)
--- - Recipient converts 100 diamonds → Gets 60 coins (loses 40 diamonds as fee)
--- - Result: System burns 40 diamonds (40% lost), recipient has 60 spendable coins
+-- - Recipient converts 100 diamonds → Gets 70 coins (loses 30 diamonds as fee)
+-- - Result: System burns 30 diamonds (30% lost), recipient has 70 spendable coins
 -- ============================================================================
 

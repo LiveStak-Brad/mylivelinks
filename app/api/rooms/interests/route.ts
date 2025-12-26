@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: interests, error } = await supabase
-      .from('room_interests')
+      .from('room_interest')
       .select('room_id')
-      .eq('user_id', user.id);
+      .eq('profile_id', user.id);
 
     if (error) {
       console.error('[API /rooms/interests] Error:', error);

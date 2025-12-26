@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.app_roles (
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_app_roles_single_owner ON public.app_roles(role) WHERE role = 'owner';
 
 CREATE TABLE IF NOT EXISTS public.room_roles (
-  room_id uuid NOT NULL REFERENCES public.coming_soon_rooms(id) ON DELETE CASCADE,
+  room_id uuid NOT NULL REFERENCES public.rooms(id) ON DELETE CASCADE,
   profile_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   role text NOT NULL CHECK (role IN ('room_admin','room_moderator')),
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -261,12 +261,12 @@ ALTER TABLE public.room_roles ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='coming_soon_rooms') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='rooms') THEN
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
-      WHERE schemaname='public' AND tablename='coming_soon_rooms' AND policyname='App admins can manage coming soon rooms'
+      WHERE schemaname='public' AND tablename='rooms' AND policyname='App admins can manage rooms'
     ) THEN
-      EXECUTE 'CREATE POLICY "App admins can manage coming soon rooms" ON public.coming_soon_rooms FOR ALL USING (public.is_app_admin(auth.uid())) WITH CHECK (public.is_app_admin(auth.uid()))';
+      EXECUTE 'CREATE POLICY "App admins can manage rooms" ON public.rooms FOR ALL USING (public.is_app_admin(auth.uid())) WITH CHECK (public.is_app_admin(auth.uid()))';
     END IF;
   END IF;
 END $$;

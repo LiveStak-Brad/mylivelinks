@@ -387,7 +387,7 @@ DECLARE
     v_diamond_balance BIGINT;
     v_coins_out BIGINT;
     v_fee_amount BIGINT;
-    v_conversion_rate DECIMAL(5, 4) := 0.6000;
+    v_conversion_rate DECIMAL(5, 4) := 0.7000;
     v_min_diamonds BIGINT := 3;
     v_conversion_id BIGINT;
     v_has_asset_type BOOLEAN;

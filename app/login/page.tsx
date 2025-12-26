@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import SmartBrandLogo from '@/components/SmartBrandLogo';
+import { Button, Input, Card, CardContent } from '@/components/ui';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -215,129 +217,132 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+    <main id="main" className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-          {/* Logo */}
-          <div className="flex justify-center mb-8">
-            <SmartBrandLogo />
-          </div>
-
-          {/* Title */}
-          <h1 className="text-3xl font-bold text-center mb-2">
-            {isSignUp ? 'Create Account' : 'Welcome Back'}
-          </h1>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-            {isSignUp ? 'Sign up to get started' : 'Sign in to your account'}
-          </p>
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Success Message */}
-          {message && (
-            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-600 dark:text-green-400 text-sm">
-              {message}
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="you@example.com"
-              />
+        <Card className="shadow-xl border-0">
+          <CardContent className="p-8">
+            {/* Logo */}
+            <div className="flex justify-center mb-8">
+              <SmartBrandLogo />
             </div>
 
-            {isSignUp && (
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium mb-2">
-                  Username
-                </label>
-                <input
-                  id="username"
-                  type="text"
-                  value={username}
-                  onChange={(e) => {
-                    // Only allow lowercase letters, numbers, and underscores
-                    const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
-                    setUsername(value);
-                  }}
-                  required
-                  minLength={3}
-                  maxLength={20}
-                  pattern="[a-z0-9_]+"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                  placeholder="username"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Letters, numbers, and underscores only (3-20 characters)
-                </p>
+            {/* Title */}
+            <h1 className="text-3xl font-bold text-center mb-2 text-foreground">
+              {isSignUp ? 'Create Account' : 'Welcome Back'}
+            </h1>
+            <p className="text-center text-muted-foreground mb-8">
+              {isSignUp ? 'Sign up to get started' : 'Sign in to your account'}
+            </p>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-destructive">{error}</p>
               </div>
             )}
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-                placeholder="••••••••"
-              />
+            {/* Success Message */}
+            {message && (
+              <div className="mb-4 p-3 rounded-lg bg-success/10 border border-success/30 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-success">{message}</p>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium mb-2 text-foreground">
+                  Email
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="you@example.com"
+                />
+              </div>
+
               {isSignUp && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Minimum 6 characters
-                </p>
+                <div>
+                  <label htmlFor="username" className="block text-sm font-medium mb-2 text-foreground">
+                    Username
+                  </label>
+                  <Input
+                    id="username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => {
+                      // Only allow lowercase letters, numbers, and underscores
+                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                      setUsername(value);
+                    }}
+                    required
+                    minLength={3}
+                    maxLength={20}
+                    pattern="[a-z0-9_]+"
+                    placeholder="username"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Letters, numbers, and underscores only (3-20 characters)
+                  </p>
+                </div>
               )}
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium mb-2 text-foreground">
+                  Password
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="••••••••"
+                />
+                {isSignUp && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Minimum 6 characters
+                  </p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading}
+                isLoading={loading}
+                size="lg"
+                className="w-full"
+              >
+                {isSignUp ? 'Sign Up' : 'Sign In'}
+              </Button>
+            </form>
+
+            {/* Toggle Sign Up/Sign In */}
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setError(null);
+                  setMessage(null);
+                  setUsername(''); // Clear username when switching
+                }}
+                className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+              >
+                {isSignUp
+                  ? 'Already have an account? Sign in'
+                  : "Don't have an account? Sign up"}
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
-            </button>
-          </form>
-
-          {/* Toggle Sign Up/Sign In */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setError(null);
-                setMessage(null);
-                setUsername(''); // Clear username when switching
-              }}
-              className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm"
-            >
-              {isSignUp
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Sign up"}
-            </button>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </main>
   );
 }
-

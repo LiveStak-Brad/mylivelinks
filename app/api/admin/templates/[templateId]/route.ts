@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { requireAppAdmin, requireUser } from '@/lib/rbac';
 
+function normalizeTemplateRow(row: any) {
+  const flags = (row?.default_feature_flags ?? {}) as Record<string, any>;
+  return {
+    ...row,
+    gifts_enabled: flags.gifts_enabled ?? flags.gifts ?? true,
+    chat_enabled: flags.chat_enabled ?? flags.chat ?? true,
+    default_fallback_gradient: flags.fallback_gradient ?? row?.default_fallback_gradient ?? 'from-purple-600 to-pink-600',
+    default_theme_color: flags.theme_color ?? row?.default_theme_color ?? null,
+  };
+}
+
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
   if (msg === 'UNAUTHORIZED') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,14 +34,13 @@ export async function GET(
       .from('room_templates')
       .select('*')
       .eq('id', templateId)
-      .eq('is_deleted', false)
       .single();
 
     if (error || !template) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ template });
+    return NextResponse.json({ template: normalizeTemplateRow(template) });
   } catch (err) {
     return authErrorToResponse(err);
   }
@@ -48,6 +58,7 @@ export async function PUT(
 
     const body = await request.json();
     const {
+      template_key,
       name,
       description,
       layout_type,
@@ -57,6 +68,7 @@ export async function PUT(
       default_category,
       default_disclaimer_required,
       default_disclaimer_text,
+      default_feature_flags,
       gifts_enabled,
       chat_enabled,
       default_fallback_gradient,
@@ -65,6 +77,30 @@ export async function PUT(
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
 
+    // Load current flags so we can merge
+    const { data: existing } = await supabase
+      .from('room_templates')
+      .select('default_feature_flags')
+      .eq('id', templateId)
+      .single();
+
+    const mergedFlags: Record<string, any> = {
+      ...((existing?.default_feature_flags as any) || {}),
+      ...((typeof default_feature_flags === 'object' && default_feature_flags ? default_feature_flags : {}) as any),
+    };
+
+    if (typeof gifts_enabled === 'boolean') mergedFlags.gifts_enabled = gifts_enabled;
+    if (typeof chat_enabled === 'boolean') mergedFlags.chat_enabled = chat_enabled;
+    if (typeof default_fallback_gradient === 'string' && default_fallback_gradient) {
+      mergedFlags.fallback_gradient = default_fallback_gradient;
+    }
+    if (typeof default_theme_color === 'string' && default_theme_color) {
+      mergedFlags.theme_color = default_theme_color;
+    }
+
+    updates.default_feature_flags = mergedFlags;
+
+    if (template_key !== undefined) updates.template_key = template_key;
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
     if (layout_type !== undefined) updates.layout_type = layout_type;
@@ -74,10 +110,6 @@ export async function PUT(
     if (default_category !== undefined) updates.default_category = default_category;
     if (default_disclaimer_required !== undefined) updates.default_disclaimer_required = default_disclaimer_required;
     if (default_disclaimer_text !== undefined) updates.default_disclaimer_text = default_disclaimer_text;
-    if (gifts_enabled !== undefined) updates.gifts_enabled = gifts_enabled;
-    if (chat_enabled !== undefined) updates.chat_enabled = chat_enabled;
-    if (default_fallback_gradient !== undefined) updates.default_fallback_gradient = default_fallback_gradient;
-    if (default_theme_color !== undefined) updates.default_theme_color = default_theme_color;
 
     const { data: template, error } = await supabase
       .from('room_templates')
@@ -91,10 +123,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Failed to update template' }, { status: 500 });
     }
 
-    return NextResponse.json({ template });
+    return NextResponse.json({ template: normalizeTemplateRow(template) });
   } catch (err) {
     return authErrorToResponse(err);
   }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  ctx: { params: Promise<{ templateId: string }> }
+) {
+  return PUT(request, ctx);
 }
 
 // DELETE /api/admin/templates/[templateId] - Soft delete template
@@ -103,26 +142,25 @@ export async function DELETE(
   { params }: { params: Promise<{ templateId: string }> }
 ) {
   try {
-    const user = await requireAppAdmin(request);
+    const user = await requireUser(request);
     const { templateId } = await params;
     const supabase = createRouteHandlerClient(request);
 
-    // Check if user is owner (only owners can delete templates)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_owner')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile?.is_owner) {
+    const { data: isOwner } = await supabase.rpc('is_owner', { p_profile_id: user.id });
+    if (isOwner !== true) {
       return NextResponse.json({ error: 'Only owners can delete templates' }, { status: 403 });
     }
 
-    // Soft delete
-    const { error } = await supabase
-      .from('room_templates')
-      .update({ is_deleted: true, updated_at: new Date().toISOString() })
-      .eq('id', templateId);
+    const { count } = await supabase
+      .from('rooms')
+      .select('*', { head: true, count: 'exact' })
+      .eq('template_id', templateId);
+
+    if ((count ?? 0) > 0) {
+      return NextResponse.json({ error: 'Template is in use by rooms' }, { status: 409 });
+    }
+
+    const { error } = await supabase.from('room_templates').delete().eq('id', templateId);
 
     if (error) {
       console.error('[API /admin/templates/[id]] Delete error:', error);
@@ -150,7 +188,6 @@ export async function POST(
       .from('room_templates')
       .select('*')
       .eq('id', templateId)
-      .eq('is_deleted', false)
       .single();
 
     if (fetchError || !original) {
@@ -161,6 +198,7 @@ export async function POST(
     const { data: duplicate, error: insertError } = await supabase
       .from('room_templates')
       .insert({
+        template_key: `${original.template_key}_copy_${Date.now()}`,
         name: `${original.name} (Copy)`,
         description: original.description,
         layout_type: original.layout_type,
@@ -170,11 +208,9 @@ export async function POST(
         default_category: original.default_category,
         default_disclaimer_required: original.default_disclaimer_required,
         default_disclaimer_text: original.default_disclaimer_text,
-        gifts_enabled: original.gifts_enabled,
-        chat_enabled: original.chat_enabled,
-        default_fallback_gradient: original.default_fallback_gradient,
-        default_theme_color: original.default_theme_color,
-        created_by: user.id,
+        default_feature_flags: original.default_feature_flags ?? {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -184,7 +220,7 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to duplicate template' }, { status: 500 });
     }
 
-    return NextResponse.json({ template: duplicate });
+    return NextResponse.json({ template: normalizeTemplateRow(duplicate) });
   } catch (err) {
     return authErrorToResponse(err);
   }

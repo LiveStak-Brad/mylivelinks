@@ -39,7 +39,7 @@ export async function POST(
     }
 
     const { data, error } = await supabase
-      .from('coming_soon_rooms')
+      .from('rooms')
       .update({ status })
       .eq('id', roomId)
       .select('id, status')

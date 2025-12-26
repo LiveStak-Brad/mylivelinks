@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Sparkles, TrendingUp, Gift, Crown } from 'lucide-react';
+import { Sparkles, TrendingUp, Gift, Crown } from 'lucide-react';
 import {
   GifterBadge,
   TierDetail,
@@ -15,6 +15,8 @@ import {
 } from '@/components/gifter';
 import { createClient } from '@/lib/supabase';
 import { LIVE_LAUNCH_ENABLED, isLiveOwnerUser } from '@/lib/livekit-constants';
+import { PageShell, PageHeader, Grid } from '@/components/layout';
+import { Card, Button } from '@/components/ui';
 
 /**
  * Gifter Levels - Public explainer page
@@ -35,21 +37,14 @@ export default function GifterLevelsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
-      {/* Header */}
-      <div className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <Link 
-            href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </Link>
-        </div>
-      </div>
+    <PageShell maxWidth="lg" padding="lg" className="bg-gradient-to-b from-background via-background to-muted/30">
+      <PageHeader 
+        title="" 
+        backLink="/" 
+        backLabel="Back to Home"
+      />
 
-      <div className="max-w-4xl mx-auto px-6 py-12 space-y-16">
+      <div className="space-y-16">
         {/* Hero Section */}
         <div className="text-center space-y-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
@@ -280,30 +275,25 @@ export default function GifterLevelsPage() {
             Get coins and start supporting your favorite creators today!
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link
-              href="/wallet"
-              className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-            >
-              Get Coins
+            <Link href="/wallet">
+              <Button size="lg">Get Coins</Button>
             </Link>
             {canOpenLive ? (
-              <Link
-                href="/live"
-                className="px-6 py-3 rounded-xl bg-muted text-foreground font-medium hover:bg-muted/80 transition-colors"
-              >
-                Browse Live Streams
+              <Link href="/live">
+                <Button variant="secondary" size="lg">Browse Live Streams</Button>
               </Link>
             ) : (
-              <div
-                className="px-6 py-3 rounded-xl bg-muted text-foreground font-medium opacity-60 cursor-not-allowed"
+              <Button 
+                variant="secondary" 
+                size="lg" 
+                disabled
                 title="Live streaming coming soon"
               >
                 Browse Live Streams
-              </div>
+              </Button>
             )}
           </div>
         </div>
-      </div>
 
       {/* TierDetail Modal */}
       {selectedTier && (
@@ -317,16 +307,16 @@ export default function GifterLevelsPage() {
 
       {/* Dev-only debug section */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="max-w-4xl mx-auto px-6 pb-12 space-y-6">
-          <div className="p-6 rounded-xl border-2 border-dashed border-amber-500/50 bg-amber-500/10">
+        <div className="space-y-6 pb-8">
+          <Card className="p-6 border-2 border-dashed border-amber-500/50 bg-amber-500/10">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               🔧 Dev: Interactive TierList Component
               <span className="text-xs font-normal text-amber-600 dark:text-amber-400">(DEV ONLY)</span>
             </h2>
             <TierList gifterStatus={demoStatus} />
-          </div>
+          </Card>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

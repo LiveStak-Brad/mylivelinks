@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import Image from 'next/image';
+import { Button, Input, Textarea, Card, CardContent } from '@/components/ui';
+import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import SmartBrandLogo from '@/components/SmartBrandLogo';
 
 interface OnboardingData {
   username: string;
@@ -52,7 +54,7 @@ export default function OnboardingPage() {
       .from('profiles')
       .select('username, date_of_birth')
       .eq('id', user.id)
-      .maybeSingle(); // Use maybeSingle() instead of single() to avoid error if no row
+      .maybeSingle();
     
     // If profile doesn't exist at all, create a minimal one
     if (!profile && !profileError) {
@@ -61,7 +63,7 @@ export default function OnboardingPage() {
         .from('profiles')
         .insert({
           id: user.id,
-          username: null, // Will be set in onboarding
+          username: null,
           coin_balance: 0,
           earnings_balance: 0,
           gifter_level: 0
@@ -69,7 +71,6 @@ export default function OnboardingPage() {
       
       if (createError) {
         console.error('[ONBOARDING] Failed to create minimal profile:', createError);
-        // Continue anyway - upsert will handle it later
       }
     }
     
@@ -190,7 +191,7 @@ export default function OnboardingPage() {
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert({
-          id: userId, // Important: include ID for upsert
+          id: userId,
           username: formData.username.trim(),
           display_name: formData.displayName.trim() || null,
           bio: formData.bio.trim() || null,
@@ -225,11 +226,10 @@ export default function OnboardingPage() {
         
         if (settingsError) {
           console.warn('Could not set adult settings:', settingsError);
-          // Don't fail the whole onboarding if this fails
         }
       }
       
-      // Redirect to homepage (will show search/features)
+      // Redirect to homepage
       router.push('/');
     } catch (err: any) {
       console.error('Onboarding error:', err);
@@ -241,212 +241,222 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center">
+      <main id="main" className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary flex items-center justify-center">
         <div className="animate-pulse text-white text-2xl">Loading...</div>
-      </div>
+      </main>
     );
   }
 
   const isAdult = formData.dateOfBirth ? calculateAge(formData.dateOfBirth) >= 18 : false;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-blue-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl p-8 md:p-12">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Welcome to MyLiveLinks!</h1>
-          <p className="text-gray-600">Let's set up your profile</p>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="flex justify-between mb-2">
-            {[1, 2, 3, 4].map((s) => (
-              <div
-                key={s}
-                className={`w-1/4 h-2 mx-1 rounded-full transition ${
-                  s <= step ? 'bg-purple-600' : 'bg-gray-200'
-                }`}
-              />
-            ))}
+    <main id="main" className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary flex items-center justify-center p-4">
+      <Card className="w-full max-w-2xl shadow-2xl border-0">
+        <CardContent className="p-8 md:p-12">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <SmartBrandLogo size={80} />
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">Welcome to MyLiveLinks!</h1>
+            <p className="text-muted-foreground">Let's set up your profile</p>
           </div>
-          <p className="text-center text-sm text-gray-600">Step {step} of 4</p>
-        </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded-lg text-red-700">
-            {error}
+          {/* Progress Bar */}
+          <div className="mb-8">
+            <div className="flex justify-between mb-2">
+              {[1, 2, 3, 4].map((s) => (
+                <div
+                  key={s}
+                  className={`flex-1 h-2 mx-1 rounded-full transition-colors ${
+                    s <= step ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
+            <p className="text-center text-sm text-muted-foreground">Step {step} of 4</p>
           </div>
-        )}
 
-        {/* Step Content */}
-        <div className="mb-8">
-          {/* Step 1: Username */}
-          {step === 1 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Choose Your Username</h2>
-              <p className="text-gray-600 mb-6">
-                This will be your unique identifier on MyLiveLinks. Choose wisely - you can't change it later!
-              </p>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                placeholder="username"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none text-lg"
-                maxLength={30}
-              />
-              <p className="text-sm text-gray-500 mt-2">
-                Your profile will be: mylivelinks.com/@{formData.username || 'username'}
-              </p>
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
 
-          {/* Step 2: Age Verification */}
-          {step === 2 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Age Verification</h2>
-              <p className="text-gray-600 mb-6">
-                We need to verify your age to comply with regulations. You must be at least 13 years old to use this platform.
-              </p>
-              <label className="block mb-2 font-semibold text-gray-700">Date of Birth</label>
-              <input
-                type="date"
-                value={formData.dateOfBirth}
-                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none text-lg"
-                max={new Date().toISOString().split('T')[0]}
-              />
-              {formData.dateOfBirth && (
-                <p className="text-sm text-gray-600 mt-2">
-                  Age: {calculateAge(formData.dateOfBirth)} years old
-                </p>
-              )}
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Privacy:</strong> Your date of birth is private and will never be shown publicly. 
-                  It's only used for age verification.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Profile Details */}
-          {step === 3 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Tell Us About Yourself</h2>
-              <p className="text-gray-600 mb-6">
-                This information will be visible on your public profile (optional)
-              </p>
-              
-              <div className="mb-4">
-                <label className="block mb-2 font-semibold text-gray-700">Display Name (Optional)</label>
-                <input
-                  type="text"
-                  value={formData.displayName}
-                  onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                  placeholder="Your Name"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none"
-                  maxLength={50}
-                />
-                <p className="text-xs text-gray-500 mt-1">This is how you'll appear to others</p>
-              </div>
-
-              <div className="mb-4">
-                <label className="block mb-2 font-semibold text-gray-700">Bio (Optional)</label>
-                <textarea
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  placeholder="Tell people a bit about yourself..."
-                  rows={4}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-purple-600 focus:outline-none resize-none"
-                  maxLength={500}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {formData.bio.length}/500 characters
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 4: Terms & Conditions */}
-          {step === 4 && (
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Terms & Agreements</h2>
-              
-              <div className="mb-6 p-4 border-2 border-gray-300 rounded-lg max-h-64 overflow-y-auto">
-                <h3 className="font-bold mb-2">Terms of Service</h3>
-                <ul className="text-sm text-gray-700 space-y-2 list-disc list-inside">
-                  <li>You must be at least 13 years old to use this service</li>
-                  <li>You are responsible for all content you post</li>
-                  <li>Harassment, hate speech, and illegal content are prohibited</li>
-                  <li>We reserve the right to suspend or terminate accounts that violate our policies</li>
-                  <li>Your data is handled according to our Privacy Policy</li>
-                  <li>Virtual currency and gifts have no real-world cash value</li>
-                </ul>
-              </div>
-
+          {/* Step Content */}
+          <div className="mb-8">
+            {/* Step 1: Username */}
+            {step === 1 && (
               <div className="space-y-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.acceptTerms}
-                    onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
-                    className="mt-1 w-5 h-5 text-purple-600"
-                  />
-                  <span className="text-gray-700">
-                    I agree to the <span className="text-purple-600 underline">Terms of Service</span> and{' '}
-                    <span className="text-purple-600 underline">Privacy Policy</span>
-                  </span>
-                </label>
+                <h2 className="text-2xl font-bold text-foreground">Choose Your Username</h2>
+                <p className="text-muted-foreground">
+                  This will be your unique identifier on MyLiveLinks. Choose wisely - you can't change it later!
+                </p>
+                <Input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  placeholder="username"
+                  maxLength={30}
+                  inputSize="lg"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Your profile will be: mylivelinks.com/@{formData.username || 'username'}
+                </p>
+              </div>
+            )}
 
-                {isAdult && (
-                  <label className="flex items-start gap-3 cursor-pointer p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            {/* Step 2: Age Verification */}
+            {step === 2 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-foreground">Age Verification</h2>
+                <p className="text-muted-foreground">
+                  We need to verify your age to comply with regulations. You must be at least 13 years old to use this platform.
+                </p>
+                <div>
+                  <label className="block mb-2 font-medium text-foreground">Date of Birth</label>
+                  <Input
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                    max={new Date().toISOString().split('T')[0]}
+                    inputSize="lg"
+                  />
+                </div>
+                {formData.dateOfBirth && (
+                  <p className="text-sm text-muted-foreground">
+                    Age: {calculateAge(formData.dateOfBirth)} years old
+                  </p>
+                )}
+                <div className="p-4 rounded-lg bg-info/10 border border-info/30 flex items-start gap-2">
+                  <Info className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-info">
+                    <strong>Privacy:</strong> Your date of birth is private and will never be shown publicly.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Profile Details */}
+            {step === 3 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-foreground">Tell Us About Yourself</h2>
+                <p className="text-muted-foreground">
+                  This information will be visible on your public profile (optional)
+                </p>
+                
+                <div>
+                  <label className="block mb-2 font-medium text-foreground">Display Name (Optional)</label>
+                  <Input
+                    type="text"
+                    value={formData.displayName}
+                    onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                    placeholder="Your Name"
+                    maxLength={50}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">This is how you'll appear to others</p>
+                </div>
+
+                <div>
+                  <label className="block mb-2 font-medium text-foreground">Bio (Optional)</label>
+                  <Textarea
+                    value={formData.bio}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    placeholder="Tell people a bit about yourself..."
+                    rows={4}
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formData.bio.length}/500 characters
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Terms & Conditions */}
+            {step === 4 && (
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold text-foreground">Terms & Agreements</h2>
+                
+                <div className="p-4 border border-border rounded-lg max-h-64 overflow-y-auto bg-muted/30">
+                  <h3 className="font-bold mb-2 text-foreground">Terms of Service</h3>
+                  <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+                    <li>You must be at least 13 years old to use this service</li>
+                    <li>You are responsible for all content you post</li>
+                    <li>Harassment, hate speech, and illegal content are prohibited</li>
+                    <li>We reserve the right to suspend or terminate accounts that violate our policies</li>
+                    <li>Your data is handled according to our Privacy Policy</li>
+                    <li>Virtual currency and gifts have no real-world cash value</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="flex items-start gap-3 cursor-pointer group">
                     <input
                       type="checkbox"
-                      checked={formData.acceptAdultDisclaimer}
-                      onChange={(e) => setFormData({ ...formData, acceptAdultDisclaimer: e.target.checked })}
-                      className="mt-1 w-5 h-5 text-orange-600"
+                      checked={formData.acceptTerms}
+                      onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
+                      className="mt-1 w-5 h-5 rounded border-border text-primary focus:ring-primary"
                     />
-                    <div>
-                      <span className="text-gray-700 font-semibold">
-                        Adult Content Disclaimer (Optional)
-                      </span>
-                      <p className="text-sm text-gray-600 mt-1">
-                        I am 18 years or older and consent to viewing adult/sensitive content when available. 
-                        Adult content is only available on web and requires consent.
-                      </p>
-                    </div>
+                    <span className="text-foreground group-hover:text-primary transition-colors">
+                      I agree to the <span className="text-primary underline">Terms of Service</span> and{' '}
+                      <span className="text-primary underline">Privacy Policy</span>
+                    </span>
                   </label>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Navigation Buttons */}
-        <div className="flex gap-4">
-          {step > 1 && (
-            <button
-              onClick={() => setStep(step - 1)}
+                  {isAdult && (
+                    <label className="flex items-start gap-3 cursor-pointer p-4 rounded-lg bg-warning/10 border border-warning/30 group">
+                      <input
+                        type="checkbox"
+                        checked={formData.acceptAdultDisclaimer}
+                        onChange={(e) => setFormData({ ...formData, acceptAdultDisclaimer: e.target.checked })}
+                        className="mt-1 w-5 h-5 rounded border-warning text-warning focus:ring-warning"
+                      />
+                      <div>
+                        <span className="text-foreground font-semibold">
+                          Adult Content Disclaimer (Optional)
+                        </span>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          I am 18 years or older and consent to viewing adult/sensitive content when available.
+                        </p>
+                      </div>
+                    </label>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Navigation Buttons */}
+          <div className="flex gap-4">
+            {step > 1 && (
+              <Button
+                type="button"
+                onClick={() => setStep(step - 1)}
+                disabled={saving}
+                variant="outline"
+                size="lg"
+                className="flex-1"
+              >
+                Back
+              </Button>
+            )}
+            
+            <Button
+              type="button"
+              onClick={handleNext}
               disabled={saving}
-              className="flex-1 px-6 py-3 border-2 border-purple-600 text-purple-600 rounded-lg font-semibold hover:bg-purple-50 transition disabled:opacity-50"
+              isLoading={saving}
+              size="lg"
+              className="flex-1"
             >
-              Back
-            </button>
-          )}
-          
-          <button
-            onClick={handleNext}
-            disabled={saving}
-            className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : step === 4 ? 'Complete Setup' : 'Next'}
-          </button>
-        </div>
-      </div>
-    </div>
+              {step === 4 ? 'Complete Setup' : 'Next'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </main>
   );
 }
-

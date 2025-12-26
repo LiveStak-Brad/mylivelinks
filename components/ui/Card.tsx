@@ -1,20 +1,42 @@
-import { HTMLAttributes, forwardRef } from 'react';
+import { HTMLAttributes, forwardRef, CSSProperties } from 'react';
+
+/**
+ * Card Component
+ * 
+ * Uses CSS tokens for consistent rhythm:
+ * - --card-padding: Default padding
+ * - --card-radius: Border radius
+ * - --card-shadow: Box shadow
+ * - --card-header-padding: Header padding
+ * - --card-footer-padding: Footer padding
+ * - --card-content-gap: Gap between content elements
+ */
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'ghost';
+  variant?: 'default' | 'ghost' | 'outline';
+  /** Use compact padding */
+  compact?: boolean;
 }
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
-  ({ className = '', variant = 'default', ...props }, ref) => {
+  ({ className = '', variant = 'default', compact = false, style, ...props }, ref) => {
     const variantStyles = {
-      default: 'border border-border bg-card shadow-sm',
+      default: 'border border-border bg-card',
       ghost: 'bg-muted/50',
+      outline: 'border-2 border-border bg-transparent',
+    };
+
+    const cardStyle: CSSProperties = {
+      borderRadius: 'var(--card-radius)',
+      boxShadow: variant === 'default' ? 'var(--card-shadow)' : undefined,
+      ...style,
     };
 
     return (
       <div
         ref={ref}
-        className={`rounded-xl text-card-foreground ${variantStyles[variant]} ${className}`}
+        className={`text-card-foreground ${variantStyles[variant]} ${className}`}
+        style={cardStyle}
         {...props}
       />
     );
@@ -24,10 +46,15 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
 Card.displayName = 'Card';
 
 const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className = '', ...props }, ref) => (
+  ({ className = '', style, ...props }, ref) => (
     <div
       ref={ref}
-      className={`flex flex-col space-y-1.5 p-6 ${className}`}
+      className={`flex flex-col ${className}`}
+      style={{
+        padding: 'var(--card-header-padding)',
+        gap: 'var(--space-1)',
+        ...style,
+      }}
       {...props}
     />
   )
@@ -48,10 +75,11 @@ const CardTitle = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLHeadingEle
 CardTitle.displayName = 'CardTitle';
 
 const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  ({ className = '', ...props }, ref) => (
+  ({ className = '', style, ...props }, ref) => (
     <p
       ref={ref}
       className={`text-sm text-muted-foreground ${className}`}
+      style={{ marginTop: 'var(--space-1)', ...style }}
       {...props}
     />
   )
@@ -59,19 +87,34 @@ const CardDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLPara
 
 CardDescription.displayName = 'CardDescription';
 
-const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className = '', ...props }, ref) => (
-    <div ref={ref} className={`p-6 pt-0 ${className}`} {...props} />
+const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { noPadding?: boolean }>(
+  ({ className = '', noPadding = false, style, ...props }, ref) => (
+    <div 
+      ref={ref} 
+      className={className}
+      style={{
+        padding: noPadding ? 0 : 'var(--card-padding)',
+        paddingTop: noPadding ? 0 : 0,
+        ...style,
+      }}
+      {...props} 
+    />
   )
 );
 
 CardContent.displayName = 'CardContent';
 
 const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className = '', ...props }, ref) => (
+  ({ className = '', style, ...props }, ref) => (
     <div
       ref={ref}
-      className={`flex items-center p-6 pt-0 ${className}`}
+      className={`flex items-center ${className}`}
+      style={{
+        padding: 'var(--card-footer-padding)',
+        gap: 'var(--space-3)',
+        borderTop: '1px solid hsl(var(--border))',
+        ...style,
+      }}
       {...props}
     />
   )
@@ -80,5 +123,3 @@ const CardFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
 CardFooter.displayName = 'CardFooter';
 
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
-
-

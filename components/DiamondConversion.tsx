@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
-import MonetizationTooltip from './MonetizationTooltip';
+import { Gem, Coins, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { Button, Input, Card, CardContent } from '@/components/ui';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 export default function DiamondConversion() {
   const [diamondBalance, setDiamondBalance] = useState<number>(0);
@@ -14,7 +16,7 @@ export default function DiamondConversion() {
 
   const supabase = createClient();
   const MIN_DIAMONDS = 2; // Minimum diamonds required
-  const CONVERSION_RATE = 0.60; // 60% (40% platform fee)
+  const CONVERSION_RATE = 0.7; // 70% (30% platform fee)
 
   useEffect(() => {
     loadBalances();
@@ -143,98 +145,96 @@ export default function DiamondConversion() {
   const conversion = calculateConversion(parseInt(diamondsToConvert) || 0);
 
   return (
-    <div className="bg-white rounded-lg p-6 shadow">
-      <div className="flex items-center gap-2 mb-4">
-        <h2 className="text-xl font-bold">Convert Diamonds to Coins</h2>
-        <MonetizationTooltip type="conversion">
-          <span className="text-gray-400 cursor-help text-sm">ℹ️</span>
-        </MonetizationTooltip>
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg font-bold text-foreground">Convert Diamonds to Coins</h2>
+        <Tooltip content="Convert your earned diamonds back to coins for gifting. 30% platform fee applies.">
+          <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+        </Tooltip>
       </div>
 
-      <div className="mb-4 space-y-2">
-        <div className="flex justify-between items-center">
+      <div className="space-y-3">
+        <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
           <div className="flex items-center gap-2">
-            <span className="text-gray-600">Diamond Balance:</span>
-            <MonetizationTooltip type="diamonds">
-              <span className="text-gray-400 cursor-help">ℹ️</span>
-            </MonetizationTooltip>
+            <Gem className="w-4 h-4 text-purple-500" />
+            <span className="text-muted-foreground text-sm">Diamond Balance</span>
           </div>
-          <span className="font-bold text-purple-600">{diamondBalance.toLocaleString()}</span>
+          <span className="font-bold text-purple-500">{diamondBalance.toLocaleString()}</span>
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
           <div className="flex items-center gap-2">
-            <span className="text-gray-600">Coin Balance:</span>
-            <MonetizationTooltip type="coins">
-              <span className="text-gray-400 cursor-help">ℹ️</span>
-            </MonetizationTooltip>
+            <Coins className="w-4 h-4 text-amber-500" />
+            <span className="text-muted-foreground text-sm">Coin Balance</span>
           </div>
-          <span className="font-bold text-blue-600">{coinBalance.toLocaleString()}</span>
+          <span className="font-bold text-amber-500">{coinBalance.toLocaleString()}</span>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
-          {error}
+        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded text-sm">
-          {success}
+        <div className="p-3 rounded-lg bg-success/10 border border-success/30 flex items-start gap-2">
+          <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-success">{success}</p>
         </div>
       )}
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-2">
+      <div>
+        <label className="block text-sm font-medium mb-2 text-foreground">
           Diamonds to Convert (min: {MIN_DIAMONDS})
         </label>
         <div className="flex gap-2">
-          <input
+          <Input
             type="number"
             min={MIN_DIAMONDS}
             max={diamondBalance}
             value={diamondsToConvert}
             onChange={(e) => setDiamondsToConvert(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="Enter diamonds"
+            className="flex-1"
           />
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => setDiamondsToConvert(String(Math.max(0, Math.floor(diamondBalance))))}
             disabled={loading || diamondBalance < MIN_DIAMONDS}
-            className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Max
-          </button>
+          </Button>
         </div>
       </div>
 
       {diamondsToConvert && conversion.valid && (
-        <div className="mb-4 p-3 bg-gray-50 rounded">
-          <div className="flex justify-between text-sm mb-1">
-            <span>You'll receive:</span>
-            <span className="font-bold text-blue-600">{conversion.coins} coins</span>
+        <div className="p-3 rounded-lg bg-muted/50 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">You'll receive:</span>
+            <span className="font-bold text-amber-500">{conversion.coins} coins</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span>Platform fee (40%):</span>
-            <span className="text-gray-600">{conversion.fee} diamonds</span>
+            <span className="text-muted-foreground">Platform fee (30%):</span>
+            <span className="text-muted-foreground">{conversion.fee} diamonds</span>
           </div>
         </div>
       )}
 
-      <button
+      <Button
         onClick={handleConvert}
         disabled={loading || !conversion.valid || parseInt(diamondsToConvert) < MIN_DIAMONDS}
-        className="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        isLoading={loading}
+        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
       >
-        {loading ? 'Converting...' : 'Convert Diamonds'}
-      </button>
+        Convert Diamonds
+      </Button>
 
-      <p className="mt-4 text-xs text-gray-500">
-        Platform fee: 40%. Minimum {MIN_DIAMONDS} diamonds required. 
-        Conversion rate: 1 diamond = 0.60 coins (after fee).
+      <p className="text-xs text-muted-foreground">
+        Platform fee: 30%. Minimum {MIN_DIAMONDS} diamonds required. 
+        Conversion rate: 1 diamond = 0.70 coins (after fee).
       </p>
     </div>
   );
 }
-

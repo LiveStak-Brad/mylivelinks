@@ -205,7 +205,7 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
               <div>
                 <p className="text-xs font-medium text-foreground">{selectedGift.name}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  {Math.floor(selectedGift.coin_cost * 0.6)} 💎 to recipient
+                  {selectedGift.coin_cost} 💎 to recipient
                 </p>
               </div>
             </div>

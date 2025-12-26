@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { PageShell, PageHeader, PageSection, SkeletonCard } from '@/components/layout';
 import RoomRow, { RoomInstance } from '@/components/owner/RoomRow';
 import { RoomRolesPanel, RoleUser } from '@/components/admin';
 
@@ -234,44 +235,32 @@ export default function OwnerRoomsPage() {
   // Roles panel view
   if (selectedRoom) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-5xl mx-auto p-6">
-          <RoomRolesPanel
-            room={selectedRoom}
-            roomAdmins={roomAdmins}
-            roomModerators={roomModerators}
-            onBack={() => setSelectedRoom(null)}
-            onAddAdmin={handleAddAdmin}
-            onAddModerator={handleAddModerator}
-            onRemoveAdmin={handleRemoveAdmin}
-            onRemoveModerator={handleRemoveModerator}
-            canManageAdmins={isOwner}
-            canManageModerators={true}
-            isLoading={rolesLoading}
-          />
-        </div>
-      </div>
+      <PageShell maxWidth="lg" padding="md">
+        <RoomRolesPanel
+          room={selectedRoom}
+          roomAdmins={roomAdmins}
+          roomModerators={roomModerators}
+          onBack={() => setSelectedRoom(null)}
+          onAddAdmin={handleAddAdmin}
+          onAddModerator={handleAddModerator}
+          onRemoveAdmin={handleRemoveAdmin}
+          onRemoveModerator={handleRemoveModerator}
+          canManageAdmins={isOwner}
+          canManageModerators={true}
+          isLoading={rolesLoading}
+        />
+      </PageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto p-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            <Link 
-              href="/owner" 
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Rooms Management</h1>
-              <p className="text-muted-foreground">Create and manage your live rooms</p>
-            </div>
-          </div>
-          
+    <PageShell maxWidth="xl" padding="md">
+      <PageHeader
+        title="Rooms Management"
+        description="Create and manage your live rooms"
+        backLink="/owner"
+        backLabel="Back"
+        actions={
           <div className="flex items-center gap-3">
             <Link href="/owner/templates">
               <Button variant="outline" className="gap-2">
@@ -286,10 +275,12 @@ export default function OwnerRoomsPage() {
               </Button>
             </Link>
           </div>
-        </div>
+        }
+      />
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg mb-6 w-fit">
+      {/* Tabs */}
+      <PageSection>
+        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
           <button
             onClick={() => setActiveTab('rooms')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition ${
@@ -309,9 +300,11 @@ export default function OwnerRoomsPage() {
             Templates
           </Link>
         </div>
+      </PageSection>
 
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      {/* Search & Filters */}
+      <PageSection>
+        <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -345,12 +338,14 @@ export default function OwnerRoomsPage() {
             </Button>
           </div>
         </div>
+      </PageSection>
 
-        {/* Rooms List */}
+      {/* Rooms List */}
+      <PageSection>
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-muted animate-pulse rounded-xl" />
+              <SkeletonCard key={i} showImage={false} textLines={2} />
             ))}
           </div>
         ) : error ? (
@@ -395,8 +390,8 @@ export default function OwnerRoomsPage() {
             ))}
           </div>
         )}
-      </div>
-    </div>
+      </PageSection>
+    </PageShell>
   );
 }
 

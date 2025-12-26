@@ -133,50 +133,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 1b) Coin ledger fallback (older deployments)
-    {
-      const { data, error } = await supabase
-        .from('coin_ledger')
-        .select('id, amount, type, description, created_at')
-        .eq('profile_id', user.id)
-        .order('created_at', { ascending: false })
-        .range(0, fetchCount - 1);
-
-      if (!error && data) {
-        for (const row of data as any[]) {
-          const ledgerType = row.type as string;
-          const amount = Number(row.amount || 0);
-          const createdAt = toIsoString(row.created_at);
-
-          if (ledgerType === 'purchase') {
-            transactions.push({
-              id: `cl:${row.id}`,
-              type: 'coin_purchase',
-              asset: 'coin',
-              amount: Math.abs(amount),
-              direction: amount >= 0 ? 'in' : 'out',
-              description: row.description || 'Coin purchase',
-              created_at: createdAt,
-            });
-            continue;
-          }
-
-          if (ledgerType === 'gift_sent') {
-            transactions.push({
-              id: `cl:${row.id}`,
-              type: 'gift_sent',
-              asset: 'coin',
-              amount: Math.abs(amount),
-              direction: 'out',
-              description: row.description || 'Gift sent',
-              created_at: createdAt,
-            });
-            continue;
-          }
-        }
-      }
-    }
-
     // 1c) Gifts fallback for gift_received (diamonds) and/or gift_sent (if ledger is absent)
     {
       // Attempt newer schema first

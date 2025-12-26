@@ -259,37 +259,6 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       } catch {
       }
 
-      if (!purchaseNoties.length) {
-        try {
-          const { data: coinLedgerRows, error: clErr } = await supabase
-            .from('coin_ledger')
-            .select('id, amount, type, description, created_at')
-            .eq('profile_id', user.id)
-            .eq('type', 'purchase')
-            .order('created_at', { ascending: false })
-            .limit(20);
-
-          if (!clErr && Array.isArray(coinLedgerRows)) {
-            purchaseNoties = coinLedgerRows.map((r: any) => {
-              const coins = Math.abs(Number(r.amount ?? 0));
-              const id = `purchase:cl:${String(r.id)}`;
-              return {
-                id,
-                type: 'purchase',
-                title: 'Purchase Complete',
-                message: `Purchase complete: +${coins} coins`,
-                avatarFallback: '✓',
-                isRead: readIds.has(id),
-                createdAt: r.created_at ? new Date(r.created_at) : new Date(),
-                actionUrl: '/wallet',
-                metadata: { coins },
-              };
-            });
-          }
-        } catch {
-        }
-      }
-
       let conversionNoties: Notie[] = [];
       try {
         const { data: conversions, error: cvErr } = await supabase
@@ -331,7 +300,11 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       
     } catch (error) {
       console.error('[Noties] Error loading notifications:', error);
-      setNoties(MOCK_NOTIES);
+      if (process.env.NODE_ENV !== 'production') {
+        setNoties(MOCK_NOTIES);
+      } else {
+        setNoties([]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -417,13 +390,6 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ledger_entries', filter: userId ? `user_id=eq.${userId}` : undefined },
-        () => {
-          void loadNoties();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'coin_ledger', filter: userId ? `profile_id=eq.${userId}` : undefined },
         () => {
           void loadNoties();
         }

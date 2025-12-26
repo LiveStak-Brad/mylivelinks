@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { requireAppAdmin, requireUser } from '@/lib/rbac';
 
+function normalizeRoomRow(row: any) {
+  const flags = (row?.effective_feature_flags ?? row?.feature_flags ?? {}) as Record<string, any>;
+  return {
+    ...row,
+    // UI compatibility: owner panel expects these fields directly
+    interest_threshold: row?.effective_interest_threshold ?? row?.interest_threshold ?? null,
+    max_participants: row?.effective_max_participants ?? row?.max_participants ?? null,
+    disclaimer_required: row?.effective_disclaimer_required ?? row?.disclaimer_required ?? null,
+    disclaimer_text: row?.effective_disclaimer_text ?? row?.disclaimer_text ?? null,
+    layout_type: row?.layout_type ?? null,
+    gifts_enabled: flags.gifts_enabled ?? flags.gifts ?? true,
+    chat_enabled: flags.chat_enabled ?? flags.chat ?? true,
+    fallback_gradient:
+      row?.fallback_gradient ?? flags.fallback_gradient ?? row?.default_fallback_gradient ?? 'from-purple-600 to-pink-600',
+    theme_color: row?.theme_color ?? flags.theme_color ?? row?.default_theme_color ?? null,
+  };
+}
+
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
   if (msg === 'UNAUTHORIZED') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -20,7 +38,7 @@ export async function GET(request: NextRequest) {
     let rooms: any[] = [];
     if (isAppAdmin === true) {
       const { data, error } = await supabase
-        .from('coming_soon_rooms')
+        .from('v_rooms_effective')
         .select('*')
         .order('display_order', { ascending: true });
 
@@ -47,7 +65,7 @@ export async function GET(request: NextRequest) {
       }
 
       const { data, error } = await supabase
-        .from('coming_soon_rooms')
+        .from('v_rooms_effective')
         .select('*')
         .in('id', roomIds)
         .order('display_order', { ascending: true });
@@ -82,7 +100,7 @@ export async function GET(request: NextRequest) {
     }
 
     const enriched = rooms.map((room: any) => ({
-      ...room,
+      ...normalizeRoomRow(room),
       roles_summary: rolesSummaryByRoomId.get(room.id) || { admins_count: 0, moderators_count: 0 },
     }));
 
@@ -101,9 +119,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       room_key,
+      template_id,
       name,
       description,
       category,
+      banner_url,
       image_url,
       fallback_gradient,
       interest_threshold,
@@ -112,27 +132,58 @@ export async function POST(request: NextRequest) {
       disclaimer_required,
       disclaimer_text,
       special_badge,
+      max_participants,
+      theme_color,
+      background_image,
+      subtitle,
+      feature_flags,
+      gifts_enabled,
+      chat_enabled,
     } = body;
 
     if (!room_key || !name || !category) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    // If template_id not provided, fall back to default template (migration seeds this)
+    let resolvedTemplateId = typeof template_id === 'string' ? template_id : null;
+    if (!resolvedTemplateId) {
+      const { data: defaultTemplate } = await supabase
+        .from('room_templates')
+        .select('id')
+        .eq('template_key', 'default_grid_12')
+        .single();
+      resolvedTemplateId = defaultTemplate?.id ?? null;
+    }
+
+    const flags: Record<string, any> = {
+      ...(typeof feature_flags === 'object' && feature_flags ? feature_flags : {}),
+    };
+    if (typeof gifts_enabled === 'boolean') flags.gifts_enabled = gifts_enabled;
+    if (typeof chat_enabled === 'boolean') flags.chat_enabled = chat_enabled;
+
     const { data: room, error } = await supabase
-      .from('coming_soon_rooms')
+      .from('rooms')
       .insert({
         room_key,
+        template_id: resolvedTemplateId,
         name,
         description: description || null,
         category,
+        banner_url: banner_url || null,
         image_url: image_url || null,
-        fallback_gradient: fallback_gradient || 'from-purple-600 to-pink-600',
-        interest_threshold: interest_threshold || 5000,
-        status: status || 'interest',
-        display_order: display_order || 0,
-        disclaimer_required: disclaimer_required || false,
-        disclaimer_text: disclaimer_text || null,
+        fallback_gradient: fallback_gradient || null,
+        theme_color: theme_color || null,
+        background_image: background_image || null,
+        subtitle: subtitle || null,
         special_badge: special_badge || null,
+        display_order: display_order || 0,
+        interest_threshold: typeof interest_threshold === 'number' ? interest_threshold : null,
+        max_participants: typeof max_participants === 'number' ? max_participants : null,
+        status: status || 'interest',
+        disclaimer_required: typeof disclaimer_required === 'boolean' ? disclaimer_required : null,
+        disclaimer_text: disclaimer_text || null,
+        feature_flags: Object.keys(flags).length ? flags : null,
       })
       .select()
       .single();
@@ -142,7 +193,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create room' }, { status: 500 });
     }
 
-    return NextResponse.json({ room });
+    // Return the enriched effective row so the UI has layout_type and effective overrides
+    const { data: effective } = await supabase
+      .from('v_rooms_effective')
+      .select('*')
+      .eq('id', room.id)
+      .single();
+
+    return NextResponse.json({ room: normalizeRoomRow(effective || room) });
   } catch (err) {
     return authErrorToResponse(err);
   }

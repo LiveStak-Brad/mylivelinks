@@ -21,12 +21,14 @@ export async function POST(
     if (interested) {
       // Add interest
       const { error: insertError } = await supabase
-        .from('room_interests')
-        .upsert({
-          room_id: roomId,
-          user_id: user.id,
-          notify_on_open: true,
-        }, { onConflict: 'room_id,user_id' });
+        .from('room_interest')
+        .upsert(
+          {
+            room_id: roomId,
+            profile_id: user.id,
+          },
+          { onConflict: 'room_id,profile_id' }
+        );
 
       if (insertError) {
         console.error('[API /rooms/interest] Insert error:', insertError);
@@ -35,10 +37,10 @@ export async function POST(
     } else {
       // Remove interest
       const { error: deleteError } = await supabase
-        .from('room_interests')
+        .from('room_interest')
         .delete()
         .eq('room_id', roomId)
-        .eq('user_id', user.id);
+        .eq('profile_id', user.id);
 
       if (deleteError) {
         console.error('[API /rooms/interest] Delete error:', deleteError);
@@ -48,7 +50,7 @@ export async function POST(
 
     // Fetch updated room to get new interest count
     const { data: room } = await supabase
-      .from('coming_soon_rooms')
+      .from('rooms')
       .select('current_interest_count')
       .eq('id', roomId)
       .single();

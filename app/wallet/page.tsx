@@ -6,6 +6,22 @@ import CoinPurchaseSection from '@/components/CoinPurchaseSection';
 import DiamondConversion from '@/components/DiamondConversion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { PageShell, PageHeader, PageSection } from '@/components/layout';
+import { 
+  Wallet, 
+  Coins, 
+  Gem, 
+  TrendingUp, 
+  CreditCard, 
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  BarChart3,
+  ArrowLeft
+} from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, Skeleton, SkeletonCard, Input } from '@/components/ui';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface ConnectStatus {
   hasAccount: boolean;
@@ -230,198 +246,317 @@ export default function WalletPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
+      <div className="min-h-screen bg-background">
+        <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+          {/* Header skeleton */}
+          <div className="flex items-center gap-4 mb-8">
+            <Skeleton variant="circle" className="w-10 h-10" />
+            <div className="space-y-2">
+              <Skeleton className="w-36 h-8" />
+              <Skeleton className="w-48 h-4" />
+            </div>
+          </div>
+          
+          {/* Balance cards skeleton */}
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="h-36 rounded-xl" />
+            <Skeleton className="h-36 rounded-xl" />
+          </div>
+          
+          {/* Purchase section skeleton */}
+          <Skeleton className="h-72 rounded-xl" />
+        </div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Wallet</h1>
-          <p className="text-gray-500 mb-4">Please log in to access your wallet</p>
-          <Link href="/login" className="text-blue-500 hover:underline">
-            Log In
-          </Link>
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="pt-12 pb-8">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
+              <Wallet className="w-10 h-10 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Access Your Wallet</h1>
+            <p className="text-muted-foreground mb-6">Please log in to view your balance and manage your coins</p>
+            <Link href="/login">
+              <Button size="lg" className="w-full">
+                Log In to Continue
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">💼 Wallet</h1>
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
+          <Button 
+            onClick={goBack}
+            variant="ghost"
+            size="sm"
+            leftIcon={<ArrowLeft className="w-4 h-4" />}
+          >
+            Back
+          </Button>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+              <Wallet className="w-7 h-7 text-white" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-success flex items-center justify-center">
+              <Sparkles className="w-3 h-3 text-white" />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Wallet</h1>
+            <p className="text-muted-foreground text-sm">Manage your coins and earnings</p>
+          </div>
+        </div>
 
         {/* Messages */}
         {message && (
           <div
-            className={`p-4 rounded-lg ${
-              message.type === 'success'
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-            }`}
+            className={`
+              flex items-start gap-3 p-4 rounded-xl border animate-slide-up
+              ${message.type === 'success'
+                ? 'bg-success/10 border-success/30 text-success'
+                : 'bg-destructive/10 border-destructive/30 text-destructive'
+              }
+            `}
           >
-            {message.text}
+            {message.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            )}
+            <p className="text-sm font-medium">{message.text}</p>
           </div>
         )}
 
         {/* Balances Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Your Balances</h2>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-yellow-50 to-amber-100 dark:from-yellow-900/20 dark:to-amber-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Coins</div>
-              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                🪙 {balance.coins.toLocaleString()}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                For sending gifts
-              </div>
-            </div>
+        <Card className="overflow-hidden border-0 shadow-xl">
+          <div className="bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 p-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Your Balances
+            </h2>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {/* Coins Balance */}
+              <Tooltip content="Use coins to send gifts to your favorite creators">
+                <div className="relative group cursor-help">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-400/20 to-yellow-500/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
+                  <div className="relative p-5 rounded-2xl bg-card border border-amber-300/30 hover:border-amber-400/50 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Coins className="w-4 h-4 text-amber-500" />
+                      <span className="text-sm font-medium text-muted-foreground">Coins</span>
+                    </div>
+                    <div className="text-3xl font-bold text-amber-500">
+                      {balance.coins.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      For sending gifts
+                    </p>
+                  </div>
+                </div>
+              </Tooltip>
 
-            <div className="bg-gradient-to-br from-purple-50 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 p-4 rounded-lg border border-purple-200 dark:border-purple-800">
-              <div className="text-sm text-gray-600 dark:text-gray-400">Diamonds</div>
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                💎 {balance.diamonds.toLocaleString()}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                ≈ ${diamondsToUsd(balance.diamonds)} USD
-              </div>
+              {/* Diamonds Balance */}
+              <Tooltip content="Earn diamonds from receiving gifts. Cash out anytime!">
+                <div className="relative group cursor-help">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-pink-500/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
+                  <div className="relative p-5 rounded-2xl bg-card border border-purple-300/30 hover:border-purple-400/50 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Gem className="w-4 h-4 text-purple-500" />
+                      <span className="text-sm font-medium text-muted-foreground">Diamonds</span>
+                    </div>
+                    <div className="text-3xl font-bold text-purple-500">
+                      {balance.diamonds.toLocaleString()}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      ≈ ${diamondsToUsd(balance.diamonds)} USD
+                    </p>
+                  </div>
+                </div>
+              </Tooltip>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* Purchase Coins */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-          <CoinPurchaseSection />
-        </div>
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CreditCard className="w-5 h-5 text-primary" />
+              Buy Coins
+            </CardTitle>
+            <CardDescription>
+              Get coins to support your favorite creators with gifts
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CoinPurchaseSection />
+          </CardContent>
+        </Card>
 
         {/* Cashout Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">💸 Cash Out Diamonds</h2>
-          
-          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
-            <p><strong>Cashout Rate:</strong> 100 diamonds = $1.00 USD</p>
-            <p><strong>Minimum:</strong> 10,000 diamonds ($100)</p>
-            <p className="text-xs mt-1 opacity-80">
-              No additional fees at cashout. The 40% platform fee was already applied when you earned diamonds.
-            </p>
-          </div>
-
-          {!connectStatus?.hasAccount ? (
-            <div className="text-center py-4">
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Set up Stripe Connect to receive payouts
-              </p>
-              <button
-                onClick={handleOnboarding}
-                disabled={onboardingLoading}
-                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
-              >
-                {onboardingLoading ? 'Loading...' : '🔗 Set Up Payouts'}
-              </button>
-            </div>
-          ) : !connectStatus?.payoutsEnabled ? (
-            <div className="text-center py-4">
-              <div className="text-yellow-600 dark:text-yellow-400 mb-2">⚠️ Payouts Not Enabled</div>
-              <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
-                {connectStatus?.disabledReason || 'Please complete Stripe onboarding to enable payouts.'}
-              </p>
-              <button
-                onClick={handleOnboarding}
-                disabled={onboardingLoading}
-                className="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 font-medium"
-              >
-                {onboardingLoading ? 'Loading...' : 'Complete Setup'}
-              </button>
-            </div>
-          ) : balance.diamonds < MIN_CASHOUT_DIAMONDS ? (
-            <div className="text-center py-4">
-              <p className="text-gray-600 dark:text-gray-400">
-                You need at least {MIN_CASHOUT_DIAMONDS.toLocaleString()} diamonds to cash out.
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                Current: {balance.diamonds.toLocaleString()} diamonds
-                ({((balance.diamonds / MIN_CASHOUT_DIAMONDS) * 100).toFixed(1)}% of minimum)
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="text-green-600 dark:text-green-400">✅</span>
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  Payouts enabled ({connectStatus?.country || 'Account ready'})
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                  Diamonds to Cash Out
-                </label>
-                <input
-                  type="number"
-                  min={MIN_CASHOUT_DIAMONDS}
-                  max={balance.diamonds}
-                  value={diamondsToCashout}
-                  onChange={(e) => setDiamondsToCashout(e.target.value)}
-                  placeholder={`Max: ${balance.diamonds.toLocaleString()}`}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
-                />
-                {diamondsToCashout && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    You'll receive: ${diamondsToUsd(parseInt(diamondsToCashout) || 0)} USD
+        <Card className="border-0 shadow-lg overflow-hidden">
+          <CardHeader className="pb-2 bg-gradient-to-r from-purple-500/5 to-pink-500/5">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Gem className="w-5 h-5 text-purple-500" />
+              Cash Out Diamonds
+            </CardTitle>
+            <CardDescription>
+              Convert your diamond earnings to real money
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {/* Rate info */}
+            <div className="mb-6 p-4 rounded-xl bg-muted/50 border border-border space-y-2">
+                    Connect with Stripe to receive your earnings
                   </p>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setDiamondsToCashout(String(balance.diamonds))}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                </div>
+                <Button
+                  onClick={handleOnboarding}
+                  disabled={onboardingLoading}
+                  size="lg"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                 >
-                  Max
-                </button>
-                <button
-                  onClick={handleCashout}
-                  disabled={cashoutLoading || !diamondsToCashout || parseInt(diamondsToCashout) < MIN_CASHOUT_DIAMONDS}
-                  className="flex-1 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 font-medium"
-                >
-                  {cashoutLoading ? 'Processing...' : '💸 Cash Out'}
-                </button>
+                  {onboardingLoading ? 'Loading...' : '🔗 Set Up Stripe Connect'}
+                </Button>
               </div>
-            </div>
-          )}
-        </div>
+            ) : !connectStatus?.payoutsEnabled ? (
+              <div className="text-center py-6 space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-warning/20 flex items-center justify-center">
+                  <AlertCircle className="w-8 h-8 text-warning" />
+                </div>
+                <div>
+                  <p className="font-medium text-warning mb-1">Payouts Not Enabled</p>
+                  <p className="text-sm text-muted-foreground">
+                    {connectStatus?.disabledReason || 'Please complete Stripe onboarding to enable payouts.'}
+                  </p>
+                </div>
+                <Button
+                  onClick={handleOnboarding}
+                  disabled={onboardingLoading}
+                  variant="secondary"
+                  size="lg"
+                >
+                  {onboardingLoading ? 'Loading...' : 'Complete Setup'}
+                </Button>
+              </div>
+            ) : balance.diamonds < MIN_CASHOUT_DIAMONDS ? (
+              <div className="text-center py-6 space-y-3">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-muted flex items-center justify-center">
+                  <Gem className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground mb-1">
+                    {MIN_CASHOUT_DIAMONDS.toLocaleString()} 💎 needed to cash out
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Current: {balance.diamonds.toLocaleString()} diamonds
+                  </p>
+                </div>
+                {/* Progress bar */}
+                <div className="max-w-xs mx-auto">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min((balance.diamonds / MIN_CASHOUT_DIAMONDS) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {((balance.diamonds / MIN_CASHOUT_DIAMONDS) * 100).toFixed(1)}% of minimum
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="w-4 h-4 text-success" />
+                  <span className="text-muted-foreground">
+                    Payouts enabled ({connectStatus?.country || 'Account ready'})
+                  </span>
+                </div>
 
-        {/* Diamond Conversion (optional) */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-          <DiamondConversion />
-        </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-foreground">
+                    Diamonds to Cash Out
+                  </label>
+                  <Input
+                    type="number"
+                    min={MIN_CASHOUT_DIAMONDS}
+                    max={balance.diamonds}
+                    value={diamondsToCashout}
+                    onChange={(e) => setDiamondsToCashout(e.target.value)}
+                    placeholder={`Max: ${balance.diamonds.toLocaleString()}`}
+                    inputSize="lg"
+                  />
+                  {diamondsToCashout && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      You'll receive: <span className="font-semibold text-success">${diamondsToUsd(parseInt(diamondsToCashout) || 0)} USD</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDiamondsToCashout(String(balance.diamonds))}
+                  >
+                    Max
+                  </Button>
+                  <Button
+                    onClick={handleCashout}
+                    disabled={cashoutLoading || !diamondsToCashout || parseInt(diamondsToCashout) < MIN_CASHOUT_DIAMONDS}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    size="lg"
+                  >
+                    {cashoutLoading ? 'Processing...' : '💸 Cash Out'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Diamond Conversion */}
+        <Card className="border-0 shadow-lg">
+          <CardContent className="pt-6">
+            <DiamondConversion />
+          </CardContent>
+        </Card>
 
         {/* Analytics Link */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">📊 Analytics</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
-            View detailed stats about your spending, earnings, and gifter status.
-          </p>
-          <Link
-            href="/me/analytics"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-          >
-            View Analytics →
+        <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow group cursor-pointer">
+          <Link href="/me/analytics" className="block">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <BarChart3 className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Analytics</h3>
+                    <p className="text-sm text-muted-foreground">
+                      View detailed spending, earnings, and gifter stats
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+              </div>
+            </CardContent>
           </Link>
-        </div>
-
-        {/* Back Link */}
-        <div className="text-center">
-          <button onClick={goBack} className="text-blue-500 hover:underline">
-            ← Back
-          </button>
-        </div>
+        </Card>
       </div>
     </div>
   );
