@@ -114,7 +114,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 md:pt-28 lg:pt-32">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -122,7 +122,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-lg max-h-[85vh] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-scale-in">
+      <div className="relative w-full max-w-lg max-h-[calc(100vh-8rem)] md:max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-12rem)] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-scale-in">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 p-4">
           <div className="flex items-center justify-between">
@@ -171,7 +171,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(85vh-180px)] p-4">
+        <div className="overflow-y-auto max-h-[calc(100vh-16rem)] md:max-h-[calc(100vh-18rem)] lg:max-h-[calc(100vh-20rem)] p-4">
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 10 }).map((_, i) => (
