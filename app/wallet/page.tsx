@@ -402,6 +402,20 @@ export default function WalletPage() {
           <DiamondConversion />
         </div>
 
+        {/* Analytics Link */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
+          <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">📊 Analytics</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
+            View detailed stats about your spending, earnings, and gifter status.
+          </p>
+          <Link
+            href="/me/analytics"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+          >
+            View Analytics →
+          </Link>
+        </div>
+
         {/* Back Link */}
         <div className="text-center">
           <button onClick={goBack} className="text-blue-500 hover:underline">

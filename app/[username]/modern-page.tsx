@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
 import Link from 'next/link';
-import { UserPlus, UserCheck, Users, Share2, MessageCircle } from 'lucide-react';
+import { UserPlus, UserCheck, Users, Share2, MessageCircle, BarChart3 } from 'lucide-react';
 import SocialCountsWidget from '@/components/profile/SocialCountsWidget';
 import TopSupportersWidget from '@/components/profile/TopSupportersWidget';
 import TopStreamersWidget from '@/components/profile/TopStreamersWidget';
@@ -553,6 +553,15 @@ export default function ModernProfilePage() {
                     <Share2 size={18} className="sm:w-5 sm:h-5" />
                     Share
                   </button>
+                  
+                  <Link
+                    href={isOwnProfile ? '/me/analytics' : `/u/${profile.username}/analytics`}
+                    className="px-3 sm:px-4 py-2 rounded-lg font-semibold transition bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 text-purple-600 dark:text-purple-400 flex items-center gap-2 text-sm sm:text-base"
+                    title="View Stats"
+                  >
+                    <BarChart3 size={18} className="sm:w-5 sm:h-5" />
+                    <span className="hidden sm:inline">Stats</span>
+                  </Link>
                 </div>
               </div>
             </div>

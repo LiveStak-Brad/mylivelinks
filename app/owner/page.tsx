@@ -1278,6 +1278,13 @@ export default function OwnerPanel() {
                             >
                               <Eye className="w-4 h-4" />
                             </a>
+                            <a
+                              href={`/owner/users/${user.id}/analytics`}
+                              className="p-2 text-purple-400 hover:bg-purple-500/20 rounded transition"
+                              title="View Analytics"
+                            >
+                              <BarChart3 className="w-4 h-4" />
+                            </a>
                             <button
                               onClick={() => handleAddCoins(user.id)}
                               disabled={actionLoading === user.id}

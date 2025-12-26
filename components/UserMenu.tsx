@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
-import { Wallet } from 'lucide-react';
+import { Wallet, BarChart3 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
 interface UserMenuProps {
@@ -143,6 +143,15 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
           >
             <Wallet className="w-4 h-4 text-amber-500" />
             Wallet
+          </a>
+          
+          <a
+            href="/me/analytics"
+            onClick={() => setShowMenu(false)}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-foreground hover:bg-muted transition"
+          >
+            <BarChart3 className="w-4 h-4 text-purple-500" />
+            Analytics
           </a>
           
           <div className="border-t border-border my-1" />
