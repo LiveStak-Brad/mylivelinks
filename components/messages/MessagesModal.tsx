@@ -103,10 +103,10 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     return (
       <>
         {/* Backdrop - solid background to prevent content bleeding through */}
-        <div className="fixed inset-0 z-[60] bg-background" aria-hidden="true" />
+        <div className="fixed inset-0 z-[70] bg-background" aria-hidden="true" />
         
         {/* Modal Content */}
-        <div className="fixed inset-0 z-[60] flex flex-col bg-background animate-slide-up">
+        <div className="fixed inset-0 z-[70] flex flex-col bg-background animate-slide-up">
           {/* Show thread or conversation list */}
           {showThread && activeConversation ? (
             <MessageThread
@@ -156,7 +156,7 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   return (
     <div
       ref={modalRef}
-      className="absolute right-0 top-full mt-2 w-[900px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[60]"
+      className="absolute right-0 top-full mt-2 w-[900px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[70]"
       style={{ height: '550px', maxHeight: 'calc(100vh - 120px)' }}
     >
       <div className="flex h-full">
