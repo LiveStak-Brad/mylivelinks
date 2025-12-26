@@ -1597,6 +1597,25 @@ export default function OwnerPanel() {
         {/* Rooms Tab */}
         {activeTab === 'rooms' && (
           <div className="space-y-6">
+            {/* New Rooms Management Banner */}
+            <a
+              href="/owner/rooms"
+              className="block p-4 bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-xl hover:border-purple-500/50 transition group"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-600/30 rounded-lg">
+                    <Sparkles className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-white">Room Templates & Advanced Management</h4>
+                    <p className="text-sm text-gray-400">Create room templates for quick setup, manage roles, and preview cards</p>
+                  </div>
+                </div>
+                <ExternalLink className="w-5 h-5 text-gray-400 group-hover:text-white transition" />
+              </div>
+            </a>
+
             {/* Actions */}
             <div className="flex justify-between items-center">
               <p className="text-gray-400">{rooms.length} rooms configured</p>

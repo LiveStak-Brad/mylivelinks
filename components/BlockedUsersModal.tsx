@@ -55,7 +55,25 @@ export default function BlockedUsersModal({ isOpen, onClose }: BlockedUsersModal
         return;
       }
 
-      setBlockedUsers(data || []);
+      type RawBlockedUser = Omit<BlockedUser, 'blocked_profile'> & {
+        blocked_profile:
+          | BlockedUser['blocked_profile']
+          | Array<BlockedUser['blocked_profile']>
+          | null;
+      };
+
+      const normalized = ((data ?? []) as unknown as RawBlockedUser[]).map((row) => {
+        const blocked_profile = Array.isArray(row.blocked_profile)
+          ? row.blocked_profile[0] ?? null
+          : row.blocked_profile ?? null;
+
+        return {
+          ...row,
+          blocked_profile,
+        } as BlockedUser;
+      });
+
+      setBlockedUsers(normalized.filter((r) => !!r.blocked_profile));
     } catch (error) {
       console.error('Error loading blocked users:', error);
     } finally {

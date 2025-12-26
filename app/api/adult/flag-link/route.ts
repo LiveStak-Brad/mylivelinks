@@ -58,15 +58,19 @@ export async function POST(request: NextRequest) {
     }
     
     // Audit log
-    await supabase.rpc('audit_logs').insert({
-      profile_id: user.id,
-      action: 'adult_link_flagged',
-      target_type: 'user_link',
-      target_id: linkId,
-      metadata: { reason }
-    }).catch(() => {
+    try {
+      await supabase
+        .from('audit_logs')
+        .insert({
+          profile_id: user.id,
+          action: 'adult_link_flagged',
+          target_type: 'user_link',
+          target_id: linkId,
+          metadata: { reason },
+        });
+    } catch {
       // Non-critical if audit log fails
-    });
+    }
     
     return NextResponse.json({
       success: true,

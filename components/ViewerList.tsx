@@ -10,13 +10,13 @@ import MiniProfile from './MiniProfile';
 interface Viewer {
   profile_id: string;
   username: string;
-  avatar_url?: string;
+  avatar_url: string | undefined;
   gifter_level: number;
   is_active: boolean;
   last_active_at: string;
-  is_live_available?: boolean; // Whether they're live streaming/available
-  is_published?: boolean; // Whether they're actually publishing video
-  live_stream_id?: number; // Their live stream ID if available
+  is_live_available: boolean; // Whether they're live streaming/available
+  is_published: boolean; // Whether they're actually publishing video
+  live_stream_id: number | undefined; // Their live stream ID if available
 }
 
 interface ViewerListProps {
@@ -157,13 +157,13 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
           return {
             profile_id: presence.profile_id,
             username: presence.username || profile.username,
-            avatar_url: profile.avatar_url,
+            avatar_url: profile.avatar_url ?? undefined,
             gifter_level: profile.gifter_level || 0,
             is_active: true,
             last_active_at: presence.last_seen_at,
             is_live_available: presence.is_live_available || liveInfo?.isLiveAvailable || false,
             is_published: false, // Removed - no longer used
-            live_stream_id: liveInfo?.streamId,
+            live_stream_id: liveInfo?.streamId ?? undefined,
           };
         })
       );

@@ -2537,10 +2537,8 @@ export default function LiveRoom() {
       const result = await supabase.auth.getUser();
       user = result.data?.user || null;
     }
-    const isCurrentUser = user && user.id === streamerId;
-    
     // If it's the current user and they're live, auto-place them in slot 1
-    if (isCurrentUser) {
+    if (user && user.id === streamerId) {
       // Check if user is live
       const { data: liveStream } = await supabase
         .from('live_streams')

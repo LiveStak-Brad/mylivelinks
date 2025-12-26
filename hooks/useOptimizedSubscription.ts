@@ -11,7 +11,7 @@ interface SubscriptionConfig {
   table: string;
   event?: 'INSERT' | 'UPDATE' | 'DELETE' | '*';
   filter?: string;
-  callback: (payload: any) => void;
+  callback: (payload: unknown) => void;
   enabled?: boolean;
 }
 
@@ -27,7 +27,7 @@ export function useOptimizedSubscription(config: SubscriptionConfig) {
     const channel = supabase.channel(channelName);
 
     if (filter) {
-      channel.on(
+      (channel as unknown as { on: (...args: any[]) => any }).on(
         'postgres_changes',
         {
           event,
@@ -38,7 +38,7 @@ export function useOptimizedSubscription(config: SubscriptionConfig) {
         callback
       );
     } else {
-      channel.on(
+      (channel as unknown as { on: (...args: any[]) => any }).on(
         'postgres_changes',
         {
           event,
@@ -79,7 +79,7 @@ export function useBatchSubscriptions(configs: SubscriptionConfig[]) {
       const channel = supabase.channel(channelName);
 
       if (config.filter) {
-        channel.on(
+        (channel as unknown as { on: (...args: any[]) => any }).on(
           'postgres_changes',
           {
             event: config.event || '*',
@@ -90,7 +90,7 @@ export function useBatchSubscriptions(configs: SubscriptionConfig[]) {
           config.callback
         );
       } else {
-        channel.on(
+        (channel as unknown as { on: (...args: any[]) => any }).on(
           'postgres_changes',
           {
             event: config.event || '*',

@@ -106,7 +106,22 @@ export default function ModerationPage() {
         .limit(100);
 
       if (!error && data) {
-        setReports(data);
+        type RawReport = Omit<Report, 'reporter' | 'reported_user'> & {
+          reporter: Report['reporter'] | Array<NonNullable<Report['reporter']>> | null;
+          reported_user: Report['reported_user'] | Array<NonNullable<Report['reported_user']>> | null;
+        };
+
+        const normalized = (data as unknown as RawReport[]).map((r) => {
+          const reporter = Array.isArray(r.reporter) ? r.reporter[0] ?? null : r.reporter ?? null;
+          const reported_user = Array.isArray(r.reported_user) ? r.reported_user[0] ?? null : r.reported_user ?? null;
+          return {
+            ...r,
+            reporter,
+            reported_user,
+          } satisfies Report;
+        });
+
+        setReports(normalized);
       }
     } catch (error) {
       console.error('Error loading reports:', error);
