@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-server';
+import { createRouteHandlerClient } from '@/lib/supabase-server';
 
 // GET /api/rooms - List all rooms (public, non-draft)
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = createRouteHandlerClient(request);
 
     const { data: rooms, error } = await supabase
       .from('coming_soon_rooms')

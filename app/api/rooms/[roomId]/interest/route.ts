@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-server';
+import { createRouteHandlerClient } from '@/lib/supabase-server';
 
 // POST /api/rooms/[roomId]/interest - Toggle interest for a room
 export async function POST(
@@ -8,7 +8,7 @@ export async function POST(
 ) {
   try {
     const { roomId } = await params;
-    const supabase = await createClient();
+    const supabase = createRouteHandlerClient(request);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {

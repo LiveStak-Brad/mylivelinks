@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase-server';
+import { createRouteHandlerClient } from '@/lib/supabase-server';
 
 // Check if user is admin
 async function isAdmin(supabase: any): Promise<boolean> {
@@ -22,7 +22,7 @@ export async function GET(
 ) {
   try {
     const { roomId } = await params;
-    const supabase = await createClient();
+    const supabase = createRouteHandlerClient(request);
 
     if (!(await isAdmin(supabase))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -52,7 +52,7 @@ export async function PUT(
 ) {
   try {
     const { roomId } = await params;
-    const supabase = await createClient();
+    const supabase = createRouteHandlerClient(request);
 
     if (!(await isAdmin(supabase))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -115,7 +115,7 @@ export async function DELETE(
 ) {
   try {
     const { roomId } = await params;
-    const supabase = await createClient();
+    const supabase = createRouteHandlerClient(request);
 
     if (!(await isAdmin(supabase))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -137,4 +137,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-
