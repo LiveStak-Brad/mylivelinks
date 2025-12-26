@@ -279,7 +279,7 @@ export default function GlobalHeader() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16 lg:h-[72px]">
             {/* Left section: Logo + Nav */}
-            <div className="flex items-center gap-2 lg:gap-3">
+            <div className="flex items-center gap-0">
               {/* Logo/Brand */}
               <Link 
                 href="/" 
@@ -289,10 +289,10 @@ export default function GlobalHeader() {
                 <SmartBrandLogo size={110} />
               </Link>
               
-              {/* Trophy - Leaderboard Button */}
+              {/* Trophy - Leaderboard Button - Right next to logo */}
               <button
                 onClick={() => setShowLeaderboard(true)}
-                className="p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
+                className="-ml-2 p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
                 aria-label="View Leaderboards"
               >
                 <Trophy className="w-6 h-6 text-amber-500" />
