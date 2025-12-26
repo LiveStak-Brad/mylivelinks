@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
 import Link from 'next/link';
-import { UserPlus, UserCheck, Users, Share2, MessageCircle, BarChart3 } from 'lucide-react';
+import { UserPlus, UserCheck, Users, Share2, MessageCircle, BarChart3, Flame, Trophy, Star } from 'lucide-react';
 import SocialCountsWidget from '@/components/profile/SocialCountsWidget';
 import TopSupportersWidget from '@/components/profile/TopSupportersWidget';
 import TopStreamersWidget from '@/components/profile/TopStreamersWidget';
@@ -467,7 +467,31 @@ export default function ModernProfilePage() {
         )}
         
         {/* Hero Section */}
-        <div className={`${borderRadiusClass} overflow-hidden shadow-2xl mb-4 sm:mb-6`} style={cardStyle}>
+        <div className={`${borderRadiusClass} overflow-hidden shadow-2xl mb-4 sm:mb-6 relative`} style={cardStyle}>
+          {/* Top Right Stats - Streak & Global Ranks */}
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex flex-col items-end gap-2 z-10">
+            {/* Streak Counter */}
+            <div className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg">
+              <Flame size={14} className="sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm font-bold">7</span>
+              <span className="text-[10px] sm:text-xs opacity-90">day streak</span>
+            </div>
+            
+            {/* Global Gifter Rank */}
+            <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg">
+              <Trophy size={14} className="sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm font-bold">#42</span>
+              <span className="text-[10px] sm:text-xs opacity-90">Gifter</span>
+            </div>
+            
+            {/* Global Streamer Rank */}
+            <div className="flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg">
+              <Star size={14} className="sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm font-bold">#128</span>
+              <span className="text-[10px] sm:text-xs opacity-90">Streamer</span>
+            </div>
+          </div>
+          
           <div className="p-4 sm:p-8">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6">
               {/* Avatar */}
