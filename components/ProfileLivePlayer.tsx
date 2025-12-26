@@ -6,6 +6,7 @@ import { Room, RemoteTrack, RemoteParticipant, Track } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
 import { Volume2, VolumeX, Gift, Users } from 'lucide-react';
 import GiftModal from './GiftModal';
+import { LIVE_LAUNCH_ENABLED, isLiveOwnerUser } from '@/lib/livekit-constants';
 
 interface ProfileLivePlayerProps {
   profileId: string;
@@ -39,6 +40,7 @@ export default function ProfileLivePlayer({
   const router = useRouter();
   const wasHiddenRef = useRef(false);
   const roomRef = useRef<Room | null>(null);
+  const [canOpenLive, setCanOpenLive] = useState(false);
 
   // BANDWIDTH SAVING: Disconnect when user leaves the tab
   useEffect(() => {
@@ -75,7 +77,14 @@ export default function ProfileLivePlayer({
   }, []);
 
   useEffect(() => {
-    connectToRoom();
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const allowed = LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user?.id, email: user?.email });
+      setCanOpenLive(allowed);
+      if (allowed) {
+        connectToRoom();
+      }
+    })();
     loadViewerCount(); // Initial load
     
     // Poll viewer count every 10 seconds

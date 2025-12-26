@@ -7,12 +7,13 @@ import { useRouter } from 'next/navigation';
 import { Gift, ArrowLeft, Shield, Plus, Trash2, Edit, Save, X, Coins, DollarSign } from 'lucide-react';
 
 interface GiftType {
-  id: string;
+  id: number | string;
   name: string;
   emoji: string;
   coin_cost: number;
   display_order: number;
   is_active: boolean;
+  icon_url?: string | null;
 }
 
 interface CoinPack {
@@ -24,6 +25,8 @@ interface CoinPack {
   is_popular: boolean;
   is_active: boolean;
   stripe_price_id: string | null;
+  sku?: string | null;
+  db_id?: number | null;
 }
 
 export default function GiftsAdminPage() {
@@ -43,6 +46,7 @@ export default function GiftsAdminPage() {
   const [editingGift, setEditingGift] = useState<GiftType | null>(null);
   const [editingPack, setEditingPack] = useState<CoinPack | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const supabase = createClient();
 
   // New gift form
@@ -63,6 +67,52 @@ export default function GiftsAdminPage() {
   useEffect(() => {
     checkAdminAndLoad();
   }, []);
+
+  const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  };
+
+  const isMissingColumnError = (error: unknown) => {
+    const msg = getErrorMessage(error).toLowerCase();
+    return msg.includes('column') && (msg.includes('does not exist') || msg.includes('not found'));
+  };
+
+  const normalizeGiftTypeRow = (row: any): GiftType => {
+    const emoji = (row?.emoji ?? row?.icon_url ?? '🎁') as string;
+    return {
+      id: row?.id,
+      name: String(row?.name ?? ''),
+      emoji: String(emoji ?? ''),
+      coin_cost: Number(row?.coin_cost ?? 0),
+      display_order: Number(row?.display_order ?? 0),
+      is_active: Boolean(row?.is_active ?? true),
+      icon_url: row?.icon_url ?? null,
+    };
+  };
+
+  const normalizeCoinPackRow = (row: any): CoinPack => {
+    const coins = Number(row?.coins ?? row?.coins_amount ?? 0);
+    const priceUsd = row?.price_usd ?? (row?.price_cents ? Number(row.price_cents) / 100 : 0);
+    const active = row?.is_active ?? row?.active;
+
+    return {
+      id: String(row?.id ?? row?.sku ?? ''),
+      db_id: typeof row?.id === 'number' ? row.id : row?.id ? Number(row.id) : null,
+      sku: row?.sku ?? null,
+      name: String(row?.name ?? row?.pack_name ?? row?.sku ?? 'Coin Pack'),
+      coins,
+      price_usd: Number(priceUsd ?? 0),
+      bonus_coins: Number(row?.bonus_coins ?? 0),
+      is_popular: Boolean(row?.is_popular ?? row?.is_vip ?? false),
+      is_active: Boolean(active ?? true),
+      stripe_price_id: (row?.stripe_price_id ?? null) as any,
+    };
+  };
 
   const isAllowedAdmin = (userId?: string | null, email?: string | null) => {
     const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -103,7 +153,7 @@ export default function GiftsAdminPage() {
         .order('display_order', { ascending: true });
 
       if (!error && data) {
-        setGiftTypes(data);
+        setGiftTypes((data as any[]).map(normalizeGiftTypeRow));
       }
     } catch (error) {
       console.error('Error loading gift types:', error);
@@ -112,34 +162,42 @@ export default function GiftsAdminPage() {
 
   const loadCoinPacks = async () => {
     try {
-      const { data, error } = await supabase
-        .from('coin_packs')
-        .select('*')
-        .order('price_usd', { ascending: true });
+      let data: any[] | null = null;
+      let error: any = null;
+
+      const byDisplayOrder = await supabase.from('coin_packs').select('*').order('display_order', { ascending: true });
+      if (byDisplayOrder.error) {
+        const byPriceUsd = await supabase.from('coin_packs').select('*').order('price_usd', { ascending: true });
+        if (byPriceUsd.error) {
+          const byPriceCents = await supabase.from('coin_packs').select('*').order('price_cents', { ascending: true });
+          data = (byPriceCents.data as any[]) ?? null;
+          error = byPriceCents.error;
+        } else {
+          data = (byPriceUsd.data as any[]) ?? null;
+          error = byPriceUsd.error;
+        }
+      } else {
+        data = (byDisplayOrder.data as any[]) ?? null;
+        error = byDisplayOrder.error;
+      }
 
       if (!error && data) {
-        const normalized = (data as any[]).map((row: any) => {
-          const coins = Number(row?.coins ?? row?.coins_amount ?? 0);
-          const priceUsd = row?.price_usd ?? (row?.price_cents ? Number(row.price_cents) / 100 : 0);
-          const active = row?.is_active ?? row?.active;
-
-          return {
-            id: String(row?.id ?? row?.sku ?? ''),
-            name: String(row?.name ?? row?.pack_name ?? row?.sku ?? 'Coin Pack'),
-            coins,
-            price_usd: Number(priceUsd ?? 0),
-            bonus_coins: Number(row?.bonus_coins ?? 0),
-            is_popular: Boolean(row?.is_popular ?? row?.is_vip ?? false),
-            is_active: Boolean(active ?? true),
-            stripe_price_id: (row?.stripe_price_id ?? null) as any,
-          } as CoinPack;
-        });
-
-        setCoinPacks(normalized);
+        setCoinPacks((data as any[]).map(normalizeCoinPackRow));
       }
     } catch (error) {
       console.error('Error loading coin packs:', error);
     }
+  };
+
+  const createCoinPackSku = (name: string, coins: number, priceUsd: number) => {
+    const base = String(name || 'coin_pack')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]+/g, '')
+      .slice(0, 50);
+    const cents = Math.round(Number(priceUsd || 0) * 100);
+    return `${base || 'coin_pack'}_${coins}_${cents}_${Date.now()}`;
   };
 
   const handleAddGift = async () => {
@@ -149,27 +207,39 @@ export default function GiftsAdminPage() {
     }
 
     setActionLoading(true);
+    setErrorMessage(null);
     try {
-      const { data, error } = await supabase
+      const payloadBase: any = {
+        name: newGift.name,
+        coin_cost: newGift.coin_cost,
+        display_order: giftTypes.length + 1,
+        is_active: true,
+      };
+
+      let insertRes = await supabase
         .from('gift_types')
-        .insert({
-          name: newGift.name,
-          emoji: newGift.emoji,
-          coin_cost: newGift.coin_cost,
-          display_order: giftTypes.length + 1,
-          is_active: true,
-        })
+        .insert({ ...payloadBase, emoji: newGift.emoji })
         .select()
         .single();
 
-      if (error) throw error;
+      if (insertRes.error && isMissingColumnError(insertRes.error)) {
+        insertRes = await supabase
+          .from('gift_types')
+          .insert({ ...payloadBase, icon_url: newGift.emoji })
+          .select()
+          .single();
+      }
 
-      setGiftTypes([...giftTypes, data]);
+      if (insertRes.error) throw insertRes.error;
+
       setNewGift({ name: '', emoji: '🎁', coin_cost: 10 });
+      await loadGiftTypes();
       alert('Gift type added!');
     } catch (error) {
       console.error('Error adding gift:', error);
-      alert('Failed to add gift type');
+      const msg = getErrorMessage(error);
+      setErrorMessage(msg);
+      alert(`Failed to add gift type: ${msg}`);
     } finally {
       setActionLoading(false);
     }
@@ -179,47 +249,68 @@ export default function GiftsAdminPage() {
     if (!editingGift) return;
 
     setActionLoading(true);
+    setErrorMessage(null);
     try {
-      const { error } = await supabase
+      const updateBase: any = {
+        name: editingGift.name,
+        coin_cost: editingGift.coin_cost,
+        is_active: editingGift.is_active,
+      };
+
+      let updateRes = await supabase
         .from('gift_types')
-        .update({
-          name: editingGift.name,
-          emoji: editingGift.emoji,
-          coin_cost: editingGift.coin_cost,
-          is_active: editingGift.is_active,
-        })
-        .eq('id', editingGift.id);
+        .update({ ...updateBase, emoji: editingGift.emoji })
+        .eq('id', editingGift.id)
+        .select('*')
+        .single();
 
-      if (error) throw error;
+      if (updateRes.error && isMissingColumnError(updateRes.error)) {
+        updateRes = await supabase
+          .from('gift_types')
+          .update({ ...updateBase, icon_url: editingGift.emoji })
+          .eq('id', editingGift.id)
+          .select('*')
+          .single();
+      }
 
-      setGiftTypes(giftTypes.map(g => g.id === editingGift.id ? editingGift : g));
+      if (updateRes.error) throw updateRes.error;
+
+      await loadGiftTypes();
       setEditingGift(null);
       alert('Gift type updated!');
     } catch (error) {
       console.error('Error updating gift:', error);
-      alert('Failed to update gift type');
+      const msg = getErrorMessage(error);
+      setErrorMessage(msg);
+      alert(`Failed to update gift type: ${msg}`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleDeleteGift = async (id: string) => {
+  const handleDeleteGift = async (id: string | number) => {
     if (!confirm('Are you sure you want to delete this gift type?')) return;
 
     setActionLoading(true);
+    setErrorMessage(null);
     try {
-      const { error } = await supabase
+      const idValue = typeof id === 'number' ? id : String(id);
+      const res = await supabase
         .from('gift_types')
         .delete()
-        .eq('id', id);
+        .eq('id', idValue as any)
+        .select('id')
+        .single();
 
-      if (error) throw error;
+      if (res.error) throw res.error;
 
-      setGiftTypes(giftTypes.filter(g => g.id !== id));
+      await loadGiftTypes();
       alert('Gift type deleted!');
     } catch (error) {
       console.error('Error deleting gift:', error);
-      alert('Failed to delete gift type');
+      const msg = getErrorMessage(error);
+      setErrorMessage(msg);
+      alert(`Failed to delete gift type: ${msg}`);
     } finally {
       setActionLoading(false);
     }
@@ -232,8 +323,9 @@ export default function GiftsAdminPage() {
     }
 
     setActionLoading(true);
+    setErrorMessage(null);
     try {
-      const { data, error } = await supabase
+      let insertRes = await supabase
         .from('coin_packs')
         .insert({
           name: newPack.name,
@@ -246,14 +338,33 @@ export default function GiftsAdminPage() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (insertRes.error && isMissingColumnError(insertRes.error)) {
+        const sku = createCoinPackSku(newPack.name, newPack.coins, newPack.price_usd);
+        insertRes = await supabase
+          .from('coin_packs')
+          .insert({
+            sku,
+            name: newPack.name,
+            coins_amount: newPack.coins,
+            price_cents: Math.round(newPack.price_usd * 100),
+            currency: 'usd',
+            active: true,
+            display_order: coinPacks.length + 1,
+          })
+          .select()
+          .single();
+      }
 
-      setCoinPacks([...coinPacks, data]);
+      if (insertRes.error) throw insertRes.error;
+
       setNewPack({ name: '', coins: 100, price_usd: 1, bonus_coins: 0 });
+      await loadCoinPacks();
       alert('Coin pack added!');
     } catch (error) {
       console.error('Error adding coin pack:', error);
-      alert('Failed to add coin pack');
+      const msg = getErrorMessage(error);
+      setErrorMessage(msg);
+      alert(`Failed to add coin pack: ${msg}`);
     } finally {
       setActionLoading(false);
     }
@@ -263,8 +374,13 @@ export default function GiftsAdminPage() {
     if (!editingPack) return;
 
     setActionLoading(true);
+    setErrorMessage(null);
     try {
-      const { error } = await supabase
+      const byIdClause = typeof editingPack.db_id === 'number' && !Number.isNaN(editingPack.db_id);
+      const idValue = byIdClause ? editingPack.db_id : editingPack.id;
+      const idColumn = byIdClause ? 'id' : 'sku';
+
+      let updateRes = await supabase
         .from('coin_packs')
         .update({
           name: editingPack.name,
@@ -274,16 +390,34 @@ export default function GiftsAdminPage() {
           is_active: editingPack.is_active,
           is_popular: editingPack.is_popular,
         })
-        .eq('id', editingPack.id);
+        .eq(idColumn as any, idValue as any)
+        .select('*')
+        .single();
 
-      if (error) throw error;
+      if (updateRes.error && isMissingColumnError(updateRes.error)) {
+        updateRes = await supabase
+          .from('coin_packs')
+          .update({
+            name: editingPack.name,
+            coins_amount: editingPack.coins,
+            price_cents: Math.round(editingPack.price_usd * 100),
+            active: editingPack.is_active,
+          })
+          .eq(idColumn as any, idValue as any)
+          .select('*')
+          .single();
+      }
 
-      setCoinPacks(coinPacks.map(p => p.id === editingPack.id ? editingPack : p));
+      if (updateRes.error) throw updateRes.error;
+
+      await loadCoinPacks();
       setEditingPack(null);
       alert('Coin pack updated!');
     } catch (error) {
       console.error('Error updating coin pack:', error);
-      alert('Failed to update coin pack');
+      const msg = getErrorMessage(error);
+      setErrorMessage(msg);
+      alert(`Failed to update coin pack: ${msg}`);
     } finally {
       setActionLoading(false);
     }
@@ -293,19 +427,36 @@ export default function GiftsAdminPage() {
     if (!confirm('Are you sure you want to delete this coin pack?')) return;
 
     setActionLoading(true);
+    setErrorMessage(null);
     try {
-      const { error } = await supabase
+      const asNumber = Number(id);
+      const canUseNumericId = Number.isFinite(asNumber) && String(asNumber) === String(id);
+
+      let delRes = await supabase
         .from('coin_packs')
         .delete()
-        .eq('id', id);
+        .eq('id', canUseNumericId ? asNumber : id)
+        .select('id')
+        .single();
 
-      if (error) throw error;
+      if (delRes.error) {
+        delRes = await supabase
+          .from('coin_packs')
+          .delete()
+          .eq('sku', id)
+          .select('id')
+          .single();
+      }
 
-      setCoinPacks(coinPacks.filter(p => p.id !== id));
+      if (delRes.error) throw delRes.error;
+
+      await loadCoinPacks();
       alert('Coin pack deleted!');
     } catch (error) {
       console.error('Error deleting coin pack:', error);
-      alert('Failed to delete coin pack');
+      const msg = getErrorMessage(error);
+      setErrorMessage(msg);
+      alert(`Failed to delete coin pack: ${msg}`);
     } finally {
       setActionLoading(false);
     }
@@ -352,6 +503,12 @@ export default function GiftsAdminPage() {
             </div>
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+            {errorMessage}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-4 mb-6">

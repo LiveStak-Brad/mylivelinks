@@ -266,7 +266,7 @@ SET search_path = public;
 COMMENT ON FUNCTION finalize_coin_purchase IS 'Idempotent coin purchase finalization. Safe to call multiple times with same idempotency_key.';
 
 -- ============================================================================
--- 9. RPC: SEND GIFT (40% Platform Fee, 60% User Value)
+-- 9. RPC: SEND GIFT (1:1 coins->diamonds, no platform fee on gifts)
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION send_gift_v2(
@@ -329,9 +329,9 @@ BEGIN
         RAISE EXCEPTION 'Insufficient coin balance. Have: %, Need: %', v_sender_balance, p_coins_amount;
     END IF;
     
-    -- Calculate 40% fee, 60% user value
-    v_diamonds_awarded := FLOOR(p_coins_amount * 0.60);
-    v_platform_fee := p_coins_amount - v_diamonds_awarded;
+    -- Calculate gift value
+    v_diamonds_awarded := p_coins_amount;
+    v_platform_fee := 0;
     
     -- Insert gift record
     INSERT INTO gifts (
@@ -378,7 +378,6 @@ BEGIN
     UPDATE profiles
     SET earnings_balance = earnings_balance + v_diamonds_awarded,
         lifetime_diamonds_earned = COALESCE(lifetime_diamonds_earned, 0) + v_diamonds_awarded,
-        total_gifts_received = COALESCE(total_gifts_received, 0) + p_coins_amount,
         last_transaction_at = CURRENT_TIMESTAMP
     WHERE id = p_recipient_id;
     
@@ -393,7 +392,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;
 
-COMMENT ON FUNCTION send_gift_v2 IS 'Send gift: 40% platform fee, 60% diamonds to recipient. Returns gift details.';
+COMMENT ON FUNCTION send_gift_v2 IS 'Send gift: diamonds = coins (1:1), platform fee = 0. Returns gift details.';
 
 -- ============================================================================
 -- 10. RPC: REQUEST CASHOUT
@@ -507,7 +506,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;
 
-COMMENT ON FUNCTION request_cashout IS 'Request diamond cashout. Minimum 10,000 diamonds = $100. 100 diamonds = $1. NO additional fees at cashout (40% already taken at gift).';
+COMMENT ON FUNCTION request_cashout IS 'Request diamond cashout. Minimum 10,000 diamonds = $100. 100 diamonds = $1. NO additional fees at cashout.';
 
 -- ============================================================================
 -- 11. RPC: COMPLETE CASHOUT (Called after Stripe Transfer)

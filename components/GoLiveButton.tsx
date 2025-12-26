@@ -11,6 +11,7 @@ interface GoLiveButtonProps {
   onLiveStatusChange?: (isLive: boolean) => void;
   onPublishingChange?: (isPublishing: boolean) => void; // NEW: Report publishing state
   onGoLive?: (liveStreamId: number, profileId: string) => void;
+  publishAllowed?: boolean;
 }
 
 interface DeviceInfo {
@@ -18,7 +19,17 @@ interface DeviceInfo {
   label: string;
 }
 
-export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive }: GoLiveButtonProps) {
+// Source types for video input
+type VideoSourceType = 'camera' | 'screen';
+
+// Check if screen sharing is supported
+function isScreenShareSupported(): boolean {
+  return typeof navigator !== 'undefined' && 
+         'mediaDevices' in navigator && 
+         'getDisplayMedia' in navigator.mediaDevices;
+}
+
+export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, publishAllowed = true }: GoLiveButtonProps) {
   const [isLive, setIsLive] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +40,12 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
   const [previewVideoRef, setPreviewVideoRef] = useState<HTMLVideoElement | null>(null);
+  
+  // Screen share state
+  const [videoSourceType, setVideoSourceType] = useState<VideoSourceType>('camera');
+  const [showScreenShareModal, setShowScreenShareModal] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareSupported] = useState(() => isScreenShareSupported());
   const isLiveRef = useRef(false); // Track current state to prevent unnecessary updates
   const lastLiveStateRef = useRef<boolean | null>(null); // Track last state to prevent rapid changes
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Debounce state updates
@@ -279,21 +296,91 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     }
   };
 
+  // Handle starting screen share
+  const handleStartScreenShare = async () => {
+    try {
+      setPermissionError(null);
+      
+      // Request screen share
+      const displayMediaOptions: DisplayMediaStreamOptions = {
+        video: {
+          displaySurface: 'monitor',
+        } as MediaTrackConstraints,
+        audio: true, // Request system audio (may not be supported on all platforms)
+      };
+
+      const screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+      
+      // Stop current preview
+      stopPreview();
+      
+      // Set up screen share preview
+      setPreviewStream(screenStream);
+      setVideoSourceType('screen');
+      setIsScreenSharing(true);
+      setShowScreenShareModal(false);
+      
+      // Use a special device ID to indicate screen share
+      setSelectedVideoDevice('screen-share');
+      
+      // Attach to preview element
+      if (previewVideoRef) {
+        previewVideoRef.srcObject = screenStream;
+      }
+      
+      // Listen for when user stops screen share via browser UI
+      screenStream.getVideoTracks()[0].onended = () => {
+        console.log('Screen share ended by user');
+        setIsScreenSharing(false);
+        setVideoSourceType('camera');
+        setPreviewStream(null);
+        // Re-load camera devices
+        if (devices.video.length > 0) {
+          setSelectedVideoDevice(devices.video[0].deviceId);
+          startPreview(undefined, devices.video[0].deviceId, selectedAudioDevice);
+        }
+      };
+      
+    } catch (err: any) {
+      console.error('Error starting screen share:', err);
+      if (err.name === 'NotAllowedError') {
+        setPermissionError('Screen share was cancelled or denied. Please try again and select a screen to share.');
+      } else {
+        setPermissionError(err.message || 'Failed to start screen share');
+      }
+      setShowScreenShareModal(false);
+    }
+  };
+
+  // Handle switching back from screen share to camera
+  const handleSwitchToCamera = async () => {
+    stopPreview();
+    setIsScreenSharing(false);
+    setVideoSourceType('camera');
+    
+    if (devices.video.length > 0) {
+      setSelectedVideoDevice(devices.video[0].deviceId);
+      await startPreview(undefined, devices.video[0].deviceId, selectedAudioDevice);
+    }
+  };
+
   // Publisher enable logic: Go Live publishes immediately when room connected + devices ready
   // NOT tied to viewer counts, presence, is_published, or tile placement
   const shouldEnablePublisher = useMemo(() => {
     const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
     
     const hasRequiredDevices = !!(selectedVideoDevice && selectedAudioDevice && liveStreamId);
-    const enabled = !!(isLive && hasRequiredDevices && isRoomConnected && sharedRoom);
+    const enabled = !!(publishAllowed && isLive && hasRequiredDevices && isRoomConnected && sharedRoom);
     
     if (DEBUG_LIVEKIT) {
       console.log('[PUBLISH] Go Live enable check', {
         enabled,
+        publishAllowed,
         isLive,
         hasRequiredDevices,
         isRoomConnected,
         hasSharedRoom: !!sharedRoom,
+        isScreenSharing,
         selectedVideoDevice,
         selectedAudioDevice,
         liveStreamId,
@@ -301,15 +388,17 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       });
     }
     return enabled;
-  }, [isLive, selectedVideoDevice, selectedAudioDevice, liveStreamId, isRoomConnected, sharedRoom]);
+  }, [publishAllowed, isLive, selectedVideoDevice, selectedAudioDevice, liveStreamId, isRoomConnected, sharedRoom]);
   const [isPublishingState, setIsPublishingState] = useState(false);
   
   const { isPublishing, error, startPublishing, stopPublishing } = useLiveKitPublisher({
     room: sharedRoom || null,
     isRoomConnected,
     enabled: shouldEnablePublisher,
-    videoDeviceId: selectedVideoDevice,
+    videoDeviceId: videoSourceType === 'camera' ? selectedVideoDevice : undefined,
     audioDeviceId: selectedAudioDevice,
+    isScreenShare: videoSourceType === 'screen',
+    screenShareStream: videoSourceType === 'screen' ? previewStream : null,
     onPublished: () => {
       const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
       if (DEBUG_LIVEKIT) {
@@ -400,6 +489,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         setLiveStreamId(null);
         setSelectedVideoDevice('');
         setSelectedAudioDevice('');
+        setVideoSourceType('camera');
+        setIsScreenSharing(false);
         onLiveStatusChange?.(false);
 
         console.log('Stop live completed successfully');
@@ -411,6 +502,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         isLiveRef.current = false;
         setIsLive(false);
         setLiveStreamId(null);
+        setVideoSourceType('camera');
+        setIsScreenSharing(false);
       } finally {
         setLoading(false);
       }
@@ -446,6 +539,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     setLiveStreamId(null);
     setSelectedVideoDevice('');
     setSelectedAudioDevice('');
+    setVideoSourceType('camera');
+    setIsScreenSharing(false);
     onLiveStatusChange?.(false);
     
     // Close modal after a short delay so user can see the error
@@ -583,8 +678,13 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         selectedAudioDevice,
       });
 
-      // Try manual start immediately (hook might not trigger fast enough)
+      // Try manual start after a short delay (hook might not trigger fast enough)
+      // CRITICAL: Still respect publishAllowed so layout commits before publishing.
       setTimeout(async () => {
+        if (!publishAllowed) {
+          console.log('[PUBLISH] Manual start blocked: publishAllowed=false (waiting for layout)');
+          return;
+        }
         try {
           console.log('Attempting manual start...');
           await startPublishing();
@@ -626,6 +726,9 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       >
         {loading ? (
           <><span className="hidden lg:inline">Loading...</span><span className="lg:hidden">⏳</span></>
+        ) : isLive && (isPublishing || isPublishingState) && isScreenSharing ? (
+          // Show screen share indicator when live with screen share
+          <><span className="hidden lg:inline">🖥️ SCREEN LIVE</span><span className="lg:hidden">🖥️</span></>
         ) : isLive && (isPublishing || isPublishingState) ? (
           // Only show "LIVE" when both isLive AND isPublishing are true
           <><span className="hidden lg:inline">🔴 LIVE</span><span className="lg:hidden">🔴</span></>
@@ -651,8 +754,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
             )}
 
             <div className="space-y-4">
-              {/* Camera Preview */}
-              <div className="w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', minHeight: '200px' }}>
+              {/* Preview */}
+              <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', minHeight: '200px' }}>
                 <video
                   ref={(el) => {
                     setPreviewVideoRef(el);
@@ -671,25 +774,104 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
                     Camera preview will appear here
                   </div>
                 )}
+                
+                {/* Screen Share Badge & Controls */}
+                {isScreenSharing && previewStream && (
+                  <div className="absolute top-2 left-2 right-2 flex justify-between items-start">
+                    <div className="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2 animate-pulse">
+                      <span>🖥️</span>
+                      <span>Sharing Screen</span>
+                    </div>
+                    <button
+                      onClick={handleSwitchToCamera}
+                      className="bg-black/60 hover:bg-black/80 text-white px-3 py-1 rounded-lg text-sm transition flex items-center gap-1"
+                    >
+                      <span>📷</span>
+                      <span className="hidden sm:inline">Switch to Camera</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* Camera Selection */}
+              {/* Video Source Selection */}
               <div>
-                <label className="block text-sm font-medium mb-2">Camera</label>
-                <select
-                  value={selectedVideoDevice}
-                  onChange={(e) => {
-                    setSelectedVideoDevice(e.target.value);
-                    startPreview(undefined, e.target.value, selectedAudioDevice);
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                >
-                  {devices.video.map((device) => (
-                    <option key={device.deviceId} value={device.deviceId}>
-                      {device.label}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium mb-2">Video Source</label>
+                <div className="space-y-2">
+                  {/* Camera options */}
+                  {devices.video.map((device, index) => {
+                    const isFrontCamera = device.label.toLowerCase().includes('front') || 
+                                          device.label.toLowerCase().includes('user') ||
+                                          device.label.toLowerCase().includes('facetime') ||
+                                          (index === 0 && devices.video.length > 1);
+                    const isBackCamera = device.label.toLowerCase().includes('back') || 
+                                         device.label.toLowerCase().includes('environment') ||
+                                         device.label.toLowerCase().includes('rear') ||
+                                         (index === 1 && devices.video.length > 1);
+                    
+                    let displayLabel = device.label;
+                    if (isFrontCamera && !device.label.toLowerCase().includes('front')) {
+                      displayLabel = `📷 Front Camera${device.label ? ` (${device.label})` : ''}`;
+                    } else if (isBackCamera && !device.label.toLowerCase().includes('back')) {
+                      displayLabel = `📸 Back Camera${device.label ? ` (${device.label})` : ''}`;
+                    } else {
+                      displayLabel = `📹 ${device.label}`;
+                    }
+                    
+                    return (
+                      <button
+                        key={device.deviceId}
+                        onClick={() => {
+                          setVideoSourceType('camera');
+                          setSelectedVideoDevice(device.deviceId);
+                          setIsScreenSharing(false);
+                          startPreview(undefined, device.deviceId, selectedAudioDevice);
+                        }}
+                        className={`w-full px-4 py-3 text-left rounded-lg border-2 transition ${
+                          videoSourceType === 'camera' && selectedVideoDevice === device.deviceId
+                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                        }`}
+                      >
+                        <span className="font-medium">{displayLabel}</span>
+                      </button>
+                    );
+                  })}
+                  
+                  {/* Screen Share / Game Screen option */}
+                  <button
+                    onClick={() => {
+                      if (!screenShareSupported) {
+                        setPermissionError("Screen sharing isn't supported on this browser/device yet. Use the mobile app or desktop Chrome/Firefox/Edge.");
+                        return;
+                      }
+                      setShowScreenShareModal(true);
+                    }}
+                    className={`w-full px-4 py-3 text-left rounded-lg border-2 transition ${
+                      videoSourceType === 'screen'
+                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                        : screenShareSupported
+                          ? 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                          : 'border-gray-200 dark:border-gray-700 opacity-50 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium">🎮 Game Screen</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">(Screen Share)</span>
+                      </div>
+                      {!screenShareSupported && (
+                        <span className="text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-2 py-1 rounded">
+                          Not Supported
+                        </span>
+                      )}
+                      {videoSourceType === 'screen' && isScreenSharing && (
+                        <span className="text-xs bg-purple-500 text-white px-2 py-1 rounded animate-pulse">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                </div>
               </div>
 
               {/* Microphone Selection */}
@@ -721,16 +903,77 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
               </button>
               <button
                 onClick={handleStartLive}
-                disabled={!selectedVideoDevice || !selectedAudioDevice || loading}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={(videoSourceType === 'camera' ? !selectedVideoDevice : !isScreenSharing) || !selectedAudioDevice || loading}
+                className={`flex-1 px-4 py-2 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                  videoSourceType === 'screen' 
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'
+                    : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
+                }`}
               >
-                {loading ? 'Starting...' : 'Start Live'}
+                {loading ? 'Starting...' : videoSourceType === 'screen' ? '🖥️ Go Live with Screen' : 'Start Live'}
               </button>
               {error && (
                 <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-sm">
                   Error: {error.message}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Screen Share Confirmation Modal */}
+      {showScreenShareModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]" onClick={() => setShowScreenShareModal(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 m-4" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">🎮</span>
+              </div>
+              <h2 className="text-xl font-bold mb-2">Share Your Screen</h2>
+              <p className="text-gray-600 dark:text-gray-400">Stream your game or app to viewers</p>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+              <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <span className="text-xl">📺</span>
+                <div>
+                  <p className="font-medium text-sm">Screen & Audio Sharing</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Your screen and system audio will be shared (if supported)</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <span className="text-xl">🎮</span>
+                <div>
+                  <p className="font-medium text-sm">Best for Mobile Games</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Perfect for streaming gameplay from your device</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <p className="font-medium text-sm">Privacy Notice</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Notifications and personal info may be visible to viewers</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowScreenShareModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStartScreenShare}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg hover:from-purple-600 hover:to-pink-700 transition font-medium flex items-center justify-center gap-2"
+              >
+                <span>🖥️</span>
+                Start Screen Share
+              </button>
             </div>
           </div>
         </div>

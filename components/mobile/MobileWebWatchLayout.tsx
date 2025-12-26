@@ -118,13 +118,14 @@ export default function MobileWebWatchLayout({
   // Extend gridSlots to fill all slots (showing empty placeholders)
   const displaySlots: GridSlot[] = [];
   for (let i = 0; i < totalSlots; i++) {
-    const existingSlot = gridSlots.find(s => s.slotIndex === i);
+    const slotIndex = i + 1;
+    const existingSlot = gridSlots.find(s => s.slotIndex === slotIndex);
     if (existingSlot) {
       displaySlots.push(existingSlot);
     } else {
       // Create empty placeholder slot
       displaySlots.push({
-        slotIndex: i,
+        slotIndex: slotIndex,
         streamer: null,
         isPinned: false,
         isMuted: false,
@@ -259,7 +260,7 @@ export default function MobileWebWatchLayout({
       <div className="flex-1 flex items-center justify-center overflow-hidden pt-12 pb-16">
         {/* Focus Mode - Single tile maximized */}
         {focusedSlotIndex !== null && focusedSlot?.streamer ? (
-          <div className="w-full h-full relative">
+          <div className="w-full h-full relative" key={`${focusedSlot.slotIndex}:${focusedSlot.streamer.profile_id}`}>
             <Tile
               streamerId={focusedSlot.streamer.profile_id}
               streamerUsername={focusedSlot.streamer.username}
@@ -269,58 +270,23 @@ export default function MobileWebWatchLayout({
               gifterLevel={focusedSlot.streamer.gifter_level}
               gifterStatus={focusedSlot.streamer.gifter_status}
               slotIndex={focusedSlot.slotIndex}
-              liveStreamId={focusedSlot.streamer.id && focusedSlot.streamer.live_available 
-                ? (() => {
-                    const idStr = focusedSlot.streamer.id.toString();
-                    if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) return undefined;
-                    const parsed = parseInt(idStr);
-                    return parsed > 0 ? parsed : undefined;
-                  })()
-                : undefined
-              }
+              liveStreamId={focusedSlot.streamer.id && focusedSlot.streamer.live_available ? (() => {
+                const idStr = focusedSlot.streamer.id.toString();
+                if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) return undefined;
+                const parsed = parseInt(idStr);
+                return parsed > 0 ? parsed : undefined;
+              })() : undefined}
               sharedRoom={sharedRoom}
               isRoomConnected={isRoomConnected}
               isCurrentUserPublishing={isCurrentUserPublishing}
               onClose={() => onCloseTile(focusedSlot.slotIndex)}
               onMute={() => onMuteTile(focusedSlot.slotIndex)}
-              isMuted={globalMuted || focusedSlot.isMuted}
+              isMuted={focusedSlot.isMuted || globalMuted}
               volume={focusedSlot.volume}
-              onVolumeChange={(vol) => onVolumeChange(focusedSlot.slotIndex, vol)}
+              onVolumeChange={(volume) => onVolumeChange(focusedSlot.slotIndex, volume)}
               isFullscreen={true}
               onExitFullscreen={handleExitFocus}
             />
-            
-            {/* Mini thumbnails of other active streams at bottom */}
-            {activeSlots.length > 1 && (
-              <div className="absolute bottom-2 left-2 right-2 flex gap-1 overflow-x-auto pb-1 scrollbar-hidden">
-                {activeSlots
-                  .filter(s => s.slotIndex !== focusedSlotIndex)
-                  .slice(0, 6)
-                  .map((slot) => (
-                    <button
-                      key={slot.slotIndex}
-                      onClick={() => handleTileTap(slot.slotIndex, true)}
-                      className="flex-shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 border-white/30 hover:border-white/60 transition relative bg-gray-900"
-                    >
-                      {/* Mini preview - show avatar or placeholder */}
-                      {slot.streamer?.avatar_url ? (
-                        <img
-                          src={slot.streamer.avatar_url}
-                          alt={slot.streamer.username}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white/50 text-xs font-bold">
-                          {slot.streamer?.username?.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center truncate px-1">
-                        {slot.streamer?.username}
-                      </div>
-                    </button>
-                  ))}
-              </div>
-            )}
           </div>
         ) : (
           /* Grid Mode - Always show full grid */
@@ -331,16 +297,21 @@ export default function MobileWebWatchLayout({
               gridTemplateRows: `repeat(${gridRows}, 1fr)`,
             }}
           >
-            {displaySlots.map((slot) => {
+            {displaySlots.map((slot, index) => {
               const hasStreamer = slot.streamer?.live_available;
               
+              const occupantKey = slot.streamer?.profile_id || 'empty';
               return (
                 <div
-                  key={slot.slotIndex}
+                  key={`${slot.slotIndex}:${occupantKey}`}
                   className={`relative rounded-lg overflow-hidden ${
                     hasStreamer 
                       ? 'cursor-pointer' 
-                      : 'bg-gray-900/50 border border-dashed border-gray-700'
+                      : 'cursor-default'
+                  } ${
+                    focusedSlotIndex === slot.slotIndex 
+                      ? 'ring-2 ring-blue-500' 
+                      : ''
                   }`}
                   onClick={() => hasStreamer && handleTileTap(slot.slotIndex, true)}
                 >

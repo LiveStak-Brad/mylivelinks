@@ -70,6 +70,10 @@ export default function LiveRoom() {
       volume: 0.5,
     }))
   );
+  const gridSlotsRef = useRef<GridSlot[]>(gridSlots);
+  useEffect(() => {
+    gridSlotsRef.current = gridSlots;
+  }, [gridSlots]);
   const [liveStreamers, setLiveStreamers] = useState<LiveStreamer[]>([]);
   const liveStreamersRef = useRef<LiveStreamer[]>([]); // Track current streamers to prevent clearing
   
@@ -97,6 +101,10 @@ export default function LiveRoom() {
   const [selectedSlotForReplacement, setSelectedSlotForReplacement] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCurrentUserPublishing, setIsCurrentUserPublishing] = useState(false); // Track if current user is publishing
+  const [layoutVersion, setLayoutVersion] = useState<number>(0);
+  const [pendingSlot1Insert, setPendingSlot1Insert] = useState<LiveStreamer | null>(null);
+  const [pendingPublish, setPendingPublish] = useState<boolean>(false);
+  const [publishAllowed, setPublishAllowed] = useState<boolean>(true);
   const [roomPresenceCountMinusSelf, setRoomPresenceCountMinusSelf] = useState<number>(0); // Room-demand: count of others in room
   const closedStreamersRef = useRef<Set<string>>(new Set()); // Streamers closed by viewer (do not auto-refill)
   
@@ -851,13 +859,6 @@ export default function LiveRoom() {
     setLoading(false);
     setGridSlots(initialSlots);
   }, []);
-
-  // Ensure current user stays in slot 1 when live
-  // Use ref to prevent infinite loops from gridSlots dependency
-  const gridSlotsRef = useRef<GridSlot[]>(gridSlots);
-  useEffect(() => {
-    gridSlotsRef.current = gridSlots;
-  }, [gridSlots]);
 
   useEffect(() => {
     if (!currentUserId || authDisabled) return;
@@ -1998,14 +1999,115 @@ export default function LiveRoom() {
         }
       });
 
-      // Immediately add to slot 1
-      addUserToSlot1(ownStream);
+      setPublishAllowed(false);
+
+      const currentSlots = [...gridSlotsRef.current];
+      const slot1Index = currentSlots.findIndex(s => s.slotIndex === 1);
+      const oldUserSlotIndex = currentSlots.findIndex(s => s.streamer?.profile_id === ownStream.profile_id);
+
+      if (oldUserSlotIndex !== -1 && oldUserSlotIndex !== slot1Index) {
+        currentSlots[oldUserSlotIndex] = {
+          ...currentSlots[oldUserSlotIndex],
+          streamer: null,
+          isEmpty: true,
+        };
+      }
+
+      if (slot1Index !== -1) {
+        const displacedStreamer = currentSlots[slot1Index].streamer;
+        if (displacedStreamer && displacedStreamer.profile_id !== ownStream.profile_id) {
+          let targetSlotIndex = -1;
+
+          if (oldUserSlotIndex !== -1 && oldUserSlotIndex !== slot1Index) {
+            targetSlotIndex = oldUserSlotIndex;
+          } else {
+            targetSlotIndex = currentSlots.findIndex(s => s.isEmpty && s.slotIndex !== 1);
+
+            if (targetSlotIndex === -1) {
+              for (let i = currentSlots.length - 1; i >= 0; i--) {
+                if (currentSlots[i].slotIndex !== 1 && currentSlots[i].streamer) {
+                  targetSlotIndex = i;
+                  break;
+                }
+              }
+
+              if (targetSlotIndex === -1) {
+                targetSlotIndex = currentSlots.findIndex(s => s.slotIndex === 12);
+              }
+            }
+          }
+
+          if (targetSlotIndex !== -1) {
+            currentSlots[targetSlotIndex] = {
+              ...currentSlots[targetSlotIndex],
+              streamer: displacedStreamer,
+              isEmpty: false,
+            };
+          } else {
+            console.warn('Could not find slot for displaced streamer:', displacedStreamer?.username);
+          }
+
+          currentSlots[slot1Index] = {
+            ...currentSlots[slot1Index],
+            streamer: null,
+            isEmpty: true,
+            isPinned: false,
+          };
+        }
+      }
+
+      setGridSlots(currentSlots);
+      saveGridLayout(currentSlots);
+      setPendingSlot1Insert(ownStream);
+      setLayoutVersion(v => v + 1);
       
       console.log('User added to slot 1:', ownStream);
     } catch (error) {
       console.error('Error adding user to grid:', error);
     }
   };
+
+  useEffect(() => {
+    if (!pendingSlot1Insert) return;
+
+    requestAnimationFrame(() => {
+      const currentSlots = [...gridSlotsRef.current];
+      const slot1Index = currentSlots.findIndex(s => s.slotIndex === 1);
+
+      const userSlotIndex = currentSlots.findIndex(s => s.streamer?.profile_id === pendingSlot1Insert.profile_id);
+      if (userSlotIndex !== -1 && userSlotIndex !== slot1Index) {
+        currentSlots[userSlotIndex] = {
+          ...currentSlots[userSlotIndex],
+          streamer: null,
+          isEmpty: true,
+        };
+      }
+
+      if (slot1Index !== -1) {
+        currentSlots[slot1Index] = {
+          ...currentSlots[slot1Index],
+          streamer: pendingSlot1Insert,
+          isEmpty: false,
+          isPinned: false,
+        };
+      }
+
+      setGridSlots(currentSlots);
+      saveGridLayout(currentSlots);
+      setPendingSlot1Insert(null);
+      setPendingPublish(true);
+      setLayoutVersion(v => v + 1);
+    });
+  }, [layoutVersion, pendingSlot1Insert, saveGridLayout]);
+
+  useEffect(() => {
+    if (!pendingPublish) return;
+
+    requestAnimationFrame(() => {
+      setPublishAllowed(true);
+      setPendingPublish(false);
+    });
+  }, [layoutVersion, pendingPublish]);
 
   const addUserToSlot1 = (streamer: LiveStreamer) => {
     console.log('[DEBUG] addUserToSlot1 called with:', {
@@ -2667,6 +2769,7 @@ export default function LiveRoom() {
               isRoomConnected={isRoomConnected} 
               onGoLive={handleGoLive}
               onPublishingChange={setIsCurrentUserPublishing}
+              publishAllowed={publishAllowed}
             />
             <button
               onClick={handleUnmuteAll}
@@ -2699,6 +2802,7 @@ export default function LiveRoom() {
             <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden bg-black">
               <div className="relative w-full h-full flex items-center justify-center">
                 <Tile
+                  key={`${expandedSlot.slotIndex}:${expandedSlot.streamer.profile_id}`}
                   streamerId={expandedSlot.streamer.profile_id}
                   streamerUsername={expandedSlot.streamer.username}
                   streamerAvatar={expandedSlot.streamer.avatar_url}
@@ -2878,9 +2982,17 @@ export default function LiveRoom() {
                         }
                       
                         try {
+                          const profileIdValue = (slot as any)?.streamer?.profile_id;
+                          let occupantKey = 'empty';
+                          if (typeof profileIdValue === 'string' && profileIdValue.length > 0) {
+                            occupantKey = profileIdValue;
+                          } else if (Array.isArray(profileIdValue) && profileIdValue.length > 0 && profileIdValue[0] != null) {
+                            occupantKey = String(profileIdValue[0]);
+                          }
+
                           return (
                           <div
-                            key={slot.slotIndex}
+                            key={`${slot.slotIndex}:${occupantKey}`}
                         draggable={!slot.isEmpty && volumeSliderOpenSlot !== slot.slotIndex}
                         onDragStart={() => {
                           if (volumeSliderOpenSlot !== slot.slotIndex) {

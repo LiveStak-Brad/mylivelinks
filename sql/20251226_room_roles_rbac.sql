@@ -49,7 +49,8 @@ RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, row_security = off
+SET search_path = public
+SET row_security = off
 AS $$
   SELECT
     EXISTS (SELECT 1 FROM public.app_roles ar WHERE ar.profile_id = p_profile_id AND ar.role = 'owner')
@@ -61,7 +62,8 @@ RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, row_security = off
+SET search_path = public
+SET row_security = off
 AS $$
   SELECT
     public.is_owner(p_profile_id)
@@ -74,7 +76,8 @@ RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, row_security = off
+SET search_path = public
+SET row_security = off
 AS $$
   SELECT public.is_app_admin(uid);
 $$;
@@ -84,7 +87,8 @@ RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, row_security = off
+SET search_path = public
+SET row_security = off
 AS $$
   SELECT
     public.is_app_admin(p_profile_id)
@@ -101,7 +105,8 @@ RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, row_security = off
+SET search_path = public
+SET row_security = off
 AS $$
   SELECT
     public.is_room_admin(p_profile_id, p_room_id)
@@ -118,7 +123,8 @@ RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, row_security = off
+SET search_path = public
+SET row_security = off
 AS $$
   SELECT public.is_room_admin(p_profile_id, p_room_id);
 $$;
@@ -128,7 +134,8 @@ RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public, row_security = off
+SET search_path = public
+SET row_security = off
 AS $$
   SELECT public.is_room_admin(p_grantor, p_room_id);
 $$;

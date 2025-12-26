@@ -10,7 +10,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  * Body: { toUserId: string, coinsAmount: number, streamId?: number }
  * Returns: { success: boolean, giftId: number, diamondsAwarded: number }
  * 
- * IMPORTANT: 40% platform fee, 60% diamonds to recipient
+ * IMPORTANT: Gifts award diamonds 1:1 with coins spent (no platform fee on gifts)
  */
 export async function POST(request: NextRequest) {
   let requestId = crypto.randomUUID();
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       streamId,
     });
 
-    // Call RPC function (40% fee, 60% diamonds)
+    // Call RPC function (gifts are 1:1 coins->diamonds)
     const { data, error: rpcError } = await adminSupabase.rpc('send_gift_v2', {
       p_sender_id: user.id,
       p_recipient_id: toUserId,
@@ -146,6 +146,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

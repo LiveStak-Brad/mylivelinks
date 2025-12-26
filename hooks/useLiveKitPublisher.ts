@@ -10,6 +10,8 @@ interface UseLiveKitPublisherOptions {
   enabled?: boolean;
   videoDeviceId?: string;
   audioDeviceId?: string;
+  isScreenShare?: boolean; // Whether to use screen share instead of camera
+  screenShareStream?: MediaStream | null; // Pre-captured screen share stream
   onPublished?: () => void;
   onUnpublished?: () => void;
   onError?: (error: Error) => void;
@@ -21,6 +23,8 @@ export function useLiveKitPublisher({
   enabled = false,
   videoDeviceId,
   audioDeviceId,
+  isScreenShare = false,
+  screenShareStream = null,
   onPublished,
   onUnpublished,
   onError,
@@ -156,24 +160,60 @@ export function useLiveKitPublisher({
         roomState: room.state,
       });
 
-      const trackOptions: any = {
-        audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
-        video: videoDeviceId 
-          ? { 
-              deviceId: { exact: videoDeviceId },
-              width: 1280,
-              height: 720,
-            }
-          : {
-              facingMode: 'user',
-              width: 1280,
-              height: 720,
-            },
-      };
+      let tracks: LocalTrack[];
 
-      console.log('Requesting tracks...');
-      const tracks = await createTracks(trackOptions);
-      console.log('Tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
+      if (isScreenShare && screenShareStream) {
+        // Use screen share stream
+        console.log('Using screen share stream...');
+        const { LocalVideoTrack, LocalAudioTrack } = await import('livekit-client');
+        
+        const videoTrack = screenShareStream.getVideoTracks()[0];
+        const audioTrack = screenShareStream.getAudioTracks()[0];
+        
+        tracks = [];
+        
+        if (videoTrack) {
+          // Create a LocalVideoTrack from the screen share video track
+          const localVideoTrack = new LocalVideoTrack(videoTrack, undefined, false);
+          tracks.push(localVideoTrack);
+        }
+        
+        if (audioTrack) {
+          // If screen share has audio, use it
+          const localAudioTrack = new LocalAudioTrack(audioTrack, undefined, false);
+          tracks.push(localAudioTrack);
+        } else if (audioDeviceId) {
+          // Fallback to microphone for audio
+          console.log('Screen share has no audio, using microphone...');
+          const audioTracks = await createTracks({
+            audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
+            video: false,
+          });
+          tracks.push(...audioTracks);
+        }
+        
+        console.log('Screen share tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
+      } else {
+        // Use camera
+        const trackOptions: any = {
+          audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
+          video: videoDeviceId 
+            ? { 
+                deviceId: { exact: videoDeviceId },
+                width: 1280,
+                height: 720,
+              }
+            : {
+                facingMode: 'user',
+                width: 1280,
+                height: 720,
+              },
+        };
+
+        console.log('Requesting camera tracks...');
+        tracks = await createTracks(trackOptions);
+        console.log('Camera tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
+      }
 
       tracksRef.current = tracks;
       
@@ -310,7 +350,7 @@ export function useLiveKitPublisher({
         onError(err);
       }
     }
-  }, [room, isRoomConnected, videoDeviceId, audioDeviceId, onPublished, onError]);
+  }, [room, isRoomConnected, videoDeviceId, audioDeviceId, isScreenShare, screenShareStream, onPublished, onError]);
 
   // Stop publishing (unpublishes tracks but does NOT disconnect room)
   // CRITICAL: This should ONLY be called from explicit user actions:

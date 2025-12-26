@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Sparkles, TrendingUp, Gift, Crown } from 'lucide-react';
 import {
@@ -13,6 +13,8 @@ import {
   GifterTier,
   formatCoinAmount,
 } from '@/components/gifter';
+import { createClient } from '@/lib/supabase';
+import { LIVE_LAUNCH_ENABLED, isLiveOwnerUser } from '@/lib/livekit-constants';
 
 /**
  * Gifter Levels - Public explainer page
@@ -22,6 +24,15 @@ import {
 export default function GifterLevelsPage() {
   const [demoStatus] = useState<GifterStatus>(MOCK_GIFTER_STATUS_VIP);
   const [selectedTier, setSelectedTier] = useState<GifterTier | null>(null);
+  const [canOpenLive, setCanOpenLive] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCanOpenLive(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user?.id, email: user?.email }));
+    })();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/30">
@@ -275,12 +286,21 @@ export default function GifterLevelsPage() {
             >
               Get Coins
             </Link>
-            <Link
-              href="/live"
-              className="px-6 py-3 rounded-xl bg-muted text-foreground font-medium hover:bg-muted/80 transition-colors"
-            >
-              Browse Live Streams
-            </Link>
+            {canOpenLive ? (
+              <Link
+                href="/live"
+                className="px-6 py-3 rounded-xl bg-muted text-foreground font-medium hover:bg-muted/80 transition-colors"
+              >
+                Browse Live Streams
+              </Link>
+            ) : (
+              <div
+                className="px-6 py-3 rounded-xl bg-muted text-foreground font-medium opacity-60 cursor-not-allowed"
+                title="Live streaming coming soon"
+              >
+                Browse Live Streams
+              </div>
+            )}
           </div>
         </div>
       </div>

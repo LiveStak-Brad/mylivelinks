@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase';
+import { LIVE_LAUNCH_ENABLED, isLiveOwnerUser } from '@/lib/livekit-constants';
 
 interface ProfileBannerProps {
   profileId: string;
@@ -33,11 +35,20 @@ export default function ProfileBanner({
   const [mounted, setMounted] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [bannerSrc, setBannerSrc] = useState<string>('');
+  const [canOpenLive, setCanOpenLive] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     setIsDark(resolvedTheme === 'dark');
   }, [resolvedTheme]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCanOpenLive(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user?.id, email: user?.email }));
+    })();
+  }, []);
 
   useEffect(() => {
     if (!mounted) return;
@@ -68,6 +79,7 @@ export default function ProfileBanner({
   }, [mounted, isDark, username]);
 
   const handleBannerClick = () => {
+    if (!canOpenLive) return;
     if (isLive && liveStreamId) {
       // Navigate to live stream
       router.push(`/live?stream=${liveStreamId}`);
@@ -116,7 +128,7 @@ export default function ProfileBanner({
 
   return (
     <div
-      className={`relative w-full cursor-pointer group overflow-hidden ${className}`}
+      className={`relative w-full group overflow-hidden ${className} ${canOpenLive ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'}`}
       style={{ height }}
       onClick={handleBannerClick}
       role="button"
@@ -163,7 +175,7 @@ export default function ProfileBanner({
             </p>
           ) : (
             <p className="text-sm opacity-90">
-              Click to go to live room →
+              {canOpenLive ? 'Click to go to live room →' : 'Live streaming coming soon'}
             </p>
           )}
         </div>

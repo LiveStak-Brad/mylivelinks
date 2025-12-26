@@ -8,12 +8,14 @@ import Link from 'next/link';
 import { Search, Video, Users, TrendingUp, Link2 } from 'lucide-react';
 import ProfileCarousel from '@/components/ProfileCarousel';
 import { RoomsCarousel } from '@/components/rooms';
+import { LIVE_LAUNCH_ENABLED, isLiveOwnerUser } from '@/lib/livekit-constants';
 
 export default function LandingPage() {
   const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [canOpenLive, setCanOpenLive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
@@ -46,11 +48,14 @@ export default function LandingPage() {
             gifter_level: 0
           });
         // Show homepage anyway - user can complete onboarding later
+        setCanOpenLive(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user.id, email: user.email }));
         setCurrentUser({ id: user.id, email: user.email });
         setLoading(false);
         return;
       }
       
+      setCanOpenLive(!!(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user.id, email: user.email })));
+
       // Always show homepage for logged-in users
       // (Even if profile is incomplete - they can access onboarding from menu)
       setCurrentUser(profile || { id: user.id, email: user.email });
@@ -269,12 +274,21 @@ export default function LandingPage() {
                   Complete Your Profile
                 </Link>
               )}
-              <Link
-                href="/live"
-                className="px-8 py-4 bg-card border-2 border-primary text-primary font-semibold rounded-xl hover:bg-primary/10 transition"
-              >
-                Browse Live Streams
-              </Link>
+              {canOpenLive ? (
+                <Link
+                  href="/live"
+                  className="px-8 py-4 bg-card border-2 border-primary text-primary font-semibold rounded-xl hover:bg-primary/10 transition"
+                >
+                  Browse Live Streams
+                </Link>
+              ) : (
+                <div
+                  className="px-8 py-4 bg-card border-2 border-border text-muted-foreground font-semibold rounded-xl opacity-60 cursor-not-allowed"
+                  title="Live streaming coming soon"
+                >
+                  Browse Live Streams
+                </div>
+              )}
             </div>
           </div>
         </div>

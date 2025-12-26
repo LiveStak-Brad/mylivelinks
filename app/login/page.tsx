@@ -16,6 +16,18 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const supabase = createClient();
 
+  const withTimeout = async <T = any,>(p: Promise<T>, ms: number, label: string): Promise<T> => {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+    });
+    try {
+      return await Promise.race([p, timeoutPromise]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  };
+
   useEffect(() => {
     // Check if already logged in
     supabase.auth.getUser().then(async ({ data: { user } }: { data: { user: any } }) => {
@@ -74,16 +86,20 @@ export default function LoginPage() {
         }
 
         // Sign up - with auto-confirm since auth is disabled on Supabase
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/settings/profile`,
-            data: {
-              username: username.toLowerCase(),
+        const { data, error: signUpError } = await withTimeout(
+          supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/settings/profile`,
+              data: {
+                username: username.toLowerCase(),
+              },
             },
-          },
-        });
+          }),
+          10000,
+          'Sign up'
+        );
 
         if (signUpError) throw signUpError;
 
@@ -93,10 +109,14 @@ export default function LoginPage() {
           
           // IMPORTANT: Sign in FIRST before creating profile (RLS requires auth.uid() = id)
           // Since auth is disabled, user should be auto-confirmed, but we need to establish session
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
+          const { error: signInError } = await withTimeout(
+            supabase.auth.signInWithPassword({
+              email,
+              password,
+            }),
+            10000,
+            'Auto sign-in'
+          );
 
           if (signInError) {
             console.error('Auto-login error:', signInError);
@@ -135,10 +155,14 @@ export default function LoginPage() {
         }
       } else {
         // Sign in
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { data, error: signInError } = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+          }),
+          10000,
+          'Sign in'
+        );
 
         if (signInError) throw signInError;
 
@@ -147,11 +171,31 @@ export default function LoginPage() {
           localStorage.removeItem('mock_user');
           
           // Check if profile is complete
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username, date_of_birth')
-            .eq('id', data.user.id)
-            .single();
+          const { data: profile, error: profileError } = await withTimeout(
+            supabase
+              .from('profiles')
+              .select('username, date_of_birth')
+              .eq('id', data.user.id)
+              .maybeSingle(),
+            10000,
+            'Loading profile'
+          );
+
+          if (!profile && !profileError) {
+            await withTimeout(
+              supabase
+                .from('profiles')
+                .insert({
+                  id: data.user.id,
+                  username: null,
+                  coin_balance: 0,
+                  earnings_balance: 0,
+                  gifter_level: 0,
+                }),
+              10000,
+              'Creating profile'
+            );
+          }
           
           if (profile?.username && profile?.date_of_birth) {
             // Profile complete, redirect to return URL or user's own profile

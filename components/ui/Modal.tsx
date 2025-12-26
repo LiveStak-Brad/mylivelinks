@@ -126,3 +126,4 @@ function ModalFooter({ className = '', children }: { className?: string; childre
 
 export { Modal, ModalHeader, ModalBody, ModalFooter };
 
+

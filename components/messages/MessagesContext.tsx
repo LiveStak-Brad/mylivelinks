@@ -65,6 +65,27 @@ type InstantMessageRow = {
   read_at: string | null;
 };
 
+type ProfileRow = {
+  id: string;
+  username?: string | null;
+  avatar_url?: string | null;
+  display_name?: string | null;
+};
+
+type IMConversationRow = {
+  other_user_id: string;
+  other_username?: string | null;
+  other_avatar_url?: string | null;
+  last_message?: string | null;
+  last_message_at?: string | null;
+  unread_count?: number | string | null;
+};
+
+type InsertIdRow = {
+  id: string | number;
+  created_at?: string | null;
+};
+
 function decodeIMContent(
   content: string
 ):
@@ -191,6 +212,9 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         .limit(200);
       if (error || !data) return [];
 
+      const rows = (Array.isArray(data) ? (data as unknown as InstantMessageRow[]) : [])
+        .filter((r) => r && typeof (r as InstantMessageRow).sender_id === 'string');
+
       const otherUserIds: string[] = [];
       const convoByOther = new Map<
         string,
@@ -201,7 +225,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         }
       >();
 
-      for (const row of data as any[]) {
+      for (const row of rows) {
         const senderId = String(row.sender_id);
         const recipientId = String(row.recipient_id);
         const otherId = senderId === currentUserId ? recipientId : senderId;
@@ -212,7 +236,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
               ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
               : decoded.type === 'image'
                 ? 'Sent a photo 📷'
-              : (decoded as any).text;
+              : decoded.text;
           convoByOther.set(otherId, {
             last_message: String(lastMessageText ?? ''),
             last_message_at: String(row.created_at),
@@ -231,8 +255,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             .from('profiles')
             .select('id, username, avatar_url, display_name')
             .in('id', otherUserIds)
-        : { data: [] as any[] };
-      const profileById = new Map<string, any>();
+        : { data: [] as ProfileRow[] };
+      const profileById = new Map<string, ProfileRow>();
       for (const p of Array.isArray(profiles) ? profiles : []) {
         if (p?.id) profileById.set(String(p.id), p);
       }
@@ -286,8 +310,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const rows = Array.isArray(data) ? data : [];
-      const otherUserIds = rows.map((r: any) => String(r.other_user_id)).filter(Boolean);
+      const rows = Array.isArray(data) ? (data as unknown as IMConversationRow[]) : [];
+      const otherUserIds = rows.map((r) => String(r.other_user_id)).filter(Boolean);
       const onlineMap = await loadOnlineMap(otherUserIds);
 
       const { data: profiles } = otherUserIds.length
@@ -295,13 +319,13 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             .from('profiles')
             .select('id, display_name')
             .in('id', otherUserIds)
-        : { data: [] as any[] };
+        : { data: [] as Array<{ id: string; display_name?: string | null }> };
       const displayNameById = new Map<string, string>();
       for (const p of Array.isArray(profiles) ? profiles : []) {
         if (p?.id && p?.display_name) displayNameById.set(String(p.id), String(p.display_name));
       }
 
-      const convos: Conversation[] = rows.map((r: any) => {
+      const convos: Conversation[] = rows.map((r) => {
         const otherId = String(r.other_user_id);
         const decoded = decodeIMContent(String(r.last_message ?? ''));
         const lastMessageText =
@@ -309,7 +333,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
             : decoded.type === 'image'
               ? 'Sent a photo 📷'
-            : (decoded as any).text;
+            : decoded.text;
         return {
           id: otherId,
           recipientId: otherId,
@@ -372,15 +396,17 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           .single();
         if (error) throw error;
 
+        const p = profile as unknown as { username?: string | null; display_name?: string | null; avatar_url?: string | null };
+
         const onlineMap = await loadOnlineMap([recipientId]);
         setConversations((prev) =>
           prev.map((c) =>
             c.id === recipientId
               ? {
                   ...c,
-                  recipientUsername: String((profile as any)?.username ?? 'Unknown'),
-                  recipientDisplayName: (profile as any)?.display_name ?? undefined,
-                  recipientAvatar: (profile as any)?.avatar_url ?? undefined,
+                  recipientUsername: String(p?.username ?? 'Unknown'),
+                  recipientDisplayName: p?.display_name ?? undefined,
+                  recipientAvatar: p?.avatar_url ?? undefined,
                   isOnline: onlineMap.get(recipientId) ?? false,
                 }
               : c
@@ -407,9 +433,9 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           p_offset: 0,
         });
 
-        let rows: any[] = [];
+        let rows: InstantMessageRow[] = [];
         if (!error) {
-          rows = Array.isArray(data) ? data : [];
+          rows = Array.isArray(data) ? (data as unknown as InstantMessageRow[]) : [];
         } else {
           const { data: fallback, error: fbErr } = await supabase
             .from('instant_messages')
@@ -419,11 +445,11 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             )
             .order('created_at', { ascending: false })
             .limit(50);
-          if (!fbErr && Array.isArray(fallback)) rows = fallback;
+          if (!fbErr && Array.isArray(fallback)) rows = fallback as unknown as InstantMessageRow[];
         }
 
         const ordered = [...rows].reverse();
-        const mapped: Message[] = ordered.map((r: any) => {
+        const mapped: Message[] = ordered.map((r) => {
           const senderId = String(r.sender_id);
           const readAt = r.read_at ? new Date(r.read_at) : null;
           const decoded = decodeIMContent(String(r.content ?? ''));
@@ -458,7 +484,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           return {
             id: String(r.id),
             senderId,
-            content: (decoded as any).text,
+            content: decoded.text,
             type: 'text',
             timestamp: r.created_at ? new Date(r.created_at) : new Date(),
             status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
@@ -501,15 +527,17 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           .single();
         if (error) throw error;
 
+        const row = data as unknown as InstantMessageRow;
+
         setMessages((prev) =>
           prev.map((m) =>
             m.id === tempId
               ? {
-                  id: String((data as any).id),
-                  senderId: String((data as any).sender_id),
-                  content: String((data as any).content ?? ''),
+                  id: String(row.id),
+                  senderId: String(row.sender_id),
+                  content: String(row.content ?? ''),
                   type: 'text',
-                  timestamp: (data as any).created_at ? new Date((data as any).created_at) : now,
+                  timestamp: row.created_at ? new Date(row.created_at) : now,
                   status: 'sent',
                 }
               : m
@@ -518,7 +546,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
         setConversations((prev) => {
           const existing = prev.find((c) => c.recipientId === recipientId);
-          const updatedAt = (data as any)?.created_at ? new Date((data as any).created_at) : now;
+          const updatedAt = row?.created_at ? new Date(row.created_at) : now;
           if (!existing) {
             void (async () => {
               try {
@@ -528,14 +556,19 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
                   .eq('id', recipientId)
                   .single();
                 if (profile) {
-                  setConversations((p) =>
-                    p.map((c) =>
+                  const profileRow = profile as unknown as {
+                    username?: string | null;
+                    avatar_url?: string | null;
+                    display_name?: string | null;
+                  };
+                  setConversations((prevConvos) =>
+                    prevConvos.map((c) =>
                       c.recipientId === recipientId
                         ? {
                             ...c,
-                            recipientUsername: String((profile as any).username ?? 'Unknown'),
-                            recipientAvatar: (profile as any).avatar_url ?? undefined,
-                            recipientDisplayName: (profile as any).display_name ?? undefined,
+                            recipientUsername: String(profileRow.username ?? 'Unknown'),
+                            recipientAvatar: profileRow.avatar_url ?? undefined,
+                            recipientDisplayName: profileRow.display_name ?? undefined,
                           }
                         : c
                     )
@@ -640,13 +673,15 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           .single();
         if (imErr) throw imErr;
 
+        const inserted = imRow as unknown as InsertIdRow;
+
         setMessages((prev) =>
           prev.map((m) =>
             m.id === tempId
               ? {
                   ...m,
-                  id: String((imRow as any)?.id ?? tempId),
-                  timestamp: (imRow as any)?.created_at ? new Date((imRow as any).created_at) : m.timestamp,
+                  id: String(inserted?.id ?? tempId),
+                  timestamp: inserted?.created_at ? new Date(inserted.created_at) : m.timestamp,
                   status: 'sent',
                 }
               : m
@@ -761,14 +796,15 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           .single();
         if (error) throw error;
 
-        const createdAt = (data as any)?.created_at ? new Date((data as any).created_at) : now;
+        const inserted = data as unknown as InsertIdRow;
+        const createdAt = inserted?.created_at ? new Date(inserted.created_at) : now;
 
         setMessages((prev) =>
           prev.map((m) =>
             m.id === tempId
               ? {
                   ...m,
-                  id: String((data as any)?.id ?? tempId),
+                  id: String(inserted?.id ?? tempId),
                   imageUrl: publicUrl,
                   imageWidth: dims.width,
                   imageHeight: dims.height,

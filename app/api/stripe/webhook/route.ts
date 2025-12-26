@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { constructWebhookEvent, logStripeAction } from '@/lib/stripe';
+import { constructWebhookEvent, getStripe, logStripeAction } from '@/lib/stripe';
 import {
   recordStripeEvent,
   updateConnectAccountStatus,
@@ -98,6 +98,19 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         await handleCheckoutCompleted(session, requestId);
+        break;
+      }
+
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge;
+        await handleChargeRefunded(charge, requestId);
+        break;
+      }
+
+      case 'charge.dispute.created':
+      case 'charge.dispute.updated': {
+        const dispute = event.data.object as Stripe.Dispute;
+        await handleDisputeUpdated(dispute, requestId);
         break;
       }
 
@@ -239,6 +252,175 @@ export async function POST(request: NextRequest) {
     userId,
     coinsAwarded: coins,
     ledgerId,
+  });
+
+  try {
+    if (!session.payment_intent) return;
+
+    const stripe = getStripe();
+    const paymentIntentId = String(session.payment_intent);
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+    const latestChargeId =
+      typeof paymentIntent.latest_charge === 'string'
+        ? paymentIntent.latest_charge
+        : paymentIntent.latest_charge?.id;
+
+    if (!latestChargeId) return;
+
+    const charge = await stripe.charges.retrieve(String(latestChargeId), {
+      expand: ['balance_transaction'],
+    });
+
+    const chargeId = charge?.id ? String(charge.id) : null;
+
+    const expandedBt = charge?.balance_transaction;
+    const btId = typeof expandedBt === 'string' ? expandedBt : expandedBt?.id;
+    const balanceTxn =
+      typeof expandedBt === 'object' && expandedBt
+        ? expandedBt
+        : btId
+          ? await stripe.balanceTransactions.retrieve(String(btId))
+          : null;
+
+    const stripeFeeCents = balanceTxn?.fee ?? null;
+    const stripeNetCents = balanceTxn?.net ?? null;
+    const stripeBalanceTxnId = balanceTxn?.id ? String(balanceTxn.id) : null;
+
+    if (!chargeId && !stripeBalanceTxnId) return;
+
+    const update: Record<string, unknown> = {
+      stripe_charge_id: chargeId,
+      stripe_balance_txn_id: stripeBalanceTxnId,
+      stripe_fee_cents: stripeFeeCents,
+      stripe_net_cents: stripeNetCents,
+    };
+
+    const { error: updateErr } = await supabase
+      .from('coin_purchases')
+      .update(update)
+      .or(`provider_payment_id.eq.${providerRef},provider_order_id.eq.${providerRef}`);
+
+    if (updateErr) {
+      logStripeAction('checkout-fee-update-failed', {
+        requestId,
+        sessionId: session.id,
+        providerRef,
+        error: updateErr.message,
+      });
+    } else {
+      logStripeAction('checkout-fee-updated', {
+        requestId,
+        sessionId: session.id,
+        providerRef,
+        stripeChargeId: chargeId,
+        stripeBalanceTxnId,
+        stripeFeeCents,
+        stripeNetCents,
+      });
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown';
+    logStripeAction('checkout-fee-update-error', {
+      requestId,
+      sessionId: session.id,
+      providerRef,
+      error: message,
+    });
+  }
+}
+
+async function handleChargeRefunded(charge: Stripe.Charge, requestId: string) {
+  const supabase = getSupabaseAdmin();
+  const chargeId = String(charge.id);
+  const paymentIntentId = charge.payment_intent ? String(charge.payment_intent) : null;
+  const refundedCents = charge.amount_refunded ?? 0;
+
+  const orClauses = [`stripe_charge_id.eq.${chargeId}`];
+  if (paymentIntentId) orClauses.push(`provider_payment_id.eq.${paymentIntentId}`);
+
+  const update: Record<string, unknown> = {
+    refunded_cents: refundedCents,
+    refunded_at: new Date().toISOString(),
+  };
+  if (refundedCents > 0) update.status = 'refunded';
+
+  const { error } = await supabase.from('coin_purchases').update(update).or(orClauses.join(','));
+
+  if (error) {
+    logStripeAction('charge-refunded-update-failed', {
+      requestId,
+      chargeId,
+      paymentIntentId,
+      refundedCents,
+      error: error.message,
+    });
+    return;
+  }
+
+  logStripeAction('charge-refunded-updated', {
+    requestId,
+    chargeId,
+    paymentIntentId,
+    refundedCents,
+  });
+}
+
+async function handleDisputeUpdated(dispute: Stripe.Dispute, requestId: string) {
+  const supabase = getSupabaseAdmin();
+  const stripe = getStripe();
+
+  const disputeId = String(dispute.id);
+  const chargeId = typeof dispute.charge === 'string' ? dispute.charge : dispute.charge?.id;
+  if (!chargeId) {
+    logStripeAction('dispute-missing-charge', { requestId, disputeId });
+    return;
+  }
+
+  let paymentIntentId: string | null = null;
+  try {
+    const charge = await stripe.charges.retrieve(String(chargeId));
+    paymentIntentId = charge.payment_intent ? String(charge.payment_intent) : null;
+  } catch {
+    paymentIntentId = null;
+  }
+
+  const disputedCents = dispute.amount ?? 0;
+  const disputeStatus = dispute.status ? String(dispute.status) : null;
+
+  const orClauses = [`stripe_charge_id.eq.${String(chargeId)}`];
+  if (paymentIntentId) orClauses.push(`provider_payment_id.eq.${paymentIntentId}`);
+
+  const { error } = await supabase
+    .from('coin_purchases')
+    .update({
+      disputed_cents: disputedCents,
+      dispute_id: disputeId,
+      dispute_status: disputeStatus,
+      status: 'disputed',
+    })
+    .or(orClauses.join(','));
+
+  if (error) {
+    logStripeAction('dispute-update-failed', {
+      requestId,
+      disputeId,
+      chargeId,
+      paymentIntentId,
+      disputedCents,
+      disputeStatus,
+      error: error.message,
+    });
+    return;
+  }
+
+  logStripeAction('dispute-updated', {
+    requestId,
+    disputeId,
+    chargeId,
+    paymentIntentId,
+    disputedCents,
+    disputeStatus,
   });
 }
 

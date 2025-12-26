@@ -56,7 +56,14 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired
-  await supabase.auth.getUser();
+  try {
+    await Promise.race([
+      supabase.auth.getUser(),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  } catch {
+    // Never block requests due to transient auth/network issues
+  }
 
   return response;
 }

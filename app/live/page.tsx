@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Video, Sparkles, Users, TrendingUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
+import { canAccessLive } from '@/lib/livekit-constants';
 import LiveRoom from '@/components/LiveRoom';
 import LiveRoomErrorBoundary from '@/components/LiveRoomErrorBoundary';
 
@@ -33,12 +34,12 @@ export default function LiveComingSoonPage() {
         error: error
       });
       
-      // Allow all authenticated users for now
-      if (user) {
-        console.log('[LIVE PAGE] ✅ User confirmed, showing LiveRoom');
+      if (canAccessLive({ id: user?.id, email: user?.email })) {
+        console.log('[LIVE PAGE] ✅ Live access allowed, showing LiveRoom');
         setIsOwner(true);
       } else {
-        console.log('[LIVE PAGE] ❌ No user logged in');
+        console.log('[LIVE PAGE] ❌ Live access not allowed');
+        setIsOwner(false);
       }
     } catch (error) {
       console.error('[LIVE PAGE] Error checking owner:', error);

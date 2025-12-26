@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { canAccessLive } from '@/lib/livekit-constants';
 
 // Trim whitespace from environment variables to prevent issues
 const LIVEKIT_URL = process.env.LIVEKIT_URL?.trim();
@@ -79,6 +80,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401, headers: corsHeaders }
+      );
+    }
+
+    if (!canAccessLive({ id: user.id, email: user.email })) {
+      return NextResponse.json(
+        { error: 'Live is not available yet' },
+        { status: 403, headers: corsHeaders }
       );
     }
 

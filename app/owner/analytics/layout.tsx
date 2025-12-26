@@ -9,3 +9,4 @@ export default function AnalyticsLayout({
   return children;
 }
 
+

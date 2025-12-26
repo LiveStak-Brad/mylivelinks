@@ -9,6 +9,7 @@ import SmartBrandLogo from './SmartBrandLogo';
 import ThemeToggle from './ThemeToggle';
 import LeaderboardModal from './LeaderboardModal';
 import { createClient } from '@/lib/supabase';
+import { LIVE_LAUNCH_ENABLED } from '@/lib/livekit-constants';
 import { useNoties } from './noties';
 import { useMessages } from './messages';
 import NotiesModal from './noties/NotiesModal';
@@ -164,6 +165,8 @@ export default function GlobalHeader() {
     return null;
   }
 
+  const canOpenLive = LIVE_LAUNCH_ENABLED || isOwner;
+
   return (
     <header className="sticky top-0 z-[60] bg-background/95 backdrop-blur-sm border-b border-border shadow-sm">
       <div className="container mx-auto px-4">
@@ -199,16 +202,25 @@ export default function GlobalHeader() {
             >
               Home
             </Link>
-            <Link
-              href="/live"
-              className={`text-sm font-medium transition ${
-                pathname === '/live'
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Live Streams
-            </Link>
+            {canOpenLive ? (
+              <Link
+                href="/live"
+                className={`text-sm font-medium transition ${
+                  pathname === '/live'
+                    ? 'text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Live Streams
+              </Link>
+            ) : (
+              <span
+                className="text-sm font-medium text-muted-foreground/50 cursor-not-allowed"
+                title="Live streaming coming soon"
+              >
+                Live Streams
+              </span>
+            )}
           </nav>
 
           {/* Right side - Theme + Icons + Owner button + User Menu */}
@@ -248,16 +260,25 @@ export default function GlobalHeader() {
           >
             Home
           </Link>
-          <Link
-            href="/live"
-            className={`text-sm font-medium whitespace-nowrap transition ${
-              pathname === '/live'
-                ? 'text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Live Streams
-          </Link>
+          {canOpenLive ? (
+            <Link
+              href="/live"
+              className={`text-sm font-medium whitespace-nowrap transition ${
+                pathname === '/live'
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Live Streams
+            </Link>
+          ) : (
+            <span
+              className="text-sm font-medium whitespace-nowrap text-muted-foreground/50 cursor-not-allowed"
+              title="Live streaming coming soon"
+            >
+              Live Streams
+            </span>
+          )}
         </nav>
       </div>
       

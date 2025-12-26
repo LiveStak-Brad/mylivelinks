@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useLiveKit } from '@/hooks/useLiveKit';
 import { RemoteTrack, Track } from 'livekit-client';
 import { LIVEKIT_ROOM_NAME } from '@/lib/livekit-constants';
+import { createClient } from '@/lib/supabase';
+import { LIVE_LAUNCH_ENABLED, isLiveOwnerUser } from '@/lib/livekit-constants';
 
 interface ViewerVideoPreviewProps {
   viewerId: string;
@@ -20,9 +22,18 @@ export default function ViewerVideoPreview({
 }: ViewerVideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
+  const [canOpenLive, setCanOpenLive] = useState(false);
 
   // Use single global room for all streamers
   const roomName = LIVEKIT_ROOM_NAME;
+
+  useEffect(() => {
+    const supabase = createClient();
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCanOpenLive(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user?.id, email: user?.email }));
+    })();
+  }, []);
 
   // Only connect if the viewer is actually publishing (isLive = true)
   const { room, isConnected } = useLiveKit({
@@ -30,7 +41,7 @@ export default function ViewerVideoPreview({
     participantName: `viewer-${viewerId}`,
     canPublish: false,
     canSubscribe: true,
-    enabled: isLive && !!liveStreamId,
+    enabled: canOpenLive && isLive && !!liveStreamId,
     onTrackSubscribed: (track, publication, participant) => {
       // Only subscribe to tracks from this specific viewer
       // Participant identity should match the viewer's profile_id (UUID)

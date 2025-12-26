@@ -219,13 +219,24 @@ export default function AnalyticsPage() {
     // TODO: Replace with actual API call
     // const res = await fetch(`/api/admin/analytics?start=${dateRange.start.toISOString()}&end=${dateRange.end.toISOString()}&includeTest=${includeTestData}`);
     // const data = await res.json();
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Use stub data for now
-    const stubData = generateStubData(dateRange);
-    setData(stubData);
+
+    try {
+      const res = await fetch(
+        `/api/admin/analytics?start=${encodeURIComponent(dateRange.start.toISOString())}&end=${encodeURIComponent(dateRange.end.toISOString())}&includeTest=${includeTestData ? 'true' : 'false'}`,
+        { cache: 'no-store' }
+      );
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || `Analytics request failed (${res.status})`);
+      }
+
+      const apiData = (await res.json()) as AnalyticsData;
+      setData(apiData);
+    } catch (err) {
+      console.error('[Owner Analytics] Failed to load data:', err);
+      setData(null);
+    }
     
     setLoading(false);
     setRefreshing(false);
