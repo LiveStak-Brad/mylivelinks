@@ -148,7 +148,7 @@ export default function RoomsCarousel() {
 
     const prevInterested = interestedRoomIds.has(room.id);
     // Support both DB format (current_interest_count) and mock format (interest_count)
-    const prevCount = room.current_interest_count ?? room.interest_count ?? 0;
+    const prevCount: number = Number(room.current_interest_count ?? room.interest_count ?? 0);
     const optimisticCount = Math.max(prevCount + (nextInterested ? 1 : -1), 0);
 
     setRoomInterested(room.id, nextInterested);
