@@ -17,6 +17,9 @@ export async function getPinnedPost(profileId: string): Promise<PinnedPost | nul
   const supabase = createClient();
 
   try {
+    const cached = mockPinnedPosts.get(profileId);
+    if (cached) return cached;
+
     const { data, error } = await supabase
       .from('pinned_posts')
       .select('*')
@@ -29,7 +32,11 @@ export async function getPinnedPost(profileId: string): Promise<PinnedPost | nul
       return null;
     }
 
-    return data || null;
+    if (data) {
+      mockPinnedPosts.set(profileId, data as PinnedPost);
+      return data as PinnedPost;
+    }
+    return null;
   } catch (error) {
     console.error('Error in getPinnedPost:', error);
     return null;
@@ -61,7 +68,10 @@ export async function upsertPinnedPost(
       .single();
 
     if (error) throw error;
-    return data;
+    if (data) {
+      mockPinnedPosts.set(profileId, data as PinnedPost);
+    }
+    return data as PinnedPost;
   } catch (error) {
     console.error('Error upserting pinned post:', error);
     throw error;
@@ -78,6 +88,8 @@ export async function deletePinnedPost(profileId: string): Promise<void> {
       .eq('profile_id', profileId);
 
     if (error) throw error;
+
+    mockPinnedPosts.delete(profileId);
   } catch (error) {
     console.error('Error deleting pinned post:', error);
     throw error;

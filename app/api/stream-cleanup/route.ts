@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 /**
  * Stream Cleanup API
@@ -51,8 +52,10 @@ export async function POST(request: Request) {
       reason: reason || null,
     });
 
-    // Update live_streams table
-    const { error: updateError } = await supabase
+    const admin = getSupabaseAdmin();
+
+    // Update live_streams table (service role to bypass RLS)
+    const { error: updateError } = await admin
       .from('live_streams')
       .update({ 
         live_available: false, 
@@ -64,8 +67,8 @@ export async function POST(request: Request) {
       console.error('[STREAM-CLEANUP] Error updating live_streams:', updateError);
     }
 
-    // Remove from user_grid_slots
-    const { error: deleteError } = await supabase
+    // Remove from user_grid_slots (service role to remove from ALL viewers)
+    const { error: deleteError } = await admin
       .from('user_grid_slots')
       .delete()
       .eq('streamer_id', profile_id);
@@ -75,7 +78,7 @@ export async function POST(request: Request) {
     }
 
     // Remove from room_presence if exists
-    const { error: presenceError } = await supabase
+    const { error: presenceError } = await admin
       .from('room_presence')
       .delete()
       .eq('profile_id', profile_id);

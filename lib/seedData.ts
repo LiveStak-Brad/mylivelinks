@@ -16,6 +16,11 @@ export interface SeedStreamer {
   badge_color?: string;
 }
 
+type SeedStreamerWithSort = SeedStreamer & {
+  session_gifts_total?: number;
+  went_live_at?: string;
+};
+
 export interface SeedProfile {
   id: string;
   username: string;
@@ -71,7 +76,7 @@ function generateAvatarUrl(username: string): string {
 }
 
 export function generateSeedStreamers(count: number = 12, sortMode: 'random' | 'most_viewed' | 'most_gifted' | 'newest' = 'random'): SeedStreamer[] {
-  const streamers: SeedStreamer[] = [];
+  const streamers: SeedStreamerWithSort[] = [];
   
   // Use deterministic seed for consistent results
   const seed = 12345; // Fixed seed for deterministic behavior
@@ -105,21 +110,20 @@ export function generateSeedStreamers(count: number = 12, sortMode: 'random' | '
       gifter_level: gifterLevel,
       badge_name: badge.name,
       badge_color: badge.color,
-      // Add sort metadata for seed mode
       session_gifts_total: sessionGiftsTotal,
       went_live_at: wentLiveAt.toISOString(),
-    } as any);
+    });
   }
 
   // Apply sorting based on mode
   if (sortMode === 'most_viewed') {
     streamers.sort((a, b) => b.viewer_count - a.viewer_count);
   } else if (sortMode === 'most_gifted') {
-    streamers.sort((a, b) => ((b as any).session_gifts_total || 0) - ((a as any).session_gifts_total || 0));
+    streamers.sort((a, b) => (b.session_gifts_total || 0) - (a.session_gifts_total || 0));
   } else if (sortMode === 'newest') {
     streamers.sort((a, b) => {
-      const aTime = new Date((a as any).went_live_at || 0).getTime();
-      const bTime = new Date((b as any).went_live_at || 0).getTime();
+      const aTime = new Date(a.went_live_at || 0).getTime();
+      const bTime = new Date(b.went_live_at || 0).getTime();
       return bTime - aTime;
     });
   } else if (sortMode === 'random') {
@@ -137,7 +141,6 @@ export function generateSeedStreamers(count: number = 12, sortMode: 'random' | '
 
 export function generateSeedProfile(username: string): SeedProfile {
   const gifterLevel = Math.floor(Math.random() * 11);
-  const badge = gifterLevels[gifterLevel];
   const isLive = Math.random() > 0.5;
 
   return {

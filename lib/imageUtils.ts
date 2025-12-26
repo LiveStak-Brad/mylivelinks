@@ -174,7 +174,7 @@ export function getProfileBannerPath(
  */
 export function getLogoPath(
   theme: 'light' | 'dark' | 'auto',
-  iconOnly: boolean = false
+  _iconOnly: boolean = false
 ): string {
   // Always use transparent logo
   return '/branding/mylivelinkstransparent.png';

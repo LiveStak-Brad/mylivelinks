@@ -16,13 +16,13 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const supabase = createClient();
 
-  const withTimeout = async <T = any,>(p: Promise<T>, ms: number, label: string): Promise<T> => {
+  const withTimeout = async <T = any,>(p: PromiseLike<T>, ms: number, label: string): Promise<T> => {
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutHandle = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
     });
     try {
-      return await Promise.race([p, timeoutPromise]);
+      return await Promise.race([Promise.resolve(p), timeoutPromise]);
     } finally {
       if (timeoutHandle) clearTimeout(timeoutHandle);
     }

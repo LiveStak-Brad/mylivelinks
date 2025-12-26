@@ -377,35 +377,50 @@ export default function GiftsAdminPage() {
     setErrorMessage(null);
     try {
       const byIdClause = typeof editingPack.db_id === 'number' && !Number.isNaN(editingPack.db_id);
-      const idValue = byIdClause ? editingPack.db_id : editingPack.id;
-      const idColumn = byIdClause ? 'id' : 'sku';
+      const updatePayload = {
+        name: editingPack.name,
+        coins: editingPack.coins,
+        price_usd: editingPack.price_usd,
+        bonus_coins: editingPack.bonus_coins,
+        is_active: editingPack.is_active,
+        is_popular: editingPack.is_popular,
+      };
 
-      let updateRes = await supabase
-        .from('coin_packs')
-        .update({
-          name: editingPack.name,
-          coins: editingPack.coins,
-          price_usd: editingPack.price_usd,
-          bonus_coins: editingPack.bonus_coins,
-          is_active: editingPack.is_active,
-          is_popular: editingPack.is_popular,
-        })
-        .eq(idColumn as any, idValue as any)
-        .select('*')
-        .single();
+      let updateRes = byIdClause
+        ? await supabase
+            .from('coin_packs')
+            .update(updatePayload)
+            .eq('id', editingPack.db_id as number)
+            .select('*')
+            .single()
+        : await supabase
+            .from('coin_packs')
+            .update(updatePayload)
+            .eq('sku', editingPack.id)
+            .select('*')
+            .single();
 
       if (updateRes.error && isMissingColumnError(updateRes.error)) {
-        updateRes = await supabase
-          .from('coin_packs')
-          .update({
-            name: editingPack.name,
-            coins_amount: editingPack.coins,
-            price_cents: Math.round(editingPack.price_usd * 100),
-            active: editingPack.is_active,
-          })
-          .eq(idColumn as any, idValue as any)
-          .select('*')
-          .single();
+        const legacyPayload = {
+          name: editingPack.name,
+          coins_amount: editingPack.coins,
+          price_cents: Math.round(editingPack.price_usd * 100),
+          active: editingPack.is_active,
+        };
+
+        updateRes = byIdClause
+          ? await supabase
+              .from('coin_packs')
+              .update(legacyPayload)
+              .eq('id', editingPack.db_id as number)
+              .select('*')
+              .single()
+          : await supabase
+              .from('coin_packs')
+              .update(legacyPayload)
+              .eq('sku', editingPack.id)
+              .select('*')
+              .single();
       }
 
       if (updateRes.error) throw updateRes.error;

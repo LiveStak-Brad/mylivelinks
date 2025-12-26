@@ -21,7 +21,7 @@ export async function uploadAvatar(
   const filePath = `${profileId}/${fileName}`;
 
   // Upload to storage
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from('avatars')
     .upload(filePath, file, {
       cacheControl: '3600',
@@ -61,7 +61,7 @@ export async function uploadPinnedPostMedia(
   const filePath = `${profileId}/${fileName}`;
 
   // Upload to storage
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from('pinned-posts')
     .upload(filePath, file, {
       cacheControl: '3600',

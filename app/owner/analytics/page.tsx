@@ -88,122 +88,6 @@ interface StripeEvent {
   type: 'charge' | 'refund' | 'dispute';
 }
 
-// Stub data generator
-function generateStubData(dateRange: DateRange): AnalyticsData {
-  const days = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (24 * 60 * 60 * 1000));
-  
-  // Generate time series
-  const revenueOverTime: ChartDataPoint[] = [];
-  const coinFlowOverTime: ChartDataPoint[] = [];
-  const circulationOverTime: ChartDataPoint[] = [];
-  const coinPurchaseVsSpent: ChartDataPoint[] = [];
-  const diamondMintedVsCashedOut: ChartDataPoint[] = [];
-  
-  const dataPoints = Math.min(days, 30);
-  let runningCirculation = 50000;
-  
-  for (let i = 0; i < dataPoints; i++) {
-    const date = new Date(dateRange.start.getTime() + (i * (dateRange.end.getTime() - dateRange.start.getTime()) / dataPoints));
-    const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    
-    const gross = Math.floor(Math.random() * 500 + 100);
-    const fees = Math.floor(gross * 0.029 + 30);
-    const purchased = Math.floor(Math.random() * 10000 + 2000);
-    const spent = Math.floor(Math.random() * 8000 + 1000);
-    const minted = Math.floor(spent * 0.8);
-    const cashedOut = Math.floor(Math.random() * 3000);
-    
-    runningCirculation += purchased - spent;
-    
-    revenueOverTime.push({ label, value: gross, value2: gross - fees });
-    coinFlowOverTime.push({ label, value: purchased, value2: spent });
-    circulationOverTime.push({ label, value: runningCirculation });
-    coinPurchaseVsSpent.push({ label, value: purchased, value2: spent });
-    diamondMintedVsCashedOut.push({ label, value: minted, value2: cashedOut });
-  }
-  
-  // Generate top users
-  const topCoinBuyers: TopUser[] = Array.from({ length: 10 }, (_, i) => ({
-    id: `buyer-${i}`,
-    username: `user${Math.floor(Math.random() * 1000)}`,
-    displayName: i < 3 ? `Top Buyer ${i + 1}` : undefined,
-    primaryValue: Math.floor(Math.random() * 5000 + 500) * (10 - i),
-    secondaryValue: Math.floor(Math.random() * 50000 + 5000) * (10 - i),
-  })).sort((a, b) => b.primaryValue - a.primaryValue);
-  
-  const topDiamondEarners: TopUser[] = Array.from({ length: 10 }, (_, i) => ({
-    id: `earner-${i}`,
-    username: `creator${Math.floor(Math.random() * 1000)}`,
-    displayName: i < 3 ? `Top Creator ${i + 1}` : undefined,
-    primaryValue: Math.floor(Math.random() * 100000 + 10000) * (10 - i),
-    secondaryValue: Math.floor((Math.random() * 100000 + 10000) * (10 - i) * 0.01),
-  })).sort((a, b) => b.primaryValue - a.primaryValue);
-  
-  // Generate stripe events
-  const stripeEvents: StripeEvent[] = Array.from({ length: 50 }, (_, i) => {
-    const types: StripeEvent['type'][] = ['charge', 'charge', 'charge', 'refund', 'dispute'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    const amount = Math.floor(Math.random() * 100 + 5) * 100; // cents
-    const fees = Math.floor(amount * 0.029 + 30);
-    const status: StripeEvent['status'] = type === 'charge' ? 'succeeded' : type === 'refund' ? 'refunded' : 'disputed';
-    
-    return {
-      id: `evt_${i}`,
-      date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-      amount: amount / 100,
-      fees: fees / 100,
-      net: type === 'charge' ? (amount - fees) / 100 : -(amount / 100),
-      status,
-      type,
-    };
-  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  
-  // Calculate totals
-  const grossCoinSales = revenueOverTime.reduce((sum, d) => sum + d.value, 0);
-  const stripeFees = Math.floor(grossCoinSales * 0.029 + 30 * dataPoints);
-  const refunds = Math.floor(grossCoinSales * 0.02);
-  const chargebacks = Math.floor(grossCoinSales * 0.005);
-  const totalCoinsPurchased = coinFlowOverTime.reduce((sum, d) => sum + d.value, 0);
-  const totalCoinsSpent = coinFlowOverTime.reduce((sum, d) => sum + (d.value2 || 0), 0);
-  const totalDiamondsMinted = diamondMintedVsCashedOut.reduce((sum, d) => sum + d.value, 0);
-  const totalDiamondsCashedOut = diamondMintedVsCashedOut.reduce((sum, d) => sum + (d.value2 || 0), 0);
-  
-  return {
-    grossCoinSales,
-    stripeFees,
-    refunds,
-    chargebacks,
-    netRevenue: grossCoinSales - stripeFees - refunds - chargebacks,
-    coinsSold: totalCoinsPurchased,
-    coinsInCirculation: runningCirculation,
-    diamondsOutstanding: totalDiamondsMinted - totalDiamondsCashedOut,
-    cashoutExposure: (totalDiamondsMinted - totalDiamondsCashedOut) * 0.01,
-    
-    totalCoinsPurchased,
-    totalCoinsSpent,
-    totalCoinsBurned: Math.floor(totalCoinsSpent * 0.1),
-    totalDiamondsMinted,
-    totalDiamondsCashedOut,
-    
-    totalChargesCount: stripeEvents.filter(e => e.type === 'charge').length,
-    totalChargesUsd: stripeEvents.filter(e => e.type === 'charge').reduce((sum, e) => sum + e.amount, 0),
-    totalStripeFees: stripeFees,
-    refundsTotal: refunds,
-    disputesTotal: chargebacks,
-    netAfterStripe: grossCoinSales - stripeFees,
-    
-    revenueOverTime,
-    coinFlowOverTime,
-    circulationOverTime,
-    coinPurchaseVsSpent,
-    diamondMintedVsCashedOut,
-    
-    topCoinBuyers,
-    topDiamondEarners,
-    stripeEvents,
-  };
-}
-
 export default function AnalyticsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
@@ -357,7 +241,6 @@ export default function AnalyticsPage() {
                 icon={<DollarSign className="w-5 h-5 text-green-400" />}
                 variant="success"
                 loading={loading}
-                trend={{ value: 12.5, label: 'vs prev' }}
               />
               <KpiCard
                 title="Stripe Fees"
@@ -380,7 +263,6 @@ export default function AnalyticsPage() {
                 icon={<TrendingUp className="w-5 h-5 text-purple-400" />}
                 variant="default"
                 loading={loading}
-                trend={{ value: 8.3 }}
               />
             </div>
             
@@ -719,9 +601,9 @@ export default function AnalyticsPage() {
               />
               <KpiCard
                 title="Coverage Ratio"
-                value={data ? `${Math.round((data.netRevenue / data.cashoutExposure) * 100)}%` : '0%'}
+                value={data && data.cashoutExposure > 0 ? `${Math.round((data.netRevenue / data.cashoutExposure) * 100)}%` : '0%'}
                 icon={<TrendingUp className="w-5 h-5 text-green-400" />}
-                variant={data && (data.netRevenue / data.cashoutExposure) >= 1 ? 'success' : 'warning'}
+                variant={data && data.cashoutExposure > 0 && (data.netRevenue / data.cashoutExposure) >= 1 ? 'success' : 'warning'}
                 loading={loading}
                 subtitle="Net revenue vs exposure"
               />

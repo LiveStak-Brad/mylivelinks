@@ -515,6 +515,18 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
           console.log('Removed from all grid slots');
         }
 
+        // Ensure service-role cleanup (removes from ALL viewers even if RLS blocks client deletes)
+        try {
+          await fetch('/api/stream-cleanup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'end_stream', reason: 'stop_button' }),
+          });
+        } catch (cleanupErr) {
+          console.warn('[GO_LIVE] Failed to call stream-cleanup API:', cleanupErr);
+        }
+
         console.log('Database updated, stopping LiveKit publishing...');
 
         // Stop LiveKit publishing (await it)

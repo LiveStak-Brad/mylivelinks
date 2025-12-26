@@ -56,24 +56,24 @@ export function getAsset(
 ): string {
   const resolvedTheme = theme === 'auto' ? 'light' : theme;
   
-  // @ts-ignore - Dynamic access
-  const asset: any = ASSETS[category];
+  const asset: unknown = ASSETS[category];
   if (!asset) return '';
   
   if (subcategory) {
-    // @ts-ignore
-    const sub = asset[subcategory];
+    if (typeof asset !== 'object' || asset === null) return '';
+    const sub = (asset as Record<string, unknown>)[subcategory];
     if (!sub) return '';
     
     if (typeof sub === 'object' && 'light' in sub) {
-      return sub[resolvedTheme] || sub.any || sub.light || '';
+      const themed = sub as Record<string, unknown>;
+      return String(themed[resolvedTheme] ?? themed.any ?? themed.light ?? '');
     }
-    return sub || '';
+    return typeof sub === 'string' ? sub : '';
   }
   
   if (typeof asset === 'object' && 'light' in asset) {
-    // @ts-ignore - Dynamic access for theme-based assets
-    return asset[resolvedTheme] || asset.any || asset.light || '';
+    const themed = asset as Record<string, unknown>;
+    return String(themed[resolvedTheme] ?? themed.any ?? themed.light ?? '');
   }
   
   // If it's a string, return it; otherwise return empty string

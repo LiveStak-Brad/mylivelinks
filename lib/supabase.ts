@@ -39,7 +39,7 @@ export function createClient() {
           on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }),
         }),
         removeChannel: () => {},
-      } as any;
+      } as unknown as SupabaseClient;
     }
     
     // Runtime browser error

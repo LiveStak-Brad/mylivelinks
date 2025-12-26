@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Heart, Check, Users, Clock, AlertTriangle } from 'lucide-react';
 import type { ComingSoonRoom } from './RoomsCarousel';
 import { formatInterestCount } from '@/lib/coming-soon-rooms';
@@ -50,27 +50,23 @@ export default function RoomPreviewModal({ room, interested, isOpen, onClose, on
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen || !room) return null;
-
-  const categoryStyle = categoryColors[room.category] || categoryColors.gaming;
-  const categoryLabel = useMemo(() => {
-    const cat = room.category?.toLowerCase();
-    if (cat === 'gaming') return 'Gaming';
-    if (cat === 'music') return 'Music';
-    return 'Entertainment';
-  }, [room.category]);
+  const categoryKey = room?.category ?? 'gaming';
+  const categoryStyle = categoryColors[categoryKey] || categoryColors.gaming;
+  const cat = room?.category?.toLowerCase();
+  const categoryLabel = cat === 'gaming' ? 'Gaming' : cat === 'music' ? 'Music' : 'Entertainment';
 
   // Support both DB format (current_interest_count) and mock format (interest_count)
-  const interestCount = room.current_interest_count ?? room.interest_count ?? 0;
-  const threshold = room.interest_threshold ?? 5000;
+  const interestCount = room?.current_interest_count ?? room?.interest_count ?? 0;
+  const threshold = room?.interest_threshold ?? 5000;
 
-  const progressPercent = useMemo(() => {
-    return Math.min((interestCount / threshold) * 100, 100);
-  }, [interestCount, threshold]);
+  const progressPercent = Math.min((interestCount / threshold) * 100, 100);
 
   const handleInterestClick = async () => {
+    if (!room) return;
     onToggleInterest(room, !interested);
   };
+
+  if (!isOpen || !room) return null;
 
   return (
     <div

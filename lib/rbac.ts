@@ -36,7 +36,7 @@ export async function getViewerContext(request?: NextRequest): Promise<ViewerCon
     user,
     is_owner: isOwner === true,
     is_app_admin: isAppAdmin === true,
-    room_roles: (roomRoles as any) ?? [],
+    room_roles: ((roomRoles ?? []) as unknown as ViewerContext['room_roles']),
   };
 }
 
@@ -105,9 +105,10 @@ export async function getRoomPermissions(params: {
     supabase.rpc('is_room_moderator', { p_profile_id: user.id, p_room_id: params.roomId }),
   ]);
 
-  const canModerate = isRoomModerator === true;
-  const canManageRoles = isRoomAdmin === true;
-  const canManageRoom = isRoomAdmin === true;
+  const isAdmin = isAppAdmin === true;
+  const canModerate = isAdmin || isRoomModerator === true;
+  const canManageRoles = isAdmin || isRoomAdmin === true;
+  const canManageRoom = isAdmin || isRoomAdmin === true;
 
   return { canModerate, canManageRoles, canManageRoom };
 }

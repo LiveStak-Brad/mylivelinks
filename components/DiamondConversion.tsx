@@ -188,15 +188,25 @@ export default function DiamondConversion() {
         <label className="block text-sm font-medium mb-2">
           Diamonds to Convert (min: {MIN_DIAMONDS})
         </label>
-        <input
-          type="number"
-          min={MIN_DIAMONDS}
-          max={diamondBalance}
-          value={diamondsToConvert}
-          onChange={(e) => setDiamondsToConvert(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Enter diamonds"
-        />
+        <div className="flex gap-2">
+          <input
+            type="number"
+            min={MIN_DIAMONDS}
+            max={diamondBalance}
+            value={diamondsToConvert}
+            onChange={(e) => setDiamondsToConvert(e.target.value)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Enter diamonds"
+          />
+          <button
+            type="button"
+            onClick={() => setDiamondsToConvert(String(Math.max(0, Math.floor(diamondBalance))))}
+            disabled={loading || diamondBalance < MIN_DIAMONDS}
+            className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Max
+          </button>
+        </div>
       </div>
 
       {diamondsToConvert && conversion.valid && (

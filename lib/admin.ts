@@ -57,7 +57,7 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
       .eq('id', user.id)
       .single();
 
-    const legacyAllowed = !!(profile as any)?.is_admin || !!(profile as any)?.is_owner;
+    const legacyAllowed = !!profile?.is_admin || !!profile?.is_owner;
     if (!legacyAllowed) throw new Error('FORBIDDEN');
     return { user };
   } catch {
