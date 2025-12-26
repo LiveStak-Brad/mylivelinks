@@ -6,7 +6,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Crown, Bell, MessageCircle, Trophy, Menu, X } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
-import ThemeToggle from './ThemeToggle';
 import LeaderboardModal from './LeaderboardModal';
 import { IconButton } from './ui';
 import { createClient } from '@/lib/supabase';
@@ -323,9 +322,6 @@ export default function GlobalHeader() {
 
             {/* Right section: Actions + User */}
             <div className="flex items-center gap-2 lg:gap-3">
-              {/* Theme Toggle */}
-              <ThemeToggle variant="icon" />
-              
               {/* Messages & Noties Icons - Only show when logged in */}
               {isLoggedIn && <HeaderIcons />}
 
