@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { createClient } from '@/lib/supabase';
 import type { AuthChangeEvent, RealtimePostgresChangesPayload, Session } from '@supabase/supabase-js';
 
-export type MessageType = 'text' | 'gift';
+export type MessageType = 'text' | 'gift' | 'image';
 
 export interface Message {
   id: string;
@@ -18,6 +18,11 @@ export interface Message {
   giftName?: string;
   giftIcon?: string;
   giftCoins?: number;
+  // Image-specific fields
+  imageUrl?: string;
+  imageMime?: string;
+  imageWidth?: number;
+  imageHeight?: number;
 }
 
 export interface Conversation {
@@ -42,7 +47,8 @@ interface MessagesContextType {
   loadMessages: (conversationId: string) => Promise<void>;
   openConversationWith: (recipientId: string) => Promise<boolean>;
   sendMessage: (recipientId: string, content: string) => Promise<boolean>;
-  sendGift: (recipientId: string, giftId: number, giftName: string, giftCoins: number) => Promise<boolean>;
+  sendGift: (recipientId: string, giftId: number, giftName: string, giftCoins: number, giftIcon?: string) => Promise<boolean>;
+  sendImage: (recipientId: string, file: File) => Promise<boolean>;
   markConversationRead: (conversationId: string) => void;
   refreshConversations: () => Promise<void>;
   currentUserId: string | null;
@@ -61,8 +67,26 @@ type InstantMessageRow = {
 
 function decodeIMContent(
   content: string
-): { type: 'text'; text: string } | { type: 'gift'; giftId?: number; giftName?: string; giftCoins?: number; giftIcon?: string } {
+):
+  | { type: 'text'; text: string }
+  | { type: 'gift'; giftId?: number; giftName?: string; giftCoins?: number; giftIcon?: string }
+  | { type: 'image'; url?: string; mime?: string; width?: number; height?: number } {
   if (typeof content !== 'string') return { type: 'text', text: '' };
+  if (content.startsWith('__img__:')) {
+    try {
+      const raw = content.slice('__img__:'.length);
+      const parsed = JSON.parse(raw);
+      return {
+        type: 'image',
+        url: typeof parsed?.url === 'string' ? parsed.url : undefined,
+        mime: typeof parsed?.mime === 'string' ? parsed.mime : undefined,
+        width: typeof parsed?.width === 'number' ? parsed.width : undefined,
+        height: typeof parsed?.height === 'number' ? parsed.height : undefined,
+      };
+    } catch {
+      return { type: 'text', text: '' };
+    }
+  }
   if (!content.startsWith('__gift__:')) return { type: 'text', text: content };
   try {
     const raw = content.slice('__gift__:'.length);
@@ -81,6 +105,29 @@ function decodeIMContent(
 
 function encodeGiftContent(gift: { giftId: number; giftName: string; giftCoins: number; giftIcon?: string }) {
   return `__gift__:${JSON.stringify(gift)}`;
+}
+
+function encodeImageContent(image: { url: string; mime: string; width?: number; height?: number }) {
+  return `__img__:${JSON.stringify(image)}`;
+}
+
+async function getImageDimensions(file: File): Promise<{ width?: number; height?: number }> {
+  try {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      const dims = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = url;
+      });
+      return dims;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch {
+    return {};
+  }
 }
 
 export function MessagesProvider({ children }: { children: ReactNode }) {
@@ -163,6 +210,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           const lastMessageText =
             decoded.type === 'gift'
               ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
+              : decoded.type === 'image'
+                ? 'Sent a photo 📷'
               : (decoded as any).text;
           convoByOther.set(otherId, {
             last_message: String(lastMessageText ?? ''),
@@ -258,6 +307,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         const lastMessageText =
           decoded.type === 'gift'
             ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
+            : decoded.type === 'image'
+              ? 'Sent a photo 📷'
             : (decoded as any).text;
         return {
           id: otherId,
@@ -390,6 +441,20 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
               status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
             };
           }
+          if (decoded.type === 'image') {
+            return {
+              id: String(r.id),
+              senderId,
+              content: '',
+              type: 'image',
+              imageUrl: decoded.url,
+              imageMime: decoded.mime,
+              imageWidth: decoded.width,
+              imageHeight: decoded.height,
+              timestamp: r.created_at ? new Date(r.created_at) : new Date(),
+              status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
+            };
+          }
           return {
             id: String(r.id),
             senderId,
@@ -516,7 +581,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       recipientId: string,
       giftId: number,
       giftName: string,
-      giftCoins: number
+      giftCoins: number,
+      giftIcon?: string
     ): Promise<boolean> => {
       if (!currentUserId) return false;
 
@@ -530,6 +596,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         type: 'gift',
         giftId,
         giftName,
+        giftIcon,
         giftCoins,
         timestamp: new Date(),
         status: 'sending',
@@ -560,6 +627,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           giftId,
           giftName,
           giftCoins,
+          giftIcon,
         });
         const { data: imRow, error: imErr } = await supabase
           .from('instant_messages')
@@ -619,6 +687,126 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         console.error('[Messages] Error sending gift:', error);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         return false;
+      }
+    },
+    [currentUserId, supabase]
+  );
+
+  const sendImage = useCallback(
+    async (recipientId: string, file: File): Promise<boolean> => {
+      if (!currentUserId) return false;
+      if (!recipientId) return false;
+      if (!file) return false;
+      if (!file.type?.startsWith('image/')) return false;
+
+      const tempId = `temp-image-${Date.now()}`;
+      const now = new Date();
+      const localUrl = URL.createObjectURL(file);
+
+      const placeholder: Message = {
+        id: tempId,
+        senderId: currentUserId,
+        content: '',
+        type: 'image',
+        imageUrl: localUrl,
+        imageMime: file.type,
+        timestamp: now,
+        status: 'sending',
+      };
+
+      setMessages((prev) => [...prev, placeholder]);
+
+      try {
+        const dims = await getImageDimensions(file);
+
+        const uploadRes = await fetch('/api/messages/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mimeType: file.type, otherProfileId: recipientId }),
+        });
+
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) {
+          throw new Error(uploadData?.error || 'Failed to prepare upload');
+        }
+
+        const bucket = String(uploadData?.bucket || '');
+        const path = String(uploadData?.path || '');
+        const token = String(uploadData?.token || '');
+        const publicUrl = String(uploadData?.publicUrl || '');
+        if (!bucket || !path || !token || !publicUrl) {
+          throw new Error('Upload response missing required fields');
+        }
+
+        const { error: uploadErr } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, file, {
+          contentType: file.type,
+        });
+        if (uploadErr) throw uploadErr;
+
+        const content = encodeImageContent({
+          url: publicUrl,
+          mime: file.type,
+          width: dims.width,
+          height: dims.height,
+        });
+
+        const { data, error } = await supabase
+          .from('instant_messages')
+          .insert({
+            sender_id: currentUserId,
+            recipient_id: recipientId,
+            content,
+          })
+          .select('id, created_at')
+          .single();
+        if (error) throw error;
+
+        const createdAt = (data as any)?.created_at ? new Date((data as any).created_at) : now;
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  id: String((data as any)?.id ?? tempId),
+                  imageUrl: publicUrl,
+                  imageWidth: dims.width,
+                  imageHeight: dims.height,
+                  timestamp: createdAt,
+                  status: 'sent',
+                }
+              : m
+          )
+        );
+
+        setConversations((prev) => {
+          const existing = prev.find((c) => c.recipientId === recipientId);
+          if (!existing) {
+            const conv: Conversation = {
+              id: recipientId,
+              recipientId,
+              recipientUsername: 'Unknown',
+              recipientDisplayName: undefined,
+              recipientAvatar: undefined,
+              isOnline: false,
+              lastMessage: 'Sent a photo 📷',
+              lastMessageAt: createdAt,
+              unreadCount: 0,
+            };
+            return [conv, ...prev];
+          }
+          return prev
+            .map((c) => (c.recipientId === recipientId ? { ...c, lastMessage: 'Sent a photo 📷', lastMessageAt: createdAt } : c))
+            .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+        });
+
+        return true;
+      } catch (err) {
+        console.error('[Messages] Error sending image:', err);
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: 'failed' } : m)));
+        return false;
+      } finally {
+        URL.revokeObjectURL(localUrl);
       }
     },
     [currentUserId, supabase]
@@ -718,6 +906,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       openConversationWith,
       sendMessage,
       sendGift,
+      sendImage,
       markConversationRead,
       refreshConversations,
       currentUserId,

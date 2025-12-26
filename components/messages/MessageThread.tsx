@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Send, Gift, Smile, ArrowLeft, MoreVertical, Loader2, ExternalLink } from 'lucide-react';
+import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
+import { Send, Gift, Smile, ArrowLeft, MoreVertical, Loader2, ExternalLink, ImagePlus } from 'lucide-react';
 import { useMessages, Message, Conversation } from './MessagesContext';
 import GiftPickerMini from './GiftPickerMini';
 import { useIM } from '@/components/im';
@@ -59,14 +59,23 @@ const getGiftEmoji = (name: string) => {
   return emojiMap[name] || '🎁';
 };
 
+const EMOJIS = [
+  '😀', '😄', '😁', '😂', '🤣', '😊', '😍', '😘', '😎', '🤩',
+  '👍', '🙏', '👏', '🔥', '💯', '🎉', '✨', '💜', '❤️', '🥳',
+  '😅', '😭', '😡', '🤔', '😴', '🙌', '✅', '❌', '⭐', '🌈',
+];
+
 export default function MessageThread({ conversation, onBack, showBackButton = false }: MessageThreadProps) {
-  const { messages, sendMessage, sendGift, currentUserId } = useMessages();
+  const { messages, sendMessage, sendGift, sendImage, currentUserId } = useMessages();
   const { openChat } = useIM();
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -88,18 +97,50 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
     inputRef.current?.focus();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  const handleGiftSelect = async (gift: { id: number; name: string; coin_cost: number }) => {
+  const handleGiftSelect = async (gift: { id: number; name: string; coin_cost: number; icon_url?: string }) => {
     setIsSending(true);
-    await sendGift(conversation.recipientId, gift.id, gift.name, gift.coin_cost);
+    await sendGift(conversation.recipientId, gift.id, gift.name, gift.coin_cost, gift.icon_url);
     setIsSending(false);
   };
+
+  const handlePickEmoji = (emoji: string) => {
+    setMessageInput((prev) => `${prev}${emoji}`);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
+  };
+
+  const handlePickPhoto = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setIsSending(true);
+    await sendImage(conversation.recipientId, file);
+    setIsSending(false);
+    inputRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const onDown = (ev: MouseEvent) => {
+      const t = ev.target as Node;
+      if (!inputAreaRef.current) return;
+      if (!inputAreaRef.current.contains(t)) setShowEmojiPicker(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [showEmojiPicker]);
 
   const formatTime = (date: Date) => {
     return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -240,7 +281,7 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
           recipientUsername={conversation.recipientUsername}
         />
 
-        <div className="flex items-center gap-2">
+        <div ref={inputAreaRef} className="flex items-center gap-2">
           {/* Gift Button */}
           <button
             onClick={() => setShowGiftPicker(!showGiftPicker)}
@@ -254,13 +295,49 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
             <Gift className="w-5 h-5" />
           </button>
 
+          <button
+            onClick={handlePickPhoto}
+            className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
+            title="Send a photo"
+            disabled={isSending}
+          >
+            <ImagePlus className="w-5 h-5" />
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
           {/* Emoji Button */}
           <button
+            onClick={() => setShowEmojiPicker((v) => !v)}
             className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
             title="Add emoji"
+            disabled={isSending}
           >
             <Smile className="w-5 h-5" />
           </button>
+
+          {showEmojiPicker && (
+            <div className="absolute bottom-[64px] left-3 z-50 w-[260px] rounded-xl border border-border bg-card shadow-xl p-2">
+              <div className="grid grid-cols-10 gap-1">
+                {EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => handlePickEmoji(e)}
+                    className="h-8 w-8 rounded-lg hover:bg-muted transition flex items-center justify-center"
+                  >
+                    <span className="text-lg leading-none">{e}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Text Input */}
           <input
@@ -307,12 +384,19 @@ function MessageBubble({
 }) {
   // Gift message bubble
   if (message.type === 'gift') {
+    const giftIcon = typeof message.giftIcon === 'string' ? message.giftIcon : '';
+    const isIconUrl = giftIcon.startsWith('http://') || giftIcon.startsWith('https://') || giftIcon.startsWith('/');
+
     return (
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
         <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30 border border-yellow-200 dark:border-yellow-800">
           <div className="flex items-center gap-3">
             <span className="text-3xl">
-              {message.giftIcon || getGiftEmoji(message.giftName || 'Gift')}
+              {giftIcon && isIconUrl ? (
+                <img src={giftIcon} alt={message.giftName || 'Gift'} className="w-10 h-10" />
+              ) : (
+                giftIcon || getGiftEmoji(message.giftName || 'Gift')
+              )}
             </span>
             <div>
               <p className="text-sm font-semibold text-foreground">
@@ -321,7 +405,7 @@ function MessageBubble({
               <p className="text-xs text-muted-foreground">
                 {message.giftName} • {message.giftCoins} 💰 
                 <span className="text-emerald-600 dark:text-emerald-400 ml-1">
-                  (+{Math.floor((message.giftCoins || 0) * 0.6)} 💎)
+                  (+{message.giftCoins || 0} 💎)
                 </span>
               </p>
             </div>
@@ -338,6 +422,39 @@ function MessageBubble({
               </span>
             )}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (message.type === 'image') {
+    const url = typeof message.imageUrl === 'string' ? message.imageUrl : '';
+    return (
+      <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+        <div
+          className={`max-w-[75%] overflow-hidden rounded-2xl border border-border ${
+            isOwn ? 'bg-card' : 'bg-card'
+          }`}
+        >
+          {url ? (
+            <a href={url} target="_blank" rel="noreferrer">
+              <img src={url} alt="Photo" className="block max-h-[260px] w-auto object-contain" />
+            </a>
+          ) : (
+            <div className="px-4 py-3 text-sm text-muted-foreground">Photo</div>
+          )}
+          <div className={`px-3 py-1.5 text-[10px] ${isOwn ? 'text-right' : 'text-left'} text-muted-foreground`}>
+            {time}
+            {isOwn && (
+              <span className="ml-1">
+                {message.status === 'sending' && '○'}
+                {message.status === 'sent' && '✓'}
+                {message.status === 'delivered' && '✓✓'}
+                {message.status === 'read' && '✓✓'}
+                {message.status === 'failed' && '⚠️'}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     );

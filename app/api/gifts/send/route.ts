@@ -13,12 +13,20 @@ import { getSupabaseAdmin } from '@/lib/supabase-admin';
  * IMPORTANT: 40% platform fee, 60% diamonds to recipient
  */
 export async function POST(request: NextRequest) {
-  const requestId = crypto.randomUUID();
+  let requestId = crypto.randomUUID();
 
   try {
     // Parse request
     const body = await request.json();
     const { toUserId, coinsAmount, streamId, giftTypeId } = body;
+
+    const clientRequestId =
+      typeof body?.requestId === 'string'
+        ? body.requestId
+        : (typeof body?.request_id === 'string' ? body.request_id : null);
+    if (clientRequestId && clientRequestId.length > 0) {
+      requestId = clientRequestId;
+    }
 
     // Validate input
     if (!toUserId || typeof toUserId !== 'string') {
