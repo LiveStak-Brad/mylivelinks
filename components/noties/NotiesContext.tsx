@@ -259,6 +259,96 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       } catch {
       }
 
+      let giftNoties: Notie[] = [];
+      try {
+        const { data: giftLedger, error: giftLedgerErr } = await supabase
+          .from('ledger_entries')
+          .select('id, entry_type, delta_diamonds, provider_ref, created_at')
+          .eq('user_id', user.id)
+          .eq('entry_type', 'diamond_earn')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        const parseGiftId = (providerRef: unknown): number | null => {
+          if (!providerRef) return null;
+          const s = String(providerRef);
+          if (!s.startsWith('gift:')) return null;
+          const raw = s.split(':')[1];
+          const n = raw ? parseInt(raw, 10) : NaN;
+          return Number.isFinite(n) ? n : null;
+        };
+
+        if (!giftLedgerErr && Array.isArray(giftLedger)) {
+          const giftIds = Array.from(
+            new Set(giftLedger.map((r: any) => parseGiftId(r.provider_ref)).filter((n: any) => Number.isFinite(n)))
+          ) as number[];
+
+          const { data: gifts } = giftIds.length
+            ? await supabase
+                .from('gifts')
+                .select('id, sender_id, recipient_id, coin_amount, diamonds_awarded')
+                .in('id', giftIds)
+            : { data: [] as any[] };
+
+          const giftById = new Map<number, any>();
+          for (const g of Array.isArray(gifts) ? gifts : []) {
+            const idNum = Number(g?.id);
+            if (Number.isFinite(idNum)) giftById.set(idNum, g);
+          }
+
+          const senderIds = Array.from(
+            new Set(
+              (Array.isArray(gifts) ? gifts : [])
+                .map((g: any) => String(g?.sender_id ?? ''))
+                .filter(Boolean)
+            )
+          );
+
+          const { data: senderProfiles } = senderIds.length
+            ? await supabase
+                .from('profiles')
+                .select('id, username, avatar_url, display_name')
+                .in('id', senderIds)
+            : { data: [] as any[] };
+
+          const senderById = new Map<string, any>();
+          for (const p of Array.isArray(senderProfiles) ? senderProfiles : []) {
+            if (p?.id) senderById.set(String(p.id), p);
+          }
+
+          giftNoties = giftLedger.map((r: any) => {
+            const id = `gift:le:${String(r.id)}`;
+            const giftId = parseGiftId(r.provider_ref);
+            const gift = giftId != null ? giftById.get(giftId) : null;
+            const senderId = gift?.sender_id ? String(gift.sender_id) : '';
+            const sender = senderId ? senderById.get(senderId) : null;
+            const username = String(sender?.username ?? 'Someone');
+            const displayName = String(sender?.display_name ?? '') || username;
+            const avatarFallback = (displayName?.[0] ?? username?.[0] ?? '?').toUpperCase();
+            const diamonds = Number(r.delta_diamonds ?? gift?.diamonds_awarded ?? 0);
+            const coins = Number(gift?.coin_amount ?? 0);
+            return {
+              id,
+              type: 'gift',
+              title: 'New Gift',
+              message: `${displayName} sent you +${diamonds} diamonds`,
+              avatarUrl: sender?.avatar_url ?? undefined,
+              avatarFallback,
+              isRead: readIds.has(id),
+              createdAt: r.created_at ? new Date(r.created_at) : new Date(),
+              actionUrl: `/${username}`,
+              metadata: {
+                gift_id: giftId ?? undefined,
+                sender_id: senderId || undefined,
+                coins_spent: coins,
+                diamonds_awarded: diamonds,
+              },
+            };
+          });
+        }
+      } catch {
+      }
+
       let conversionNoties: Notie[] = [];
       try {
         const { data: conversions, error: cvErr } = await supabase
@@ -292,7 +382,7 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       } catch {
       }
 
-      const combined = [...followNoties, ...liveNoties, ...purchaseNoties, ...conversionNoties]
+      const combined = [...followNoties, ...liveNoties, ...giftNoties, ...purchaseNoties, ...conversionNoties]
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, 100);
 

@@ -17,15 +17,13 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 interface MenuOverlayProps {
   visible: boolean;
   onClose: () => void;
-  coinBalance?: number;
-  diamondBalance?: number;
+  onOpenWallet: () => void;
 }
 
 export const MenuOverlay: React.FC<MenuOverlayProps> = ({
   visible,
   onClose,
-  coinBalance = 0,
-  diamondBalance = 0,
+  onOpenWallet,
 }) => {
   const translateX = useSharedValue(0);
 
@@ -51,23 +49,20 @@ export const MenuOverlay: React.FC<MenuOverlayProps> = ({
   if (!visible) return null;
 
   const handlePurchaseCoins = () => {
-    // TODO: Navigate to purchase screen
-    console.log('[PLACEHOLDER] Navigate to Purchase Coins');
+    // noop
   };
 
   const handleConvertCoins = () => {
-    // TODO: Navigate to convert screen
-    console.log('[PLACEHOLDER] Navigate to Convert Coins');
+    // noop
   };
 
   const handleWallet = () => {
-    // TODO: Navigate to wallet screen
-    console.log('[PLACEHOLDER] Navigate to Wallet');
+    onOpenWallet();
+    onClose();
   };
 
   const handleSettings = () => {
-    // TODO: Navigate to settings screen
-    console.log('[PLACEHOLDER] Navigate to Settings');
+    // noop
   };
 
   return (
@@ -91,29 +86,21 @@ export const MenuOverlay: React.FC<MenuOverlayProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* Balance display */}
               <View style={styles.balanceContainer}>
-                <View style={styles.balanceItem}>
-                  <Text style={styles.balanceLabel}>Coins</Text>
-                  <Text style={styles.balanceValue}>🪙 {coinBalance}</Text>
-                </View>
-                <View style={styles.balanceItem}>
-                  <Text style={styles.balanceLabel}>Diamonds</Text>
-                  <Text style={styles.balanceValue}>💎 {diamondBalance}</Text>
-                </View>
+                <Text style={styles.balanceNote}>Wallet balances available in Wallet screen</Text>
               </View>
 
               {/* Menu items */}
               <View style={styles.menuItems}>
-                <TouchableOpacity style={styles.menuItem} onPress={handlePurchaseCoins}>
+                <TouchableOpacity style={styles.menuItem} onPress={handlePurchaseCoins} disabled>
                   <Text style={styles.menuIcon}>💳</Text>
-                  <Text style={styles.menuItemText}>Purchase Coins</Text>
+                  <Text style={styles.menuItemText}>Purchase Coins (Coming Soon)</Text>
                   <Text style={styles.menuArrow}>›</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.menuItem} onPress={handleConvertCoins}>
+                <TouchableOpacity style={styles.menuItem} onPress={handleConvertCoins} disabled>
                   <Text style={styles.menuIcon}>🔄</Text>
-                  <Text style={styles.menuItemText}>Convert Coins</Text>
+                  <Text style={styles.menuItemText}>Convert Coins (Coming Soon)</Text>
                   <Text style={styles.menuArrow}>›</Text>
                 </TouchableOpacity>
 
@@ -123,9 +110,9 @@ export const MenuOverlay: React.FC<MenuOverlayProps> = ({
                   <Text style={styles.menuArrow}>›</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.menuItem} onPress={handleSettings}>
+                <TouchableOpacity style={styles.menuItem} onPress={handleSettings} disabled>
                   <Text style={styles.menuIcon}>⚙️</Text>
-                  <Text style={styles.menuItemText}>Settings</Text>
+                  <Text style={styles.menuItemText}>Settings (Coming Soon)</Text>
                   <Text style={styles.menuArrow}>›</Text>
                 </TouchableOpacity>
               </View>
@@ -187,27 +174,15 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   balanceContainer: {
-    flexDirection: 'row',
-    gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 24,
   },
-  balanceItem: {
-    flex: 1,
-    backgroundColor: 'rgba(74, 158, 255, 0.2)',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#4a9eff',
-  },
-  balanceLabel: {
-    color: '#888',
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  balanceValue: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+  balanceNote: {
+    color: '#9aa0a6',
+    fontSize: 13,
+    fontWeight: '600',
   },
   menuItems: {
     gap: 12,

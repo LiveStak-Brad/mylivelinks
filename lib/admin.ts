@@ -8,26 +8,26 @@ export type AdminAuthResult = {
   user: User;
 };
 
-export async function getSessionUser(request?: NextRequest): Promise<User | null> {
-  const supabase = (() => {
-    if (!request) return createServerSupabaseClient();
-
-    const authHeader = request.headers.get('authorization') || '';
-    const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
-    if (token) {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!url || !key) {
-        return createRouteHandlerClient(request);
-      }
-      return createSupabaseClient(url, key, {
-        global: { headers: { Authorization: `Bearer ${token}` } },
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-      });
+export function createAuthedRouteHandlerClient(request: NextRequest) {
+  const authHeader = request.headers.get('authorization') || '';
+  const token = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+  if (token) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) {
+      return createRouteHandlerClient(request);
     }
+    return createSupabaseClient(url, key, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+  }
 
-    return createRouteHandlerClient(request);
-  })();
+  return createRouteHandlerClient(request);
+}
+
+export async function getSessionUser(request?: NextRequest): Promise<User | null> {
+  const supabase = request ? createAuthedRouteHandlerClient(request) : createServerSupabaseClient();
 
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;

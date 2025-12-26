@@ -7,13 +7,13 @@
  * - Double-tap → Focus mode
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, withSpring, useSharedValue } from 'react-native-reanimated';
-import { VideoRenderer } from '@livekit/react-native';
+import { VideoView } from '@livekit/react-native';
 import type { TileItem } from '../../types/live';
-import type { Room } from 'livekit-client';
+import type { Room, VideoTrack } from 'livekit-client';
 
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
@@ -60,8 +60,14 @@ export const Tile: React.FC<TileProps> = ({
       });
     }
 
-    return videoPublication.track;
+    return videoPublication.track as unknown as VideoTrack;
   }, [room, participant]);
+
+  useEffect(() => {
+    if (DEBUG && videoTrack) {
+      console.log('[VIDEO] Rendering video for participant', participant?.identity);
+    }
+  }, [videoTrack, participant?.identity]);
 
   // Long-press gesture (450ms)
   const longPressGesture = Gesture.LongPress()
@@ -124,16 +130,11 @@ export const Tile: React.FC<TileProps> = ({
       <Animated.View style={[containerStyle, animatedStyle]}>
       {/* Video surface - LiveKit VideoRenderer */}
       {videoTrack ? (
-        (() => {
-          console.log('[VIDEO] Rendering VideoRenderer for participant', participant?.identity);
-          return (
-            <VideoRenderer
-              track={videoTrack}
-              style={styles.videoRenderer}
-              objectFit="cover"
-            />
-          );
-        })()
+        <VideoView
+          videoTrack={videoTrack}
+          style={styles.videoRenderer}
+          objectFit="cover"
+        />
       ) : (
         <View style={styles.videoPlaceholder}>
           <Text style={styles.placeholderText}>📹</Text>

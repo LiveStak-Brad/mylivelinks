@@ -1,0 +1,12 @@
+Price ID,Product ID,Product Name,Product Statement Descriptor,Product Tax Code,Description,Created (UTC),Amount,Currency,Interval,Interval Count,Usage Type,Aggregate Usage,Billing Scheme,Trial Period Days,Tax Behavior
+price_1SiIANK3qxgxnYka9t4WF4OX,prod_TfdRmdVXDb25uf,"Coins – 1,875,000",,txcd_10000000,,2025-12-25 17:17,25000.00,usd,,,,,per_unit,,unspecified
+price_1SiI98K3qxgxnYkaekScpzAv,prod_TfdPWG7xcltAIh,"Coins – 700,000",,txcd_10000000,,2025-12-25 17:16,10000.00,usd,,,,,per_unit,,unspecified
+price_1SiI7bK3qxgxnYkamqMwvVIK,prod_TfdOlHENWZqcRO,"Coins – 300,000",,txcd_10000000,,2025-12-25 17:14,5000.00,usd,,,,,per_unit,,unspecified
+price_1SiI7AK3qxgxnYkadjGi1jew,prod_TfdNEE9tePo7DX,"Coins – 120,000",,txcd_10000000,,2025-12-25 17:14,2000.00,usd,,,,,per_unit,,unspecified
+price_1SiI6rK3qxgxnYkaCwdE3aJs,prod_TfdN4ALlSZYdHO,"Coins – 60,000",,txcd_10000000,,2025-12-25 17:13,1000.00,usd,,,,,per_unit,,unspecified
+price_1SiI6MK3qxgxnYkaJBxCBeuE,prod_TfdNsZzac8hVng,"Coins – 30,000",,txcd_10000000,,2025-12-25 17:13,500.00,usd,,,,,per_unit,,unspecified
+price_1SiI5jK3qxgxnYka8cGf5g7k,prod_TfdMVzPYlthVzW,"Coins – 15,000",,txcd_10000000,,2025-12-25 17:12,250.00,usd,,,,,per_unit,,unspecified
+price_1SiI5JK3qxgxnYkatUOOb8CE,prod_TfdMoKbErBfjO1,"Coins – 6,000",,txcd_10000000,,2025-12-25 17:12,100.00,usd,,,,,per_unit,,unspecified
+price_1SiI50K3qxgxnYkarAV7xgOj,prod_TfdLI1ddsux2Fs,"Coins – 3,000",,txcd_10000000,,2025-12-25 17:12,50.00,usd,,,,,per_unit,,unspecified
+price_1SiI4ZK3qxgxnYkaLz370QTx,prod_TfdLO4fXu6vgJE,"Coins – 1,500",,txcd_10000000,,2025-12-25 17:11,25.00,usd,,,,,per_unit,,unspecified
+price_1SiI3CK3qxgxnYka0jkRalqa,prod_TfdJziSrw6HXvm,Coins – 600,,txcd_10000000,,2025-12-25 17:10,10.00,usd,,,,,per_unit,,unspecified

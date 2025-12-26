@@ -20,8 +20,6 @@ export {
   formatCoinAmount,
   getTierLevelRange,
   getTierCoinRange,
-  MOCK_GIFTER_STATUS_STARTER,
-  MOCK_GIFTER_STATUS_DIAMOND,
 } from './gifterTiers';
 
 export type { GifterTier, GifterStatus } from './gifterTiers';

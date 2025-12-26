@@ -6,11 +6,11 @@
 import { useState, useCallback } from 'react';
 import type { OverlayType, LiveRoomUIState } from '../types/live';
 
+const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
+
 const initialState: LiveRoomUIState = {
   activeOverlay: null,
   isConnected: false,
-  coinBalance: 0,
-  diamondBalance: 0,
   // Gesture state (UI-only)
   isEditMode: false,
   focusedIdentity: null,
@@ -45,17 +45,9 @@ export function useLiveRoomUI() {
     }));
   }, []);
 
-  const updateBalance = useCallback((coins: number, diamonds: number) => {
-    setState(prev => ({
-      ...prev,
-      coinBalance: coins,
-      diamondBalance: diamonds,
-    }));
-  }, []);
-
   // Gesture state management (UI-only)
   const enterEditMode = useCallback(() => {
-    console.log('[GESTURE] Enter edit mode → user can reorder tiles');
+    if (DEBUG) console.log('[GESTURE] Enter edit mode → user can reorder tiles');
     setState(prev => ({
       ...prev,
       isEditMode: true,
@@ -63,7 +55,7 @@ export function useLiveRoomUI() {
   }, []);
 
   const exitEditMode = useCallback(() => {
-    console.log('[GESTURE] Exit edit mode → restore normal interaction');
+    if (DEBUG) console.log('[GESTURE] Exit edit mode → restore normal interaction');
     setState(prev => ({
       ...prev,
       isEditMode: false,
@@ -72,9 +64,9 @@ export function useLiveRoomUI() {
 
   const setFocusedIdentity = useCallback((identity: string | null) => {
     if (identity) {
-      console.log(`[GESTURE] Double-tap → focus identity=${identity}`);
+      if (DEBUG) console.log(`[GESTURE] Double-tap → focus identity=${identity}`);
     } else {
-      console.log('[GESTURE] Exit focus mode → restore grid');
+      if (DEBUG) console.log('[GESTURE] Exit focus mode → restore grid');
     }
     setState(prev => ({
       ...prev,
@@ -83,7 +75,7 @@ export function useLiveRoomUI() {
   }, []);
 
   const reorderTileSlots = useCallback((fromIndex: number, toIndex: number) => {
-    console.log(`[GESTURE] Drag swap index ${fromIndex} ↔ ${toIndex}`);
+    if (DEBUG) console.log(`[GESTURE] Drag swap index ${fromIndex} ↔ ${toIndex}`);
     setState(prev => {
       const newSlots = [...prev.tileSlots];
       const [moved] = newSlots.splice(fromIndex, 1);
@@ -107,7 +99,6 @@ export function useLiveRoomUI() {
     openOverlay,
     closeOverlay,
     setConnected,
-    updateBalance,
     // Gesture methods
     enterEditMode,
     exitEditMode,

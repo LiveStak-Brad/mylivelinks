@@ -20,23 +20,6 @@ interface ViewersLeaderboardsOverlayProps {
   onClose: () => void;
 }
 
-// Mock data
-const MOCK_VIEWERS: Viewer[] = [
-  { id: '1', username: 'Viewer1', avatarUrl: undefined },
-  { id: '2', username: 'Viewer2', avatarUrl: undefined },
-  { id: '3', username: 'Viewer3', avatarUrl: undefined },
-];
-
-const MOCK_STREAMER_LEADERBOARD: LeaderboardEntry[] = [
-  { id: '1', username: 'TopStreamer', value: 5420, avatarUrl: undefined },
-  { id: '2', username: 'Streamer2', value: 3210, avatarUrl: undefined },
-];
-
-const MOCK_GIFTER_LEADERBOARD: LeaderboardEntry[] = [
-  { id: '1', username: 'TopGifter', value: 1250, avatarUrl: undefined },
-  { id: '2', username: 'Gifter2', value: 890, avatarUrl: undefined },
-];
-
 type Tab = 'viewers' | 'streamers' | 'gifters';
 
 export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProps> = ({
@@ -44,6 +27,9 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('viewers');
+  const viewers: Viewer[] = [];
+  const streamerLeaderboard: LeaderboardEntry[] = [];
+  const gifterLeaderboard: LeaderboardEntry[] = [];
   
   const translateY = useSharedValue(0);
 
@@ -110,33 +96,54 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
             <ScrollView style={styles.scrollView}>
               {activeTab === 'viewers' && (
                 <View>
-                  {MOCK_VIEWERS.map((viewer) => (
-                    <View key={viewer.id} style={styles.listItem}>
-                      <Text style={styles.itemText}>{viewer.username}</Text>
+                  {viewers.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyTitle}>Viewers coming soon</Text>
+                      <Text style={styles.emptySubtitle}>Live viewer lists will appear here when enabled.</Text>
                     </View>
-                  ))}
+                  ) : (
+                    viewers.map((viewer) => (
+                      <View key={viewer.id} style={styles.listItem}>
+                        <Text style={styles.itemText}>{viewer.username}</Text>
+                      </View>
+                    ))
+                  )}
                 </View>
               )}
               {activeTab === 'streamers' && (
                 <View>
-                  {MOCK_STREAMER_LEADERBOARD.map((entry, idx) => (
-                    <View key={entry.id} style={styles.listItem}>
-                      <Text style={styles.rankText}>#{idx + 1}</Text>
-                      <Text style={styles.itemText}>{entry.username}</Text>
-                      <Text style={styles.valueText}>💎 {entry.value}</Text>
+                  {streamerLeaderboard.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyTitle}>Leaderboards coming soon</Text>
+                      <Text style={styles.emptySubtitle}>Top streamers will appear here when available.</Text>
                     </View>
-                  ))}
+                  ) : (
+                    streamerLeaderboard.map((entry, idx) => (
+                      <View key={entry.id} style={styles.listItem}>
+                        <Text style={styles.rankText}>#{idx + 1}</Text>
+                        <Text style={styles.itemText}>{entry.username}</Text>
+                        <Text style={styles.valueText}>💎 {entry.value}</Text>
+                      </View>
+                    ))
+                  )}
                 </View>
               )}
               {activeTab === 'gifters' && (
                 <View>
-                  {MOCK_GIFTER_LEADERBOARD.map((entry, idx) => (
-                    <View key={entry.id} style={styles.listItem}>
-                      <Text style={styles.rankText}>#{idx + 1}</Text>
-                      <Text style={styles.itemText}>{entry.username}</Text>
-                      <Text style={styles.valueText}>🎁 {entry.value}</Text>
+                  {gifterLeaderboard.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyTitle}>Leaderboards coming soon</Text>
+                      <Text style={styles.emptySubtitle}>Top gifters will appear here when available.</Text>
                     </View>
-                  ))}
+                  ) : (
+                    gifterLeaderboard.map((entry, idx) => (
+                      <View key={entry.id} style={styles.listItem}>
+                        <Text style={styles.rankText}>#{idx + 1}</Text>
+                        <Text style={styles.itemText}>{entry.username}</Text>
+                        <Text style={styles.valueText}>🎁 {entry.value}</Text>
+                      </View>
+                    ))
+                  )}
                 </View>
               )}
             </ScrollView>
@@ -201,6 +208,26 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  emptyState: {
+    paddingVertical: 28,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#9aa0a6',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   listItem: {
     flexDirection: 'row',

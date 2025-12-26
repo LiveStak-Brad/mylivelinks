@@ -47,19 +47,40 @@ function createTileItems(
   const participantMap = new Map(participants.map(p => [p.identity, p]));
 
   if (tileSlots.length > 0) {
-    // Use tileSlots order (reordered by user)
-    tileSlots.forEach((identity, idx) => {
-      if (idx < TOTAL_TILES) {
-        const participant = participantMap.get(identity);
-        if (participant) {
-          items.push({
-            id: participant.identity,
-            participant,
-            isAutofill: false,
-          });
-        }
+    // Use tileSlots order (reordered by user), preserving slot count.
+    // If a slot identity isn't currently present, keep a placeholder at that slot.
+    for (let idx = 0; idx < TOTAL_TILES; idx++) {
+      const identity = tileSlots[idx];
+      const participant = identity ? participantMap.get(identity) : undefined;
+      if (participant) {
+        items.push({
+          id: participant.identity,
+          participant,
+          isAutofill: false,
+        });
+      } else {
+        items.push({
+          id: `slot-${idx}`,
+          participant: null,
+          isAutofill: true,
+        });
       }
-    });
+    }
+
+    // Backfill empty slots with any remaining participants not in tileSlots.
+    const used = new Set(items.filter(i => i.participant).map(i => i.participant!.identity));
+    const remaining = participants.filter(p => !used.has(p.identity));
+    let remainingIdx = 0;
+    for (let i = 0; i < items.length && remainingIdx < remaining.length; i++) {
+      if (!items[i].participant) {
+        const p = remaining[remainingIdx++];
+        items[i] = {
+          id: p.identity,
+          participant: p,
+          isAutofill: false,
+        };
+      }
+    }
   } else {
     // Natural order (no reordering yet)
     participants.forEach((p, idx) => {
@@ -73,9 +94,9 @@ function createTileItems(
     });
   }
 
-  // Fill remaining with empty tiles
-  const remaining = TOTAL_TILES - items.length;
-  for (let i = 0; i < remaining; i++) {
+  // Fill remaining with empty tiles (natural order path only)
+  const remainingSlots = TOTAL_TILES - items.length;
+  for (let i = 0; i < remainingSlots; i++) {
     items.push({
       id: `empty-${i}`,
       participant: null,

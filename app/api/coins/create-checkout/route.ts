@@ -4,6 +4,9 @@ import { cookies } from 'next/headers';
 import { createCoinCheckoutSession, logStripeAction } from '@/lib/stripe';
 import { getCoinPackByPriceId, getCoinPackBySku } from '@/lib/supabase-admin';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const OWNER_IDS = new Set(['2b4a1178-3c39-4179-94ea-314dd824a818']);
 const OWNER_EMAILS = new Set(['wcba.mo@gmail.com']);
 
@@ -71,17 +74,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!pack.stripe_price_id) {
-      logStripeAction('create-checkout-missing-price-id', {
-        requestId,
-        userId: user.id,
-        packSku: pack.sku,
-      });
-      return NextResponse.json(
-        { error: 'Coin pack is not purchasable' },
-        { status: 400 }
-      );
-    }
+    const rawStripePriceId = pack.stripe_price_id ? String(pack.stripe_price_id) : '';
+    const looksLikePlaceholder = rawStripePriceId.includes('REPLACE_WITH_LIVE_ID');
+    const looksValidPriceId = /^price_[A-Za-z0-9]+$/.test(rawStripePriceId);
+    const effectiveStripePriceId =
+      rawStripePriceId && looksValidPriceId && !looksLikePlaceholder ? rawStripePriceId : undefined;
 
     const email = (user.email || '').toLowerCase();
     const isOwner = OWNER_IDS.has(user.id) || OWNER_EMAILS.has(email);
@@ -134,17 +131,43 @@ export async function POST(request: NextRequest) {
       priceCents: pack.price_cents,
     });
 
-    const session = await createCoinCheckoutSession({
-      userId: user.id,
-      packSku: pack.sku,
-      packName: pack.name,
-      priceId: pack.stripe_price_id,
-      priceCents: pack.price_cents,
-      coinsAmount: pack.coins_amount,
-      vipTier: pack.vip_tier || undefined,
-      successUrl: `${baseUrl}/wallet?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${baseUrl}/wallet?purchase=cancelled`,
-    });
+    let session;
+    try {
+      session = await createCoinCheckoutSession({
+        userId: user.id,
+        packSku: pack.sku,
+        packName: pack.name,
+        priceId: effectiveStripePriceId,
+        priceCents: pack.price_cents,
+        coinsAmount: pack.coins_amount,
+        vipTier: pack.vip_tier || undefined,
+        successUrl: `${baseUrl}/wallet?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${baseUrl}/wallet?purchase=cancelled`,
+      });
+    } catch (err) {
+      if (effectiveStripePriceId) {
+        logStripeAction('create-checkout-retry-with-price-data', {
+          requestId,
+          userId: user.id,
+          packSku: pack.sku,
+          stripePriceId: effectiveStripePriceId,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        });
+
+        session = await createCoinCheckoutSession({
+          userId: user.id,
+          packSku: pack.sku,
+          packName: pack.name,
+          priceCents: pack.price_cents,
+          coinsAmount: pack.coins_amount,
+          vipTier: pack.vip_tier || undefined,
+          successUrl: `${baseUrl}/wallet?purchase=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${baseUrl}/wallet?purchase=cancelled`,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     logStripeAction('create-checkout-success', {
       requestId,

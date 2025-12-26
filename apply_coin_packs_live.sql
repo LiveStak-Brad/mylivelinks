@@ -33,10 +33,10 @@ INSERT INTO coin_packs (sku, name, coins_amount, price_cents, currency, stripe_p
 ('coins_300000_500000', '300,000 Coins', 300000, 500000, 'usd', 'price_REPLACE_WITH_LIVE_ID_300000', 0, 60, FALSE, 9, 'Premium pack', TRUE),
 
 -- VIP packs (unlocked by spending, 60% value)
-('coins_70000_1000000', '70,000 Coins VIP', 70000, 1000000, 'usd', 'price_REPLACE_WITH_LIVE_ID_70000_VIP', 1, 60, TRUE, 10, 'VIP Whale Pack - Unlocked after $1,000 spent', TRUE),
+('coins_700000_1000000', '700,000 Coins', 700000, 1000000, 'usd', 'price_REPLACE_WITH_LIVE_ID_700000', 1, 60, TRUE, 10, 'Whale Pack', TRUE),
 
 -- VIP Elite (75% creator value - special)
-('coins_187500_2500000', '187,500 Coins VIP Elite', 187500, 2500000, 'usd', 'price_REPLACE_WITH_LIVE_ID_ELITE', 2, 75, TRUE, 11, 'VIP Elite - 75% creator value!', TRUE);
+('coins_1875000_2500000', '1,875,000 Coins', 1875000, 2500000, 'usd', 'price_REPLACE_WITH_LIVE_ID_1875000', 2, 75, TRUE, 11, 'Elite Pack', TRUE);
 
 -- Create VIP tier tracking on profiles if not exists
 ALTER TABLE profiles
@@ -206,7 +206,15 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;
 
-COMMENT ON FUNCTION cfm_finalize_coin_purchase IS 'Idempotent coin purchase fulfillment for Stripe webhooks. Returns {ok: boolean, duplicate: boolean, coins_awarded: number}';
+COMMENT ON FUNCTION public.cfm_finalize_coin_purchase(
+    character varying,
+    character varying,
+    character varying,
+    uuid,
+    integer,
+    bigint,
+    jsonb
+  ) IS 'Idempotent coin purchase fulfillment for Stripe webhooks. Returns {ok: boolean, duplicate: boolean, coins_awarded: number}';
 
 -- ============================================================================
 -- IMPORTANT: After running this SQL, update the stripe_price_id values!

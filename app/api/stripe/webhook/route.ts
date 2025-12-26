@@ -101,6 +101,18 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'checkout.session.async_payment_succeeded': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await handleCheckoutCompleted(session, requestId);
+        break;
+      }
+
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        await handlePaymentIntentSucceeded(paymentIntent, requestId);
+        break;
+      }
+
       case 'charge.refunded': {
         const charge = event.data.object as Stripe.Charge;
         await handleChargeRefunded(charge, requestId);
@@ -191,19 +203,8 @@ export async function POST(request: NextRequest) {
     session.metadata?.coins_amount ||
     session.metadata?.coins;
 
-  if (!userId || !coinsStr) {
+  if (!userId) {
     logStripeAction('checkout-missing-metadata', {
-      requestId,
-      sessionId: session.id,
-      userId,
-      coins_awarded: coinsStr,
-    });
-    return;
-  }
-
-  const coins = parseInt(coinsStr, 10);
-  if (!Number.isFinite(coins) || coins <= 0) {
-    logStripeAction('checkout-invalid-coins', {
       requestId,
       sessionId: session.id,
       userId,
@@ -216,6 +217,57 @@ export async function POST(request: NextRequest) {
   const providerRef = session.payment_intent ?? session.id;
   const idempotencyKey = `stripe:${providerRef}`;
 
+  const supabase = getSupabaseAdmin();
+  let coins: number | null = null;
+
+  const priceId = session.metadata?.price_id ? String(session.metadata.price_id) : null;
+  if (priceId) {
+    const { data, error } = await supabase
+      .from('coin_packs')
+      .select('coins_amount')
+      .eq('stripe_price_id', priceId)
+      .eq('active', true)
+      .maybeSingle();
+
+    if (!error && data?.coins_amount != null) {
+      const parsed = Number(data.coins_amount);
+      coins = Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  if (!coins && usdCents > 0) {
+    const { data, error } = await supabase
+      .from('coin_packs')
+      .select('coins_amount')
+      .eq('price_cents', usdCents)
+      .eq('active', true)
+      .order('display_order', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data?.coins_amount != null) {
+      const parsed = Number(data.coins_amount);
+      coins = Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  if (!coins && coinsStr) {
+    const parsed = parseInt(String(coinsStr), 10);
+    coins = Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (!coins || coins <= 0) {
+    logStripeAction('checkout-invalid-coins', {
+      requestId,
+      sessionId: session.id,
+      userId,
+      coins_awarded: coinsStr,
+      usdCents,
+      priceId,
+    });
+    return;
+  }
+
   logStripeAction('checkout-processing', {
     requestId,
     sessionId: session.id,
@@ -227,7 +279,6 @@ export async function POST(request: NextRequest) {
   });
 
   // Call RPC to finalize purchase (coins only)
-  const supabase = getSupabaseAdmin();
   const { data: ledgerId, error } = await supabase.rpc('finalize_coin_purchase', {
     p_idempotency_key: idempotencyKey,
     p_user_id: userId,
@@ -328,6 +379,151 @@ export async function POST(request: NextRequest) {
       error: message,
     });
   }
+}
+
+async function handlePaymentIntentSucceeded(
+  paymentIntent: Stripe.PaymentIntent,
+  requestId: string
+) {
+  const stripe = getStripe();
+
+  const providerRef = String(paymentIntent.id);
+  const idempotencyKey = `stripe:${providerRef}`;
+
+  let userId: string | null = paymentIntent.metadata?.user_id ?? null;
+  const coinsStr: string | null =
+    paymentIntent.metadata?.coins_awarded ??
+    paymentIntent.metadata?.coins_amount ??
+    paymentIntent.metadata?.coins ??
+    null;
+
+  let sessionId: string | null = null;
+  let usdCents: number = paymentIntent.amount_received ?? paymentIntent.amount ?? 0;
+  let priceId: string | null = paymentIntent.metadata?.price_id ?? null;
+
+  try {
+    if ((!userId || !coinsStr) && providerRef) {
+      const sessions = await stripe.checkout.sessions.list({
+        payment_intent: providerRef,
+        limit: 1,
+      });
+
+      const session = sessions.data?.[0] ?? null;
+      if (session) {
+        sessionId = session.id;
+        userId = userId ?? session.metadata?.user_id ?? session.client_reference_id ?? null;
+        priceId = priceId ?? (session.metadata?.price_id ? String(session.metadata.price_id) : null);
+        usdCents = session.amount_total ?? usdCents;
+      }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown';
+    logStripeAction('payment-intent-session-lookup-failed', {
+      requestId,
+      paymentIntentId: providerRef,
+      error: message,
+    });
+  }
+
+  if (!userId) {
+    logStripeAction('payment-intent-missing-metadata', {
+      requestId,
+      paymentIntentId: providerRef,
+      sessionId,
+      userId,
+      coins_awarded: coinsStr,
+    });
+    return;
+  }
+
+  const supabase = getSupabaseAdmin();
+  let coins: number | null = null;
+
+  if (priceId) {
+    const { data, error } = await supabase
+      .from('coin_packs')
+      .select('coins_amount')
+      .eq('stripe_price_id', String(priceId))
+      .eq('active', true)
+      .maybeSingle();
+
+    if (!error && data?.coins_amount != null) {
+      const parsed = Number(data.coins_amount);
+      coins = Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  if (!coins && usdCents > 0) {
+    const { data, error } = await supabase
+      .from('coin_packs')
+      .select('coins_amount')
+      .eq('price_cents', usdCents)
+      .eq('active', true)
+      .order('display_order', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data?.coins_amount != null) {
+      const parsed = Number(data.coins_amount);
+      coins = Number.isFinite(parsed) ? parsed : null;
+    }
+  }
+
+  if (!coins && coinsStr) {
+    const parsed = parseInt(String(coinsStr), 10);
+    coins = Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (!coins || coins <= 0) {
+    logStripeAction('payment-intent-invalid-coins', {
+      requestId,
+      paymentIntentId: providerRef,
+      sessionId,
+      userId,
+      coins_awarded: coinsStr,
+      usdCents,
+      priceId,
+    });
+    return;
+  }
+
+  logStripeAction('payment-intent-processing', {
+    requestId,
+    paymentIntentId: providerRef,
+    sessionId,
+    userId,
+    coins,
+    usdCents,
+    idempotencyKey,
+  });
+
+  const { data: ledgerId, error } = await supabase.rpc('finalize_coin_purchase', {
+    p_idempotency_key: idempotencyKey,
+    p_user_id: userId,
+    p_coins_amount: coins,
+    p_amount_usd_cents: usdCents,
+    p_provider_ref: providerRef,
+  });
+
+  if (error) {
+    logStripeAction('payment-intent-rpc-error', {
+      requestId,
+      paymentIntentId: providerRef,
+      sessionId,
+      userId,
+      error: error.message,
+    });
+    return;
+  }
+
+  logStripeAction('payment-intent-finalized', {
+    requestId,
+    paymentIntentId: providerRef,
+    sessionId,
+    userId,
+    coinsAwarded: coins,
+    ledgerId,
+  });
 }
 
 async function handleChargeRefunded(charge: Stripe.Charge, requestId: string) {

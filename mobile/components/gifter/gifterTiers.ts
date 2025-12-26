@@ -225,7 +225,7 @@ export function getTierCoinRange(tier: GifterTier): string {
 // MOCK DATA FOR UI TESTING
 // ============================================================================
 
-export const MOCK_GIFTER_STATUS_STARTER: GifterStatus = {
+const MOCK_GIFTER_STATUS_STARTER: GifterStatus = {
   tier_key: 'starter',
   tier_name: 'Starter',
   tier_color: '#9CA3AF',
@@ -240,7 +240,7 @@ export const MOCK_GIFTER_STATUS_STARTER: GifterStatus = {
   show_locked_tiers: false,
 };
 
-export const MOCK_GIFTER_STATUS_DIAMOND: GifterStatus = {
+const MOCK_GIFTER_STATUS_DIAMOND: GifterStatus = {
   tier_key: 'diamond',
   tier_name: 'Diamond',
   tier_color: '#22D3EE',

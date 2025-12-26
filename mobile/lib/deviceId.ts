@@ -4,6 +4,8 @@
  * Safe for startup: uses in-memory fallback if SecureStore unavailable
  */
 
+import * as SecureStore from 'expo-secure-store';
+
 const DEVICE_ID_KEY = 'mylivelinks_device_id';
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
@@ -33,9 +35,6 @@ export async function getDeviceId(): Promise<string> {
   }
 
   try {
-    // Lazy-load SecureStore only when needed
-    const SecureStore = await import('expo-secure-store');
-    
     // Try to get existing device ID
     const existing = await SecureStore.getItemAsync(DEVICE_ID_KEY);
     if (existing) {
@@ -87,7 +86,6 @@ export function generateSessionId(): string {
 export async function clearDeviceId(): Promise<void> {
   cachedDeviceId = null;
   try {
-    const SecureStore = await import('expo-secure-store');
     await SecureStore.deleteItemAsync(DEVICE_ID_KEY);
     if (DEBUG) {
       console.log('[DEVICE] Cleared device ID');

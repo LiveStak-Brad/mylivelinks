@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Room, RoomEvent, RemoteParticipant, Track } from 'livekit-client';
+import * as SecureStore from 'expo-secure-store';
 import type { Participant } from '../types/live';
 import { getMobileIdentity } from '../lib/mobileIdentity';
 import { getDeviceId, generateSessionId } from '../lib/deviceId';
@@ -46,9 +47,8 @@ interface UseLiveRoomParticipantsOptions {
 export function useLiveRoomParticipants(
   options: UseLiveRoomParticipantsOptions = {}
 ): UseLiveRoomParticipantsReturn {
-  console.log('[ROOM] useLiveRoomParticipants invoked');
-  
-  const { enabled = true } = options;
+  const { enabled = false } = options;
+  if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked');
   const [allParticipants, setAllParticipants] = useState<RemoteParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -69,7 +69,6 @@ export function useLiveRoomParticipants(
   useEffect(() => {
     const loadOrCreateSeed = async () => {
       try {
-        const SecureStore = await import('expo-secure-store');
         const stored = await SecureStore.getItemAsync('mylivelinks_random_seed');
         if (stored) {
           setRandomSeed(parseInt(stored, 10));
@@ -255,7 +254,7 @@ export function useLiveRoomParticipants(
         // Fetch token
         const { token, url } = await fetchToken(identity);
 
-        console.log('[ROOM] Creating LiveKit Room instance');
+        if (DEBUG) console.log('[ROOM] Creating LiveKit Room instance');
         
         // Create room
         const room = new Room({
@@ -283,6 +282,7 @@ export function useLiveRoomParticipants(
           }
           setIsConnected(true);
           hasConnectedRef.current = true;
+          isConnectingRef.current = false;
           updateParticipants(room);
         });
 
@@ -291,6 +291,7 @@ export function useLiveRoomParticipants(
             console.log('[ROOM] Disconnected:', reason);
           }
           setIsConnected(false);
+          isConnectingRef.current = false;
         });
 
         room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
@@ -345,9 +346,9 @@ export function useLiveRoomParticipants(
           });
         }
 
-        console.log('[ROOM] About to call room.connect()');
+        if (DEBUG) console.log('[ROOM] About to call room.connect()');
         await room.connect(url, token);
-        console.log('[ROOM] Connected successfully');
+        if (DEBUG) console.log('[ROOM] Connected successfully');
 
       } catch (error: any) {
         console.error('[ROOM] Connection error', error);
@@ -357,8 +358,9 @@ export function useLiveRoomParticipants(
     };
 
     connectToRoom();
+  }, [enabled, updateParticipants]);
 
-    // Cleanup on unmount
+  useEffect(() => {
     return () => {
       if (roomRef.current) {
         if (DEBUG) {
@@ -372,7 +374,7 @@ export function useLiveRoomParticipants(
       // Clear first seen timestamps on unmount
       firstSeenTimestampRef.current.clear();
     };
-  }, []); // Empty deps - connect ONCE on mount
+  }, []);
 
   /**
    * Use selection engine to determine which 12 participants to display

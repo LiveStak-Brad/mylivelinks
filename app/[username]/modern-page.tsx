@@ -110,6 +110,10 @@ interface ProfileData {
     followers_gained_from_streams: number;
     last_stream_at?: string;
   };
+
+  streak_days?: number;
+  gifter_rank?: number;
+  streamer_rank?: number;
 }
 
 export default function ModernProfilePage() {
@@ -471,25 +475,39 @@ export default function ModernProfilePage() {
           {/* Top Right Stats - Streak & Global Ranks */}
           <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex flex-col items-end gap-2 z-10">
             {/* Streak Counter */}
-            <div className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg">
-              <Flame size={14} className="sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm font-bold">7</span>
-              <span className="text-[10px] sm:text-xs opacity-90">day streak</span>
-            </div>
+            {!!profileData?.streak_days && profileData.streak_days > 0 && (
+              <div
+                className="group relative flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg"
+                title="Streak days require real activity (comment, gift, chat, transactions, etc.). Refreshing the app/page doesn't count."
+              >
+                <Flame size={14} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm font-bold">{profileData.streak_days}</span>
+                <span className="text-[10px] sm:text-xs opacity-90">day streak</span>
+                <div className="pointer-events-none absolute right-0 top-full mt-2 w-56 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="rounded-lg bg-black/85 px-3 py-2 text-[11px] leading-snug text-white shadow-xl">
+                    Streak days require real activity (comment, gift, chat, transactions, etc.). Refreshing the app/page doesn&apos;t count.
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Global Gifter Rank */}
-            <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg">
-              <Trophy size={14} className="sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm font-bold">#42</span>
-              <span className="text-[10px] sm:text-xs opacity-90">Gifter</span>
-            </div>
+            {!!profileData?.gifter_rank && profileData.gifter_rank > 0 && (
+              <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg">
+                <Trophy size={14} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm font-bold">#{profileData.gifter_rank}</span>
+                <span className="text-[10px] sm:text-xs opacity-90">Gifter</span>
+              </div>
+            )}
             
             {/* Global Streamer Rank */}
-            <div className="flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg">
-              <Star size={14} className="sm:w-4 sm:h-4" />
-              <span className="text-xs sm:text-sm font-bold">#128</span>
-              <span className="text-[10px] sm:text-xs opacity-90">Streamer</span>
-            </div>
+            {!!profileData?.streamer_rank && profileData.streamer_rank > 0 && (
+              <div className="flex items-center gap-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full shadow-lg">
+                <Star size={14} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm font-bold">#{profileData.streamer_rank}</span>
+                <span className="text-[10px] sm:text-xs opacity-90">Streamer</span>
+              </div>
+            )}
           </div>
           
           <div className="p-4 sm:p-8">

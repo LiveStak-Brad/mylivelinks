@@ -63,19 +63,24 @@ export async function createCoinCheckoutSession(params: {
   const timestampBucket = Math.floor(Date.now() / (5 * 60 * 1000));
   const idempotencyKey = `checkout:${params.userId}:${params.packSku}:${timestampBucket}`;
 
+  const metadata: Record<string, string> = {
+    user_id: params.userId,
+    pack_sku: params.packSku,
+    // Locked rule: webhook must read coins_awarded from metadata
+    coins_awarded: String(params.coinsAmount),
+    // Back-compat with older handlers
+    coins_amount: String(params.coinsAmount),
+    pack_name: params.packName,
+    ...(params.priceId ? { price_id: params.priceId } : {}),
+    ...(params.vipTier ? { vip_tier: String(params.vipTier) } : {}),
+  };
+
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: 'payment',
     client_reference_id: params.userId,
-    metadata: {
-      user_id: params.userId,
-      pack_sku: params.packSku,
-      // Locked rule: webhook must read coins_awarded from metadata
-      coins_awarded: String(params.coinsAmount),
-      // Back-compat with older handlers
-      coins_amount: String(params.coinsAmount),
-      pack_name: params.packName,
-      ...(params.priceId ? { price_id: params.priceId } : {}),
-      ...(params.vipTier && { vip_tier: String(params.vipTier) }),
+    metadata,
+    payment_intent_data: {
+      metadata,
     },
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,

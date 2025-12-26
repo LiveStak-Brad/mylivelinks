@@ -50,8 +50,6 @@ export type OverlayType = 'chat' | 'viewers' | 'menu' | 'stats' | null;
 export interface LiveRoomUIState {
   activeOverlay: OverlayType;
   isConnected: boolean;
-  coinBalance: number;
-  diamondBalance: number;
   // Gesture state (UI-only)
   isEditMode: boolean;
   focusedIdentity: string | null;

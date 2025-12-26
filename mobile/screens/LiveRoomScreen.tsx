@@ -11,7 +11,7 @@
  */
 
 import React, { useCallback, useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Grid12 } from '../components/live/Grid12';
 import { ChatOverlay } from '../overlays/ChatOverlay';
@@ -23,14 +23,15 @@ import { useLiveRoomUI } from '../state/liveRoomUI';
 import { useLiveRoomParticipants } from '../hooks/useLiveRoomParticipants';
 
 const SWIPE_THRESHOLD = 50;
+const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
 type LiveRoomScreenProps = {
   enabled?: boolean;
+  onExitLive?: () => void;
+  onNavigateWallet: () => void;
 };
 
-export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = true }) => {
-  console.log('[LIVE] LiveRoomScreen render start');
-  
+export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false, onExitLive, onNavigateWallet }) => {
   // UI state management
   const { 
     state, 
@@ -42,10 +43,32 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = true }
     initializeTileSlots,
   } = useLiveRoomUI();
   
-  console.log('[LIVE] Before LiveKit hooks');
-  
   // LiveKit streaming hook
   const { participants, isConnected, tileCount, room } = useLiveRoomParticipants({ enabled });
+
+  const setRemoteAudioMuted = useCallback((muted: boolean, focusedIdentity?: string) => {
+    if (!room) return;
+    let changedCount = 0;
+
+    room.remoteParticipants.forEach((participant) => {
+      if (focusedIdentity && participant.identity === focusedIdentity) return;
+      participant.audioTrackPublications.forEach((publication) => {
+        const track: any = publication.track;
+        if (!track) return;
+        if (typeof track.setMuted === 'function') {
+          track.setMuted(muted);
+          changedCount++;
+          return;
+        }
+        if (typeof track.setVolume === 'function') {
+          track.setVolume(muted ? 0 : 1);
+          changedCount++;
+        }
+      });
+    });
+
+    return changedCount;
+  }, [room]);
 
   /**
    * Swipe gesture handler
@@ -65,11 +88,11 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = true }
 
       // GESTURE PRIORITY: Disable swipes during edit or focus mode
       if (state.isEditMode) {
-        console.log('[GESTURE] Swipe blocked → edit mode active');
+        if (DEBUG) console.log('[GESTURE] Swipe blocked → edit mode active');
         return;
       }
       if (state.focusedIdentity) {
-        console.log('[GESTURE] Swipe blocked → focus mode active');
+        if (DEBUG) console.log('[GESTURE] Swipe blocked → focus mode active');
         return;
       }
 
@@ -107,75 +130,41 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = true }
 
   // Gesture handlers for tiles
   const handleLongPress = useCallback((identity: string) => {
-    console.log(`[GESTURE] Long-press → enter edit mode (identity=${identity})`);
+    if (DEBUG) console.log(`[GESTURE] Long-press → enter edit mode (identity=${identity})`);
     enterEditMode();
   }, [enterEditMode]);
 
   const handleDoubleTap = useCallback((identity: string) => {
     if (state.focusedIdentity === identity) {
       // Double-tap focused tile → exit focus mode
-      console.log('[GESTURE] Double-tap focused tile → exit focus mode');
+      if (DEBUG) console.log('[GESTURE] Double-tap focused tile → exit focus mode');
       setFocusedIdentity(null);
       
       // Unmute all audio tracks
-      if (room) {
-        let unmutedCount = 0;
-        room.remoteParticipants.forEach((participant) => {
-          participant.audioTrackPublications.forEach((publication) => {
-            if (publication.track && publication.track.isMuted) {
-              publication.track.setMuted(false);
-              unmutedCount++;
-            }
-          });
-        });
-        console.log(`[AUDIO] Exit focus → restored audio for ${unmutedCount} tracks`);
-      }
+      const unmutedCount = setRemoteAudioMuted(false) || 0;
+      if (DEBUG) console.log(`[AUDIO] Exit focus → restored audio for ${unmutedCount} tracks`);
     } else {
       // Double-tap different tile → enter focus mode
-      console.log(`[GESTURE] Double-tap → focus identity=${identity}`);
+      if (DEBUG) console.log(`[GESTURE] Double-tap → focus identity=${identity}`);
       setFocusedIdentity(identity);
       
       // Mute all other audio tracks locally
-      if (room) {
-        let mutedCount = 0;
-        room.remoteParticipants.forEach((participant) => {
-          if (participant.identity !== identity) {
-            participant.audioTrackPublications.forEach((publication) => {
-              if (publication.track && !publication.track.isMuted) {
-                publication.track.setMuted(true);
-                mutedCount++;
-              }
-            });
-          }
-        });
-        console.log(`[AUDIO] Focus mode → muted others count=${mutedCount}`);
-      }
+      const mutedCount = setRemoteAudioMuted(true, identity) || 0;
+      if (DEBUG) console.log(`[AUDIO] Focus mode → muted others count=${mutedCount}`);
     }
-  }, [state.focusedIdentity, setFocusedIdentity, room]);
+  }, [state.focusedIdentity, setFocusedIdentity, setRemoteAudioMuted]);
 
   const handleExitEditMode = useCallback(() => {
-    console.log('[GESTURE] Exit edit mode → restore normal interaction');
     exitEditMode();
   }, [exitEditMode]);
 
   const handleExitFocus = useCallback(() => {
-    console.log('[GESTURE] Exit focus mode → restore grid');
     setFocusedIdentity(null);
     
     // Unmute all audio tracks
-    if (room) {
-      let unmutedCount = 0;
-      room.remoteParticipants.forEach((participant) => {
-        participant.audioTrackPublications.forEach((publication) => {
-          if (publication.track && publication.track.isMuted) {
-            publication.track.setMuted(false);
-            unmutedCount++;
-          }
-        });
-      });
-      console.log(`[AUDIO] Exit focus → restored audio for ${unmutedCount} tracks`);
-    }
-  }, [setFocusedIdentity, room]);
+    const unmutedCount = setRemoteAudioMuted(false) || 0;
+    if (DEBUG) console.log(`[AUDIO] Exit focus → restored audio for ${unmutedCount} tracks`);
+  }, [setFocusedIdentity, setRemoteAudioMuted]);
 
   // Auto-exit focus if focused participant leaves
   useEffect(() => {
@@ -184,7 +173,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = true }
         p => p.identity === state.focusedIdentity
       );
       if (!focusedExists) {
-        console.log('[GESTURE] Focused participant left → auto-exit focus');
+        if (DEBUG) console.log('[GESTURE] Focused participant left → auto-exit focus');
         setFocusedIdentity(null);
         // Audio will be restored automatically since participant is gone
       }
@@ -193,6 +182,13 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = true }
 
   return (
     <GestureHandlerRootView style={styles.root}>
+      <TouchableOpacity
+        onPress={() => onExitLive?.()}
+        style={styles.backButton}
+      >
+        <Text style={styles.backButtonText}>‹ Back</Text>
+      </TouchableOpacity>
+
       {/* Main grid - ALWAYS mounted, never unmounts */}
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.gridContainer}>
@@ -227,8 +223,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = true }
           <MenuOverlay
             visible={state.activeOverlay === 'menu'}
             onClose={handleCloseOverlay}
-            coinBalance={state.coinBalance}
-            diamondBalance={state.diamondBalance}
+            onOpenWallet={onNavigateWallet}
           />
 
           <StatsOverlay
@@ -263,6 +258,23 @@ const styles = StyleSheet.create({
   },
   gridContainer: {
     flex: 1,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    zIndex: 50,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  backButtonText: {
+    color: '#5E9BFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
 

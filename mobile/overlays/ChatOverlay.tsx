@@ -29,15 +29,8 @@ interface ChatOverlayProps {
   onClose: () => void;
 }
 
-// Mock messages for UI scaffolding
-const MOCK_MESSAGES: Message[] = [
-  { id: '1', username: 'User1', text: 'Hey everyone!', timestamp: Date.now() - 60000 },
-  { id: '2', username: 'User2', text: 'Welcome to the stream 🎉', timestamp: Date.now() - 50000 },
-  { id: '3', username: 'User3', text: 'This is amazing!', timestamp: Date.now() - 40000 },
-];
-
 export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) => {
-  const [messages] = useState<Message[]>(MOCK_MESSAGES);
+  const messages: Message[] = [];
   const [inputText, setInputText] = useState('');
   
   const translateY = useSharedValue(0);
@@ -64,8 +57,6 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) =>
   if (!visible) return null;
 
   const handleSend = () => {
-    // TODO: Implement actual chat send
-    console.log('[PLACEHOLDER] Send message:', inputText);
     setInputText('');
   };
 
@@ -82,12 +73,19 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) =>
 
             {/* Messages list */}
             <ScrollView style={styles.messageList} contentContainerStyle={styles.messageContent}>
-              {messages.map((msg) => (
-                <View key={msg.id} style={styles.messageItem}>
-                  <Text style={styles.messageUsername}>{msg.username}</Text>
-                  <Text style={styles.messageText}>{msg.text}</Text>
+              {messages.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyTitle}>Chat coming soon</Text>
+                  <Text style={styles.emptySubtitle}>Messages will appear here when chat is enabled.</Text>
                 </View>
-              ))}
+              ) : (
+                messages.map((msg) => (
+                  <View key={msg.id} style={styles.messageItem}>
+                    <Text style={styles.messageUsername}>{msg.username}</Text>
+                    <Text style={styles.messageText}>{msg.text}</Text>
+                  </View>
+                ))
+              )}
             </ScrollView>
 
             {/* Input area */}
@@ -99,12 +97,13 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) =>
                 style={styles.input}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder="Type a message..."
+                placeholder="Chat disabled"
                 placeholderTextColor="#888"
                 returnKeyType="send"
                 onSubmitEditing={handleSend}
+                editable={false}
               />
-              <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+              <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled>
                 <Text style={styles.sendButtonText}>Send</Text>
               </TouchableOpacity>
             </KeyboardAvoidingView>
@@ -155,6 +154,27 @@ const styles = StyleSheet.create({
   },
   messageContent: {
     paddingBottom: 16,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#9aa0a6',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   messageItem: {
     marginBottom: 12,

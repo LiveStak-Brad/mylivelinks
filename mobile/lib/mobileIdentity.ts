@@ -4,6 +4,8 @@
  * Safe for startup: uses in-memory fallback if SecureStore unavailable
  */
 
+import * as SecureStore from 'expo-secure-store';
+
 const IDENTITY_KEY = 'mylivelinks_mobile_identity';
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
@@ -32,9 +34,6 @@ export async function getMobileIdentity(): Promise<string> {
   }
 
   try {
-    // Lazy-load SecureStore only when needed
-    const SecureStore = await import('expo-secure-store');
-    
     // Try to get existing identity
     const existing = await SecureStore.getItemAsync(IDENTITY_KEY);
     if (existing) {
@@ -71,7 +70,6 @@ export async function getMobileIdentity(): Promise<string> {
 export async function clearMobileIdentity(): Promise<void> {
   cachedIdentity = null;
   try {
-    const SecureStore = await import('expo-secure-store');
     await SecureStore.deleteItemAsync(IDENTITY_KEY);
     if (DEBUG) {
       console.log('[IDENTITY] Cleared');

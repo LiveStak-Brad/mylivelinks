@@ -215,7 +215,25 @@ RETURNS bigint AS $$
 DECLARE
   v_ledger_id bigint;
   v_purchase_id bigint;
+  v_has_user_id boolean;
+  v_has_profile_id boolean;
 BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'coin_purchases'
+      AND column_name = 'user_id'
+  ) INTO v_has_user_id;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'coin_purchases'
+      AND column_name = 'profile_id'
+  ) INTO v_has_profile_id;
+
   SELECT id INTO v_ledger_id
   FROM public.ledger_entries
   WHERE idempotency_key = p_idempotency_key;
@@ -265,52 +283,109 @@ BEGIN
   WHERE id = p_user_id;
 
   BEGIN
-    INSERT INTO public.coin_purchases (
-      profile_id,
-      platform,
-      payment_provider,
-      provider_event_id,
-      provider_payment_id,
-      provider_order_id,
-      coin_amount,
-      coins_awarded,
-      usd_amount,
-      amount_usd_cents,
-      stripe_price_id,
-      stripe_charge_id,
-      stripe_balance_txn_id,
-      stripe_fee_cents,
-      stripe_net_cents,
-      ledger_entry_id,
-      status,
-      confirmed_at,
-      metadata
-    )
-    VALUES (
-      p_user_id,
-      'web',
-      'stripe',
-      p_idempotency_key,
-      p_provider_ref,
-      p_provider_ref,
-      p_coins_amount,
-      p_coins_amount,
-      (p_amount_usd_cents::numeric / 100.0),
-      p_amount_usd_cents,
-      NULL,
-      NULL,
-      NULL,
-      NULL,
-      NULL,
-      v_ledger_id,
-      'confirmed',
-      now(),
-      jsonb_build_object(
-        'idempotency_key', p_idempotency_key,
-        'provider_ref', p_provider_ref
-      )
-    )
-    RETURNING id INTO v_purchase_id;
+    IF v_has_user_id THEN
+      EXECUTE $SQL$
+        INSERT INTO public.coin_purchases (
+          user_id,
+          platform,
+          payment_provider,
+          provider_event_id,
+          provider_payment_id,
+          provider_order_id,
+          coin_amount,
+          coins_awarded,
+          usd_amount,
+          amount_usd_cents,
+          stripe_price_id,
+          stripe_charge_id,
+          stripe_balance_txn_id,
+          stripe_fee_cents,
+          stripe_net_cents,
+          ledger_entry_id,
+          status,
+          confirmed_at,
+          metadata
+        )
+        VALUES (
+          $1,
+          'web',
+          'stripe',
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          ($7::numeric / 100.0),
+          $7,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          $8,
+          'confirmed',
+          now(),
+          jsonb_build_object(
+            'idempotency_key', $2,
+            'provider_ref', $3
+          )
+        )
+        RETURNING id
+      $SQL$
+      INTO v_purchase_id
+      USING p_user_id, p_idempotency_key, p_provider_ref, p_provider_ref, p_coins_amount, p_coins_amount, p_amount_usd_cents, v_ledger_id;
+    ELSIF v_has_profile_id THEN
+      EXECUTE $SQL$
+        INSERT INTO public.coin_purchases (
+          profile_id,
+          platform,
+          payment_provider,
+          provider_event_id,
+          provider_payment_id,
+          provider_order_id,
+          coin_amount,
+          coins_awarded,
+          usd_amount,
+          amount_usd_cents,
+          stripe_price_id,
+          stripe_charge_id,
+          stripe_balance_txn_id,
+          stripe_fee_cents,
+          stripe_net_cents,
+          ledger_entry_id,
+          status,
+          confirmed_at,
+          metadata
+        )
+        VALUES (
+          $1,
+          'web',
+          'stripe',
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          ($7::numeric / 100.0),
+          $7,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          $8,
+          'confirmed',
+          now(),
+          jsonb_build_object(
+            'idempotency_key', $2,
+            'provider_ref', $3
+          )
+        )
+        RETURNING id
+      $SQL$
+      INTO v_purchase_id
+      USING p_user_id, p_idempotency_key, p_provider_ref, p_provider_ref, p_coins_amount, p_coins_amount, p_amount_usd_cents, v_ledger_id;
+    END IF;
   EXCEPTION
     WHEN unique_violation THEN
       UPDATE public.coin_purchases
@@ -320,6 +395,10 @@ BEGIN
         ledger_entry_id = COALESCE(public.coin_purchases.ledger_entry_id, v_ledger_id)
       WHERE public.coin_purchases.provider_payment_id = p_provider_ref
          OR public.coin_purchases.provider_order_id = p_provider_ref;
+    WHEN not_null_violation THEN
+      NULL;
+    WHEN undefined_column THEN
+      NULL;
   END;
 
   RETURN v_ledger_id;
