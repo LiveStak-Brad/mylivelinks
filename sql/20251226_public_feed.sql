@@ -74,15 +74,38 @@ CREATE TABLE IF NOT EXISTS public.post_gifts (
   sender_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   recipient_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   coins bigint NOT NULL CHECK (coins > 0),
+  gift_id bigint,
   request_id text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (request_id)
 );
 
+ALTER TABLE public.post_gifts
+  ADD COLUMN IF NOT EXISTS gift_id bigint;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = 'public'
+      AND t.relname = 'post_gifts'
+      AND c.conname = 'post_gifts_gift_id_fkey'
+  ) THEN
+    ALTER TABLE public.post_gifts
+      ADD CONSTRAINT post_gifts_gift_id_fkey
+      FOREIGN KEY (gift_id) REFERENCES public.gifts(id) ON DELETE SET NULL;
+  END IF;
+END;
+$$;
+
 CREATE INDEX IF NOT EXISTS idx_post_gifts_post_id ON public.post_gifts (post_id);
 CREATE INDEX IF NOT EXISTS idx_post_gifts_sender_id ON public.post_gifts (sender_id);
 CREATE INDEX IF NOT EXISTS idx_post_gifts_recipient_id ON public.post_gifts (recipient_id);
 CREATE INDEX IF NOT EXISTS idx_post_gifts_created_at_desc ON public.post_gifts (created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_post_gifts_gift_id_unique ON public.post_gifts (gift_id) WHERE gift_id IS NOT NULL;
 
 ALTER TABLE public.post_gifts ENABLE ROW LEVEL SECURITY;
 
@@ -105,15 +128,38 @@ CREATE TABLE IF NOT EXISTS public.comment_gifts (
   sender_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   recipient_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   coins bigint NOT NULL CHECK (coins > 0),
+  gift_id bigint,
   request_id text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (request_id)
 );
 
+ALTER TABLE public.comment_gifts
+  ADD COLUMN IF NOT EXISTS gift_id bigint;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = 'public'
+      AND t.relname = 'comment_gifts'
+      AND c.conname = 'comment_gifts_gift_id_fkey'
+  ) THEN
+    ALTER TABLE public.comment_gifts
+      ADD CONSTRAINT comment_gifts_gift_id_fkey
+      FOREIGN KEY (gift_id) REFERENCES public.gifts(id) ON DELETE SET NULL;
+  END IF;
+END;
+$$;
+
 CREATE INDEX IF NOT EXISTS idx_comment_gifts_comment_id ON public.comment_gifts (comment_id);
 CREATE INDEX IF NOT EXISTS idx_comment_gifts_sender_id ON public.comment_gifts (sender_id);
 CREATE INDEX IF NOT EXISTS idx_comment_gifts_recipient_id ON public.comment_gifts (recipient_id);
 CREATE INDEX IF NOT EXISTS idx_comment_gifts_created_at_desc ON public.comment_gifts (created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_comment_gifts_gift_id_unique ON public.comment_gifts (gift_id) WHERE gift_id IS NOT NULL;
 
 ALTER TABLE public.comment_gifts ENABLE ROW LEVEL SECURITY;
 
@@ -176,10 +222,11 @@ AS $$
     GROUP BY c.post_id
   ),
   gift_totals AS (
-    SELECT g.post_id, COALESCE(SUM(g.coins), 0)::bigint AS gift_total_coins
-    FROM public.post_gifts g
-    WHERE g.post_id IN (SELECT id FROM base_posts)
-    GROUP BY g.post_id
+    SELECT pg.post_id, COALESCE(SUM(COALESCE(gg.coin_amount, pg.coins)), 0)::bigint AS gift_total_coins
+    FROM public.post_gifts pg
+    LEFT JOIN public.gifts gg ON gg.id = pg.gift_id
+    WHERE pg.post_id IN (SELECT id FROM base_posts)
+    GROUP BY pg.post_id
   )
   SELECT
     bp.id AS post_id,
@@ -217,11 +264,10 @@ SET row_security = off
 AS $$
 DECLARE
   v_recipient_id uuid;
-  v_sender_balance bigint;
   v_gift_id uuid;
   v_existing_coins bigint;
-  v_sender_idempotency_key text;
-  v_recipient_idempotency_key text;
+  v_canonical_gift_id bigint;
+  v_send_result jsonb;
 BEGIN
   IF p_request_id IS NULL OR length(trim(p_request_id)) = 0 THEN
     RAISE EXCEPTION 'request_id is required';
@@ -241,15 +287,16 @@ BEGIN
 
   PERFORM pg_advisory_xact_lock(hashtext('post_gift:' || p_request_id)::bigint);
 
-  SELECT pg.id, pg.recipient_id, pg.coins
-  INTO v_gift_id, v_recipient_id, v_existing_coins
+  SELECT pg.id, pg.recipient_id, pg.coins, pg.gift_id
+  INTO v_gift_id, v_recipient_id, v_existing_coins, v_canonical_gift_id
   FROM public.post_gifts pg
   WHERE pg.request_id = p_request_id
   LIMIT 1;
 
   IF v_gift_id IS NOT NULL THEN
     RETURN jsonb_build_object(
-      'gift_id', v_gift_id,
+      'gift_id', v_canonical_gift_id,
+      'feed_gift_id', v_gift_id,
       'already_existed', true,
       'recipient_id', v_recipient_id,
       'coins_spent', COALESCE(v_existing_coins, p_coins_amount),
@@ -269,70 +316,24 @@ BEGIN
     RAISE EXCEPTION 'Cannot gift yourself';
   END IF;
 
-  SELECT pr.coin_balance INTO v_sender_balance
-  FROM public.profiles pr
-  WHERE pr.id = p_sender_id
-  FOR UPDATE;
+  v_send_result := public.send_gift_v2(
+    p_sender_id,
+    v_recipient_id,
+    p_coins_amount,
+    NULL,
+    NULL,
+    p_request_id
+  );
 
-  IF v_sender_balance IS NULL THEN
-    RAISE EXCEPTION 'Sender profile not found';
-  END IF;
+  v_canonical_gift_id := NULLIF(v_send_result->>'gift_id', '')::bigint;
 
-  IF v_sender_balance < p_coins_amount THEN
-    RAISE EXCEPTION 'Insufficient coin balance. Have: %, Need: %', v_sender_balance, p_coins_amount;
-  END IF;
-
-  INSERT INTO public.post_gifts (post_id, sender_id, recipient_id, coins, request_id)
-  VALUES (p_post_id, p_sender_id, v_recipient_id, p_coins_amount, p_request_id)
+  INSERT INTO public.post_gifts (post_id, sender_id, recipient_id, coins, gift_id, request_id)
+  VALUES (p_post_id, p_sender_id, v_recipient_id, p_coins_amount, v_canonical_gift_id, p_request_id)
   RETURNING id INTO v_gift_id;
 
-  -- Atomic wallet updates
-  UPDATE public.profiles
-  SET coin_balance = coin_balance - p_coins_amount,
-      total_spent = total_spent + p_coins_amount,
-      total_gifts_sent = total_gifts_sent + p_coins_amount,
-      last_transaction_at = CURRENT_TIMESTAMP
-  WHERE id = p_sender_id;
-
-  UPDATE public.profiles
-  SET earnings_balance = earnings_balance + p_coins_amount,
-      total_gifts_received = total_gifts_received + p_coins_amount,
-      last_transaction_at = CURRENT_TIMESTAMP
-  WHERE id = v_recipient_id;
-
-  v_sender_idempotency_key := 'feed:post_gift:sender:' || p_request_id;
-  v_recipient_idempotency_key := 'feed:post_gift:recipient:' || p_request_id;
-
-  INSERT INTO public.ledger_entries (
-    idempotency_key, user_id, entry_type, delta_coins, delta_diamonds, provider_ref, metadata
-  )
-  VALUES (
-    v_sender_idempotency_key,
-    p_sender_id,
-    'coin_spend_gift',
-    -p_coins_amount,
-    0,
-    'post_gift:' || v_gift_id,
-    jsonb_build_object('post_id', p_post_id, 'gift_id', v_gift_id, 'recipient_id', v_recipient_id, 'coins_spent', p_coins_amount)
-  )
-  ON CONFLICT (idempotency_key) DO NOTHING;
-
-  INSERT INTO public.ledger_entries (
-    idempotency_key, user_id, entry_type, delta_coins, delta_diamonds, provider_ref, metadata
-  )
-  VALUES (
-    v_recipient_idempotency_key,
-    v_recipient_id,
-    'diamond_earn',
-    0,
-    p_coins_amount,
-    'post_gift:' || v_gift_id,
-    jsonb_build_object('post_id', p_post_id, 'gift_id', v_gift_id, 'sender_id', p_sender_id, 'diamonds_awarded', p_coins_amount)
-  )
-  ON CONFLICT (idempotency_key) DO NOTHING;
-
   RETURN jsonb_build_object(
-    'gift_id', v_gift_id,
+    'gift_id', v_canonical_gift_id,
+    'feed_gift_id', v_gift_id,
     'recipient_id', v_recipient_id,
     'coins_spent', p_coins_amount,
     'diamonds_awarded', p_coins_amount,
@@ -360,12 +361,11 @@ SET row_security = off
 AS $$
 DECLARE
   v_recipient_id uuid;
-  v_sender_balance bigint;
   v_gift_id uuid;
   v_post_id uuid;
   v_existing_coins bigint;
-  v_sender_idempotency_key text;
-  v_recipient_idempotency_key text;
+  v_canonical_gift_id bigint;
+  v_send_result jsonb;
 BEGIN
   IF p_request_id IS NULL OR length(trim(p_request_id)) = 0 THEN
     RAISE EXCEPTION 'request_id is required';
@@ -385,15 +385,16 @@ BEGIN
 
   PERFORM pg_advisory_xact_lock(hashtext('comment_gift:' || p_request_id)::bigint);
 
-  SELECT cg.id, cg.recipient_id, cg.coins
-  INTO v_gift_id, v_recipient_id, v_existing_coins
+  SELECT cg.id, cg.recipient_id, cg.coins, cg.gift_id
+  INTO v_gift_id, v_recipient_id, v_existing_coins, v_canonical_gift_id
   FROM public.comment_gifts cg
   WHERE cg.request_id = p_request_id
   LIMIT 1;
 
   IF v_gift_id IS NOT NULL THEN
     RETURN jsonb_build_object(
-      'gift_id', v_gift_id,
+      'gift_id', v_canonical_gift_id,
+      'feed_gift_id', v_gift_id,
       'already_existed', true,
       'recipient_id', v_recipient_id,
       'coins_spent', COALESCE(v_existing_coins, p_coins_amount),
@@ -414,70 +415,24 @@ BEGIN
     RAISE EXCEPTION 'Cannot gift yourself';
   END IF;
 
-  SELECT pr.coin_balance INTO v_sender_balance
-  FROM public.profiles pr
-  WHERE pr.id = p_sender_id
-  FOR UPDATE;
+  v_send_result := public.send_gift_v2(
+    p_sender_id,
+    v_recipient_id,
+    p_coins_amount,
+    NULL,
+    NULL,
+    p_request_id
+  );
 
-  IF v_sender_balance IS NULL THEN
-    RAISE EXCEPTION 'Sender profile not found';
-  END IF;
+  v_canonical_gift_id := NULLIF(v_send_result->>'gift_id', '')::bigint;
 
-  IF v_sender_balance < p_coins_amount THEN
-    RAISE EXCEPTION 'Insufficient coin balance. Have: %, Need: %', v_sender_balance, p_coins_amount;
-  END IF;
-
-  INSERT INTO public.comment_gifts (comment_id, sender_id, recipient_id, coins, request_id)
-  VALUES (p_comment_id, p_sender_id, v_recipient_id, p_coins_amount, p_request_id)
+  INSERT INTO public.comment_gifts (comment_id, sender_id, recipient_id, coins, gift_id, request_id)
+  VALUES (p_comment_id, p_sender_id, v_recipient_id, p_coins_amount, v_canonical_gift_id, p_request_id)
   RETURNING id INTO v_gift_id;
 
-  -- Atomic wallet updates
-  UPDATE public.profiles
-  SET coin_balance = coin_balance - p_coins_amount,
-      total_spent = total_spent + p_coins_amount,
-      total_gifts_sent = total_gifts_sent + p_coins_amount,
-      last_transaction_at = CURRENT_TIMESTAMP
-  WHERE id = p_sender_id;
-
-  UPDATE public.profiles
-  SET earnings_balance = earnings_balance + p_coins_amount,
-      total_gifts_received = total_gifts_received + p_coins_amount,
-      last_transaction_at = CURRENT_TIMESTAMP
-  WHERE id = v_recipient_id;
-
-  v_sender_idempotency_key := 'feed:comment_gift:sender:' || p_request_id;
-  v_recipient_idempotency_key := 'feed:comment_gift:recipient:' || p_request_id;
-
-  INSERT INTO public.ledger_entries (
-    idempotency_key, user_id, entry_type, delta_coins, delta_diamonds, provider_ref, metadata
-  )
-  VALUES (
-    v_sender_idempotency_key,
-    p_sender_id,
-    'coin_spend_gift',
-    -p_coins_amount,
-    0,
-    'comment_gift:' || v_gift_id,
-    jsonb_build_object('comment_id', p_comment_id, 'post_id', v_post_id, 'gift_id', v_gift_id, 'recipient_id', v_recipient_id, 'coins_spent', p_coins_amount)
-  )
-  ON CONFLICT (idempotency_key) DO NOTHING;
-
-  INSERT INTO public.ledger_entries (
-    idempotency_key, user_id, entry_type, delta_coins, delta_diamonds, provider_ref, metadata
-  )
-  VALUES (
-    v_recipient_idempotency_key,
-    v_recipient_id,
-    'diamond_earn',
-    0,
-    p_coins_amount,
-    'comment_gift:' || v_gift_id,
-    jsonb_build_object('comment_id', p_comment_id, 'post_id', v_post_id, 'gift_id', v_gift_id, 'sender_id', p_sender_id, 'diamonds_awarded', p_coins_amount)
-  )
-  ON CONFLICT (idempotency_key) DO NOTHING;
-
   RETURN jsonb_build_object(
-    'gift_id', v_gift_id,
+    'gift_id', v_canonical_gift_id,
+    'feed_gift_id', v_gift_id,
     'recipient_id', v_recipient_id,
     'coins_spent', p_coins_amount,
     'diamonds_awarded', p_coins_amount,
