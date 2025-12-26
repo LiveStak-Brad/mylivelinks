@@ -45,6 +45,38 @@ export async function uploadAvatar(
   return urlData.publicUrl;
 }
 
+export async function uploadPostMedia(profileId: string, file: File): Promise<string> {
+  const supabase = createClient();
+
+  const extRaw =
+    file.name.split('.').pop() ||
+    (file.type.startsWith('video/') ? 'mp4' : file.type.startsWith('image/') ? file.type.split('/')[1] : 'jpg');
+  const ext = String(extRaw).toLowerCase().replace(/[^a-z0-9]/g, '') || (file.type.startsWith('video/') ? 'mp4' : 'jpg');
+
+  const id =
+    typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function'
+      ? (crypto as any).randomUUID()
+      : String(Date.now());
+  const filePath = `${profileId}/feed/${Date.now()}-${id}.${ext}`;
+
+  const { error } = await supabase.storage.from('post-media').upload(filePath, file, {
+    cacheControl: '3600',
+    upsert: false,
+  });
+
+  if (error) {
+    console.error('Error uploading post media:', error);
+    throw new Error(`Failed to upload post media: ${error.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from('post-media').getPublicUrl(filePath);
+  if (!urlData?.publicUrl) {
+    throw new Error('Failed to get post media URL');
+  }
+
+  return urlData.publicUrl;
+}
+
 /**
  * Upload pinned post media to Supabase Storage
  * Path: pinned-posts/{profile_id}/pinned.{ext}

@@ -292,10 +292,10 @@ export default function GlobalHeader() {
               {/* Trophy - Leaderboard Button */}
               <button
                 onClick={() => setShowLeaderboard(true)}
-                className="p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
+                className="p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring mr-2"
                 aria-label="View Leaderboards"
               >
-                <Trophy className="w-5 h-5 text-amber-500" />
+                <Trophy className="w-6 h-6 text-amber-500" />
               </button>
 
               {/* Navigation - Desktop */}
