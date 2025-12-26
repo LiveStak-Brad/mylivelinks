@@ -295,6 +295,8 @@ export default function GifterLevelsPage() {
           </div>
         </div>
 
+      </div>
+
       {/* TierDetail Modal */}
       {selectedTier && (
         <TierDetail

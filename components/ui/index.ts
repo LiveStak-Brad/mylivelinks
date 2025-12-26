@@ -48,6 +48,7 @@ export {
 export { Badge, type BadgeProps } from './Badge';
 export { Chip, type ChipProps } from './Chip';
 export { Tooltip, type TooltipProps } from './Tooltip';
+export { StatusBadge, LiveDot, type StatusBadgeProps } from './StatusBadge';
 
 // Feedback Components
 export { 

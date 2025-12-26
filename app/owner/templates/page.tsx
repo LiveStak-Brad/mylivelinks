@@ -14,7 +14,8 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { PageShell, PageHeader, PageSection, SkeletonCard } from '@/components/layout';
+import { SkeletonCard } from '@/components/ui';
+import { PageShell, PageHeader, PageSection } from '@/components/layout';
 import TemplateCard, { RoomTemplate } from '@/components/owner/TemplateCard';
 
 export default function OwnerTemplatesPage() {

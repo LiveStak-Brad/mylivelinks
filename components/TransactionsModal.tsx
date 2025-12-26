@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, Gift, ArrowUpRight, ArrowDownLeft, Coins, Inbox } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
-import { Modal, ModalHeader, ModalBody, ModalFooter, Button, Skeleton, EmptyState } from '@/components/ui';
+import { Modal, ModalHeader, ModalBody, ModalFooter, Button, Skeleton, EmptyState, IconButton } from '@/components/ui';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
 import Link from 'next/link';
 
@@ -77,10 +77,15 @@ export default function TransactionsModal({ isOpen, onClose }: TransactionsModal
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
-      <ModalHeader onClose={onClose}>
-        <div className="flex items-center gap-2">
-          <Gift className="w-5 h-5 text-primary" />
-          <span>Gifts & Transactions</span>
+      <ModalHeader>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Gift className="w-5 h-5 text-primary" />
+            <span>Gifts & Transactions</span>
+          </div>
+          <IconButton aria-label="Close" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </IconButton>
         </div>
       </ModalHeader>
       

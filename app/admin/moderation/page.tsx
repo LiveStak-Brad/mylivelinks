@@ -314,21 +314,23 @@ export default function ModerationPage() {
                       <IconButton
                         variant="ghost"
                         size="sm"
-                        icon={<Check className="w-4 h-4" />}
                         onClick={() => handleResolveReport(report.id, 'resolved')}
                         disabled={actionLoading === report.id}
                         aria-label="Resolve report"
                         className="text-success hover:bg-success/10"
-                      />
+                      >
+                        <Check className="w-4 h-4" />
+                      </IconButton>
                       <IconButton
                         variant="ghost"
                         size="sm"
-                        icon={<X className="w-4 h-4" />}
                         onClick={() => handleResolveReport(report.id, 'dismissed')}
                         disabled={actionLoading === report.id}
                         aria-label="Dismiss report"
                         className="text-muted-foreground hover:bg-muted"
-                      />
+                      >
+                        <X className="w-4 h-4" />
+                      </IconButton>
                     </div>
                   )}
                 </div>
@@ -350,7 +352,7 @@ export default function ModerationPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             leftIcon={<Search className="w-4 h-4" />}
-            size="lg"
+            inputSize="lg"
           />
 
           {/* User Table */}
@@ -397,15 +399,15 @@ export default function ModerationPage() {
                           <IconButton
                             variant="ghost"
                             size="sm"
-                            icon={<Eye className="w-4 h-4" />}
                             onClick={() => router.push(`/${user.username}`)}
                             aria-label="View profile"
                             className="text-primary"
-                          />
+                          >
+                            <Eye className="w-4 h-4" />
+                          </IconButton>
                           <IconButton
                             variant="ghost"
                             size="sm"
-                            icon={<MessageSquare className="w-4 h-4" />}
                             onClick={() => user.is_muted 
                               ? handleMuteUser(user.id, false) 
                               : handleMuteUser(user.id, true, 60)
@@ -413,16 +415,19 @@ export default function ModerationPage() {
                             disabled={actionLoading === user.id}
                             aria-label={user.is_muted ? 'Unmute user' : 'Mute user (1 hour)'}
                             className={user.is_muted ? 'text-success' : 'text-warning'}
-                          />
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </IconButton>
                           <IconButton
                             variant="ghost"
                             size="sm"
-                            icon={<Ban className="w-4 h-4" />}
                             onClick={() => handleBanUser(user.id, !user.is_banned)}
                             disabled={actionLoading === user.id}
                             aria-label={user.is_banned ? 'Unban user' : 'Ban user'}
                             className={user.is_banned ? 'text-success' : 'text-destructive'}
-                          />
+                          >
+                            <Ban className="w-4 h-4" />
+                          </IconButton>
                         </div>
                       </td>
                     </tr>

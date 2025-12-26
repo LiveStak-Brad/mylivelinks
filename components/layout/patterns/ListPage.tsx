@@ -18,7 +18,7 @@
 import { ReactNode } from 'react';
 import { PageShell, PageHeader, PageSection } from '../PageShell';
 import { Grid } from '../Grid';
-import { SkeletonCard } from '../Skeleton';
+import { SkeletonCard } from '@/components/ui';
 
 export interface ListPageProps<T> {
   /** Page title */

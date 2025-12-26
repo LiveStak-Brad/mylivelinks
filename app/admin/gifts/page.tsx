@@ -564,7 +564,7 @@ export default function GiftsAdminPage() {
                             onChange={(e) => setEditingGift({ ...editingGift, emoji: e.target.value })}
                             className="w-16 text-center"
                             maxLength={2}
-                            size="sm"
+                            inputSize="sm"
                           />
                         ) : (
                           gift.emoji
@@ -575,7 +575,7 @@ export default function GiftsAdminPage() {
                           <Input
                             value={editingGift.name}
                             onChange={(e) => setEditingGift({ ...editingGift, name: e.target.value })}
-                            size="sm"
+                            inputSize="sm"
                           />
                         ) : (
                           <span className="font-medium text-foreground">{gift.name}</span>
@@ -588,7 +588,7 @@ export default function GiftsAdminPage() {
                             value={editingGift.coin_cost}
                             onChange={(e) => setEditingGift({ ...editingGift, coin_cost: parseInt(e.target.value) || 0 })}
                             className="w-24"
-                            size="sm"
+                            inputSize="sm"
                             min={1}
                           />
                         ) : (
@@ -618,37 +618,41 @@ export default function GiftsAdminPage() {
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              icon={<Save className="w-4 h-4" />}
                               onClick={handleUpdateGift}
                               aria-label="Save changes"
                               className="text-success"
-                            />
+                            >
+                              <Save className="w-4 h-4" />
+                            </IconButton>
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              icon={<X className="w-4 h-4" />}
                               onClick={() => setEditingGift(null)}
                               aria-label="Cancel editing"
-                            />
+                            >
+                              <X className="w-4 h-4" />
+                            </IconButton>
                           </div>
                         ) : (
                           <div className="flex justify-end gap-1">
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              icon={<Edit className="w-4 h-4" />}
                               onClick={() => setEditingGift(gift)}
                               aria-label="Edit gift"
                               className="text-primary"
-                            />
+                            >
+                              <Edit className="w-4 h-4" />
+                            </IconButton>
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              icon={<Trash2 className="w-4 h-4" />}
                               onClick={() => handleDeleteGift(gift.id)}
                               aria-label="Delete gift"
                               className="text-destructive"
-                            />
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </IconButton>
                           </div>
                         )}
                       </td>
@@ -729,7 +733,7 @@ export default function GiftsAdminPage() {
                           <Input
                             value={editingPack.name}
                             onChange={(e) => setEditingPack({ ...editingPack, name: e.target.value })}
-                            size="sm"
+                            inputSize="sm"
                           />
                         ) : (
                           <span className="font-medium text-foreground">{pack.name}</span>
@@ -742,7 +746,7 @@ export default function GiftsAdminPage() {
                             value={editingPack.coins}
                             onChange={(e) => setEditingPack({ ...editingPack, coins: parseInt(e.target.value) || 0 })}
                             className="w-24"
-                            size="sm"
+                            inputSize="sm"
                           />
                         ) : (
                           <span className="text-warning">🪙 {pack.coins.toLocaleString()}</span>
@@ -755,7 +759,7 @@ export default function GiftsAdminPage() {
                             value={editingPack.bonus_coins}
                             onChange={(e) => setEditingPack({ ...editingPack, bonus_coins: parseInt(e.target.value) || 0 })}
                             className="w-24"
-                            size="sm"
+                            inputSize="sm"
                           />
                         ) : pack.bonus_coins > 0 ? (
                           <span className="text-success">+{pack.bonus_coins.toLocaleString()}</span>
@@ -770,7 +774,7 @@ export default function GiftsAdminPage() {
                             value={editingPack.price_usd}
                             onChange={(e) => setEditingPack({ ...editingPack, price_usd: parseFloat(e.target.value) || 0 })}
                             className="w-24"
-                            size="sm"
+                            inputSize="sm"
                             step={0.01}
                           />
                         ) : (
@@ -818,37 +822,41 @@ export default function GiftsAdminPage() {
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              icon={<Save className="w-4 h-4" />}
                               onClick={handleUpdatePack}
                               aria-label="Save changes"
                               className="text-success"
-                            />
+                            >
+                              <Save className="w-4 h-4" />
+                            </IconButton>
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              icon={<X className="w-4 h-4" />}
                               onClick={() => setEditingPack(null)}
                               aria-label="Cancel editing"
-                            />
+                            >
+                              <X className="w-4 h-4" />
+                            </IconButton>
                           </div>
                         ) : (
                           <div className="flex justify-end gap-1">
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              icon={<Edit className="w-4 h-4" />}
                               onClick={() => setEditingPack(pack)}
                               aria-label="Edit pack"
                               className="text-primary"
-                            />
+                            >
+                              <Edit className="w-4 h-4" />
+                            </IconButton>
                             <IconButton
                               variant="ghost"
                               size="sm"
-                              icon={<Trash2 className="w-4 h-4" />}
                               onClick={() => handleDeletePack(pack.id)}
                               aria-label="Delete pack"
                               className="text-destructive"
-                            />
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </IconButton>
                           </div>
                         )}
                       </td>

@@ -421,6 +421,27 @@ export default function WalletPage() {
           <CardContent className="pt-4">
             {/* Rate info */}
             <div className="mb-6 p-4 rounded-xl bg-muted/50 border border-border space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Cashout rate</span>
+                <span className="font-semibold text-foreground">100 💎 = $1.00 USD</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Minimum cashout</span>
+                <span className="font-semibold text-foreground">10,000 💎 ($100)</span>
+              </div>
+              <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
+                No additional fees at cashout.
+              </p>
+            </div>
+
+            {!connectStatus?.hasAccount ? (
+              <div className="text-center py-6 space-y-4">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Gem className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground mb-1">Set Up Stripe Connect</p>
+                  <p className="text-sm text-muted-foreground">
                     Connect with Stripe to receive your earnings
                   </p>
                 </div>

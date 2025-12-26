@@ -201,10 +201,11 @@ export default function ChangeUsernamePage() {
                     {suggestions.map((suggestion) => (
                       <Chip
                         key={suggestion}
-                        label={suggestion}
                         variant="outline"
                         onClick={() => handleUsernameChange(suggestion)}
-                      />
+                      >
+                        {suggestion}
+                      </Chip>
                     ))}
                   </div>
                 </div>

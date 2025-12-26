@@ -43,7 +43,7 @@ const FAQ_SECTIONS = [
       },
       {
         q: 'How do gift conversions work?',
-        a: 'When you send a gift, 60% of the coin value goes to the streamer as diamonds. The platform keeps 40% to maintain the service.',
+        a: 'When you send a gift, the streamer receives diamonds 1:1 with the coins you spent.',
       },
       {
         q: 'How do I cash out my diamonds?',

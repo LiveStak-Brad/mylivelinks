@@ -17,7 +17,7 @@
 
 import { ReactNode, useState } from 'react';
 import { PageShell, PageHeader, PageSection } from '../PageShell';
-import { Skeleton, SkeletonAvatar, SkeletonText } from '../Skeleton';
+import { Skeleton, SkeletonAvatar, SkeletonText } from '@/components/ui';
 
 export interface DetailPageProps {
   /** Back navigation */

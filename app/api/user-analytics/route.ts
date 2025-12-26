@@ -273,18 +273,18 @@ export async function GET(request: NextRequest) {
     // Gifts sent (as gifter)
     const { data: giftsSent } = await supabase
       .from('gifts')
-      .select('id, coins_spent, diamonds_awarded, recipient_id, created_at')
+      .select('id, coin_amount, recipient_id, sent_at')
       .eq('sender_id', profileId)
-      .gte('created_at', startIso)
-      .lte('created_at', endIso);
+      .gte('sent_at', startIso)
+      .lte('sent_at', endIso);
     
     if (giftsSent) {
       response.gifting.giftsSentCount = giftsSent.length;
-      response.gifting.totalCoinsSpent = giftsSent.reduce((sum, g) => sum + (g.coins_spent || 0), 0);
+      response.gifting.totalCoinsSpent = giftsSent.reduce((sum, g) => sum + ((g as any).coin_amount || 0), 0);
       response.gifting.avgGiftSize = giftsSent.length > 0 
         ? Math.round(response.gifting.totalCoinsSpent / giftsSent.length) 
         : 0;
-      response.gifting.biggestGift = Math.max(0, ...giftsSent.map(g => g.coins_spent || 0));
+      response.gifting.biggestGift = Math.max(0, ...giftsSent.map(g => (g as any).coin_amount || 0));
       response.overview.totalCoinsSpent = response.gifting.totalCoinsSpent;
       response.overview.totalGiftsSent = giftsSent.length;
       
@@ -293,7 +293,7 @@ export async function GET(request: NextRequest) {
       giftsSent.forEach(g => {
         const existing = recipientMap.get(g.recipient_id) || { coins: 0, count: 0 };
         recipientMap.set(g.recipient_id, {
-          coins: existing.coins + (g.coins_spent || 0),
+          coins: existing.coins + ((g as any).coin_amount || 0),
           count: existing.count + 1,
         });
       });
@@ -325,14 +325,15 @@ export async function GET(request: NextRequest) {
     // Gifts received (as creator)
     const { data: giftsReceived } = await supabase
       .from('gifts')
-      .select('id, coins_spent, diamonds_awarded, sender_id, created_at')
+      .select('id, coin_amount, sender_id, sent_at')
       .eq('recipient_id', profileId)
-      .gte('created_at', startIso)
-      .lte('created_at', endIso);
+      .gte('sent_at', startIso)
+      .lte('sent_at', endIso);
     
     if (giftsReceived) {
       response.earnings.giftsReceivedCount = giftsReceived.length;
-      response.earnings.diamondsEarned = giftsReceived.reduce((sum, g) => sum + (g.diamonds_awarded || 0), 0);
+      // Canonical gift economics: 1:1 coins -> diamonds
+      response.earnings.diamondsEarned = giftsReceived.reduce((sum, g) => sum + ((g as any).coin_amount || 0), 0);
       response.earnings.avgGiftReceived = giftsReceived.length > 0 
         ? Math.round(response.earnings.diamondsEarned / giftsReceived.length) 
         : 0;
@@ -344,7 +345,7 @@ export async function GET(request: NextRequest) {
       giftsReceived.forEach(g => {
         const existing = senderMap.get(g.sender_id) || { coins: 0, count: 0 };
         senderMap.set(g.sender_id, {
-          coins: existing.coins + (g.coins_spent || 0),
+          coins: existing.coins + ((g as any).coin_amount || 0),
           count: existing.count + 1,
         });
       });
@@ -471,13 +472,13 @@ export async function GET(request: NextRequest) {
       dateLabels.forEach(l => buckets.set(l, 0));
       
       giftsSent.forEach(g => {
-        const date = new Date(g.created_at);
+        const date = new Date((g as any).sent_at);
         const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const closest = dateLabels.reduce((prev, curr) => 
           Math.abs(new Date(curr).getTime() - date.getTime()) < Math.abs(new Date(prev).getTime() - date.getTime()) 
             ? curr : prev
         );
-        buckets.set(closest, (buckets.get(closest) || 0) + (g.coins_spent || 0));
+        buckets.set(closest, (buckets.get(closest) || 0) + ((g as any).coin_amount || 0));
       });
       
       response.charts.coinsSpentOverTime = dateLabels.map(label => ({
@@ -492,13 +493,13 @@ export async function GET(request: NextRequest) {
       dateLabels.forEach(l => buckets.set(l, 0));
       
       giftsReceived.forEach(g => {
-        const date = new Date(g.created_at);
+        const date = new Date((g as any).sent_at);
         const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const closest = dateLabels.reduce((prev, curr) => 
           Math.abs(new Date(curr).getTime() - date.getTime()) < Math.abs(new Date(prev).getTime() - date.getTime()) 
             ? curr : prev
         );
-        buckets.set(closest, (buckets.get(closest) || 0) + (g.diamonds_awarded || 0));
+        buckets.set(closest, (buckets.get(closest) || 0) + ((g as any).coin_amount || 0));
       });
       
       response.charts.diamondsEarnedOverTime = dateLabels.map(label => ({

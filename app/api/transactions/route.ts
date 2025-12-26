@@ -135,38 +135,24 @@ export async function GET(request: NextRequest) {
 
     // 1c) Gifts fallback for gift_received (diamonds) and/or gift_sent (if ledger is absent)
     {
-      // Attempt newer schema first
-      const attemptNew = await supabase
+      let rows: any[] | null = null;
+
+      const attempt = await supabase
         .from('gifts')
-        .select('id, sender_id, recipient_id, coins_spent, diamonds_awarded, created_at')
+        .select('id, sender_id, recipient_id, coin_amount, streamer_revenue, sent_at')
         .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-        .order('created_at', { ascending: false })
+        .order('sent_at', { ascending: false })
         .range(0, fetchCount - 1);
 
-      let rows: any[] | null = null;
-      let useSentAt = false;
-
-      if (!attemptNew.error && attemptNew.data) {
-        rows = attemptNew.data as any[];
-      } else {
-        const attemptOld = await supabase
-          .from('gifts')
-          .select('id, sender_id, recipient_id, coin_amount, streamer_revenue, sent_at')
-          .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-          .order('sent_at', { ascending: false })
-          .range(0, fetchCount - 1);
-
-        if (!attemptOld.error && attemptOld.data) {
-          rows = attemptOld.data as any[];
-          useSentAt = true;
-        }
+      if (!attempt.error && attempt.data) {
+        rows = attempt.data as any[];
       }
 
       if (rows) {
         for (const row of rows) {
-          const createdAt = toIsoString(useSentAt ? row.sent_at : row.created_at);
+          const createdAt = toIsoString(row.sent_at);
           if (row.sender_id === user.id) {
-            const coins = Number(row.coins_spent ?? row.coin_amount ?? 0);
+            const coins = Number(row.coin_amount ?? 0);
             transactions.push({
               id: `gf:sent:${row.id}`,
               type: 'gift_sent',
@@ -178,7 +164,9 @@ export async function GET(request: NextRequest) {
             });
           }
           if (row.recipient_id === user.id) {
-            const diamonds = Number(row.diamonds_awarded ?? row.streamer_revenue ?? 0);
+            // Canonical gift economics: 1:1 coins -> diamonds.
+            // For legacy rows, streamer_revenue should equal coin_amount if platform_revenue is 0.
+            const diamonds = Number(row.coin_amount ?? row.streamer_revenue ?? 0);
             transactions.push({
               id: `gf:recv:${row.id}`,
               type: 'gift_received',

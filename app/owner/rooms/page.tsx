@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { PageShell, PageHeader, PageSection, SkeletonCard } from '@/components/layout';
+import { SkeletonCard } from '@/components/ui';
+import { PageShell, PageHeader, PageSection } from '@/components/layout';
 import RoomRow, { RoomInstance } from '@/components/owner/RoomRow';
 import { RoomRolesPanel, RoleUser } from '@/components/admin';
 

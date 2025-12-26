@@ -288,13 +288,15 @@ DECLARE
     v_recipient_idempotency_key VARCHAR(255);
     v_existing_provider_ref VARCHAR(255);
     v_existing_gift_id BIGINT;
-    v_existing_coins_spent BIGINT;
-    v_existing_diamonds_awarded BIGINT;
-    v_existing_platform_fee BIGINT;
+    v_gift_type_id BIGINT;
 BEGIN
     v_request_id := COALESCE(p_request_id, gen_random_uuid()::text);
     v_sender_idempotency_key := 'gift:sender:' || v_request_id;
     v_recipient_idempotency_key := 'gift:recipient:' || v_request_id;
+
+    -- Prevent concurrent double-processing for the same request_id.
+    -- This guarantees total_spent/total_gifts_received and balances are updated exactly once.
+    PERFORM pg_advisory_xact_lock(hashtext(v_sender_idempotency_key)::bigint);
     
     SELECT provider_ref
     INTO v_existing_provider_ref
@@ -304,17 +306,12 @@ BEGIN
     
     IF v_existing_provider_ref IS NOT NULL THEN
         v_existing_gift_id := NULLIF(split_part(v_existing_provider_ref, ':', 2), '')::bigint;
-        
-        SELECT coins_spent, diamonds_awarded, platform_fee_coins
-        INTO v_existing_coins_spent, v_existing_diamonds_awarded, v_existing_platform_fee
-        FROM gifts
-        WHERE id = v_existing_gift_id;
-        
+
         RETURN jsonb_build_object(
             'gift_id', v_existing_gift_id,
-            'coins_spent', v_existing_coins_spent,
-            'diamonds_awarded', v_existing_diamonds_awarded,
-            'platform_fee', v_existing_platform_fee
+            'coins_spent', p_coins_amount,
+            'diamonds_awarded', p_coins_amount,
+            'platform_fee', 0
         );
     END IF;
     
@@ -332,18 +329,34 @@ BEGIN
     -- Calculate gift value
     v_diamonds_awarded := p_coins_amount;
     v_platform_fee := 0;
+
+    -- Resolve gift_type_id (gift_type_id is NOT NULL in production schema)
+    IF p_gift_type_id IS NOT NULL THEN
+        v_gift_type_id := p_gift_type_id;
+    ELSE
+        SELECT id
+        INTO v_gift_type_id
+        FROM gift_types
+        WHERE COALESCE(is_active, true) = true
+        ORDER BY COALESCE(display_order, 0) ASC, id ASC
+        LIMIT 1;
+
+        IF v_gift_type_id IS NULL THEN
+            RAISE EXCEPTION 'No active gift_types found';
+        END IF;
+    END IF;
     
     -- Insert gift record
     INSERT INTO gifts (
         sender_id, recipient_id, gift_type_id,
-        coin_amount, coins_spent, diamonds_awarded, platform_fee_coins,
+        coin_amount,
         platform_revenue, streamer_revenue,
         live_stream_id
     )
     VALUES (
-        p_sender_id, p_recipient_id, p_gift_type_id,
-        p_coins_amount, p_coins_amount, v_diamonds_awarded, v_platform_fee,
-        v_platform_fee, v_diamonds_awarded,
+        p_sender_id, p_recipient_id, v_gift_type_id,
+        p_coins_amount,
+        0, p_coins_amount,
         p_stream_id
     )
     RETURNING id INTO v_gift_id;
@@ -369,15 +382,15 @@ BEGIN
     -- Update sender balance
     UPDATE profiles
     SET coin_balance = coin_balance - p_coins_amount,
-        lifetime_coins_gifted = COALESCE(lifetime_coins_gifted, 0) + p_coins_amount,
         total_spent = COALESCE(total_spent, 0) + p_coins_amount,
+        total_gifts_sent = COALESCE(total_gifts_sent, 0) + p_coins_amount,
         last_transaction_at = CURRENT_TIMESTAMP
     WHERE id = p_sender_id;
     
     -- Update recipient balance
     UPDATE profiles
     SET earnings_balance = earnings_balance + v_diamonds_awarded,
-        lifetime_diamonds_earned = COALESCE(lifetime_diamonds_earned, 0) + v_diamonds_awarded,
+        total_gifts_received = COALESCE(total_gifts_received, 0) + p_coins_amount,
         last_transaction_at = CURRENT_TIMESTAMP
     WHERE id = p_recipient_id;
     
