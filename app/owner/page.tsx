@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { uploadRoomImage } from '@/lib/storage';
@@ -204,6 +204,12 @@ export default function OwnerPanel() {
   const [roomImageUploading, setRoomImageUploading] = useState(false);
   const [roomImageUploadError, setRoomImageUploadError] = useState<string | null>(null);
   const roomImageInputRef = useRef<HTMLInputElement>(null);
+  const [roomDisclaimerDraft, setRoomDisclaimerDraft] = useState('');
+
+  useEffect(() => {
+    if (!editingRoom) return;
+    setRoomDisclaimerDraft(editingRoom.disclaimer_text || '');
+  }, [editingRoom?.id]);
 
   useEffect(() => {
     bootstrap();
@@ -507,7 +513,7 @@ export default function OwnerPanel() {
     }
   };
 
-  const handleRoomImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRoomImageSelected = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1817,8 +1823,9 @@ export default function OwnerPanel() {
                         <label className="block text-sm font-medium text-gray-300 mb-1">Disclaimer Text</label>
                         <input
                           type="text"
-                          value={editingRoom.disclaimer_text || ''}
-                          onChange={(e) => setEditingRoom({ ...editingRoom, disclaimer_text: e.target.value })}
+                          value={roomDisclaimerDraft}
+                          onChange={(e) => setRoomDisclaimerDraft(e.target.value)}
+                          onBlur={() => setEditingRoom({ ...editingRoom, disclaimer_text: roomDisclaimerDraft })}
                           placeholder="All participants must provide consent..."
                           className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
                         />
@@ -1836,7 +1843,13 @@ export default function OwnerPanel() {
                       Cancel
                     </button>
                     <button
-                      onClick={() => handleSaveRoom(isCreatingRoom ? { ...editingRoom, id: undefined } : editingRoom)}
+                      onClick={() =>
+                        handleSaveRoom(
+                          isCreatingRoom
+                            ? { ...editingRoom, id: undefined, disclaimer_text: roomDisclaimerDraft }
+                            : { ...editingRoom, disclaimer_text: roomDisclaimerDraft }
+                        )
+                      }
                       disabled={actionLoading === (editingRoom.id || 'new-room')}
                       className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2 disabled:opacity-50"
                     >
@@ -1849,95 +1862,97 @@ export default function OwnerPanel() {
             )}
 
             {/* Rooms Grid */}
-            {rooms.length === 0 ? (
-              <div className="bg-gray-800 rounded-xl p-16 text-center border border-gray-700">
-                <Sparkles className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400 text-lg">No rooms yet</p>
-                <p className="text-gray-500 text-sm mt-2">Add your first Coming Soon room above</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {rooms.map((room) => (
-                  <div key={room.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-                    {/* Room Image */}
-                    <div className="h-36 relative">
-                      {room.image_url ? (
-                        <img
-                          src={room.image_url}
-                          alt={room.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <div className={`w-full h-full bg-gradient-to-br ${room.fallback_gradient} ${room.image_url ? 'hidden' : ''} absolute inset-0`} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-gray-800 via-transparent to-transparent" />
-                      
-                      {/* Status Badge */}
-                      <div className={`absolute top-3 right-3 px-2 py-1 text-xs font-medium rounded ${
-                        room.status === 'draft' ? 'bg-gray-600 text-gray-300' :
-                        room.status === 'interest' ? 'bg-amber-500/80 text-white' :
-                        room.status === 'opening_soon' ? 'bg-green-500/80 text-white' :
-                        room.status === 'live' ? 'bg-red-500 text-white' :
-                        'bg-gray-500 text-white'
-                      }`}>
-                        {room.status === 'interest' ? 'Collecting Interest' : room.status.replace('_', ' ').toUpperCase()}
+            {!editingRoom && !isCreatingRoom && (
+              rooms.length === 0 ? (
+                <div className="bg-gray-800 rounded-xl p-16 text-center border border-gray-700">
+                  <Sparkles className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-400 text-lg">No rooms yet</p>
+                  <p className="text-gray-500 text-sm mt-2">Add your first Coming Soon room above</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {rooms.map((room) => (
+                    <div key={room.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                      {/* Room Image */}
+                      <div className="h-36 relative">
+                        {room.image_url ? (
+                          <img
+                            src={room.image_url}
+                            alt={room.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`w-full h-full bg-gradient-to-br ${room.fallback_gradient} ${room.image_url ? 'hidden' : ''} absolute inset-0`} />
+                        <div className="absolute inset-0 bg-gradient-to-t from-gray-800 via-transparent to-transparent" />
+                        
+                        {/* Status Badge */}
+                        <div className={`absolute top-3 right-3 px-2 py-1 text-xs font-medium rounded ${
+                          room.status === 'draft' ? 'bg-gray-600 text-gray-300' :
+                          room.status === 'interest' ? 'bg-amber-500/80 text-white' :
+                          room.status === 'opening_soon' ? 'bg-green-500/80 text-white' :
+                          room.status === 'live' ? 'bg-red-500 text-white' :
+                          'bg-gray-500 text-white'
+                        }`}>
+                          {room.status === 'interest' ? 'Collecting Interest' : room.status.replace('_', ' ').toUpperCase()}
+                        </div>
+
+                        {/* Category Badge */}
+                        <div className="absolute top-3 left-3 px-2 py-1 bg-black/50 text-xs font-medium text-white rounded capitalize">
+                          {room.category}
+                        </div>
                       </div>
 
-                      {/* Category Badge */}
-                      <div className="absolute top-3 left-3 px-2 py-1 bg-black/50 text-xs font-medium text-white rounded capitalize">
-                        {room.category}
+                      {/* Room Info */}
+                      <div className="p-4">
+                        <h3 className="font-bold text-white text-lg mb-1">{room.name}</h3>
+                        <p className="text-gray-400 text-sm line-clamp-2 mb-3">{room.description}</p>
+                        
+                        {/* Stats */}
+                        <div className="flex items-center gap-4 text-sm text-gray-400 mb-4">
+                          <span className="flex items-center gap-1">
+                            <Heart className="w-4 h-4 text-pink-400" />
+                            {room.current_interest_count.toLocaleString()}
+                          </span>
+                          <span>/ {room.interest_threshold.toLocaleString()} to open</span>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden mb-4">
+                          <div
+                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                            style={{ width: `${Math.min((room.current_interest_count / room.interest_threshold) * 100, 100)}%` }}
+                          />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingRoom(room);
+                              setIsCreatingRoom(false);
+                            }}
+                            className="flex-1 px-3 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-600 transition flex items-center justify-center gap-2"
+                          >
+                            <Edit className="w-4 h-4" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRoom(room.id)}
+                            disabled={actionLoading === room.id}
+                            className="px-3 py-2 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition disabled:opacity-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Room Info */}
-                    <div className="p-4">
-                      <h3 className="font-bold text-white text-lg mb-1">{room.name}</h3>
-                      <p className="text-gray-400 text-sm line-clamp-2 mb-3">{room.description}</p>
-                      
-                      {/* Stats */}
-                      <div className="flex items-center gap-4 text-sm text-gray-400 mb-4">
-                        <span className="flex items-center gap-1">
-                          <Heart className="w-4 h-4 text-pink-400" />
-                          {room.current_interest_count.toLocaleString()}
-                        </span>
-                        <span>/ {room.interest_threshold.toLocaleString()} to open</span>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="h-2 bg-gray-700 rounded-full overflow-hidden mb-4">
-                        <div
-                          className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
-                          style={{ width: `${Math.min((room.current_interest_count / room.interest_threshold) * 100, 100)}%` }}
-                        />
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setEditingRoom(room);
-                            setIsCreatingRoom(false);
-                          }}
-                          className="flex-1 px-3 py-2 bg-gray-700 text-white text-sm rounded-lg hover:bg-gray-600 transition flex items-center justify-center gap-2"
-                        >
-                          <Edit className="w-4 h-4" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRoom(room.id)}
-                          disabled={actionLoading === room.id}
-                          className="px-3 py-2 bg-red-600/20 text-red-400 text-sm rounded-lg hover:bg-red-600/30 transition disabled:opacity-50"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         )}
