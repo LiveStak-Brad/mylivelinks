@@ -295,7 +295,7 @@ export default function GlobalHeader() {
                 className="-ml-2 p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
                 aria-label="View Leaderboards"
               >
-                <Trophy className="w-6 h-6 text-amber-500" />
+                <Trophy className="w-7 h-7 text-amber-500" />
               </button>
 
               {/* Navigation - Desktop */}
