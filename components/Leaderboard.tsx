@@ -343,7 +343,7 @@ export default function Leaderboard() {
               </div>
 
               {/* Metric Value */}
-              <div className="flex-shrink-0 text-right">
+              <div className="flex-shrink-0 text-center">
                 <div className="text-sm font-bold text-gray-900 dark:text-white">
                   {formatMetric(entry.metric_value)}
                 </div>
