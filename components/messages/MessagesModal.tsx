@@ -152,15 +152,20 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     );
   }
 
-  // Desktop: Two-pane layout in modal
+  // Desktop: Three-pane layout in modal (Friends | Messages | Thread)
   return (
     <div
       ref={modalRef}
-      className="absolute right-0 top-full mt-2 w-[700px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[60]"
-      style={{ height: '500px', maxHeight: 'calc(100vh - 120px)' }}
+      className="absolute right-0 top-full mt-2 w-[900px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[60]"
+      style={{ height: '550px', maxHeight: 'calc(100vh - 120px)' }}
     >
       <div className="flex h-full">
-        {/* Left Pane: Conversations List */}
+        {/* Left Pane: Friends List (vertical) */}
+        <div className="w-52 border-r border-border flex flex-col bg-muted/20">
+          <FriendsList onSelectFriend={() => {}} layout="vertical" />
+        </div>
+
+        {/* Middle Pane: Messages List */}
         <div className="w-72 border-r border-border flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-purple-500/10 to-pink-500/10">
@@ -177,9 +182,6 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
               <Edit className="w-4 h-4" />
             </button>
           </div>
-          
-          {/* Friends List */}
-          <FriendsList onSelectFriend={() => {}} />
           
           {/* Conversations List */}
           <div className="flex-1 overflow-hidden">

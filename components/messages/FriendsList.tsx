@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Users } from 'lucide-react';
+import { Users, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { useMessages } from './MessagesContext';
 
@@ -16,11 +16,13 @@ interface Friend {
 
 interface FriendsListProps {
   onSelectFriend: (friendId: string) => void;
+  layout?: 'horizontal' | 'vertical';
 }
 
-export default function FriendsList({ onSelectFriend }: FriendsListProps) {
+export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: FriendsListProps) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const { currentUserId, setActiveConversationId } = useMessages();
   const supabase = createClient();
 
@@ -150,7 +152,31 @@ export default function FriendsList({ onSelectFriend }: FriendsListProps) {
     onSelectFriend(friend.id);
   };
 
+  // Filter friends by search query
+  const filteredFriends = friends.filter(friend =>
+    (friend.display_name || friend.username).toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading) {
+    if (layout === 'vertical') {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="p-3 border-b border-border">
+            <div className="h-10 bg-muted/50 rounded-lg animate-pulse" />
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="flex items-center gap-3 p-2 rounded-lg">
+                <div className="w-10 h-10 rounded-full bg-muted/50 animate-pulse" />
+                <div className="flex-1">
+                  <div className="h-3 w-20 bg-muted/50 rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="px-3 py-2 border-b border-border">
         <div className="flex items-center gap-2 mb-2">
@@ -170,9 +196,75 @@ export default function FriendsList({ onSelectFriend }: FriendsListProps) {
   }
 
   if (friends.length === 0) {
-    return null; // Don't show section if no friends
+    if (layout === 'vertical') {
+      return (
+        <div className="flex flex-col h-full">
+          <div className="p-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">Friends</span>
+              <span className="text-xs text-muted-foreground/60">(0)</span>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center p-4">
+            <p className="text-xs text-muted-foreground text-center">No friends yet</p>
+          </div>
+        </div>
+      );
+    }
+    return null; // Don't show section if no friends (horizontal)
   }
 
+  // Vertical layout for sidebar
+  if (layout === 'vertical') {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Header with count */}
+        <div className="px-3 py-3 border-b border-border bg-gradient-to-r from-purple-500/10 to-pink-500/10">
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">Friends</span>
+            <span className="text-xs text-muted-foreground">({friends.length})</span>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="p-2 border-b border-border">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search friends"
+              className="w-full pl-8 pr-3 py-2 bg-muted/50 border-none rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+        </div>
+
+        {/* Friends list - vertical scroll */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {filteredFriends.length === 0 ? (
+            <div className="flex items-center justify-center py-8 px-4">
+              <p className="text-xs text-muted-foreground text-center">
+                {searchQuery ? 'No friends found' : 'No friends yet'}
+              </p>
+            </div>
+          ) : (
+            filteredFriends.map(friend => (
+              <FriendRow
+                key={friend.id}
+                friend={friend}
+                onClick={() => handleFriendClick(friend)}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Horizontal layout (original)
   return (
     <div className="px-3 py-2 border-b border-border bg-muted/20">
       <div className="flex items-center gap-2 mb-2">
@@ -251,6 +343,60 @@ function FriendAvatar({ friend, onClick }: { friend: Friend; onClick: () => void
       <span className="text-[10px] text-muted-foreground truncate max-w-[56px] group-hover:text-foreground transition-colors">
         {friend.display_name || friend.username}
       </span>
+    </button>
+  );
+}
+
+// Row-based friend display for vertical layout
+function FriendRow({ friend, onClick }: { friend: Friend; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/50 transition group"
+    >
+      {/* Avatar */}
+      <div className="relative flex-shrink-0">
+        {/* Ring for live users */}
+        <div className={`
+          w-10 h-10 rounded-full p-[2px] transition-transform group-hover:scale-105
+          ${friend.is_live 
+            ? 'bg-gradient-to-tr from-red-500 via-pink-500 to-red-500 animate-pulse' 
+            : 'bg-transparent'
+          }
+        `}>
+          <div className="w-full h-full rounded-full bg-card p-[1px]">
+            {friend.avatar_url ? (
+              <img
+                src={friend.avatar_url}
+                alt={friend.username}
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs">
+                {(friend.display_name || friend.username).charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Online indicator */}
+        {!friend.is_live && friend.is_online && (
+          <div className="absolute bottom-0 right-0 w-3 h-3 bg-purple-500 rounded-full border-2 border-card" />
+        )}
+      </div>
+
+      {/* Name and status */}
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-sm font-medium text-foreground truncate">
+          {friend.display_name || friend.username}
+        </p>
+        {friend.is_live && (
+          <span className="text-[10px] text-red-500 font-semibold uppercase">● Live</span>
+        )}
+        {!friend.is_live && friend.is_online && (
+          <span className="text-[10px] text-purple-400">Online</span>
+        )}
+      </div>
     </button>
   );
 }
