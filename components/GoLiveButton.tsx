@@ -618,7 +618,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       <button
         onClick={handleGoLive}
         disabled={loading}
-        className={`px-4 py-2 rounded-lg transition font-semibold ${
+        className={`px-1.5 py-1 sm:px-2 sm:py-1.5 md:px-3 lg:px-4 md:py-2 rounded-md md:rounded-lg transition font-semibold whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base ${
           isLive
             ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white hover:from-red-600 hover:to-pink-700'
             : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'

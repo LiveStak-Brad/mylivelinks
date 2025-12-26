@@ -138,7 +138,7 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
       <div className={`relative ${className}`} ref={menuRef}>
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-sm sm:text-base font-medium shadow-md flex items-center gap-2"
+          className="px-1.5 py-1 sm:px-2 sm:py-1.5 md:px-3 lg:px-4 md:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-md md:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base font-medium shadow-md flex items-center gap-1 md:gap-2"
         >
           <span>⚙️</span>
           <span>Options</span>
