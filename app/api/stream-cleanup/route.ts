@@ -9,10 +9,10 @@ import { NextResponse } from 'next/server';
  */
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { profile_id, action } = body;
+    const body = await request.json().catch(() => ({} as any));
+    const { action, reason } = body as { action?: string; reason?: string };
 
-    if (!profile_id || action !== 'end_stream') {
+    if (action !== 'end_stream') {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
@@ -35,7 +35,21 @@ export async function POST(request: Request) {
       }
     );
 
-    console.log('[STREAM-CLEANUP] Ending stream for profile:', profile_id);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const profile_id = user.id;
+
+    console.log('[STREAM-CLEANUP] Ending stream for profile:', {
+      profile_id,
+      reason: reason || null,
+    });
 
     // Update live_streams table
     const { error: updateError } = await supabase
@@ -64,7 +78,7 @@ export async function POST(request: Request) {
     const { error: presenceError } = await supabase
       .from('room_presence')
       .delete()
-      .eq('user_id', profile_id);
+      .eq('profile_id', profile_id);
 
     if (presenceError) {
       console.error('[STREAM-CLEANUP] Error removing room presence:', presenceError);

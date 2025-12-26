@@ -53,6 +53,17 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   const isPublishingRef = useRef(false); // Store isPublishing state for realtime handler
   const supabase = createClient();
 
+  const sendStreamCleanupBeacon = (reason: string) => {
+    try {
+      if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') return;
+      const payload = JSON.stringify({ action: 'end_stream', reason });
+      const blob = new Blob([payload], { type: 'application/json' });
+      navigator.sendBeacon('/api/stream-cleanup', blob);
+    } catch {
+      // ignore
+    }
+  };
+
   // Get current user's live stream (only on mount, not when callbacks change)
   useEffect(() => {
     let channel: any = null;
@@ -198,20 +209,28 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         try {
           // Stop publishing immediately
           await stopPublishingRef.current('visibility_hidden');
-          
-          // Also update database
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            await supabase
-              .from('live_streams')
-              .update({ live_available: false, ended_at: new Date().toISOString() })
-              .eq('profile_id', user.id);
-            
-            await supabase
-              .from('user_grid_slots')
-              .delete()
-              .eq('streamer_id', user.id);
+
+          // Best-effort: also update DB while page is still alive (more reliable than beacon)
+          try {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            if (user) {
+              await supabase
+                .from('live_streams')
+                .update({ live_available: false, ended_at: new Date().toISOString() })
+                .eq('profile_id', user.id);
+
+              await supabase
+                .from('user_grid_slots')
+                .delete()
+                .eq('streamer_id', user.id);
+            }
+          } catch (dbErr) {
+            console.warn('[GO_LIVE] Failed DB cleanup on visibility change (will rely on beacon/webhook):', dbErr);
           }
+
+          sendStreamCleanupBeacon('visibility_hidden');
         } catch (err) {
           console.error('[GO_LIVE] Error stopping stream on visibility change:', err);
         }
@@ -223,6 +242,32 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [supabase]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePageHide = () => {
+      if (isPublishingRef.current) {
+        sendStreamCleanupBeacon('pagehide');
+      }
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handlePageHide);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handlePageHide);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (isPublishingRef.current) {
+        sendStreamCleanupBeacon('component_unmount');
+      }
+    };
+  }, []);
 
   const loadDevices = async () => {
     try {

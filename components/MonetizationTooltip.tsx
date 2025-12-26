@@ -17,11 +17,11 @@ export default function MonetizationTooltip({ type, children }: MonetizationTool
     },
     diamonds: {
       title: 'Diamonds',
-      description: 'Earned currency. Receive diamonds when viewers send you gifts. Convert diamonds to coins with a 30% platform fee.',
+      description: 'Earned currency. Receive diamonds when viewers send you gifts. Convert diamonds to coins with a 40% platform fee.',
     },
     conversion: {
       title: 'Diamond Conversion',
-      description: 'Convert diamonds to coins with a 30% platform fee. Minimum 3 diamonds required. You receive 70% of the diamonds as coins.',
+      description: 'Convert diamonds to coins with a 40% platform fee. Minimum 2 diamonds required. You receive 60% of the diamonds as coins.',
     },
     gift: {
       title: 'Send Gift',

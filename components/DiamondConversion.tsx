@@ -13,7 +13,7 @@ export default function DiamondConversion() {
   const [success, setSuccess] = useState<string | null>(null);
 
   const supabase = createClient();
-  const MIN_DIAMONDS = 3; // Minimum diamonds required
+  const MIN_DIAMONDS = 2; // Minimum diamonds required
   const CONVERSION_RATE = 0.60; // 60% (40% platform fee)
 
   useEffect(() => {
@@ -87,14 +87,15 @@ export default function DiamondConversion() {
   };
 
   const handleConvert = async () => {
-    const diamonds = parseInt(diamondsToConvert);
+    const requestedDiamonds = parseInt(diamondsToConvert);
+    const diamonds = Math.min(requestedDiamonds, diamondBalance);
     
-    if (isNaN(diamonds) || diamonds < MIN_DIAMONDS) {
+    if (isNaN(requestedDiamonds) || requestedDiamonds < MIN_DIAMONDS) {
       setError(`Minimum ${MIN_DIAMONDS} diamonds required`);
       return;
     }
 
-    if (diamonds > diamondBalance) {
+    if (diamonds < MIN_DIAMONDS) {
       setError('Insufficient diamond balance');
       return;
     }

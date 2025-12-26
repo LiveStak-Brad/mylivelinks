@@ -493,6 +493,101 @@
   min-width: 44px;
 }
 
+/* ============================================================================
+   iOS PWA STANDALONE MODE OPTIMIZATIONS
+   ============================================================================
+   When the app is "Added to Home Screen" on iOS, it runs in standalone mode.
+   These styles handle safe areas, keyboard, and other iOS-specific quirks.
+   ============================================================================ */
+
+/* Detect iOS standalone mode */
+@media all and (display-mode: standalone) {
+  /* Full height without address bar */
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  /* Fix for iOS keyboard pushing content */
+  body {
+    position: fixed;
+    width: 100%;
+  }
+}
+
+/* iOS safe area utilities for PWA */
+.pwa-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pwa-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pwa-safe-left {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+.pwa-safe-right {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.pwa-safe-all {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* iOS keyboard-aware input container */
+.ios-keyboard-aware {
+  /* This element sticks to bottom, above keyboard */
+  position: sticky;
+  bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: inherit;
+}
+
+/* Full height container that respects safe areas */
+.pwa-full-height {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  min-height: 100dvh;
+}
+
+/* Messages container that accounts for keyboard */
+.pwa-messages-container {
+  height: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollable messages area */
+.pwa-messages-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Fixed input at bottom with safe area */
+.pwa-input-area {
+  flex-shrink: 0;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+/* Prevent rubber-banding on iOS */
+.pwa-no-overscroll {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+/* iOS notch-aware header */
+.pwa-header {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
 /* Landscape-only media query helper */
 @media (orientation: landscape) and (max-width: 900px) {
   .mobile-landscape-only {

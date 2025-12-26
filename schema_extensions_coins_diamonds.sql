@@ -182,83 +182,175 @@ CREATE OR REPLACE FUNCTION convert_diamonds_to_coins(
 RETURNS BIGINT AS $$
 DECLARE
     v_diamond_balance BIGINT;
+    v_diamonds_to_convert BIGINT;
     v_coins_out BIGINT;
     v_fee_amount BIGINT;
-    v_conversion_rate DECIMAL(5, 4) := 0.7000; -- 70% (1 - 0.30 fee)
-    v_min_diamonds BIGINT := 3; -- Minimum diamonds required (ensures at least 1 coin after fee)
+    v_conversion_rate DECIMAL(5, 4) := 0.6000; -- 60% (1 - 0.40 fee)
+    v_min_diamonds BIGINT := 2; -- Minimum diamonds required (ensures at least 1 coin after fee)
     v_conversion_id BIGINT;
+    v_has_coin_ledger BOOLEAN;
+    v_has_asset_type BOOLEAN;
+    v_has_ledger_entries BOOLEAN;
 BEGIN
     -- Validate minimum threshold
     IF p_diamonds_in < v_min_diamonds THEN
-        RAISE EXCEPTION 'Minimum conversion is % diamonds (yields at least 1 coin after 30%% fee)', v_min_diamonds;
+        RAISE EXCEPTION 'Minimum conversion is % diamonds (yields at least 1 coin after 40%% fee)', v_min_diamonds;
     END IF;
     
     -- Check diamond balance
     SELECT earnings_balance INTO v_diamond_balance
     FROM profiles
-    WHERE id = p_profile_id;
-    
-    IF v_diamond_balance < p_diamonds_in THEN
-        RAISE EXCEPTION 'Insufficient diamond balance. You have % diamonds, trying to convert %', v_diamond_balance, p_diamonds_in;
+    WHERE id = p_profile_id
+    FOR UPDATE;
+
+    IF v_diamond_balance IS NULL THEN
+        RAISE EXCEPTION 'Profile not found';
+    END IF;
+
+    v_diamonds_to_convert := LEAST(p_diamonds_in, v_diamond_balance);
+
+    IF v_diamonds_to_convert < v_min_diamonds THEN
+        RAISE EXCEPTION 'Insufficient diamond balance. You have % diamonds, minimum conversion is %', v_diamond_balance, v_min_diamonds;
     END IF;
     
-    -- Calculate conversion: coins_out = floor(diamonds_in * 0.70)
-    v_coins_out := FLOOR(p_diamonds_in * v_conversion_rate);
-    v_fee_amount := p_diamonds_in - v_coins_out;
+    -- Calculate conversion: coins_out = floor(diamonds_in * 0.60)
+    v_coins_out := FLOOR(v_diamonds_to_convert * v_conversion_rate);
+    v_fee_amount := v_diamonds_to_convert - v_coins_out;
     
     -- Ensure at least 1 coin output
     IF v_coins_out < 1 THEN
         RAISE EXCEPTION 'Conversion too small. Minimum % diamonds required to yield 1 coin', v_min_diamonds;
     END IF;
+
+    SELECT to_regclass('public.coin_ledger') IS NOT NULL INTO v_has_coin_ledger;
+
+    SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'coin_ledger'
+          AND column_name = 'asset_type'
+    ) INTO v_has_asset_type;
+
+    SELECT to_regclass('public.ledger_entries') IS NOT NULL INTO v_has_ledger_entries;
     
     -- Insert conversion record
     INSERT INTO diamond_conversions (
         profile_id, diamonds_in, coins_out, fee_amount, conversion_rate, status, completed_at
     )
     VALUES (
-        p_profile_id, p_diamonds_in, v_coins_out, v_fee_amount, v_conversion_rate, 'completed', CURRENT_TIMESTAMP
+        p_profile_id, v_diamonds_to_convert, v_coins_out, v_fee_amount, v_conversion_rate, 'completed', CURRENT_TIMESTAMP
     )
     RETURNING id INTO v_conversion_id;
     
-    -- Update balances atomically via ledger
-    -- 1. Remove diamonds (convert_out)
-    INSERT INTO coin_ledger (profile_id, amount, asset_type, type, ref_type, ref_id, description)
-    VALUES (p_profile_id, -p_diamonds_in, 'diamond', 'convert_out', 'diamond_conversion', v_conversion_id, 
-            'Diamond conversion: ' || p_diamonds_in || ' diamonds removed');
-    
-    -- 2. Add coins (convert_in)
-    INSERT INTO coin_ledger (profile_id, amount, asset_type, type, ref_type, ref_id, description)
-    VALUES (p_profile_id, v_coins_out, 'coin', 'convert_in', 'diamond_conversion', v_conversion_id,
-            'Diamond conversion: ' || v_coins_out || ' coins received');
-    
-    -- 3. Record platform fee (convert_fee) - for reporting/metrics
-    INSERT INTO coin_ledger (profile_id, amount, asset_type, type, ref_type, ref_id, description)
-    VALUES (p_profile_id, v_fee_amount, 'diamond', 'convert_fee', 'diamond_conversion', v_conversion_id,
-            'Platform fee: ' || v_fee_amount || ' diamonds (30%)');
+    -- Record conversion into coin_ledger for diagnostics/metrics if the table exists.
+    -- NOTE: We do NOT insert the coin credit here; update_coin_balance_via_ledger will do that and prevent double-credit.
+    IF v_has_coin_ledger THEN
+        -- We represent the diamond debit as 2 parts:
+        -- - convert_out: diamonds converted into coins (value portion)
+        -- - convert_fee: diamonds taken as platform fee
+        -- Net diamond delta in coin_ledger = -(coins_out + fee_amount) = -diamonds_in
+        IF v_has_asset_type THEN
+            INSERT INTO coin_ledger (profile_id, amount, asset_type, type, ref_type, ref_id, description)
+            VALUES (
+                p_profile_id,
+                -v_coins_out,
+                'diamond',
+                'convert_out',
+                'diamond_conversion',
+                v_conversion_id,
+                'Diamond conversion: diamonds converted'
+            );
+
+            INSERT INTO coin_ledger (profile_id, amount, asset_type, type, ref_type, ref_id, description)
+            VALUES (
+                p_profile_id,
+                -v_fee_amount,
+                'diamond',
+                'convert_fee',
+                'diamond_conversion',
+                v_conversion_id,
+                'Diamond conversion: platform fee'
+            );
+        ELSE
+            INSERT INTO coin_ledger (profile_id, amount, type, ref_type, ref_id, description)
+            VALUES (
+                p_profile_id,
+                -v_coins_out,
+                'convert_out',
+                'diamond_conversion',
+                v_conversion_id,
+                'Diamond conversion: diamonds converted'
+            );
+
+            INSERT INTO coin_ledger (profile_id, amount, type, ref_type, ref_id, description)
+            VALUES (
+                p_profile_id,
+                -v_fee_amount,
+                'convert_fee',
+                'diamond_conversion',
+                v_conversion_id,
+                'Diamond conversion: platform fee'
+            );
+        END IF;
+    END IF;
+
+    IF v_has_ledger_entries THEN
+        INSERT INTO ledger_entries (idempotency_key, user_id, entry_type, delta_diamonds, provider_ref, metadata)
+        VALUES (
+            'diamond_conversion:' || v_conversion_id || ':diamond_debit',
+            p_profile_id,
+            'diamond_debit_conversion',
+            -v_diamonds_to_convert,
+            'diamond_conversion:' || v_conversion_id,
+            jsonb_build_object('diamonds_in', v_diamonds_to_convert, 'coins_out', v_coins_out, 'fee_diamonds', v_fee_amount, 'rate', v_conversion_rate)
+        )
+        ON CONFLICT (idempotency_key) DO NOTHING;
+
+        INSERT INTO ledger_entries (idempotency_key, user_id, entry_type, delta_coins, provider_ref, metadata)
+        VALUES (
+            'diamond_conversion:' || v_conversion_id || ':coin_credit',
+            p_profile_id,
+            'coin_credit_conversion',
+            v_coins_out,
+            'diamond_conversion:' || v_conversion_id,
+            jsonb_build_object('diamonds_in', v_diamonds_to_convert, 'coins_out', v_coins_out, 'fee_diamonds', v_fee_amount, 'rate', v_conversion_rate)
+        )
+        ON CONFLICT (idempotency_key) DO NOTHING;
+    END IF;
     
     -- Update cached balances in same transaction
-    -- Deduct diamonds
+    -- Deduct diamonds always.
     UPDATE profiles
-    SET earnings_balance = earnings_balance - p_diamonds_in,
+    SET earnings_balance = earnings_balance - v_diamonds_to_convert,
         last_transaction_at = CURRENT_TIMESTAMP
     WHERE id = p_profile_id;
-    
-    -- Add coins (recalculate from ledger)
-    PERFORM update_coin_balance_via_ledger(
-        p_profile_id,
-        v_coins_out,
-        'convert_in',
-        'diamond_conversion',
-        v_conversion_id,
-        'Diamond conversion: ' || v_coins_out || ' coins'
-    );
+
+    -- Credit coins.
+    -- Prefer the ledger-driven approach when available.
+    IF to_regclass('public.update_coin_balance_via_ledger') IS NOT NULL THEN
+        PERFORM update_coin_balance_via_ledger(
+            p_profile_id,
+            v_coins_out,
+            'convert_in',
+            'diamond_conversion',
+            v_conversion_id,
+            'Diamond conversion: ' || v_coins_out || ' coins'
+        );
+    ELSE
+        -- Fallback if coin_ledger-based balance system isn't deployed yet.
+        UPDATE profiles
+        SET coin_balance = COALESCE(coin_balance, 0) + v_coins_out,
+            last_transaction_at = CURRENT_TIMESTAMP
+        WHERE id = p_profile_id;
+    END IF;
     
     RETURN v_conversion_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public;
 
-COMMENT ON FUNCTION convert_diamonds_to_coins IS 'Convert diamonds to coins with 30% platform fee. Minimum 3 diamonds required. Returns conversion_id.';
+COMMENT ON FUNCTION convert_diamonds_to_coins IS 'Convert diamonds to coins with 40% platform fee. Minimum 2 diamonds required. Returns conversion_id.';
 
 -- ============================================================================
 -- 8. UPDATE PROCESS_GIFT RPC: GIVE DIAMONDS 1:1 (NOT COINS)

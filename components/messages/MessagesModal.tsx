@@ -98,15 +98,15 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
 
   if (!isOpen) return null;
 
-  // Mobile: Full screen with single pane navigation
+  // Mobile: Full screen with single pane navigation (PWA-optimized)
   if (isMobile) {
     return (
       <>
         {/* Backdrop - solid background to prevent content bleeding through */}
         <div className="fixed inset-0 z-[70] bg-background" aria-hidden="true" />
         
-        {/* Modal Content */}
-        <div className="fixed inset-0 z-[70] flex flex-col bg-background animate-slide-up">
+        {/* Modal Content - PWA safe area aware */}
+        <div className="fixed inset-0 z-[70] flex flex-col bg-background animate-slide-up pwa-messages-container pwa-no-overscroll">
           {/* Show thread or conversation list */}
           {showThread && activeConversation ? (
             <MessageThread
@@ -116,8 +116,8 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
             />
           ) : (
             <>
-              {/* Mobile Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0">
+              {/* Mobile Header - iOS notch aware */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0 pwa-header">
                 <div className="flex items-center gap-2">
                   <MessageCircle className="w-5 h-5 text-primary" />
                   <h2 className="text-lg font-bold text-foreground">Messages</h2>
@@ -140,8 +140,8 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
                 </div>
               </div>
               
-              {/* Friends List + Conversation List */}
-              <div className="flex-1 h-[calc(100%-60px)] bg-background overflow-y-auto">
+              {/* Friends List + Conversation List - scrollable with safe bottom */}
+              <div className="flex-1 bg-background overflow-y-auto pwa-messages-scroll pwa-safe-bottom">
                 <FriendsList onSelectFriend={() => setShowThread(true)} />
                 <ConversationList onSelectConversation={handleSelectConversation} />
               </div>

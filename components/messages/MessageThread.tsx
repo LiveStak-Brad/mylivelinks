@@ -88,6 +88,25 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
     inputRef.current?.focus();
   }, [conversation.id]);
 
+  // iOS PWA keyboard handling - scroll input into view when focused
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const handleFocus = () => {
+      // Small delay to let iOS keyboard animation start
+      setTimeout(() => {
+        // Scroll the input into view on iOS PWA
+        input.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        // Also ensure messages scroll to bottom
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+    };
+
+    input.addEventListener('focus', handleFocus);
+    return () => input.removeEventListener('focus', handleFocus);
+  }, []);
+
   const handleSend = async () => {
     if (!messageInput.trim() || isSending) return;
 
@@ -179,9 +198,9 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
   });
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
+    <div className="flex flex-col h-full pwa-messages-container">
+      {/* Header - iOS notch aware */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card flex-shrink-0 pwa-header">
         {showBackButton && (
           <button
             onClick={onBack}
@@ -240,8 +259,8 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+      {/* Messages - scrollable with iOS momentum scroll */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar pwa-messages-scroll">
         {groupedMessages.length === 0 ? (
           <EmptyThreadState username={conversation.recipientUsername} />
         ) : (
@@ -272,8 +291,8 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="relative border-t border-border p-3 bg-card">
+      {/* Input Area - iOS keyboard and safe area aware */}
+      <div className="relative border-t border-border p-3 bg-card flex-shrink-0 pwa-input-area">
         {/* Gift Picker */}
         <GiftPickerMini
           isOpen={showGiftPicker}
