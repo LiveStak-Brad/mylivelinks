@@ -146,38 +146,36 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
           </div>
           
           {/* Type Tabs */}
-          <div className="flex gap-2 mt-4">
+          <div className="flex gap-1.5 mt-4">
             <button
               onClick={() => setType('top_streamers')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition ${
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
                 type === 'top_streamers'
-                  ? 'bg-white text-amber-600 shadow-lg'
+                  ? 'bg-white text-amber-600 shadow-md'
                   : 'bg-white/20 text-white hover:bg-white/30'
               }`}
             >
-              <Gem className="w-4 h-4" />
-              Top Earners
+              Top Streamers
             </button>
             <button
               onClick={() => setType('top_gifters')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition ${
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
                 type === 'top_gifters'
-                  ? 'bg-white text-amber-600 shadow-lg'
+                  ? 'bg-white text-amber-600 shadow-md'
                   : 'bg-white/20 text-white hover:bg-white/30'
               }`}
             >
-              <Coins className="w-4 h-4" />
               Top Gifters
             </button>
           </div>
 
           {/* Period Tabs */}
-          <div className="flex gap-1 mt-3">
+          <div className="flex gap-1.5 mt-2">
             {(['daily', 'weekly', 'monthly', 'alltime'] as Period[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition ${
+                className={`flex-1 px-2 py-2 rounded-lg text-sm font-medium transition ${
                   period === p
                     ? 'bg-white text-amber-600 shadow-md'
                     : 'bg-white/20 text-white hover:bg-white/30'
