@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Rss, Video, MessageCircle, Trophy } from 'lucide-react';
+import { Home, Rss, Video, MessageCircle, Bell } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { isRouteActive } from '@/lib/navigation';
 import { useMessages } from './messages';
+import { useNoties } from './noties';
 
 interface NavItem {
   href: string;
@@ -33,6 +34,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const { totalUnreadCount: unreadMessages } = useMessages();
+  const { unreadCount: unreadNoties } = useNoties();
   const supabase = createClient();
 
   useEffect(() => {
@@ -94,10 +96,12 @@ export default function BottomNav() {
       requiresAuth: true,
     },
     {
-      href: '/leaderboards',
-      label: 'Ranks',
-      icon: Trophy,
+      href: '/noties',
+      label: 'Noties',
+      icon: Bell,
       matchType: 'exact',
+      badge: unreadNoties,
+      requiresAuth: true,
     },
   ];
 
@@ -130,11 +134,9 @@ export default function BottomNav() {
               <div className="relative">
                 <Icon className="w-6 h-6" />
                 
-                {/* Badge for unread messages */}
+                {/* Dot indicator for unread items */}
                 {item.badge && item.badge > 0 && (
-                  <span className="bottom-nav-badge">
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
+                  <span className="bottom-nav-badge-dot" />
                 )}
               </div>
               

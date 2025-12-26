@@ -289,16 +289,14 @@ export default function GlobalHeader() {
                 <SmartBrandLogo size={110} />
               </Link>
               
-              {/* Trophy - Leaderboard Button - Desktop only (mobile uses bottom nav) */}
-              <IconButton
+              {/* Trophy - Leaderboard Button */}
+              <button
                 onClick={() => setShowLeaderboard(true)}
-                variant="primary"
-                size="md"
+                className="p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
                 aria-label="View Leaderboards"
-                className="hidden md:flex bg-gradient-to-br from-amber-400 to-yellow-500 text-white hover:from-amber-500 hover:to-yellow-600 shadow-md hover:shadow-lg"
               >
-                <Trophy className="w-5 h-5" />
-              </IconButton>
+                <Trophy className="w-5 h-5 text-amber-500" />
+              </button>
 
               {/* Navigation - Desktop */}
               <nav 

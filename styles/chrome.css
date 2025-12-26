@@ -620,3 +620,58 @@ button:active:not(:disabled),
   animation: pop-in 0.2s ease-out;
 }
 
+.bottom-nav-badge-dot {
+  position: absolute;
+  top: 0.25rem;
+  right: 50%;
+  transform: translateX(10px);
+  width: 8px;
+  height: 8px;
+  background: hsl(var(--destructive));
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--background));
+  animation: pop-in 0.2s ease-out;
+}
+
+/* Tab-specific colors */
+.bottom-nav-item[href="/"] svg {
+  color: hsl(258 90% 58%); /* Purple - Home */
+}
+
+.bottom-nav-item[href="/feed"] svg {
+  color: hsl(328 85% 60%); /* Pink - Feed */
+}
+
+.bottom-nav-item[href="/rooms"] svg {
+  color: hsl(0 72% 51%); /* Red - Rooms/Live */
+}
+
+.bottom-nav-item[href="/messages"] svg {
+  color: hsl(200 98% 50%); /* Blue - Messages */
+}
+
+.bottom-nav-item[href="/noties"] svg {
+  color: hsl(43 96% 56%); /* Amber - Noties */
+}
+
+/* Active state keeps the color vibrant */
+.bottom-nav-item-active[href="/"] svg {
+  color: hsl(258 90% 58%);
+}
+
+.bottom-nav-item-active[href="/feed"] svg {
+  color: hsl(328 85% 60%);
+}
+
+.bottom-nav-item-active[href="/rooms"] svg {
+  color: hsl(0 72% 51%);
+}
+
+.bottom-nav-item-active[href="/messages"] svg {
+  color: hsl(200 98% 50%);
+}
+
+.bottom-nav-item-active[href="/noties"] svg {
+  color: hsl(43 96% 56%);
+}
+
