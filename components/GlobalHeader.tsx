@@ -289,13 +289,13 @@ export default function GlobalHeader() {
                 <SmartBrandLogo size={110} />
               </Link>
               
-              {/* Trophy - Leaderboard Button */}
+              {/* Trophy - Leaderboard Button - Desktop only (mobile uses bottom nav) */}
               <IconButton
                 onClick={() => setShowLeaderboard(true)}
                 variant="primary"
                 size="md"
                 aria-label="View Leaderboards"
-                className="bg-gradient-to-br from-amber-400 to-yellow-500 text-white hover:from-amber-500 hover:to-yellow-600 shadow-md hover:shadow-lg"
+                className="hidden md:flex bg-gradient-to-br from-amber-400 to-yellow-500 text-white hover:from-amber-500 hover:to-yellow-600 shadow-md hover:shadow-lg"
               >
                 <Trophy className="w-5 h-5" />
               </IconButton>
@@ -322,8 +322,12 @@ export default function GlobalHeader() {
 
             {/* Right section: Actions + User */}
             <div className="flex items-center gap-2 lg:gap-3">
-              {/* Messages & Noties Icons - Only show when logged in */}
-              {isLoggedIn && <HeaderIcons />}
+              {/* Messages & Noties Icons - Only show when logged in and on desktop */}
+              {isLoggedIn && (
+                <div className="hidden md:flex">
+                  <HeaderIcons />
+                </div>
+              )}
 
               {/* Owner Panel Quick Access */}
               {isOwner && (

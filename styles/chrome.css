@@ -532,3 +532,91 @@ button:active:not(:disabled),
   color: hsl(var(--muted-foreground));
   max-width: 20rem;
 }
+
+/* =============================================================================
+   BOTTOM NAVIGATION (MOBILE)
+   iOS/Android style bottom tab bar for mobile app parity
+============================================================================= */
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: hsl(var(--background) / 0.98);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid hsl(var(--border) / 0.5);
+  box-shadow: 0 -2px 8px hsl(var(--foreground) / 0.05);
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+/* Hide on desktop (md and up) */
+@media (min-width: 768px) {
+  .bottom-nav {
+    display: none;
+  }
+}
+
+.bottom-nav-container {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0.5rem 0.25rem 0;
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.25rem;
+  color: hsl(var(--muted-foreground));
+  transition: all 0.2s ease-out;
+  border-radius: 0.75rem;
+  position: relative;
+  min-width: 60px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item:active {
+  transform: scale(0.95);
+  background: hsl(var(--muted) / 0.5);
+}
+
+.bottom-nav-item-active {
+  color: hsl(var(--primary));
+}
+
+.bottom-nav-item-active svg {
+  transform: scale(1.05);
+}
+
+.bottom-nav-label {
+  font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.bottom-nav-badge {
+  position: absolute;
+  top: 0.25rem;
+  right: 50%;
+  transform: translateX(10px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  color: white;
+  background: hsl(var(--destructive));
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--background));
+  animation: pop-in 0.2s ease-out;
+}
+

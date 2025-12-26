@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
-    "postinstall": "patch-package"
+    "postinstall": "node ./scripts/normalize-patches.js && patch-package"
   },
   "dependencies": {
     "@livekit/react-native": "^2.0.0",

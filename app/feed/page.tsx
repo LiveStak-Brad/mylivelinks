@@ -1,7 +1,7 @@
 'use client';
 
 import { Rss } from 'lucide-react';
-import { FeedComposer, FeedEmptyState } from '@/components/feed';
+import PublicFeedClient from '@/components/feed/PublicFeedClient';
 
 /* =============================================================================
    PUBLIC FEED PAGE
@@ -42,15 +42,9 @@ export default function FeedPage() {
             Discover posts from the community
           </p>
         </header>
-        
-        {/* Disabled composer */}
+
         <div className="animate-slide-up" style={{ animationDelay: '50ms' }}>
-          <FeedComposer />
-        </div>
-        
-        {/* Empty state - default since no backend */}
-        <div className="animate-slide-up" style={{ animationDelay: '100ms' }}>
-          <FeedEmptyState />
+          <PublicFeedClient />
         </div>
         
         {/* Bottom padding for mobile safe area */}

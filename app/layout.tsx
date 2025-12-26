@@ -5,6 +5,7 @@ import ClientThemeProvider from '@/components/ClientThemeProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AgeVerificationModal from '@/components/AgeVerificationModal';
 import GlobalHeader from '@/components/GlobalHeader';
+import BottomNav from '@/components/BottomNav';
 import { IMProvider } from '@/components/im';
 import { NotiesProvider } from '@/components/noties';
 import { MessagesProvider } from '@/components/messages';
@@ -52,6 +53,7 @@ export default function RootLayout({
                     for skip-link accessibility. If not using PageShell, ensure you have a 
                     <main id="main" tabIndex={-1}> landmark element. */}
                 {children}
+                <BottomNav />
               </MessagesProvider>
             </NotiesProvider>
           </ClientThemeProvider>

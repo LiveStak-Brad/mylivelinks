@@ -24,3 +24,4 @@ index 5b0f9c1..c8a4e5d 100644
        "registeredCallbacks": manager.registeredCallbacks.map { $0.name }
      ]
    }
+
