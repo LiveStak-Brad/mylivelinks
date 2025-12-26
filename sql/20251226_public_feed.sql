@@ -133,7 +133,8 @@ CREATE POLICY "Deny direct inserts - use RPC only"
 CREATE OR REPLACE FUNCTION public.get_public_feed(
   p_limit integer DEFAULT 20,
   p_before_created_at timestamptz DEFAULT NULL,
-  p_before_id uuid DEFAULT NULL
+  p_before_id uuid DEFAULT NULL,
+  p_username text DEFAULT NULL
 )
 RETURNS TABLE (
   post_id uuid,
@@ -155,7 +156,12 @@ AS $$
   WITH base_posts AS (
     SELECT p.id, p.author_id, p.text_content, p.media_url, p.created_at
     FROM public.posts p
+    JOIN public.profiles pr ON pr.id = p.author_id
     WHERE (
+      p_username IS NULL
+      OR pr.username = p_username
+    )
+    AND (
       p_before_created_at IS NULL
       OR p_before_id IS NULL
       OR (p.created_at, p.id) < (p_before_created_at, p_before_id)
@@ -192,9 +198,9 @@ AS $$
   ORDER BY bp.created_at DESC, bp.id DESC;
 $$;
 
-REVOKE ALL ON FUNCTION public.get_public_feed(integer, timestamptz, uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_public_feed(integer, timestamptz, uuid) TO anon;
-GRANT EXECUTE ON FUNCTION public.get_public_feed(integer, timestamptz, uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.get_public_feed(integer, timestamptz, uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_public_feed(integer, timestamptz, uuid, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_public_feed(integer, timestamptz, uuid, text) TO authenticated;
 
 
 CREATE OR REPLACE FUNCTION public.gift_post(

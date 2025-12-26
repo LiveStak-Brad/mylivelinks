@@ -12,10 +12,12 @@
 -- Buckets needed:
 -- - avatars: User profile avatars
 -- - pinned-posts: Pinned post media (images/videos)
+-- - post-media: Public feed post media (images/videos)
 --
 -- Path structure:
 -- - avatars/{profile_id}/avatar.{ext}
 -- - pinned-posts/{profile_id}/pinned.{ext}
+-- - post-media/{profile_id}/feed/{timestamp}-{id}.{ext}
 --
 -- RLS Rules:
 -- - Write: Only auth.uid() = profile_id (users can upload their own)
@@ -143,6 +145,48 @@ CREATE POLICY "Users can delete own pinned post"
   ON storage.objects FOR DELETE
   USING (
     bucket_id = 'pinned-posts'
+    AND auth.uid() IS NOT NULL
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- ==========================================================================
+-- POST-MEDIA BUCKET POLICIES
+-- ==========================================================================
+
+DROP POLICY IF EXISTS "Public read post media" ON storage.objects;
+DROP POLICY IF EXISTS "Users can upload own post media" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own post media" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own post media" ON storage.objects;
+
+CREATE POLICY "Public read post media"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'post-media');
+
+CREATE POLICY "Users can upload own post media"
+  ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'post-media'
+    AND auth.uid() IS NOT NULL
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "Users can update own post media"
+  ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'post-media'
+    AND auth.uid() IS NOT NULL
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  )
+  WITH CHECK (
+    bucket_id = 'post-media'
+    AND auth.uid() IS NOT NULL
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "Users can delete own post media"
+  ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'post-media'
     AND auth.uid() IS NOT NULL
     AND (storage.foldername(name))[1] = auth.uid()::text
   );

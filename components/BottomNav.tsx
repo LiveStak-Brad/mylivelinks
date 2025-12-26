@@ -25,7 +25,7 @@ interface NavItem {
  * Features:
  * - 5 primary navigation items
  * - Active state indicators
- * - Badge support for messages
+ * - Dot badge for unread items (NO COUNTS)
  * - Responsive: shows on mobile/tablet, hidden on desktop
  * - Consistent with iOS/Android bottom navigation patterns
  * - Safe area padding for mobile devices

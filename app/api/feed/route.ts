@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const limitParam = url.searchParams.get('limit');
     const beforeCreatedAt = url.searchParams.get('before_created_at');
     const beforeId = url.searchParams.get('before_id');
+    const username = url.searchParams.get('username');
 
     const limit = Math.min(Math.max(parseInt(limitParam || '20', 10) || 20, 1), 50);
 
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
       p_limit: limit,
       p_before_created_at: beforeCreatedAt,
       p_before_id: beforeId,
+      p_username: username,
     });
 
     if (error) {

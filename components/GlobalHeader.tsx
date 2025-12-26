@@ -279,7 +279,7 @@ export default function GlobalHeader() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16 lg:h-[72px]">
             {/* Left section: Logo + Nav */}
-            <div className="flex items-center gap-4 lg:gap-6">
+            <div className="flex items-center gap-2 lg:gap-3">
               {/* Logo/Brand */}
               <Link 
                 href="/" 
@@ -292,7 +292,7 @@ export default function GlobalHeader() {
               {/* Trophy - Leaderboard Button */}
               <button
                 onClick={() => setShowLeaderboard(true)}
-                className="p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring mr-2"
+                className="p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
                 aria-label="View Leaderboards"
               >
                 <Trophy className="w-6 h-6 text-amber-500" />
