@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
-import { requireAdmin } from '@/lib/admin';
+import { requireUser } from '@/lib/rbac';
 
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
@@ -17,7 +17,16 @@ export async function GET(
   try {
     const { roomId } = await params;
     const supabase = createRouteHandlerClient(request);
-    await requireAdmin(request);
+    const user = await requireUser(request);
+
+    const { data: canManage } = await supabase.rpc('is_room_admin', {
+      p_profile_id: user.id,
+      p_room_id: roomId,
+    });
+
+    if (canManage !== true) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { data: room, error } = await supabase
       .from('coming_soon_rooms')
@@ -43,7 +52,16 @@ export async function PUT(
   try {
     const { roomId } = await params;
     const supabase = createRouteHandlerClient(request);
-    await requireAdmin(request);
+    const user = await requireUser(request);
+
+    const { data: canManage } = await supabase.rpc('is_room_admin', {
+      p_profile_id: user.id,
+      p_room_id: roomId,
+    });
+
+    if (canManage !== true) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const body = await request.json();
     const {
@@ -103,7 +121,16 @@ export async function DELETE(
   try {
     const { roomId } = await params;
     const supabase = createRouteHandlerClient(request);
-    await requireAdmin(request);
+    const user = await requireUser(request);
+
+    const { data: canManage } = await supabase.rpc('is_room_admin', {
+      p_profile_id: user.id,
+      p_room_id: roomId,
+    });
+
+    if (canManage !== true) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { error } = await supabase
       .from('coming_soon_rooms')

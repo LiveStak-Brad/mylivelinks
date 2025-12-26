@@ -217,6 +217,17 @@ export default function ModernProfilePage() {
       setLoading(false);
     }
   };
+
+  const handleMessage = async () => {
+    if (!profileData) return;
+    if (!currentUser) {
+      alert('Please log in to message users');
+      router.push('/login?returnUrl=' + encodeURIComponent(`/${username}?dm=${profileData.profile.id}`));
+      return;
+    }
+
+    router.push(`/${username}?dm=${profileData.profile.id}`);
+  };
   
   const handleFollow = async () => {
     if (!profileData || followLoading) return;
@@ -516,7 +527,10 @@ export default function ModernProfilePage() {
                         {followLoading ? 'Loading...' : followBtnConfig.text}
                       </button>
                       
-                      <button className="px-4 sm:px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2 text-sm sm:text-base">
+                      <button
+                        onClick={handleMessage}
+                        className="px-4 sm:px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2 text-sm sm:text-base"
+                      >
                         <MessageCircle size={18} className="sm:w-5 sm:h-5" />
                         Message
                       </button>

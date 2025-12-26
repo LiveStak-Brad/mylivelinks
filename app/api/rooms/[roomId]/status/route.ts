@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
-import { requireAdmin } from '@/lib/admin';
+import { requireUser } from '@/lib/rbac';
 
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
@@ -14,11 +14,20 @@ export async function POST(
   { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
-    await requireAdmin(request);
-
     const { roomId } = await params;
     if (!roomId) {
       return NextResponse.json({ error: 'roomId is required' }, { status: 400 });
+    }
+
+    const supabase = createRouteHandlerClient(request);
+    const user = await requireUser(request);
+    const { data: canManage } = await supabase.rpc('is_room_admin', {
+      p_profile_id: user.id,
+      p_room_id: roomId,
+    });
+
+    if (canManage !== true) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await request.json().catch(() => null);
@@ -28,8 +37,6 @@ export async function POST(
     if (!allowed.includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
-
-    const supabase = createRouteHandlerClient(request);
 
     const { data, error } = await supabase
       .from('coming_soon_rooms')

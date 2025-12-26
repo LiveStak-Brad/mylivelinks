@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
-import { requireAdmin } from '@/lib/admin';
+import { requireAppAdmin, requireUser } from '@/lib/rbac';
 
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
@@ -12,20 +12,81 @@ function authErrorToResponse(err: unknown) {
 // GET /api/admin/rooms - List all rooms (including drafts) for admin
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    const user = await requireUser(request);
     const supabase = createRouteHandlerClient(request);
 
-    const { data: rooms, error } = await supabase
-      .from('coming_soon_rooms')
-      .select('*')
-      .order('display_order', { ascending: true });
+    const { data: isAppAdmin } = await supabase.rpc('is_app_admin', { p_profile_id: user.id });
 
-    if (error) {
-      console.error('[API /admin/rooms] Error:', error);
-      return NextResponse.json({ error: 'Failed to fetch rooms' }, { status: 500 });
+    let rooms: any[] = [];
+    if (isAppAdmin === true) {
+      const { data, error } = await supabase
+        .from('coming_soon_rooms')
+        .select('*')
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        console.error('[API /admin/rooms] Error:', error);
+        return NextResponse.json({ error: 'Failed to fetch rooms' }, { status: 500 });
+      }
+
+      rooms = data || [];
+    } else {
+      const { data: myRoomRoles, error: myRoomRolesError } = await supabase
+        .from('room_roles')
+        .select('room_id')
+        .eq('profile_id', user.id)
+        .in('role', ['room_admin', 'room_moderator']);
+
+      if (myRoomRolesError) {
+        return NextResponse.json({ error: myRoomRolesError.message }, { status: 403 });
+      }
+
+      const roomIds = Array.from(new Set((myRoomRoles || []).map((r: any) => r.room_id)));
+      if (roomIds.length === 0) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
+      const { data, error } = await supabase
+        .from('coming_soon_rooms')
+        .select('*')
+        .in('id', roomIds)
+        .order('display_order', { ascending: true });
+
+      if (error) {
+        console.error('[API /admin/rooms] Error:', error);
+        return NextResponse.json({ error: 'Failed to fetch rooms' }, { status: 500 });
+      }
+
+      rooms = data || [];
     }
 
-    return NextResponse.json({ rooms: rooms || [] });
+    const roomIds = rooms.map((r: any) => r.id);
+    const rolesSummaryByRoomId = new Map<string, { admins_count: number; moderators_count: number }>();
+
+    if (roomIds.length > 0) {
+      const { data: roles } = await supabase
+        .from('room_roles')
+        .select('room_id, role')
+        .in('room_id', roomIds);
+
+      for (const roomId of roomIds) {
+        rolesSummaryByRoomId.set(roomId, { admins_count: 0, moderators_count: 0 });
+      }
+
+      for (const rr of (roles as any[]) || []) {
+        const current = rolesSummaryByRoomId.get(rr.room_id) || { admins_count: 0, moderators_count: 0 };
+        if (rr.role === 'room_admin') current.admins_count += 1;
+        if (rr.role === 'room_moderator') current.moderators_count += 1;
+        rolesSummaryByRoomId.set(rr.room_id, current);
+      }
+    }
+
+    const enriched = rooms.map((room: any) => ({
+      ...room,
+      roles_summary: rolesSummaryByRoomId.get(room.id) || { admins_count: 0, moderators_count: 0 },
+    }));
+
+    return NextResponse.json({ rooms: enriched });
   } catch (err) {
     return authErrorToResponse(err);
   }
@@ -34,7 +95,7 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/rooms - Create a new room
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requireAppAdmin(request);
     const supabase = createRouteHandlerClient(request);
 
     const body = await request.json();

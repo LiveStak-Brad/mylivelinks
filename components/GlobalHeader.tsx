@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Crown, Bell, MessageCircle } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
@@ -21,12 +21,31 @@ const OWNER_EMAILS = ['wcba.mo@gmail.com'];
 function HeaderIcons() {
   const [showNotiesModal, setShowNotiesModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   
   const notiesButtonRef = useRef<HTMLButtonElement>(null);
   const messagesButtonRef = useRef<HTMLButtonElement>(null);
   
   const { unreadCount: unreadNoties } = useNoties();
-  const { totalUnreadCount: unreadMessages } = useMessages();
+  const { totalUnreadCount: unreadMessages, openConversationWith } = useMessages();
+
+  useEffect(() => {
+    const dm = searchParams?.get('dm');
+    if (!dm) return;
+
+    void (async () => {
+      setShowMessagesModal(true);
+      setShowNotiesModal(false);
+      await openConversationWith(dm);
+
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete('dm');
+      const qs = next.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    })();
+  }, [openConversationWith, pathname, router, searchParams]);
 
   return (
     <>

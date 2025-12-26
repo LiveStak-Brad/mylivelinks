@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Gift, Smile, ArrowLeft, MoreVertical, Loader2 } from 'lucide-react';
+import { Send, Gift, Smile, ArrowLeft, MoreVertical, Loader2, ExternalLink } from 'lucide-react';
 import { useMessages, Message, Conversation } from './MessagesContext';
 import GiftPickerMini from './GiftPickerMini';
+import { useIM } from '@/components/im';
 
 interface MessageThreadProps {
   conversation: Conversation;
@@ -60,6 +61,7 @@ const getGiftEmoji = (name: string) => {
 
 export default function MessageThread({ conversation, onBack, showBackButton = false }: MessageThreadProps) {
   const { messages, sendMessage, sendGift, currentUserId } = useMessages();
+  const { openChat } = useIM();
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
@@ -176,9 +178,24 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
         </div>
 
         {/* Actions */}
-        <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition">
-          <MoreVertical className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() =>
+              openChat(
+                conversation.recipientId,
+                conversation.recipientDisplayName || conversation.recipientUsername,
+                conversation.recipientAvatar
+              )
+            }
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
+            title="Pop out"
+          >
+            <ExternalLink className="w-5 h-5" />
+          </button>
+          <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition">
+            <MoreVertical className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}

@@ -23,7 +23,7 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const { currentUserId, setActiveConversationId } = useMessages();
+  const { currentUserId, openConversationWith } = useMessages();
   const supabase = createClient();
 
   const loadFriends = useCallback(async () => {
@@ -148,8 +148,10 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
   }, [loadFriends]);
 
   const handleFriendClick = (friend: Friend) => {
-    setActiveConversationId(friend.id);
-    onSelectFriend(friend.id);
+    void (async () => {
+      const ok = await openConversationWith(friend.id);
+      if (ok) onSelectFriend(friend.id);
+    })();
   };
 
   // Filter friends by search query

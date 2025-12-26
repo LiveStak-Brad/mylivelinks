@@ -40,6 +40,7 @@ interface MessagesContextType {
   setActiveConversationId: (id: string | null) => void;
   messages: Message[];
   loadMessages: (conversationId: string) => Promise<void>;
+  openConversationWith: (recipientId: string) => Promise<boolean>;
   sendMessage: (recipientId: string, content: string) => Promise<boolean>;
   sendGift: (recipientId: string, giftId: number, giftName: string, giftCoins: number) => Promise<boolean>;
   markConversationRead: (conversationId: string) => void;
@@ -226,7 +227,13 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         const fallback = await loadConversationsFallback();
-        setConversations(fallback);
+        setConversations((prev) => {
+          if (!activeConversationId) return fallback;
+          if (fallback.some((c) => c.id === activeConversationId)) return fallback;
+          const existing = prev.find((c) => c.id === activeConversationId);
+          if (!existing) return fallback;
+          return [existing, ...fallback].sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+        });
         return;
       }
 
@@ -265,13 +272,77 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         };
       });
 
-      setConversations(convos);
+      setConversations((prev) => {
+        if (!activeConversationId) return convos;
+        if (convos.some((c) => c.id === activeConversationId)) return convos;
+        const existing = prev.find((c) => c.id === activeConversationId);
+        if (!existing) return convos;
+        return [existing, ...convos].sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+      });
     } catch (error) {
       console.error('[Messages] Error loading conversations:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [currentUserId, loadConversationsFallback, loadOnlineMap, supabase]);
+  }, [activeConversationId, currentUserId, loadConversationsFallback, loadOnlineMap, supabase]);
+
+  const openConversationWith = useCallback(
+    async (recipientId: string): Promise<boolean> => {
+      if (!currentUserId) return false;
+      if (!recipientId) return false;
+      if (recipientId === currentUserId) return false;
+
+      const existing = conversations.find((c) => c.recipientId === recipientId);
+      if (existing) {
+        setActiveConversationId(existing.id);
+        return true;
+      }
+
+      const conv: Conversation = {
+        id: recipientId,
+        recipientId,
+        recipientUsername: 'Unknown',
+        recipientDisplayName: undefined,
+        recipientAvatar: undefined,
+        isOnline: false,
+        lastMessage: undefined,
+        lastMessageAt: new Date(),
+        unreadCount: 0,
+      };
+
+      setConversations((prev) => [conv, ...prev].filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i));
+      setActiveConversationId(recipientId);
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('username, avatar_url, display_name')
+          .eq('id', recipientId)
+          .single();
+        if (error) throw error;
+
+        const onlineMap = await loadOnlineMap([recipientId]);
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === recipientId
+              ? {
+                  ...c,
+                  recipientUsername: String((profile as any)?.username ?? 'Unknown'),
+                  recipientDisplayName: (profile as any)?.display_name ?? undefined,
+                  recipientAvatar: (profile as any)?.avatar_url ?? undefined,
+                  isOnline: onlineMap.get(recipientId) ?? false,
+                }
+              : c
+          )
+        );
+      } catch (err) {
+        console.error('[Messages] Error opening conversation:', err);
+      }
+
+      return true;
+    },
+    [conversations, currentUserId, loadOnlineMap, supabase]
+  );
 
   const loadMessages = useCallback(
     async (conversationId: string) => {
@@ -644,6 +715,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       setActiveConversationId,
       messages,
       loadMessages,
+      openConversationWith,
       sendMessage,
       sendGift,
       markConversationRead,
