@@ -107,6 +107,11 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
     matchType: 'exact',
   },
   { 
+    href: '/feed', 
+    label: 'Feed', 
+    matchType: 'exact',
+  },
+  { 
     href: '/live', 
     label: 'Live Streams', 
     matchType: 'prefix',

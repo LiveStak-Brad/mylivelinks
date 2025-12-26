@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 
 interface GiftType {
@@ -34,6 +34,8 @@ export default function GiftModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userCoinBalance, setUserCoinBalance] = useState<number>(0);
+
+  const inFlightRef = useRef(false);
 
   const supabase = createClient();
 
@@ -121,11 +123,14 @@ export default function GiftModal({
   const handleSendGift = async () => {
     if (!selectedGift) return;
 
+    if (inFlightRef.current) return;
+
     if (userCoinBalance < selectedGift.coin_cost) {
       setError('Insufficient coin balance');
       return;
     }
 
+    inFlightRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -187,6 +192,7 @@ export default function GiftModal({
     } catch (err: any) {
       setError(err.message || 'Failed to send gift');
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
     }
   };

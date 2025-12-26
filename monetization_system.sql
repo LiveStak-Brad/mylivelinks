@@ -379,20 +379,9 @@ BEGIN
     )
     ON CONFLICT (idempotency_key) DO NOTHING;
     
-    -- Update sender balance
-    UPDATE profiles
-    SET coin_balance = coin_balance - p_coins_amount,
-        total_spent = COALESCE(total_spent, 0) + p_coins_amount,
-        total_gifts_sent = COALESCE(total_gifts_sent, 0) + p_coins_amount,
-        last_transaction_at = CURRENT_TIMESTAMP
-    WHERE id = p_sender_id;
-    
-    -- Update recipient balance
-    UPDATE profiles
-    SET earnings_balance = earnings_balance + v_diamonds_awarded,
-        total_gifts_received = COALESCE(total_gifts_received, 0) + p_coins_amount,
-        last_transaction_at = CURRENT_TIMESTAMP
-    WHERE id = p_recipient_id;
+    -- IMPORTANT: Do NOT update cached profile balances/totals here.
+    -- Production DB uses triggers to recompute profiles balances from ledger_entries
+    -- and to update gift totals from gifts inserts. Updating profiles here would double-credit.
     
     -- Return result
     RETURN jsonb_build_object(

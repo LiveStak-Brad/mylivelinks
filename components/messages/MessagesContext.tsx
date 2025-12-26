@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
 import type { AuthChangeEvent, RealtimePostgresChangesPayload, Session } from '@supabase/supabase-js';
 
@@ -162,6 +162,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const supabase = createClient();
+
+  const sendGiftInFlightRef = useRef(false);
 
   const totalUnreadCount = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
@@ -661,6 +663,9 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     ): Promise<boolean> => {
       if (!currentUserId) return false;
 
+      if (sendGiftInFlightRef.current) return false;
+      sendGiftInFlightRef.current = true;
+
       const tempId = `temp-gift-${Date.now()}`;
       const requestId = crypto.randomUUID();
 
@@ -764,6 +769,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         console.error('[Messages] Error sending gift:', error);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         return false;
+      } finally {
+        sendGiftInFlightRef.current = false;
       }
     },
     [currentUserId, supabase]
