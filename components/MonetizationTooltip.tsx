@@ -21,7 +21,7 @@ export default function MonetizationTooltip({ type, children }: MonetizationTool
     },
     conversion: {
       title: 'Diamond Conversion',
-      description: 'Convert diamonds to coins with a 40% platform fee. Minimum 2 diamonds required. You receive 60% of the diamonds as coins.',
+      description: 'Convert diamonds to coins with a 40% platform fee. Minimum 2 diamonds required.',
     },
     gift: {
       title: 'Send Gift',

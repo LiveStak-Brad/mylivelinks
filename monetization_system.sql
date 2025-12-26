@@ -254,7 +254,7 @@ BEGIN
     -- Update wallet balance
     UPDATE profiles
     SET coin_balance = coin_balance + p_coins_amount,
-        lifetime_coins_purchased = COALESCE(lifetime_coins_purchased, 0) + p_coins_amount,
+        total_purchased = COALESCE(total_purchased, 0) + p_coins_amount,
         last_transaction_at = CURRENT_TIMESTAMP
     WHERE id = p_user_id;
     

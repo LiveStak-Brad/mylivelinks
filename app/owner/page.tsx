@@ -51,6 +51,8 @@ import {
   Image,
   Heart,
   UserCog,
+  Menu,
+  PanelLeftClose,
 } from 'lucide-react';
 
 import { RoleUserRow, AddRoleModal, RoomRolesPanel, RoleUser } from '@/components/admin';
@@ -199,6 +201,7 @@ export default function OwnerPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile sidebar state
   const [userFilter, setUserFilter] = useState<'all' | 'banned' | 'muted' | 'streamers' | 'verified'>('all');
   const [reportFilter, setReportFilter] = useState<'all' | 'pending' | 'resolved' | 'dismissed'>('pending');
   const [roomImageUploading, setRoomImageUploading] = useState(false);
@@ -895,18 +898,38 @@ export default function OwnerPanel() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex">
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col fixed h-full">
+      <aside className={`
+        w-64 bg-gray-800 border-r border-gray-700 flex flex-col fixed h-full z-50
+        transition-transform duration-300 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0
+      `}>
         {/* Logo */}
         <div className="p-6 border-b border-gray-700">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
               <Crown className="w-6 h-6 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="font-bold text-white">Owner Panel</h1>
               <p className="text-xs text-gray-400">MyLiveLinks</p>
             </div>
+            {/* Mobile close button */}
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden p-1 text-gray-400 hover:text-white"
+            >
+              <PanelLeftClose className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
@@ -933,6 +956,7 @@ export default function OwnerPanel() {
                       ? 'bg-purple-600/20 text-purple-400 border-r-2 border-purple-500'
                       : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'
                   }`}
+                  onClick={() => setSidebarOpen(false)}
                 >
                   <Icon className="w-5 h-5" />
                   <span className="flex-1">{tab.label}</span>
@@ -944,7 +968,10 @@ export default function OwnerPanel() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setSidebarOpen(false); // Close sidebar on mobile when selecting tab
+                }}
                 className={`w-full flex items-center gap-3 px-6 py-3 text-left transition ${
                   isActive
                     ? 'bg-purple-600/20 text-purple-400 border-r-2 border-purple-500'
@@ -978,133 +1005,147 @@ export default function OwnerPanel() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 lg:ml-64 p-4 lg:p-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              {tabs.find(t => t.id === activeTab)?.label}
-            </h2>
-            <p className="text-gray-400">
-              {activeTab === 'dashboard' && 'Platform overview and statistics'}
-              {activeTab === 'users' && 'Manage all platform users'}
-              {activeTab === 'streams' && 'Monitor and control live streams'}
-              {activeTab === 'reports' && 'Review and handle user reports'}
-              {activeTab === 'applications' && 'Approve or reject room applications'}
-              {activeTab === 'rooms' && 'Manage Coming Soon rooms and their images'}
-              {activeTab === 'roles' && 'Manage App Admins and Room Roles'}
-              {activeTab === 'gifts' && 'Manage gift types and coin packs'}
-              {activeTab === 'transactions' && 'View all platform transactions'}
-              {activeTab === 'analytics' && 'Platform analytics and insights'}
-              {activeTab === 'settings' && 'Platform configuration'}
-            </p>
-          </div>
+        <div className="flex items-center justify-between mb-8 gap-4">
           <div className="flex items-center gap-3">
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 bg-gray-800 text-gray-300 hover:text-white rounded-lg border border-gray-700"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div>
+              <h2 className="text-xl lg:text-2xl font-bold text-white">
+                {tabs.find(t => t.id === activeTab)?.label}
+              </h2>
+              <p className="text-gray-400 text-sm lg:text-base hidden sm:block">
+                {activeTab === 'dashboard' && 'Platform overview and statistics'}
+                {activeTab === 'users' && 'Manage all platform users'}
+                {activeTab === 'streams' && 'Monitor and control live streams'}
+                {activeTab === 'reports' && 'Review and handle user reports'}
+                {activeTab === 'applications' && 'Approve or reject room applications'}
+                {activeTab === 'rooms' && 'Manage Coming Soon rooms and their images'}
+                {activeTab === 'roles' && 'Manage App Admins and Room Roles'}
+                {activeTab === 'gifts' && 'Manage gift types and coin packs'}
+                {activeTab === 'transactions' && 'View all platform transactions'}
+                {activeTab === 'analytics' && 'Platform analytics and insights'}
+                {activeTab === 'settings' && 'Platform configuration'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 lg:gap-3">
             <button
               onClick={loadAllData}
               disabled={refreshing}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition disabled:opacity-50"
+              className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
+              <span className="hidden sm:inline">Refresh</span>
             </button>
             <a
               href="/"
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+              className="flex items-center gap-2 px-3 lg:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
             >
               <ExternalLink className="w-4 h-4" />
-              View Site
+              <span className="hidden sm:inline">View Site</span>
             </a>
           </div>
         </div>
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && stats && (
-          <div className="space-y-6">
+          <div className="space-y-4 lg:space-y-6">
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <div className="flex items-center justify-between mb-4">
-                  <Users className="w-8 h-8 text-blue-400" />
-                  <span className="text-green-400 text-sm flex items-center gap-1">
-                    <TrendingUp className="w-4 h-4" />
-                    +{stats.newUsersToday} today
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+              <div className="bg-gray-800 rounded-xl p-3 lg:p-6 border border-gray-700">
+                <div className="flex items-center justify-between mb-2 lg:mb-4">
+                  <Users className="w-6 h-6 lg:w-8 lg:h-8 text-blue-400" />
+                  <span className="text-green-400 text-xs lg:text-sm flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3 lg:w-4 lg:h-4" />
+                    <span className="hidden sm:inline">+{stats.newUsersToday} today</span>
+                    <span className="sm:hidden">+{stats.newUsersToday}</span>
                   </span>
                 </div>
-                <p className="text-3xl font-bold text-white">{stats.totalUsers.toLocaleString()}</p>
-                <p className="text-gray-400 text-sm">Total Users</p>
+                <p className="text-xl lg:text-3xl font-bold text-white">{stats.totalUsers.toLocaleString()}</p>
+                <p className="text-gray-400 text-xs lg:text-sm">Total Users</p>
               </div>
 
-              <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <div className="flex items-center justify-between mb-4">
-                  <Radio className="w-8 h-8 text-red-400" />
-                  <span className="relative flex h-3 w-3">
+              <div className="bg-gray-800 rounded-xl p-3 lg:p-6 border border-gray-700">
+                <div className="flex items-center justify-between mb-2 lg:mb-4">
+                  <Radio className="w-6 h-6 lg:w-8 lg:h-8 text-red-400" />
+                  <span className="relative flex h-2 w-2 lg:h-3 lg:w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 lg:h-3 lg:w-3 bg-red-500"></span>
                   </span>
                 </div>
-                <p className="text-3xl font-bold text-white">{stats.activeStreams}</p>
-                <p className="text-gray-400 text-sm">Live Streams</p>
+                <p className="text-xl lg:text-3xl font-bold text-white">{stats.activeStreams}</p>
+                <p className="text-gray-400 text-xs lg:text-sm">Live Streams</p>
               </div>
 
-              <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <div className="flex items-center justify-between mb-4">
-                  <Gift className="w-8 h-8 text-pink-400" />
-                  <Activity className="w-5 h-5 text-gray-500" />
+              <div className="bg-gray-800 rounded-xl p-3 lg:p-6 border border-gray-700">
+                <div className="flex items-center justify-between mb-2 lg:mb-4">
+                  <Gift className="w-6 h-6 lg:w-8 lg:h-8 text-pink-400" />
+                  <Activity className="w-4 h-4 lg:w-5 lg:h-5 text-gray-500" />
                 </div>
-                <p className="text-3xl font-bold text-white">{stats.totalGiftsSent.toLocaleString()}</p>
-                <p className="text-gray-400 text-sm">Gifts Sent</p>
+                <p className="text-xl lg:text-3xl font-bold text-white">{stats.totalGiftsSent.toLocaleString()}</p>
+                <p className="text-gray-400 text-xs lg:text-sm">Gifts Sent</p>
               </div>
 
-              <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <div className="flex items-center justify-between mb-4">
-                  <AlertTriangle className="w-8 h-8 text-amber-400" />
+              <div className="bg-gray-800 rounded-xl p-3 lg:p-6 border border-gray-700">
+                <div className="flex items-center justify-between mb-2 lg:mb-4">
+                  <AlertTriangle className="w-6 h-6 lg:w-8 lg:h-8 text-amber-400" />
                   {stats.pendingReports > 0 && (
-                    <span className="px-2 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-full">
-                      Needs attention
+                    <span className="px-1.5 lg:px-2 py-0.5 lg:py-1 bg-amber-500/20 text-amber-400 text-[10px] lg:text-xs rounded-full">
+                      <span className="hidden sm:inline">Needs attention</span>
+                      <span className="sm:hidden">!</span>
                     </span>
                   )}
                 </div>
-                <p className="text-3xl font-bold text-white">{stats.pendingReports}</p>
-                <p className="text-gray-400 text-sm">Pending Reports</p>
+                <p className="text-xl lg:text-3xl font-bold text-white">{stats.pendingReports}</p>
+                <p className="text-gray-400 text-xs lg:text-sm">Pending Reports</p>
               </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
-              <div className="flex flex-wrap gap-3">
+            <div className="bg-gray-800 rounded-xl p-4 lg:p-6 border border-gray-700">
+              <h3 className="text-base lg:text-lg font-semibold text-white mb-3 lg:mb-4">Quick Actions</h3>
+              <div className="flex flex-wrap gap-2 lg:gap-3">
                 <button
                   onClick={() => setActiveTab('reports')}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition flex items-center gap-2"
+                  className="px-3 lg:px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition flex items-center gap-2 text-sm lg:text-base"
                 >
                   <AlertTriangle className="w-4 h-4" />
-                  Review Reports ({stats.pendingReports})
+                  <span className="hidden sm:inline">Review Reports</span>
+                  <span className="sm:hidden">Reports</span> ({stats.pendingReports})
                 </button>
                 <button
                   onClick={() => setActiveTab('applications')}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+                  className="px-3 lg:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2 text-sm lg:text-base"
                 >
                   <FileCheck className="w-4 h-4" />
-                  Review Applications ({stats.pendingApplications})
+                  <span className="hidden sm:inline">Review Applications</span>
+                  <span className="sm:hidden">Apps</span> ({stats.pendingApplications})
                 </button>
                 <button
                   onClick={handleEndAllStreams}
                   disabled={actionLoading === 'all-streams' || stats.activeStreams === 0}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2 disabled:opacity-50"
+                  className="px-3 lg:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2 text-sm lg:text-base disabled:opacity-50"
                 >
                   <VideoOff className="w-4 h-4" />
-                  End All Streams
+                  <span className="hidden sm:inline">End All Streams</span>
+                  <span className="sm:hidden">End All</span>
                 </button>
               </div>
             </div>
 
             {/* Recent Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
               {/* Recent Streams */}
-              <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <Radio className="w-5 h-5 text-red-400" />
+              <div className="bg-gray-800 rounded-xl p-4 lg:p-6 border border-gray-700">
+                <h3 className="text-base lg:text-lg font-semibold text-white mb-3 lg:mb-4 flex items-center gap-2">
+                  <Radio className="w-4 h-4 lg:w-5 lg:h-5 text-red-400" />
                   Live Now
                 </h3>
                 {liveStreams.length === 0 ? (

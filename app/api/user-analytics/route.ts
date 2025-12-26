@@ -187,8 +187,10 @@ export async function GET(request: NextRequest) {
     // Determine which profile to load
     const profileId = targetProfileId || currentUserId;
     
+    // If there is no authenticated user AND no explicit profileId, treat as unauthenticated.
+    // The client relies on a 401 here to redirect to /login.
     if (!profileId) {
-      return NextResponse.json({ error: 'Profile ID required' }, { status: 400 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
     // Check permissions
@@ -197,9 +199,16 @@ export async function GET(request: NextRequest) {
     
     // Check if admin/owner viewing another profile
     if (!isOwnProfile && currentUserId) {
-      const { data: isAdmin } = await supabase.rpc('is_app_admin', { p_profile_id: currentUserId });
-      const { data: isOwner } = await supabase.rpc('is_owner', { p_profile_id: currentUserId });
-      canViewPrivate = isAdmin === true || isOwner === true;
+      try {
+        const { data: isAdmin, error: adminErr } = await supabase.rpc('is_app_admin', { p_profile_id: currentUserId });
+        const { data: isOwner, error: ownerErr } = await supabase.rpc('is_owner', { p_profile_id: currentUserId });
+        if (!adminErr && !ownerErr) {
+          canViewPrivate = isAdmin === true || isOwner === true;
+        }
+      } catch {
+        // If the RPCs are not deployed yet, fail closed (no private access) instead of erroring.
+        canViewPrivate = false;
+      }
     }
     
     // Load profile data.

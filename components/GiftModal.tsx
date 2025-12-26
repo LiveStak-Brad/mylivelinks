@@ -135,7 +135,7 @@ export default function GiftModal({
 
       const requestId = crypto.randomUUID();
 
-      // Call new API endpoint (40% platform fee, 60% diamonds to recipient)
+      // Call API endpoint (gifts are 1:1 coins -> diamonds, no platform fee on gifts)
       const response = await fetch('/api/gifts/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
