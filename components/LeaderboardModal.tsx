@@ -18,6 +18,7 @@ interface LeaderboardEntry {
 }
 
 type LeaderboardType = 'top_streamers' | 'top_gifters';
+type Period = 'daily' | 'weekly' | 'monthly' | 'alltime';
 
 interface LeaderboardModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ interface LeaderboardModalProps {
 
 export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalProps) {
   const [type, setType] = useState<LeaderboardType>('top_streamers');
+  const [period, setPeriod] = useState<Period>('daily');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatus>>({});
@@ -36,7 +38,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
     if (isOpen) {
       loadLeaderboard();
     }
-  }, [isOpen, type]);
+  }, [isOpen, type, period]);
 
   // Close on escape key
   useEffect(() => {
@@ -167,6 +169,23 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
               <Coins className="w-4 h-4" />
               Top Gifters
             </button>
+          </div>
+
+          {/* Period Tabs */}
+          <div className="flex gap-1 mt-3">
+            {(['daily', 'weekly', 'monthly', 'alltime'] as Period[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition ${
+                  period === p
+                    ? 'bg-white text-amber-600 shadow-md'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+              >
+                {p === 'alltime' ? 'All Time' : p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
           </div>
         </div>
 

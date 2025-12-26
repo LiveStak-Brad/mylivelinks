@@ -18,7 +18,7 @@ interface LeaderboardEntry {
 }
 
 type LeaderboardType = 'top_streamers' | 'top_gifters';
-type Period = 'daily' | 'weekly' | 'alltime';
+type Period = 'daily' | 'weekly' | 'monthly' | 'alltime';
 
 export default function Leaderboard() {
   const [type, setType] = useState<LeaderboardType>('top_streamers');
@@ -253,7 +253,7 @@ export default function Leaderboard() {
 
       {/* Period Tabs */}
       <div className="flex gap-2 mb-6">
-        {(['daily', 'weekly', 'alltime'] as Period[]).map((p) => (
+        {(['daily', 'weekly', 'monthly', 'alltime'] as Period[]).map((p) => (
           <button
             key={p}
             onClick={() => setPeriod(p)}
@@ -263,7 +263,7 @@ export default function Leaderboard() {
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
             }`}
           >
-            {p.charAt(0).toUpperCase() + p.slice(1)}
+            {p === 'alltime' ? 'All Time' : p.charAt(0).toUpperCase() + p.slice(1)}
           </button>
         ))}
       </div>
