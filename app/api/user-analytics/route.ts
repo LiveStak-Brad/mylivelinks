@@ -202,15 +202,33 @@ export async function GET(request: NextRequest) {
       canViewPrivate = isAdmin === true || isOwner === true;
     }
     
-    // Load profile data
+    // Load profile data.
+    // IMPORTANT: use select('*') so this route remains compatible across schema migrations.
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url, coin_balance, earnings_balance, follower_count, following_count, lifetime_coins_gifted')
+      .select('*')
       .eq('id', profileId)
       .single();
     
     if (profileError || !profile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    // following_count is not always denormalized in the profiles table.
+    // Fall back to computing it from the follows table when possible.
+    let followingCount = Number((profile as any).following_count ?? 0);
+    if (!Number.isFinite(followingCount) || followingCount <= 0) {
+      try {
+        const { count } = await supabase
+          .from('follows')
+          .select('id', { count: 'exact', head: true })
+          .eq('follower_id', profileId);
+        if (typeof count === 'number' && Number.isFinite(count)) {
+          followingCount = count;
+        }
+      } catch {
+        // ignore
+      }
     }
     
     // Initialize response with public data
@@ -223,7 +241,7 @@ export async function GET(request: NextRequest) {
         lifetimeDiamondsEarned: 0,
         totalGiftsSent: 0,
         followerCount: profile.follower_count || 0,
-        followingCount: profile.following_count || 0,
+        followingCount,
       },
       wallet: {
         coinsBalance: canViewPrivate ? (profile.coin_balance || 0) : 0,
@@ -393,13 +411,20 @@ export async function GET(request: NextRequest) {
     }
     
     // Load stream sessions if available
-    const { data: streams } = await supabase
-      .from('live_streams')
-      .select('id, created_at, ended_at, peak_viewers, total_views')
-      .eq('host_id', profileId)
-      .gte('created_at', startIso)
-      .lte('created_at', endIso)
-      .order('created_at', { ascending: false });
+    let streams: any[] | null = null;
+    try {
+      const attempt = await supabase
+        .from('live_streams')
+        .select('id, created_at, started_at, ended_at, total_viewer_minutes')
+        .eq('profile_id', profileId)
+        .gte('created_at', startIso)
+        .lte('created_at', endIso)
+        .order('created_at', { ascending: false });
+
+      if (!attempt.error) streams = (attempt.data as any[]) ?? null;
+    } catch {
+      streams = null;
+    }
     
     if (streams && streams.length > 0) {
       response.streams.totalSessions = streams.length;
@@ -409,20 +434,21 @@ export async function GET(request: NextRequest) {
       let totalViewers = 0;
       
       const sessions = streams.map(s => {
-        const startTime = new Date(s.created_at).getTime();
-        const endTime = s.ended_at ? new Date(s.ended_at).getTime() : Date.now();
+        const startTime = new Date(s.started_at || s.created_at).getTime();
+        const endTime = s.ended_at ? new Date(s.ended_at).getTime() : startTime;
         const duration = Math.round((endTime - startTime) / 60000);
         
         totalMinutes += duration;
-        peakViewers = Math.max(peakViewers, s.peak_viewers || 0);
-        totalViewers += s.total_views || 0;
+        // These fields aren't part of the canonical live_streams schema yet.
+        peakViewers = Math.max(peakViewers, 0);
+        totalViewers += 0;
         
         return {
           id: s.id,
           date: s.created_at,
-          duration,
-          peakViewers: s.peak_viewers || 0,
-          totalViews: s.total_views || 0,
+          duration: Math.max(0, duration),
+          peakViewers: 0,
+          totalViews: 0,
         };
       });
       
@@ -509,12 +535,18 @@ export async function GET(request: NextRequest) {
     }
     
     // Load recent transactions (last 50)
-    const { data: ledgerEntries } = await supabase
-      .from('ledger_entries')
-      .select('id, entry_type, delta_coins, delta_diamonds, provider_ref, created_at')
-      .eq('user_id', profileId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+    let ledgerEntries: any[] | null = null;
+    try {
+      const le = await supabase
+        .from('ledger_entries')
+        .select('id, entry_type, delta_coins, delta_diamonds, provider_ref, created_at')
+        .eq('user_id', profileId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (!le.error) ledgerEntries = (le.data as any[]) ?? null;
+    } catch {
+      ledgerEntries = null;
+    }
     
     if (ledgerEntries) {
       response.transactions = ledgerEntries.map(entry => {
@@ -538,6 +570,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
   } catch (error) {
     console.error('[API] user-analytics error:', error);
+    const details = error instanceof Error ? error.message : String(error);
+    if (process.env.NODE_ENV !== 'production') {
+      return NextResponse.json({ error: 'Failed to load analytics', details }, { status: 500 });
+    }
     return NextResponse.json({ error: 'Failed to load analytics' }, { status: 500 });
   }
 }

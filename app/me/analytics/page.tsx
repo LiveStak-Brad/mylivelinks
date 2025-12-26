@@ -153,7 +153,11 @@ export default function MyAnalyticsPage() {
           router.push('/login');
           return;
         }
-        throw new Error('Failed to load analytics');
+        const body = await res.json().catch(() => null);
+        const serverMsg = typeof body?.error === 'string' ? body.error : null;
+        const serverDetails = typeof body?.details === 'string' ? body.details : null;
+        const msg = serverMsg || `Analytics request failed (${res.status})`;
+        throw new Error(serverDetails ? `${msg}: ${serverDetails}` : msg);
       }
       
       const analyticsData = await res.json();

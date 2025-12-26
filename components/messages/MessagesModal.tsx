@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, MessageCircle, Edit } from 'lucide-react';
 import { useMessages, Conversation } from './MessagesContext';
 import ConversationList from './ConversationList';
@@ -14,6 +15,7 @@ interface MessagesModalProps {
 }
 
 export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesModalProps) {
+  const [mounted, setMounted] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const { conversations, activeConversationId, setActiveConversationId, totalUnreadCount } = useMessages();
   const [isMobile, setIsMobile] = useState(false);
@@ -21,6 +23,11 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
 
   // Get active conversation object
   const activeConversation = conversations.find(c => c.id === activeConversationId);
+
+  // Mount check for portal
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check mobile
   useEffect(() => {
@@ -96,64 +103,62 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     setActiveConversationId(null);
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   // Mobile: Full screen with single pane navigation (PWA-optimized)
-  if (isMobile) {
-    return (
-      <>
-        {/* Backdrop - solid background to prevent content bleeding through */}
-        <div className="fixed inset-0 z-[9999] bg-background" aria-hidden="true" />
-        
-        {/* Modal Content - PWA safe area aware */}
-        <div className="fixed inset-0 z-[9999] flex flex-col bg-background animate-slide-up pwa-messages-container pwa-no-overscroll">
-          {/* Show thread or conversation list */}
-          {showThread && activeConversation ? (
-            <MessageThread
-              conversation={activeConversation}
-              onBack={handleBack}
-              showBackButton={true}
-            />
-          ) : (
-            <>
-              {/* Mobile Header - iOS notch aware */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0 pwa-header">
-                <div className="flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5 text-primary" />
-                  <h2 className="text-lg font-bold text-foreground">Messages</h2>
-                  {totalUnreadCount > 0 && (
-                    <span className="px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
-                      {totalUnreadCount}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition">
-                    <Edit className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={onClose}
-                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+  const mobileContent = (
+    <>
+      {/* Backdrop - solid background to prevent content bleeding through */}
+      <div className="fixed inset-0 z-[9999] bg-background" aria-hidden="true" />
+      
+      {/* Modal Content - PWA safe area aware */}
+      <div className="fixed inset-0 z-[9999] flex flex-col bg-background animate-slide-up pwa-messages-container pwa-no-overscroll">
+        {/* Show thread or conversation list */}
+        {showThread && activeConversation ? (
+          <MessageThread
+            conversation={activeConversation}
+            onBack={handleBack}
+            showBackButton={true}
+          />
+        ) : (
+          <>
+            {/* Mobile Header - iOS notch aware */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0 pwa-header">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Messages</h2>
+                {totalUnreadCount > 0 && (
+                  <span className="px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                    {totalUnreadCount}
+                  </span>
+                )}
               </div>
-              
-              {/* Friends List + Conversation List - scrollable with safe bottom */}
-              <div className="flex-1 bg-background overflow-y-auto pwa-messages-scroll pwa-safe-bottom">
-                <FriendsList onSelectFriend={() => setShowThread(true)} />
-                <ConversationList onSelectConversation={handleSelectConversation} />
+              <div className="flex items-center gap-2">
+                <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition">
+                  <Edit className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-            </>
-          )}
-        </div>
-      </>
-    );
-  }
+            </div>
+            
+            {/* Friends List + Conversation List - scrollable with safe bottom */}
+            <div className="flex-1 bg-background overflow-y-auto pwa-messages-scroll pwa-safe-bottom">
+              <FriendsList onSelectFriend={() => setShowThread(true)} />
+              <ConversationList onSelectConversation={handleSelectConversation} />
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
 
   // Desktop: Three-pane layout in modal (Friends | Messages | Thread)
-  return (
+  const desktopContent = (
     <div
       ref={modalRef}
       className="fixed right-4 top-16 mt-2 w-[900px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[9999]"
@@ -199,6 +204,12 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
         </div>
       </div>
     </div>
+  );
+
+  // Use portal to render at body level for proper z-index stacking
+  return createPortal(
+    isMobile ? mobileContent : desktopContent,
+    document.body
   );
 }
 

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { ArrowLeft, Users, Volume2, VolumeX, Gift, Maximize2, Minimize2, AlertTriangle, LayoutGrid, Video } from 'lucide-react';
 import { Room } from 'livekit-client';
 import Tile from '@/components/Tile';
+import GoLiveButton from '@/components/GoLiveButton';
 import GiftModal from '@/components/GiftModal';
 import ReportModal from '@/components/ReportModal';
 import type { GifterStatus } from '@/lib/gifter-status';
@@ -35,6 +36,9 @@ interface MobileWebWatchLayoutProps {
   currentUserId: string | null;
   isCurrentUserPublishing: boolean;
   viewerCount?: number;
+  onGoLive?: (liveStreamId: number, profileId: string) => void;
+  publishAllowed?: boolean;
+  onPublishingChange?: (isPublishing: boolean) => void;
   onLeave: () => void;
   onMuteTile: (slotIndex: number) => void;
   onVolumeChange: (slotIndex: number, volume: number) => void;
@@ -65,6 +69,9 @@ export default function MobileWebWatchLayout({
   currentUserId,
   isCurrentUserPublishing,
   viewerCount = 0,
+  onGoLive,
+  publishAllowed = true,
+  onPublishingChange,
   onLeave,
   onMuteTile,
   onVolumeChange,
@@ -248,9 +255,22 @@ export default function MobileWebWatchLayout({
             </button>
           )}
           {focusedSlotIndex === null && (
-            <div className="flex items-center gap-1 text-white/50 text-xs p-2 -mr-2">
-              <Users size={14} />
-              <span>{viewerCount}</span>
+            <div className="flex items-center gap-2 p-2 -mr-2">
+              <div className="flex items-center gap-1 text-white/50 text-xs">
+                <Users size={14} />
+                <span>{viewerCount}</span>
+              </div>
+              {currentUserId && (
+                <div className="scale-125 origin-right">
+                  <GoLiveButton 
+                    sharedRoom={sharedRoom} 
+                    isRoomConnected={isRoomConnected} 
+                    onGoLive={onGoLive}
+                    onPublishingChange={onPublishingChange}
+                    publishAllowed={publishAllowed}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

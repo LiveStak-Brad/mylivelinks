@@ -365,7 +365,7 @@ export default function GlobalHeader() {
           <>
             {/* Backdrop */}
             <div 
-              className="mobile-menu-backdrop md:hidden animate-fade-in" 
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm md:hidden animate-fade-in z-[64]" 
               aria-hidden="true"
               onClick={() => setMobileMenuOpen(false)}
             />
@@ -374,7 +374,7 @@ export default function GlobalHeader() {
             <div 
               ref={mobileMenuRef}
               id="mobile-menu"
-              className="md:hidden absolute top-full left-0 right-0 bg-background border-b border-border shadow-xl animate-slide-down z-[56]"
+              className="md:hidden fixed top-16 left-0 right-0 bg-background border-b border-border shadow-xl animate-slide-down z-[65] max-h-[calc(100vh-4rem)] overflow-y-auto"
               role="navigation"
               aria-label="Mobile navigation"
             >

@@ -2655,6 +2655,9 @@ export default function LiveRoom() {
         currentUserId={currentUserId}
         isCurrentUserPublishing={isCurrentUserPublishing}
         viewerCount={roomPresenceCountMinusSelf}
+        onGoLive={handleGoLive}
+        onPublishingChange={setIsCurrentUserPublishing}
+        publishAllowed={publishAllowed}
         onLeave={handleLeaveRoom}
         onMuteTile={handleMuteTile}
         onVolumeChange={handleVolumeChange}

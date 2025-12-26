@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Bell, Check, CheckCheck, Gift, UserPlus, AtSign, MessageCircle, Trophy, Package, Settings, X } from 'lucide-react';
 import { useNoties, NotieType, Notie } from './NotiesContext';
@@ -18,7 +19,13 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
   const modalRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { noties, unreadCount, isLoading, markAsRead, markAllAsRead } = useNoties();
+
+  // Mount check for portal
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check mobile
   useEffect(() => {
@@ -69,7 +76,7 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
     }
   }, [isMobile, isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   // Filter notifications by tab
   const filterNoties = (tab: TabType): Notie[] => {
@@ -130,82 +137,80 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
   ];
 
   // Mobile: Full screen slide-up
-  if (isMobile) {
-    return (
-      <>
-        {/* Backdrop - solid background to prevent content bleeding through */}
-        <div className="fixed inset-0 z-[9999] bg-background" aria-hidden="true" />
-        
-        {/* Modal Content */}
-        <div className="fixed inset-0 z-[9999] flex flex-col bg-background animate-slide-up">
-          {/* Mobile Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0">
-            <h2 className="text-lg font-bold text-foreground">Noties</h2>
-            <div className="flex items-center gap-2">
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllAsRead}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-muted rounded-lg transition"
-                >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  Mark all read
-                </button>
-              )}
+  const mobileContent = (
+    <>
+      {/* Backdrop - solid background to prevent content bleeding through */}
+      <div className="fixed inset-0 z-[9999] bg-background" aria-hidden="true" />
+      
+      {/* Modal Content */}
+      <div className="fixed inset-0 z-[9999] flex flex-col bg-background animate-slide-up">
+        {/* Mobile Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0">
+          <h2 className="text-lg font-bold text-foreground">Noties</h2>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
               <button
-                onClick={onClose}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
+                onClick={markAllAsRead}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-muted rounded-lg transition"
               >
-                <X className="w-5 h-5" />
+                <CheckCheck className="w-3.5 h-3.5" />
+                Mark all read
               </button>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex border-b border-border bg-card overflow-x-auto scrollbar-hidden flex-shrink-0">
-            {tabs.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex-1 min-w-[80px] px-4 py-2.5 text-sm font-medium whitespace-nowrap transition ${
-                  activeTab === tab.key
-                    ? 'text-primary border-b-2 border-primary bg-primary/5'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Content - explicit background to prevent any bleed-through */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar bg-background">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : filteredNoties.length === 0 ? (
-              <EmptyState />
-            ) : (
-              <div className="divide-y divide-border bg-background">
-                {filteredNoties.map(notie => (
-                  <NotieItem
-                    key={notie.id}
-                    notie={notie}
-                    icon={getNotieIcon(notie.type)}
-                    timeAgo={formatTimeAgo(notie.createdAt)}
-                    onClick={() => handleNotieClick(notie)}
-                  />
-                ))}
-              </div>
             )}
+            <button
+              onClick={onClose}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
-      </>
-    );
-  }
+
+        {/* Tabs */}
+        <div className="flex border-b border-border bg-card overflow-x-auto scrollbar-hidden flex-shrink-0">
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 min-w-[80px] px-4 py-2.5 text-sm font-medium whitespace-nowrap transition ${
+                activeTab === tab.key
+                  ? 'text-primary border-b-2 border-primary bg-primary/5'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content - explicit background to prevent any bleed-through */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-background">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filteredNoties.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="divide-y divide-border bg-background">
+              {filteredNoties.map(notie => (
+                <NotieItem
+                  key={notie.id}
+                  notie={notie}
+                  icon={getNotieIcon(notie.type)}
+                  timeAgo={formatTimeAgo(notie.createdAt)}
+                  onClick={() => handleNotieClick(notie)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
 
   // Desktop: Dropdown anchored to icon
-  return (
+  const desktopContent = (
     <div
       ref={modalRef}
       className="fixed right-4 top-16 mt-2 w-96 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-scale-in z-[9999]"
@@ -273,6 +278,12 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
         )}
       </div>
     </div>
+  );
+
+  // Use portal to render at body level for proper z-index stacking
+  return createPortal(
+    isMobile ? mobileContent : desktopContent,
+    document.body
   );
 }
 

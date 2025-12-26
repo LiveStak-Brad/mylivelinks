@@ -425,6 +425,8 @@ DECLARE
   v_total_spent bigint;
   v_total_gifts_received bigint;
 
+  v_profile jsonb;
+
   v_gifts_sent_count bigint;
   v_coins_spent bigint;
   v_max_gift bigint;
@@ -455,24 +457,20 @@ DECLARE
 BEGIN
   PERFORM public._require_self_or_admin(p_profile_id);
 
-  SELECT
-    COALESCE(p.coin_balance, 0)::bigint,
-    COALESCE(p.earnings_balance, 0)::bigint,
-    COALESCE(p.lifetime_diamonds_earned, 0)::bigint,
-    COALESCE(p.total_spent, 0)::bigint,
-    COALESCE(p.total_gifts_received, 0)::bigint
-  INTO
-    v_coin_balance,
-    v_earnings_balance,
-    v_lifetime_diamonds_earned,
-    v_total_spent,
-    v_total_gifts_received
+  SELECT to_jsonb(p)
+  INTO v_profile
   FROM public.profiles p
   WHERE p.id = p_profile_id;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'profile not found';
   END IF;
+
+  v_coin_balance := COALESCE((v_profile->>'coin_balance')::bigint, 0);
+  v_earnings_balance := COALESCE((v_profile->>'earnings_balance')::bigint, 0);
+  v_lifetime_diamonds_earned := COALESCE((v_profile->>'lifetime_diamonds_earned')::bigint, 0);
+  v_total_spent := COALESCE((v_profile->>'total_spent')::bigint, 0);
+  v_total_gifts_received := COALESCE((v_profile->>'total_gifts_received')::bigint, 0);
 
   SELECT EXISTS (
     SELECT 1 FROM information_schema.columns
