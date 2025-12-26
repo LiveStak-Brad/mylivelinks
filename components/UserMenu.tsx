@@ -78,7 +78,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
     return (
       <a
         href="/login"
-        className={`px-1.5 py-1 sm:px-2 sm:py-1.5 md:px-3 lg:px-4 md:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-md md:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base font-medium shadow-md ${className}`}
+        className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-1.5 xl:px-4 xl:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded md:rounded-md lg:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-medium shadow-sm md:shadow-md ${className}`}
       >
         Login
       </a>
@@ -89,7 +89,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
     <div className={`relative ${className}`} ref={menuRef}>
       <button
         onClick={() => setShowMenu(!showMenu)}
-        className="flex items-center gap-1 md:gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"
+        className="flex items-center focus:outline-none focus:ring-1 lg:focus:ring-2 focus:ring-blue-500 rounded-full"
       >
         {profile?.avatar_url ? (
           <Image
@@ -97,10 +97,10 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
             alt={profile.display_name || profile.username || 'User'}
             width={40}
             height={40}
-            className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-10 lg:h-10 rounded-full object-cover border sm:border-2 border-blue-500"
+            className="w-5 h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 rounded-full object-cover border lg:border-2 border-blue-500"
           />
         ) : (
-          <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 lg:w-10 lg:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-[9px] sm:text-xs md:text-sm border sm:border-2 border-blue-500">
+          <div className="w-5 h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 xl:w-10 xl:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-[6px] md:text-[8px] lg:text-xs xl:text-sm border lg:border-2 border-blue-500">
             {(profile?.display_name || profile?.username || user.email?.[0] || 'U').toUpperCase()}
           </div>
         )}

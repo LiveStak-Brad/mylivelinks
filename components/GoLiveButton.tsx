@@ -618,24 +618,24 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       <button
         onClick={handleGoLive}
         disabled={loading}
-        className={`px-1.5 py-1 sm:px-2 sm:py-1.5 md:px-3 lg:px-4 md:py-2 rounded-md md:rounded-lg transition font-semibold whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base ${
+        className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-1.5 xl:px-4 xl:py-2 rounded md:rounded-md lg:rounded-lg transition font-semibold whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm shadow-sm md:shadow-md ${
           isLive
             ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white hover:from-red-600 hover:to-pink-700'
             : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
         } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         {loading ? (
-          'Loading...'
+          <><span className="hidden lg:inline">Loading...</span><span className="lg:hidden">⏳</span></>
         ) : isLive && (isPublishing || isPublishingState) ? (
           // Only show "LIVE" when both isLive AND isPublishing are true
-          '🔴 LIVE'
+          <><span className="hidden lg:inline">🔴 LIVE</span><span className="lg:hidden">🔴</span></>
         ) : isLive ? (
           // Show "Stop Live" when isLive is true but not publishing yet
-          '⏸️ Stop Live'
+          <><span className="hidden lg:inline">⏸️ Stop Live</span><span className="lg:hidden">⏸️</span></>
         ) : (
-          '▶️ Go Live'
+          <><span className="hidden lg:inline">▶️ Go Live</span><span className="lg:hidden">▶️</span></>
         )}
-        {error && <span className="ml-2 text-xs">⚠️</span>}
+        {error && <span className="ml-1 lg:ml-2 text-[6px] lg:text-xs">⚠️</span>}
       </button>
 
       {/* Device Selection Modal */}

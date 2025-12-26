@@ -2582,62 +2582,67 @@ export default function LiveRoom() {
       </div>
       
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-50 relative pb-4 md:pb-8">
-        <div className="w-full px-2 sm:px-4 md:px-6 flex items-center justify-between relative min-h-[80px] sm:min-h-[100px] md:min-h-[120px] h-auto md:h-[120px]">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-50 relative pb-2 lg:pb-8">
+        <div className="w-full px-1 md:px-3 lg:px-6 flex items-center justify-between relative min-h-[56px] md:min-h-[70px] lg:min-h-[100px] xl:min-h-[120px]">
           {/* Left Section - Apply for a Room */}
           <div className="flex items-center flex-shrink-0 z-10">
             <a
               href="/apply"
-              className="px-2 py-1.5 sm:px-3 sm:py-2 md:px-4 lg:px-6 md:py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-md md:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[10px] sm:text-xs md:text-sm lg:text-base xl:text-lg font-semibold shadow-md"
+              className="px-1.5 py-1 md:px-2 md:py-1.5 lg:px-4 lg:py-2 xl:px-6 xl:py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded md:rounded-md lg:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[8px] md:text-[10px] lg:text-sm xl:text-base font-semibold shadow-md"
             >
-              Apply for a Room
+              <span className="hidden lg:inline">Apply for a Room</span>
+              <span className="lg:hidden">Apply</span>
             </a>
           </div>
 
           {/* Sort Buttons Group - Positioned halfway between Apply and Logo */}
-          <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0 z-10 absolute left-[25%] transform -translate-x-1/2">
+          <div className="flex items-center gap-0.5 md:gap-1 lg:gap-2 xl:gap-3 flex-shrink-0 z-10 absolute left-[22%] md:left-[25%] transform -translate-x-1/2">
             <button
               onClick={handleRandomize}
-              className={`px-2 py-1.5 sm:px-3 sm:py-2 md:px-4 lg:px-6 md:py-3 rounded-md md:rounded-lg transition whitespace-nowrap text-[10px] sm:text-xs md:text-sm lg:text-base xl:text-lg font-semibold shadow-md flex-shrink-0 ${
+              className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-3 lg:py-2 xl:px-5 xl:py-2.5 rounded md:rounded-md lg:rounded-lg transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0 ${
                 sortMode === 'random'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700'
                   : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 opacity-70 hover:opacity-100'
               }`}
             >
-              Randomize
+              <span className="hidden xl:inline">Randomize</span>
+              <span className="xl:hidden">🎲</span>
             </button>
             
             <button
               onClick={() => handleSortModeChange('most_viewed')}
-              className={`px-1.5 py-1.5 sm:px-2 sm:py-2 md:px-3 lg:px-4 md:py-3 rounded-md md:rounded-lg transition whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base font-semibold shadow-md flex-shrink-0 ${
+              className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-2 xl:px-4 xl:py-2.5 rounded md:rounded-md lg:rounded-lg transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0 ${
                 sortMode === 'most_viewed'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700'
                   : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 opacity-70 hover:opacity-100'
               }`}
             >
-              Most Viewed
+              <span className="hidden xl:inline">Most Viewed</span>
+              <span className="xl:hidden">👁️</span>
             </button>
             
             <button
               onClick={() => handleSortModeChange('most_gifted')}
-              className={`px-1.5 py-1.5 sm:px-2 sm:py-2 md:px-3 lg:px-4 md:py-3 rounded-md md:rounded-lg transition whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base font-semibold shadow-md flex-shrink-0 ${
+              className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-2 xl:px-4 xl:py-2.5 rounded md:rounded-md lg:rounded-lg transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0 ${
                 sortMode === 'most_gifted'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700'
                   : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 opacity-70 hover:opacity-100'
               }`}
             >
-              Most Gifted
+              <span className="hidden xl:inline">Most Gifted</span>
+              <span className="xl:hidden">🎁</span>
             </button>
             
             <button
               onClick={() => handleSortModeChange('newest')}
-              className={`px-1.5 py-1.5 sm:px-2 sm:py-2 md:px-3 lg:px-4 md:py-3 rounded-md md:rounded-lg transition whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base font-semibold shadow-md flex-shrink-0 ${
+              className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-2 xl:px-4 xl:py-2.5 rounded md:rounded-md lg:rounded-lg transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0 ${
                 sortMode === 'newest'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700'
                   : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 opacity-70 hover:opacity-100'
               }`}
             >
-              Newest
+              <span className="hidden xl:inline">Newest</span>
+              <span className="xl:hidden">🆕</span>
             </button>
           </div>
 
@@ -2649,14 +2654,14 @@ export default function LiveRoom() {
                 alt="MyLiveLinks"
                 width={400}
                 height={160}
-                className="h-16 sm:h-24 md:h-32 lg:h-44 xl:h-52 w-auto object-contain"
+                className="h-10 md:h-14 lg:h-24 xl:h-36 2xl:h-44 w-auto object-contain"
                 priority
               />
             </a>
           </div>
 
           {/* Right Section - Go Live, Unmute All, Focus Mode, Options and Login grouped together */}
-          <div className="flex items-center gap-1 sm:gap-1.5 md:gap-2 lg:gap-3 flex-shrink-0 z-10">
+          <div className="flex items-center gap-0.5 md:gap-1 lg:gap-2 xl:gap-3 flex-shrink-0 z-10">
             <GoLiveButton 
               sharedRoom={sharedRoom} 
               isRoomConnected={isRoomConnected} 
@@ -2665,16 +2670,18 @@ export default function LiveRoom() {
             />
             <button
               onClick={handleUnmuteAll}
-              className="px-1.5 py-1.5 sm:px-2 sm:py-2 md:px-3 lg:px-4 md:py-3 bg-green-500 text-white rounded-md md:rounded-lg hover:bg-green-600 transition whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base font-semibold shadow-md flex-shrink-0"
+              className="px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-2 xl:px-4 xl:py-2.5 bg-green-500 text-white rounded md:rounded-md lg:rounded-lg hover:bg-green-600 transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0"
               title="Unmute all tiles to enable sound"
             >
-              🔊 Unmute All
+              <span className="hidden lg:inline">🔊 Unmute All</span>
+              <span className="lg:hidden">🔊</span>
             </button>
             <button
               onClick={toggleFocusMode}
-              className="px-1.5 py-1 sm:px-2 sm:py-1.5 md:px-3 lg:px-4 md:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-md md:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base font-medium shadow-md"
+              className="px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-1.5 xl:px-4 xl:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded md:rounded-md lg:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-medium shadow-sm md:shadow-md"
             >
-              {uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}
+              <span className="hidden lg:inline">{uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}</span>
+              <span className="lg:hidden">{uiPanels.focusMode ? '📺' : '🎯'}</span>
             </button>
             <OptionsMenu />
             <UserMenu />

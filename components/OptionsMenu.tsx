@@ -138,10 +138,10 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
       <div className={`relative ${className}`} ref={menuRef}>
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="px-1.5 py-1 sm:px-2 sm:py-1.5 md:px-3 lg:px-4 md:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-md md:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[9px] sm:text-[10px] md:text-xs lg:text-sm xl:text-base font-medium shadow-md flex items-center gap-1 md:gap-2"
+          className="px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-1.5 xl:px-4 xl:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded md:rounded-md lg:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-medium shadow-sm md:shadow-md flex items-center gap-0.5 lg:gap-1 xl:gap-2"
         >
           <span>⚙️</span>
-          <span>Options</span>
+          <span className="hidden xl:inline">Options</span>
         </button>
 
         {showMenu && (
