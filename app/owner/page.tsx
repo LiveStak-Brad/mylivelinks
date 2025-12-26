@@ -879,7 +879,7 @@ export default function OwnerPanel() {
   }
 
   // Tabs configuration
-  const tabs: { id: TabType; label: string; icon: any; badge?: number }[] = [
+  const tabs: { id: TabType; label: string; icon: any; badge?: number; href?: string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'Users', icon: Users, badge: users.length },
     { id: 'streams', label: 'Live Streams', icon: Radio, badge: liveStreams.length },
@@ -889,7 +889,7 @@ export default function OwnerPanel() {
     { id: 'roles', label: 'Roles', icon: UserCog, badge: appAdmins.length },
     { id: 'gifts', label: 'Gifts & Coins', icon: Gift },
     { id: 'transactions', label: 'Transactions', icon: Wallet },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '/owner/analytics' },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -921,6 +921,26 @@ export default function OwnerPanel() {
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            
+            // If tab has href, render as link
+            if (tab.href) {
+              return (
+                <a
+                  key={tab.id}
+                  href={tab.href}
+                  className={`w-full flex items-center gap-3 px-6 py-3 text-left transition ${
+                    isActive
+                      ? 'bg-purple-600/20 text-purple-400 border-r-2 border-purple-500'
+                      : 'text-gray-400 hover:bg-gray-700/50 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="flex-1">{tab.label}</span>
+                  <ExternalLink className="w-4 h-4 opacity-50" />
+                </a>
+              );
+            }
+            
             return (
               <button
                 key={tab.id}
