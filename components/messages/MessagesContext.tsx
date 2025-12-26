@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import type { AuthChangeEvent, RealtimePostgresChangesPayload, Session } from '@supabase/supabase-js';
 
 export type MessageType = 'text' | 'gift';
 
@@ -49,155 +49,38 @@ interface MessagesContextType {
 
 const MessagesContext = createContext<MessagesContextType | undefined>(undefined);
 
-// Mock conversations for development
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: 'conv-1',
-    recipientId: 'user-1',
-    recipientUsername: 'JohnDoe',
-    recipientDisplayName: 'John Doe',
-    recipientAvatar: undefined,
-    isOnline: true,
-    lastMessage: 'Hey! Thanks for the stream today 🔥',
-    lastMessageAt: new Date(Date.now() - 5 * 60 * 1000),
-    unreadCount: 2,
-  },
-  {
-    id: 'conv-2',
-    recipientId: 'user-2',
-    recipientUsername: 'SarahLive',
-    recipientDisplayName: 'Sarah',
-    recipientAvatar: undefined,
-    isOnline: true,
-    lastMessage: 'Are you going live tonight?',
-    lastMessageAt: new Date(Date.now() - 30 * 60 * 1000),
-    unreadCount: 1,
-  },
-  {
-    id: 'conv-3',
-    recipientId: 'user-3',
-    recipientUsername: 'GamerMike',
-    recipientDisplayName: 'Mike',
-    recipientAvatar: undefined,
-    isOnline: false,
-    lastMessage: 'Sent you a gift 🎁 Rose (+30 💎)',
-    lastMessageAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    unreadCount: 0,
-  },
-  {
-    id: 'conv-4',
-    recipientId: 'user-4',
-    recipientUsername: 'CoolCreator',
-    recipientDisplayName: 'Cool Creator',
-    recipientAvatar: undefined,
-    isOnline: false,
-    lastMessage: 'Thanks for following!',
-    lastMessageAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-    unreadCount: 0,
-  },
-];
-
-// Mock messages for development
-const MOCK_MESSAGES: Record<string, Message[]> = {
-  'conv-1': [
-    {
-      id: 'm1',
-      senderId: 'user-1',
-      content: 'Hey! Loved your stream today!',
-      type: 'text',
-      timestamp: new Date(Date.now() - 60 * 60 * 1000),
-      status: 'read',
-    },
-    {
-      id: 'm2',
-      senderId: 'current-user',
-      content: 'Thanks so much! Glad you enjoyed it 😊',
-      type: 'text',
-      timestamp: new Date(Date.now() - 55 * 60 * 1000),
-      status: 'read',
-    },
-    {
-      id: 'm3',
-      senderId: 'user-1',
-      content: 'When are you streaming next?',
-      type: 'text',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      status: 'read',
-    },
-    {
-      id: 'm4',
-      senderId: 'current-user',
-      content: 'Probably tomorrow evening around 8pm!',
-      type: 'text',
-      timestamp: new Date(Date.now() - 20 * 60 * 1000),
-      status: 'delivered',
-    },
-    {
-      id: 'm5',
-      senderId: 'user-1',
-      content: "Hey! Thanks for the stream today 🔥",
-      type: 'text',
-      timestamp: new Date(Date.now() - 5 * 60 * 1000),
-      status: 'delivered',
-    },
-  ],
-  'conv-2': [
-    {
-      id: 'm1',
-      senderId: 'current-user',
-      content: 'Hi Sarah!',
-      type: 'text',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      status: 'read',
-    },
-    {
-      id: 'm2',
-      senderId: 'user-2',
-      content: 'Hey! How are you?',
-      type: 'text',
-      timestamp: new Date(Date.now() - 90 * 60 * 1000),
-      status: 'read',
-    },
-    {
-      id: 'm3',
-      senderId: 'user-2',
-      content: 'Are you going live tonight?',
-      type: 'text',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      status: 'delivered',
-    },
-  ],
-  'conv-3': [
-    {
-      id: 'm1',
-      senderId: 'user-3',
-      content: 'Your content is amazing!',
-      type: 'text',
-      timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-      status: 'read',
-    },
-    {
-      id: 'm2',
-      senderId: 'user-3',
-      content: '',
-      type: 'gift',
-      giftId: 1,
-      giftName: 'Rose',
-      giftIcon: '🌹',
-      giftCoins: 50,
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      status: 'read',
-    },
-    {
-      id: 'm3',
-      senderId: 'current-user',
-      content: 'Thank you so much for the gift! 💕',
-      type: 'text',
-      timestamp: new Date(Date.now() - 1.5 * 60 * 60 * 1000),
-      status: 'read',
-    },
-  ],
+type InstantMessageRow = {
+  id: string | number;
+  sender_id: string;
+  recipient_id: string;
+  content: string;
+  created_at: string;
+  read_at: string | null;
 };
+
+function decodeIMContent(
+  content: string
+): { type: 'text'; text: string } | { type: 'gift'; giftId?: number; giftName?: string; giftCoins?: number; giftIcon?: string } {
+  if (typeof content !== 'string') return { type: 'text', text: '' };
+  if (!content.startsWith('__gift__:')) return { type: 'text', text: content };
+  try {
+    const raw = content.slice('__gift__:'.length);
+    const parsed = JSON.parse(raw);
+    return {
+      type: 'gift',
+      giftId: typeof parsed?.giftId === 'number' ? parsed.giftId : undefined,
+      giftName: typeof parsed?.giftName === 'string' ? parsed.giftName : undefined,
+      giftCoins: typeof parsed?.giftCoins === 'number' ? parsed.giftCoins : undefined,
+      giftIcon: typeof parsed?.giftIcon === 'string' ? parsed.giftIcon : undefined,
+    };
+  } catch {
+    return { type: 'text', text: content };
+  }
+}
+
+function encodeGiftContent(gift: { giftId: number; giftName: string; giftCoins: number; giftIcon?: string }) {
+  return `__gift__:${JSON.stringify(gift)}`;
+}
 
 export function MessagesProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -208,6 +91,29 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const supabase = createClient();
 
   const totalUnreadCount = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+
+  const loadOnlineMap = useCallback(
+    async (profileIds: string[]) => {
+      if (!profileIds.length) return new Map<string, boolean>();
+      try {
+        const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+        const { data, error } = await supabase
+          .from('room_presence')
+          .select('profile_id, last_seen_at')
+          .in('profile_id', profileIds)
+          .gt('last_seen_at', cutoff);
+        if (error) return new Map<string, boolean>();
+        const online = new Map<string, boolean>();
+        for (const row of Array.isArray(data) ? data : []) {
+          if (row?.profile_id) online.set(String(row.profile_id), true);
+        }
+        return online;
+      } catch {
+        return new Map<string, boolean>();
+      }
+    },
+    [supabase]
+  );
 
   // Get current user
   useEffect(() => {
@@ -226,6 +132,86 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     };
   }, [supabase]);
 
+  const loadConversationsFallback = useCallback(
+    async () => {
+      if (!currentUserId) return [] as Conversation[];
+      const { data, error } = await supabase
+        .from('instant_messages')
+        .select('id, sender_id, recipient_id, content, created_at, read_at')
+        .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error || !data) return [];
+
+      const otherUserIds: string[] = [];
+      const convoByOther = new Map<
+        string,
+        {
+          last_message: string;
+          last_message_at: string;
+          unread_count: number;
+        }
+      >();
+
+      for (const row of data as any[]) {
+        const senderId = String(row.sender_id);
+        const recipientId = String(row.recipient_id);
+        const otherId = senderId === currentUserId ? recipientId : senderId;
+        if (!convoByOther.has(otherId)) {
+          const decoded = decodeIMContent(String(row.content ?? ''));
+          const lastMessageText =
+            decoded.type === 'gift'
+              ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
+              : (decoded as any).text;
+          convoByOther.set(otherId, {
+            last_message: String(lastMessageText ?? ''),
+            last_message_at: String(row.created_at),
+            unread_count: 0,
+          });
+          otherUserIds.push(otherId);
+        }
+        if (recipientId === currentUserId && senderId === otherId && row.read_at == null) {
+          const c = convoByOther.get(otherId);
+          if (c) c.unread_count += 1;
+        }
+      }
+
+      const { data: profiles } = otherUserIds.length
+        ? await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, display_name')
+            .in('id', otherUserIds)
+        : { data: [] as any[] };
+      const profileById = new Map<string, any>();
+      for (const p of Array.isArray(profiles) ? profiles : []) {
+        if (p?.id) profileById.set(String(p.id), p);
+      }
+
+      const onlineMap = await loadOnlineMap(otherUserIds);
+
+      const convos: Conversation[] = otherUserIds
+        .map((otherId) => {
+          const meta = convoByOther.get(otherId);
+          const p = profileById.get(otherId);
+          return {
+            id: otherId,
+            recipientId: otherId,
+            recipientUsername: String(p?.username ?? 'Unknown'),
+            recipientDisplayName: p?.display_name ?? undefined,
+            recipientAvatar: p?.avatar_url ?? undefined,
+            isOnline: onlineMap.get(otherId) ?? false,
+            lastMessage: meta?.last_message ?? undefined,
+            lastMessageAt: meta?.last_message_at ? new Date(meta.last_message_at) : new Date(),
+            unreadCount: meta?.unread_count ?? 0,
+          };
+        })
+        .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+
+      return convos;
+    },
+    [currentUserId, loadOnlineMap, supabase]
+  );
+
   const loadConversations = useCallback(async () => {
     if (!currentUserId) {
       setConversations([]);
@@ -234,152 +220,366 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
     setIsLoading(true);
     try {
-      // TODO: Replace with actual Supabase query when backend is ready
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setConversations(MOCK_CONVERSATIONS);
+      const { data, error } = await supabase.rpc('get_im_conversations', {
+        p_user_id: currentUserId,
+      });
+
+      if (error) {
+        const fallback = await loadConversationsFallback();
+        setConversations(fallback);
+        return;
+      }
+
+      const rows = Array.isArray(data) ? data : [];
+      const otherUserIds = rows.map((r: any) => String(r.other_user_id)).filter(Boolean);
+      const onlineMap = await loadOnlineMap(otherUserIds);
+
+      const { data: profiles } = otherUserIds.length
+        ? await supabase
+            .from('profiles')
+            .select('id, display_name')
+            .in('id', otherUserIds)
+        : { data: [] as any[] };
+      const displayNameById = new Map<string, string>();
+      for (const p of Array.isArray(profiles) ? profiles : []) {
+        if (p?.id && p?.display_name) displayNameById.set(String(p.id), String(p.display_name));
+      }
+
+      const convos: Conversation[] = rows.map((r: any) => {
+        const otherId = String(r.other_user_id);
+        const decoded = decodeIMContent(String(r.last_message ?? ''));
+        const lastMessageText =
+          decoded.type === 'gift'
+            ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
+            : (decoded as any).text;
+        return {
+          id: otherId,
+          recipientId: otherId,
+          recipientUsername: String(r.other_username ?? 'Unknown'),
+          recipientAvatar: r.other_avatar_url ?? undefined,
+          recipientDisplayName: displayNameById.get(otherId),
+          isOnline: onlineMap.get(otherId) ?? false,
+          lastMessage: lastMessageText || undefined,
+          lastMessageAt: r.last_message_at ? new Date(r.last_message_at) : new Date(),
+          unreadCount: Number(r.unread_count ?? 0),
+        };
+      });
+
+      setConversations(convos);
     } catch (error) {
       console.error('[Messages] Error loading conversations:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, loadConversationsFallback, loadOnlineMap, supabase]);
 
-  const loadMessages = useCallback(async (conversationId: string) => {
-    if (!currentUserId) return;
+  const loadMessages = useCallback(
+    async (conversationId: string) => {
+      if (!currentUserId) return;
+      const otherUserId = conversationId;
+      try {
+        const { data, error } = await supabase.rpc('get_conversation', {
+          p_user_id: currentUserId,
+          p_other_user_id: otherUserId,
+          p_limit: 50,
+          p_offset: 0,
+        });
 
-    try {
-      // TODO: Replace with actual Supabase query
-      await new Promise(resolve => setTimeout(resolve, 200));
-      const mockMessages = MOCK_MESSAGES[conversationId] || [];
-      // Replace 'current-user' with actual user id in mock
-      const mappedMessages = mockMessages.map(m => ({
-        ...m,
-        senderId: m.senderId === 'current-user' ? currentUserId : m.senderId,
-      }));
-      setMessages(mappedMessages);
-    } catch (error) {
-      console.error('[Messages] Error loading messages:', error);
-    }
-  }, [currentUserId]);
+        let rows: any[] = [];
+        if (!error) {
+          rows = Array.isArray(data) ? data : [];
+        } else {
+          const { data: fallback, error: fbErr } = await supabase
+            .from('instant_messages')
+            .select('id, sender_id, recipient_id, content, created_at, read_at')
+            .or(
+              `and(sender_id.eq.${currentUserId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${currentUserId})`
+            )
+            .order('created_at', { ascending: false })
+            .limit(50);
+          if (!fbErr && Array.isArray(fallback)) rows = fallback;
+        }
 
-  const sendMessage = useCallback(async (recipientId: string, content: string): Promise<boolean> => {
-    if (!currentUserId || !content.trim()) return false;
-
-    const tempId = `temp-${Date.now()}`;
-    const newMessage: Message = {
-      id: tempId,
-      senderId: currentUserId,
-      content: content.trim(),
-      type: 'text',
-      timestamp: new Date(),
-      status: 'sending',
-    };
-
-    // Optimistic update
-    setMessages(prev => [...prev, newMessage]);
-
-    try {
-      // TODO: Actual API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Mark as sent
-      setMessages(prev => prev.map(m => 
-        m.id === tempId ? { ...m, status: 'sent' as const } : m
-      ));
-
-      // Update conversation last message
-      setConversations(prev => prev.map(c => 
-        c.recipientId === recipientId 
-          ? { ...c, lastMessage: content, lastMessageAt: new Date() }
-          : c
-      ));
-
-      return true;
-    } catch (error) {
-      console.error('[Messages] Error sending message:', error);
-      setMessages(prev => prev.map(m => 
-        m.id === tempId ? { ...m, status: 'failed' as const } : m
-      ));
-      return false;
-    }
-  }, [currentUserId]);
-
-  const sendGift = useCallback(async (
-    recipientId: string, 
-    giftId: number, 
-    giftName: string, 
-    giftCoins: number
-  ): Promise<boolean> => {
-    if (!currentUserId) return false;
-
-    const tempId = `temp-gift-${Date.now()}`;
-    const requestId = crypto.randomUUID();
-    
-    const newGiftMessage: Message = {
-      id: tempId,
-      senderId: currentUserId,
-      content: '',
-      type: 'gift',
-      giftId,
-      giftName,
-      giftCoins,
-      timestamp: new Date(),
-      status: 'sending',
-    };
-
-    // Optimistic update
-    setMessages(prev => [...prev, newGiftMessage]);
-
-    try {
-      // Call the existing gift API
-      const response = await fetch('/api/gifts/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          toUserId: recipientId,
-          coinsAmount: giftCoins,
-          giftTypeId: giftId,
-          context: 'dm',
-          requestId,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send gift');
+        const ordered = [...rows].reverse();
+        const mapped: Message[] = ordered.map((r: any) => {
+          const senderId = String(r.sender_id);
+          const readAt = r.read_at ? new Date(r.read_at) : null;
+          const decoded = decodeIMContent(String(r.content ?? ''));
+          if (decoded.type === 'gift') {
+            return {
+              id: String(r.id),
+              senderId,
+              content: '',
+              type: 'gift',
+              giftId: decoded.giftId,
+              giftName: decoded.giftName,
+              giftIcon: decoded.giftIcon,
+              giftCoins: decoded.giftCoins,
+              timestamp: r.created_at ? new Date(r.created_at) : new Date(),
+              status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
+            };
+          }
+          return {
+            id: String(r.id),
+            senderId,
+            content: (decoded as any).text,
+            type: 'text',
+            timestamp: r.created_at ? new Date(r.created_at) : new Date(),
+            status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
+          };
+        });
+        setMessages(mapped);
+      } catch (error) {
+        console.error('[Messages] Error loading messages:', error);
       }
+    },
+    [currentUserId, supabase]
+  );
 
-      // Mark as sent
-      setMessages(prev => prev.map(m => 
-        m.id === tempId ? { ...m, status: 'sent' as const } : m
-      ));
+  const sendMessage = useCallback(
+    async (recipientId: string, content: string): Promise<boolean> => {
+      if (!currentUserId || !content.trim()) return false;
 
-      // Update conversation last message
-      setConversations(prev => prev.map(c => 
-        c.recipientId === recipientId 
-          ? { 
-              ...c, 
+      const tempId = `temp-${Date.now()}`;
+      const now = new Date();
+      const newMessage: Message = {
+        id: tempId,
+        senderId: currentUserId,
+        content: content.trim(),
+        type: 'text',
+        timestamp: now,
+        status: 'sending',
+      };
+
+      setMessages((prev) => [...prev, newMessage]);
+
+      try {
+        const { data, error } = await supabase
+          .from('instant_messages')
+          .insert({
+            sender_id: currentUserId,
+            recipient_id: recipientId,
+            content: content.trim(),
+          })
+          .select('id, sender_id, recipient_id, content, created_at, read_at')
+          .single();
+        if (error) throw error;
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? {
+                  id: String((data as any).id),
+                  senderId: String((data as any).sender_id),
+                  content: String((data as any).content ?? ''),
+                  type: 'text',
+                  timestamp: (data as any).created_at ? new Date((data as any).created_at) : now,
+                  status: 'sent',
+                }
+              : m
+          )
+        );
+
+        setConversations((prev) => {
+          const existing = prev.find((c) => c.recipientId === recipientId);
+          const updatedAt = (data as any)?.created_at ? new Date((data as any).created_at) : now;
+          if (!existing) {
+            void (async () => {
+              try {
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('username, avatar_url, display_name')
+                  .eq('id', recipientId)
+                  .single();
+                if (profile) {
+                  setConversations((p) =>
+                    p.map((c) =>
+                      c.recipientId === recipientId
+                        ? {
+                            ...c,
+                            recipientUsername: String((profile as any).username ?? 'Unknown'),
+                            recipientAvatar: (profile as any).avatar_url ?? undefined,
+                            recipientDisplayName: (profile as any).display_name ?? undefined,
+                          }
+                        : c
+                    )
+                  );
+                }
+              } catch {
+              }
+            })();
+            const conv: Conversation = {
+              id: recipientId,
+              recipientId,
+              recipientUsername: 'Unknown',
+              recipientDisplayName: undefined,
+              recipientAvatar: undefined,
+              isOnline: false,
+              lastMessage: content.trim(),
+              lastMessageAt: updatedAt,
+              unreadCount: 0,
+            };
+            return [conv, ...prev];
+          }
+          return prev
+            .map((c) =>
+              c.recipientId === recipientId
+                ? { ...c, lastMessage: content.trim(), lastMessageAt: updatedAt }
+                : c
+            )
+            .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+        });
+
+        return true;
+      } catch (error) {
+        console.error('[Messages] Error sending message:', error);
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: 'failed' } : m)));
+        return false;
+      }
+    },
+    [currentUserId, supabase]
+  );
+
+  const sendGift = useCallback(
+    async (
+      recipientId: string,
+      giftId: number,
+      giftName: string,
+      giftCoins: number
+    ): Promise<boolean> => {
+      if (!currentUserId) return false;
+
+      const tempId = `temp-gift-${Date.now()}`;
+      const requestId = crypto.randomUUID();
+
+      const newGiftMessage: Message = {
+        id: tempId,
+        senderId: currentUserId,
+        content: '',
+        type: 'gift',
+        giftId,
+        giftName,
+        giftCoins,
+        timestamp: new Date(),
+        status: 'sending',
+      };
+
+      setMessages((prev) => [...prev, newGiftMessage]);
+
+      try {
+        const response = await fetch('/api/gifts/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toUserId: recipientId,
+            coinsAmount: giftCoins,
+            giftTypeId: giftId,
+            context: 'dm',
+            requestId,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to send gift');
+        }
+
+        const giftContent = encodeGiftContent({
+          giftId,
+          giftName,
+          giftCoins,
+        });
+        const { data: imRow, error: imErr } = await supabase
+          .from('instant_messages')
+          .insert({
+            sender_id: currentUserId,
+            recipient_id: recipientId,
+            content: giftContent,
+          })
+          .select('id, created_at')
+          .single();
+        if (imErr) throw imErr;
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  id: String((imRow as any)?.id ?? tempId),
+                  timestamp: (imRow as any)?.created_at ? new Date((imRow as any).created_at) : m.timestamp,
+                  status: 'sent',
+                }
+              : m
+          )
+        );
+
+        setConversations((prev) => {
+          const existing = prev.find((c) => c.recipientId === recipientId);
+          if (!existing) {
+            const conv: Conversation = {
+              id: recipientId,
+              recipientId,
+              recipientUsername: 'Unknown',
+              recipientDisplayName: undefined,
+              recipientAvatar: undefined,
+              isOnline: false,
               lastMessage: `Sent ${giftName} 🎁 (+${data.diamondsAwarded} 💎)`,
-              lastMessageAt: new Date() 
-            }
-          : c
-      ));
+              lastMessageAt: new Date(),
+              unreadCount: 0,
+            };
+            return [conv, ...prev];
+          }
+          return prev
+            .map((c) =>
+              c.recipientId === recipientId
+                ? {
+                    ...c,
+                    lastMessage: `Sent ${giftName} 🎁 (+${data.diamondsAwarded} 💎)`,
+                    lastMessageAt: new Date(),
+                  }
+                : c
+            )
+            .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+        });
 
-      return true;
-    } catch (error) {
-      console.error('[Messages] Error sending gift:', error);
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      return false;
-    }
-  }, [currentUserId]);
+        return true;
+      } catch (error) {
+        console.error('[Messages] Error sending gift:', error);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        return false;
+      }
+    },
+    [currentUserId, supabase]
+  );
 
-  const markConversationRead = useCallback((conversationId: string) => {
-    setConversations(prev => prev.map(c => 
-      c.id === conversationId ? { ...c, unreadCount: 0 } : c
-    ));
-    // TODO: Persist to database
-  }, []);
+  const markConversationRead = useCallback(
+    (conversationId: string) => {
+      if (!currentUserId) return;
+      const otherUserId = conversationId;
+      setConversations((prev) => prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c)));
+
+      const readAt = new Date().toISOString();
+      void (async () => {
+        try {
+          const { error: rpcErr } = await supabase.rpc('mark_messages_read', {
+            p_user_id: currentUserId,
+            p_sender_id: otherUserId,
+          });
+          if (!rpcErr) return;
+
+          await supabase
+            .from('instant_messages')
+            .update({ read_at: readAt })
+            .eq('recipient_id', currentUserId)
+            .eq('sender_id', otherUserId)
+            .is('read_at', null);
+        } catch {
+        }
+      })();
+    },
+    [currentUserId, supabase]
+  );
 
   const refreshConversations = useCallback(async () => {
     await loadConversations();
@@ -401,6 +601,39 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       setMessages([]);
     }
   }, [activeConversationId, loadMessages, markConversationRead]);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+    const channel = supabase
+      .channel(`im-realtime-${currentUserId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'instant_messages',
+        },
+        (payload: RealtimePostgresChangesPayload<InstantMessageRow>) => {
+          const row = (payload.new || payload.old) as InstantMessageRow | null;
+          if (!row) return;
+          const senderId = String(row.sender_id ?? '');
+          const recipientId = String(row.recipient_id ?? '');
+          if (senderId !== currentUserId && recipientId !== currentUserId) return;
+          void loadConversations();
+          if (activeConversationId) {
+            const otherId = activeConversationId;
+            if (senderId === otherId || recipientId === otherId) {
+              void loadMessages(activeConversationId);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeConversationId, currentUserId, loadConversations, loadMessages, supabase]);
 
   return (
     <MessagesContext.Provider value={{

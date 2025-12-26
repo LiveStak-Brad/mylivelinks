@@ -7,6 +7,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Search, Video, Users, TrendingUp, Link2 } from 'lucide-react';
 import ProfileCarousel from '@/components/ProfileCarousel';
+import { RoomsCarousel } from '@/components/rooms';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -197,6 +198,11 @@ export default function LandingPage() {
             title={currentUser ? "Recommended for You" : "Popular Creators"} 
             currentUserId={currentUser?.id || null}
           />
+        </div>
+
+        {/* Coming Soon Rooms Carousel */}
+        <div className="bg-card rounded-2xl shadow-2xl p-6 md:p-8 mb-12 border border-border/50">
+          <RoomsCarousel />
         </div>
 
           {/* Features Grid */}

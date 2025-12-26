@@ -100,47 +100,53 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   // Mobile: Full screen with single pane navigation
   if (isMobile) {
     return (
-      <div className="fixed inset-0 z-50 bg-background animate-slide-up">
-        {/* Show thread or conversation list */}
-        {showThread && activeConversation ? (
-          <MessageThread
-            conversation={activeConversation}
-            onBack={handleBack}
-            showBackButton={true}
-          />
-        ) : (
-          <>
-            {/* Mobile Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-bold text-foreground">Messages</h2>
-                {totalUnreadCount > 0 && (
-                  <span className="px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
-                    {totalUnreadCount}
-                  </span>
-                )}
+      <>
+        {/* Backdrop - solid background to prevent content bleeding through */}
+        <div className="fixed inset-0 z-[60] bg-background" aria-hidden="true" />
+        
+        {/* Modal Content */}
+        <div className="fixed inset-0 z-[60] flex flex-col bg-background animate-slide-up">
+          {/* Show thread or conversation list */}
+          {showThread && activeConversation ? (
+            <MessageThread
+              conversation={activeConversation}
+              onBack={handleBack}
+              showBackButton={true}
+            />
+          ) : (
+            <>
+              {/* Mobile Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-primary" />
+                  <h2 className="text-lg font-bold text-foreground">Messages</h2>
+                  {totalUnreadCount > 0 && (
+                    <span className="px-1.5 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                      {totalUnreadCount}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition">
+                    <Edit className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition">
-                  <Edit className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={onClose}
-                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+              
+              {/* Conversation List */}
+              <div className="flex-1 h-[calc(100%-60px)] bg-background">
+                <ConversationList onSelectConversation={handleSelectConversation} />
               </div>
-            </div>
-            
-            {/* Conversation List */}
-            <div className="flex-1 h-[calc(100%-60px)]">
-              <ConversationList onSelectConversation={handleSelectConversation} />
-            </div>
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </div>
+      </>
     );
   }
 
@@ -148,7 +154,7 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   return (
     <div
       ref={modalRef}
-      className="absolute right-0 top-full mt-2 w-[700px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-50"
+      className="absolute right-0 top-full mt-2 w-[700px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[60]"
       style={{ height: '500px', maxHeight: 'calc(100vh - 120px)' }}
     >
       <div className="flex h-full">
