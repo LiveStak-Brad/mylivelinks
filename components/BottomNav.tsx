@@ -19,13 +19,13 @@ interface NavItem {
 }
 
 /**
- * BottomNav Component
+ * BottomNav Component v2.0
  * 
  * Mobile-first bottom navigation bar for web and mobile app.
  * Features:
- * - 5 primary navigation items
+ * - 5 primary navigation items with ONLY TEXT LABELS (NO NUMBERS!)
  * - Active state indicators
- * - Dot badge for unread items (NO COUNTS)
+ * - Dot badge for unread items (NO COUNT NUMBERS)
  * - Responsive: shows on mobile/tablet, hidden on desktop
  * - Consistent with iOS/Android bottom navigation patterns
  * - Safe area padding for mobile devices

@@ -602,11 +602,9 @@ button:active:not(:disabled),
   margin-top: 0.125rem;
 }
 
-/* Make Rooms label stand out */
+/* Make Rooms label stand out slightly */
 .bottom-nav-item[href="/rooms"] .bottom-nav-label {
-  font-weight: 700;
-  font-size: 0.75rem;
-  color: hsl(0 84% 60%);
+  font-weight: 600;
 }
 
 .bottom-nav-badge {
@@ -644,59 +642,32 @@ button:active:not(:disabled),
 /* Tab-specific colors and sizes */
 .bottom-nav-item[href="/"] svg {
   color: hsl(258 90% 58%); /* Purple - Home */
-  width: 1.625rem;
-  height: 1.625rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .bottom-nav-item[href="/feed"] svg {
   color: hsl(328 85% 60%); /* Pink - Feed */
-  width: 1.625rem;
-  height: 1.625rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .bottom-nav-item[href="/rooms"] svg {
   color: hsl(0 84% 60%); /* Bright Red - Rooms/Live */
-  width: 2.25rem;
-  height: 2.25rem;
-}
-
-/* Special highlight for Rooms button - THE MONEY MAKER */
-.bottom-nav-item[href="/rooms"] {
-  position: relative;
-}
-
-.bottom-nav-item[href="/rooms"]::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 3.5rem;
-  height: 3.5rem;
-  background: linear-gradient(135deg, hsl(0 84% 60% / 0.15), hsl(0 84% 60% / 0.25));
-  border-radius: 50%;
-  border: 2px solid hsl(0 84% 60% / 0.3);
-  z-index: -1;
-  transition: all 0.2s ease-out;
-}
-
-.bottom-nav-item[href="/rooms"]:hover::before,
-.bottom-nav-item-active[href="/rooms"]::before {
-  background: linear-gradient(135deg, hsl(0 84% 60% / 0.25), hsl(0 84% 60% / 0.35));
-  border-color: hsl(0 84% 60% / 0.5);
-  box-shadow: 0 0 20px hsl(0 84% 60% / 0.3);
+  width: 2rem;
+  height: 2rem;
 }
 
 .bottom-nav-item[href="/messages"] svg {
   color: hsl(200 98% 50%); /* Blue - Messages */
-  width: 1.625rem;
-  height: 1.625rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .bottom-nav-item[href="/noties"] svg {
   color: hsl(43 96% 56%); /* Amber - Noties */
-  width: 1.625rem;
-  height: 1.625rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 /* Active state keeps the color vibrant and slightly bigger */
@@ -712,8 +683,7 @@ button:active:not(:disabled),
 
 .bottom-nav-item-active[href="/rooms"] svg {
   color: hsl(0 84% 60%);
-  transform: scale(1.15);
-  filter: drop-shadow(0 0 8px hsl(0 84% 60% / 0.4));
+  transform: scale(1.1);
 }
 
 .bottom-nav-item-active[href="/messages"] svg {
