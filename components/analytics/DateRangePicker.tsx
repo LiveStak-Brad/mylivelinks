@@ -90,7 +90,7 @@ export default function DateRangePicker({ value, onChange }: DateRangePickerProp
       </button>
       
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-[1200] overflow-hidden">
           {presets.map((preset) => (
             <button
               key={preset.id}
