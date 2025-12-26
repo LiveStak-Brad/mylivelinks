@@ -275,15 +275,30 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
 
               {/* Messages in group */}
               <div className="space-y-2">
-                {group.messages.map(msg => (
-                  <MessageBubble
-                    key={msg.id}
-                    message={msg}
-                    isOwn={msg.senderId === currentUserId}
-                    time={formatTime(msg.timestamp)}
-                    senderUsername={conversation.recipientUsername}
-                  />
-                ))}
+                {group.messages.map((msg, msgIdx) => {
+                  const isOwn = msg.senderId === currentUserId;
+                  // Check if this is the last sent message that was read (to show "Seen")
+                  const isLastReadMessage = isOwn && 
+                    msg.status === 'read' && 
+                    groupIdx === groupedMessages.length - 1 && 
+                    msgIdx === group.messages.length - 1;
+                  
+                  return (
+                    <div key={msg.id}>
+                      <MessageBubble
+                        message={msg}
+                        isOwn={isOwn}
+                        time={formatTime(msg.timestamp)}
+                        senderUsername={conversation.recipientUsername}
+                      />
+                      {isLastReadMessage && (
+                        <p className="text-[10px] text-right text-blue-400 mt-1 mr-1 font-medium">
+                          Seen
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))
@@ -434,11 +449,11 @@ function MessageBubble({
             {time}
             {isOwn && (
               <span className="ml-1">
-                {message.status === 'sending' && '○'}
-                {message.status === 'sent' && '✓'}
-                {message.status === 'delivered' && '✓✓'}
-                {message.status === 'read' && '✓✓'}
-                {message.status === 'failed' && '⚠️'}
+                {message.status === 'sending' && <span className="opacity-60">○</span>}
+                {message.status === 'sent' && <span className="opacity-80">✓</span>}
+                {message.status === 'delivered' && <span className="opacity-80">✓✓</span>}
+                {message.status === 'read' && <span className="text-blue-400 font-medium">✓✓</span>}
+                {message.status === 'failed' && <span className="text-red-500">⚠️</span>}
               </span>
             )}
           </p>
@@ -467,11 +482,11 @@ function MessageBubble({
             {time}
             {isOwn && (
               <span className="ml-1">
-                {message.status === 'sending' && '○'}
-                {message.status === 'sent' && '✓'}
-                {message.status === 'delivered' && '✓✓'}
-                {message.status === 'read' && '✓✓'}
-                {message.status === 'failed' && '⚠️'}
+                {message.status === 'sending' && <span className="opacity-60">○</span>}
+                {message.status === 'sent' && <span className="opacity-80">✓</span>}
+                {message.status === 'delivered' && <span className="opacity-80">✓✓</span>}
+                {message.status === 'read' && <span className="text-blue-400 font-medium">✓✓</span>}
+                {message.status === 'failed' && <span className="text-red-500">⚠️</span>}
               </span>
             )}
           </div>
@@ -495,11 +510,11 @@ function MessageBubble({
           {time}
           {isOwn && (
             <span className="ml-1">
-              {message.status === 'sending' && '○'}
-              {message.status === 'sent' && '✓'}
-              {message.status === 'delivered' && '✓✓'}
-              {message.status === 'read' && '✓✓'}
-              {message.status === 'failed' && '⚠️'}
+              {message.status === 'sending' && <span className="opacity-60">○</span>}
+              {message.status === 'sent' && <span className="opacity-80">✓</span>}
+              {message.status === 'delivered' && <span className="opacity-80">✓✓</span>}
+              {message.status === 'read' && <span className="text-blue-300 font-medium">✓✓</span>}
+              {message.status === 'failed' && <span className="text-red-300">⚠️</span>}
             </span>
           )}
         </p>

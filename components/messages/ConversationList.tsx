@@ -145,9 +145,17 @@ function ConversationRow({
           </span>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className={`text-xs truncate ${conversation.unreadCount > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
-            {conversation.lastMessage || 'Start a conversation'}
-          </p>
+          <div className="flex items-center gap-1 min-w-0 flex-1">
+            {/* Show read status for messages you sent */}
+            {conversation.lastMessageSentByMe && (
+              <span className={`flex-shrink-0 text-[10px] ${conversation.lastMessageRead ? 'text-blue-400' : 'text-muted-foreground/60'}`}>
+                {conversation.lastMessageRead ? '✓✓' : '✓'}
+              </span>
+            )}
+            <p className={`text-xs truncate ${conversation.unreadCount > 0 ? 'text-foreground' : 'text-muted-foreground'}`}>
+              {conversation.lastMessage || 'Start a conversation'}
+            </p>
+          </div>
           {conversation.unreadCount > 0 && (
             <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
               {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}

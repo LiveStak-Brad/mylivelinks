@@ -35,6 +35,10 @@ export interface Conversation {
   lastMessage?: string;
   lastMessageAt: Date;
   unreadCount: number;
+  /** Whether the last message was sent by the current user */
+  lastMessageSentByMe?: boolean;
+  /** Whether the last message (if sent by me) was read by recipient */
+  lastMessageRead?: boolean;
 }
 
 interface MessagesContextType {
@@ -222,6 +226,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           last_message: string;
           last_message_at: string;
           unread_count: number;
+          last_message_sent_by_me: boolean;
+          last_message_read: boolean;
         }
       >();
 
@@ -237,10 +243,13 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
               : decoded.type === 'image'
                 ? 'Sent a photo 📷'
               : decoded.text;
+          const sentByMe = senderId === currentUserId;
           convoByOther.set(otherId, {
             last_message: String(lastMessageText ?? ''),
             last_message_at: String(row.created_at),
             unread_count: 0,
+            last_message_sent_by_me: sentByMe,
+            last_message_read: sentByMe && row.read_at != null,
           });
           otherUserIds.push(otherId);
         }
@@ -277,6 +286,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             lastMessage: meta?.last_message ?? undefined,
             lastMessageAt: meta?.last_message_at ? new Date(meta.last_message_at) : new Date(),
             unreadCount: meta?.unread_count ?? 0,
+            lastMessageSentByMe: meta?.last_message_sent_by_me ?? false,
+            lastMessageRead: meta?.last_message_read ?? false,
           };
         })
         .sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
@@ -325,6 +336,34 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         if (p?.id && p?.display_name) displayNameById.set(String(p.id), String(p.display_name));
       }
 
+      // Need to fetch last message read status for each conversation
+      // For now, we'll query to check if the last message was sent by us and if it was read
+      const lastMessageStatusMap = new Map<string, { sentByMe: boolean; read: boolean }>();
+      
+      // Batch query to get the last message info for all conversations
+      for (const r of rows) {
+        const otherId = String(r.other_user_id);
+        try {
+          const { data: lastMsg } = await supabase
+            .from('instant_messages')
+            .select('sender_id, read_at')
+            .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${currentUserId})`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (lastMsg) {
+            const sentByMe = String(lastMsg.sender_id) === currentUserId;
+            lastMessageStatusMap.set(otherId, {
+              sentByMe,
+              read: sentByMe && lastMsg.read_at != null,
+            });
+          }
+        } catch {
+          // Ignore errors for individual lookups
+        }
+      }
+
       const convos: Conversation[] = rows.map((r) => {
         const otherId = String(r.other_user_id);
         const decoded = decodeIMContent(String(r.last_message ?? ''));
@@ -334,6 +373,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             : decoded.type === 'image'
               ? 'Sent a photo 📷'
             : decoded.text;
+        const statusInfo = lastMessageStatusMap.get(otherId);
         return {
           id: otherId,
           recipientId: otherId,
@@ -344,6 +384,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           lastMessage: lastMessageText || undefined,
           lastMessageAt: r.last_message_at ? new Date(r.last_message_at) : new Date(),
           unreadCount: Number(r.unread_count ?? 0),
+          lastMessageSentByMe: statusInfo?.sentByMe ?? false,
+          lastMessageRead: statusInfo?.read ?? false,
         };
       });
 
