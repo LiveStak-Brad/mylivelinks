@@ -536,16 +536,18 @@ function createStyles(theme: ThemeDefinition) {
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme.colors.cardSurface,
+      backgroundColor: theme.mode === 'light' 
+        ? 'rgba(236, 72, 153, 0.05)' // Pink tint background
+        : 'rgba(244, 114, 182, 0.08)',
       borderRadius: 14,
       paddingHorizontal: 16,
       paddingVertical: 12,
       marginHorizontal: 16,
       marginVertical: 12,
       borderWidth: 1,
-      borderColor: theme.mode === 'light' ? 'rgba(236, 72, 153, 0.15)' : theme.colors.border, // Pink border
-      shadowColor: theme.colors.menuShadow,
-      shadowOpacity: 0.08,
+      borderColor: theme.mode === 'light' ? 'rgba(236, 72, 153, 0.2)' : 'rgba(244, 114, 182, 0.25)', // Pink border
+      shadowColor: theme.mode === 'light' ? '#EC4899' : '#F472B6',
+      shadowOpacity: 0.12,
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 4 },
       elevation: 3,
@@ -603,17 +605,19 @@ function createStyles(theme: ThemeDefinition) {
       marginHorizontal: 12,
       marginVertical: 6,
       borderRadius: 16,
-      backgroundColor: theme.colors.cardSurface,
+      backgroundColor: theme.mode === 'light' 
+        ? 'rgba(236, 72, 153, 0.05)' // Light pink tint background
+        : 'rgba(244, 114, 182, 0.08)', // Darker pink tint for dark mode
       borderWidth: 1,
-      borderColor: theme.mode === 'light' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(244, 114, 182, 0.15)', // Pink tint border
-      shadowColor: theme.colors.menuShadow,
-      shadowOpacity: 0.12,
+      borderColor: theme.mode === 'light' ? 'rgba(236, 72, 153, 0.2)' : 'rgba(244, 114, 182, 0.25)', // Pink border
+      shadowColor: theme.mode === 'light' ? '#EC4899' : '#F472B6',
+      shadowOpacity: 0.15,
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 6 },
       elevation: 4,
     },
     conversationRowPressed: {
-      backgroundColor: theme.mode === 'light' ? 'rgba(236, 72, 153, 0.08)' : theme.colors.cardAlt, // Pink pressed state
+      backgroundColor: theme.mode === 'light' ? 'rgba(236, 72, 153, 0.12)' : 'rgba(244, 114, 182, 0.15)', // Deeper pink on press
     },
     avatarContainer: {
       position: 'relative',
