@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface LeaderboardEntry {
   profile_id: string;
@@ -261,17 +262,11 @@ export default function Leaderboard() {
 
               {/* Avatar with Badge Overlay */}
               <div className="flex-shrink-0 relative">
-                {entry.avatar_url ? (
-                  <img
-                    src={entry.avatar_url}
-                    alt={entry.username}
-                    className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold border border-gray-200 dark:border-gray-700">
-                    {(entry.username?.[0] ?? '?').toUpperCase()}
-                  </div>
-                )}
+                <img
+                  src={getAvatarUrl(entry.avatar_url)}
+                  alt={entry.username}
+                  className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700"
+                />
               </div>
 
               {/* User Info */}

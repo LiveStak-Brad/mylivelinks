@@ -7,6 +7,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import Link from 'next/link';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface LeaderboardEntry {
   profile_id: string;
@@ -219,27 +220,16 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
 
                   {/* Avatar */}
                   <div className="flex-shrink-0">
-                    {entry.avatar_url ? (
-                      <img
-                        src={entry.avatar_url}
-                        alt={entry.username}
-                        className={`rounded-full object-cover border-2 ${
-                          entry.rank === 1 ? 'w-12 h-12 border-amber-400' :
-                          entry.rank === 2 ? 'w-11 h-11 border-gray-300' :
-                          entry.rank === 3 ? 'w-10 h-10 border-orange-400' :
-                          'w-9 h-9 border-border'
-                        }`}
-                      />
-                    ) : (
-                      <div className={`rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold border-2 ${
-                        entry.rank === 1 ? 'w-12 h-12 text-lg border-amber-400' :
+                    <img
+                      src={getAvatarUrl(entry.avatar_url)}
+                      alt={entry.username}
+                      className={`rounded-full object-cover border-2 ${
+                        entry.rank === 1 ? 'w-12 h-12 border-amber-400' :
                         entry.rank === 2 ? 'w-11 h-11 border-gray-300' :
                         entry.rank === 3 ? 'w-10 h-10 border-orange-400' :
-                        'w-9 h-9 text-sm border-border'
-                      }`}>
-                        {(entry.username?.[0] ?? '?').toUpperCase()}
-                      </div>
-                    )}
+                        'w-9 h-9 border-border'
+                      }`}
+                    />
                   </div>
 
                   {/* User Info */}
