@@ -463,11 +463,15 @@ const styles = StyleSheet.create({
     width: 44, // Exact button size, no extra space
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#000', // Opaque background
+    zIndex: 100, // Above grid
   },
   
   // CAMERA GRID - MIDDLE COLUMN (MAX space between columns)
   cameraGrid: {
     flex: 1, // Takes remaining space between columns
+    backgroundColor: '#000', // Ensure black background
+    zIndex: 1, // Below controls
   },
   
   // RIGHT COLUMN (Gift + PiP + Share) - MINIMAL WIDTH
@@ -475,6 +479,8 @@ const styles = StyleSheet.create({
     width: 44, // Exact button size, no extra space
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#000', // Opaque background
+    zIndex: 100, // Above grid
   },
   
   spacer: {
