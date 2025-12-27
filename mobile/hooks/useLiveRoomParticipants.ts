@@ -23,9 +23,9 @@ import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT } from '../lib/li
 
 const DEBUG = DEBUG_LIVEKIT;
 const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
-const TOKEN_ENDPOINT = process.env.EXPO_PUBLIC_API_URL 
+const TOKEN_ENDPOINT = process.env.EXPO_PUBLIC_API_URL
   ? `${process.env.EXPO_PUBLIC_API_URL}${TOKEN_ENDPOINT_PATH}`
-  : `https://mylivelinks.com${TOKEN_ENDPOINT_PATH}`; // Default to production
+  : '';
 
 interface UseLiveRoomParticipantsReturn {
   participants: Participant[];
@@ -53,6 +53,14 @@ export function useLiveRoomParticipants(
 ): UseLiveRoomParticipantsReturn {
   const { enabled = false } = options;
   if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked');
+
+  if (enabled && !process.env.EXPO_PUBLIC_API_URL) {
+    const message =
+      '[ROOM] Missing EXPO_PUBLIC_API_URL. Refusing to default LiveKit token endpoint to production. Set EXPO_PUBLIC_API_URL (e.g. in mobile/.env for local Expo dev, or in mobile/eas.json for EAS builds) and restart the dev server.';
+    console.error(message);
+    throw new Error(message);
+  }
+
   const { user, getAccessToken } = useAuthContext();
   const [allParticipants, setAllParticipants] = useState<RemoteParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
@@ -137,6 +145,34 @@ export function useLiveRoomParticipants(
       const sessionId = generateSessionId();
 
       const accessToken = await getAccessToken();
+
+      console.log('[PARITY-PROOF] token_fetch_inputs', {
+        EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+        TOKEN_ENDPOINT,
+        ROOM_NAME,
+        deviceType: 'mobile',
+        deviceId,
+        sessionId,
+        identity: `u_${user?.id}:mobile:${deviceId}:${sessionId}`,
+      });
+
+      console.log('[PARITY-PROOF] token_fetch_request', {
+        url: TOKEN_ENDPOINT,
+        origin: (() => {
+          try {
+            return new URL(TOKEN_ENDPOINT).origin;
+          } catch {
+            return null;
+          }
+        })(),
+        host: (() => {
+          try {
+            return new URL(TOKEN_ENDPOINT).host;
+          } catch {
+            return null;
+          }
+        })(),
+      });
 
       if (DEBUG) {
         console.log('[TOKEN] Requesting token:', {
@@ -257,6 +293,25 @@ export function useLiveRoomParticipants(
     const remoteParticipants = Array.from(room.remoteParticipants.values());
 
     if (DEBUG) {
+      for (const p of remoteParticipants) {
+        const videoPubs = Array.from(p.videoTrackPublications.values());
+        const hasVideo = videoPubs.some(pub => !!pub.track);
+        const metadata = (p as any).metadata;
+        console.log('[ROOM-AUDIT] remote_participant', {
+          identity: p.identity,
+          videoPublicationsCount: videoPubs.length,
+          videoPublications: videoPubs.map(pub => ({
+            trackSid: (pub as any).trackSid,
+            isSubscribed: (pub as any).isSubscribed,
+            hasTrack: !!pub.track,
+          })),
+          participantMetadataExists: !!metadata,
+          hasVideo,
+        });
+      }
+    }
+
+    if (DEBUG) {
       console.log('[ROOM] All participants updated:', {
         count: remoteParticipants.length,
         identities: remoteParticipants.map(p => p.identity.substring(0, 8) + '...'),
@@ -288,10 +343,10 @@ export function useLiveRoomParticipants(
 
     // Ensure env is present
     if (!TOKEN_ENDPOINT) {
-      if (DEBUG) {
-        console.log('[ROOM] Skipping connect (missing TOKEN_ENDPOINT / API URL)');
-      }
-      return;
+      const message =
+        '[ROOM] Missing EXPO_PUBLIC_API_URL. Refusing to default LiveKit token endpoint to production. Set EXPO_PUBLIC_API_URL (e.g. in mobile/.env for local Expo dev, or in mobile/eas.json for EAS builds) and restart the dev server.';
+      console.error(message);
+      throw new Error(message);
     }
 
     isConnectingRef.current = true;
@@ -417,6 +472,9 @@ export function useLiveRoomParticipants(
           });
         }
 
+        console.log('[PARITY-PROOF] room_connect_inputs', {
+          url,
+        });
         if (DEBUG) console.log('[ROOM] About to call room.connect()');
         await room.connect(url, token);
         if (DEBUG) console.log('[ROOM] Connected successfully');

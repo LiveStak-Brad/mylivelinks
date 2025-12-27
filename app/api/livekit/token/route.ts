@@ -122,6 +122,21 @@ export async function POST(request: NextRequest) {
       role,
     } = body;
 
+    // TEMP DEBUG: Parity proof logging (do not change response shape)
+    // Helps confirm which host minted the token, the requested room, and the wsUrl used by clients.
+    console.log('[PARITY-PROOF][TOKEN_API] request_headers', {
+      host: request.headers.get('host'),
+      origin: request.headers.get('origin'),
+      referer: request.headers.get('referer'),
+      'x-forwarded-host': request.headers.get('x-forwarded-host'),
+      'x-forwarded-proto': request.headers.get('x-forwarded-proto'),
+      'x-forwarded-for': request.headers.get('x-forwarded-for'),
+      'x-real-ip': request.headers.get('x-real-ip'),
+      'cf-connecting-ip': request.headers.get('cf-connecting-ip'),
+      'cf-ray': request.headers.get('cf-ray'),
+      'user-agent': request.headers.get('user-agent'),
+    });
+
     // Validate required fields
     if (!roomName || !participantName) {
       return NextResponse.json(
@@ -340,6 +355,21 @@ export async function POST(request: NextRequest) {
     } else if (!wsUrl.startsWith('wss://') && !wsUrl.startsWith('ws://')) {
       wsUrl = `wss://${wsUrl}`;
     }
+
+    console.log('[PARITY-PROOF][TOKEN_API] minted', {
+      requestedRoomName: roomName,
+      participantName,
+      identity,
+      canPublish: canPublish === true,
+      canSubscribe: canSubscribe !== false,
+      role: effectiveRole,
+      deviceType: effectiveDeviceType,
+      // avoid logging full deviceId/sessionId if desired; but parity proof often needs exact values
+      deviceId: effectiveDeviceId,
+      sessionId: effectiveSessionId,
+      wsUrl,
+      livekitUrlEnv: LIVEKIT_URL,
+    });
 
     return NextResponse.json({
       token,

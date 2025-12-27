@@ -298,6 +298,26 @@ export function useLiveKitPublisher({
           
           const videoCount = verifiedPublishedTracks.filter(p => p.source === Track.Source.Camera).length;
           const audioCount = verifiedPublishedTracks.filter(p => p.source === Track.Source.Microphone).length;
+
+          if (DEBUG_LIVEKIT) {
+            const cameraPublications = Array.from(room.localParticipant.trackPublications.values())
+              .filter(pub => pub.source === Track.Source.Camera)
+              .map(pub => ({
+                publicationSid: pub.trackSid,
+                trackSid: pub.track?.sid,
+                hasTrack: !!pub.track,
+                kind: pub.kind,
+                isMuted: pub.isMuted,
+              }));
+            console.log('[PUBLISH-AUDIT] local_camera_publish_state', {
+              localParticipantSid: room.localParticipant.sid,
+              localParticipantIdentity: room.localParticipant.identity,
+              canPublish: room.localParticipant.permissions?.canPublish,
+              cameraPublicationsCount: cameraPublications.length,
+              cameraPublications,
+              cameraTrackPublished: cameraPublications.some(p => p.hasTrack && !!p.publicationSid),
+            });
+          }
           
           console.log('Publishing verified:', {
             cameraTracks: videoCount,
