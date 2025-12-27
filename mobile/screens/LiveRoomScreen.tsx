@@ -361,22 +361,24 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         </View>
 
         {/* CAMERA GRID - MIDDLE COLUMN (fits BETWEEN left and right) */}
-        <GestureDetector gesture={swipeGesture}>
-          <View style={styles.cameraGrid}>
-            <Grid12 
-              participants={participants}
-              isEditMode={state.isEditMode}
-              focusedIdentity={state.focusedIdentity}
-              tileSlots={state.tileSlots}
-              room={room}
-              onLongPress={handleLongPress}
-              onDoubleTap={handleDoubleTap}
-              onExitEditMode={handleExitEditMode}
-              onExitFocus={handleExitFocus}
-              onInitializeTileSlots={initializeTileSlots}
-            />
-          </View>
-        </GestureDetector>
+        <View style={styles.centerGridWrapper}>
+          <GestureDetector gesture={swipeGesture}>
+            <View style={styles.cameraGrid}>
+              <Grid12 
+                participants={participants}
+                isEditMode={state.isEditMode}
+                focusedIdentity={state.focusedIdentity}
+                tileSlots={state.tileSlots}
+                room={room}
+                onLongPress={handleLongPress}
+                onDoubleTap={handleDoubleTap}
+                onExitEditMode={handleExitEditMode}
+                onExitFocus={handleExitFocus}
+                onInitializeTileSlots={initializeTileSlots}
+              />
+            </View>
+          </GestureDetector>
+        </View>
 
         {/* RIGHT COLUMN - Controls */}
         <View style={[styles.rightColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingRight: insets.right || 8 }]}>
@@ -450,10 +452,17 @@ const styles = StyleSheet.create({
     zIndex: 100, // Above grid
   },
   
-  // CAMERA GRID - MIDDLE COLUMN (MAX space between columns)
-  cameraGrid: {
+  // CENTER GRID WRAPPER - OWNS GRID WIDTH (prevents grid from rendering under controllers)
+  centerGridWrapper: {
     flex: 1, // Takes remaining space between columns
-    backgroundColor: '#000', // Ensure black background
+    overflow: 'hidden', // CRITICAL: Clips grid content to prevent overflow under controllers
+    backgroundColor: '#000',
+  },
+  
+  // CAMERA GRID - FULL HEIGHT/WIDTH within wrapper
+  cameraGrid: {
+    flex: 1, // Fill centerGridWrapper completely
+    backgroundColor: '#000',
     zIndex: 1, // Below controls
   },
   
