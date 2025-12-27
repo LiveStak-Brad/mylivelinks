@@ -445,9 +445,10 @@ const styles = StyleSheet.create({
   
   // LEFT COLUMN (Back + GO LIVE) - BUTTON + SAFE AREA SPACE
   leftColumn: {
-    width: 60, // Button (44px) + safe area padding (8-16px)
+    width: 80, // Increased to contain GO LIVE glow (52px button + 8px shadow + padding)
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 6, // Center buttons within column
     backgroundColor: '#000', // Opaque background
     zIndex: 100, // Above grid
   },
@@ -468,9 +469,10 @@ const styles = StyleSheet.create({
   
   // RIGHT COLUMN (Gift + PiP + Share) - BUTTON + SAFE AREA SPACE
   rightColumn: {
-    width: 60, // Button (44px) + safe area padding (8-16px)
+    width: 80, // Increased to contain gift/PiP/share buttons fully
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 6, // Center buttons within column
     backgroundColor: '#000', // Opaque background
     zIndex: 100, // Above grid
   },
