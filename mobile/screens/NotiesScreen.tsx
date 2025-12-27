@@ -47,7 +47,7 @@ export function NotiesScreen({ navigation }: Props) {
       onNavigateToProfile={(username) => {
         navigation.navigate('Profile', { username });
       }}
-      onNavigateToRooms={() => navigation.navigate('Rooms')}
+      onNavigateToRooms={() => navigation.getParent?.()?.navigate?.('Rooms')}
     >
       {/* Page Header: Bell icon + Noties with Mark all read button */}
       <PageHeader

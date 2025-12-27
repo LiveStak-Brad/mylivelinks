@@ -121,11 +121,7 @@ export function HomeDashboardScreen({ navigation }: Props) {
       parent.navigate('Rooms');
       return;
     }
-    try {
-      navigation.navigate('Rooms');
-    } catch {
-      // ignore
-    }
+    navigation.navigate('Rooms' as never);
   };
 
   const handleNavigateToAnalytics = () => {

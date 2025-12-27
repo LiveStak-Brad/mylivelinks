@@ -278,7 +278,7 @@ export function FeedScreen({ navigation }: Props) {
       onNavigateToProfile={(username) => {
         navigation.navigate('Profile', { username });
       }}
-      onNavigateToRooms={() => navigation.navigate('Rooms')}
+      onNavigateToRooms={() => navigation.getParent?.()?.navigate?.('Rooms')}
     >
       {/* Page Header: Activity icon + Feed */}
       <PageHeader icon="activity" iconColor="#ec4899" title="Feed" />

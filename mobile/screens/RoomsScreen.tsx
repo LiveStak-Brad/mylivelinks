@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, useWindowDimensions, Image } from 'react-native';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { PageShell, PageHeader } from '../components/ui';
-import type { MainTabsParamList } from '../types/navigation';
+import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import { LiveRoomScreen } from './LiveRoomScreen';
 
-type Props = BottomTabScreenProps<MainTabsParamList, 'Rooms'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Rooms'>;
 
 export function RoomsScreen({ navigation }: Props) {
   const { theme } = useThemeMode();
@@ -31,7 +31,7 @@ export function RoomsScreen({ navigation }: Props) {
         onNavigateWallet={() => {
           setLiveRoomEnabled(false);
           // Navigate to wallet screen (assuming it's in root navigator)
-          navigation.getParent()?.navigate('Wallet' as never);
+          navigation.navigate('Wallet');
         }}
       />
     );
@@ -41,9 +41,9 @@ export function RoomsScreen({ navigation }: Props) {
     <PageShell 
       contentStyle={styles.container}
       useNewHeader
-      onNavigateHome={() => navigation.navigate('Home')}
+      onNavigateHome={() => navigation.navigate('MainTabs', { screen: 'Home' })}
       onNavigateToProfile={(username) => {
-        navigation.navigate('Profile', { username });
+        navigation.navigate('MainTabs', { screen: 'Profile', params: { username } });
       }}
     >
       {/* Page Header: Video icon + Rooms */}

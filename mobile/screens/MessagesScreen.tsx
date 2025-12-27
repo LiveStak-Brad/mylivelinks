@@ -205,7 +205,7 @@ export function MessagesScreen({ navigation: _navigation }: Props) {
       onNavigateToProfile={(username) => {
         _navigation.navigate('Profile', { username });
       }}
-      onNavigateToRooms={() => _navigation.navigate('Rooms')}
+      onNavigateToRooms={() => _navigation.getParent?.()?.navigate?.('Rooms')}
     >
       {/* Page Header: MessageCircle icon + Messys */}
       <PageHeader icon="message-circle" iconColor="#00a8ff" title="Messys" />

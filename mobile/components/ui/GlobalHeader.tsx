@@ -73,15 +73,36 @@ export function GlobalHeader({
     [navigation]
   );
 
+  const navigateToRoot = useCallback(
+    (routeName: string, params?: any) => {
+      const state = navigation.getState?.();
+      const routeNames: string[] = Array.isArray(state?.routeNames) ? state.routeNames : [];
+
+      if (routeNames.includes(routeName)) {
+        navigation.navigate(routeName, params);
+        return;
+      }
+
+      const parent = navigation.getParent?.();
+      if (parent?.navigate) {
+        parent.navigate(routeName, params);
+        return;
+      }
+
+      navigation.navigate(routeName, params);
+    },
+    [navigation]
+  );
+
   const handleRoomsPress = useCallback(() => {
     try {
       onNavigateToRooms?.();
     } catch {
       // ignore
     }
-    // Always attempt fallback navigation so it works even when callback is a stub.
-    navigateToTab('Rooms');
-  }, [navigateToTab, onNavigateToRooms]);
+    // Rooms is a RootStack screen (NOT a bottom tab).
+    navigateToRoot('Rooms');
+  }, [navigateToRoot, onNavigateToRooms]);
 
   const handleHomePress = useCallback(() => {
     try {

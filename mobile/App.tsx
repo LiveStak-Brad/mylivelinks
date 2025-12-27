@@ -28,6 +28,7 @@ import type { RootStackParamList } from './types/navigation';
 import { GateScreen } from './screens/GateScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { CreateProfileScreen } from './screens/CreateProfileScreen';
+import { RoomsScreen } from './screens/RoomsScreen';
 import { MainTabs } from './navigation/MainTabs';
 import { WalletScreen } from './screens/WalletScreen';
 import { ProfileRouteScreen } from './screens/ProfileRouteScreen';
@@ -58,6 +59,7 @@ function AppNavigation() {
             <Stack.Screen name="Gate" component={GateScreen} />
             <Stack.Screen name="Auth" component={AuthScreen} />
             <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
+            <Stack.Screen name="Rooms" component={RoomsScreen} />
             <Stack.Screen name="MainTabs" component={MainTabs} />
             <Stack.Screen name="Wallet" component={WalletScreen} />
             <Stack.Screen name="Transactions" component={TransactionsScreen} />

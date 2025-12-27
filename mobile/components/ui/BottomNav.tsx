@@ -48,11 +48,6 @@ export function BottomNav({ navigation, currentRoute }: BottomNavProps) {
       icon: '📰',
     },
     {
-      route: 'Rooms',
-      label: 'Rooms',
-      icon: '🎥',
-    },
-    {
       route: 'Messages',
       label: 'Messys',
       icon: '💬',

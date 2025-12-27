@@ -1,9 +1,12 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 // Root stack for authentication and initial flow
 export type RootStackParamList = {
   Gate: undefined;
   Auth: undefined;
   CreateProfile: undefined;
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabsParamList> | undefined;
+  Rooms: undefined;
   Wallet: undefined;
   Transactions: undefined;
   MyAnalytics: undefined;
@@ -25,7 +28,6 @@ export type RootStackParamList = {
 export type MainTabsParamList = {
   Home: undefined;
   Feed: undefined;
-  Rooms: undefined;
   Messages: undefined;
   Noties: undefined;
   Profile: { username?: string };
