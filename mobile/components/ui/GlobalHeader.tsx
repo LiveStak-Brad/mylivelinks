@@ -13,8 +13,9 @@
  * └───────────────────────────────────────┘
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View, Pressable } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { BrandLogo } from './BrandLogo';
 import { UserMenu } from '../UserMenu';
@@ -42,9 +43,76 @@ export function GlobalHeader({
   onNavigateToRooms,
   onLogout,
 }: GlobalHeaderProps) {
+  const navigation = useNavigation<any>();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const navigateToTab = useCallback(
+    (tabName: string, params?: any) => {
+      // Prefer direct tab navigation if we're currently in MainTabs
+      try {
+        navigation.navigate(tabName, params);
+        return;
+      } catch {
+        // ignore
+      }
+
+      // Otherwise target the nested tab navigator from the root stack
+      try {
+        navigation.navigate('MainTabs', {
+          screen: tabName,
+          params,
+        });
+        return;
+      } catch {
+        // ignore
+      }
+
+      try {
+        navigation.getParent?.()?.navigate?.('MainTabs', {
+          screen: tabName,
+          params,
+        });
+      } catch {
+        // ignore
+      }
+    },
+    [navigation]
+  );
+
+  const handleRoomsPress = useCallback(() => {
+    try {
+      onNavigateToRooms?.();
+    } catch {
+      // ignore
+    }
+    // Always attempt fallback navigation so it works even when callback is a stub.
+    navigateToTab('Rooms');
+  }, [navigateToTab, onNavigateToRooms]);
+
+  const handleHomePress = useCallback(() => {
+    try {
+      onNavigateHome?.();
+    } catch {
+      // ignore
+    }
+    navigateToTab('Home');
+  }, [navigateToTab, onNavigateHome]);
+
+  const handleProfilePress = useCallback(
+    (username: string) => {
+      try {
+        onNavigateToProfile?.(username);
+      } catch {
+        // ignore
+      }
+
+      // Always attempt fallback navigation so it works even when callback is a stub.
+      navigateToTab('Profile', { username });
+    },
+    [navigateToTab, onNavigateToProfile]
+  );
 
   return (
     <>
@@ -60,27 +128,15 @@ export function GlobalHeader({
           </Pressable>
           
           {/* Rooms Video Icon (Red) */}
-          {onNavigateToRooms ? (
-            <Pressable 
-              style={styles.iconButton}
-              onPress={() => {
-                console.log('[GlobalHeader] Rooms button pressed, onNavigateToRooms:', !!onNavigateToRooms);
-                onNavigateToRooms();
-              }}
-            >
-              <Feather name="video" size={24} color="#f44336" />
-            </Pressable>
-          ) : (
-            <View style={[styles.iconButton, { opacity: 0.3 }]}>
-              <Feather name="video" size={24} color="#f44336" />
-            </View>
-          )}
+          <Pressable style={styles.iconButton} onPress={handleRoomsPress}>
+            <Feather name="video" size={24} color="#f44336" />
+          </Pressable>
         </View>
 
         {/* Center Section: Logo */}
         <Pressable
           style={styles.centerSection}
-          onPress={onNavigateHome}
+          onPress={handleHomePress}
         >
           <BrandLogo size={90} />
         </Pressable>
@@ -102,7 +158,7 @@ export function GlobalHeader({
       <LeaderboardModal
         visible={showLeaderboard}
         onClose={() => setShowLeaderboard(false)}
-        onNavigateToProfile={onNavigateToProfile}
+        onNavigateToProfile={handleProfilePress}
       />
     </>
   );
