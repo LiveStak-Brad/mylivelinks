@@ -363,18 +363,35 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         {/* CAMERA GRID - MIDDLE COLUMN (fits BETWEEN left and right) */}
         <GestureDetector gesture={swipeGesture}>
           <View style={styles.cameraGrid}>
-            <Grid12 
-              participants={participants}
-              isEditMode={state.isEditMode}
-              focusedIdentity={state.focusedIdentity}
-              tileSlots={state.tileSlots}
-              room={room}
-              onLongPress={handleLongPress}
-              onDoubleTap={handleDoubleTap}
-              onExitEditMode={handleExitEditMode}
-              onExitFocus={handleExitFocus}
-              onInitializeTileSlots={initializeTileSlots}
-            />
+            {!isConnected ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+                <Text style={{ color: '#ff4444', fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+                  LIVEKIT ROOM NOT CONNECTED
+                </Text>
+                <Text style={{ color: '#999', fontSize: 14, textAlign: 'center', paddingHorizontal: 20 }}>
+                  Make sure you're logged in. Check console logs for details.
+                </Text>
+              </View>
+            ) : participants.length === 0 ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+                <Text style={{ color: '#999', fontSize: 16 }}>
+                  No live streamers
+                </Text>
+              </View>
+            ) : (
+              <Grid12 
+                participants={participants}
+                isEditMode={state.isEditMode}
+                focusedIdentity={state.focusedIdentity}
+                tileSlots={state.tileSlots}
+                room={room}
+                onLongPress={handleLongPress}
+                onDoubleTap={handleDoubleTap}
+                onExitEditMode={handleExitEditMode}
+                onExitFocus={handleExitFocus}
+                onInitializeTileSlots={initializeTileSlots}
+              />
+            )}
           </View>
         </GestureDetector>
 
