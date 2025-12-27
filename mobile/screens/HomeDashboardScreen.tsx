@@ -440,6 +440,7 @@ function createStyles(theme: ThemeDefinition) {
     },
     section: {
       paddingHorizontal: 4,
+      marginTop: 20,
       marginBottom: 24,
     },
     sectionHeader: {
