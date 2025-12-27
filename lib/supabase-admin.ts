@@ -79,15 +79,24 @@ export async function recordStripeEvent(params: {
     const { error } = await supabase.from('stripe_events').insert({
       event_id: params.eventId,
       event_type: params.eventType,
-      processed: true,
+      processed: false,
       request_id: params.requestId,
     });
 
     if (error) {
       // Check if it's a duplicate (already processed)
       if (error.code === '23505') {
-        // Unique violation
-        return { alreadyProcessed: true };
+        const { data, error: readErr } = await supabase
+          .from('stripe_events')
+          .select('processed')
+          .eq('event_id', params.eventId)
+          .maybeSingle();
+
+        if (readErr) {
+          return { alreadyProcessed: false, error: readErr.message };
+        }
+
+        return { alreadyProcessed: data?.processed === true };
       }
       return { alreadyProcessed: false, error: error.message };
     }

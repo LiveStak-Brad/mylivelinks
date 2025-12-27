@@ -172,6 +172,31 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    try {
+      const supabase = getSupabaseAdmin();
+      const { error: markErr } = await supabase
+        .from('stripe_events')
+        .update({ processed: true })
+        .eq('event_id', event.id);
+
+      if (markErr) {
+        logStripeAction('webhook-mark-processed-failed', {
+          requestId,
+          eventId: event.id,
+          eventType: event.type,
+          error: markErr.message,
+        });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown';
+      logStripeAction('webhook-mark-processed-error', {
+        requestId,
+        eventId: event.id,
+        eventType: event.type,
+        error: message,
+      });
+    }
+
     return NextResponse.json({ received: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown';
@@ -195,6 +220,7 @@ export async function POST(request: NextRequest) {
   session: Stripe.Checkout.Session,
   requestId: string
 ) {
+  const creditStartMs = Date.now();
   // Locked rule: webhook credits COINS only.
   // Must read user_id + coins_awarded from metadata (fallbacks allowed for legacy sessions).
   const userId = session.metadata?.user_id || session.client_reference_id;
@@ -210,7 +236,7 @@ export async function POST(request: NextRequest) {
       userId,
       coins_awarded: coinsStr,
     });
-    return;
+    throw new Error('Missing userId on checkout.session.* purchase event');
   }
 
   const usdCents = session.amount_total || 0;
@@ -247,8 +273,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const providerRef = paymentIntentId ?? String(session.id);
-  const idempotencyKey = `stripe:${providerRef}`;
+  if (!paymentIntentId) {
+    logStripeAction('checkout-missing-payment-intent', {
+      requestId,
+      sessionId: session.id,
+      userId,
+      coins_awarded: coinsStr,
+    });
+    throw new Error('Missing payment_intent on checkout.session.* purchase event');
+  }
+
+  const providerRef = String(paymentIntentId);
+  const idempotencyKey = `stripe:pi:${providerRef}`;
 
   const supabase = getSupabaseAdmin();
   let coins: number | null = null;
@@ -298,7 +334,7 @@ export async function POST(request: NextRequest) {
       usdCents,
       priceId,
     });
-    return;
+    throw new Error('Invalid coins for checkout.session.* purchase event');
   }
 
   logStripeAction('checkout-processing', {
@@ -312,8 +348,7 @@ export async function POST(request: NextRequest) {
   });
 
   // Pre-flight guard against double-crediting:
-  // If we previously finalized with stripe:<sessionId> (older code) or stripe:<paymentIntentId>,
-  // skip calling finalize_coin_purchase again.
+  // If we previously finalized with stripe:pi:<paymentIntentId>, skip calling finalize_coin_purchase again.
   try {
     const existing = await supabase
       .from('ledger_entries')
@@ -321,9 +356,7 @@ export async function POST(request: NextRequest) {
       .or(
         [
           `idempotency_key.eq.${idempotencyKey}`,
-          `idempotency_key.eq.stripe:${String(session.id)}`,
-          `provider_ref.eq.${String(session.id)}`,
-          paymentIntentId ? `provider_ref.eq.${String(paymentIntentId)}` : null,
+          `provider_ref.eq.${String(paymentIntentId)}`,
         ]
           .filter(Boolean)
           .join(',')
@@ -368,7 +401,7 @@ export async function POST(request: NextRequest) {
       userId,
       error: error.message,
     });
-    return;
+    throw new Error(`finalize_coin_purchase failed (checkout.session.*): ${error.message}`);
   }
 
   logStripeAction('checkout-finalized', {
@@ -377,6 +410,7 @@ export async function POST(request: NextRequest) {
     userId,
     coinsAwarded: coins,
     ledgerId,
+    creditLatencyMs: Date.now() - creditStartMs,
   });
 
   try {
@@ -459,10 +493,11 @@ async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
   requestId: string
 ) {
+  const creditStartMs = Date.now();
   const stripe = getStripe();
 
   const providerRef = String(paymentIntent.id);
-  const idempotencyKey = `stripe:${providerRef}`;
+  const idempotencyKey = `stripe:pi:${providerRef}`;
 
   let userId: string | null = paymentIntent.metadata?.user_id ?? null;
   const coinsStr: string | null =
@@ -507,31 +542,11 @@ async function handlePaymentIntentSucceeded(
       userId,
       coins_awarded: coinsStr,
     });
-    return;
+    throw new Error('Missing userId on payment_intent.succeeded purchase event');
   }
 
   // Guard against double-crediting:
-  // If checkout.session.* finalized using the session id (stripe:<sessionId>) and then
-  // payment_intent.succeeded fires, we'd otherwise create a 2nd ledger entry.
-  if (sessionId) {
-    const supabase = getSupabaseAdmin();
-    const existing = await supabase
-      .from('ledger_entries')
-      .select('id')
-      .or(`idempotency_key.eq.stripe:${sessionId},provider_ref.eq.${sessionId}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (!existing.error && existing.data?.id) {
-      logStripeAction('payment-intent-skip-existing-session-finalization', {
-        requestId,
-        paymentIntentId: providerRef,
-        sessionId,
-        ledgerId: existing.data.id,
-      });
-      return;
-    }
-  }
+  // If checkout.session.* already finalized using stripe:pi:<paymentIntentId>, this call will be idempotent.
 
   const supabase = getSupabaseAdmin();
   let coins: number | null = null;
@@ -581,7 +596,7 @@ async function handlePaymentIntentSucceeded(
       usdCents,
       priceId,
     });
-    return;
+    throw new Error('Invalid coins for payment_intent.succeeded purchase event');
   }
 
   logStripeAction('payment-intent-processing', {
@@ -610,7 +625,7 @@ async function handlePaymentIntentSucceeded(
       userId,
       error: error.message,
     });
-    return;
+    throw new Error(`finalize_coin_purchase failed (payment_intent.succeeded): ${error.message}`);
   }
 
   logStripeAction('payment-intent-finalized', {
@@ -620,6 +635,7 @@ async function handlePaymentIntentSucceeded(
     userId,
     coinsAwarded: coins,
     ledgerId,
+    creditLatencyMs: Date.now() - creditStartMs,
   });
 }
 

@@ -65,53 +65,37 @@ export default function WalletPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const purchaseStatus = params.get('purchase');
-    const sessionId = params.get('session_id');
 
     if (purchaseStatus === 'success') {
-      if (!sessionId) {
-        setMessage({
-          type: 'error',
-          text: 'Purchase completed but missing session_id. Please contact support.',
-        });
-        window.history.replaceState({}, '', '/wallet');
-        return;
-      }
+      setMessage({
+        type: 'success',
+        text: 'Processing purchase…',
+      });
 
-      (async () => {
-        try {
-          const resp = await fetch('/api/coins/confirm', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId }),
-          });
+      let startingCoins = balance.coins;
 
-          const data = await resp.json().catch(() => ({} as any));
-
-          if (!resp.ok) {
-            setMessage({
-              type: 'error',
-              text:
-                data?.error ||
-                data?.message ||
-                'Purchase completed but failed to credit coins. Please contact support.',
-            });
-            return;
+      const start = Date.now();
+      const interval = window.setInterval(() => {
+        refreshBalance().then((next) => {
+          if (next && next.coins > startingCoins) {
+            window.clearInterval(interval);
+            setMessage({ type: 'success', text: 'Coins added 🎉' });
           }
+        });
 
-          setMessage({
-            type: 'success',
-            text: '🎉 Coins purchased successfully! Your balance has been updated.',
-          });
-          await loadUserData();
-        } catch (e) {
+        if (Date.now() - start > 60000) {
+          window.clearInterval(interval);
           setMessage({
             type: 'error',
-            text: 'Purchase completed but failed to confirm coins. Please contact support.',
+            text: 'Still processing your purchase. If coins do not appear soon, please contact support.',
           });
-        } finally {
-          window.history.replaceState({}, '', '/wallet');
         }
-      })();
+      }, 2500);
+
+      refreshBalance().then((next) => {
+        if (next) startingCoins = next.coins;
+      });
+      window.history.replaceState({}, '', '/wallet');
     } else if (purchaseStatus === 'cancelled') {
       setMessage({ type: 'error', text: 'Purchase was cancelled.' });
       window.history.replaceState({}, '', '/wallet');
@@ -122,6 +106,32 @@ export default function WalletPage() {
     }
   }, []);
 
+  const refreshBalance = async (): Promise<WalletBalance | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('coin_balance, earnings_balance')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        const next = {
+          coins: profile.coin_balance || 0,
+          diamonds: profile.earnings_balance || 0,
+        };
+        setBalance(next);
+        return next;
+      }
+    } catch (err) {
+      console.error('Error refreshing balance:', err);
+    }
+
+    return null;
+  };
+
   const loadUserData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -131,19 +141,7 @@ export default function WalletPage() {
       }
       setUser(user);
 
-      // Load balance
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('coin_balance, earnings_balance')
-        .eq('id', user.id)
-        .single();
-
-      if (profile) {
-        setBalance({
-          coins: profile.coin_balance || 0,
-          diamonds: profile.earnings_balance || 0,
-        });
-      }
+      await refreshBalance();
 
       // Load Connect status
       await refreshConnectStatus();
