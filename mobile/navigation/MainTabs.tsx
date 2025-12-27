@@ -24,6 +24,7 @@ import { Feather } from '@expo/vector-icons';
 import type { MainTabsParamList } from '../types/navigation';
 import { HomeDashboardScreen } from '../screens/HomeDashboardScreen';
 import { FeedScreen } from '../screens/FeedScreen';
+import { RoomsScreen } from '../screens/RoomsScreen';
 import { MessagesScreen } from '../screens/MessagesScreen';
 import { NotiesScreen } from '../screens/NotiesScreen';
 import { ProfileTabScreen } from '../screens/ProfileTabScreen';
@@ -79,6 +80,16 @@ export function MainTabs() {
           tabBarLabel: 'Feed',
           tabBarIcon: ({ color, size }) => (
             <Feather name="activity" size={size} color={color} style={{ color: '#ec4899' }} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Rooms"
+        component={RoomsScreen}
+        options={{
+          tabBarLabel: 'Rooms',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="video" size={size} color={color} style={{ color: '#f44336' }} />
           ),
         }}
       />

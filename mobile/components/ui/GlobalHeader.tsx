@@ -50,33 +50,25 @@ export function GlobalHeader({
 
   const navigateToTab = useCallback(
     (tabName: string, params?: any) => {
-      // Prefer direct tab navigation if we're currently in MainTabs
-      try {
+      // IMPORTANT: navigation.navigate() does not throw if a route is missing; it can silently no-op.
+      // So we explicitly check if the current navigator knows this tab.
+      const state = navigation.getState?.();
+      const routeNames: string[] = Array.isArray(state?.routeNames) ? state.routeNames : [];
+
+      if (routeNames.includes(tabName)) {
         navigation.navigate(tabName, params);
         return;
-      } catch {
-        // ignore
       }
 
-      // Otherwise target the nested tab navigator from the root stack
-      try {
-        navigation.navigate('MainTabs', {
-          screen: tabName,
-          params,
-        });
+      // Otherwise, bubble up to the parent (RootStack) and target MainTabs -> tab.
+      const parent = navigation.getParent?.();
+      if (parent?.navigate) {
+        parent.navigate('MainTabs', { screen: tabName, params });
         return;
-      } catch {
-        // ignore
       }
 
-      try {
-        navigation.getParent?.()?.navigate?.('MainTabs', {
-          screen: tabName,
-          params,
-        });
-      } catch {
-        // ignore
-      }
+      // Last resort: attempt from current nav.
+      navigation.navigate('MainTabs', { screen: tabName, params });
     },
     [navigation]
   );

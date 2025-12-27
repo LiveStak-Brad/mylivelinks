@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
 import type { MainTabsParamList } from '../types/navigation';
@@ -49,15 +50,39 @@ export function ProfileTabScreen({ navigation, route }: Props) {
     void loadOwnUsername();
   }, [resolvedUsername, session?.user?.id]);
 
-  const username = useMemo(() => {
-    return resolvedUsername || 'demo';
-  }, [resolvedUsername]);
+  const isLoggedIn = !!session?.user?.id;
+  const isOwnProfile = (!!topBar.username && !!resolvedUsername && topBar.username === resolvedUsername) || (!routeUsername && isLoggedIn);
 
-  const isOwnProfile = (!!topBar.username && topBar.username === username) || (!routeUsername && !!session?.user?.id);
+  // Prevent rendering a broken ProfileScreen (which will show "Profile Not Found")
+  // while the username is still resolving.
+  if (isLoggedIn && !resolvedUsername) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
+        <Text style={{ marginTop: 8 }}>Loading profile…</Text>
+      </View>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Text>Please log in to view your profile.</Text>
+      </View>
+    );
+  }
+
+  if (!resolvedUsername) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <Text>Profile unavailable.</Text>
+      </View>
+    );
+  }
 
   return (
     <ProfileScreen
-      username={username}
+      username={resolvedUsername}
       isOwnProfile={isOwnProfile}
       apiBaseUrl="https://mylivelinks.com"
       authToken={authToken}

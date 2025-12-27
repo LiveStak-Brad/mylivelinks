@@ -17,6 +17,7 @@ import { getMobileIdentity } from '../lib/mobileIdentity';
 import { getDeviceId, generateSessionId } from '../lib/deviceId';
 import { selectGridParticipants, type ParticipantLite, type SortMode } from '../lib/live';
 import { supabase } from '../lib/supabase';
+import { useAuthContext } from '../contexts/AuthContext';
 
 import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT } from '../lib/livekit-constants';
 
@@ -52,6 +53,7 @@ export function useLiveRoomParticipants(
 ): UseLiveRoomParticipantsReturn {
   const { enabled = false } = options;
   if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked');
+  const { user, getAccessToken } = useAuthContext();
   const [allParticipants, setAllParticipants] = useState<RemoteParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -134,8 +136,7 @@ export function useLiveRoomParticipants(
       // Generate session ID for this connection
       const sessionId = generateSessionId();
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token || null;
+      const accessToken = await getAccessToken();
 
       if (DEBUG) {
         console.log('[TOKEN] Requesting token:', {
@@ -194,8 +195,6 @@ export function useLiveRoomParticipants(
   };
 
   const getAuthContext = useCallback(async () => {
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user || null;
     if (user?.id) {
       myProfileIdRef.current = user.id;
       return {

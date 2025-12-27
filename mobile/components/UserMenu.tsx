@@ -79,11 +79,30 @@ export function UserMenu({
     }
   };
 
+  const navigateToProfileTab = () => {
+    try {
+      // If we're already inside the tab navigator
+      navigation.navigate?.('Profile');
+      return;
+    } catch {
+      // ignore
+    }
+    try {
+      navigation.getParent?.()?.navigate?.('MainTabs', { screen: 'Profile' });
+    } catch {
+      // ignore
+    }
+  };
+
   const handleViewProfile = () => {
     closeMenu();
     if (onNavigateToProfile && topBar.username) {
       onNavigateToProfile(topBar.username);
+      return;
     }
+
+    // Fallback: navigate to Profile tab and let ProfileTabScreen resolve the username
+    navigateToProfileTab();
   };
 
   const handleEditProfile = () => {
