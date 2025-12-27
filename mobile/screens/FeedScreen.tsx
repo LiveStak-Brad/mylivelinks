@@ -10,6 +10,7 @@ import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Feed'>;
 
@@ -135,15 +136,7 @@ export function FeedScreen({ navigation }: Props) {
       return (
         <View style={styles.postCard}>
           <View style={styles.postHeader}>
-            {avatarUri ? (
-              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarLetter}>
-                  {(item.author?.username || 'U').slice(0, 1).toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <Image source={getAvatarSource(avatarUri)} style={styles.avatarImage} />
             <View style={styles.postMeta}>
               <Text style={styles.author} numberOfLines={1}>
                 {item.author?.username || 'Unknown'}

@@ -19,6 +19,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useAutoHideBars } from '../hooks/useAutoHideBars';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 /* =============================================================================
    PROFILE SCREEN v2 - FULL VISUAL PARITY WITH WEB
@@ -520,15 +521,10 @@ export function ProfileScreen({
 
           {/* Avatar */}
           <View style={styles.avatarContainer}>
-            {resolveMediaUrl(profile.avatar_url) ? (
-              <Image source={{ uri: resolveMediaUrl(profile.avatar_url) }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarLetter}>
-                  {profile.username[0].toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <Image 
+              source={getAvatarSource(resolveMediaUrl(profile.avatar_url))} 
+              style={styles.avatar} 
+            />
             {profile.is_live && (
               <View style={styles.liveBadge}>
                 <View style={styles.liveDot} />

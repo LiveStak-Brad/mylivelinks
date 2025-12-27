@@ -16,6 +16,7 @@ import type { MainTabsParamList } from '../types/navigation';
 import { useMessages } from '../hooks/useMessages';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import { resolveMediaUrl } from '../lib/mediaUrl';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Messages'>;
 
@@ -258,18 +259,10 @@ export function MessagesScreen({ navigation: _navigation }: Props) {
               >
                 {/* Avatar */}
                 <View style={styles.avatarContainer}>
-                  {resolveMediaUrl(conv.recipientAvatar ?? null) ? (
-                    <Image
-                      source={{ uri: resolveMediaUrl(conv.recipientAvatar ?? null) as string }}
-                      style={styles.avatarImage}
-                    />
-                  ) : (
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
-                        {conv.recipientUsername?.[0]?.toUpperCase() || '?'}
-                      </Text>
-                    </View>
-                  )}
+                  <Image
+                    source={getAvatarSource(resolveMediaUrl(conv.recipientAvatar ?? null))}
+                    style={styles.avatarImage}
+                  />
                   {/* Unread badge */}
                   {conv.unreadCount > 0 && (
                     <View style={styles.unreadBadge}>

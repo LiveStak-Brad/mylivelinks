@@ -14,6 +14,7 @@ import { PageShell, PageHeader } from '../components/ui';
 import type { MainTabsParamList } from '../types/navigation';
 import { useNoties } from '../hooks/useNoties';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Noties'>;
 
@@ -99,18 +100,10 @@ export function NotiesScreen({ navigation }: Props) {
                 }}
               >
                 <View style={styles.avatarWrap}>
-                  {notie.avatarUrl ? (
-                    <Image
-                      source={{ uri: notie.avatarUrl }}
-                      style={styles.avatarImage}
-                    />
-                  ) : (
-                    <View style={styles.avatarFallback}>
-                      <Text style={styles.avatarFallbackText}>
-                        {notie.avatarFallback || '?'}
-                      </Text>
-                    </View>
-                  )}
+                  <Image
+                    source={getAvatarSource(notie.avatarUrl)}
+                    style={styles.avatarImage}
+                  />
                   <View style={styles.avatarBadge}>
                     <Text style={styles.avatarBadgeText}>
                       {getNotieIcon(notie.type)}
