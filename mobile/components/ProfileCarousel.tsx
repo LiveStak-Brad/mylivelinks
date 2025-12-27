@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { ProfileCard } from './ProfileCard';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 interface Profile {
   id: string;
@@ -28,6 +29,8 @@ interface ProfileCarouselProps {
 export function ProfileCarousel({ title, currentUserId, onProfilePress }: ProfileCarouselProps) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     loadProfiles();
@@ -147,7 +150,7 @@ export function ProfileCarousel({ title, currentUserId, onProfilePress }: Profil
       <View style={styles.container}>
         <Text style={styles.title}>{title}</Text>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#5E9BFF" />
+          <ActivityIndicator size="large" color={theme.colors.accent} />
         </View>
       </View>
     );
@@ -193,31 +196,32 @@ export function ProfileCarousel({ title, currentUserId, onProfilePress }: Profil
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 24,
-  },
-  header: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#9aa0a6',
-  },
-  scrollContent: {
-    paddingHorizontal: 8,
-  },
-  loadingContainer: {
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
-
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    container: {
+      marginBottom: 24,
+    },
+    header: {
+      paddingHorizontal: 16,
+      marginBottom: 16,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: '900',
+      color: theme.colors.textPrimary,
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 13,
+      color: theme.colors.textSecondary,
+    },
+    scrollContent: {
+      paddingHorizontal: 8,
+    },
+    loadingContainer: {
+      height: 200,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
+}

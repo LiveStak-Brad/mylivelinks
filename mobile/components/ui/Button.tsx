@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, TextStyle, ViewStyle } from 'react-native';
+
+import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 type ButtonVariant = 'primary' | 'secondary';
 
@@ -22,7 +24,12 @@ export function Button({
   style,
   textStyle,
 }: ButtonProps) {
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const isDisabled = disabled || loading;
+
+  const textColorStyle = variant === 'secondary' ? styles.textSecondary : styles.textPrimary;
+  const indicatorColor = variant === 'secondary' ? theme.colors.textPrimary : '#fff';
 
   return (
     <Pressable
@@ -37,41 +44,51 @@ export function Button({
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color="#fff" />
-      ) : (
-        <Text style={[styles.text, textStyle]}>{title}</Text>
-      )}
+      {loading ? <ActivityIndicator color={indicatorColor} /> : <Text style={[styles.textBase, textColorStyle, textStyle]}>{title}</Text>}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  primary: {
-    backgroundColor: '#5E9BFF',
-  },
-  secondary: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-  },
-  pressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.99 }],
-  },
-  disabled: {
-    opacity: 0.55,
-  },
-  text: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  const primaryShadow = theme.elevations.card;
+
+  return StyleSheet.create({
+    base: {
+      height: 44,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 18,
+    },
+    primary: {
+      backgroundColor: theme.colors.accent,
+      shadowColor: primaryShadow.color,
+      shadowOpacity: primaryShadow.opacity,
+      shadowRadius: primaryShadow.radius,
+      shadowOffset: primaryShadow.offset,
+      elevation: primaryShadow.elevation,
+    },
+    secondary: {
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    pressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.99 }],
+    },
+    disabled: {
+      opacity: 0.55,
+    },
+    textBase: {
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    textPrimary: {
+      color: '#fff',
+    },
+    textSecondary: {
+      color: theme.colors.textPrimary,
+    },
+  });
+}

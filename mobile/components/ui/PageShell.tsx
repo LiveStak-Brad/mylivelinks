@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { GlobalHeader } from './GlobalHeader';
+import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 type PageShellProps = {
   title?: string;
@@ -41,6 +42,10 @@ export function PageShell({
   onLogout,
   useNewHeader = false,
 }: PageShellProps) {
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const legacyStyles = useMemo(() => createLegacyStyles(theme), [theme]);
+
   return (
     <SafeAreaView style={[styles.container, style]} edges={edges ?? ['top', 'left', 'right', 'bottom']}>
       {useNewHeader ? (
@@ -68,38 +73,43 @@ export function PageShell({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  content: {
-    flex: 1,
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.tokens.backgroundPrimary,
+    },
+    content: {
+      flex: 1,
+      backgroundColor: theme.tokens.backgroundSecondary,
+    },
+  });
+}
 
 // Legacy header styles (to be removed)
-const legacyStyles = StyleSheet.create({
-  container: {
-    height: 56,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: '#000',
-  },
-  side: {
-    width: 72,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  title: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-    maxWidth: '60%',
-    textAlign: 'center',
-  },
-});
+function createLegacyStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    container: {
+      height: 56,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
+    },
+    side: {
+      width: 72,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+    },
+    title: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '900',
+      maxWidth: '60%',
+      textAlign: 'center',
+    },
+  });
+}

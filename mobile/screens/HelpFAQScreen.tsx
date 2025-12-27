@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HelpFAQ'>;
 
@@ -109,6 +110,8 @@ const FAQ_SECTIONS: Section[] = [
 ];
 
 export function HelpFAQScreen({ navigation }: Props) {
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [expandedCategory, setExpandedCategory] = useState<string>('Getting Started');
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
 
@@ -167,89 +170,99 @@ export function HelpFAQScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  headerButton: {
-    height: 36,
-    paddingHorizontal: 12,
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  scroll: {
-    paddingBottom: 24,
-    gap: 12,
-  },
-  pressed: {
-    opacity: 0.9,
-  },
-  section: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  sectionHeader: {
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  sectionHeaderText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  sectionCount: {
-    color: '#9aa0a6',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  sectionBody: {
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  qaItem: {
-    borderLeftWidth: 2,
-    borderLeftColor: 'rgba(255,255,255,0.12)',
-    paddingLeft: 10,
-  },
-  qaHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    paddingVertical: 8,
-  },
-  qaQ: {
-    flex: 1,
-    color: '#e5e7eb',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  qaChevron: {
-    color: '#9aa0a6',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  qaA: {
-    color: '#bdbdbd',
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-    paddingBottom: 8,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingTop: 8,
-  },
-  footerText: {
-    color: '#9aa0a6',
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  const cardShadow = theme.elevations.card;
+  return StyleSheet.create({
+    headerButton: {
+      height: 36,
+      paddingHorizontal: 12,
+    },
+    container: {
+      flex: 1,
+      padding: 16,
+      backgroundColor: theme.tokens.backgroundSecondary,
+    },
+    scroll: {
+      paddingBottom: 24,
+      gap: 12,
+    },
+    pressed: {
+      opacity: 0.9,
+    },
+    section: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 14,
+      overflow: 'hidden',
+      shadowColor: cardShadow.color,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      shadowOffset: cardShadow.offset,
+      elevation: cardShadow.elevation,
+    },
+    sectionHeader: {
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    sectionHeaderText: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    sectionCount: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    sectionBody: {
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      padding: 10,
+      gap: 8,
+    },
+    qaItem: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      padding: 10,
+      backgroundColor: theme.colors.cardAlt,
+    },
+    qaHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    qaQ: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+      flex: 1,
+    },
+    qaChevron: {
+      color: theme.colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    qaA: {
+      marginTop: 8,
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    footer: {
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    footerText: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      textAlign: 'center',
+    },
+  });
+}
+

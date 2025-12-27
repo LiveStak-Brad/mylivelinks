@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { fetchAuthed } from '../lib/api';
+import { useFetchAuthed } from '../hooks/useFetchAuthed';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type RoomCategory = 'gaming' | 'music' | 'entertainment' | 'Gaming' | 'Music' | 'Entertainment';
 type RoomStatus = 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused' | 'coming_soon';
@@ -34,9 +35,12 @@ interface RoomsCarouselProps {
 }
 
 export function RoomsCarousel({ onApplyPress }: RoomsCarouselProps) {
+  const { fetchAuthed } = useFetchAuthed();
   const [rooms, setRooms] = useState<ComingSoonRoom[]>([]);
   const [interestedRoomIds, setInterestedRoomIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     loadRooms();
@@ -61,15 +65,14 @@ export function RoomsCarousel({ onApplyPress }: RoomsCarouselProps) {
   const loadInterests = async () => {
     try {
       const res = await fetchAuthed('/api/rooms/interests');
-      if (res.status === 401) {
-        setInterestedRoomIds(new Set());
+      if (!res.ok) {
+        if (res.status === 401) {
+          setInterestedRoomIds(new Set());
+        }
         return;
       }
-      const json = await res.json();
-      if (res.ok) {
-        const ids = Array.isArray(json?.room_ids) ? (json.room_ids as string[]) : [];
-        setInterestedRoomIds(new Set(ids));
-      }
+      const ids = Array.isArray(res.data?.room_ids) ? (res.data.room_ids as string[]) : [];
+      setInterestedRoomIds(new Set(ids));
     } catch (err) {
       console.error('[ROOMS] interests fetch exception:', err);
     }
@@ -107,36 +110,42 @@ export function RoomsCarousel({ onApplyPress }: RoomsCarouselProps) {
         body: JSON.stringify({ interested: nextInterested }),
       });
 
-      if (res.status === 401) {
-        // Revert
-        setInterestedRoomIds((prev) => {
-          const next = new Set(prev);
-          if (prevInterested) next.add(room.id);
-          else next.delete(room.id);
-          return next;
-        });
-        setRooms((prev) =>
-          prev.map((r) => (r.id === room.id ? { ...r, current_interest_count: prevCount, interest_count: prevCount } : r))
-        );
+      if (!res.ok) {
+        if (res.status === 401) {
+          // Revert
+          setInterestedRoomIds((prev) => {
+            const next = new Set(prev);
+            if (prevInterested) next.add(room.id);
+            else next.delete(room.id);
+            return next;
+          });
+          setRooms((prev) =>
+            prev.map((r) => (r.id === room.id ? { ...r, current_interest_count: prevCount, interest_count: prevCount } : r))
+          );
+        }
         return;
       }
 
-      const json = await res.json();
-      if (res.ok) {
-        setInterestedRoomIds((prev) => {
-          const next = new Set(prev);
-          if (json?.interested) next.add(room.id);
-          else next.delete(room.id);
-          return next;
-        });
-        setRooms((prev) =>
-          prev.map((r) =>
-            r.id === room.id
-              ? { ...r, current_interest_count: json?.current_interest_count ?? optimisticCount, interest_count: json?.current_interest_count ?? optimisticCount }
-              : r
-          )
-        );
-      }
+      const interested = Boolean(res.data?.interested);
+      const currentInterestCount = res.data?.current_interest_count ?? optimisticCount;
+
+      setInterestedRoomIds((prev) => {
+        const next = new Set(prev);
+        if (interested) next.add(room.id);
+        else next.delete(room.id);
+        return next;
+      });
+      setRooms((prev) =>
+        prev.map((r) =>
+          r.id === room.id
+            ? {
+                ...r,
+                current_interest_count: currentInterestCount,
+                interest_count: currentInterestCount,
+              }
+            : r
+        )
+      );
     } catch (err) {
       console.error('[ROOMS] toggle interest exception:', err);
       // Revert on error
@@ -157,7 +166,7 @@ export function RoomsCarousel({ onApplyPress }: RoomsCarouselProps) {
       <View style={styles.container}>
         <Text style={styles.title}>Coming Soon Rooms</Text>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#5E9BFF" />
+          <ActivityIndicator size="large" color={theme.colors.accent} />
         </View>
       </View>
     );
@@ -257,183 +266,191 @@ export function RoomsCarousel({ onApplyPress }: RoomsCarouselProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 24,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
-  titleIcon: {
-    fontSize: 24,
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#9aa0a6',
-    lineHeight: 18,
-  },
-  scrollContent: {
-    paddingHorizontal: 8,
-  },
-  loadingContainer: {
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  roomCard: {
-    width: 260,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    marginHorizontal: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  roomImageContainer: {
-    height: 140,
-    position: 'relative',
-  },
-  roomImage: {
-    width: '100%',
-    height: '100%',
-  },
-  roomGradient: {
-    backgroundColor: '#5E9BFF',
-  },
-  specialBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(255, 215, 0, 0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  specialBadgeText: {
-    color: '#000',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  roomContent: {
-    padding: 12,
-  },
-  roomCategory: {
-    fontSize: 11,
-    color: '#5E9BFF',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  roomName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 6,
-  },
-  roomDescription: {
-    fontSize: 12,
-    color: '#c9c9c9',
-    lineHeight: 16,
-    marginBottom: 12,
-  },
-  progressContainer: {
-    marginBottom: 12,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#5E9BFF',
-    borderRadius: 3,
-  },
-  progressText: {
-    fontSize: 11,
-    color: '#9aa0a6',
-  },
-  interestButton: {
-    backgroundColor: '#5E9BFF',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  interestButtonActive: {
-    backgroundColor: 'rgba(94, 155, 255, 0.3)',
-    borderWidth: 1,
-    borderColor: '#5E9BFF',
-  },
-  interestButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  applyCard: {
-    width: 260,
-    backgroundColor: 'rgba(94, 155, 255, 0.15)',
-    borderRadius: 16,
-    marginHorizontal: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(94, 155, 255, 0.3)',
-  },
-  applyContent: {
-    padding: 16,
-    height: 280,
-    justifyContent: 'space-between',
-  },
-  applyBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  applyBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  applyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  applySubtitle: {
-    fontSize: 13,
-    color: '#c9c9c9',
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  applyButton: {
-    backgroundColor: '#5E9BFF',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  applyButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-});
-
+function createStyles(theme: ThemeDefinition) {
+  const cardShadow = theme.elevations.card;
+  
+  return StyleSheet.create({
+    container: {
+      marginBottom: 24,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingHorizontal: 16,
+      marginBottom: 16,
+      gap: 8,
+    },
+    titleIcon: {
+      fontSize: 24,
+    },
+    headerTextContainer: {
+      flex: 1,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: '900',
+      color: theme.colors.textPrimary,
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 13,
+      color: theme.colors.textSecondary,
+      lineHeight: 18,
+    },
+    scrollContent: {
+      paddingHorizontal: 8,
+    },
+    loadingContainer: {
+      height: 200,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    roomCard: {
+      width: 260,
+      backgroundColor: theme.colors.surfaceCard,
+      borderRadius: 16,
+      marginHorizontal: 8,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: cardShadow.color,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      shadowOffset: cardShadow.offset,
+      elevation: cardShadow.elevation,
+    },
+    roomImageContainer: {
+      height: 140,
+      position: 'relative',
+    },
+    roomImage: {
+      width: '100%',
+      height: '100%',
+    },
+    roomGradient: {
+      backgroundColor: theme.colors.accent,
+    },
+    specialBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: 'rgba(255, 215, 0, 0.9)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    specialBadgeText: {
+      color: '#000',
+      fontSize: 10,
+      fontWeight: '900',
+    },
+    roomContent: {
+      padding: 12,
+    },
+    roomCategory: {
+      fontSize: 11,
+      color: theme.colors.accent,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      marginBottom: 4,
+    },
+    roomName: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.textPrimary,
+      marginBottom: 6,
+    },
+    roomDescription: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+      lineHeight: 16,
+      marginBottom: 12,
+    },
+    progressContainer: {
+      marginBottom: 12,
+    },
+    progressBar: {
+      height: 6,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 3,
+      overflow: 'hidden',
+      marginBottom: 6,
+    },
+    progressFill: {
+      height: '100%',
+      backgroundColor: theme.colors.accent,
+      borderRadius: 3,
+    },
+    progressText: {
+      fontSize: 11,
+      color: theme.colors.textMuted,
+    },
+    interestButton: {
+      backgroundColor: theme.colors.accent,
+      paddingVertical: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    interestButtonActive: {
+      backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(94, 155, 255, 0.3)',
+      borderWidth: 1,
+      borderColor: theme.colors.accent,
+    },
+    interestButtonText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    applyCard: {
+      width: 260,
+      backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(94, 155, 255, 0.15)',
+      borderRadius: 16,
+      marginHorizontal: 8,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(94, 155, 255, 0.3)',
+    },
+    applyContent: {
+      padding: 16,
+      height: 280,
+      justifyContent: 'space-between',
+    },
+    applyBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    applyBadgeText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    applyTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: theme.colors.textPrimary,
+      marginBottom: 8,
+    },
+    applySubtitle: {
+      fontSize: 13,
+      color: theme.colors.textSecondary,
+      lineHeight: 18,
+      marginBottom: 12,
+    },
+    applyButton: {
+      backgroundColor: theme.colors.accent,
+      paddingVertical: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    applyButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+  });
+}

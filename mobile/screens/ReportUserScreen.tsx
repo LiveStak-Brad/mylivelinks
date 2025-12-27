@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ReportUser'>;
 
@@ -22,6 +23,8 @@ const REPORT_REASONS: Reason[] = [
 
 export function ReportUserScreen({ navigation, route }: Props) {
   const { session } = useAuthContext();
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const userId = session?.user?.id ?? null;
 
   const reportedUserId = route.params?.reportedUserId;
@@ -67,6 +70,7 @@ export function ReportUserScreen({ navigation, route }: Props) {
           return;
         }
       } catch {
+        // ignore rate limit RPC failure; continue submit
       }
 
       const insert = await client.from('content_reports').insert({
@@ -130,7 +134,7 @@ export function ReportUserScreen({ navigation, route }: Props) {
             value={details}
             onChangeText={setDetails}
             placeholder="Provide any additional context…"
-            placeholderTextColor="#9aa0a6"
+            placeholderTextColor={theme.colors.textMuted}
             multiline
             style={styles.textArea}
             maxLength={500}
@@ -144,90 +148,98 @@ export function ReportUserScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  headerButton: {
-    height: 36,
-    paddingHorizontal: 12,
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  scroll: {
-    paddingBottom: 24,
-    gap: 14,
-  },
-  pressed: {
-    opacity: 0.9,
-  },
-  note: {
-    color: '#bdbdbd',
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-  },
-  section: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 14,
-    padding: 12,
-    gap: 8,
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  reasonRow: {
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  activeRow: {
-    borderColor: 'rgba(94, 155, 255, 0.50)',
-    backgroundColor: 'rgba(94, 155, 255, 0.10)',
-  },
-  reasonLabel: {
-    flex: 1,
-    color: '#e5e7eb',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  activeText: {
-    color: '#5E9BFF',
-  },
-  muted: {
-    color: '#6b7280',
-  },
-  check: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  textArea: {
-    minHeight: 120,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    color: '#fff',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    textAlignVertical: 'top',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  counter: {
-    color: '#9aa0a6',
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  const cardShadow = theme.elevations.card;
+  return StyleSheet.create({
+    headerButton: {
+      height: 36,
+      paddingHorizontal: 12,
+    },
+    container: {
+      flex: 1,
+      padding: 16,
+      backgroundColor: theme.tokens.backgroundSecondary,
+    },
+    scroll: {
+      paddingBottom: 24,
+      gap: 14,
+    },
+    pressed: {
+      opacity: 0.9,
+    },
+    note: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      fontWeight: '600',
+      lineHeight: 18,
+    },
+    section: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 14,
+      padding: 12,
+      gap: 8,
+      shadowColor: cardShadow.color,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      shadowOffset: cardShadow.offset,
+      elevation: cardShadow.elevation,
+    },
+    sectionTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '900',
+    },
+    reasonRow: {
+      paddingVertical: 10,
+      paddingHorizontal: 10,
+      borderRadius: 12,
+      backgroundColor: theme.colors.cardAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    activeRow: {
+      borderColor: theme.colors.accentSecondary,
+      backgroundColor: theme.colors.highlight,
+    },
+    reasonLabel: {
+      flex: 1,
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    activeText: {
+      color: theme.colors.accentSecondary,
+      fontWeight: '800',
+    },
+    muted: {
+      color: theme.colors.textMuted,
+    },
+    check: {
+      fontSize: 14,
+      fontWeight: '900',
+      color: theme.colors.textMuted,
+    },
+    textArea: {
+      minHeight: 100,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 12,
+      color: theme.colors.textPrimary,
+      backgroundColor: theme.colors.cardAlt,
+      textAlignVertical: 'top',
+    },
+    counter: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      textAlign: 'right',
+    },
+  });
+}
+

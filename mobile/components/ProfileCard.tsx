@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
+import { resolveMediaUrl } from '../lib/mediaUrl';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 interface Profile {
   id: string;
@@ -30,6 +32,8 @@ export function ProfileCard({ profile, currentUserId, onPress, onFollow }: Profi
   const [isFollowing, setIsFollowing] = useState(false);
   const [followsYou, setFollowsYou] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
     if (!currentUserId) return;
@@ -110,8 +114,8 @@ export function ProfileCard({ profile, currentUserId, onPress, onFollow }: Profi
       <View style={styles.header}>
         {/* Avatar */}
         <View style={styles.avatarContainer}>
-          {profile.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+          {resolveMediaUrl(profile.avatar_url) ? (
+            <Image source={{ uri: resolveMediaUrl(profile.avatar_url) as string }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={styles.avatarText}>
@@ -181,136 +185,144 @@ export function ProfileCard({ profile, currentUserId, onPress, onFollow }: Profi
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    width: 280,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    marginHorizontal: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  header: {
-    height: 140,
-    backgroundColor: '#5E9BFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  avatarContainer: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderWidth: 3,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#fff',
-  },
-  liveDot: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#FF4444',
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  liveBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: '#FF4444',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  liveBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  content: {
-    padding: 16,
-  },
-  displayName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 2,
-  },
-  username: {
-    fontSize: 14,
-    color: '#9aa0a6',
-    marginBottom: 8,
-  },
-  bio: {
-    fontSize: 13,
-    color: '#c9c9c9',
-    lineHeight: 18,
-    minHeight: 36,
-    marginBottom: 12,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  followerCount: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  followerCountText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  followerCountLabel: {
-    fontSize: 12,
-    color: '#9aa0a6',
-  },
-  followButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  followButtonDefault: {
-    backgroundColor: '#5E9BFF',
-  },
-  followButtonFollowBack: {
-    backgroundColor: '#5E9BFF',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  followButtonFollowing: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  followButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-});
-
+function createStyles(theme: ThemeDefinition) {
+  const cardShadow = theme.elevations.card;
+  
+  return StyleSheet.create({
+    card: {
+      width: 280,
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 16,
+      marginHorizontal: 8,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: cardShadow.color,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      shadowOffset: cardShadow.offset,
+      elevation: cardShadow.elevation,
+    },
+    header: {
+      height: 140,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+    },
+    avatarContainer: {
+      position: 'relative',
+    },
+    avatar: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      borderWidth: 3,
+      borderColor: '#fff',
+    },
+    avatarPlaceholder: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderWidth: 3,
+      borderColor: '#fff',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      fontSize: 36,
+      fontWeight: '900',
+      color: '#fff',
+    },
+    liveDot: {
+      position: 'absolute',
+      bottom: 4,
+      right: 4,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: '#FF4444',
+      borderWidth: 3,
+      borderColor: '#fff',
+    },
+    liveBadge: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      backgroundColor: '#FF4444',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    liveBadgeText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '900',
+    },
+    content: {
+      padding: 16,
+    },
+    displayName: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.textPrimary,
+      marginBottom: 2,
+    },
+    username: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      marginBottom: 8,
+    },
+    bio: {
+      fontSize: 13,
+      color: theme.colors.textSecondary,
+      lineHeight: 18,
+      minHeight: 36,
+      marginBottom: 12,
+    },
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    followerCount: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 4,
+    },
+    followerCountText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.textPrimary,
+    },
+    followerCountLabel: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+    },
+    followButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+    },
+    followButtonDefault: {
+      backgroundColor: theme.colors.accent,
+    },
+    followButtonFollowBack: {
+      backgroundColor: theme.colors.accent,
+      borderWidth: 2,
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    followButtonFollowing: {
+      backgroundColor: theme.mode === 'light' ? theme.colors.surface : 'rgba(255, 255, 255, 0.15)',
+    },
+    followButtonText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+  });
+}

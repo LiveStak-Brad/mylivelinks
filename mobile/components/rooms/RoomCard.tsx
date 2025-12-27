@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 interface Room {
   id: string;
@@ -34,6 +35,8 @@ interface RoomCardProps {
  */
 export function RoomCard({ room, onPress }: RoomCardProps) {
   const [imageError, setImageError] = useState(false);
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <TouchableOpacity
@@ -110,146 +113,148 @@ export function RoomCard({ room, onPress }: RoomCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    overflow: 'hidden',
-    marginHorizontal: 6,
-    marginBottom: 12,
-    // Shadow for elevation
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  thumbnailContainer: {
-    width: '100%',
-    aspectRatio: 16 / 9, // 16:9 aspect ratio like web
-    backgroundColor: '#2a2a2a',
-    position: 'relative',
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailFallback: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(94, 155, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  thumbnailFallbackIcon: {
-    fontSize: 48,
-    opacity: 0.3,
-  },
-  thumbnailOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0)',
-  },
-  liveBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#dc2626', // red-600
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#fff',
-    // Note: Animated pulse would need Animated API in actual usage
-  },
-  liveText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  viewerBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
-    gap: 4,
-  },
-  viewerIcon: {
-    fontSize: 12,
-  },
-  viewerText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  content: {
-    padding: 12,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  description: {
-    color: '#9aa0a6',
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  badges: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
-  },
-  categoryBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  categoryText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  tagBadge: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  tagText: {
-    color: '#9aa0a6',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  const cardShadow = theme.elevations.card;
 
+  return StyleSheet.create({
+    card: {
+      flex: 1,
+      backgroundColor: theme.colors.surfaceCard,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      overflow: 'hidden',
+      marginHorizontal: 6,
+      marginBottom: 12,
+      shadowColor: cardShadow.color,
+      shadowOffset: cardShadow.offset,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      elevation: cardShadow.elevation,
+    },
+    thumbnailContainer: {
+      width: '100%',
+      aspectRatio: 16 / 9, // 16:9 aspect ratio like web
+      backgroundColor: theme.colors.surface,
+      position: 'relative',
+    },
+    thumbnail: {
+      width: '100%',
+      height: '100%',
+    },
+    thumbnailFallback: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(94, 155, 255, 0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    thumbnailFallbackIcon: {
+      fontSize: 48,
+      opacity: 0.3,
+    },
+    thumbnailOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+    },
+    liveBadge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#dc2626', // red-600
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 16,
+      gap: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    liveDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#fff',
+      // Note: Animated pulse would need Animated API in actual usage
+    },
+    liveText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+    viewerBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 16,
+      gap: 4,
+    },
+    viewerIcon: {
+      fontSize: 12,
+    },
+    viewerText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    content: {
+      padding: 12,
+    },
+    title: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    description: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+      marginBottom: 8,
+    },
+    badges: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginTop: 4,
+    },
+    categoryBadge: {
+      backgroundColor: theme.mode === 'light' ? theme.colors.surface : 'rgba(255, 255, 255, 0.1)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    categoryText: {
+      color: theme.colors.textPrimary,
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    tagBadge: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    tagText: {
+      color: theme.colors.textSecondary,
+      fontSize: 11,
+      fontWeight: '500',
+    },
+  });
+}

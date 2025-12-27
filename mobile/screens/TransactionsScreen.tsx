@@ -2,9 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { fetchAuthed } from '../lib/api';
+import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type Tx = {
   id: string;
@@ -19,6 +20,9 @@ type Tx = {
 type Props = NativeStackScreenProps<RootStackParamList, 'Transactions'>;
 
 export function TransactionsScreen({ navigation }: Props) {
+  const { fetchAuthed } = useFetchAuthed();
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<Tx[]>([]);
@@ -28,18 +32,17 @@ export function TransactionsScreen({ navigation }: Props) {
     setError(null);
     try {
       const res = await fetchAuthed('/api/transactions?limit=50&offset=0', { method: 'GET' });
-      const body = (await res.json().catch(() => null)) as any;
       if (!res.ok) {
-        throw new Error(body?.error || `Failed to load transactions (${res.status})`);
+        throw new Error(res.message || `Failed to load transactions (${res.status})`);
       }
-      setTransactions(Array.isArray(body?.transactions) ? (body.transactions as Tx[]) : []);
+      setTransactions(Array.isArray(res.data?.transactions) ? (res.data.transactions as Tx[]) : []);
     } catch (e: any) {
       setError(e?.message || 'Failed to load transactions');
       setTransactions([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchAuthed]);
 
   useEffect(() => {
     void load();
@@ -54,8 +57,7 @@ export function TransactionsScreen({ navigation }: Props) {
   }, []);
 
   const emptyText = useMemo(() => {
-    if (loading) return null;
-    if (error) return null;
+    if (loading || error) return null;
     return 'No transactions yet.';
   }, [error, loading]);
 
@@ -67,7 +69,7 @@ export function TransactionsScreen({ navigation }: Props) {
     >
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#5E9BFF" />
+          <ActivityIndicator size="large" color={theme.colors.accent} />
           <Text style={styles.mutedText}>Loading…</Text>
         </View>
       ) : error ? (
@@ -108,65 +110,75 @@ export function TransactionsScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  headerButton: {
-    height: 36,
-    paddingHorizontal: 12,
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  mutedText: {
-    color: '#bdbdbd',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  list: {
-    paddingBottom: 24,
-    gap: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 14,
-    padding: 12,
-  },
-  rowLeft: {
-    flex: 1,
-    minWidth: 0,
-  },
-  rowTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  rowSubtitle: {
-    color: '#9aa0a6',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  rowAmount: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  const cardShadow = theme.elevations.card;
+  return StyleSheet.create({
+    headerButton: {
+      height: 36,
+      paddingHorizontal: 12,
+    },
+    container: {
+      flex: 1,
+      padding: 16,
+      backgroundColor: theme.tokens.backgroundSecondary,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+    },
+    mutedText: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    errorText: {
+      color: theme.colors.danger,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    list: {
+      paddingBottom: 24,
+      gap: 10,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 14,
+      padding: 12,
+      shadowColor: cardShadow.color,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      shadowOffset: cardShadow.offset,
+      elevation: cardShadow.elevation,
+    },
+    rowLeft: {
+      flex: 1,
+      minWidth: 0,
+    },
+    rowTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    rowSubtitle: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 2,
+    },
+    rowAmount: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '900',
+    },
+  });
+}
+
