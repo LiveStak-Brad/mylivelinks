@@ -116,14 +116,14 @@ export default function LandingPage() {
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
           {/* Hero Banner */}
-          <div className="mb-12">
+          <div className="mb-12 -mx-4 sm:mx-0">
             <Image
               src="/mylivelinksmeta.png"
               alt="MyLiveLinks - Share your links, Make Posts, Go Live, Get Paid!"
               width={1200}
               height={630}
               priority
-              className="w-full h-auto rounded-3xl shadow-2xl"
+              className="w-full h-auto sm:rounded-3xl shadow-2xl"
             />
           </div>
 

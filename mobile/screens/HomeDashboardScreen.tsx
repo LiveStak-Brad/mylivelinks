@@ -392,6 +392,7 @@ function createStyles(theme: ThemeDefinition) {
     scrollContent: {
       paddingBottom: 32,
       paddingHorizontal: 12,
+      paddingTop: 0,
     },
     heroCard: {
       backgroundColor: 'transparent',
@@ -399,7 +400,8 @@ function createStyles(theme: ThemeDefinition) {
       paddingHorizontal: 0,
       paddingTop: 0,
       paddingBottom: 0,
-      marginHorizontal: 0,
+      marginHorizontal: -12, // Negative margin to offset scrollContent padding
+      marginTop: 0,
       marginBottom: 20,
       shadowColor: 'transparent',
       shadowOpacity: 0,
