@@ -31,6 +31,7 @@ import { supabase } from '../lib/supabase';
 
 const SWIPE_THRESHOLD = 50;
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
+const ROOM_NAME = 'live_central';
 
 type LiveRoomScreenProps = {
   enabled?: boolean;
@@ -112,7 +113,20 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
   } = useLiveRoomUI();
   
   // LiveKit streaming hook
-  const { participants, isConnected, tileCount, room, goLive, stopLive, isLive, isPublishing } = useLiveRoomParticipants({ enabled });
+  const {
+    participants,
+    isConnected,
+    tileCount,
+    room,
+    goLive,
+    stopLive,
+    isLive,
+    isPublishing,
+    lastTokenEndpoint,
+    lastTokenError,
+    lastWsUrl,
+    lastConnectError,
+  } = useLiveRoomParticipants({ enabled });
   const { theme } = useThemeMode();
 
   const setRemoteAudioMuted = useCallback((muted: boolean, focusedIdentity?: string) => {
@@ -207,6 +221,18 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         return;
       }
 
+      if (!isConnected) {
+        const msg = [
+          `TOKEN_ENDPOINT=${lastTokenEndpoint || ''}`,
+          `TOKEN_STATUS=${lastTokenError?.status ?? 'no response'}`,
+          `TOKEN_BODY=${lastTokenError?.bodySnippet || ''}`,
+          `LIVEKIT_WS_URL=${lastWsUrl || ''}`,
+          `CONNECT_ERROR=${lastConnectError || ''}`,
+        ].join('\n');
+        Alert.alert('Live error', msg);
+        return;
+      }
+
       if (isLive) {
         await stopLive();
       } else {
@@ -217,7 +243,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
     } finally {
       goLivePressInFlightRef.current = false;
     }
-  }, [currentUser?.id, goLive, isLive, stopLive]);
+  }, [currentUser?.id, goLive, isConnected, isLive, lastConnectError, lastTokenEndpoint, lastTokenError?.bodySnippet, lastTokenError?.status, lastWsUrl, stopLive]);
 
   const handleGiftPress = useCallback(() => {
     openOverlay('gift');

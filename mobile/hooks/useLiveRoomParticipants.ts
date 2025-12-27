@@ -37,6 +37,13 @@ interface UseLiveRoomParticipantsReturn {
   isPublishing: boolean;
   tileCount: number;
   room: Room | null;
+  connectionError: string | null;
+  tokenDebug: { endpoint: string; status: number | null; bodySnippet: string | null };
+  connectDebug: { wsUrl: string | null; errorMessage: string | null; reachedConnected: boolean };
+  lastTokenEndpoint: string;
+  lastTokenError: { status: number | null; bodySnippet: string; message: string } | null;
+  lastWsUrl: string | null;
+  lastConnectError: string | null;
 }
 
 interface UseLiveRoomParticipantsOptions {
@@ -67,6 +74,20 @@ export function useLiveRoomParticipants(
   const [isConnected, setIsConnected] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [tokenDebug, setTokenDebug] = useState<{ endpoint: string; status: number | null; bodySnippet: string | null }>(() => ({
+    endpoint: TOKEN_ENDPOINT,
+    status: null,
+    bodySnippet: null,
+  }));
+  const [connectDebug, setConnectDebug] = useState<{ wsUrl: string | null; errorMessage: string | null; reachedConnected: boolean }>(() => ({
+    wsUrl: null,
+    errorMessage: null,
+    reachedConnected: false,
+  }));
+  const [lastTokenError, setLastTokenError] = useState<{ status: number | null; bodySnippet: string; message: string } | null>(null);
+  const [lastWsUrl, setLastWsUrl] = useState<string | null>(null);
+  const [lastConnectError, setLastConnectError] = useState<string | null>(null);
   const isLiveRef = useRef(false);
   const isPublishingRef = useRef(false);
   const goLiveInFlightRef = useRef(false);
@@ -77,6 +98,8 @@ export function useLiveRoomParticipants(
   const roomRef = useRef<Room | null>(null);
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
+  const reachedConnectedRef = useRef(false);
+  const lastTokenStatusRef = useRef<number | null>(null);
 
   const livekitModuleRef = useRef<any>(null);
 
@@ -138,6 +161,11 @@ export function useLiveRoomParticipants(
     participantMetadata?: Record<string, any>;
   }): Promise<{ token: string; url: string }> => {
     try {
+      setConnectionError(null);
+      setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: null, bodySnippet: null });
+      setLastTokenError(null);
+      setLastWsUrl(null);
+      setLastConnectError(null);
       // Get stable device ID
       const deviceId = await getDeviceId();
       
@@ -205,12 +233,37 @@ export function useLiveRoomParticipants(
         }),
       });
 
+      lastTokenStatusRef.current = response.status;
+      setTokenDebug(prev => ({ ...prev, status: response.status }));
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || `Token fetch failed: ${response.status}`);
+        const bodyText = await response.text().catch(() => '');
+        const snippet = (bodyText || '').slice(0, 300);
+        setTokenDebug(prev => ({ ...prev, bodySnippet: snippet }));
+
+        setLastTokenError({
+          status: response.status,
+          bodySnippet: snippet,
+          message: `Token fetch failed: ${response.status}`,
+        });
+
+        let message = `Token fetch failed: ${response.status}`;
+        if (response.status === 401 || response.status === 403) {
+          message = 'Auth token missing/expired – Bearer token not being sent or Supabase session invalid';
+          setLastTokenError({
+            status: response.status,
+            bodySnippet: snippet,
+            message,
+          });
+        }
+        setConnectionError(message);
+        throw new Error(message);
       }
 
       const data = await response.json();
+      setTokenDebug(prev => ({ ...prev, bodySnippet: null }));
+
+      setLastWsUrl(data?.url ?? null);
       
       if (DEBUG) {
         console.log('[TOKEN] Fetched successfully:', {
@@ -225,7 +278,16 @@ export function useLiveRoomParticipants(
 
       return data;
     } catch (error: any) {
-      console.error('[TOKEN] Fetch error:', error.message);
+      const msg = error?.message || 'Token fetch error';
+      console.error('[TOKEN] Fetch error:', msg);
+      setTokenDebug(prev => ({ ...prev, status: prev.status ?? 0 }));
+      if (lastTokenStatusRef.current == null) lastTokenStatusRef.current = 0;
+      setConnectionError(prev => prev || 'Network/SSL error calling TOKEN_ENDPOINT');
+      setLastTokenError({
+        status: lastTokenStatusRef.current,
+        bodySnippet: '',
+        message: msg,
+      });
       throw error;
     }
   };
@@ -353,6 +415,8 @@ export function useLiveRoomParticipants(
 
     const connectToRoom = async () => {
       try {
+        reachedConnectedRef.current = false;
+        setConnectDebug({ wsUrl: null, errorMessage: null, reachedConnected: false });
         const livekit = getLivekit();
         const RoomEvent = livekit.RoomEvent;
         const Track = livekit.Track;
@@ -409,6 +473,9 @@ export function useLiveRoomParticipants(
           setIsConnected(true);
           hasConnectedRef.current = true;
           isConnectingRef.current = false;
+          reachedConnectedRef.current = true;
+          setConnectDebug(prev => ({ ...prev, reachedConnected: true }));
+          setConnectionError(null);
           updateParticipants(room);
         });
 
@@ -476,13 +543,39 @@ export function useLiveRoomParticipants(
           url,
         });
         if (DEBUG) console.log('[ROOM] About to call room.connect()');
-        await room.connect(url, token);
+        setConnectDebug({ wsUrl: url, errorMessage: null, reachedConnected: false });
+        try {
+          await room.connect(url, token);
+        } catch (err: any) {
+          const details = [err?.name, err?.message, err?.stack].filter(Boolean).join(' | ').slice(0, 500);
+          setConnectDebug(prev => ({ ...prev, wsUrl: url, errorMessage: details || 'WS connect failed' }));
+          setLastConnectError(details || (err?.message || 'WS connect failed'));
+
+          if (lastTokenStatusRef.current === 0) {
+            setConnectionError('Network/SSL error calling TOKEN_ENDPOINT');
+          } else {
+            setConnectionError('WS connect failed (DNS/SSL/LIVEKIT_URL mismatch)');
+          }
+          throw err;
+        }
         if (DEBUG) console.log('[ROOM] Connected successfully');
 
       } catch (error: any) {
         console.error('[ROOM] Connection error', error);
         isConnectingRef.current = false;
         hasConnectedRef.current = false;
+        if (!lastConnectError) {
+          const details = [error?.name, error?.message, error?.stack].filter(Boolean).join(' | ').slice(0, 500);
+          setLastConnectError(details || (error?.message || 'LiveKit room connection failed'));
+        }
+        if (!reachedConnectedRef.current) {
+          setConnectDebug(prev => ({
+            ...prev,
+            reachedConnected: false,
+            errorMessage: prev.errorMessage || (error?.message || 'LiveKit room connection failed').slice(0, 500),
+          }));
+          setConnectionError(prev => prev || (error?.message || 'LiveKit room connection failed'));
+        }
       }
     };
 
@@ -572,7 +665,7 @@ export function useLiveRoomParticipants(
 
       const room = roomRef.current;
       if (!room || room.state !== 'connected') {
-        throw new Error('LiveKit room not connected');
+        throw new Error(connectionError || 'LiveKit room not connected');
       }
 
       setIsLive(true);
@@ -720,5 +813,15 @@ export function useLiveRoomParticipants(
     isPublishing,
     tileCount: selectedParticipants.length,
     room: roomRef.current,
+    connectionError,
+    tokenDebug,
+    connectDebug: {
+      ...connectDebug,
+      reachedConnected: connectDebug.reachedConnected || reachedConnectedRef.current,
+    },
+    lastTokenEndpoint: TOKEN_ENDPOINT,
+    lastTokenError,
+    lastWsUrl,
+    lastConnectError,
   };
 }
