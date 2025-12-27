@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessLive } from '@/lib/livekit-constants';
 
 // Trim whitespace from environment variables to prevent issues
@@ -64,10 +65,26 @@ export async function POST(request: NextRequest) {
     });
 
     // Create Supabase client with proper route handler support
-    const supabase = createRouteHandlerClient(request);
-    
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    let supabase = createRouteHandlerClient(request);
+
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
+
+    // Get authenticated user (supports cookie auth for web and Bearer token auth for mobile)
+    let user: any = null;
+    let authError: any = null;
+
+    if (bearerToken) {
+      const admin = getSupabaseAdmin();
+      const result = await (admin.auth as any).getUser(bearerToken);
+      user = result?.data?.user || null;
+      authError = result?.error || null;
+      supabase = admin as any;
+    } else {
+      const result = await supabase.auth.getUser();
+      user = result.data?.user || null;
+      authError = result.error || null;
+    }
 
     console.log('Auth result:', {
       hasUser: !!user,

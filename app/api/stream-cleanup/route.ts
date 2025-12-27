@@ -36,10 +36,22 @@ export async function POST(request: Request) {
       }
     );
 
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
+
+    let user: any = null;
+    let authError: any = null;
+
+    if (bearerToken) {
+      const admin = getSupabaseAdmin();
+      const result = await (admin.auth as any).getUser(bearerToken);
+      user = result?.data?.user || null;
+      authError = result?.error || null;
+    } else {
+      const result = await supabase.auth.getUser();
+      user = result.data?.user || null;
+      authError = result.error || null;
+    }
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

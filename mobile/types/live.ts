@@ -45,7 +45,7 @@ export interface RoomStats {
   totalGiftsReceived?: number;
 }
 
-export type OverlayType = 'chat' | 'viewers' | 'menu' | 'stats' | null;
+export type OverlayType = 'chat' | 'viewers' | 'menu' | 'stats' | 'gift' | null;
 
 export interface LiveRoomUIState {
   activeOverlay: OverlayType;

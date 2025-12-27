@@ -10,12 +10,13 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Room, RoomEvent, RemoteParticipant, Track } from 'livekit-client';
+import type { Room, RemoteParticipant } from 'livekit-client';
 import * as SecureStore from 'expo-secure-store';
 import type { Participant } from '../types/live';
 import { getMobileIdentity } from '../lib/mobileIdentity';
 import { getDeviceId, generateSessionId } from '../lib/deviceId';
 import { selectGridParticipants, type ParticipantLite, type SortMode } from '../lib/live';
+import { supabase } from '../lib/supabase';
 
 import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT } from '../lib/livekit-constants';
 
@@ -31,6 +32,8 @@ interface UseLiveRoomParticipantsReturn {
   isConnected: boolean;
   goLive: () => Promise<void>;
   stopLive: () => Promise<void>;
+  isLive: boolean;
+  isPublishing: boolean;
   tileCount: number;
   room: Room | null;
 }
@@ -52,11 +55,37 @@ export function useLiveRoomParticipants(
   const [allParticipants, setAllParticipants] = useState<RemoteParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  
+  const [isLive, setIsLive] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const isLiveRef = useRef(false);
+  const isPublishingRef = useRef(false);
+  const goLiveInFlightRef = useRef(false);
+  const stopLiveInFlightRef = useRef(false);
+  const myProfileIdRef = useRef<string | null>(null);
+
   // Refs to prevent reconnect on rerender
   const roomRef = useRef<Room | null>(null);
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
+
+  const livekitModuleRef = useRef<any>(null);
+
+  const getLivekit = useCallback(() => {
+    if (livekitModuleRef.current) return livekitModuleRef.current;
+    // Ensure encoder/decoder globals exist before loading livekit-client under Hermes
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { TextDecoder, TextEncoder } = require('text-encoding');
+      if ((global as any).TextEncoder == null) (global as any).TextEncoder = TextEncoder;
+      if ((global as any).TextDecoder == null) (global as any).TextDecoder = TextDecoder;
+    } catch {
+      // ignore
+    }
+    // Lazy-load so app boot doesn't evaluate livekit-client unless LiveRoom is entered.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    livekitModuleRef.current = require('livekit-client');
+    return livekitModuleRef.current;
+  }, []);
 
   // Selection engine state (persisted between renders for anti-thrash)
   const currentSelectionRef = useRef<string[]>([]);
@@ -91,7 +120,13 @@ export function useLiveRoomParticipants(
   /**
    * Fetch LiveKit token from server with device/session identifiers
    */
-  const fetchToken = async (identity: string): Promise<{ token: string; url: string }> => {
+  const fetchToken = async (params: {
+    participantName: string;
+    canPublish: boolean;
+    canSubscribe: boolean;
+    role: 'viewer' | 'publisher';
+    participantMetadata?: Record<string, any>;
+  }): Promise<{ token: string; url: string }> => {
     try {
       // Get stable device ID
       const deviceId = await getDeviceId();
@@ -99,13 +134,18 @@ export function useLiveRoomParticipants(
       // Generate session ID for this connection
       const sessionId = generateSessionId();
 
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || null;
+
       if (DEBUG) {
         console.log('[TOKEN] Requesting token:', {
-          identity: identity.substring(0, 8) + '...',
+          participantName: params.participantName,
           deviceType: 'mobile',
           deviceId: deviceId.substring(0, 8) + '...',
           sessionId: sessionId.substring(0, 8) + '...',
-          role: 'viewer',
+          role: params.role,
+          canPublish: params.canPublish,
+          hasAccessToken: !!accessToken,
         });
       }
 
@@ -113,27 +153,18 @@ export function useLiveRoomParticipants(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Note: For mobile anonymous viewers, we may need to handle auth differently
-          // For now, let's try without auth token (server should allow anonymous viewing)
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({
           roomName: ROOM_NAME,
-          userId: identity, // Use mobile identity as userId
-          displayName: 'Mobile User',
           deviceType: 'mobile',
           deviceId,
           sessionId,
-          role: 'viewer',
-          // Legacy fields for backwards compatibility
-          participantName: 'Mobile User',
-          canPublish: false,
-          canSubscribe: true,
-          participantMetadata: {
-            platform: 'mobile',
-            deviceType: 'mobile',
-            deviceId,
-            sessionId,
-          },
+          role: params.role,
+          participantName: params.participantName,
+          canPublish: params.canPublish,
+          canSubscribe: params.canSubscribe,
+          participantMetadata: params.participantMetadata,
         }),
       });
 
@@ -161,6 +192,27 @@ export function useLiveRoomParticipants(
       throw error;
     }
   };
+
+  const getAuthContext = useCallback(async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user || null;
+    if (user?.id) {
+      myProfileIdRef.current = user.id;
+      return {
+        isAuthed: true as const,
+        profileId: user.id,
+      };
+    }
+
+    // Anonymous viewer identity fallback (NOT used for hosting)
+    const anonIdentity = await getMobileIdentity();
+    myProfileIdRef.current = null;
+    return {
+      isAuthed: false as const,
+      profileId: null,
+      anonIdentity,
+    };
+  }, []);
 
   /**
    * Map LiveKit participant to ParticipantLite for selection engine
@@ -247,17 +299,37 @@ export function useLiveRoomParticipants(
 
     const connectToRoom = async () => {
       try {
-        // Get or create stable mobile identity
-        const identity = await getMobileIdentity();
-        setMyIdentity(identity);
+        const livekit = getLivekit();
+        const RoomEvent = livekit.RoomEvent;
+        const Track = livekit.Track;
 
-        // Fetch token
-        const { token, url } = await fetchToken(identity);
+        const authContext = await getAuthContext();
+        if (!authContext.isAuthed || !authContext.profileId) {
+          if (DEBUG) {
+            console.log('[ROOM] Skipping connect (not authenticated)');
+          }
+          isConnectingRef.current = false;
+          hasConnectedRef.current = false;
+          return;
+        }
+        const participantName = authContext.profileId;
+        setMyIdentity(participantName);
+
+        // Fetch token (viewer)
+        const { token, url } = await fetchToken({
+          participantName,
+          canPublish: true,
+          canSubscribe: true,
+          role: 'viewer',
+          participantMetadata: authContext.isAuthed
+            ? { profile_id: authContext.profileId, platform: 'mobile' }
+            : { platform: 'mobile' },
+        });
 
         if (DEBUG) console.log('[ROOM] Creating LiveKit Room instance');
         
         // Create room
-        const room = new Room({
+        const room = new livekit.Room({
           adaptiveStream: true,
           dynacast: true,
           videoCaptureDefaults: {
@@ -276,7 +348,7 @@ export function useLiveRoomParticipants(
           if (DEBUG) {
             console.log('[ROOM] Connected:', {
               room: ROOM_NAME,
-              identity,
+              participantName,
               participants: room.remoteParticipants.size,
             });
           }
@@ -286,7 +358,7 @@ export function useLiveRoomParticipants(
           updateParticipants(room);
         });
 
-        room.on(RoomEvent.Disconnected, (reason) => {
+        room.on(RoomEvent.Disconnected, (reason: unknown) => {
           if (DEBUG) {
             console.log('[ROOM] Disconnected:', reason);
           }
@@ -313,8 +385,8 @@ export function useLiveRoomParticipants(
           updateParticipants(room);
         });
 
-        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-          if (track.kind === Track.Kind.Video) {
+        room.on(RoomEvent.TrackSubscribed, (track: any, publication: any, participant: any) => {
+          if (track?.kind === Track.Kind.Video) {
             if (DEBUG) {
               console.log('[TRACK] Video subscribed:', {
                 participant: participant.identity,
@@ -325,8 +397,8 @@ export function useLiveRoomParticipants(
           }
         });
 
-        room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-          if (track.kind === Track.Kind.Video) {
+        room.on(RoomEvent.TrackUnsubscribed, (track: any, publication: any, participant: any) => {
+          if (track?.kind === Track.Kind.Video) {
             if (DEBUG) {
               console.log('[TRACK] Video unsubscribed:', {
                 participant: participant.identity,
@@ -342,7 +414,7 @@ export function useLiveRoomParticipants(
           console.log('[ROOM] Connecting to:', {
             url: url.substring(0, 30) + '...',
             room: ROOM_NAME,
-            identity,
+            participantName,
           });
         }
 
@@ -431,13 +503,154 @@ export function useLiveRoomParticipants(
   }, [allParticipants, toParticipantLite, sortMode, randomSeed]);
 
   const goLive = async () => {
-    // Not implemented for mobile viewers
-    console.warn('[ROOM] goLive() not implemented for mobile viewers');
+    if (goLiveInFlightRef.current) return;
+    if (isLiveRef.current) return;
+
+    goLiveInFlightRef.current = true;
+    try {
+      const authContext = await getAuthContext();
+      if (!authContext.isAuthed || !authContext.profileId) {
+        throw new Error('Not authenticated');
+      }
+
+      const room = roomRef.current;
+      if (!room || room.state !== 'connected') {
+        throw new Error('LiveKit room not connected');
+      }
+
+      setIsLive(true);
+      isLiveRef.current = true;
+
+      // Upsert live_streams as live
+      const { data: liveStream, error: liveStreamError } = await supabase
+        .from('live_streams')
+        .upsert(
+          {
+            profile_id: authContext.profileId,
+            live_available: true,
+            started_at: new Date().toISOString(),
+          },
+          { onConflict: 'profile_id' }
+        )
+        .select('id')
+        .single();
+
+      if (liveStreamError || !liveStream) {
+        throw new Error(liveStreamError?.message || 'Failed to start live stream');
+      }
+
+      // Ensure user appears in slot 1 for themselves (same schema as web saveGridLayout)
+      await supabase.from('user_grid_slots').delete().eq('viewer_id', authContext.profileId);
+      await supabase.from('user_grid_slots').insert({
+        viewer_id: authContext.profileId,
+        slot_index: 1,
+        streamer_id: authContext.profileId,
+        live_stream_id: liveStream.id,
+        is_pinned: false,
+        is_muted: false,
+        volume: 0.5,
+      });
+
+      // Update LiveKit participant metadata so webhook can identify streamer
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, display_name, avatar_url')
+          .eq('id', authContext.profileId)
+          .single();
+
+        await room.localParticipant.setMetadata(
+          JSON.stringify({
+            profile_id: authContext.profileId,
+            username: profile?.username || 'Anonymous',
+            display_name: profile?.display_name || profile?.username || 'Anonymous',
+            avatar_url: profile?.avatar_url || null,
+            live_stream_id: liveStream.id,
+            platform: 'mobile',
+          })
+        );
+      } catch {
+        // ignore
+      }
+
+      // Enable camera + mic (publishing)
+      setIsPublishing(true);
+      isPublishingRef.current = true;
+      try {
+        await room.localParticipant.setCameraEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(true);
+      } catch (err: any) {
+        setIsPublishing(false);
+        isPublishingRef.current = false;
+        throw new Error(err?.message || 'Failed to publish');
+      }
+    } catch (err) {
+      // rollback local state on failure
+      setIsLive(false);
+      setIsPublishing(false);
+      isLiveRef.current = false;
+      isPublishingRef.current = false;
+      throw err;
+    } finally {
+      goLiveInFlightRef.current = false;
+    }
   };
 
   const stopLive = async () => {
-    // Not implemented for mobile viewers
-    console.warn('[ROOM] stopLive() not implemented for mobile viewers');
+    if (stopLiveInFlightRef.current) return;
+    if (!isLiveRef.current) return;
+
+    stopLiveInFlightRef.current = true;
+    try {
+      const authContext = await getAuthContext();
+      if (!authContext.isAuthed || !authContext.profileId) {
+        throw new Error('Not authenticated');
+      }
+
+      const room = roomRef.current;
+      if (room && room.state === 'connected') {
+        try {
+          await room.localParticipant.setCameraEnabled(false);
+          await room.localParticipant.setMicrophoneEnabled(false);
+        } catch {
+          // ignore
+        }
+      }
+
+      // Update DB state first
+      await supabase
+        .from('live_streams')
+        .update({ live_available: false, ended_at: new Date().toISOString() })
+        .eq('profile_id', authContext.profileId);
+
+      await supabase.from('user_grid_slots').delete().eq('streamer_id', authContext.profileId);
+
+      // Service-role cleanup (same endpoint as web)
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token || null;
+        const cleanupUrl = process.env.EXPO_PUBLIC_API_URL
+          ? `${process.env.EXPO_PUBLIC_API_URL}/api/stream-cleanup`
+          : 'https://mylivelinks.com/api/stream-cleanup';
+
+        await fetch(cleanupUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: JSON.stringify({ action: 'end_stream', reason: 'mobile_stop_button' }),
+        });
+      } catch {
+        // ignore
+      }
+    } finally {
+      setIsPublishing(false);
+      setIsLive(false);
+      isPublishingRef.current = false;
+      isLiveRef.current = false;
+      stopLiveInFlightRef.current = false;
+    }
   };
 
   return {
@@ -446,6 +659,8 @@ export function useLiveRoomParticipants(
     isConnected,
     goLive,
     stopLive,
+    isLive,
+    isPublishing,
     tileCount: selectedParticipants.length,
     room: roomRef.current,
   };
