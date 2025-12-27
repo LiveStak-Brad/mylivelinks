@@ -10,7 +10,7 @@
       "distribution": "internal",
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
-        "simulator": true
+        "simulator": false
       },
       "env": {
         "EXPO_PUBLIC_DEBUG_LIVE": "1",
