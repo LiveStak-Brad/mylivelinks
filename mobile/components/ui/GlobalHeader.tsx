@@ -60,12 +60,21 @@ export function GlobalHeader({
           </Pressable>
           
           {/* Rooms Video Icon (Red) */}
-          <Pressable 
-            style={styles.iconButton}
-            onPress={onNavigateToRooms}
-          >
-            <Feather name="video" size={24} color="#f44336" />
-          </Pressable>
+          {onNavigateToRooms ? (
+            <Pressable 
+              style={styles.iconButton}
+              onPress={() => {
+                console.log('[GlobalHeader] Rooms button pressed, onNavigateToRooms:', !!onNavigateToRooms);
+                onNavigateToRooms();
+              }}
+            >
+              <Feather name="video" size={24} color="#f44336" />
+            </Pressable>
+          ) : (
+            <View style={[styles.iconButton, { opacity: 0.3 }]}>
+              <Feather name="video" size={24} color="#f44336" />
+            </View>
+          )}
         </View>
 
         {/* Center Section: Logo */}
