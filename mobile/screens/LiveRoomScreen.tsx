@@ -441,9 +441,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', // Side by side columns
   },
   
-  // LEFT COLUMN (Back + GO LIVE) - MINIMAL WIDTH
+  // LEFT COLUMN (Back + GO LIVE) - BUTTON + SAFE AREA SPACE
   leftColumn: {
-    width: 44, // Exact button size, no extra space
+    width: 60, // Button (44px) + safe area padding (8-16px)
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#000', // Opaque background
@@ -457,9 +457,9 @@ const styles = StyleSheet.create({
     zIndex: 1, // Below controls
   },
   
-  // RIGHT COLUMN (Gift + PiP + Share) - MINIMAL WIDTH
+  // RIGHT COLUMN (Gift + PiP + Share) - BUTTON + SAFE AREA SPACE
   rightColumn: {
-    width: 44, // Exact button size, no extra space
+    width: 60, // Button (44px) + safe area padding (8-16px)
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#000', // Opaque background
