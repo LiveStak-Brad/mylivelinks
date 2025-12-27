@@ -6,6 +6,8 @@ import RoomCard from './RoomCard';
 import RoomPreviewModal from './RoomPreviewModal';
 import Image from 'next/image';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase';
+import { isLiveOwnerUser } from '@/lib/livekit-constants';
 
 type RoomCategory = 'gaming' | 'music' | 'entertainment' | 'Gaming' | 'Music' | 'Entertainment';
 type RoomStatus = 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused' | 'coming_soon';
@@ -32,6 +34,8 @@ export default function RoomsCarousel() {
   const [interestedRoomIds, setInterestedRoomIds] = useState<Set<string>>(new Set());
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const supabase = createClient();
 
   const selectedRoom = useMemo(() => {
     if (!selectedRoomId || !rooms) return null;
@@ -40,6 +44,13 @@ export default function RoomsCarousel() {
 
   useEffect(() => {
     let cancelled = false;
+
+    const checkOwner = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!cancelled && user) {
+        setIsOwner(isLiveOwnerUser({ id: user.id, email: user.email }));
+      }
+    };
 
     const loadRooms = async () => {
       try {
@@ -77,6 +88,7 @@ export default function RoomsCarousel() {
       }
     };
 
+    checkOwner();
     loadRooms();
     loadInterests();
 
@@ -217,31 +229,67 @@ export default function RoomsCarousel() {
           <div className="flex-shrink-0 w-0.5 md:w-1" />
           
           {/* Live Central Featured Card */}
-          <Link
-            href="/live"
-            className="
-              group relative flex-shrink-0 w-[320px] md:w-[380px] 
-              rounded-2xl overflow-hidden cursor-pointer
-              transition-all duration-300 ease-out
-              hover:scale-[1.03] hover:shadow-2xl hover:shadow-red-500/30
-              border-2 border-red-500/50 hover:border-red-500
-            "
-          >
-            <div className="relative h-[200px] md:h-[220px]">
-              <Image
-                src="/livecentralmeta.png"
-                alt="Live Central"
-                fill
-                className="object-cover"
-                priority
-              />
-              {/* Live Badge */}
-              <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-red-500 flex items-center gap-1.5 animate-pulse">
-                <div className="w-2 h-2 rounded-full bg-white" />
-                <span className="text-xs font-bold text-white">LIVE NOW</span>
+          {isOwner ? (
+            <Link
+              href="/live"
+              className="
+                group relative flex-shrink-0 w-[320px] md:w-[380px] 
+                rounded-2xl overflow-hidden cursor-pointer
+                transition-all duration-300 ease-out
+                hover:scale-[1.03] hover:shadow-2xl hover:shadow-red-500/30
+                border-2 border-red-500/50 hover:border-red-500
+              "
+            >
+              <div className="relative h-[200px] md:h-[220px]">
+                <Image
+                  src="/livecentralmeta.png"
+                  alt="Live Central"
+                  fill
+                  className="object-cover"
+                  priority
+                />
+                {/* Owner Badge */}
+                <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-red-500 flex items-center gap-1.5 animate-pulse">
+                  <div className="w-2 h-2 rounded-full bg-white" />
+                  <span className="text-xs font-bold text-white">LIVE NOW</span>
+                </div>
+              </div>
+            </Link>
+          ) : (
+            <div
+              className="
+                relative flex-shrink-0 w-[320px] md:w-[380px] 
+                rounded-2xl overflow-hidden
+                border-2 border-yellow-500/50
+                bg-card
+              "
+            >
+              <div className="relative h-[200px] md:h-[220px]">
+                <Image
+                  src="/livecentralmeta.png"
+                  alt="Live Central - Coming Soon"
+                  fill
+                  className="object-cover opacity-60"
+                  priority
+                />
+                {/* Coming Soon Badge */}
+                <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-yellow-500 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-white" />
+                  <span className="text-xs font-bold text-white">COMING SOON</span>
+                </div>
+                {/* Overlay Text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 p-4">
+                  <h3 className="text-xl font-bold text-white text-center mb-2">Live Central</h3>
+                  <p className="text-sm text-white/90 text-center">
+                    Watch up to 12 creators streaming live at once!
+                  </p>
+                  <p className="text-xs text-yellow-300 text-center mt-2">
+                    Opening soon for all users
+                  </p>
+                </div>
               </div>
             </div>
-          </Link>
+          )}
           
           {(rooms ?? []).map((room) => (
             <RoomCard
