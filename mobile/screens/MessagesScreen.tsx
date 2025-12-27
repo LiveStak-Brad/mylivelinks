@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-import { PageShell } from '../components/ui';
+import { PageShell, PageHeader } from '../components/ui';
 import type { MainTabsParamList } from '../types/navigation';
 import { useMessages } from '../hooks/useMessages';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
@@ -22,12 +22,13 @@ type Props = BottomTabScreenProps<MainTabsParamList, 'Messages'>;
 /**
  * MESSAGES SCREEN - Mobile parity with web
  * 
- * Matches web app/messages/page.tsx layout:
- * - List of conversations with avatars, names, preview text, timestamps
- * - Unread indicators (badges)
- * - Empty state when no messages
- * - Search functionality
- * - Tap to open conversation thread
+ * Structure:
+ * - Global top bar (hamburger, logo, avatar)
+ * - Page header: 💬 Messys (NO subtitle, NO "Messages")
+ * - Search bar
+ * - Conversations list OR thread view
+ * 
+ * Naming: "Messys" everywhere, never "Messages"
  */
 export function MessagesScreen({ navigation: _navigation }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,7 +63,7 @@ export function MessagesScreen({ navigation: _navigation }: Props) {
   if (activeConversationId) {
     return (
       <PageShell
-        title={activeConversation?.recipientDisplayName || activeConversation?.recipientUsername || 'Messages'}
+        title={activeConversation?.recipientDisplayName || activeConversation?.recipientUsername || 'Messys'}
         contentStyle={styles.container}
         left={
           <Pressable
@@ -196,7 +197,18 @@ export function MessagesScreen({ navigation: _navigation }: Props) {
   }
 
   return (
-    <PageShell title="Messages" contentStyle={styles.container}>
+    <PageShell 
+      contentStyle={styles.container}
+      useNewHeader
+      onNavigateHome={() => _navigation.navigate('Home')}
+      onNavigateToProfile={(username) => {
+        _navigation.navigate('Profile', { username });
+      }}
+      onNavigateToRooms={() => _navigation.navigate('Rooms')}
+    >
+      {/* Page Header: MessageCircle icon + Messys */}
+      <PageHeader icon="message-circle" iconColor="#00a8ff" title="Messys" />
+
       <View style={styles.content}>
         {/* Search Bar - matches web */}
         <View style={styles.searchContainer}>

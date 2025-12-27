@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Image } from 'react-native';
 
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { emitTopBarRefresh } from './topbar/useTopBarState';
+import { fetchAuthed } from '../lib/api';
+import { generateSessionId } from '../lib/deviceId';
 
 /**
  * useMessages Hook - Mobile parity with web
@@ -23,6 +26,25 @@ export interface Conversation {
   unreadCount: number;
 }
 
+function encodeGiftContent(gift: { giftId: number; giftName: string; giftCoins: number; giftIcon?: string }) {
+  return `__gift__:${JSON.stringify(gift)}`;
+}
+
+function encodeImageContent(image: { url: string; mime: string; width?: number; height?: number }) {
+  return `__img__:${JSON.stringify(image)}`;
+}
+
+function getImageDimensions(uri: string): Promise<{ width?: number; height?: number }> {
+  return new Promise((resolve) => {
+    if (!uri) return resolve({});
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      () => resolve({})
+    );
+  });
+}
+
 export interface Message {
   id: string;
   senderId: string;
@@ -30,13 +52,57 @@ export interface Message {
   type: 'text' | 'gift' | 'image';
   timestamp: Date;
   status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  giftId?: number;
   giftName?: string;
   giftCoins?: number;
+  giftIcon?: string;
   imageUrl?: string;
+  imageMime?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  error?: string;
+}
+
+function decodeIMContent(
+  content: string
+):
+  | { type: 'text'; text: string }
+  | { type: 'gift'; giftId?: number; giftName?: string; giftCoins?: number; giftIcon?: string }
+  | { type: 'image'; url?: string; mime?: string; width?: number; height?: number } {
+  if (typeof content !== 'string') return { type: 'text', text: '' };
+  if (content.startsWith('__img__:')) {
+    try {
+      const raw = content.slice('__img__:'.length);
+      const parsed = JSON.parse(raw);
+      return {
+        type: 'image',
+        url: typeof parsed?.url === 'string' ? parsed.url : undefined,
+        mime: typeof parsed?.mime === 'string' ? parsed.mime : undefined,
+        width: typeof parsed?.width === 'number' ? parsed.width : undefined,
+        height: typeof parsed?.height === 'number' ? parsed.height : undefined,
+      };
+    } catch {
+      return { type: 'text', text: '' };
+    }
+  }
+  if (!content.startsWith('__gift__:')) return { type: 'text', text: content };
+  try {
+    const raw = content.slice('__gift__:'.length);
+    const parsed = JSON.parse(raw);
+    return {
+      type: 'gift',
+      giftId: typeof parsed?.giftId === 'number' ? parsed.giftId : undefined,
+      giftName: typeof parsed?.giftName === 'string' ? parsed.giftName : undefined,
+      giftCoins: typeof parsed?.giftCoins === 'number' ? parsed.giftCoins : undefined,
+      giftIcon: typeof parsed?.giftIcon === 'string' ? parsed.giftIcon : undefined,
+    };
+  } catch {
+    return { type: 'text', text: content };
+  }
 }
 
 export function useMessages() {
-  const { user } = useAuthContext();
+  const { user, getAccessToken } = useAuthContext();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,17 +139,27 @@ export function useMessages() {
 
       const rows = Array.isArray(data) ? data : [];
       
-      const convos: Conversation[] = rows.map((r: any) => ({
-        id: String(r.other_user_id),
-        recipientId: String(r.other_user_id),
-        recipientUsername: String(r.other_username ?? 'Unknown'),
-        recipientAvatar: r.other_avatar_url ?? undefined,
-        recipientDisplayName: r.other_display_name ?? undefined,
-        isOnline: false, // Simplified for mobile
-        lastMessage: String(r.last_message ?? ''),
-        lastMessageAt: r.last_message_at ? new Date(r.last_message_at) : new Date(),
-        unreadCount: Number(r.unread_count ?? 0),
-      }));
+      const convos: Conversation[] = rows.map((r: any) => {
+        const decoded = decodeIMContent(String(r.last_message ?? ''));
+        const lastMessageText =
+          decoded.type === 'gift'
+            ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
+            : decoded.type === 'image'
+              ? '📷 Photo'
+              : decoded.text;
+
+        return {
+          id: String(r.other_user_id),
+          recipientId: String(r.other_user_id),
+          recipientUsername: String(r.other_username ?? 'Unknown'),
+          recipientAvatar: r.other_avatar_url ?? undefined,
+          recipientDisplayName: r.other_display_name ?? undefined,
+          isOnline: false,
+          lastMessage: lastMessageText,
+          lastMessageAt: r.last_message_at ? new Date(r.last_message_at) : new Date(),
+          unreadCount: Number(r.unread_count ?? 0),
+        };
+      });
 
       setConversations(convos);
     } catch (error) {
@@ -115,14 +191,52 @@ export function useMessages() {
         const rows = Array.isArray(data) ? data : [];
         const ordered = [...rows].reverse();
         
-        const mapped: Message[] = ordered.map((r: any) => ({
-          id: String(r.id),
-          senderId: String(r.sender_id),
-          content: String(r.content ?? ''),
-          type: 'text', // Simplified for mobile
-          timestamp: r.created_at ? new Date(r.created_at) : new Date(),
-          status: 'sent',
-        }));
+        const mapped: Message[] = ordered.map((r: any) => {
+          const senderId = String(r.sender_id);
+          const readAt = r.read_at ? new Date(r.read_at) : null;
+          const decoded = decodeIMContent(String(r.content ?? ''));
+          const timestamp = r.created_at ? new Date(r.created_at) : new Date();
+          const status = senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered';
+
+          if (decoded.type === 'gift') {
+            return {
+              id: String(r.id),
+              senderId,
+              content: '',
+              type: 'gift',
+              giftId: decoded.giftId,
+              giftName: decoded.giftName,
+              giftIcon: decoded.giftIcon,
+              giftCoins: decoded.giftCoins,
+              timestamp,
+              status,
+            };
+          }
+
+          if (decoded.type === 'image') {
+            return {
+              id: String(r.id),
+              senderId,
+              content: '',
+              type: 'image',
+              imageUrl: decoded.url,
+              imageMime: decoded.mime,
+              imageWidth: decoded.width,
+              imageHeight: decoded.height,
+              timestamp,
+              status,
+            };
+          }
+
+          return {
+            id: String(r.id),
+            senderId,
+            content: decoded.text,
+            type: 'text',
+            timestamp,
+            status,
+          };
+        });
         
         setMessages(mapped);
       } catch (error) {
@@ -164,6 +278,206 @@ export function useMessages() {
       }
     },
     [currentUserId, activeConversationId, loadConversations, loadMessages]
+  );
+
+  const sendGift = useCallback(
+    async (
+      recipientId: string,
+      giftId: number,
+      giftName: string,
+      giftCoins: number,
+      giftIcon?: string
+    ): Promise<boolean> => {
+      const client = supabase;
+      if (!client) return false;
+      if (!currentUserId) return false;
+      if (!recipientId) return false;
+
+      const accessToken = await getAccessToken();
+      const requestId = generateSessionId();
+      const tempId = `temp-gift-${Date.now()}`;
+
+      const placeholder: Message = {
+        id: tempId,
+        senderId: currentUserId,
+        content: '',
+        type: 'gift',
+        giftId,
+        giftName,
+        giftCoins,
+        giftIcon,
+        timestamp: new Date(),
+        status: 'sending',
+      };
+
+      setMessages((prev) => [...prev, placeholder]);
+
+      try {
+        const res = await fetchAuthed(
+          '/api/gifts/send',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              toUserId: recipientId,
+              coinsAmount: giftCoins,
+              giftTypeId: giftId,
+              context: 'dm',
+              requestId,
+            }),
+          },
+          accessToken
+        );
+
+        if (!res.ok) {
+          throw new Error(res.message || 'Failed to send gift');
+        }
+
+        const giftContent = encodeGiftContent({
+          giftId,
+          giftName,
+          giftCoins,
+          giftIcon,
+        });
+
+        const { data: imRow, error: imErr } = await client
+          .from('instant_messages')
+          .insert({
+            sender_id: currentUserId,
+            recipient_id: recipientId,
+            content: giftContent,
+          })
+          .select('id, created_at')
+          .single();
+
+        if (imErr) throw imErr;
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  id: String((imRow as any)?.id ?? tempId),
+                  timestamp: (imRow as any)?.created_at ? new Date((imRow as any).created_at) : m.timestamp,
+                  status: 'sent',
+                }
+              : m
+          )
+        );
+
+        await loadConversations();
+        emitTopBarRefresh();
+        return true;
+      } catch (error) {
+        const errText = error instanceof Error ? error.message : 'Failed to send gift';
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: 'failed', error: errText } : m)));
+        return false;
+      }
+    },
+    [currentUserId, getAccessToken, loadConversations]
+  );
+
+  const sendImage = useCallback(
+    async (recipientId: string, uri: string, mimeType: string): Promise<boolean> => {
+      const client = supabase;
+      if (!client) return false;
+      if (!currentUserId) return false;
+      if (!recipientId) return false;
+      if (!uri) return false;
+      if (!mimeType || !mimeType.startsWith('image/')) return false;
+
+      const accessToken = await getAccessToken();
+      const tempId = `temp-image-${Date.now()}`;
+      const now = new Date();
+
+      const placeholder: Message = {
+        id: tempId,
+        senderId: currentUserId,
+        content: '',
+        type: 'image',
+        imageUrl: uri,
+        imageMime: mimeType,
+        timestamp: now,
+        status: 'sending',
+      };
+
+      setMessages((prev) => [...prev, placeholder]);
+
+      try {
+        const dims = await getImageDimensions(uri);
+
+        const uploadPrep = await fetchAuthed(
+          '/api/messages/upload-url',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mimeType, otherProfileId: recipientId }),
+          },
+          accessToken
+        );
+
+        if (!uploadPrep.ok) {
+          throw new Error(uploadPrep.message || 'Failed to prepare upload');
+        }
+
+        const bucket = String((uploadPrep.data as any)?.bucket || '');
+        const path = String((uploadPrep.data as any)?.path || '');
+        const token = String((uploadPrep.data as any)?.token || '');
+        const publicUrl = String((uploadPrep.data as any)?.publicUrl || '');
+        if (!bucket || !path || !token || !publicUrl) {
+          throw new Error('Upload response missing required fields');
+        }
+
+        const blob = await fetch(uri).then((r) => r.blob());
+        const { error: uploadErr } = await client.storage.from(bucket).uploadToSignedUrl(path, token, blob, {
+          contentType: mimeType,
+        });
+        if (uploadErr) throw uploadErr;
+
+        const content = encodeImageContent({
+          url: publicUrl,
+          mime: mimeType,
+          width: dims.width,
+          height: dims.height,
+        });
+
+        const { data: imRow, error: imErr } = await client
+          .from('instant_messages')
+          .insert({
+            sender_id: currentUserId,
+            recipient_id: recipientId,
+            content,
+          })
+          .select('id, created_at')
+          .single();
+        if (imErr) throw imErr;
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId
+              ? {
+                  ...m,
+                  id: String((imRow as any)?.id ?? tempId),
+                  imageUrl: publicUrl,
+                  imageWidth: dims.width,
+                  imageHeight: dims.height,
+                  timestamp: (imRow as any)?.created_at ? new Date((imRow as any).created_at) : m.timestamp,
+                  status: 'sent',
+                }
+              : m
+          )
+        );
+
+        await loadConversations();
+        emitTopBarRefresh();
+        return true;
+      } catch (error) {
+        const errText = error instanceof Error ? error.message : 'Failed to send image';
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: 'failed', error: errText } : m)));
+        return false;
+      }
+    },
+    [currentUserId, getAccessToken, loadConversations]
   );
 
   const markConversationRead = useCallback(
@@ -220,6 +534,8 @@ export function useMessages() {
     setActiveConversationId,
     messages,
     sendMessage,
+    sendGift,
+    sendImage,
     markConversationRead,
     refreshConversations: loadConversations,
     currentUserId,

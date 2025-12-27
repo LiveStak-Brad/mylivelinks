@@ -16,7 +16,7 @@ Extended the production-ready MyLiveLinks schema with:
 
 **Changes:**
 - Added `gifter_level` to `profiles` table
-- Added `asset_type` to `coin_ledger` (coin/diamond)
+- Added `asset_type` to `ledger_entries` (coin/diamond)
 - Created `diamond_conversions` table
 - Created `gifter_levels` config table (11 default levels)
 - Updated `gifts` table with `diamond_amount` field
@@ -141,7 +141,7 @@ Extended the production-ready MyLiveLinks schema with:
    - Added: `gifter_level` (cached level)
    - `earnings_balance` = diamond balance (renamed in docs)
 
-2. **`coin_ledger`**
+2. **`ledger_entries`**
    - Added: `asset_type` ('coin' or 'diamond')
    - Updated: `type` enum includes conversion types
 

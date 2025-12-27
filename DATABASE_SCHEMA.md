@@ -23,7 +23,7 @@ This schema supports a production-grade group live streaming platform with:
 ```
 auth.users (Supabase) ──< (1) profiles (PRIMARY USER TABLE)
 profiles (1) ──< (1) live_streams
-profiles (1) ──< (*) coin_ledger (source of truth for balances)
+profiles (1) ──< (*) ledger_entries (source of truth for balances)
 profiles (1) ──< (*) coin_purchases
 profiles (1) ──< (*) gifts (as sender)
 profiles (1) ──< (*) gifts (as recipient)
@@ -38,8 +38,8 @@ live_streams (1) ──< (*) video_boxes
 video_boxes (1) ──< (*) box_viewers (SOURCE OF TRUTH for is_published)
 
 gift_types (1) ──< (*) gifts
-coin_purchases (1) ──< (*) coin_ledger
-gifts (1) ──< (*) coin_ledger
+coin_purchases (1) ──< (*) ledger_entries
+gifts (1) ──< (*) ledger_entries
 ```
 
 ---
@@ -58,7 +58,7 @@ gifts (1) ──< (*) coin_ledger
 - `follower_count` - Cached follower count (updated via trigger)
 - `total_gifts_received` - Lifetime gifts received (coins) - BIGINT
 - `total_gifts_sent` - Lifetime gifts sent (coins) - BIGINT
-- `coin_balance` - **Cached** spendable coin balance (BIGINT) - source of truth is `coin_ledger`
+- `coin_balance` - **Cached** spendable coin balance (BIGINT) - source of truth is `ledger_entries`
 - `earnings_balance` - **Separate** earnings from gifts (BIGINT) - may convert to spendable per policy
 - `total_purchased` - Lifetime coins purchased (BIGINT)
 - `total_spent` - Lifetime coins spent (BIGINT)
@@ -155,7 +155,7 @@ Tracks which users are currently watching which video boxes.
 
 ---
 
-### 5. `coin_ledger` ⚠️ **CRITICAL - SOURCE OF TRUTH**
+### 5. `ledger_entries` ⚠️ **CRITICAL - SOURCE OF TRUTH**
 Immutable transaction log for all coin movements.
 
 **Purpose:** **Source of truth** for coin balances. All coin movements go through this table. `profiles.coin_balance` is cached and updated only via `update_coin_balance_via_ledger()` RPC.
@@ -429,7 +429,7 @@ Pre-computed leaderboard data for fast display.
 ### Coin Balance Management
 
 1. **Never update `profiles.coin_balance` directly** - always use `update_coin_balance_via_ledger()`
-2. **Ledger is source of truth** - balance computed as `SUM(amount)` from `coin_ledger`
+2. **Ledger is source of truth** - balance computed as `SUM(amount)` from `ledger_entries`
 3. **Cached balance** - `profiles.coin_balance` is cached for performance
 4. **Separate earnings** - `earnings_balance` is separate from `coin_balance` for clean accounting
 
@@ -454,7 +454,7 @@ All coin-related fields use BIGINT:
 - `total_gifts_received`, `total_gifts_sent`
 - `coin_amount`, `platform_revenue`, `streamer_revenue`
 - `coin_cost` in gift_types
-- `amount` in coin_ledger
+- `amount` in ledger_entries
 
 This supports whale-level balances (millions of coins per user).
 
@@ -466,7 +466,7 @@ This supports whale-level balances (millions of coins per user).
 2. **Read Replicas:** Leaderboard queries can use read replicas
 3. **Caching:** Leaderboard cache table reduces database load
 4. **Archiving:** Old chat messages can be archived to cold storage after 30 days
-5. **Ledger Performance:** Index `coin_ledger` by `profile_id` and `created_at` for fast balance queries
+5. **Ledger Performance:** Index `ledger_entries` by `profile_id` and `created_at` for fast balance queries
 
 ---
 
@@ -488,7 +488,7 @@ If migrating from the previous schema:
 1. **Create `profiles` table** with UUID primary key referencing `auth.users.id`
 2. **Migrate user data** from old `users` table to `profiles`
 3. **Update all foreign keys** to reference `profiles.id` (UUID) instead of `users.id` (BIGINT)
-4. **Create `coin_ledger` table** and backfill from existing `coins` table
+4. **Create `ledger_entries` table** and backfill from existing `coins` table
 5. **Add idempotency fields** to `coin_purchases` (`provider_event_id`, `provider_payment_id`)
 6. **Update RPC functions** to use ledger-based balance updates
 7. **Add `earnings_balance`** to `profiles` table

@@ -115,18 +115,18 @@ export default function LandingPage() {
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
-          {/* Welcome Message */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-4">
-              Welcome to MyLiveLinks
-            </h1>
-            <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-2">
-              Your all-in-one platform for live streaming and link sharing
-            </p>
-            <p className="text-base sm:text-lg text-white/80 flex items-center justify-center gap-2">
-              Stream live, share your links, and build your community
-              <Sparkles className="w-5 h-5" />
-            </p>
+          {/* Hero Banner */}
+          <div className="mb-12">
+            <div className="relative w-full max-w-3xl mx-auto rounded-3xl overflow-hidden shadow-2xl">
+              <Image
+                src="/mylivelinksmeta.png"
+                alt="MyLiveLinks - Share your links, Make Posts, Go Live, Get Paid!"
+                width={1200}
+                height={630}
+                priority
+                className="w-full h-auto"
+              />
+            </div>
           </div>
 
           {/* Search Bar */}

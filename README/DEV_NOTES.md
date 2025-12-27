@@ -394,7 +394,7 @@ This file tracks ongoing development decisions, TODOs, questions answered, and i
 - Audit trail
 - Idempotent operations
 
-**Implementation:** `coin_ledger` table is source of truth. `profiles.coin_balance` is cached.
+**Implementation:** `ledger_entries` table is source of truth. `profiles.coin_balance` is cached.
 
 **Status:** ✅ Implemented
 

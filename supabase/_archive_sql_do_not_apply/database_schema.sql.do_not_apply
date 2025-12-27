@@ -1,0 +1,855 @@
+-- ============================================================================
+-- MyLiveLinks Database Schema
+-- Production-Grade Group Live Streaming Platform
+-- Supabase-Compatible Schema with RLS
+-- ============================================================================
+-- 
+-- This schema supports:
+-- - Demand-based video publishing (cost-efficient)
+-- - High-value monetization (coins, gifting)
+-- - Real-time leaderboards
+-- - Profile system with external links
+-- - 12-box group live room (per-user layout)
+--
+-- Database: PostgreSQL 14+ (Supabase)
+-- Auth: Uses Supabase auth.users table
+-- RLS: Row Level Security enabled on all sensitive tables
+-- ============================================================================
+
+-- Enable UUID extension (required for Supabase)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================================================
+-- CORE USER TABLES (Supabase Auth Integration)
+-- ============================================================================
+
+-- Profiles: Primary user table (references auth.users.id)
+-- This is the main user table - everything references profiles.id
+CREATE TABLE profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    avatar_url TEXT,
+    bio TEXT,
+    display_name VARCHAR(100),
+    follower_count INTEGER DEFAULT 0,
+    total_gifts_received BIGINT DEFAULT 0, -- Lifetime coins received
+    total_gifts_sent BIGINT DEFAULT 0, -- Lifetime coins sent
+    rank INTEGER, -- Current platform rank
+    is_live BOOLEAN DEFAULT FALSE, -- Denormalized from live_streams
+    last_live_at TIMESTAMP WITH TIME ZONE,
+    -- Coin balances (cached - source of truth is coinledger_legacy)
+    coin_balance BIGINT NOT NULL DEFAULT 0 CHECK (coin_balance >= 0), -- Spendable coins
+    earnings_balance BIGINT NOT NULL DEFAULT 0 CHECK (earnings_balance >= 0), -- Earnings from gifts (may convert to spendable)
+    total_purchased BIGINT NOT NULL DEFAULT 0, -- Lifetime coins purchased
+    total_spent BIGINT NOT NULL DEFAULT 0, -- Lifetime coins spent
+    last_transaction_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_profiles_username ON profiles(username);
+CREATE INDEX idx_profiles_total_gifts_received ON profiles(total_gifts_received DESC);
+CREATE INDEX idx_profiles_is_live ON profiles(is_live);
+CREATE INDEX idx_profiles_follower_count ON profiles(follower_count DESC);
+CREATE INDEX idx_profiles_coin_balance ON profiles(coin_balance DESC);
+
+-- Enable RLS on profiles
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users can SELECT all profiles (public), but only UPDATE their own
+CREATE POLICY "Profiles are viewable by everyone"
+    ON profiles FOR SELECT
+    USING (true);
+
+CREATE POLICY "Users can update own profile"
+    ON profiles FOR UPDATE
+    USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert own profile"
+    ON profiles FOR INSERT
+    WITH CHECK (auth.uid() = id);
+
+-- ============================================================================
+-- LIVE STREAMING TABLES
+-- ============================================================================
+
+-- Live Streams: Demand-based publishing state
+CREATE TABLE live_streams (
+    id BIGSERIAL PRIMARY KEY,
+    profile_id UUID NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
+    live_available BOOLEAN DEFAULT FALSE, -- Streamer pressed "Go Live"
+    is_published BOOLEAN DEFAULT FALSE, -- Video is actively published (DERIVED from active_viewers - do not set manually)
+    published_at TIMESTAMP WITH TIME ZONE,
+    unpublished_at TIMESTAMP WITH TIME ZONE,
+    total_viewer_minutes BIGINT DEFAULT 0, -- Aggregate viewing time
+    webrtc_channel VARCHAR(255), -- Agora/WebRTC channel identifier
+    webrtc_token TEXT, -- Temporary token for channel access
+    webrtc_uid BIGINT, -- Streamer's UID in WebRTC channel
+    started_at TIMESTAMP WITH TIME ZONE, -- When live_available became true
+    ended_at TIMESTAMP WITH TIME ZONE, -- When streamer manually stopped
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_live_streams_profile_id ON live_streams(profile_id);
+CREATE INDEX idx_live_streams_live_available ON live_streams(live_available) WHERE live_available = TRUE;
+CREATE INDEX idx_live_streams_is_published ON live_streams(is_published) WHERE is_published = TRUE;
+CREATE INDEX idx_live_streams_published_at ON live_streams(published_at DESC);
+CREATE INDEX idx_live_streams_started_at ON live_streams(started_at DESC);
+
+-- Enable RLS on live_streams
+ALTER TABLE live_streams ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Everyone can view live streams, only owner can update live_available
+CREATE POLICY "Live streams are viewable by everyone"
+    ON live_streams FOR SELECT
+    USING (true);
+
+CREATE POLICY "Streamers can update own live_available"
+    ON live_streams FOR UPDATE
+    USING (auth.uid() = profile_id)
+    WITH CHECK (auth.uid() = profile_id);
+
+CREATE POLICY "Streamers can insert own live stream"
+    ON live_streams FOR INSERT
+    WITH CHECK (auth.uid() = profile_id);
+
+-- User Grid Slots: Per-user 12-slot layout (client state persistence)
+-- This is per-user layout, not a global grid
+CREATE TABLE user_grid_slots (
+    id BIGSERIAL PRIMARY KEY,
+    viewer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    slot_index INTEGER NOT NULL CHECK (slot_index >= 1 AND slot_index <= 12),
+    streamer_id UUID REFERENCES profiles(id) ON DELETE SET NULL, -- Streamer in this slot
+    live_stream_id BIGINT REFERENCES live_streams(id) ON DELETE SET NULL,
+    is_pinned BOOLEAN DEFAULT FALSE, -- Slot is pinned
+    is_muted BOOLEAN DEFAULT FALSE, -- Slot is muted
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(viewer_id, slot_index)
+);
+
+CREATE INDEX idx_user_grid_slots_viewer_id ON user_grid_slots(viewer_id);
+CREATE INDEX idx_user_grid_slots_streamer_id ON user_grid_slots(streamer_id);
+CREATE INDEX idx_user_grid_slots_live_stream_id ON user_grid_slots(live_stream_id);
+
+-- Enable RLS on user_grid_slots
+ALTER TABLE user_grid_slots ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users can only manage their own grid slots
+CREATE POLICY "Users can manage own grid slots"
+    ON user_grid_slots FOR ALL
+    USING (auth.uid() = viewer_id)
+    WITH CHECK (auth.uid() = viewer_id);
+
+-- Active Viewers: Tracks users actively WATCHING a stream (not just in grid)
+-- This is the source of truth for is_published state
+-- Only counts viewers who are: active + unmuted + visible + subscribed
+CREATE TABLE active_viewers (
+    id BIGSERIAL PRIMARY KEY,
+    streamer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    live_stream_id BIGINT NOT NULL REFERENCES live_streams(id) ON DELETE CASCADE,
+    viewer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    is_active BOOLEAN DEFAULT TRUE, -- Viewer is actively watching (not just in grid)
+    is_unmuted BOOLEAN DEFAULT TRUE, -- Stream is unmuted
+    is_visible BOOLEAN DEFAULT TRUE, -- Stream is visible (not hidden/minimized)
+    is_subscribed BOOLEAN DEFAULT TRUE, -- Viewer is subscribed to stream
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_active_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, -- Heartbeat: update every 10-15 seconds
+    UNIQUE(live_stream_id, viewer_id)
+);
+
+CREATE INDEX idx_active_viewers_streamer_id ON active_viewers(streamer_id);
+CREATE INDEX idx_active_viewers_live_stream_id ON active_viewers(live_stream_id);
+CREATE INDEX idx_active_viewers_viewer_id ON active_viewers(viewer_id);
+CREATE INDEX idx_active_viewers_last_active_at ON active_viewers(last_active_at);
+CREATE INDEX idx_active_viewers_active ON active_viewers(live_stream_id, is_active, is_unmuted, is_visible, is_subscribed) 
+    WHERE is_active = TRUE AND is_unmuted = TRUE AND is_visible = TRUE AND is_subscribed = TRUE;
+
+-- Enable RLS on active_viewers
+ALTER TABLE active_viewers ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Viewers can insert/update their own heartbeat rows (or via RPC)
+CREATE POLICY "Viewers can manage own viewing records"
+    ON active_viewers FOR ALL
+    USING (auth.uid() = viewer_id)
+    WITH CHECK (auth.uid() = viewer_id);
+
+-- ============================================================================
+-- CHAT SYSTEM
+-- ============================================================================
+
+-- Chat Messages: Global chat messages
+CREATE TABLE chat_messages (
+    id BIGSERIAL PRIMARY KEY,
+    profile_id UUID REFERENCES profiles(id) ON DELETE SET NULL, -- NULL for system messages
+    message_type VARCHAR(20) NOT NULL DEFAULT 'text' CHECK (message_type IN ('text', 'gift', 'system', 'emoji')),
+    content TEXT NOT NULL,
+    gift_id BIGINT, -- Foreign key to gifts (if message_type = 'gift')
+    metadata JSONB, -- For emoji reactions, mentions, etc.
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_chat_messages_created_at ON chat_messages(created_at DESC);
+CREATE INDEX idx_chat_messages_profile_id ON chat_messages(profile_id);
+CREATE INDEX idx_chat_messages_message_type ON chat_messages(message_type);
+CREATE INDEX idx_chat_messages_gift_id ON chat_messages(gift_id) WHERE gift_id IS NOT NULL;
+
+-- Enable RLS on chat_messages
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Everyone can read chat, authenticated users can send messages
+CREATE POLICY "Chat messages are viewable by everyone"
+    ON chat_messages FOR SELECT
+    USING (true);
+
+CREATE POLICY "Authenticated users can send messages"
+    ON chat_messages FOR INSERT
+    WITH CHECK (auth.uid() = profile_id OR profile_id IS NULL);
+
+-- ============================================================================
+-- MONETIZATION TABLES (Ledger-Based)
+-- ============================================================================
+
+-- Coin Ledger: Immutable transaction log (source of truth for balances)
+-- All coin movements go through this table
+CREATE TABLE coinledger_legacy (
+    id BIGSERIAL PRIMARY KEY,
+    profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    amount BIGINT NOT NULL, -- Positive for credits, negative for debits
+    type VARCHAR(50) NOT NULL CHECK (type IN (
+        'purchase',           -- Coin purchase
+        'gift_sent',          -- Coins spent on gift
+        'gift_received',      -- Earnings from received gift
+        'refund',             -- Purchase refund
+        'chargeback',         -- Chargeback reversal
+        'admin_adjustment'    -- Manual admin adjustment
+    )),
+    ref_type VARCHAR(50), -- 'coin_purchase', 'gift', etc.
+    ref_id BIGINT, -- Foreign key to related record (coin_purchases.id, gifts.id, etc.)
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_coinledger_legacy_profile_id ON coinledger_legacy(profile_id);
+CREATE INDEX idx_coinledger_legacy_type ON coinledger_legacy(type);
+CREATE INDEX idx_coinledger_legacy_ref ON coinledger_legacy(ref_type, ref_id);
+CREATE INDEX idx_coinledger_legacy_created_at ON coinledger_legacy(created_at DESC);
+
+-- Enable RLS on coinledger_legacy
+ALTER TABLE coinledger_legacy ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users can only view their own ledger entries, inserts only via RPC
+CREATE POLICY "Users can view own ledger entries"
+    ON coinledger_legacy FOR SELECT
+    USING (auth.uid() = profile_id);
+
+CREATE POLICY "Deny direct inserts - use RPC only"
+    ON coinledger_legacy FOR INSERT
+    USING (false); -- Force all inserts through RPC functions
+
+-- Coin Purchases: Purchase transactions (Stripe, Apple IAP, Google Play)
+-- Strict idempotency for high-value purchases
+CREATE TABLE coin_purchases (
+    id BIGSERIAL PRIMARY KEY,
+    profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    platform VARCHAR(20) NOT NULL CHECK (platform IN ('web', 'ios', 'android')),
+    payment_provider VARCHAR(20) NOT NULL CHECK (payment_provider IN ('stripe', 'apple', 'google')),
+    -- Idempotency fields (CRITICAL for high-value purchases)
+    provider_event_id VARCHAR(255) NOT NULL UNIQUE, -- Webhook event ID (prevents duplicate processing)
+    provider_payment_id VARCHAR(255) UNIQUE, -- Payment intent ID or IAP transaction ID
+    payment_intent_id VARCHAR(255), -- Stripe payment intent (legacy, use provider_payment_id)
+    coin_amount BIGINT NOT NULL CHECK (coin_amount > 0),
+    usd_amount DECIMAL(10, 2) NOT NULL CHECK (usd_amount > 0),
+    -- High-value purchase guardrails
+    max_purchase_limit DECIMAL(10, 2) DEFAULT 50000.00 CHECK (max_purchase_limit > 0), -- Max per purchase (default $50k)
+    requires_approval BOOLEAN DEFAULT FALSE, -- Requires manual approval if true
+    -- Fraud prevention fields
+    ip_address INET, -- User's IP address
+    country_code VARCHAR(2), -- ISO country code
+    user_agent TEXT, -- Browser/client info
+    -- Status state machine: pending -> confirmed -> refunded/chargeback
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'refunded', 'chargeback', 'failed')),
+    purchased_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at TIMESTAMP WITH TIME ZONE,
+    refunded_at TIMESTAMP WITH TIME ZONE,
+    metadata JSONB, -- Additional payment data
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_coin_purchases_profile_id ON coin_purchases(profile_id);
+CREATE INDEX idx_coin_purchases_status ON coin_purchases(status);
+CREATE INDEX idx_coin_purchases_purchased_at ON coin_purchases(purchased_at DESC);
+CREATE INDEX idx_coin_purchases_provider_event_id ON coin_purchases(provider_event_id);
+CREATE INDEX idx_coin_purchases_provider_payment_id ON coin_purchases(provider_payment_id) WHERE provider_payment_id IS NOT NULL;
+CREATE INDEX idx_coin_purchases_platform ON coin_purchases(platform);
+CREATE INDEX idx_coin_purchases_profile_purchased_at ON coin_purchases(profile_id, purchased_at DESC); -- For velocity checks
+
+-- Enable RLS on coin_purchases
+ALTER TABLE coin_purchases ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users can view own purchases, inserts only via RPC
+CREATE POLICY "Users can view own purchases"
+    ON coin_purchases FOR SELECT
+    USING (auth.uid() = profile_id);
+
+CREATE POLICY "Deny direct inserts - use RPC only"
+    ON coin_purchases FOR INSERT
+    USING (false); -- Force all inserts through RPC functions
+
+-- Gift Types: Catalog of available gifts
+CREATE TABLE gift_types (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    coin_cost BIGINT NOT NULL CHECK (coin_cost > 0),
+    animation_url TEXT,
+    icon_url TEXT,
+    tier INTEGER DEFAULT 1 CHECK (tier >= 1 AND tier <= 5),
+    is_active BOOLEAN DEFAULT TRUE,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_gift_types_coin_cost ON gift_types(coin_cost);
+CREATE INDEX idx_gift_types_is_active ON gift_types(is_active) WHERE is_active = TRUE;
+CREATE INDEX idx_gift_types_tier ON gift_types(tier);
+CREATE INDEX idx_gift_types_display_order ON gift_types(display_order);
+
+-- Gifts: Gift transactions (70/30 revenue split)
+CREATE TABLE gifts (
+    id BIGSERIAL PRIMARY KEY,
+    sender_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    recipient_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    gift_type_id BIGINT NOT NULL REFERENCES gift_types(id) ON DELETE RESTRICT,
+    coin_amount BIGINT NOT NULL CHECK (coin_amount > 0),
+    platform_revenue BIGINT NOT NULL, -- 30% of coin_amount
+    streamer_revenue BIGINT NOT NULL, -- 70% of coin_amount
+    slot_index INTEGER CHECK (slot_index >= 1 AND slot_index <= 12), -- Which slot received the gift
+    live_stream_id BIGINT REFERENCES live_streams(id) ON DELETE SET NULL,
+    sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT check_revenue_split CHECK (platform_revenue + streamer_revenue = coin_amount)
+);
+
+CREATE INDEX idx_gifts_sender_id ON gifts(sender_id);
+CREATE INDEX idx_gifts_recipient_id ON gifts(recipient_id);
+CREATE INDEX idx_gifts_sent_at ON gifts(sent_at DESC);
+CREATE INDEX idx_gifts_recipient_sent_at ON gifts(recipient_id, sent_at DESC);
+CREATE INDEX idx_gifts_sender_sent_at ON gifts(sender_id, sent_at DESC);
+CREATE INDEX idx_gifts_slot_index ON gifts(slot_index);
+CREATE INDEX idx_gifts_live_stream_id ON gifts(live_stream_id);
+
+-- Enable RLS on gifts
+ALTER TABLE gifts ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Users can view all gifts, inserts only via RPC
+CREATE POLICY "Gifts are viewable by everyone"
+    ON gifts FOR SELECT
+    USING (true);
+
+CREATE POLICY "Deny direct inserts - use RPC only"
+    ON gifts FOR INSERT
+    USING (false); -- Force all inserts through RPC functions
+
+-- ============================================================================
+-- PROFILE & SOCIAL TABLES
+-- ============================================================================
+
+-- User Links: External links on profiles (LinkTree-style)
+CREATE TABLE user_links (
+    id BIGSERIAL PRIMARY KEY,
+    profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    title VARCHAR(100) NOT NULL,
+    url TEXT NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    click_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_user_links_profile_id ON user_links(profile_id);
+CREATE INDEX idx_user_links_profile_order ON user_links(profile_id, display_order);
+
+-- Enable RLS on user_links
+ALTER TABLE user_links ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Everyone can view links, users can manage own links
+CREATE POLICY "User links are viewable by everyone"
+    ON user_links FOR SELECT
+    USING (true);
+
+CREATE POLICY "Users can manage own links"
+    ON user_links FOR ALL
+    USING (auth.uid() = profile_id)
+    WITH CHECK (auth.uid() = profile_id);
+
+-- Follows: Follower/following relationships
+CREATE TABLE follows (
+    id BIGSERIAL PRIMARY KEY,
+    follower_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    followee_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    followed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT check_no_self_follow CHECK (follower_id != followee_id),
+    UNIQUE(follower_id, followee_id)
+);
+
+CREATE INDEX idx_follows_follower_id ON follows(follower_id);
+CREATE INDEX idx_follows_followee_id ON follows(followee_id);
+CREATE INDEX idx_follows_followed_at ON follows(followed_at DESC);
+
+-- Enable RLS on follows
+ALTER TABLE follows ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Everyone can view follows, users can manage own follow relationships
+CREATE POLICY "Follows are viewable by everyone"
+    ON follows FOR SELECT
+    USING (true);
+
+CREATE POLICY "Users can manage own follow relationships"
+    ON follows FOR ALL
+    USING (auth.uid() = follower_id)
+    WITH CHECK (auth.uid() = follower_id);
+
+-- ============================================================================
+-- LEADERBOARD TABLES
+-- ============================================================================
+
+-- Leaderboard Cache: Pre-computed leaderboard data
+-- Note: Refresh strategy should be defined (hourly for daily, 6-hourly for weekly, daily for all-time)
+-- Source of truth remains transaction tables (gifts, live_streams)
+CREATE TABLE leaderboard_cache (
+    id BIGSERIAL PRIMARY KEY,
+    leaderboard_type VARCHAR(50) NOT NULL CHECK (leaderboard_type IN (
+        'top_streamers_daily',
+        'top_streamers_weekly',
+        'top_streamers_alltime',
+        'top_gifters_daily',
+        'top_gifters_weekly',
+        'top_gifters_alltime'
+    )),
+    profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    rank INTEGER NOT NULL CHECK (rank > 0),
+    metric_value BIGINT NOT NULL, -- Score (gifts received, gifts sent, viewer minutes, etc.)
+    period_start TIMESTAMP WITH TIME ZONE,
+    period_end TIMESTAMP WITH TIME ZONE,
+    computed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(leaderboard_type, rank, period_start)
+);
+
+CREATE INDEX idx_leaderboard_cache_type ON leaderboard_cache(leaderboard_type);
+CREATE INDEX idx_leaderboard_cache_profile_id ON leaderboard_cache(profile_id);
+CREATE INDEX idx_leaderboard_cache_period_start ON leaderboard_cache(period_start DESC);
+CREATE INDEX idx_leaderboard_cache_type_rank ON leaderboard_cache(leaderboard_type, rank);
+
+-- ============================================================================
+-- TRIGGERS & FUNCTIONS
+-- ============================================================================
+
+-- Function: Update follower_count in profiles
+CREATE OR REPLACE FUNCTION update_follower_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE profiles
+        SET follower_count = follower_count + 1
+        WHERE id = NEW.followee_id;
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE profiles
+        SET follower_count = follower_count - 1
+        WHERE id = OLD.followee_id;
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_follower_count
+    AFTER INSERT OR DELETE ON follows
+    FOR EACH ROW
+    EXECUTE FUNCTION update_follower_count();
+
+-- Function: Update gift totals in profiles
+CREATE OR REPLACE FUNCTION update_gift_totals()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        -- Update recipient's total_gifts_received
+        UPDATE profiles
+        SET total_gifts_received = total_gifts_received + NEW.coin_amount
+        WHERE id = NEW.recipient_id;
+        
+        -- Update sender's total_gifts_sent
+        UPDATE profiles
+        SET total_gifts_sent = total_gifts_sent + NEW.coin_amount
+        WHERE id = NEW.sender_id;
+        
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_gift_totals
+    AFTER INSERT ON gifts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_gift_totals();
+
+-- Function: Update live status in profiles
+CREATE OR REPLACE FUNCTION update_live_status()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' OR TG_OP = 'INSERT' THEN
+        UPDATE profiles
+        SET is_live = NEW.live_available,
+            last_live_at = CASE WHEN NEW.live_available THEN COALESCE(NEW.started_at, CURRENT_TIMESTAMP) ELSE last_live_at END
+        WHERE id = NEW.profile_id;
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE profiles
+        SET is_live = FALSE
+        WHERE id = OLD.profile_id;
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_live_status
+    AFTER INSERT OR UPDATE OR DELETE ON live_streams
+    FOR EACH ROW
+    EXECUTE FUNCTION update_live_status();
+
+-- ============================================================================
+-- CRITICAL RPC FUNCTIONS (Ledger-Based Coin Management)
+-- ============================================================================
+
+-- Function: Update coin balance via ledger (with locking)
+-- This is the ONLY function that should update profiles.coin_balance
+-- All coin movements must go through coinledger_legacy first
+CREATE OR REPLACE FUNCTION update_coin_balance_via_ledger(
+    p_profile_id UUID,
+    p_amount BIGINT,
+    p_type VARCHAR(50),
+    p_ref_type VARCHAR(50) DEFAULT NULL,
+    p_ref_id BIGINT DEFAULT NULL,
+    p_description TEXT DEFAULT NULL
+)
+RETURNS void AS $$
+DECLARE
+    v_new_balance BIGINT;
+BEGIN
+    -- Lock the profile row to prevent concurrent updates
+    SELECT id INTO p_profile_id FROM profiles WHERE id = p_profile_id FOR UPDATE;
+    
+    -- Insert ledger entry
+    INSERT INTO coinledger_legacy (profile_id, amount, type, ref_type, ref_id, description)
+    VALUES (p_profile_id, p_amount, p_type, p_ref_type, p_ref_id, p_description);
+    
+    -- Recalculate balance from ledger (source of truth)
+    SELECT COALESCE(SUM(amount), 0) INTO v_new_balance
+    FROM coinledger_legacy
+    WHERE profile_id = p_profile_id;
+    
+    -- Update cached balance
+    UPDATE profiles
+    SET coin_balance = v_new_balance,
+        last_transaction_at = CURRENT_TIMESTAMP
+    WHERE id = p_profile_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- Function: Process coin purchase (idempotent with guardrails)
+-- Call this from webhook handlers with provider_event_id
+CREATE OR REPLACE FUNCTION process_coin_purchase(
+    p_profile_id UUID,
+    p_platform VARCHAR(20),
+    p_payment_provider VARCHAR(20),
+    p_provider_event_id VARCHAR(255),
+    p_provider_payment_id VARCHAR(255),
+    p_coin_amount BIGINT,
+    p_usd_amount DECIMAL(10, 2),
+    p_ip_address INET DEFAULT NULL,
+    p_country_code VARCHAR(2) DEFAULT NULL,
+    p_user_agent TEXT DEFAULT NULL,
+    p_metadata JSONB DEFAULT NULL
+)
+RETURNS BIGINT AS $$
+DECLARE
+    v_purchase_id BIGINT;
+    v_max_limit DECIMAL(10, 2) := 50000.00; -- Default max $50k per purchase
+    v_recent_purchases INTEGER;
+BEGIN
+    -- Check if already processed (idempotency)
+    SELECT id INTO v_purchase_id
+    FROM coin_purchases
+    WHERE provider_event_id = p_provider_event_id;
+    
+    IF v_purchase_id IS NOT NULL THEN
+        RETURN v_purchase_id; -- Already processed
+    END IF;
+    
+    -- High-value purchase guardrail: Check max limit
+    IF p_usd_amount > v_max_limit THEN
+        RAISE EXCEPTION 'Purchase amount exceeds maximum limit of $%', v_max_limit;
+    END IF;
+    
+    -- Velocity check: No more than 5 purchases per minute
+    SELECT COUNT(*) INTO v_recent_purchases
+    FROM coin_purchases
+    WHERE profile_id = p_profile_id
+    AND purchased_at > CURRENT_TIMESTAMP - INTERVAL '1 minute';
+    
+    IF v_recent_purchases >= 5 THEN
+        RAISE EXCEPTION 'Too many purchases in short time period';
+    END IF;
+    
+    -- Insert purchase record
+    INSERT INTO coin_purchases (
+        profile_id, platform, payment_provider,
+        provider_event_id, provider_payment_id,
+        coin_amount, usd_amount,
+        ip_address, country_code, user_agent,
+        status, confirmed_at, metadata,
+        max_purchase_limit, requires_approval
+    )
+    VALUES (
+        p_profile_id, p_platform, p_payment_provider,
+        p_provider_event_id, p_provider_payment_id,
+        p_coin_amount, p_usd_amount,
+        p_ip_address, p_country_code, p_user_agent,
+        'confirmed', CURRENT_TIMESTAMP, p_metadata,
+        v_max_limit, p_usd_amount > 25000.00 -- Require approval above $25k
+    )
+    RETURNING id INTO v_purchase_id;
+    
+    -- Update ledger and balance
+    PERFORM update_coin_balance_via_ledger(
+        p_profile_id,
+        p_coin_amount,
+        'purchase',
+        'coin_purchase',
+        v_purchase_id,
+        'Coin purchase: ' || p_coin_amount || ' coins'
+    );
+    
+    -- Update total_purchased
+    UPDATE profiles
+    SET total_purchased = total_purchased + p_coin_amount
+    WHERE id = p_profile_id;
+    
+    RETURN v_purchase_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- Function: Process gift (deduct from sender, add earnings to recipient)
+CREATE OR REPLACE FUNCTION process_gift(
+    p_sender_id UUID,
+    p_recipient_id UUID,
+    p_gift_type_id BIGINT,
+    p_slot_index INTEGER DEFAULT NULL,
+    p_live_stream_id BIGINT DEFAULT NULL
+)
+RETURNS BIGINT AS $$
+DECLARE
+    v_coin_cost BIGINT;
+    v_platform_revenue BIGINT;
+    v_streamer_revenue BIGINT;
+    v_gift_id BIGINT;
+    v_sender_balance BIGINT;
+BEGIN
+    -- Get gift cost
+    SELECT coin_cost INTO v_coin_cost
+    FROM gift_types
+    WHERE id = p_gift_type_id AND is_active = TRUE;
+    
+    IF v_coin_cost IS NULL THEN
+        RAISE EXCEPTION 'Invalid or inactive gift type';
+    END IF;
+    
+    -- Check sender balance
+    SELECT coin_balance INTO v_sender_balance
+    FROM profiles
+    WHERE id = p_sender_id;
+    
+    IF v_sender_balance < v_coin_cost THEN
+        RAISE EXCEPTION 'Insufficient coin balance';
+    END IF;
+    
+    -- Calculate revenue split
+    v_platform_revenue := (v_coin_cost * 30) / 100;
+    v_streamer_revenue := v_coin_cost - v_platform_revenue;
+    
+    -- Insert gift record
+    INSERT INTO gifts (
+        sender_id, recipient_id, gift_type_id,
+        coin_amount, platform_revenue, streamer_revenue,
+        slot_index, live_stream_id
+    )
+    VALUES (
+        p_sender_id, p_recipient_id, p_gift_type_id,
+        v_coin_cost, v_platform_revenue, v_streamer_revenue,
+        p_slot_index, p_live_stream_id
+    )
+    RETURNING id INTO v_gift_id;
+    
+    -- Deduct from sender's spendable balance
+    PERFORM update_coin_balance_via_ledger(
+        p_sender_id,
+        -v_coin_cost,
+        'gift_sent',
+        'gift',
+        v_gift_id,
+        'Gift sent: ' || v_coin_cost || ' coins'
+    );
+    
+    -- Add to recipient's earnings balance (separate from spendable)
+    UPDATE profiles
+    SET earnings_balance = earnings_balance + v_streamer_revenue,
+        total_spent = total_spent + v_coin_cost
+    WHERE id = p_sender_id;
+    
+    -- Add earnings to recipient (can convert to spendable later if policy requires)
+    UPDATE profiles
+    SET earnings_balance = earnings_balance + v_streamer_revenue
+    WHERE id = p_recipient_id;
+    
+    RETURN v_gift_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- Function: Update publish state based on ACTIVE viewer presence (demand-based publishing)
+-- Only counts viewers who are: active + unmuted + visible + subscribed
+-- Call this periodically (every 10-15 seconds) or when active_viewers changes
+CREATE OR REPLACE FUNCTION update_publish_state_from_viewers()
+RETURNS void AS $$
+DECLARE
+    v_stream RECORD;
+    v_active_viewer_count INTEGER;
+BEGIN
+    -- For each live stream, check active viewer count
+    FOR v_stream IN
+        SELECT ls.id, ls.profile_id, ls.live_available, ls.is_published
+        FROM live_streams ls
+        WHERE ls.live_available = TRUE
+    LOOP
+        -- Count ACTIVE viewers (is_active + unmuted + visible + subscribed + heartbeat within 60 seconds)
+        SELECT COUNT(*) INTO v_active_viewer_count
+        FROM active_viewers av
+        WHERE av.live_stream_id = v_stream.id
+        AND av.is_active = TRUE
+        AND av.is_unmuted = TRUE
+        AND av.is_visible = TRUE
+        AND av.is_subscribed = TRUE
+        AND av.last_active_at > CURRENT_TIMESTAMP - INTERVAL '60 seconds'; -- Heartbeat window: 60 seconds
+        
+        -- Update publish state based on active viewer presence
+        IF v_active_viewer_count > 0 AND NOT v_stream.is_published THEN
+            -- Publish: first active viewer joined
+            UPDATE live_streams
+            SET is_published = TRUE,
+                published_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = v_stream.id;
+        ELSIF v_active_viewer_count = 0 AND v_stream.is_published THEN
+            -- Unpublish: last active viewer left
+            UPDATE live_streams
+            SET is_published = FALSE,
+                unpublished_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = v_stream.id;
+        END IF;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- Function: Update viewer heartbeat (call every 10-15 seconds from client)
+CREATE OR REPLACE FUNCTION update_viewer_heartbeat(
+    p_viewer_id UUID,
+    p_live_stream_id BIGINT,
+    p_is_active BOOLEAN DEFAULT TRUE,
+    p_is_unmuted BOOLEAN DEFAULT TRUE,
+    p_is_visible BOOLEAN DEFAULT TRUE,
+    p_is_subscribed BOOLEAN DEFAULT TRUE
+)
+RETURNS void AS $$
+BEGIN
+    -- Upsert active viewer record with heartbeat
+    INSERT INTO active_viewers (
+        viewer_id, live_stream_id, streamer_id,
+        is_active, is_unmuted, is_visible, is_subscribed,
+        last_active_at
+    )
+    SELECT 
+        p_viewer_id,
+        p_live_stream_id,
+        ls.profile_id,
+        p_is_active,
+        p_is_unmuted,
+        p_is_visible,
+        p_is_subscribed,
+        CURRENT_TIMESTAMP
+    FROM live_streams ls
+    WHERE ls.id = p_live_stream_id
+    ON CONFLICT (live_stream_id, viewer_id) 
+    DO UPDATE SET
+        is_active = EXCLUDED.is_active,
+        is_unmuted = EXCLUDED.is_unmuted,
+        is_visible = EXCLUDED.is_visible,
+        is_subscribed = EXCLUDED.is_subscribed,
+        last_active_at = CURRENT_TIMESTAMP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- Function: Clean up stale viewer sessions (heartbeat timeout)
+-- Mark stale after 60 seconds, cleanup job runs every 30-60 seconds
+CREATE OR REPLACE FUNCTION cleanup_stale_viewers()
+RETURNS void AS $$
+BEGIN
+    -- Remove viewers who haven't sent heartbeat in 60 seconds
+    DELETE FROM active_viewers
+    WHERE last_active_at < CURRENT_TIMESTAMP - INTERVAL '60 seconds';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- ============================================================================
+-- INITIAL DATA
+-- ============================================================================
+
+-- Insert default gift types (example catalog)
+INSERT INTO gift_types (name, coin_cost, tier, display_order) VALUES
+    ('Rose', 10, 1, 1),
+    ('Heart', 50, 2, 2),
+    ('Star', 100, 2, 3),
+    ('Diamond', 500, 3, 4),
+    ('Super Star', 1000, 4, 5),
+    ('Crown', 5000, 5, 6),
+    ('Platinum', 10000, 5, 7),
+    ('Legendary', 50000, 5, 8);
+
+-- ============================================================================
+-- COMMENTS
+-- ============================================================================
+
+COMMENT ON TABLE profiles IS 'Primary user table - references auth.users.id (UUID). All other tables reference profiles.id';
+COMMENT ON TABLE live_streams IS 'Demand-based publishing state - is_published is DERIVED from active_viewers presence, not manually set';
+COMMENT ON TABLE user_grid_slots IS 'Per-user 12-slot layout (client state persistence). Each user has their own grid layout.';
+COMMENT ON TABLE active_viewers IS 'Tracks users actively WATCHING a stream (active + unmuted + visible + subscribed). Source of truth for is_published. Heartbeat: update every 10-15 seconds, stale after 60 seconds.';
+COMMENT ON TABLE chat_messages IS 'Global chat messages visible to all users';
+COMMENT ON TABLE coinledger_legacy IS 'Immutable transaction log - source of truth for coin balances. profiles.coin_balance is cached.';
+COMMENT ON TABLE coin_purchases IS 'Purchase transactions with strict idempotency (provider_event_id UNIQUE) and high-value guardrails (max $50k, velocity checks)';
+COMMENT ON TABLE gift_types IS 'Catalog of available gifts with prices and metadata';
+COMMENT ON TABLE gifts IS 'Gift transactions with 70/30 revenue split (streamer/platform)';
+COMMENT ON TABLE user_links IS 'External links displayed on user profiles (LinkTree-style)';
+COMMENT ON TABLE follows IS 'Follower/following relationships';
+COMMENT ON TABLE leaderboard_cache IS 'Pre-computed leaderboard data - refresh: hourly (daily), 6-hourly (weekly), daily (all-time)';
+
+-- ============================================================================
+-- END OF SCHEMA
+-- ============================================================================

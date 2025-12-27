@@ -17,6 +17,7 @@ import { View, StyleSheet, TouchableOpacity, Text, useWindowDimensions } from 'r
 import { Tile } from './Tile';
 import type { Participant, TileItem } from '../../types/live';
 import type { Room } from 'livekit-client';
+import { useThemeMode } from '../../contexts/ThemeContext';
 
 interface Grid12Props {
   participants: Participant[];
@@ -119,9 +120,9 @@ export const Grid12: React.FC<Grid12Props> = ({
   onExitFocus,
   onInitializeTileSlots,
 }) => {
-  // Track orientation
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  const { theme } = useThemeMode();
   
   // Grid dimensions based on orientation
   const gridCols = isLandscape ? 4 : 3;
@@ -178,7 +179,7 @@ export const Grid12: React.FC<Grid12Props> = ({
     );
 
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Top bar - active count + exit button */}
         <View style={styles.focusTopBar}>
           <View style={styles.activeCountBadge}>
@@ -244,7 +245,7 @@ export const Grid12: React.FC<Grid12Props> = ({
 
   // Normal grid layout
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Grid info overlay - shows active count */}
       <View style={styles.gridInfoOverlay}>
         <Text style={styles.gridInfoText}>
@@ -291,8 +292,8 @@ export const Grid12: React.FC<Grid12Props> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-    padding: 4,
+    backgroundColor: 'transparent',
+    padding: 0, // CRITICAL: NO padding - cameras fill 100% of screen
   },
   row: {
     flex: 1,

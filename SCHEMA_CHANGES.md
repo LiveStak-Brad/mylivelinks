@@ -36,7 +36,7 @@ All critical production requirements have been applied to the database schema. T
 - Risk of balance drift from retries, partial failures, concurrent updates
 
 **After:**
-- **Created** `coin_ledger` table (immutable transaction log)
+- **Created** `ledger_entries` table (immutable transaction log)
 - `profiles.coin_balance` is **cached** (source of truth is ledger)
 - **Removed** trigger-based balance updates
 - **Created** `update_coin_balance_via_ledger()` RPC function with row locking
@@ -104,7 +104,7 @@ All critical production requirements have been applied to the database schema. T
   - `total_gifts_received`, `total_gifts_sent`
   - `coin_amount`, `platform_revenue`, `streamer_revenue`
   - `coin_cost` in gift_types
-  - `amount` in coin_ledger
+  - `amount` in ledger_entries
 
 **Impact:**
 - Supports millions of coins per user
@@ -140,7 +140,7 @@ All critical production requirements have been applied to the database schema. T
 **After:**
 - **All foreign keys** reference `profiles.id` (UUID):
   - `live_streams.profile_id`
-  - `coin_ledger.profile_id`
+  - `ledger_entries.profile_id`
   - `coin_purchases.profile_id`
   - `gifts.sender_id`, `gifts.recipient_id`
   - `chat_messages.profile_id`
@@ -207,7 +207,7 @@ If migrating from previous schema:
 1. **Create `profiles` table** with UUID primary key
 2. **Migrate user data** from `users` to `profiles`
 3. **Update foreign keys** to UUID references
-4. **Create `coin_ledger` table** and backfill balances
+4. **Create `ledger_entries` table** and backfill balances
 5. **Add idempotency fields** to `coin_purchases`
 6. **Add `earnings_balance`** to `profiles`
 7. **Update application code** to use RPC functions
@@ -231,7 +231,7 @@ Before production:
 
 ## Performance Considerations
 
-1. **Ledger Queries:** Index `coin_ledger` by `profile_id` and `created_at` for fast balance queries
+1. **Ledger Queries:** Index `ledger_entries` by `profile_id` and `created_at` for fast balance queries
 2. **Publish State Updates:** Run `update_publish_state_from_viewers()` every 10-15 seconds (not on every viewer change)
 3. **Stale Cleanup:** Run `cleanup_stale_viewers()` every 30 seconds
 4. **Leaderboard Refresh:** Cache refresh cadence defined in `leaderboard_cache` comments

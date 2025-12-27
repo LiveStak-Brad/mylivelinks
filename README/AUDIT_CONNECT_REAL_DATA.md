@@ -213,7 +213,7 @@ This document provides a comprehensive audit of the current UI implementation, i
 
 **What's Real:**
 - RPC functions exist in database
-- Tables exist (`gift_types`, `gifts`, `coin_purchases`, `coin_ledger`)
+- Tables exist (`gift_types`, `gifts`, `coin_purchases`, `ledger_entries`)
 
 ---
 
@@ -232,7 +232,7 @@ This document provides a comprehensive audit of the current UI implementation, i
 | `chat_messages` | Global chat messages | ✅ Table exists, needs realtime |
 | `gift_types` | Gift catalog | ✅ Table exists, needs query |
 | `gifts` | Gift transactions | ✅ Table exists, RPC ready |
-| `coin_ledger` | Immutable coin transaction log | ✅ Table exists, RPC ready |
+| `ledger_entries` | Immutable coin transaction log | ✅ Table exists, RPC ready |
 | `coin_purchases` | Coin purchase records | ✅ Table exists, RPC ready |
 | `diamond_conversions` | Diamond→coin conversions | ✅ Table exists, RPC ready |
 | `gifter_levels` | Gifter badge definitions | ✅ Table exists |

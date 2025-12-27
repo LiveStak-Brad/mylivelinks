@@ -15,6 +15,7 @@ type UseAuthReturn = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, username?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  getAccessToken: () => Promise<string | null>;
 };
 
 export function useAuth(): UseAuthReturn {
@@ -33,9 +34,14 @@ export function useAuth(): UseAuthReturn {
 
     const bootstrap = async () => {
       try {
+        console.log('[AUTH] Bootstrap: fetching initial session...');
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         if (mounted) {
+          console.log('[AUTH] Bootstrap: session loaded', {
+            hasSession: !!data.session,
+            userId: data.session?.user?.id,
+          });
           setSession(data.session ?? null);
         }
       } catch (e) {
@@ -52,8 +58,13 @@ export function useAuth(): UseAuthReturn {
 
     bootstrap();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return;
+      console.log('[AUTH] onAuthStateChange fired:', {
+        event,
+        hasSession: !!newSession,
+        userId: newSession?.user?.id,
+      });
       setSession(newSession);
       setLoading(false);
     });
@@ -68,34 +79,67 @@ export function useAuth(): UseAuthReturn {
     if (!supabaseConfigured) {
       throw new Error('Supabase client not initialized. Please configure environment variables.');
     }
+    console.log('[AUTH] signIn called for:', email);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     } satisfies SignInWithPasswordCredentials);
 
-    if (error) throw error;
+    if (error) {
+      console.error('[AUTH] signIn failed:', error);
+      throw error;
+    }
+    console.log('[AUTH] signIn successful, waiting for onAuthStateChange...');
   }, []);
 
   const signUp = useCallback(async (email: string, password: string, username?: string) => {
     if (!supabaseConfigured) {
       throw new Error('Supabase client not initialized. Please configure environment variables.');
     }
+    console.log('[AUTH] signUp called for:', email);
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: username ? { data: { username } } : undefined,
     } satisfies SignUpWithPasswordCredentials);
 
-    if (error) throw error;
+    if (error) {
+      console.error('[AUTH] signUp failed:', error);
+      throw error;
+    }
+    console.log('[AUTH] signUp successful, waiting for onAuthStateChange...');
   }, []);
 
   const signOut = useCallback(async () => {
     if (!supabaseConfigured) {
       throw new Error('Supabase client not initialized. Please configure environment variables.');
     }
+    console.log('[AUTH] signOut called');
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    if (error) {
+      console.error('[AUTH] signOut failed:', error);
+      throw error;
+    }
+    console.log('[AUTH] signOut successful');
   }, []);
+
+  // CRITICAL: Get access token from the session in React state
+  // This is the SINGLE SOURCE OF TRUTH for auth
+  // DO NOT call supabase.auth.getSession() directly - it bypasses React state
+  const getAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!supabaseConfigured) {
+      console.warn('[AUTH] Supabase not configured');
+      return null;
+    }
+
+    // Use session from React state (from onAuthStateChange)
+    if (session?.access_token) {
+      return session.access_token;
+    }
+
+    // No fallback outside React state; caller must handle missing token
+    return null;
+  }, [session, supabaseConfigured]);
 
   const user = useMemo(() => session?.user ?? null, [session]);
 
@@ -106,5 +150,6 @@ export function useAuth(): UseAuthReturn {
     signIn,
     signUp,
     signOut,
+    getAccessToken,
   };
 }

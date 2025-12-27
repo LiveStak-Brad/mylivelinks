@@ -22,6 +22,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider, useThemeMode } from './contexts/ThemeContext';
 
 import type { RootStackParamList } from './types/navigation';
 import { GateScreen } from './screens/GateScreen';
@@ -45,16 +46,14 @@ import { AdminGiftsScreen } from './screens/AdminGiftsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-/* =============================================================================
-   MAIN APP EXPORT
-============================================================================= */
+function AppNavigation() {
+  const { navigationTheme, mode } = useThemeMode();
 
-export default function App() {
   return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
+    <>
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <AuthProvider>
-        <NavigationContainer>
+        <NavigationContainer theme={navigationTheme}>
           <Stack.Navigator initialRouteName="Gate" screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Gate" component={GateScreen} />
             <Stack.Screen name="Auth" component={AuthScreen} />
@@ -73,10 +72,24 @@ export default function App() {
             <Stack.Screen name="ModerationPanel" component={ModerationPanelScreen} />
             <Stack.Screen name="AdminApplications" component={AdminApplicationsScreen} />
             <Stack.Screen name="AdminGifts" component={AdminGiftsScreen} />
-            <Stack.Screen name="ProfileRoute" component={ProfileRouteScreen} />
+            <Stack.Screen name="ProfileRoute" component={ProfileRouteScreen} options={{ presentation: 'card', animation: 'none' }} />
           </Stack.Navigator>
         </NavigationContainer>
       </AuthProvider>
-    </SafeAreaProvider>
+    </>
+  );
+}
+
+/* =============================================================================
+   MAIN APP EXPORT
+============================================================================= */
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <AppNavigation />
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }

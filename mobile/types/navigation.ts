@@ -28,4 +28,5 @@ export type MainTabsParamList = {
   Rooms: undefined;
   Messages: undefined;
   Noties: undefined;
+  Profile: { username?: string };
 };

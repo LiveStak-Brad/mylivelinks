@@ -1,11 +1,11 @@
 /**
  * BrandLogo Component - Mobile
  * Matches web components/SmartBrandLogo.tsx behavior
- * Displays the MyLiveLinks branding
+ * Displays the MyLiveLinks branding using actual logo image
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Image, ViewStyle } from 'react-native';
+import { View, StyleSheet, Image, ViewStyle } from 'react-native';
 
 interface BrandLogoProps {
   size?: number;
@@ -14,25 +14,22 @@ interface BrandLogoProps {
 }
 
 export function BrandLogo({ size = 110, iconOnly = false, style }: BrandLogoProps) {
-  // For mobile, we'll use text-based branding with emoji icon
-  // Web uses images, but for mobile parity we maintain the same visual weight
+  // Use the EXACT same logo as web: /branding/mylivelinkstransparent.png
+  // (web uses this in components/BrandLogo.tsx line 41, components/SmartBrandLogo.tsx line 43)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- React Native requires require() for static assets
+  const logoSource = require('../../assets/branding/mylivelinkstransparent.png');
   
-  if (iconOnly) {
-    return (
-      <View style={[styles.container, { width: size * 0.4, height: size * 0.4 }, style]}>
-        <Text style={[styles.icon, { fontSize: size * 0.3 }]}>🔗</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, style]}>
-      <View style={styles.logoRow}>
-        <Text style={[styles.icon, { fontSize: size * 0.25 }]}>🔗</Text>
-        <View style={styles.textContainer}>
-          <Text style={[styles.logoText, { fontSize: size * 0.15 }]}>MyLiveLinks</Text>
-        </View>
-      </View>
+      <Image
+        source={logoSource}
+        style={{
+          width: size,
+          height: size,
+          resizeMode: 'contain',
+        }}
+        accessibilityLabel="MyLiveLinks Logo"
+      />
     </View>
   );
 }
@@ -42,22 +39,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  icon: {
-    lineHeight: undefined,
-  },
-  textContainer: {
-    justifyContent: 'center',
-  },
-  logoText: {
-    color: '#fff',
-    fontWeight: '900',
-    letterSpacing: -0.5,
   },
 });
 

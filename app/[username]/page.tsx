@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: { params: { username: string 
     // Generate OG image with watermark
     const ogImageUrl = avatarUrl 
       ? `https://www.mylivelinks.com/api/og/profile?avatar=${encodeURIComponent(avatarUrl)}&username=${encodeURIComponent(profile.username)}`
-      : 'https://www.mylivelinks.com/og-default.png';
+      : 'https://www.mylivelinks.com/mylivelinksmeta.png';
     
     return {
       title: `${displayName} (@${profile.username}) | MyLiveLinks`,

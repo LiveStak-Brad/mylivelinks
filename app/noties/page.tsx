@@ -72,16 +72,29 @@ export default function NotiesPage() {
                   `}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 text-2xl">
-                      {notie.type === 'gift' && '🎁'}
-                      {notie.type === 'follow' && '👤'}
-                      {notie.type === 'live' && '📹'}
-                      {notie.type === 'mention' && '💬'}
-                      {notie.type === 'comment' && '💬'}
-                      {notie.type === 'level_up' && '⭐'}
-                      {notie.type === 'purchase' && '💰'}
-                      {notie.type === 'conversion' && '💎'}
-                      {notie.type === 'system' && '🔔'}
+                    <div className="relative flex-shrink-0">
+                      {notie.avatarUrl ? (
+                        <img
+                          src={notie.avatarUrl}
+                          alt=""
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-sm">
+                          {notie.avatarFallback || '?'}
+                        </div>
+                      )}
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 flex items-center justify-center bg-card rounded-full border border-border text-xs">
+                        {notie.type === 'gift' && '🎁'}
+                        {notie.type === 'follow' && '👤'}
+                        {notie.type === 'live' && '📹'}
+                        {notie.type === 'mention' && '💬'}
+                        {notie.type === 'comment' && '💬'}
+                        {notie.type === 'level_up' && '⭐'}
+                        {notie.type === 'purchase' && '💰'}
+                        {notie.type === 'conversion' && '💎'}
+                        {notie.type === 'system' && '🔔'}
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-foreground">

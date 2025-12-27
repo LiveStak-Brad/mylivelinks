@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { fetchAuthed } from '../lib/api';
+import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -21,6 +21,7 @@ type GiftsResponse = {
 };
 
 export function AdminGiftsScreen({ navigation }: Props) {
+  const { fetchAuthed } = useFetchAuthed();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<GiftRow[]>([]);
@@ -31,11 +32,10 @@ export function AdminGiftsScreen({ navigation }: Props) {
 
     try {
       const res = await fetchAuthed('/api/admin/gifts?limit=50&offset=0', { method: 'GET' });
-      const body = (await res.json().catch(() => null)) as any;
       if (!res.ok) {
-        throw new Error(body?.error || `Failed to load gifts (${res.status})`);
+        throw new Error(res.message || `Failed to load gifts (${res.status})`);
       }
-      const parsed = body as GiftsResponse;
+      const parsed = (res.data || {}) as GiftsResponse;
       setRows(Array.isArray(parsed.gifts) ? parsed.gifts : []);
     } catch (e: any) {
       setError(e?.message || 'Failed to load gifts');

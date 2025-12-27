@@ -1,26 +1,85 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, useWindowDimensions, Image } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-import { PageShell } from '../components/ui';
+import { PageShell, PageHeader } from '../components/ui';
 import type { MainTabsParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { LiveRoomScreen } from './LiveRoomScreen';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Rooms'>;
 
-export function RoomsScreen(_props: Props) {
+export function RoomsScreen({ navigation }: Props) {
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const [liveRoomEnabled, setLiveRoomEnabled] = useState(false);
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+
+  // If LiveRoom is active, show it fullscreen WITHOUT PageShell (no bottom nav)
+  if (liveRoomEnabled) {
+
+    return (
+      <LiveRoomScreen
+        enabled={true}
+        onExitLive={() => setLiveRoomEnabled(false)}
+        onNavigateToRooms={() => {
+          // Stay in LiveRoom but just return to Rooms list view
+          // For now, same as exit
+          setLiveRoomEnabled(false);
+        }}
+        onNavigateWallet={() => {
+          setLiveRoomEnabled(false);
+          // Navigate to wallet screen (assuming it's in root navigator)
+          navigation.getParent()?.navigate('Wallet' as never);
+        }}
+      />
+    );
+  }
 
   return (
-    <PageShell title="Rooms" contentStyle={styles.container}>
+    <PageShell 
+      contentStyle={styles.container}
+      useNewHeader
+      onNavigateHome={() => navigation.navigate('Home')}
+      onNavigateToProfile={(username) => {
+        navigation.navigate('Profile', { username });
+      }}
+    >
+      {/* Page Header: Video icon + Rooms */}
+      <PageHeader icon="video" iconColor="#f44336" title="Rooms" />
+
       <ScrollView style={styles.content}>
         <View style={styles.placeholder}>
-          <Text style={styles.title}>🎥 Rooms</Text>
-          <Text style={styles.subtitle}>Live streaming rooms</Text>
+          {/* Live Central Banner Image */}
+          <Image
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            source={require('../assets/livecentralmeta.png')}
+            style={styles.bannerImage}
+            resizeMode="cover"
+          />
+          
+          <Text style={styles.subtitle}>Live Central</Text>
           <Text style={styles.text}>
-            Discover and join live streaming rooms. Watch live content, interact with hosts, and connect with other viewers.
+            Watch up to 12 live streamers at once in a dynamic grid. Interact with cameras, chat, and view leaderboards.
           </Text>
+          
+          {/* Orientation hint - shown before entering */}
+          {!isLandscape && (
+            <View style={styles.orientationHint}>
+              <Text style={styles.hintIcon}>📱 → 📱</Text>
+              <Text style={styles.hintText}>Rotate your phone to landscape for the best viewing experience</Text>
+            </View>
+          )}
+          
+          {/* Enter Live Central Button */}
+          <TouchableOpacity
+            style={[styles.enterButton, { backgroundColor: theme.colors.accent }]}
+            onPress={() => setLiveRoomEnabled(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.enterButtonText}>🔴 Enter Live Central</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </PageShell>
@@ -54,12 +113,11 @@ function createStyles(theme: ThemeDefinition) {
       alignItems: 'center',
       gap: 8,
     },
-    title: {
-      color: theme.colors.textPrimary,
-      fontSize: 28,
-      fontWeight: '900',
-      textAlign: 'center',
-      marginBottom: 6,
+    bannerImage: {
+      width: '100%',
+      height: 160,
+      borderRadius: 12,
+      marginBottom: 16,
     },
     subtitle: {
       color: theme.colors.textSecondary,
@@ -74,6 +132,45 @@ function createStyles(theme: ThemeDefinition) {
       lineHeight: 20,
       textAlign: 'center',
       maxWidth: 320,
+      marginBottom: 24,
+    },
+    enterButton: {
+      paddingVertical: 16,
+      paddingHorizontal: 32,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minWidth: 200,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    enterButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    orientationHint: {
+      backgroundColor: 'rgba(74, 158, 255, 0.1)',
+      borderWidth: 1,
+      borderColor: theme.colors.accent,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20,
+      alignItems: 'center',
+      gap: 8,
+    },
+    hintIcon: {
+      fontSize: 32,
+    },
+    hintText: {
+      color: theme.colors.accent,
+      fontSize: 14,
+      fontWeight: '600',
+      textAlign: 'center',
+      lineHeight: 20,
     },
   });
 }

@@ -1,0 +1,180 @@
+-- ============================================================================
+-- MyLiveLinks: Owner Account & Seed Data
+-- ============================================================================
+-- 
+-- STEP 1: Create auth user via Supabase Dashboard or API
+-- Email: wcba.mo@gmail.com
+-- Password: lopsided1
+--
+-- Then run this SQL to create the profile and seed data
+-- ============================================================================
+
+-- ============================================================================
+-- STEP 2: Create Owner Profile
+-- ============================================================================
+-- NOTE: Replace 'USER_UUID_HERE' with the actual UUID from auth.users
+-- You can get it by running: SELECT id FROM auth.users WHERE email = 'wcba.mo@gmail.com';
+
+-- First, get the user UUID (run this separately to get the UUID)
+-- SELECT id FROM auth.users WHERE email = 'wcba.mo@gmail.com';
+
+-- Then insert the profile (replace USER_UUID_HERE with actual UUID)
+INSERT INTO profiles (
+    id,
+    username,
+    display_name,
+    bio,
+    coin_balance,
+    earnings_balance,
+    total_purchased,
+    total_spent,
+    total_gifts_received,
+    total_gifts_sent,
+    gifter_level,
+    is_live,
+    created_at,
+    updated_at
+)
+SELECT 
+    id,
+    'owner',
+    'Owner',
+    'Platform Owner Account',
+    1000000, -- 1 million coins
+    0, -- No diamonds initially
+    1000000, -- Purchased 1M coins
+    0, -- Haven't spent any yet
+    0, -- No gifts received
+    0, -- No gifts sent
+    0, -- Level 0 (no spending yet)
+    FALSE, -- Not live
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+FROM auth.users
+WHERE email = 'wcba.mo@gmail.com'
+ON CONFLICT (id) DO UPDATE SET
+    username = 'owner',
+    display_name = 'Owner',
+    bio = 'Platform Owner Account',
+    coin_balance = GREATEST(profiles.coin_balance, 1000000),
+    updated_at = CURRENT_TIMESTAMP;
+
+-- ============================================================================
+-- STEP 3: Seed Gift Types (if not already inserted)
+-- ============================================================================
+
+INSERT INTO gift_types (name, coin_cost, tier, display_order, is_active) VALUES
+    ('Rose', 10, 1, 1, TRUE),
+    ('Heart', 50, 2, 2, TRUE),
+    ('Star', 100, 2, 3, TRUE),
+    ('Diamond', 500, 3, 4, TRUE),
+    ('Super Star', 1000, 4, 5, TRUE),
+    ('Crown', 5000, 5, 6, TRUE),
+    ('Platinum', 10000, 5, 7, TRUE),
+    ('Legendary', 50000, 5, 8, TRUE)
+ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================================
+-- STEP 4: Seed Gifter Levels (if not already inserted)
+-- ============================================================================
+
+INSERT INTO gifter_levels (level, min_coins_spent, badge_name, badge_color, description) VALUES
+    (0, 0, 'New Gifter', '#94A3B8', 'Just getting started'),
+    (1, 100, 'Bronze Gifter', '#CD7F32', 'Bronze tier gifter'),
+    (2, 500, 'Silver Gifter', '#C0C0C0', 'Silver tier gifter'),
+    (3, 1500, 'Gold Gifter', '#FFD700', 'Gold tier gifter'),
+    (4, 4000, 'Platinum Gifter', '#E5E4E2', 'Platinum tier gifter'),
+    (5, 10000, 'Diamond Gifter', '#B9F2FF', 'Diamond tier gifter'),
+    (6, 25000, 'Elite Gifter', '#8B5CF6', 'Elite tier gifter'),
+    (7, 60000, 'Master Gifter', '#3B82F6', 'Master tier gifter'),
+    (8, 150000, 'Legendary Gifter', '#14B8A6', 'Legendary tier gifter'),
+    (9, 400000, 'Titan Gifter', '#EC4899', 'Titan tier gifter'),
+    (10, 1000000, 'Immortal Gifter', '#F59E0B', 'Immortal tier gifter')
+ON CONFLICT (level) DO NOTHING;
+
+-- ============================================================================
+-- STEP 5: Add Initial Coins to Owner via Ledger (Proper Way)
+-- ============================================================================
+-- This adds 1M coins to the owner account via the ledger system
+
+DO $$
+DECLARE
+    v_owner_id UUID;
+    v_ledger_id BIGINT;
+BEGIN
+    -- Get owner UUID
+    SELECT id INTO v_owner_id
+    FROM auth.users
+    WHERE email = 'wcba.mo@gmail.com';
+    
+    IF v_owner_id IS NULL THEN
+        RAISE EXCEPTION 'Owner user not found. Please create auth user first.';
+    END IF;
+    
+    -- Insert ledger entry for initial coins
+    INSERT INTO coinledger_legacy (
+        profile_id,
+        amount,
+        asset_type,
+        type,
+        ref_type,
+        description,
+        created_at
+    )
+    VALUES (
+        v_owner_id,
+        1000000, -- 1 million coins
+        'coin',
+        'admin_adjustment',
+        'admin',
+        'Initial owner account setup - 1M coins',
+        CURRENT_TIMESTAMP
+    )
+    RETURNING id INTO v_ledger_id;
+    
+    -- Update cached balance via RPC function
+    PERFORM update_coin_balance_via_ledger(
+        v_owner_id,
+        1000000,
+        'admin_adjustment',
+        'admin',
+        v_ledger_id,
+        'Initial owner account setup'
+    );
+    
+    RAISE NOTICE 'Owner account created with 1M coins. Ledger ID: %', v_ledger_id;
+END $$;
+
+-- ============================================================================
+-- VERIFICATION QUERIES
+-- ============================================================================
+
+-- Verify owner profile exists
+SELECT 
+    id,
+    username,
+    display_name,
+    coin_balance,
+    earnings_balance,
+    gifter_level,
+    created_at
+FROM profiles
+WHERE username = 'owner';
+
+-- Verify gift types
+SELECT COUNT(*) as gift_type_count FROM gift_types;
+
+-- Verify gifter levels
+SELECT COUNT(*) as gifter_level_count FROM gifter_levels;
+
+-- Verify owner coin balance
+SELECT 
+    p.username,
+    p.coin_balance,
+    COALESCE(SUM(cl.amount) FILTER (WHERE cl.asset_type = 'coin'), 0) as ledger_coin_balance
+FROM profiles p
+LEFT JOIN coinledger_legacy cl ON cl.profile_id = p.id AND cl.asset_type = 'coin'
+WHERE p.username = 'owner'
+GROUP BY p.id, p.username, p.coin_balance;
+
+

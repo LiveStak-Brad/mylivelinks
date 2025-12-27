@@ -54,7 +54,7 @@ export function BottomNav({ navigation, currentRoute }: BottomNavProps) {
     },
     {
       route: 'Messages',
-      label: 'Messages',
+      label: 'Messys',
       icon: '💬',
       badge: topBar.showMessagesBadge ? Math.max(1, Number(topBar.unreadMessagesCount ?? 0)) : 0,
     },

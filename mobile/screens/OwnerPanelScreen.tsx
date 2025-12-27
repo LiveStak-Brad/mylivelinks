@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { fetchAuthed } from '../lib/api';
+import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -18,6 +18,7 @@ type OverviewResponse = {
 };
 
 export function OwnerPanelScreen({ navigation }: Props) {
+  const { fetchAuthed } = useFetchAuthed();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<OverviewResponse | null>(null);
@@ -28,11 +29,10 @@ export function OwnerPanelScreen({ navigation }: Props) {
 
     try {
       const res = await fetchAuthed('/api/admin/overview', { method: 'GET' });
-      const body = (await res.json().catch(() => null)) as any;
       if (!res.ok) {
-        throw new Error(body?.error || `Failed to load overview (${res.status})`);
+        throw new Error(res.message || `Failed to load overview (${res.status})`);
       }
-      setData(body as OverviewResponse);
+      setData((res.data || null) as OverviewResponse | null);
     } catch (e: any) {
       setError(e?.message || 'Failed to load owner overview');
       setData(null);

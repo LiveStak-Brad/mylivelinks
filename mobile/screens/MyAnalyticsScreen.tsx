@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { fetchAuthed } from '../lib/api';
+import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -27,6 +27,7 @@ type Analytics = {
 type Props = NativeStackScreenProps<RootStackParamList, 'MyAnalytics'>;
 
 export function MyAnalyticsScreen({ navigation }: Props) {
+  const { fetchAuthed } = useFetchAuthed();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<Analytics | null>(null);
@@ -37,11 +38,10 @@ export function MyAnalyticsScreen({ navigation }: Props) {
 
     try {
       const res = await fetchAuthed('/api/user-analytics?range=30d', { method: 'GET' });
-      const body = (await res.json().catch(() => null)) as any;
       if (!res.ok) {
-        throw new Error(body?.error || `Failed to load analytics (${res.status})`);
+        throw new Error(res.message || `Failed to load analytics (${res.status})`);
       }
-      setData(body as Analytics);
+      setData((res.data || null) as Analytics | null);
     } catch (e: any) {
       setError(e?.message || 'Failed to load analytics');
       setData(null);

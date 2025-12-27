@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { Heart, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 /* =============================================================================
    FEED POST CARD COMPONENT
@@ -53,15 +54,20 @@ export interface FeedPostCardProps {
    
    Shown when no avatar is provided.
 ----------------------------------------------------------------------------- */
-function DefaultAvatar({ name }: { name: string }) {
+function DefaultAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
   const initial = name.charAt(0).toUpperCase();
+  const imgSrc = getAvatarUrl(avatarUrl);
   
   return (
     <div 
-      className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0"
+      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden"
       aria-hidden="true"
     >
-      <span className="text-white font-semibold text-sm">{initial}</span>
+      <img 
+        src={imgSrc} 
+        alt={`${name}'s avatar`} 
+        className="w-full h-full object-cover"
+      />
     </div>
   );
 }

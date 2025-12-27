@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,27 +6,32 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-import { PageShell, BottomNav } from '../components/ui';
+import { PageShell, PageHeader } from '../components/ui';
 import type { MainTabsParamList } from '../types/navigation';
 import { useNoties } from '../hooks/useNoties';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Noties'>;
 
 /**
  * NOTIES SCREEN - Mobile parity with web
  * 
- * Matches web app/noties/page.tsx layout:
- * - List of notifications with icons, message, and timestamp
- * - Unread indicator (dot)
- * - Type-specific icons (gift, follow, live, etc.)
- * - Empty state when no notifications
- * - Mark all as read button
+ * Structure:
+ * - Global top bar (hamburger, logo, avatar)
+ * - Page header: 🔔 Noties
+ * - Mark all read button (in PageHeader action slot)
+ * - List of notifications
+ * 
+ * NO duplicate headers, NO "Notifications" text
  */
 export function NotiesScreen({ navigation }: Props) {
   const { noties, isLoading, unreadCount, markAllAsRead, markAsRead } = useNoties();
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const handleMarkAllRead = () => {
     console.log('[Noties] Mark all as read');
@@ -34,26 +39,30 @@ export function NotiesScreen({ navigation }: Props) {
   };
 
   return (
-    <PageShell title="Notifications" contentStyle={styles.container}>
-      <View style={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.bellIcon}>🔔</Text>
-            <View>
-              <Text style={styles.headerTitle}>Notifications</Text>
-              <Text style={styles.headerSubtitle}>
-                Stay updated with your activity
-              </Text>
-            </View>
-          </View>
-          {noties.length > 0 && (
+    <PageShell 
+      contentStyle={styles.container}
+      useNewHeader
+      onNavigateHome={() => navigation.navigate('Home')}
+      onNavigateToProfile={(username) => {
+        navigation.navigate('Profile', { username });
+      }}
+      onNavigateToRooms={() => navigation.navigate('Rooms')}
+    >
+      {/* Page Header: Bell icon + Noties with Mark all read button */}
+      <PageHeader
+        icon="bell"
+        iconColor="#f59e0b"
+        title="Noties"
+        action={
+          noties.length > 0 ? (
             <Pressable onPress={handleMarkAllRead}>
               <Text style={styles.markAllButton}>Mark all read</Text>
             </Pressable>
-          )}
-        </View>
+          ) : undefined
+        }
+      />
 
+      <View style={styles.content}>
         {/* Notifications List */}
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -89,11 +98,24 @@ export function NotiesScreen({ navigation }: Props) {
                   // TODO: Navigate to action URL
                 }}
               >
-                {/* Icon */}
-                <View style={styles.notieIcon}>
-                  <Text style={styles.notieIconText}>
-                    {getNotieIcon(notie.type)}
-                  </Text>
+                <View style={styles.avatarWrap}>
+                  {notie.avatarUrl ? (
+                    <Image
+                      source={{ uri: notie.avatarUrl }}
+                      style={styles.avatarImage}
+                    />
+                  ) : (
+                    <View style={styles.avatarFallback}>
+                      <Text style={styles.avatarFallbackText}>
+                        {notie.avatarFallback || '?'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.avatarBadge}>
+                    <Text style={styles.avatarBadgeText}>
+                      {getNotieIcon(notie.type)}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Content */}
@@ -115,7 +137,6 @@ export function NotiesScreen({ navigation }: Props) {
           </ScrollView>
         )}
       </View>
-      <BottomNav navigation={navigation} currentRoute="Noties" />
     </PageShell>
   );
 }
@@ -161,125 +182,141 @@ function formatTime(date: Date | string): string {
   return d.toLocaleString();
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  content: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  bellIcon: {
-    fontSize: 24,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#9aa0a6',
-  },
-  markAllButton: {
-    fontSize: 14,
-    color: '#8B5CF6',
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyDescription: {
-    fontSize: 15,
-    color: '#9aa0a6',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 100, // Space for bottom nav
-  },
-  notieRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    backgroundColor: 'transparent',
-  },
-  notieRowUnread: {
-    backgroundColor: 'rgba(139, 92, 246, 0.05)',
-  },
-  notieRowPressed: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-  },
-  notieIcon: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  notieIconText: {
-    fontSize: 28,
-  },
-  notieContent: {
-    flex: 1,
-  },
-  notieMessage: {
-    fontSize: 15,
-    color: '#fff',
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  notieTime: {
-    fontSize: 13,
-    color: '#9aa0a6',
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#8B5CF6',
-    marginLeft: 12,
-    marginTop: 6,
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    content: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    markAllButton: {
+      fontSize: 14,
+      color: theme.colors.accent,
+      fontWeight: '600',
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 32,
+    },
+    emptyIcon: {
+      fontSize: 64,
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: theme.colors.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    emptyDescription: {
+      fontSize: 15,
+      color: theme.colors.mutedText,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: 16, // Space for tab bar (React Navigation handles the rest)
+      backgroundColor: theme.colors.background,
+    },
+    notieRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      marginHorizontal: 12,
+      marginVertical: 6,
+      borderRadius: 16,
+      backgroundColor: theme.colors.cardSurface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: theme.colors.menuShadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
+    },
+    notieRowUnread: {
+      backgroundColor: theme.colors.highlight,
+    },
+    notieRowPressed: {
+      backgroundColor: theme.colors.cardAlt,
+    },
+    avatarWrap: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+      position: 'relative',
+    },
+    avatarImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+    },
+    avatarFallback: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    avatarFallbackText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    avatarBadge: {
+      position: 'absolute',
+      right: -4,
+      bottom: -4,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: theme.colors.cardSurface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    avatarBadgeText: {
+      fontSize: 12,
+    },
+    notieContent: {
+      flex: 1,
+    },
+    notieMessage: {
+      fontSize: 15,
+      color: theme.colors.textPrimary,
+      lineHeight: 20,
+      marginBottom: 4,
+    },
+    notieTime: {
+      fontSize: 13,
+      color: theme.colors.textSecondary,
+    },
+    unreadDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.colors.accent,
+      marginLeft: 12,
+      marginTop: 6,
+    },
+  });
+}

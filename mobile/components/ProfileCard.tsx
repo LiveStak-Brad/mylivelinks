@@ -10,6 +10,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 interface Profile {
   id: string;
@@ -114,15 +115,10 @@ export function ProfileCard({ profile, currentUserId, onPress, onFollow }: Profi
       <View style={styles.header}>
         {/* Avatar */}
         <View style={styles.avatarContainer}>
-          {resolveMediaUrl(profile.avatar_url) ? (
-            <Image source={{ uri: resolveMediaUrl(profile.avatar_url) as string }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {displayName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <Image 
+            source={getAvatarSource(resolveMediaUrl(profile.avatar_url))} 
+            style={styles.avatar} 
+          />
           {profile.is_live && <View style={styles.liveDot} />}
         </View>
 

@@ -166,9 +166,9 @@ BEGIN
   )
   SELECT 
     c.other_id,
-    p.username,
-    p.avatar_url,
-    c.last_msg,
+    p.username::text,
+    p.avatar_url::text,
+    c.last_msg::text,
     c.last_at,
     COALESCE(u.cnt, 0),
     c.sent_by_me

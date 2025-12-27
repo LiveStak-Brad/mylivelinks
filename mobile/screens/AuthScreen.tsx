@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, ImageBackground, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { Button, Input, PageShell } from '../components/ui';
+import { Button, Input } from '../components/ui';
+import { BrandLogo } from '../components/ui/BrandLogo';
 import { useAuthContext } from '../contexts/AuthContext';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
@@ -15,6 +17,8 @@ export function AuthScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const primaryCtaTitle = useMemo(() => (mode === 'signIn' ? 'Sign In' : 'Create Account'), [mode]);
   const secondaryCtaTitle = useMemo(
@@ -36,10 +40,8 @@ export function AuthScreen({ navigation }: Props) {
         await signUp(email.trim(), password, username.trim() || undefined);
       }
 
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Gate' }],
-      });
+      // Don't manually navigate - let GateScreen's useEffect detect the auth state change
+      // This prevents race condition where Gate checks auth before session is set
     } catch (e: any) {
       Alert.alert('Auth failed', e?.message ?? 'Unknown error');
     } finally {
@@ -48,10 +50,21 @@ export function AuthScreen({ navigation }: Props) {
   };
 
   return (
-    <PageShell contentStyle={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>MyLiveLinks</Text>
-        <Text style={styles.subtitle}>{mode === 'signIn' ? 'Sign in to continue' : 'Create your account'}</Text>
+    <ImageBackground
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- React Native requires require() for static assets
+      source={require('../assets/login.png')}
+      style={styles.backgroundImage}
+      imageStyle={styles.backgroundImageStyle}
+    >
+      <View style={styles.container}>
+        <View style={styles.card}>
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <BrandLogo size={120} />
+          </View>
+
+          <Text style={styles.title}>{mode === 'signIn' ? 'Welcome Back' : 'Create Account'}</Text>
+          <Text style={styles.subtitle}>{mode === 'signIn' ? 'Sign in to continue' : 'Sign up to get started'}</Text>
 
         {mode === 'signUp' ? (
           <View style={styles.field}>
@@ -85,41 +98,62 @@ export function AuthScreen({ navigation }: Props) {
           disabled={submitting}
         />
       </View>
-    </PageShell>
+      </View>
+    </ImageBackground>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  card: {
-    width: '100%',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    padding: 16,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  subtitle: {
-    color: '#c9c9c9',
-    fontSize: 14,
-    marginBottom: 14,
-  },
-  field: {
-    marginBottom: 12,
-  },
-  actions: {
-    marginTop: 4,
-    marginBottom: 12,
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    backgroundImage: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    backgroundImageStyle: {
+      opacity: theme.mode === 'light' ? 0.08 : 0.3,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: 'transparent',
+      justifyContent: 'center',
+      padding: 20,
+    },
+    card: {
+      width: '100%',
+      borderRadius: 16,
+      backgroundColor: theme.mode === 'light' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.08)',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 20,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    logoContainer: {
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    title: {
+      color: theme.colors.text,
+      fontSize: 26,
+      fontWeight: '800',
+      marginBottom: 6,
+      textAlign: 'center',
+    },
+    subtitle: {
+      color: theme.colors.mutedText,
+      fontSize: 14,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    field: {
+      marginBottom: 12,
+    },
+    actions: {
+      marginTop: 4,
+      marginBottom: 12,
+    },
+  });
+}

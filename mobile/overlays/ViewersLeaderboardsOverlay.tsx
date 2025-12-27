@@ -1,10 +1,10 @@
 /**
  * Viewers & Leaderboards Overlay - Swipe DOWN to open, UP to close
- * Shows current viewers and leaderboards in tabs
+ * Shows current viewers and leaderboards in tabs with REAL DATA
  */
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Animated, {
   useAnimatedStyle,
@@ -13,7 +13,8 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import type { Viewer, LeaderboardEntry } from '../types/live';
+import { useViewers } from '../hooks/useViewers';
+import { useLeaderboard } from '../hooks/useLeaderboard';
 
 interface ViewersLeaderboardsOverlayProps {
   visible: boolean;
@@ -27,9 +28,11 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('viewers');
-  const viewers: Viewer[] = [];
-  const streamerLeaderboard: LeaderboardEntry[] = [];
-  const gifterLeaderboard: LeaderboardEntry[] = [];
+  
+  // Fetch real data
+  const { viewers, loading: viewersLoading } = useViewers();
+  const { entries: streamerLeaderboard, loading: streamersLoading } = useLeaderboard('top_streamers', 'daily');
+  const { entries: gifterLeaderboard, loading: giftersLoading } = useLeaderboard('top_gifters', 'daily');
   
   const translateY = useSharedValue(0);
 
@@ -71,7 +74,7 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
                 onPress={() => setActiveTab('viewers')}
               >
                 <Text style={[styles.tabText, activeTab === 'viewers' && styles.tabTextActive]}>
-                  Viewers
+                  Viewers ({viewers.length})
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -79,7 +82,7 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
                 onPress={() => setActiveTab('streamers')}
               >
                 <Text style={[styles.tabText, activeTab === 'streamers' && styles.tabTextActive]}>
-                  Top Streamers
+                  Streamers
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -87,7 +90,7 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
                 onPress={() => setActiveTab('gifters')}
               >
                 <Text style={[styles.tabText, activeTab === 'gifters' && styles.tabTextActive]}>
-                  Top Gifters
+                  Gifters
                 </Text>
               </TouchableOpacity>
             </View>
@@ -96,15 +99,24 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
             <ScrollView style={styles.scrollView}>
               {activeTab === 'viewers' && (
                 <View>
-                  {viewers.length === 0 ? (
+                  {viewersLoading ? (
                     <View style={styles.emptyState}>
-                      <Text style={styles.emptyTitle}>Viewers coming soon</Text>
-                      <Text style={styles.emptySubtitle}>Live viewer lists will appear here when enabled.</Text>
+                      <ActivityIndicator color="#4a9eff" size="large" />
+                      <Text style={styles.emptySubtitle}>Loading viewers...</Text>
+                    </View>
+                  ) : viewers.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyTitle}>No viewers yet</Text>
+                      <Text style={styles.emptySubtitle}>Viewers will appear here when they join the room.</Text>
                     </View>
                   ) : (
                     viewers.map((viewer) => (
-                      <View key={viewer.id} style={styles.listItem}>
+                      <View key={viewer.profile_id} style={styles.listItem}>
+                        {viewer.is_live_available && <Text style={styles.liveIndicator}>🔴</Text>}
                         <Text style={styles.itemText}>{viewer.username}</Text>
+                        {viewer.gifter_level > 0 && (
+                          <Text style={styles.levelBadge}>Lvl {viewer.gifter_level}</Text>
+                        )}
                       </View>
                     ))
                   )}
@@ -112,17 +124,22 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
               )}
               {activeTab === 'streamers' && (
                 <View>
-                  {streamerLeaderboard.length === 0 ? (
+                  {streamersLoading ? (
                     <View style={styles.emptyState}>
-                      <Text style={styles.emptyTitle}>Leaderboards coming soon</Text>
-                      <Text style={styles.emptySubtitle}>Top streamers will appear here when available.</Text>
+                      <ActivityIndicator color="#4a9eff" size="large" />
+                      <Text style={styles.emptySubtitle}>Loading leaderboard...</Text>
+                    </View>
+                  ) : streamerLeaderboard.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyTitle}>No data yet</Text>
+                      <Text style={styles.emptySubtitle}>Top streamers will appear here.</Text>
                     </View>
                   ) : (
-                    streamerLeaderboard.map((entry, idx) => (
-                      <View key={entry.id} style={styles.listItem}>
-                        <Text style={styles.rankText}>#{idx + 1}</Text>
+                    streamerLeaderboard.map((entry) => (
+                      <View key={entry.profile_id} style={styles.listItem}>
+                        <Text style={styles.rankText}>#{entry.rank}</Text>
                         <Text style={styles.itemText}>{entry.username}</Text>
-                        <Text style={styles.valueText}>💎 {entry.value}</Text>
+                        <Text style={styles.valueText}>💎 {entry.metric_value}</Text>
                       </View>
                     ))
                   )}
@@ -130,17 +147,22 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
               )}
               {activeTab === 'gifters' && (
                 <View>
-                  {gifterLeaderboard.length === 0 ? (
+                  {giftersLoading ? (
                     <View style={styles.emptyState}>
-                      <Text style={styles.emptyTitle}>Leaderboards coming soon</Text>
-                      <Text style={styles.emptySubtitle}>Top gifters will appear here when available.</Text>
+                      <ActivityIndicator color="#4a9eff" size="large" />
+                      <Text style={styles.emptySubtitle}>Loading leaderboard...</Text>
+                    </View>
+                  ) : gifterLeaderboard.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyTitle}>No data yet</Text>
+                      <Text style={styles.emptySubtitle}>Top gifters will appear here.</Text>
                     </View>
                   ) : (
-                    gifterLeaderboard.map((entry, idx) => (
-                      <View key={entry.id} style={styles.listItem}>
-                        <Text style={styles.rankText}>#{idx + 1}</Text>
+                    gifterLeaderboard.map((entry) => (
+                      <View key={entry.profile_id} style={styles.listItem}>
+                        <Text style={styles.rankText}>#{entry.rank}</Text>
                         <Text style={styles.itemText}>{entry.username}</Text>
-                        <Text style={styles.valueText}>🎁 {entry.value}</Text>
+                        <Text style={styles.valueText}>🎁 {entry.metric_value}</Text>
                       </View>
                     ))
                   )}
@@ -254,6 +276,19 @@ const styles = StyleSheet.create({
     color: '#ffd700',
     fontSize: 14,
     fontWeight: '600',
+  },
+  liveIndicator: {
+    fontSize: 10,
+    marginRight: 4,
+  },
+  levelBadge: {
+    backgroundColor: 'rgba(74, 158, 255, 0.2)',
+    color: '#4a9eff',
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
 });
 

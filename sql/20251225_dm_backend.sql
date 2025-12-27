@@ -255,9 +255,9 @@ AS $$
   SELECT
     c.id AS conversation_id,
     o.other_profile_id,
-    p.username AS other_username,
-    p.avatar_url AS other_avatar_url,
-    p.display_name AS other_display_name,
+    p.username::text AS other_username,
+    p.avatar_url::text AS other_avatar_url,
+    p.display_name::text AS other_display_name,
     c.last_message_preview,
     c.last_message_type,
     c.last_message_at,

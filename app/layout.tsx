@@ -21,7 +21,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <title>MyLiveLinks - One link. Every live.</title>
-        <meta name="description" content="One link. Every live. Group live streaming platform." />
+        <meta name="description" content="Share your links, make posts, go live, and get paid! Join the MyLiveLinks community." />
         <meta name="application-name" content="MyLiveLinks" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -31,6 +31,21 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="msapplication-TileColor" content="#8b5cf6" />
         <meta name="msapplication-TileImage" content="/branding/favicon/icon-144x144.png" />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="MyLiveLinks" />
+        <meta property="og:title" content="MyLiveLinks - One link. Every live." />
+        <meta property="og:description" content="Share your links, make posts, go live, and get paid! Join the MyLiveLinks community." />
+        <meta property="og:image" content="/mylivelinksmeta.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="MyLiveLinks - One link. Every live." />
+        <meta name="twitter:description" content="Share your links, make posts, go live, and get paid! Join the MyLiveLinks community." />
+        <meta name="twitter:image" content="/mylivelinksmeta.png" />
         
         <link rel="icon" href="/branding/favicon/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/branding/favicon/favicon-32x32.png" />

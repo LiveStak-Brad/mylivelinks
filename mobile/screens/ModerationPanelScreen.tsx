@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { fetchAuthed } from '../lib/api';
+import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -22,6 +22,7 @@ type ReportsResponse = {
 };
 
 export function ModerationPanelScreen({ navigation }: Props) {
+  const { fetchAuthed } = useFetchAuthed();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reports, setReports] = useState<ReportRow[]>([]);
@@ -32,11 +33,10 @@ export function ModerationPanelScreen({ navigation }: Props) {
 
     try {
       const res = await fetchAuthed('/api/admin/reports?status=all&limit=50&offset=0', { method: 'GET' });
-      const body = (await res.json().catch(() => null)) as any;
       if (!res.ok) {
-        throw new Error(body?.error || `Failed to load reports (${res.status})`);
+        throw new Error(res.message || `Failed to load reports (${res.status})`);
       }
-      const parsed = body as ReportsResponse;
+      const parsed = (res.data || {}) as ReportsResponse;
       setReports(Array.isArray(parsed.reports) ? parsed.reports : []);
     } catch (e: any) {
       setError(e?.message || 'Failed to load reports');

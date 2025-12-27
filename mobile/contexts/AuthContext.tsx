@@ -11,6 +11,10 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, username?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  // CRITICAL: Expose getAccessToken for API calls
+  // This ensures all auth checks use the SAME session source (AuthContext)
+  // instead of calling supabase.auth.getSession() directly
+  getAccessToken: () => Promise<string | null>;
 };
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);

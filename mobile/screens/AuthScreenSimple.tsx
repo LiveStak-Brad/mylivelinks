@@ -10,6 +10,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Input, PageShell } from '../components/ui';
 import { useAuthContext } from '../contexts/AuthContext';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 export function AuthScreenSimple() {
   const { signIn, signUp } = useAuthContext();
@@ -18,6 +19,8 @@ export function AuthScreenSimple() {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const primaryCtaTitle = useMemo(
     () => (mode === 'signIn' ? 'Sign In' : 'Create Account'),
@@ -105,40 +108,47 @@ export function AuthScreenSimple() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  card: {
-    width: '100%',
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    padding: 16,
-  },
-  title: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  subtitle: {
-    color: '#c9c9c9',
-    fontSize: 14,
-    marginBottom: 14,
-  },
-  field: {
-    marginBottom: 12,
-  },
-  actions: {
-    marginTop: 4,
-    marginBottom: 12,
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+      justifyContent: 'center',
+      padding: 20,
+    },
+    card: {
+      width: '100%',
+      borderRadius: 16,
+      backgroundColor: theme.mode === 'light' ? '#FFFFFF' : theme.colors.cardAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    title: {
+      color: theme.colors.text,
+      fontSize: 26,
+      fontWeight: '800',
+      marginBottom: 6,
+    },
+    subtitle: {
+      color: theme.colors.mutedText,
+      fontSize: 14,
+      marginBottom: 14,
+    },
+    field: {
+      marginBottom: 12,
+    },
+    actions: {
+      marginTop: 4,
+      marginBottom: 12,
+    },
+  });
+}
 
 export default AuthScreenSimple;
 

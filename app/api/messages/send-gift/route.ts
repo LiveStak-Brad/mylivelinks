@@ -106,6 +106,12 @@ export async function POST(request: NextRequest) {
     }
 
     const messageId = (giftMessageResult as any)?.message_id ?? null;
+    if (!messageId) {
+      return NextResponse.json(
+        { error: 'Gift message was not created' },
+        { status: 500 }
+      );
+    }
     const { data: messages, error: messageFetchError } = await supabase
       .from('messages')
       .select('*')
@@ -116,9 +122,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: messageFetchError.message }, { status: 500 });
     }
 
+    const message = (messages ?? [])[0] ?? null;
+    if (!message) {
+      return NextResponse.json(
+        { error: 'Gift message missing after creation' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       {
-        message: (messages ?? [])[0] ?? null,
+        message,
         gift: (giftMessageResult as any)?.gift ?? giftMessageResult,
         conversationId,
       },

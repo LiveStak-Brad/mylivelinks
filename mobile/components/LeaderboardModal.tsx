@@ -15,6 +15,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
 
 interface LeaderboardEntry {
@@ -36,6 +37,7 @@ interface LeaderboardModalProps {
 }
 
 export function LeaderboardModal({ visible, onClose, onNavigateToProfile }: LeaderboardModalProps) {
+  const insets = useSafeAreaInsets();
   const [type, setType] = useState<LeaderboardType>('top_streamers');
   const [period, setPeriod] = useState<Period>('daily');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -101,11 +103,11 @@ export function LeaderboardModal({ visible, onClose, onNavigateToProfile }: Lead
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) + 60 }]}>
         <Pressable style={styles.backdropTouchable} onPress={onClose} />
         
         <View style={styles.modalContainer}>
@@ -297,17 +299,30 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    // paddingTop is set dynamically with safe area insets
+    paddingHorizontal: 16,
   },
   backdropTouchable: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   modalContainer: {
     backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
+    borderRadius: 24,
+    maxHeight: '85%',
+    width: '100%',
+    maxWidth: 500,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   header: {
     backgroundColor: '#f59e0b', // Amber gradient approximation

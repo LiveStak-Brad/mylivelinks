@@ -14,6 +14,7 @@ import Animated, { useAnimatedStyle, withSpring, useSharedValue } from 'react-na
 import { VideoView } from '@livekit/react-native';
 import type { TileItem } from '../../types/live';
 import type { Room, VideoTrack } from 'livekit-client';
+import { useThemeMode } from '../../contexts/ThemeContext';
 
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
@@ -37,6 +38,7 @@ export const Tile: React.FC<TileProps> = ({
   onDoubleTap,
 }) => {
   const { participant, isAutofill } = item;
+  const { theme } = useThemeMode();
   
   // Animation values for edit mode
   const scale = useSharedValue(1);
@@ -108,17 +110,27 @@ export const Tile: React.FC<TileProps> = ({
     }
   }, [isEditMode]);
 
-  const containerStyle = [
-    styles.container,
-    isMinimized && styles.minimized,
-    isFocused && styles.focused,
-  ];
+  const containerStyle = useMemo(
+    () => [
+      styles.container,
+      { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
+      isMinimized && styles.minimized,
+      isFocused && { borderColor: theme.colors.accent },
+    ],
+    [isFocused, isMinimized, theme.colors.accent, theme.colors.border, theme.colors.card]
+  );
 
   if (!participant) {
     // Empty tile (autofill placeholder)
     return (
-      <View style={[styles.container, styles.emptyTile]}>
-        <Text style={styles.emptyText}>Available</Text>
+      <View
+        style={[
+          styles.container,
+          styles.emptyTile,
+          { backgroundColor: theme.colors.cardAlt, borderColor: theme.colors.border },
+        ]}
+      >
+        <Text style={[styles.emptyText, { color: theme.colors.mutedText }]}>Available</Text>
       </View>
     );
   }
@@ -128,37 +140,37 @@ export const Tile: React.FC<TileProps> = ({
   return (
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[containerStyle, animatedStyle]}>
-      {/* Video surface - LiveKit VideoRenderer */}
-      {videoTrack ? (
-        <VideoView
-          videoTrack={videoTrack}
-          style={styles.videoRenderer}
-          objectFit="cover"
-        />
-      ) : (
-        <View style={styles.videoPlaceholder}>
-          <Text style={styles.placeholderText}>📹</Text>
-        </View>
-      )}
+        {/* Video surface - LiveKit VideoRenderer */}
+        {videoTrack ? (
+          <VideoView
+            videoTrack={videoTrack}
+            style={{ ...styles.videoRenderer, backgroundColor: theme.colors.background }}
+            objectFit="cover"
+          />
+        ) : (
+          <View style={[styles.videoPlaceholder, { backgroundColor: theme.colors.cardAlt }]}>
+            <Text style={styles.placeholderText}>📹</Text>
+          </View>
+        )}
 
       {/* LIVE badge - top left */}
       <View style={styles.liveBadge}>
         <Text style={styles.liveBadgeText}>LIVE</Text>
       </View>
 
-      {/* Username - bottom left */}
-      <View style={styles.bottomLeft}>
-        <Text style={styles.username} numberOfLines={1}>
-          {username}
-        </Text>
-      </View>
-
-      {/* Viewer count - bottom right */}
-      {viewerCount !== undefined && (
-        <View style={styles.bottomRight}>
-          <Text style={styles.viewerCount}>👁 {viewerCount}</Text>
+        {/* Username - bottom left */}
+        <View style={[styles.bottomLeft, { backgroundColor: theme.colors.overlay }]}>
+          <Text style={styles.username} numberOfLines={1}>
+            {username}
+          </Text>
         </View>
-      )}
+
+        {/* Viewer count - bottom right */}
+        {viewerCount !== undefined && (
+          <View style={[styles.bottomRight, { backgroundColor: theme.colors.overlay }]}>
+            <Text style={styles.viewerCount}>👁 {viewerCount}</Text>
+          </View>
+        )}
 
       {/* Camera/mic status icons - top right */}
       <View style={styles.topRight}>
@@ -180,10 +192,12 @@ export const Tile: React.FC<TileProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 8,
+    backgroundColor: 'transparent',
+    borderRadius: 0, // NO rounded corners - full bleed
     overflow: 'hidden',
-    margin: 4,
+    margin: 0, // NO margins - tiles touch edges
+    borderWidth: 0.5, // Optional: 1px hairline divider
+    borderColor: 'rgba(255, 255, 255, 0.05)',
     position: 'relative',
   },
   emptyTile: {
@@ -200,13 +214,13 @@ const styles = StyleSheet.create({
   },
   videoRenderer: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
   },
   videoPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: 'transparent',
   },
   placeholderText: {
     fontSize: 32,

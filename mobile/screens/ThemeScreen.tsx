@@ -1,46 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as SecureStore from 'expo-secure-store';
 
 import { Button, PageShell } from '../components/ui';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Theme'>;
 
-type ThemeChoice = 'light' | 'dark' | 'system';
-
-const STORAGE_KEY = 'theme_preference';
-
 export function ThemeScreen({ navigation }: Props) {
-  const [value, setValue] = useState<ThemeChoice>('system');
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const raw = await SecureStore.getItemAsync(STORAGE_KEY);
-        if (raw === 'light' || raw === 'dark' || raw === 'system') {
-          setValue(raw);
-        }
-      } catch {
-      }
-    };
-    void load();
-  }, []);
-
-  const setAndSave = async (next: ThemeChoice) => {
-    setValue(next);
-    try {
-      await SecureStore.setItemAsync(STORAGE_KEY, next);
-    } catch {
-    }
-  };
+  const { mode, setMode, theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const options = useMemo(
     () => [
       { key: 'light' as const, label: 'Light' },
       { key: 'dark' as const, label: 'Dark' },
-      { key: 'system' as const, label: 'System' },
     ],
     []
   );
@@ -53,12 +28,12 @@ export function ThemeScreen({ navigation }: Props) {
     >
       <View style={styles.card}>
         {options.map((o) => {
-          const active = value === o.key;
+          const active = mode === o.key;
           return (
             <Pressable
               key={o.key}
               style={({ pressed }) => [styles.row, pressed ? styles.pressed : null, active ? styles.activeRow : null]}
-              onPress={() => void setAndSave(o.key)}
+              onPress={() => setMode(o.key)}
             >
               <Text style={[styles.rowLabel, active ? styles.activeLabel : null]}>{o.label}</Text>
               <Text style={[styles.check, active ? styles.activeLabel : styles.muted]}>{active ? '✓' : ''}</Text>
@@ -70,48 +45,55 @@ export function ThemeScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  headerButton: {
-    height: 36,
-    paddingHorizontal: 12,
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  row: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  pressed: {
-    opacity: 0.9,
-  },
-  activeRow: {
-    backgroundColor: 'rgba(94, 155, 255, 0.12)',
-  },
-  rowLabel: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  activeLabel: {
-    color: '#5E9BFF',
-  },
-  muted: {
-    color: '#6b7280',
-  },
-  check: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    headerButton: {
+      height: 36,
+      paddingHorizontal: 12,
+    },
+    container: {
+      flex: 1,
+      padding: 16,
+    },
+    card: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardAlt,
+      borderRadius: 14,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    row: {
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    pressed: {
+      opacity: 0.92,
+    },
+    activeRow: {
+      backgroundColor: theme.colors.highlight,
+    },
+    rowLabel: {
+      color: theme.colors.text,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    activeLabel: {
+      color: theme.colors.accentSecondary,
+    },
+    muted: {
+      color: theme.colors.mutedText,
+    },
+    check: {
+      fontSize: 14,
+      fontWeight: '900',
+    },
+  });
+}

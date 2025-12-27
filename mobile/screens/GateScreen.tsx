@@ -1,11 +1,12 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { ActivityIndicator, ImageBackground, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuthContext } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 import type { RootStackParamList } from '../types/navigation';
-import { PageShell } from '../components/ui';
+import { BrandLogo } from '../components/ui/BrandLogo';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Gate'>;
 
@@ -15,6 +16,8 @@ export function GateScreen({ navigation }: Props) {
   const { session, loading: authLoading } = useAuthContext();
   const userId = session?.user?.id ?? null;
   const { loading: profileLoading, needsOnboarding, isComplete } = useProfile(userId);
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const lastTargetRef = React.useRef<Target | null>(null);
 
@@ -43,29 +46,50 @@ export function GateScreen({ navigation }: Props) {
   }, [authLoading, isComplete, needsOnboarding, navigation, profileLoading, session]);
 
   return (
-    <PageShell contentStyle={styles.container}>
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#5E9BFF" />
-        <Text style={styles.text}>Loading…</Text>
+    <ImageBackground
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- React Native requires require() for static assets
+      source={require('../assets/splash.png')}
+      style={styles.backgroundImage}
+      imageStyle={styles.backgroundImageStyle}
+    >
+      <View style={styles.container}>
+        <View style={styles.center}>
+          <BrandLogo size={150} />
+          <ActivityIndicator size="large" color="#8B5CF6" style={styles.spinner} />
+          <Text style={styles.text}>Loading…</Text>
+        </View>
       </View>
-    </PageShell>
+    </ImageBackground>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  center: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  text: {
-    color: '#bdbdbd',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    backgroundImage: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    backgroundImageStyle: {
+      opacity: theme.mode === 'light' ? 0.1 : 0.2,
+    },
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: 20,
+      backgroundColor: 'transparent',
+    },
+    center: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 16,
+    },
+    spinner: {
+      marginTop: 8,
+    },
+    text: {
+      color: theme.colors.mutedText,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+  });
+}

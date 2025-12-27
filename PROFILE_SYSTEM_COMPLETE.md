@@ -228,7 +228,7 @@ Implemented a comprehensive, modern profile system for MyLiveLinks with premium 
 - ✅ `user_links`: Public read, owner-only write/delete
 - ✅ `follows`: Public read, follower-only insert/delete
 - ✅ `stream_stats`: Public read, owner-only write
-- ✅ `coin_ledger`: Owner-only read (no direct inserts)
+- ✅ `ledger_entries`: Owner-only read (no direct inserts)
 
 ### API Security
 - ✅ Auth checks on all mutation endpoints

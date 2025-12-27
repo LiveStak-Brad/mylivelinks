@@ -1,0 +1,135 @@
+-- ============================================================================
+-- PRODUCTION RESET - WIPE ALL ECONOMY DATA
+-- ============================================================================
+-- This clears EVERYTHING for production launch with real money:
+-- - All coins and diamonds (set to 0)
+-- - All transactions (gifts, conversions, ledger)
+-- - All leaderboards (top streamers, top gifters, all time periods)
+-- - All spending stats (total_spent, total_purchased)
+-- - All gifter levels (reset to 1)
+-- - All points/metrics
+--
+-- User profiles and accounts remain intact (username, avatar, etc.)
+-- ============================================================================
+
+BEGIN;
+
+-- ============================================================================
+-- STEP 1: Clear All Transaction History
+-- ============================================================================
+
+-- Clear gift history
+DELETE FROM gifts;
+SELECT 'Cleared all gifts' as status;
+
+-- Clear diamond conversions
+DELETE FROM diamond_conversions;
+SELECT 'Cleared all diamond conversions' as status;
+
+-- Clear coin ledger (transaction history)
+DELETE FROM coinledger_legacy;
+SELECT 'Cleared all coin ledger entries' as status;
+
+-- ============================================================================
+-- STEP 2: Reset All User Balances and Stats
+-- ============================================================================
+
+UPDATE profiles
+SET 
+    -- Zero out all balances
+    coin_balance = 0,
+    earnings_balance = 0,  -- diamonds
+    
+    -- Reset spending stats (used for leaderboards)
+    total_spent = 0,
+    total_purchased = 0,
+    total_gifts_received = 0,  -- Top streamers leaderboard
+    total_gifts_sent = 0,      -- Top gifters leaderboard
+    
+    -- Reset gifter level
+    gifter_level = 1
+WHERE TRUE;
+
+SELECT 'Reset all user balances and stats to zero' as status;
+
+-- ============================================================================
+-- STEP 3: Clear ALL Leaderboards
+-- ============================================================================
+
+-- Clear pre-computed leaderboard cache (all periods: daily, weekly, alltime)
+-- This includes: top_streamers_*, top_gifters_*, top_earners_*
+DELETE FROM leaderboard_cache;
+SELECT 'Cleared all leaderboard cache (streamers, gifters, all periods)' as status;
+
+-- Note: Leaderboards are computed from profiles.total_gifts_received and profiles.total_spent
+-- Those fields are reset in Step 2 above
+
+-- ============================================================================
+-- STEP 4: Reset Stream Stats (if tracked)
+-- ============================================================================
+
+-- Stream stats columns don't exist in profiles table - skipping
+SELECT 'Stream stats reset skipped (columns not present)' as status;
+
+-- ============================================================================
+-- STEP 5: Verification - Show Clean Slate
+-- ============================================================================
+
+-- Count remaining records (should all be 0)
+SELECT 
+    'Verification Check' as check_type,
+    (SELECT COUNT(*) FROM gifts) as remaining_gifts,
+    (SELECT COUNT(*) FROM diamond_conversions) as remaining_conversions,
+    (SELECT COUNT(*) FROM coinledger_legacy) as remaining_ledger_entries,
+    (SELECT COUNT(*) FROM leaderboard_cache) as remaining_leaderboard_entries;
+
+-- Show sample of user balances (should all be 0)
+SELECT 
+    'Sample User Balances' as check_type,
+    username,
+    coin_balance,
+    earnings_balance as diamonds,
+    total_spent,
+    gifter_level
+FROM profiles
+ORDER BY created_at DESC
+LIMIT 5;
+
+-- Show total economy values (should all be 0)
+SELECT 
+    'Total Economy Check' as check_type,
+    SUM(coin_balance) as total_coins_in_system,
+    SUM(earnings_balance) as total_diamonds_in_system,
+    SUM(total_spent) as total_ever_spent,
+    COUNT(*) as total_users
+FROM profiles;
+
+COMMIT;
+
+-- ============================================================================
+-- ✅ PRODUCTION RESET COMPLETE
+-- ============================================================================
+-- All fake coins, diamonds, transactions, and leaderboards have been wiped.
+-- The system is now ready for real money integration.
+--
+-- What remains intact:
+-- - User accounts (profiles)
+-- - Usernames, avatars, bios
+-- - Authentication data
+-- - Live stream settings
+-- - Gift type definitions (Rose, Heart, etc.)
+-- - System configuration
+--
+-- What has been wiped:
+-- - All coin balances (0)
+-- - All diamond balances (0)
+-- - All gift history
+-- - All conversion history
+-- - All transaction logs
+-- - All leaderboards
+-- - All spending stats
+-- - All gifter levels (reset to 1)
+-- ============================================================================
+
+SELECT '🎉 PRODUCTION RESET COMPLETE - System ready for real money!' as final_status;
+

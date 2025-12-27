@@ -1,25 +1,122 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-import { Button, Input, PageShell } from '../components/ui';
+import { Button, Input, PageShell, PageHeader } from '../components/ui';
 import { useFeed, type FeedPost } from '../hooks/useFeed';
 import type { MainTabsParamList } from '../types/navigation';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { useAuthContext } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Feed'>;
 
-export function FeedScreen({}: Props) {
+export function FeedScreen({ navigation }: Props) {
   const { posts, nextCursor, isLoading, error, refresh, loadMore } = useFeed();
   const { fetchAuthed } = useFetchAuthed();
+  const { user } = useAuthContext();
   const [composerText, setComposerText] = useState('');
   const [composerLoading, setComposerLoading] = useState(false);
+  const [mediaLocalUri, setMediaLocalUri] = useState<string | null>(null);
+  const [mediaMimeType, setMediaMimeType] = useState<string | null>(null);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
 
-  const canPost = composerText.trim().length > 0 && !composerLoading;
+  const canPost = (composerText.trim().length > 0 || !!mediaUrl) && !composerLoading && !mediaUploading;
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  const uploadPostMedia = useCallback(
+    async (uri: string, mime: string | null): Promise<string> => {
+      const profileId = user?.id;
+      if (!profileId) {
+        throw new Error('Not signed in');
+      }
+
+      const extFromMime = mime?.includes('/') ? mime.split('/')[1] : null;
+      const ext = String(extFromMime || 'jpg')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 8);
+      const filePath = `${profileId}/feed/${Date.now()}.${ext || 'jpg'}`;
+
+      const blob = await fetch(uri).then((r) => r.blob());
+      const { error: uploadError } = await supabase.storage.from('post-media').upload(filePath, blob, {
+        contentType: mime || undefined,
+        upsert: false,
+      });
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage.from('post-media').getPublicUrl(filePath);
+      const publicUrl = urlData?.publicUrl;
+      if (!publicUrl) {
+        throw new Error('Failed to get media URL');
+      }
+      return publicUrl;
+    },
+    [user?.id]
+  );
+
+  const pickMedia = useCallback(
+    async (kind: 'photo' | 'video') => {
+      try {
+        let ImagePicker: any = null;
+        try {
+          // Use require() instead of dynamic import() because some TS configs disallow import().
+          // This also avoids compile-time module resolution errors when the dependency isn't installed yet.
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          ImagePicker = require('expo-image-picker');
+        } catch {
+          Alert.alert(
+            'Uploader not installed',
+            "Install expo-image-picker in the mobile app to enable photo/video uploads."
+          );
+          return;
+        }
+
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm?.granted) {
+          Alert.alert('Permission required', 'Please allow photo library access.');
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes:
+            kind === 'photo'
+              ? ImagePicker.MediaTypeOptions.Images
+              : ImagePicker.MediaTypeOptions.Videos,
+          quality: 0.9,
+          allowsEditing: false,
+        });
+
+        if (result?.canceled) return;
+        const asset = Array.isArray(result?.assets) ? result.assets[0] : null;
+        const uri = typeof asset?.uri === 'string' ? asset.uri : null;
+        if (!uri) return;
+
+        setMediaLocalUri(uri);
+        const mime = typeof asset?.mimeType === 'string' ? asset.mimeType : null;
+        setMediaMimeType(mime);
+
+        setMediaUploading(true);
+        try {
+          const uploadedUrl = await uploadPostMedia(uri, mime);
+          setMediaUrl(uploadedUrl);
+        } finally {
+          setMediaUploading(false);
+        }
+      } catch (e: any) {
+        const message = String(e?.message || e || 'Failed to open media picker');
+        console.error('[Feed] pickMedia error:', e);
+        Alert.alert('Upload failed', message);
+      }
+    },
+    [uploadPostMedia]
+  );
 
   const formatDateTime = useCallback((value: string) => {
     try {
@@ -87,25 +184,76 @@ export function FeedScreen({}: Props) {
           multiline
           style={styles.composerInput}
         />
+
+        <View style={styles.mediaActionsRow}>
+          <Pressable
+            onPress={() => void pickMedia('photo')}
+            disabled={composerLoading || mediaUploading}
+            style={({ pressed }) => [
+              styles.mediaActionButton,
+              pressed && !(composerLoading || mediaUploading) ? styles.mediaActionButtonPressed : null,
+            ]}
+          >
+            <Text style={styles.mediaActionIcon}>📷</Text>
+            <Text style={styles.mediaActionText}>Photo</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => void pickMedia('video')}
+            disabled={composerLoading || mediaUploading}
+            style={({ pressed }) => [
+              styles.mediaActionButton,
+              pressed && !(composerLoading || mediaUploading) ? styles.mediaActionButtonPressed : null,
+            ]}
+          >
+            <Text style={styles.mediaActionIcon}>🎥</Text>
+            <Text style={styles.mediaActionText}>Video</Text>
+          </Pressable>
+
+          {(mediaUploading || mediaUrl) && (
+            <View style={styles.mediaStatusPill}>
+              <Text style={styles.mediaStatusText}>{mediaUploading ? 'Uploading…' : 'Attached'}</Text>
+            </View>
+          )}
+        </View>
+
+        {!!mediaLocalUri && !mediaMimeType?.startsWith('video/') && (
+          <View style={styles.composerPreviewWrap}>
+            <Image source={{ uri: mediaLocalUri }} style={styles.composerPreviewImage} resizeMode="cover" />
+            <Pressable
+              onPress={() => {
+                setMediaLocalUri(null);
+                setMediaMimeType(null);
+                setMediaUrl(null);
+              }}
+              style={({ pressed }) => [styles.removeMediaButton, pressed ? styles.removeMediaButtonPressed : null]}
+            >
+              <Text style={styles.removeMediaText}>Remove</Text>
+            </Pressable>
+          </View>
+        )}
         <View style={styles.composerActions}>
           <Button
             title={composerLoading ? 'Posting…' : 'Post'}
             onPress={() => {
               void (async () => {
                 const text = composerText.trim();
-                if (!text || composerLoading) return;
+                if ((!text && !mediaUrl) || composerLoading || mediaUploading) return;
                 setComposerLoading(true);
                 try {
                   const res = await fetchAuthed('/api/posts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text_content: text }),
+                    body: JSON.stringify({ text_content: text, media_url: mediaUrl }),
                   });
                   if (!res.ok) {
                     console.error('[Feed] create post failed:', res.message);
                     return;
                   }
                   setComposerText('');
+                  setMediaLocalUri(null);
+                  setMediaMimeType(null);
+                  setMediaUrl(null);
                   await refresh();
                 } finally {
                   setComposerLoading(false);
@@ -119,7 +267,7 @@ export function FeedScreen({}: Props) {
         </View>
       </View>
     );
-  }, [canPost, composerLoading, composerText, fetchAuthed, refresh]);
+  }, [canPost, composerLoading, composerText, fetchAuthed, mediaLocalUri, mediaMimeType, mediaUploading, mediaUrl, pickMedia, refresh]);
 
   const keyExtractor = useCallback((item: FeedPost) => item.id, []);
 
@@ -129,59 +277,68 @@ export function FeedScreen({}: Props) {
     void loadMore();
   }, [isLoading, loadMore, nextCursor]);
 
-  const showEmpty = posts.length === 0 && !isLoading;
-
   return (
-    <PageShell title="Feed" contentStyle={styles.container}>
-      {error && posts.length === 0 ? (
-        <View style={styles.stateContainer}>
-          <Text style={styles.stateTitle}>Something went wrong</Text>
-          <Text style={styles.stateSubtitle}>{error}</Text>
-          <Button title="Retry" onPress={() => void refresh()} style={styles.stateButton} />
-        </View>
-      ) : showEmpty ? (
-        <View style={styles.stateContainer}>
-          <Text style={styles.stateTitle}>No posts yet</Text>
-          <Text style={styles.stateSubtitle}>When posts are shared, they’ll appear here.</Text>
-          <Button
-            title={isLoading ? 'Loading…' : 'Refresh'}
-            onPress={() => void refresh()}
-            loading={isLoading}
-            style={styles.stateButton}
+    <PageShell 
+      contentStyle={styles.container}
+      useNewHeader
+      onNavigateHome={() => navigation.navigate('Home')}
+      onNavigateToProfile={(username) => {
+        navigation.navigate('Profile', { username });
+      }}
+      onNavigateToRooms={() => navigation.navigate('Rooms')}
+    >
+      {/* Page Header: Activity icon + Feed */}
+      <PageHeader icon="activity" iconColor="#ec4899" title="Feed" />
+
+      <FlatList
+        data={posts}
+        keyExtractor={keyExtractor}
+        renderItem={renderPost}
+        contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListHeaderComponent={renderComposer}
+        ListEmptyComponent={
+          error ? (
+            <View style={styles.stateContainer}>
+              <Text style={styles.stateTitle}>Something went wrong</Text>
+              <Text style={styles.stateSubtitle}>{error}</Text>
+              <Button title="Retry" onPress={() => void refresh()} style={styles.stateButton} />
+            </View>
+          ) : isLoading ? (
+            <View style={styles.footerLoading}>
+              <ActivityIndicator color="#5E9BFF" />
+            </View>
+          ) : (
+            <View style={styles.stateContainer}>
+              <Text style={styles.stateTitle}>No posts yet</Text>
+              <Text style={styles.stateSubtitle}>When posts are shared, they’ll appear here.</Text>
+              <Button title="Refresh" onPress={() => void refresh()} style={styles.stateButton} />
+            </View>
+          )
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading && posts.length === 0}
+            onRefresh={() => void refresh()}
+            tintColor="#5E9BFF"
           />
-        </View>
-      ) : (
-        <FlatList
-          data={posts}
-          keyExtractor={keyExtractor}
-          renderItem={renderPost}
-          contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListHeaderComponent={renderComposer}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoading && posts.length === 0}
-              onRefresh={() => void refresh()}
-              tintColor="#5E9BFF"
-            />
-          }
-          onEndReached={onEndReached}
-          onEndReachedThreshold={0.6}
-          ListFooterComponent={
-            isLoading && posts.length > 0 ? (
-              <View style={styles.footerLoading}>
-                <ActivityIndicator color="#5E9BFF" />
-              </View>
-            ) : nextCursor ? (
-              <Pressable style={styles.loadMoreButton} onPress={() => void loadMore()}>
-                <Text style={styles.loadMoreText}>Load more</Text>
-              </Pressable>
-            ) : (
-              <View style={styles.footerSpacer} />
-            )
-          }
-        />
-      )}
+        }
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.6}
+        ListFooterComponent={
+          isLoading && posts.length > 0 ? (
+            <View style={styles.footerLoading}>
+              <ActivityIndicator color="#5E9BFF" />
+            </View>
+          ) : nextCursor ? (
+            <Pressable style={styles.loadMoreButton} onPress={() => void loadMore()}>
+              <Text style={styles.loadMoreText}>Load more</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.footerSpacer} />
+          )
+        }
+      />
     </PageShell>
   );
 }
@@ -221,6 +378,77 @@ function createStyles(theme: ThemeDefinition) {
       paddingTop: 12,
       paddingBottom: 12,
       textAlignVertical: 'top',
+    },
+    mediaActionsRow: {
+      marginTop: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    mediaActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 12,
+      backgroundColor: theme.colors.cardAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    mediaActionButtonPressed: {
+      opacity: 0.85,
+    },
+    mediaActionIcon: {
+      fontSize: 14,
+    },
+    mediaActionText: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    mediaStatusPill: {
+      marginLeft: 'auto',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: 'rgba(94,155,255,0.16)',
+      borderWidth: 1,
+      borderColor: 'rgba(94,155,255,0.30)',
+    },
+    mediaStatusText: {
+      color: theme.colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    composerPreviewWrap: {
+      marginTop: 12,
+      borderRadius: 12,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardAlt,
+    },
+    composerPreviewImage: {
+      width: '100%',
+      height: 200,
+    },
+    removeMediaButton: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    removeMediaButtonPressed: {
+      opacity: 0.85,
+    },
+    removeMediaText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '800',
     },
     composerActions: {
       marginTop: 10,

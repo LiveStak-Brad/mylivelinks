@@ -12,7 +12,7 @@ All critical pre-deploy requirements have been applied. The schema is now produc
 
 **RLS Enabled on All Required Tables:**
 - ✅ `profiles` - Users can SELECT all, UPDATE own
-- ✅ `coin_ledger` - Users can SELECT own, INSERT only via RPC
+- ✅ `ledger_entries` - Users can SELECT own, INSERT only via RPC
 - ✅ `coin_purchases` - Users can SELECT own, INSERT only via RPC
 - ✅ `gifts` - Everyone can SELECT, INSERT only via RPC
 - ✅ `live_streams` - Everyone can SELECT, only owner can update `live_available`
@@ -22,7 +22,7 @@ All critical pre-deploy requirements have been applied. The schema is now produc
 - ✅ `user_links` - Everyone can SELECT, users can manage own links
 
 **Key RLS Policies:**
-- Direct inserts to `coin_ledger`, `coin_purchases`, and `gifts` are **denied** - must use RPC functions
+- Direct inserts to `ledger_entries`, `coin_purchases`, and `gifts` are **denied** - must use RPC functions
 - Users can only update their own profiles, grid slots, and viewing records
 - Streamers can only update their own `live_available` (not `is_published`)
 

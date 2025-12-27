@@ -4,5 +4,6 @@ export { Checkbox } from './Checkbox';
 export { Modal } from './Modal';
 export { GlobalHeader } from './GlobalHeader';
 export { PageShell } from './PageShell';
+export { PageHeader } from './PageHeader';
 export { BottomNav } from './BottomNav';
 export { BrandLogo } from './BrandLogo';

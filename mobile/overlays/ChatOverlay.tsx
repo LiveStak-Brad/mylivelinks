@@ -1,9 +1,9 @@
 /**
  * Chat Overlay - Swipe UP to open, DOWN to close
- * Semi-transparent scrollable chat list
+ * Semi-transparent scrollable chat list with REAL DATA
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Animated, {
@@ -22,7 +23,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import type { Message } from '../types/live';
+import { useChatMessages } from '../hooks/useChatMessages';
 
 interface ChatOverlayProps {
   visible: boolean;
@@ -30,10 +31,20 @@ interface ChatOverlayProps {
 }
 
 export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) => {
-  const messages: Message[] = [];
+  const { messages, loading, sendMessage } = useChatMessages();
   const [inputText, setInputText] = useState('');
+  const scrollViewRef = useRef<ScrollView>(null);
   
   const translateY = useSharedValue(0);
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (visible && messages.length > 0) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages.length, visible]);
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
@@ -56,8 +67,13 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) =>
 
   if (!visible) return null;
 
-  const handleSend = () => {
-    setInputText('');
+  const handleSend = async () => {
+    if (!inputText.trim()) return;
+    
+    const success = await sendMessage(inputText.trim());
+    if (success) {
+      setInputText('');
+    }
   };
 
   return (
@@ -72,17 +88,26 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) =>
             </View>
 
             {/* Messages list */}
-            <ScrollView style={styles.messageList} contentContainerStyle={styles.messageContent}>
-              {messages.length === 0 ? (
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.messageList} 
+              contentContainerStyle={styles.messageContent}
+            >
+              {loading ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyTitle}>Chat coming soon</Text>
-                  <Text style={styles.emptySubtitle}>Messages will appear here when chat is enabled.</Text>
+                  <ActivityIndicator color="#4a9eff" size="large" />
+                  <Text style={styles.emptySubtitle}>Loading messages...</Text>
+                </View>
+              ) : messages.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyTitle}>No messages yet</Text>
+                  <Text style={styles.emptySubtitle}>Be the first to say something!</Text>
                 </View>
               ) : (
                 messages.map((msg) => (
                   <View key={msg.id} style={styles.messageItem}>
-                    <Text style={styles.messageUsername}>{msg.username}</Text>
-                    <Text style={styles.messageText}>{msg.text}</Text>
+                    <Text style={styles.messageUsername}>{msg.username || 'Unknown'}</Text>
+                    <Text style={styles.messageText}>{msg.content}</Text>
                   </View>
                 ))
               )}
@@ -97,13 +122,17 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) =>
                 style={styles.input}
                 value={inputText}
                 onChangeText={setInputText}
-                placeholder="Chat disabled"
+                placeholder="Type a message..."
                 placeholderTextColor="#888"
                 returnKeyType="send"
                 onSubmitEditing={handleSend}
-                editable={false}
+                editable={!loading}
               />
-              <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled>
+              <TouchableOpacity 
+                style={[styles.sendButton, (!inputText.trim() || loading) && styles.sendButtonDisabled]} 
+                onPress={handleSend} 
+                disabled={!inputText.trim() || loading}
+              >
                 <Text style={styles.sendButtonText}>Send</Text>
               </TouchableOpacity>
             </KeyboardAvoidingView>
@@ -211,6 +240,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#333',
+    opacity: 0.5,
   },
   sendButtonText: {
     color: '#fff',

@@ -18,8 +18,8 @@ export async function POST(request: NextRequest) {
     const textContent = typeof body?.text_content === 'string' ? body.text_content.trim() : '';
     const mediaUrl = typeof body?.media_url === 'string' ? body.media_url.trim() : null;
 
-    if (!textContent) {
-      return NextResponse.json({ error: 'text_content is required' }, { status: 400 });
+    if (!textContent && !(mediaUrl && mediaUrl.length)) {
+      return NextResponse.json({ error: 'text_content or media_url is required' }, { status: 400 });
     }
 
     const supabase = createAuthedRouteHandlerClient(request);

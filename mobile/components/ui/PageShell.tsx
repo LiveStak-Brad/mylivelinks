@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Animated, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { GlobalHeader } from './GlobalHeader';
@@ -20,9 +20,13 @@ type PageShellProps = {
   onNavigateToWallet?: () => void;
   onNavigateToAnalytics?: () => void;
   onNavigateToApply?: () => void;
+  onNavigateToRooms?: () => void;
   onLogout?: () => void;
   // Flag to show new header
   useNewHeader?: boolean;
+  // Auto-hide support
+  headerVisible?: boolean;
+  headerAnimatedValue?: Animated.Value;
 };
 
 export function PageShell({ 
@@ -39,34 +43,50 @@ export function PageShell({
   onNavigateToWallet,
   onNavigateToAnalytics,
   onNavigateToApply,
+  onNavigateToRooms,
   onLogout,
   useNewHeader = false,
+  headerVisible = true,
+  headerAnimatedValue,
 }: PageShellProps) {
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const legacyStyles = useMemo(() => createLegacyStyles(theme), [theme]);
 
+  // Calculate header transform
+  const headerTransform = headerAnimatedValue 
+    ? [{
+        translateY: headerAnimatedValue.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-60, 0], // Slide up by header height when hidden
+        }),
+      }]
+    : [];
+
   return (
     <SafeAreaView style={[styles.container, style]} edges={edges ?? ['top', 'left', 'right', 'bottom']}>
       {useNewHeader ? (
-        <GlobalHeader
-          onNavigateHome={onNavigateHome}
-          onNavigateToProfile={onNavigateToProfile}
-          onNavigateToSettings={onNavigateToSettings}
-          onNavigateToWallet={onNavigateToWallet}
-          onNavigateToAnalytics={onNavigateToAnalytics}
-          onNavigateToApply={onNavigateToApply}
-          onLogout={onLogout}
-        />
+        <Animated.View style={[{ transform: headerTransform }]}>
+          <GlobalHeader
+            onNavigateHome={onNavigateHome}
+            onNavigateToProfile={onNavigateToProfile}
+            onNavigateToSettings={onNavigateToSettings}
+            onNavigateToWallet={onNavigateToWallet}
+            onNavigateToAnalytics={onNavigateToAnalytics}
+            onNavigateToApply={onNavigateToApply}
+            onNavigateToRooms={onNavigateToRooms}
+            onLogout={onLogout}
+          />
+        </Animated.View>
       ) : title ? (
         // Legacy header - to be removed after migration
-        <View style={legacyStyles.container}>
+        <Animated.View style={[legacyStyles.container, { transform: headerTransform }]}>
           <View style={legacyStyles.side}>{left}</View>
           <Text style={legacyStyles.title} numberOfLines={1}>
             {title}
           </Text>
           <View style={legacyStyles.side}>{right}</View>
-        </View>
+        </Animated.View>
       ) : null}
       <View style={[styles.content, contentStyle]}>{children}</View>
     </SafeAreaView>

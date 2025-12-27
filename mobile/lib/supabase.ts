@@ -30,11 +30,18 @@ const ExpoSecureStoreAdapter = {
 const safeSupabaseUrl = supabaseUrl ?? 'https://example.supabase.co';
 const safeSupabaseAnonKey = supabaseAnonKey ?? 'public-anon-key-not-set';
 
+export const supabaseBaseUrl = safeSupabaseUrl;
+
 export const supabase = createClient(safeSupabaseUrl, safeSupabaseAnonKey, {
   auth: {
     storage: ExpoSecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // CRITICAL: Use unique storage key to prevent conflicts with web sessions
+    // Web uses default 'sb-{project-ref}-auth-token' in localStorage
+    // Mobile uses 'sb-mobile-auth-token' in SecureStore
+    // This allows independent sessions without backend token invalidation
+    storageKey: 'sb-mobile-auth-token',
   },
 });

@@ -14,7 +14,7 @@
 ```sql
 -- RLS Policy blocks direct inserts
 CREATE POLICY "Deny direct inserts - use RPC only"
-    ON coin_ledger FOR INSERT
+    ON ledger_entries FOR INSERT
     USING (false);
 
 -- But RPC function can insert (SECURITY DEFINER bypasses RLS)
@@ -55,16 +55,16 @@ SET search_path = public;
 **Status:** ✅ VERIFIED
 
 **Implementation:**
-- `coin_ledger`: RLS policy `USING (false)` blocks direct inserts
+- `ledger_entries`: RLS policy `USING (false)` blocks direct inserts
 - `coin_purchases`: RLS policy `USING (false)` blocks direct inserts
 - `gifts`: RLS policy `USING (false)` blocks direct inserts
 - All inserts must go through RPC functions
 
 **Evidence:**
 ```sql
--- coin_ledger
+-- ledger_entries
 CREATE POLICY "Deny direct inserts - use RPC only"
-    ON coin_ledger FOR INSERT
+    ON ledger_entries FOR INSERT
     USING (false);
 
 -- coin_purchases
@@ -137,11 +137,11 @@ BEGIN
     SELECT id INTO p_profile_id FROM profiles WHERE id = p_profile_id FOR UPDATE;
     
     -- Insert ledger entry
-    INSERT INTO coin_ledger (...);
+    INSERT INTO ledger_entries (...);
     
     -- Recalculate balance from ledger (source of truth)
     SELECT COALESCE(SUM(amount), 0) INTO v_new_balance
-    FROM coin_ledger
+    FROM ledger_entries
     WHERE profile_id = p_profile_id;
     
     -- Update cached balance (same transaction)

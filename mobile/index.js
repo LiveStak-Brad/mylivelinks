@@ -1,6 +1,14 @@
 import { registerRootComponent } from 'expo';
 
-import App from './App';
+require('react-native-url-polyfill/auto');
+require('react-native-get-random-values');
+
+const { TextDecoder, TextEncoder } = require('text-encoding');
+
+if (global.TextEncoder == null) global.TextEncoder = TextEncoder;
+if (global.TextDecoder == null) global.TextDecoder = TextDecoder;
+
+const App = require('./App').default;
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
 // It also ensures that whether you load the app in Expo Go or in a native build,

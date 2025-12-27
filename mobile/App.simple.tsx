@@ -10,7 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 export default function App() {
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <Text style={styles.text}>✅ MyLiveLinks Mobile</Text>
       <Text style={styles.subtitle}>Build is working!</Text>
     </View>
@@ -20,17 +20,17 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   text: {
-    color: '#fff',
+    color: '#0F172A',
     fontSize: 24,
     fontWeight: 'bold',
   },
   subtitle: {
-    color: '#888',
+    color: '#4B5563',
     fontSize: 16,
     marginTop: 8,
   },

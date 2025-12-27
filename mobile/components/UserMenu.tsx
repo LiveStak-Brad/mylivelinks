@@ -1,8 +1,9 @@
 /**
- * UserMenu Component - Mobile
+ * UserMenu Component - Mobile (v3.0 - Vector Icons)
  * 
- * WEB PARITY: components/UserMenu.tsx
- * Profile dropdown with user info, profile actions, wallet, analytics, theme toggle, logout
+ * Single menu combining UserMenu + OptionsMenu items
+ * Triggered by avatar circle in top bar
+ * Now uses vector icons (Ionicons) for professional styling
  */
 
 import React, { useMemo, useState } from 'react';
@@ -14,18 +15,24 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  Image,
+  Switch,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { assertRouteExists } from '../lib/routeAssert';
 import { useTopBarState } from '../hooks/topbar/useTopBarState';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 interface UserMenuProps {
   onNavigateToProfile?: (username: string) => void;
   onNavigateToSettings?: () => void;
   onNavigateToWallet?: () => void;
   onNavigateToAnalytics?: () => void;
+  onNavigateToApply?: () => void;
   onLogout?: () => void;
 }
 
@@ -34,10 +41,13 @@ export function UserMenu({
   onNavigateToSettings,
   onNavigateToWallet,
   onNavigateToAnalytics,
+  onNavigateToApply,
   onLogout,
 }: UserMenuProps) {
   const navigation = useNavigation<any>();
   const topBar = useTopBarState();
+  const { theme, mode, setMode } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [showMenu, setShowMenu] = useState(false);
 
@@ -59,6 +69,15 @@ export function UserMenu({
   };
 
   const closeMenu = () => setShowMenu(false);
+
+  const navigateRoot = (screenName: string) => {
+    try {
+      assertRouteExists(navigation, screenName);
+      navigation.getParent?.()?.navigate?.(screenName);
+    } catch {
+      console.warn(`Failed to navigate to ${screenName}`);
+    }
+  };
 
   const handleViewProfile = () => {
     closeMenu();
@@ -86,10 +105,36 @@ export function UserMenu({
     navigation.getParent?.()?.navigate?.('MyAnalytics');
   };
 
-  const handleTheme = () => {
+  const handleTransactions = () => {
     closeMenu();
-    assertRouteExists(navigation, 'Theme');
-    navigation.getParent?.()?.navigate?.('Theme');
+    navigateRoot('Transactions');
+  };
+
+  const handleApplyRoom = () => {
+    closeMenu();
+    if (onNavigateToApply) {
+      onNavigateToApply();
+    }
+  };
+
+  const handleRoomRules = () => {
+    closeMenu();
+    navigateRoot('RoomRules');
+  };
+
+  const handleHelpFaq = () => {
+    closeMenu();
+    navigateRoot('HelpFAQ');
+  };
+
+  const handleReportUser = () => {
+    closeMenu();
+    navigateRoot('ReportUser');
+  };
+
+  const handleBlockedUsers = () => {
+    closeMenu();
+    navigateRoot('BlockedUsers');
   };
 
   // Loading state
@@ -121,22 +166,16 @@ export function UserMenu({
 
   return (
     <>
-      {/* Trigger Button */}
+      {/* Trigger Button - Avatar Circle */}
       <Pressable
         style={styles.triggerButton}
         onPress={() => setShowMenu(true)}
       >
-        {/* Avatar */}
-        {topBar.avatarUrl ? (
-          <View style={styles.avatarImage}>
-            {/* In production, use <Image source={{ uri: profile.avatar_url }} /> */}
-            <Text style={styles.avatarInitials}>{initials}</Text>
-          </View>
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitials}>{initials}</Text>
-          </View>
-        )}
+        {/* Avatar with default fallback image */}
+        <Image
+          source={getAvatarSource(topBar.avatarUrl)}
+          style={styles.avatarImage}
+        />
 
         {/* Chevron indicator */}
         <Text style={styles.chevron}>▼</Text>
@@ -155,15 +194,10 @@ export function UserMenu({
             {topBar.username && (
               <View style={styles.userInfoHeader}>
                 <View style={styles.userInfoContent}>
-                  {topBar.avatarUrl ? (
-                    <View style={styles.userInfoAvatar}>
-                      <Text style={styles.userInfoAvatarText}>{initials}</Text>
-                    </View>
-                  ) : (
-                    <View style={[styles.userInfoAvatar, styles.avatarPlaceholder]}>
-                      <Text style={styles.userInfoAvatarText}>{initials}</Text>
-                    </View>
-                  )}
+                  <Image
+                    source={getAvatarSource(topBar.avatarUrl)}
+                    style={styles.userInfoAvatar}
+                  />
                   <View style={styles.userInfoText}>
                     <Text style={styles.userInfoName} numberOfLines={1}>
                       {displayName}
@@ -180,61 +214,138 @@ export function UserMenu({
             <ScrollView style={styles.menuItems} showsVerticalScrollIndicator={false}>
               {/* Profile Actions */}
               <MenuItem
-                icon="👤"
-                iconColor="#3b82f6"
+                icon="person-outline"
+                iconColor="#8b5cf6"
                 label="View Profile"
                 onPress={handleViewProfile}
                 disabled={!topBar.enabledItems.userMenu_viewProfile}
+                styles={styles}
               />
 
               <MenuItem
-                icon="⚙️"
-                iconColor="#6b7280"
+                icon="settings-outline"
+                iconColor="#a78bfa"
                 label="Edit Profile"
                 onPress={handleEditProfile}
                 disabled={!topBar.enabledItems.userMenu_editProfile}
+                styles={styles}
               />
 
-              <MenuDivider />
+              <MenuDivider styles={styles} />
 
               {/* Account Actions */}
               <MenuItem
-                icon="💰"
-                iconColor="#f59e0b"
+                icon="wallet-outline"
+                iconColor="#ec4899"
                 label="Wallet"
                 onPress={handleWallet}
                 disabled={!topBar.enabledItems.userMenu_wallet}
+                styles={styles}
               />
 
               <MenuItem
-                icon="📊"
-                iconColor="#8b5cf6"
+                icon="bar-chart-outline"
+                iconColor="#6366f1"
                 label="Analytics"
                 onPress={handleAnalytics}
                 disabled={!topBar.enabledItems.userMenu_analytics}
+                styles={styles}
               />
 
-              <MenuDivider />
-
-              {/* Theme Toggle - Placeholder */}
               <MenuItem
-                icon="🌙"
-                iconColor="#6b7280"
-                label="Theme"
-                onPress={handleTheme}
-                disabled={!topBar.enabledItems.userMenu_themeToggle}
+                icon="diamond-outline"
+                iconColor="#d946ef"
+                label="Transactions"
+                onPress={handleTransactions}
+                disabled={!topBar.enabledItems.optionsMenu_transactions}
+                styles={styles}
               />
 
-              <MenuDivider />
+              <MenuDivider styles={styles} />
+
+              {/* Room / Live */}
+              <MenuItem
+                icon="document-text-outline"
+                iconColor="#3b82f6"
+                label="Apply for a Room"
+                onPress={handleApplyRoom}
+                disabled={!topBar.enabledItems.optionsMenu_applyRoom}
+                styles={styles}
+              />
+
+              <MenuItem
+                icon="list-outline"
+                iconColor="#c084fc"
+                label="Room Rules"
+                onPress={handleRoomRules}
+                disabled={!topBar.enabledItems.optionsMenu_roomRules}
+                styles={styles}
+              />
+
+              <MenuItem
+                icon="help-circle-outline"
+                iconColor="#818cf8"
+                label="Help / FAQ"
+                onPress={handleHelpFaq}
+                disabled={!topBar.enabledItems.optionsMenu_helpFaq}
+                styles={styles}
+              />
+
+              <MenuDivider styles={styles} />
+
+              {/* Safety */}
+              <MenuItem
+                icon="warning-outline"
+                iconColor="#f472b6"
+                label="Report a User"
+                onPress={handleReportUser}
+                disabled={!topBar.enabledItems.optionsMenu_reportUser}
+                styles={styles}
+              />
+
+              <MenuItem
+                icon="ban-outline"
+                iconColor="#a855f7"
+                label="Blocked Users"
+                onPress={handleBlockedUsers}
+                disabled={!topBar.enabledItems.optionsMenu_blockedUsers}
+                styles={styles}
+              />
+
+              <MenuDivider styles={styles} />
+
+              {/* Theme Toggle */}
+              <View style={styles.themeRow}>
+                <View style={styles.themeLabelGroup}>
+                  <View style={styles.themeIconRow}>
+                    <Ionicons 
+                      name={mode === 'light' ? 'sunny-outline' : 'moon-outline'} 
+                      size={18} 
+                      color="#6366f1" 
+                    />
+                    <Text style={styles.themeLabel}>Theme</Text>
+                  </View>
+                  <Text style={styles.themeValue}>{mode === 'light' ? 'Light' : 'Dark'}</Text>
+                </View>
+                <Switch
+                  value={mode === 'light'}
+                  onValueChange={(isLight) => setMode(isLight ? 'light' : 'dark')}
+                  trackColor={{ false: theme.colors.border, true: '#8b5cf6' }}
+                  thumbColor={mode === 'light' ? '#fff' : '#e0e7ff'}
+                />
+              </View>
+
+              <MenuDivider styles={styles} />
 
               {/* Logout */}
               <MenuItem
-                icon="🚪"
-                iconColor="#ef4444"
+                icon="log-out-outline"
+                iconColor="#ec4899"
                 label="Logout"
                 onPress={handleLogout}
                 destructive
                 disabled={!topBar.enabledItems.userMenu_logout}
+                styles={styles}
               />
             </ScrollView>
           </View>
@@ -246,15 +357,18 @@ export function UserMenu({
 
 // Menu Item Component
 interface MenuItemProps {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   iconColor?: string;
   label: string;
   onPress: () => void;
   destructive?: boolean;
   disabled?: boolean;
+  styles: Styles;
 }
 
-function MenuItem({ icon, iconColor, label, onPress, destructive = false, disabled = false }: MenuItemProps) {
+function MenuItem({ icon, iconColor, label, onPress, destructive = false, disabled = false, styles }: MenuItemProps) {
+  const finalIconColor = disabled ? '#9ca3af' : (iconColor || '#6b7280');
+  
   return (
     <Pressable
       style={({ pressed }) => [
@@ -266,9 +380,11 @@ function MenuItem({ icon, iconColor, label, onPress, destructive = false, disabl
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
     >
-      <Text style={[styles.menuItemIcon, iconColor && !disabled ? { color: iconColor } : undefined, disabled && styles.menuItemIconDisabled]}>
-        {icon}
-      </Text>
+      <Ionicons 
+        name={icon} 
+        size={20} 
+        color={finalIconColor}
+      />
       <Text
         style={[
           styles.menuItemLabel,
@@ -283,167 +399,209 @@ function MenuItem({ icon, iconColor, label, onPress, destructive = false, disabl
 }
 
 // Menu Divider
-function MenuDivider() {
+function MenuDivider({ styles }: { styles: Styles }) {
   return <View style={styles.divider} />;
 }
 
-const styles = StyleSheet.create({
-  loadingAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#8b5cf6',
-    borderRadius: 12,
-  },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 14,
+type Styles = ReturnType<typeof createStyles>;
+
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    loadingAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.colors.cardAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loginButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      backgroundColor: theme.colors.accent,
+      borderRadius: 12,
+    },
+    loginButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    triggerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 4,
+      paddingLeft: 4,
+      paddingRight: 8,
+      borderRadius: 20,
+    backgroundColor: theme.colors.cardSurface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    shadowColor: theme.colors.menuShadow,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    },
+    avatarImage: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: 'rgba(139, 92, 246, 0.2)',
+    },
+    avatarPlaceholder: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: 'rgba(139, 92, 246, 0.2)',
+    },
+    avatarInitials: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    chevron: {
+      fontSize: 10,
+      color: theme.colors.mutedText,
+    },
+    backdrop: {
+      flex: 1,
+      backgroundColor: theme.colors.menuBackdrop,
+      justifyContent: 'flex-start',
+      alignItems: 'flex-end',
+      paddingTop: 60,
+      paddingRight: 16,
+    },
+    menuContainer: {
+      width: 256,
+      maxHeight: '80%',
+    backgroundColor: theme.colors.cardSurface,
+    borderRadius: 14,
+      overflow: 'hidden',
+      borderWidth: 1,
+    borderColor: theme.colors.border,
+      shadowColor: theme.colors.menuShadow,
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 12,
+    },
+    userInfoHeader: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.colors.cardAlt,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.menuBorder,
+    },
+    userInfoContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    userInfoAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: 'rgba(139, 92, 246, 0.2)',
+    },
+    userInfoAvatarText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    userInfoText: {
+      flex: 1,
+    },
+    userInfoName: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 2,
+    },
+    userInfoUsername: {
+      fontSize: 12,
+      color: theme.colors.mutedText,
+    },
+    menuItems: {
+      padding: 8,
+    backgroundColor: 'transparent',
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 8,
+    },
+    menuItemPressed: {
+      backgroundColor: theme.colors.highlight,
+    },
+    menuItemDestructive: {
+      backgroundColor: 'transparent',
+    },
+    menuItemDisabled: {
+      opacity: 0.4,
+    },
+    menuItemLabel: {
+      flex: 1,
+      fontSize: 14,
     fontWeight: '600',
-  },
-  triggerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    paddingLeft: 4,
-    paddingRight: 8,
-    borderRadius: 20,
-  },
-  avatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#8b5cf6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
-  },
-  avatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#8b5cf6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
-  },
-  avatarInitials: {
-    color: '#fff',
-    fontSize: 14,
+    color: theme.colors.textPrimary,
+    },
+    menuItemLabelDestructive: {
+      color: theme.colors.danger,
+    },
+    menuItemLabelDisabled: {
+      color: theme.colors.mutedText,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: theme.colors.menuBorder,
+      marginVertical: 4,
+    },
+    themeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      borderRadius: 8,
+    backgroundColor: theme.colors.cardSurface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    themeLabelGroup: {
+      flexDirection: 'column',
+      gap: 2,
+      flex: 1,
+    },
+    themeIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    themeLabel: {
+      fontSize: 14,
     fontWeight: '700',
-  },
-  chevron: {
-    fontSize: 10,
-    color: '#9aa0a6',
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 60,
-    paddingRight: 16,
-  },
-  menuContainer: {
-    width: 256,
-    maxHeight: '80%',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  userInfoHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  userInfoContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  userInfoAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#8b5cf6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
-  },
-  userInfoAvatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  userInfoText: {
-    flex: 1,
-  },
-  userInfoName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-    marginBottom: 2,
-  },
-  userInfoUsername: {
-    fontSize: 12,
-    color: '#9aa0a6',
-  },
-  menuItems: {
-    padding: 8,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  menuItemPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  menuItemDestructive: {
-    // backgroundColor remains default
-  },
-  menuItemDisabled: {
-    opacity: 0.4,
-  },
-  menuItemIcon: {
-    fontSize: 16,
-  },
-  menuItemIconDisabled: {
-    opacity: 0.5,
-  },
-  menuItemLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#fff',
-  },
-  menuItemLabelDestructive: {
-    color: '#ef4444',
-  },
-  menuItemLabelDisabled: {
-    color: '#6b7280',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: 4,
-  },
-});
+    color: theme.colors.textPrimary,
+    },
+    themeValue: {
+      fontSize: 12,
+    color: theme.colors.textSecondary,
+    },
+  });
+}
 

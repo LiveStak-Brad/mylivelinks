@@ -13,7 +13,7 @@
  * - Components mirror: components/ProfileCarousel.tsx, components/rooms/RoomsCarousel.tsx
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -22,20 +22,24 @@ import {
   ActivityIndicator,
   Pressable,
   Linking,
+  Image,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { Button, Input, PageShell } from '../components/ui';
+import { Button, Input, PageShell, PageHeader } from '../components/ui';
 import { useAuthContext } from '../contexts/AuthContext';
 import { ProfileCarousel } from '../components/ProfileCarousel';
 import { RoomsCarousel } from '../components/RoomsCarousel';
 import type { MainTabsParamList } from '../types/navigation';
 import { supabase } from '../lib/supabase';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type Props = { navigation: any };
 
 export function HomeDashboardScreen({ navigation }: Props) {
   const { user } = useAuthContext();
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [loading, setLoading] = React.useState(true);
   const [currentUser, setCurrentUser] = React.useState<any>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -92,11 +96,8 @@ export function HomeDashboardScreen({ navigation }: Props) {
   };
 
   const handleProfilePress = (username: string) => {
-    // Navigate to profile via parent stack navigator
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.navigate('ProfileRoute', { username });
-    }
+    // Navigate to profile tab within MainTabs
+    navigation.navigate('Profile', { username });
   };
 
   const handleNavigateHome = () => {
@@ -114,20 +115,25 @@ export function HomeDashboardScreen({ navigation }: Props) {
     }
   };
 
+  const handleNavigateToRooms = () => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Rooms');
+      return;
+    }
+    try {
+      navigation.navigate('Rooms');
+    } catch {
+      // ignore
+    }
+  };
+
   const handleNavigateToAnalytics = () => {
     // TODO: Navigate to analytics
   };
 
   const handleApplyPress = () => {
     Linking.openURL('https://mylivelinks.com/apply');
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    const parent = navigation.getParent();
-    if (parent) {
-      parent.navigate('Gate');
-    }
   };
 
   if (loading) {
@@ -141,10 +147,10 @@ export function HomeDashboardScreen({ navigation }: Props) {
         onNavigateToWallet={handleNavigateToWallet}
         onNavigateToAnalytics={handleNavigateToAnalytics}
         onNavigateToApply={handleApplyPress}
-        onLogout={handleLogout}
+        onNavigateToRooms={handleNavigateToRooms}
       >
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#5E9BFF" />
+          <ActivityIndicator size="large" color={theme.colors.accentSecondary} />
         </View>
       </PageShell>
     );
@@ -160,22 +166,24 @@ export function HomeDashboardScreen({ navigation }: Props) {
       onNavigateToWallet={handleNavigateToWallet}
       onNavigateToAnalytics={handleNavigateToAnalytics}
       onNavigateToApply={handleApplyPress}
-      onLogout={handleLogout}
+      onNavigateToRooms={handleNavigateToRooms}
     >
+      {/* Page Header: Home icon + Home */}
+      <PageHeader icon="home" iconColor="#8b5cf6" title="Home" />
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Welcome to MyLiveLinks</Text>
-          <Text style={styles.heroSubtitle}>
-            Your all-in-one platform for live streaming and link sharing
-          </Text>
-          <Text style={styles.heroDescription}>
-            Stream live, share your links, and build your community ✨
-          </Text>
+        {/* Hero Banner */}
+        <View style={styles.heroCard}>
+          <Image
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            source={require('../assets/mylivelinksmeta.png')}
+            style={styles.heroBanner}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Search Section */}
@@ -202,7 +210,7 @@ export function HomeDashboardScreen({ navigation }: Props) {
             <View style={styles.searchResults}>
               {searching ? (
                 <View style={styles.searchLoading}>
-                  <ActivityIndicator color="#5E9BFF" />
+                  <ActivityIndicator color={theme.colors.accentSecondary} />
                   <Text style={styles.searchLoadingText}>Searching...</Text>
                 </View>
               ) : searchResults.length > 0 ? (
@@ -214,9 +222,16 @@ export function HomeDashboardScreen({ navigation }: Props) {
                       onPress={() => handleProfilePress(profile.username)}
                     >
                       <View style={styles.resultAvatar}>
-                        <Text style={styles.resultAvatarText}>
-                          {(profile.username || '?').charAt(0).toUpperCase()}
-                        </Text>
+                        {profile.avatar_url ? (
+                          <Image
+                            source={{ uri: profile.avatar_url }}
+                            style={styles.resultAvatarImage}
+                          />
+                        ) : (
+                          <Text style={styles.resultAvatarText}>
+                            {(profile.username || '?').charAt(0).toUpperCase()}
+                          </Text>
+                        )}
                       </View>
                       <View style={styles.resultInfo}>
                         <View style={styles.resultNameRow}>
@@ -229,7 +244,7 @@ export function HomeDashboardScreen({ navigation }: Props) {
                             </View>
                           )}
                         </View>
-                        <Text style={styles.resultUsername}>@{profile.username}</Text>
+                      <Text style={styles.resultUsername}>@{profile.username}</Text>
                         {profile.bio && (
                           <Text style={styles.resultBio} numberOfLines={1}>
                             {profile.bio}
@@ -317,10 +332,7 @@ export function HomeDashboardScreen({ navigation }: Props) {
               <Button
                 title="View My Profile"
                 onPress={() => {
-                  const parent = navigation.getParent();
-                  if (parent) {
-                    parent.navigate('ProfileRoute', { username: currentUser.username });
-                  }
+                  navigation.navigate('Profile', { username: currentUser.username });
                 }}
                 style={styles.actionButton}
               />
@@ -362,207 +374,256 @@ export function HomeDashboardScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  hero: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 32,
-    alignItems: 'center',
-  },
-  heroTitle: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  heroSubtitle: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    marginBottom: 8,
-    paddingHorizontal: 16,
-  },
-  heroDescription: {
-    fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-  },
-  section: {
-    paddingHorizontal: 16,
-    marginBottom: 32,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    gap: 8,
-  },
-  sectionIcon: {
-    fontSize: 24,
-  },
-  sectionHeaderText: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#9aa0a6',
-    lineHeight: 18,
-  },
-  searchInput: {
-    marginBottom: 12,
-  },
-  searchResults: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  searchLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    gap: 8,
-  },
-  searchLoadingText: {
-    color: '#9aa0a6',
-    fontSize: 14,
-  },
-  resultsList: {
-    gap: 4,
-  },
-  resultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    gap: 12,
-  },
-  resultAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#5E9BFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resultAvatarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  resultInfo: {
-    flex: 1,
-  },
-  resultNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 2,
-  },
-  resultName: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  liveBadgeSmall: {
-    backgroundColor: '#FF4444',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  liveBadgeSmallText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '900',
-  },
-  resultUsername: {
-    color: '#9aa0a6',
-    fontSize: 13,
-    marginBottom: 2,
-  },
-  resultBio: {
-    color: '#c9c9c9',
-    fontSize: 12,
-  },
-  searchEmpty: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  searchEmptyText: {
-    color: '#9aa0a6',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  featuresGrid: {
-    gap: 12,
-  },
-  featureCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  featureIconText: {
-    fontSize: 24,
-  },
-  featureTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  featureDescription: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 20,
-  },
-  quickActions: {
-    gap: 12,
-    marginTop: 16,
-  },
-  actionButton: {
-    width: '100%',
-  },
-  footer: {
-    paddingHorizontal: 16,
-    paddingVertical: 24,
-    alignItems: 'center',
-  },
-  footerText: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 12,
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    scrollView: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    scrollContent: {
+      paddingBottom: 32,
+      paddingHorizontal: 12,
+    },
+    heroCard: {
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 12,
+      marginHorizontal: 4,
+      marginBottom: 20,
+      shadowColor: theme.colors.menuShadow,
+      shadowOpacity: 0.18,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+      overflow: 'hidden',
+    },
+    heroBanner: {
+      width: '100%',
+      height: undefined,
+      aspectRatio: 1200 / 630, // Maintain original aspect ratio
+    },
+    heroTitle: {
+      fontSize: 30,
+      fontWeight: '900',
+      color: theme.colors.textPrimary,
+      textAlign: 'center',
+      marginBottom: 10,
+    },
+    heroSubtitle: {
+      fontSize: 18,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: 6,
+      paddingHorizontal: 8,
+    },
+    heroDescription: {
+      fontSize: 15,
+      color: theme.colors.textSecondary,
+      textAlign: 'center',
+    },
+    section: {
+      paddingHorizontal: 4,
+      marginBottom: 24,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+      gap: 8,
+      paddingHorizontal: 8,
+    },
+    sectionIcon: {
+      fontSize: 24,
+    },
+    sectionHeaderText: {
+      flex: 1,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: '900',
+      color: theme.colors.textPrimary,
+      marginBottom: 4,
+    },
+    sectionSubtitle: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      lineHeight: 18,
+    },
+    searchInput: {
+      marginBottom: 12,
+    },
+    searchResults: {
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 16,
+      padding: 8,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: theme.colors.menuShadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
+    },
+    searchLoading: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      gap: 8,
+    },
+    searchLoadingText: {
+      color: theme.colors.textSecondary,
+      fontSize: 14,
+    },
+    resultsList: {
+      gap: 6,
+    },
+    resultItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 12,
+      gap: 12,
+      backgroundColor: theme.colors.cardAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    resultAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.accentSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      shadowColor: theme.colors.menuShadow,
+      shadowOpacity: 0.14,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    resultAvatarImage: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+    },
+    resultAvatarText: {
+      color: '#fff',
+      fontSize: 18,
+      fontWeight: '900',
+    },
+    resultInfo: {
+      flex: 1,
+    },
+    resultNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 2,
+    },
+    resultName: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    liveBadgeSmall: {
+      backgroundColor: '#FF4444',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    liveBadgeSmallText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: '900',
+    },
+    resultUsername: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      marginBottom: 2,
+    },
+    resultBio: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+    },
+    searchEmpty: {
+      padding: 20,
+      alignItems: 'center',
+    },
+    searchEmptyText: {
+      color: theme.colors.textSecondary,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    featuresGrid: {
+      gap: 12,
+    },
+    featureCard: {
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 16,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: theme.colors.menuShadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 6,
+    },
+    featureIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.cardAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    featureIconText: {
+      fontSize: 24,
+    },
+    featureTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.textPrimary,
+      marginBottom: 8,
+    },
+    featureDescription: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      lineHeight: 20,
+    },
+    quickActions: {
+      gap: 12,
+      marginTop: 16,
+    },
+    actionButton: {
+      width: '100%',
+    },
+    footer: {
+      paddingHorizontal: 16,
+      paddingVertical: 24,
+      alignItems: 'center',
+    },
+    footerText: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+    },
+  });
+}

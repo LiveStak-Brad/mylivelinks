@@ -7,7 +7,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { fetchAuthed } from '../lib/api';
+import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, PageShell } from '../components/ui';
 
 type WalletResponse = {
@@ -21,6 +21,7 @@ type WalletScreenSimpleProps = {
 };
 
 export function WalletScreenSimple({ onBack }: WalletScreenSimpleProps) {
+  const { fetchAuthed } = useFetchAuthed();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
@@ -31,16 +32,14 @@ export function WalletScreenSimple({ onBack }: WalletScreenSimpleProps) {
 
     try {
       const resp = await fetchAuthed('/api/wallet', { method: 'GET' });
-      const data = (await resp.json().catch(() => ({}))) as any;
-
       if (!resp.ok) {
-        throw new Error(data?.error || `Failed to load wallet (${resp.status})`);
+        throw new Error(resp.message || `Failed to load wallet (${resp.status})`);
       }
 
       setWallet({
-        coin_balance: Number(data?.coin_balance ?? 0),
-        diamond_balance: Number(data?.diamond_balance ?? 0),
-        diamond_usd: Number(data?.diamond_usd ?? 0),
+        coin_balance: Number(resp.data?.coin_balance ?? 0),
+        diamond_balance: Number(resp.data?.diamond_balance ?? 0),
+        diamond_usd: Number(resp.data?.diamond_usd ?? 0),
       });
     } catch (e: any) {
       setError(e?.message || 'Failed to load wallet');

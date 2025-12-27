@@ -49,7 +49,7 @@ The complete database schema is provided in:
 ### Key Production Features
 
 ✅ **Supabase Auth Integration** - Uses `auth.users`, `profiles` is primary table  
-✅ **Ledger-Based Coins** - Immutable `coin_ledger` table (source of truth)  
+✅ **Ledger-Based Coins** - Immutable `ledger_entries` table (source of truth)  
 ✅ **Strict Idempotency** - High-value purchase protection (`provider_event_id` UNIQUE)  
 ✅ **Demand-Based Publishing** - `is_published` derived from viewer presence  
 ✅ **BIGINT Support** - All coin fields use BIGINT (supports whale-level balances)  
@@ -61,7 +61,7 @@ The complete database schema is provided in:
 2. **`live_streams`** - Demand-based publishing state
 3. **`video_boxes`** - 12-box grid state
 4. **`box_viewers`** - Active viewers (source of truth for publishing)
-5. **`coin_ledger`** - ⚠️ **Immutable transaction log (source of truth)**
+5. **`ledger_entries`** - ⚠️ **Immutable transaction log (source of truth)**
 6. **`coin_purchases`** - Purchase transactions (strict idempotency)
 7. **`gifts`** - Gift transactions (70/30 split)
 8. **`gift_types`** - Gift catalog
@@ -90,7 +90,7 @@ See **`COIN_PACKS_CONFIG.md`** for complete coin pack pricing:
 
 **Critical:** Never update `profiles.coin_balance` directly!
 
-1. All coin movements go through `coin_ledger` (immutable)
+1. All coin movements go through `ledger_entries` (immutable)
 2. Balance computed as `SUM(amount)` from ledger
 3. Cached balance updated only via `update_coin_balance_via_ledger()` RPC
 4. Prevents balance drift from retries, partial failures, concurrent updates

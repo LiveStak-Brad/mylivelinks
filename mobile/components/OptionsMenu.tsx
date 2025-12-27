@@ -5,7 +5,7 @@
  * Secondary menu with Account, Room/Live, Preferences, Safety, and Admin sections
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -16,10 +16,12 @@ import {
   Switch,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { assertRouteExists } from '../lib/routeAssert';
 import { useTopBarState } from '../hooks/topbar/useTopBarState';
+import { useThemeMode, ThemeDefinition } from '../contexts/ThemeContext';
 
 interface OptionsMenuProps {
   onNavigateToProfile?: (username: string) => void;
@@ -36,6 +38,9 @@ export function OptionsMenu({
 }: OptionsMenuProps) {
   const navigation = useNavigation<any>();
   const topBar = useTopBarState();
+  const insets = useSafeAreaInsets();
+  const { theme, mode, setMode } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [showMenu, setShowMenu] = useState(false);
   const [endingAllStreams, setEndingAllStreams] = useState(false);
   
@@ -113,11 +118,11 @@ export function OptionsMenu({
       {/* Menu Modal */}
       <Modal
         visible={showMenu}
-        animationType="slide"
+        animationType="fade"
         transparent
         onRequestClose={closeMenu}
       >
-        <View style={styles.backdrop}>
+        <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) + 40 }]}>
           <Pressable style={styles.backdropTouchable} onPress={closeMenu} />
 
           <View style={styles.menuContainer}>
@@ -135,8 +140,9 @@ export function OptionsMenu({
               showsVerticalScrollIndicator={false}
             >
               {/* Account Section */}
-              <SectionHeader title="Account" />
+              <SectionHeader title="Account" styles={styles} />
               <MenuItem
+                styles={styles}
                 label="My Profile"
                 onPress={() => {
                   closeMenu();
@@ -147,6 +153,7 @@ export function OptionsMenu({
                 disabled={!topBar.enabledItems.optionsMenu_myProfile}
               />
               <MenuItem
+                styles={styles}
                 label="Edit Profile"
                 onPress={() => {
                   closeMenu();
@@ -155,6 +162,7 @@ export function OptionsMenu({
                 disabled={!topBar.enabledItems.optionsMenu_editProfile}
               />
               <MenuItem
+                styles={styles}
                 label="Wallet"
                 onPress={() => {
                   closeMenu();
@@ -165,6 +173,7 @@ export function OptionsMenu({
                 disabled={!topBar.enabledItems.optionsMenu_wallet}
               />
               <MenuItem
+                styles={styles}
                 label="My Gifts / Transactions"
                 onPress={() => {
                   closeMenu();
@@ -173,11 +182,12 @@ export function OptionsMenu({
                 disabled={!topBar.enabledItems.optionsMenu_transactions}
               />
 
-              <Divider />
+              <Divider styles={styles} />
 
               {/* Room / Live Section */}
-              <SectionHeader title="Room / Live" />
+              <SectionHeader title="Room / Live" styles={styles} />
               <MenuItem
+                styles={styles}
                 label="Apply for a Room"
                 onPress={() => {
                   closeMenu();
@@ -188,6 +198,7 @@ export function OptionsMenu({
                 disabled={!topBar.enabledItems.optionsMenu_applyRoom}
               />
               <MenuItem
+                styles={styles}
                 label="Room Rules"
                 onPress={() => {
                   closeMenu();
@@ -196,6 +207,7 @@ export function OptionsMenu({
                 disabled={!topBar.enabledItems.optionsMenu_roomRules}
               />
               <MenuItem
+                styles={styles}
                 label="Help / FAQ"
                 onPress={() => {
                   closeMenu();
@@ -204,31 +216,45 @@ export function OptionsMenu({
                 disabled={!topBar.enabledItems.optionsMenu_helpFaq}
               />
 
-              <Divider />
+              <Divider styles={styles} />
 
               {/* Preferences Section */}
-              <SectionHeader title="Preferences" />
+              <SectionHeader title="Preferences" styles={styles} />
               <PreferenceToggle
                 label="Mute All Tiles"
                 value={muteAllTiles}
                 onValueChange={setMuteAllTiles}
+                styles={styles}
+                theme={theme}
               />
               <PreferenceToggle
                 label="Autoplay Tiles"
                 value={autoplayTiles}
                 onValueChange={setAutoplayTiles}
+                styles={styles}
+                theme={theme}
               />
               <PreferenceToggle
                 label="Show Preview Mode Labels"
                 value={showPreviewLabels}
                 onValueChange={setShowPreviewLabels}
+                styles={styles}
+                theme={theme}
+              />
+              <PreferenceToggle
+                label="Light Mode"
+                value={mode === 'light'}
+                onValueChange={(isLight) => setMode(isLight ? 'light' : 'dark')}
+                styles={styles}
+                theme={theme}
               />
 
-              <Divider />
+              <Divider styles={styles} />
 
               {/* Safety Section */}
-              <SectionHeader title="Safety" />
+              <SectionHeader title="Safety" styles={styles} />
               <MenuItem
+                styles={styles}
                 label="Report a User"
                 onPress={() => {
                   closeMenu();
@@ -237,6 +263,7 @@ export function OptionsMenu({
                 disabled={!topBar.enabledItems.optionsMenu_reportUser}
               />
               <MenuItem
+                styles={styles}
                 label="Blocked Users"
                 onPress={() => {
                   closeMenu();
@@ -248,9 +275,10 @@ export function OptionsMenu({
               {/* Admin Section */}
               {topBar.isAdmin && (
                 <>
-                  <Divider />
-                  <SectionHeader title="Admin" />
+                  <Divider styles={styles} />
+                  <SectionHeader title="Admin" styles={styles} />
                   <MenuItem
+                    styles={styles}
                     label="👑 Owner Panel"
                     onPress={() => {
                       closeMenu();
@@ -259,6 +287,7 @@ export function OptionsMenu({
                     disabled={!topBar.enabledItems.optionsMenu_ownerPanel}
                   />
                   <MenuItem
+                    styles={styles}
                     label="Moderation Panel"
                     onPress={() => {
                       closeMenu();
@@ -267,6 +296,7 @@ export function OptionsMenu({
                     disabled={!topBar.enabledItems.optionsMenu_moderationPanel}
                   />
                   <MenuItem
+                    styles={styles}
                     label="Approve Room Applications"
                     onPress={() => {
                       closeMenu();
@@ -275,6 +305,7 @@ export function OptionsMenu({
                     disabled={!topBar.enabledItems.optionsMenu_approveApplications}
                   />
                   <MenuItem
+                    styles={styles}
                     label="Manage Gift Types / Coin Packs"
                     onPress={() => {
                       closeMenu();
@@ -283,6 +314,7 @@ export function OptionsMenu({
                     disabled={!topBar.enabledItems.optionsMenu_manageGifts}
                   />
                   <MenuItem
+                    styles={styles}
                     label={endingAllStreams ? 'Ending all streams...' : 'End ALL streams'}
                     onPress={handleEndAllStreams}
                     destructive
@@ -299,7 +331,7 @@ export function OptionsMenu({
 }
 
 // Section Header Component
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({ title, styles }: { title: string; styles: Styles }) {
   return (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionHeaderText}>{title}</Text>
@@ -314,9 +346,10 @@ interface MenuItemProps {
   destructive?: boolean;
   highlighted?: boolean;
   disabled?: boolean;
+  styles: Styles;
 }
 
-function MenuItem({ label, onPress, destructive, highlighted, disabled }: MenuItemProps) {
+function MenuItem({ label, onPress, destructive, highlighted, disabled, styles }: MenuItemProps) {
   return (
     <Pressable
       style={({ pressed }) => [
@@ -348,146 +381,174 @@ interface PreferenceToggleProps {
   label: string;
   value: boolean;
   onValueChange: (value: boolean) => void;
+  styles: Styles;
+  theme: ThemeDefinition;
 }
 
-function PreferenceToggle({ label, value, onValueChange }: PreferenceToggleProps) {
+function PreferenceToggle({ label, value, onValueChange, styles, theme }: PreferenceToggleProps) {
   return (
     <View style={styles.preferenceItem}>
       <Text style={styles.preferenceLabel}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: '#3e3e3e', true: '#8b5cf6' }}
-        thumbColor={value ? '#fff' : '#9aa0a6'}
+        trackColor={{ false: theme.colors.border, true: theme.colors.accent }}
+        thumbColor={value ? '#fff' : theme.colors.mutedText}
       />
     </View>
   );
 }
 
 // Divider Component
-function Divider() {
+function Divider({ styles }: { styles: Styles }) {
   return <View style={styles.divider} />;
 }
 
-const styles = StyleSheet.create({
-  triggerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#8b5cf6',
-    borderRadius: 8,
-  },
-  triggerIcon: {
-    fontSize: 14,
-  },
-  triggerText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  backdropTouchable: {
-    flex: 1,
-  },
-  menuContainer: {
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#9aa0a6',
-    fontWeight: '300',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingVertical: 8,
-  },
-  sectionHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  sectionHeaderText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#9aa0a6',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  menuItem: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  menuItemPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  menuItemHighlighted: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-  },
-  menuItemDestructive: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  menuItemDisabled: {
-    opacity: 0.5,
-  },
-  menuItemLabel: {
-    fontSize: 14,
-    color: '#fff',
-  },
-  menuItemLabelDestructive: {
-    color: '#ef4444',
-    fontWeight: '600',
-  },
-  menuItemLabelHighlighted: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  menuItemLabelDisabled: {
-    color: '#6b7280',
-  },
-  preferenceItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  preferenceLabel: {
-    fontSize: 14,
-    color: '#fff',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginVertical: 4,
-  },
-});
+type Styles = ReturnType<typeof createStyles>;
+
+function createStyles(theme: ThemeDefinition) {
+  const isLight = theme.mode === 'light';
+  const accent = theme.colors.accent;
+  const accentSecondary = theme.colors.accentSecondary;
+  const textPrimary = theme.colors.textPrimary;
+  const textSecondary = theme.colors.textSecondary;
+  const textMuted = theme.colors.textMuted;
+
+  return StyleSheet.create({
+    triggerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: theme.colors.accent,
+      borderRadius: 8,
+    },
+    triggerIcon: {
+      fontSize: 14,
+    },
+    triggerText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    backdrop: {
+      flex: 1,
+      backgroundColor: theme.colors.menuBackdrop,
+      justifyContent: 'flex-start',
+    },
+    backdropTouchable: {
+      flex: 1,
+    },
+    menuContainer: {
+      backgroundColor: isLight ? theme.colors.cardSurface : theme.colors.menuBackground,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      maxHeight: '80%',
+      overflow: 'hidden',
+      shadowColor: theme.colors.menuShadow,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+      elevation: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.menuBorder,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: isLight ? 'rgba(139, 92, 246, 0.18)' : theme.colors.menuBorder,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: isLight ? accent : theme.colors.textPrimary,
+    },
+    closeButton: {
+      padding: 4,
+    },
+    closeButtonText: {
+      fontSize: 24,
+      color: textMuted,
+      fontWeight: '300',
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingVertical: 8,
+    },
+    sectionHeader: {
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 8,
+    },
+    sectionHeaderText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: isLight ? accentSecondary : theme.colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    menuItem: {
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+    },
+    menuItemPressed: {
+      backgroundColor: isLight ? 'rgba(139, 92, 246, 0.1)' : theme.colors.highlight,
+    },
+    menuItemHighlighted: {
+      backgroundColor: isLight ? 'rgba(139, 92, 246, 0.14)' : theme.colors.highlight,
+    },
+    menuItemDestructive: {
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    menuItemDisabled: {
+      opacity: 0.5,
+    },
+    menuItemLabel: {
+      fontSize: 14,
+      color: isLight ? textPrimary : theme.colors.textPrimary,
+    },
+    menuItemLabelDestructive: {
+      color: theme.colors.danger,
+      fontWeight: '600',
+    },
+    menuItemLabelHighlighted: {
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
+    menuItemLabelDisabled: {
+      color: textMuted,
+    },
+    preferenceItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      backgroundColor: isLight ? 'rgba(139, 92, 246, 0.07)' : theme.colors.cardAlt,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: isLight ? 'rgba(139, 92, 246, 0.25)' : theme.colors.border,
+    },
+    preferenceLabel: {
+      fontSize: 14,
+      color: isLight ? textPrimary : theme.colors.textPrimary,
+      fontWeight: '600',
+    },
+    divider: {
+      height: 1,
+      backgroundColor: isLight ? 'rgba(139, 92, 246, 0.18)' : theme.colors.menuBorder,
+      marginVertical: 4,
+      marginHorizontal: 12,
+    },
+  });
+}
 

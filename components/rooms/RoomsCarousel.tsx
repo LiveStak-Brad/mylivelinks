@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import RoomCard from './RoomCard';
 import RoomPreviewModal from './RoomPreviewModal';
+import Image from 'next/image';
+import Link from 'next/link';
 
 type RoomCategory = 'gaming' | 'music' | 'entertainment' | 'Gaming' | 'Music' | 'Entertainment';
 type RoomStatus = 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused' | 'coming_soon';
@@ -172,11 +174,11 @@ export default function RoomsCarousel() {
           <div className="flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-amber-500" />
             <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-              Coming Soon Rooms
+              Rooms
             </h2>
           </div>
           <p className="text-muted-foreground text-sm md:text-base max-w-xl">
-            Vote with interest — we open rooms when enough people sign up.
+            Live Central is live now! More themed rooms coming soon based on your votes.
           </p>
         </div>
 
@@ -213,6 +215,33 @@ export default function RoomsCarousel() {
         >
           {/* Left Padding for edge alignment */}
           <div className="flex-shrink-0 w-0.5 md:w-1" />
+          
+          {/* Live Central Featured Card */}
+          <Link
+            href="/live"
+            className="
+              group relative flex-shrink-0 w-[320px] md:w-[380px] 
+              rounded-2xl overflow-hidden cursor-pointer
+              transition-all duration-300 ease-out
+              hover:scale-[1.03] hover:shadow-2xl hover:shadow-red-500/30
+              border-2 border-red-500/50 hover:border-red-500
+            "
+          >
+            <div className="relative h-[200px] md:h-[220px]">
+              <Image
+                src="/livecentralmeta.png"
+                alt="Live Central"
+                fill
+                className="object-cover"
+                priority
+              />
+              {/* Live Badge */}
+              <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-red-500 flex items-center gap-1.5 animate-pulse">
+                <div className="w-2 h-2 rounded-full bg-white" />
+                <span className="text-xs font-bold text-white">LIVE NOW</span>
+              </div>
+            </div>
+          </Link>
           
           {(rooms ?? []).map((room) => (
             <RoomCard

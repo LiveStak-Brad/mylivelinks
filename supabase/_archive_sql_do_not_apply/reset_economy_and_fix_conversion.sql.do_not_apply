@@ -1,0 +1,126 @@
+-- ============================================================================
+-- RESET ECONOMY & FIX CONVERSION RATE
+-- ============================================================================
+-- This script will:
+-- 1. Wipe all coins and diamonds from all profiles
+-- 2. Give you 100,000 coins for testing
+-- 3. Fix conversion rate to 70% (30% fee)
+-- ============================================================================
+
+-- Step 1: Reset ALL balances to zero
+UPDATE profiles
+SET 
+  coin_balance = 0,
+  earnings_balance = 0,  -- This is diamond balance
+  total_spent = 0,
+  total_purchased = 0,
+  gifter_level = 0;
+
+-- Step 2: Give yourself 100,000 coins for testing
+-- REPLACE 'YOUR_USER_ID_HERE' with your actual user ID
+-- To find your ID, run: SELECT id, username, email FROM profiles WHERE email = 'your@email.com';
+
+UPDATE profiles
+SET coin_balance = 100000
+WHERE id = 'YOUR_USER_ID_HERE';  -- ⚠️ REPLACE THIS!
+
+-- Step 3: Clear all transaction history (optional, for clean slate)
+TRUNCATE TABLE gifts RESTART IDENTITY CASCADE;
+TRUNCATE TABLE diamond_conversions RESTART IDENTITY CASCADE;
+TRUNCATE TABLE coinledger_legacy RESTART IDENTITY CASCADE;
+
+-- Step 4: Fix conversion rate to 70% (30% fee)
+CREATE OR REPLACE FUNCTION convert_diamonds_to_coins(
+    p_profile_id UUID,
+    p_diamonds_in BIGINT
+)
+RETURNS BIGINT AS $$
+DECLARE
+    v_diamond_balance BIGINT;
+    v_coins_out BIGINT;
+    v_fee_amount BIGINT;
+    v_conversion_rate DECIMAL(5, 4) := 0.7000; -- 70% (1 - 0.30 fee)
+    v_min_diamonds BIGINT := 3; -- Minimum diamonds required
+    v_conversion_id BIGINT;
+BEGIN
+    -- Validate minimum threshold
+    IF p_diamonds_in < v_min_diamonds THEN
+        RAISE EXCEPTION 'Minimum conversion is % diamonds (yields at least 1 coin after 30%% fee)', v_min_diamonds;
+    END IF;
+    
+    -- Check diamond balance
+    SELECT earnings_balance INTO v_diamond_balance
+    FROM profiles
+    WHERE id = p_profile_id;
+    
+    IF v_diamond_balance < p_diamonds_in THEN
+        RAISE EXCEPTION 'Insufficient diamond balance. You have % diamonds, trying to convert %', v_diamond_balance, p_diamonds_in;
+    END IF;
+    
+    -- Calculate conversion: coins_out = floor(diamonds_in * 0.70)
+    v_coins_out := FLOOR(p_diamonds_in * v_conversion_rate);
+    v_fee_amount := p_diamonds_in - v_coins_out;
+    
+    -- Ensure at least 1 coin output
+    IF v_coins_out < 1 THEN
+        RAISE EXCEPTION 'Conversion too small. Minimum % diamonds required to yield 1 coin', v_min_diamonds;
+    END IF;
+    
+    -- Insert conversion record
+    INSERT INTO diamond_conversions (
+        profile_id, diamonds_in, coins_out, fee_amount, conversion_rate, status, completed_at
+    )
+    VALUES (
+        p_profile_id, p_diamonds_in, v_coins_out, v_fee_amount, v_conversion_rate, 'completed', CURRENT_TIMESTAMP
+    )
+    RETURNING id INTO v_conversion_id;
+    
+    -- Deduct diamonds from earnings_balance
+    UPDATE profiles
+    SET earnings_balance = earnings_balance - p_diamonds_in
+    WHERE id = p_profile_id;
+    
+    -- Add coins to spendable balance via ledger
+    PERFORM update_coin_balance_via_ledger(
+        p_profile_id,
+        v_coins_out,
+        'conversion_in',
+        'diamond_conversion',
+        v_conversion_id,
+        'Diamond conversion: ' || v_coins_out || ' coins'
+    );
+    
+    RETURN v_conversion_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;
+
+-- Verify the changes
+SELECT 'Conversion rate updated to 70% (30% fee)' as status;
+
+-- Show your new balance
+SELECT username, coin_balance, earnings_balance as diamond_balance
+FROM profiles
+WHERE coin_balance > 0 OR earnings_balance > 0;
+
+-- ============================================================================
+-- INSTRUCTIONS:
+-- ============================================================================
+-- 1. Find your user ID first:
+--    SELECT id, username, email FROM profiles WHERE email = 'your@email.com';
+--
+-- 2. Replace 'YOUR_USER_ID_HERE' on line 23 with your actual UUID
+--
+-- 3. Run this entire script in Supabase SQL Editor
+--
+-- 4. After deployment, the frontend will show:
+--    "Platform fee: 30%"
+--    "Conversion rate: 1 diamond = 0.70 coins"
+--
+-- EXAMPLE FLOW:
+-- - You have 100,000 coins
+-- - Send 100 coin gift → Recipient gets 100 diamonds (1:1)
+-- - Recipient converts 100 diamonds → Gets 70 coins (loses 30 diamonds as fee)
+-- - Result: System burns 30 diamonds (30% lost), recipient has 70 spendable coins
+-- ============================================================================
+

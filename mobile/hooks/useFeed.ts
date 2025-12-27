@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchAuthed } from '../lib/api';
+import { useAuthContext } from '../contexts/AuthContext';
 
 export type FeedAuthor = {
   id: string;
@@ -32,6 +33,7 @@ type UseFeedOptions = {
 
 export function useFeed(options: UseFeedOptions = {}) {
   const { username } = options;
+  const { getAccessToken } = useAuthContext();
 
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [nextCursor, setNextCursor] = useState<FeedCursor | null>(null);
@@ -39,6 +41,7 @@ export function useFeed(options: UseFeedOptions = {}) {
   const [error, setError] = useState<string | null>(null);
 
   const inFlightRef = useRef(false);
+  const lastCursorKeyRef = useRef<string>('');
 
   const loadFeed = useCallback(
     async (mode: 'replace' | 'append') => {
@@ -49,33 +52,52 @@ export function useFeed(options: UseFeedOptions = {}) {
 
       try {
         const cursor = mode === 'append' ? nextCursor : null;
+        const cursorKey = cursor ? `${cursor.before_created_at}|${cursor.before_id}` : '';
+        if (mode === 'append' && cursorKey && cursorKey === lastCursorKeyRef.current) {
+          setNextCursor(null);
+          return;
+        }
+        lastCursorKeyRef.current = cursorKey;
         const params = new URLSearchParams();
         params.set('limit', '20');
         if (username) params.set('username', username);
         if (cursor?.before_created_at) params.set('before_created_at', cursor.before_created_at);
         if (cursor?.before_id) params.set('before_id', cursor.before_id);
 
-        const res = await fetchAuthed(`/api/feed?${params.toString()}`);
-        const json = (await res.json()) as any;
+        // CRITICAL: Get token from AuthContext (single source of truth)
+        const token = await getAccessToken();
+        const res = await fetchAuthed(`/api/feed?${params.toString()}`, {}, token);
 
         if (!res.ok) {
-          setError(String(json?.error || 'Failed to load feed'));
+          setError(String(res.message || 'Failed to load feed'));
+          if (mode === 'append') {
+            // Avoid repeatedly calling loadMore with a stale cursor when the request fails.
+            setNextCursor(null);
+          }
           return;
         }
 
-        const data = json as FeedResponse;
+        const data = (res.data || {}) as FeedResponse;
         const nextPosts = Array.isArray(data?.posts) ? (data.posts as FeedPost[]) : [];
+
+        if (mode === 'append' && nextPosts.length === 0) {
+          setNextCursor(null);
+          return;
+        }
 
         setPosts((prev) => (mode === 'append' ? [...prev, ...nextPosts] : nextPosts));
         setNextCursor(data?.nextCursor ?? null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load feed');
+        if (mode === 'append') {
+          setNextCursor(null);
+        }
       } finally {
         inFlightRef.current = false;
         setIsLoading(false);
       }
     },
-    [nextCursor, username]
+    [nextCursor, username, getAccessToken]
   );
 
   useEffect(() => {
