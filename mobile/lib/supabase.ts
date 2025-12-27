@@ -2,10 +2,14 @@ import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
 
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const expoExtra: Record<string, any> =
+  (Constants.expoConfig?.extra as any) ?? (Constants as any).manifest?.extra ?? (Constants as any).manifest2?.extra ?? {};
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? expoExtra.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? expoExtra.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 export const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
