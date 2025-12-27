@@ -246,13 +246,6 @@ export const Grid12: React.FC<Grid12Props> = ({
   // Normal grid layout
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Grid info overlay - shows active count */}
-      <View style={styles.gridInfoOverlay}>
-        <Text style={styles.gridInfoText}>
-          🔴 {activeCount}/{TOTAL_TILES} Live
-        </Text>
-      </View>
-      
       {/* Exit edit mode button */}
       {isEditMode && (
         <TouchableOpacity style={styles.exitEditButton} onPress={onExitEditMode}>
