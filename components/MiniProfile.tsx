@@ -7,6 +7,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { useIM } from '@/components/im';
 import Image from 'next/image';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface MiniProfileProps {
   profileId: string;
@@ -173,25 +174,19 @@ export default function MiniProfile({
         {/* Profile Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            {avatarUrl ? (
-              <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
-                <Image
-                  src={avatarUrl}
-                  alt={username}
-                  fill
-                  className="object-cover"
-                />
-                {isLive && (
-                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-white dark:border-gray-800">
-                    <span className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75" />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-                {(username?.[0] ?? '?').toUpperCase()}
-              </div>
-            )}
+            <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
+              <Image
+                src={getAvatarUrl(avatarUrl)}
+                alt={username}
+                fill
+                className="object-cover"
+              />
+              {isLive && (
+                <div className="absolute bottom-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-white dark:border-gray-800">
+                  <span className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75" />
+                </div>
+              )}
+            </div>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">

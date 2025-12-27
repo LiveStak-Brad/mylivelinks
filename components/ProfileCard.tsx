@@ -7,6 +7,7 @@ import { UserPlus, Check, ExternalLink, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { StatusBadge, LiveDot } from '@/components/ui';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface ProfileCardProps {
   profile: {
@@ -122,21 +123,13 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
           
           {/* Avatar */}
           <div className="relative">
-            {profile.avatar_url ? (
-              <Image
-                src={profile.avatar_url}
-                alt={displayName}
-                width={120}
-                height={120}
-                className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-white/20"
-              />
-            ) : (
-              <div className="w-28 h-28 rounded-full bg-card flex items-center justify-center border-4 border-white shadow-xl ring-4 ring-white/20">
-                <span className="text-4xl font-bold gradient-text">
-                  {(displayName?.charAt(0) ?? '?').toUpperCase()}
-                </span>
-              </div>
-            )}
+            <Image
+              src={getAvatarUrl(profile.avatar_url)}
+              alt={displayName}
+              width={120}
+              height={120}
+              className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-white/20"
+            />
             
             {/* Live indicator on avatar */}
             {profile.is_live && (
@@ -228,21 +221,13 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
           <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-card border-r border-b border-border rotate-45" />
           
           <div className="flex items-start gap-4 mb-4">
-            {profile.avatar_url ? (
-              <Image
-                src={profile.avatar_url}
-                alt={displayName}
-                width={60}
-                height={60}
-                className="w-16 h-16 rounded-full object-cover ring-2 ring-border"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center ring-2 ring-border">
-                <span className="text-2xl font-bold text-white">
-                  {(displayName?.charAt(0) ?? '?').toUpperCase()}
-                </span>
-              </div>
-            )}
+            <Image
+              src={getAvatarUrl(profile.avatar_url)}
+              alt={displayName}
+              width={60}
+              height={60}
+              className="w-16 h-16 rounded-full object-cover ring-2 ring-border"
+            />
             <div className="flex-1 min-w-0">
               <h4 className="font-bold text-foreground truncate">
                 {displayName}

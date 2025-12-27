@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Users, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { useMessages } from './MessagesContext';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface Friend {
   id: string;
@@ -314,17 +315,11 @@ function FriendAvatar({ friend, onClick }: { friend: Friend; onClick: () => void
           }
         `}>
           <div className="w-full h-full rounded-full bg-card p-[2px]">
-            {friend.avatar_url ? (
-              <img
-                src={friend.avatar_url}
-                alt={friend.username}
-                className="w-full h-full rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
-                {(friend.display_name || friend.username).charAt(0).toUpperCase()}
-              </div>
-            )}
+            <img
+              src={getAvatarUrl(friend.avatar_url)}
+              alt={friend.username}
+              className="w-full h-full rounded-full object-cover"
+            />
           </div>
         </div>
 
@@ -367,17 +362,11 @@ function FriendRow({ friend, onClick }: { friend: Friend; onClick: () => void })
           }
         `}>
           <div className="w-full h-full rounded-full bg-card p-[1px]">
-            {friend.avatar_url ? (
-              <img
-                src={friend.avatar_url}
-                alt={friend.username}
-                className="w-full h-full rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xs">
-                {(friend.display_name || friend.username).charAt(0).toUpperCase()}
-              </div>
-            )}
+            <img
+              src={getAvatarUrl(friend.avatar_url)}
+              alt={friend.username}
+              className="w-full h-full rounded-full object-cover"
+            />
           </div>
         </div>
 

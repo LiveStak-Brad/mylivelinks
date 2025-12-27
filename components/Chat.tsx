@@ -6,6 +6,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import MiniProfile from './MiniProfile';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface ChatMessage {
   id: number | string;
@@ -505,17 +506,11 @@ export default function Chat() {
             >
               {msg.message_type !== 'system' && msg.profile_id && (
                 <>
-                  {msg.avatar_url ? (
-                    <img
-                      src={msg.avatar_url}
-                      alt={msg.username}
-                      className="w-8 h-8 rounded-full flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {msg.username?.[0]?.toUpperCase() || '?'}
-                    </div>
-                  )}
+                  <img
+                    src={getAvatarUrl(msg.avatar_url)}
+                    alt={msg.username}
+                    className="w-8 h-8 rounded-full flex-shrink-0"
+                  />
                 </>
               )}
 

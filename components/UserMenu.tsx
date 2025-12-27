@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ExternalLink 
 } from 'lucide-react';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 import ThemeToggle from './ThemeToggle';
 
 interface UserMenuProps {
@@ -215,19 +216,13 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
         aria-label={`User menu for ${displayName}`}
       >
         {/* Avatar */}
-        {profile?.avatar_url ? (
-          <Image
-            src={profile.avatar_url}
-            alt={displayName}
-            width={36}
-            height={36}
-            className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover ring-2 ring-primary/20"
-          />
-        ) : (
-          <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-semibold text-sm ring-2 ring-primary/20">
-            {initials}
-          </div>
-        )}
+        <Image
+          src={getAvatarUrl(profile?.avatar_url)}
+          alt={displayName}
+          width={36}
+          height={36}
+          className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover ring-2 ring-primary/20"
+        />
         
         {/* Chevron indicator */}
         <ChevronDown 
@@ -246,19 +241,13 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
           {profile && (
             <div className="px-4 py-3 bg-muted/30 border-b border-border">
               <div className="flex items-center gap-3">
-                {profile.avatar_url ? (
-                  <Image
-                    src={profile.avatar_url}
-                    alt={displayName}
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-semibold">
-                    {initials}
-                  </div>
-                )}
+                <Image
+                  src={getAvatarUrl(profile.avatar_url)}
+                  alt={displayName}
+                  width={40}
+                  height={40}
+                  className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">
                     {displayName}

@@ -6,6 +6,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import MiniProfile from './MiniProfile';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface Viewer {
   profile_id: string;
@@ -262,15 +263,17 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                 ) : viewer.avatar_url ? (
                   // Regular avatar if not live
                   <img
-                    src={viewer.avatar_url}
+                    src={getAvatarUrl(viewer.avatar_url)}
                     alt={viewer.username}
                     className="w-8 h-8 rounded-full flex-shrink-0"
                   />
                 ) : (
                   // Default avatar if no image
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {(viewer.username?.[0] ?? '?').toUpperCase()}
-                  </div>
+                  <img
+                    src={getAvatarUrl(null)}
+                    alt={viewer.username}
+                    className="w-8 h-8 rounded-full flex-shrink-0"
+                  />
                 )}
 
                 {/* Username + Badge */}
