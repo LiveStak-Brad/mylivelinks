@@ -401,9 +401,9 @@ export function ProfileScreen({
         contentStyle={styles.container}
         useNewHeader
         edges={['top']}
-        onNavigateHome={() => {}}
-        onNavigateToProfile={(username) => {}}
-        onNavigateToRooms={() => {}}
+        onNavigateHome={() => navigation.navigate('Home')}
+        onNavigateToProfile={(username) => navigation.push('Profile', { username })}
+        onNavigateToRooms={() => navigation.navigate('Rooms')}
       >
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#5E9BFF" />
