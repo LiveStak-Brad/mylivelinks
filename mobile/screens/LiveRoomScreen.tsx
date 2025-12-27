@@ -28,6 +28,8 @@ import { useLiveRoomParticipants } from '../hooks/useLiveRoomParticipants';
 import { useRoomPresence } from '../hooks/useRoomPresence';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
+import { OptionsMenu } from '../components/OptionsMenu';
+import { MixerModal } from '../components/MixerModal';
 
 const SWIPE_THRESHOLD = 50;
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
@@ -53,6 +55,10 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
   const goLivePressInFlightRef = useRef(false);
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
+  
+  // Modal states for Options and Mixer
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const [showMixerModal, setShowMixerModal] = useState(false);
   
   // 🔒 LOCK ORIENTATION TO LANDSCAPE on mount/focus
   useFocusEffect(
@@ -152,6 +158,64 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
 
     return changedCount;
   }, [room]);
+
+  const getSlotIdentity = useCallback((slotIndex: number): string | null => {
+    if (slotIndex < 0 || slotIndex > 11) return null;
+
+    // Match Grid12 slot assignment behavior
+    if (!state.tileSlots || state.tileSlots.length === 0) {
+      return participants[slotIndex]?.identity ?? null;
+    }
+
+    const participantMap = new Map(participants.map(p => [p.identity, p] as const));
+    const assigned: Array<string | null> = new Array(12).fill(null);
+
+    for (let idx = 0; idx < 12; idx++) {
+      const identity = state.tileSlots[idx];
+      if (identity && participantMap.has(identity)) {
+        assigned[idx] = identity;
+      }
+    }
+
+    const used = new Set(assigned.filter(Boolean) as string[]);
+    const remaining = participants.filter(p => !used.has(p.identity));
+    let remainingIdx = 0;
+    for (let i = 0; i < assigned.length && remainingIdx < remaining.length; i++) {
+      if (!assigned[i]) {
+        assigned[i] = remaining[remainingIdx++].identity;
+      }
+    }
+
+    return assigned[slotIndex] ?? null;
+  }, [participants, state.tileSlots]);
+
+  const setSlotVolume = useCallback((slotIndex: number, value: number) => {
+    if (!room) return;
+
+    const identity = getSlotIdentity(slotIndex);
+    if (!identity) return;
+
+    const target: any =
+      (room.localParticipant && room.localParticipant.identity === identity
+        ? room.localParticipant
+        : room.remoteParticipants.get(identity));
+
+    if (!target) return;
+
+    const clamped = Math.max(0, Math.min(1, value));
+    target.audioTrackPublications?.forEach?.((publication: any) => {
+      const track: any = publication?.track;
+      if (!track) return;
+
+      if (typeof track.setVolume === 'function') {
+        track.setVolume(clamped);
+        return;
+      }
+      if (typeof track.setMuted === 'function') {
+        track.setMuted(clamped <= 0.001);
+      }
+    });
+  }, [getSlotIdentity, room]);
 
   /**
    * Swipe gesture handler
@@ -276,6 +340,19 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
       Alert.alert('Share failed', err?.message || 'Could not open share sheet');
     }
   }, [currentUser?.username]);
+
+  const handleOptionsPress = useCallback(() => {
+    setShowOptionsModal(true);
+  }, []);
+
+  const handleMixerPress = useCallback(() => {
+    setShowMixerModal(true);
+  }, []);
+
+  const handleMixerChange = useCallback((slotIndex: number, value: number) => {
+    if (DEBUG) console.log(`[MIXER] Slot ${slotIndex} → ${Math.round(value * 100)}%`);
+    setSlotVolume(slotIndex, value);
+  }, [setSlotVolume]);
 
   // Gesture handlers for tiles
   const handleLongPress = useCallback((identity: string) => {
@@ -408,7 +485,12 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
 
         {/* RIGHT COLUMN - Controls */}
         <View style={[styles.rightColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingRight: insets.right || 8 }]}>
-          {/* Gift - TOP RIGHT */}
+          {/* Options - TOP RIGHT */}
+          <TouchableOpacity style={styles.vectorButton} onPress={handleOptionsPress}>
+            <Text style={[styles.vectorIcon, { color: '#fbbf24' }]}>⚙️</Text>
+          </TouchableOpacity>
+
+          {/* Gift */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleGiftPress}>
             <Text style={[styles.vectorIcon, { color: '#ff6b9d' }]}>🎁</Text>
           </TouchableOpacity>
@@ -421,6 +503,11 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
           </TouchableOpacity>
 
           <View style={styles.spacer} />
+
+          {/* Mixer */}
+          <TouchableOpacity style={styles.vectorButton} onPress={handleMixerPress}>
+            <Text style={[styles.vectorLabel, { color: '#10b981' }]}>Mix</Text>
+          </TouchableOpacity>
 
           {/* Share - BOTTOM RIGHT */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleSharePress}>
@@ -445,6 +532,35 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
           />
         </>
       )}
+
+      {/* Options Modal - Independent of overlay system */}
+      <OptionsMenu
+        visible={showOptionsModal}
+        onClose={() => setShowOptionsModal(false)}
+        onNavigateToProfile={(username) => {
+          setShowOptionsModal(false);
+          // TODO: Navigate to profile
+        }}
+        onNavigateToSettings={() => {
+          setShowOptionsModal(false);
+          // TODO: Navigate to settings
+        }}
+        onNavigateToWallet={() => {
+          setShowOptionsModal(false);
+          onNavigateWallet();
+        }}
+        onNavigateToApply={() => {
+          setShowOptionsModal(false);
+          // TODO: Navigate to apply
+        }}
+      />
+
+      {/* Mixer Modal - 12-slot volume control */}
+      <MixerModal
+        visible={showMixerModal}
+        onClose={() => setShowMixerModal(false)}
+        onChange={handleMixerChange}
+      />
 
       {/* Portrait Hint - Translucent overlay */}
       {!isLandscape && (

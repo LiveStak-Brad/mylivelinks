@@ -24,6 +24,8 @@ import { useTopBarState } from '../hooks/topbar/useTopBarState';
 import { useThemeMode, ThemeDefinition } from '../contexts/ThemeContext';
 
 interface OptionsMenuProps {
+  visible?: boolean;
+  onClose?: () => void;
   onNavigateToProfile?: (username: string) => void;
   onNavigateToSettings?: () => void;
   onNavigateToWallet?: () => void;
@@ -31,6 +33,8 @@ interface OptionsMenuProps {
 }
 
 export function OptionsMenu({
+  visible: externalVisible,
+  onClose: externalOnClose,
   onNavigateToProfile,
   onNavigateToSettings,
   onNavigateToWallet,
@@ -41,8 +45,12 @@ export function OptionsMenu({
   const insets = useSafeAreaInsets();
   const { theme, mode, setMode } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [showMenu, setShowMenu] = useState(false);
+  const [internalShowMenu, setInternalShowMenu] = useState(false);
   const [endingAllStreams, setEndingAllStreams] = useState(false);
+  
+  // Use external control if provided, otherwise use internal state
+  const showMenu = externalVisible !== undefined ? externalVisible : internalShowMenu;
+  const isControlled = externalVisible !== undefined;
   
   // Preferences state
   const [muteAllTiles, setMuteAllTiles] = useState(false);
@@ -87,7 +95,7 @@ export function OptionsMenu({
                 throw new Error(data?.error || 'Failed to end streams');
               }
               Alert.alert('Success', 'All streams have been ended.');
-              setShowMenu(false);
+              closeMenu();
             } catch (err: any) {
               console.error('Failed to end all streams', err);
               Alert.alert('Error', err.message || 'Failed to end all streams');
@@ -100,7 +108,19 @@ export function OptionsMenu({
     );
   };
 
-  const closeMenu = () => setShowMenu(false);
+  const closeMenu = () => {
+    if (isControlled && externalOnClose) {
+      externalOnClose();
+    } else {
+      setInternalShowMenu(false);
+    }
+  };
+
+  const openMenu = () => {
+    if (!isControlled) {
+      setInternalShowMenu(true);
+    }
+  };
 
   const navigateRoot = (routeName: string, params?: any) => {
     assertRouteExists(navigation, routeName);
@@ -109,11 +129,13 @@ export function OptionsMenu({
 
   return (
     <>
-      {/* Trigger Button */}
-      <Pressable style={styles.triggerButton} onPress={() => setShowMenu(true)}>
-        <Text style={styles.triggerIcon}>⚙️</Text>
-        <Text style={styles.triggerText}>Options</Text>
-      </Pressable>
+      {/* Trigger Button - Only show if not controlled externally */}
+      {!isControlled && (
+        <Pressable style={styles.triggerButton} onPress={openMenu}>
+          <Text style={styles.triggerIcon}>⚙️</Text>
+          <Text style={styles.triggerText}>Options</Text>
+        </Pressable>
+      )}
 
       {/* Menu Modal */}
       <Modal
