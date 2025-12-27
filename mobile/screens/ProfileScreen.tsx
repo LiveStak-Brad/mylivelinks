@@ -420,9 +420,9 @@ export function ProfileScreen({
         contentStyle={styles.container}
         useNewHeader
         edges={['top']}
-        onNavigateHome={() => {}}
-        onNavigateToProfile={(username) => {}}
-        onNavigateToRooms={() => {}}
+        onNavigateHome={() => navigation.navigate('Home')}
+        onNavigateToProfile={(username) => navigation.push('Profile', { username })}
+        onNavigateToRooms={() => navigation.navigate('Rooms')}
       >
         <View style={styles.centerContainer}>
           <Text style={styles.errorTitle}>Profile Not Found</Text>
@@ -464,9 +464,9 @@ export function ProfileScreen({
       contentStyle={styles.container}
       useNewHeader
       edges={['top']}
-      onNavigateHome={() => {}}
-      onNavigateToProfile={(username) => {}}
-      onNavigateToRooms={() => {}}
+      onNavigateHome={() => navigation.navigate('Home')}
+      onNavigateToProfile={(username) => navigation.push('Profile', { username })}
+      onNavigateToRooms={() => navigation.navigate('Rooms')}
     >
       {/* FULL-SCREEN BACKGROUND IMAGE (like web) */}
       <View style={styles.backgroundContainer}>
