@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Bell, Check, CheckCheck, Gift, UserPlus, AtSign, MessageCircle, Trophy, Package, Settings, X } from 'lucide-react';
 import { useNoties, NotieType, Notie } from './NotiesContext';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 type TabType = 'all' | 'mentions' | 'gifts' | 'system';
 
@@ -308,17 +309,11 @@ function NotieItem({
     >
       {/* Avatar */}
       <div className="relative flex-shrink-0">
-        {notie.avatarUrl ? (
-          <img 
-            src={notie.avatarUrl} 
-            alt="" 
-            className="w-10 h-10 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold text-sm">
-            {notie.avatarFallback || '?'}
-          </div>
-        )}
+        <img 
+          src={getAvatarUrl(notie.avatarUrl)} 
+          alt="" 
+          className="w-10 h-10 rounded-full object-cover"
+        />
         <div className="absolute -bottom-1 -right-1 p-1 bg-card rounded-full border border-border">
           {icon}
         </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Search, MessageCircle } from 'lucide-react';
 import { useMessages, Conversation } from './MessagesContext';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface ConversationListProps {
   onSelectConversation?: (conversation: Conversation) => void;
@@ -117,17 +118,11 @@ function ConversationRow({
     >
       {/* Avatar */}
       <div className="relative flex-shrink-0">
-        {conversation.recipientAvatar ? (
-          <img
-            src={conversation.recipientAvatar}
-            alt={conversation.recipientUsername}
-            className="w-12 h-12 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
-            {(conversation.recipientDisplayName || conversation.recipientUsername).charAt(0).toUpperCase()}
-          </div>
-        )}
+        <img
+          src={getAvatarUrl(conversation.recipientAvatar)}
+          alt={conversation.recipientUsername}
+          className="w-12 h-12 rounded-full object-cover"
+        />
         {/* Online indicator */}
         {conversation.isOnline && (
           <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card" />
