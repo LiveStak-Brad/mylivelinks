@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
+    right: 0,  // Stays within grid container bounds
     zIndex: 1000,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
@@ -389,11 +389,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  // Grid info overlay
+  // Grid info overlay - KEPT INSIDE GRID BOUNDS (not over side controls)
   gridInfoOverlay: {
     position: 'absolute',
     top: 8,
-    left: 8,
+    left: 8,  // Stays inside grid area, doesn't extend to side columns
     backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 10,
     paddingVertical: 6,
