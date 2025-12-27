@@ -474,8 +474,10 @@ const styles = StyleSheet.create({
     width: 80, // Increased to contain GO LIVE glow (52px button + 8px shadow + padding)
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 6, // Center buttons within column
+    paddingLeft: 10, // Safe press zone from edge
+    paddingRight: 16, // Gutter from grid (prevents overlap)
     backgroundColor: '#000', // Opaque background
+    overflow: 'hidden', // Clip any button glow overflow
     zIndex: 100, // Above grid
   },
   
@@ -498,8 +500,10 @@ const styles = StyleSheet.create({
     width: 80, // Increased to contain gift/PiP/share buttons fully
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 6, // Center buttons within column
+    paddingLeft: 16, // Gutter from grid (prevents overlap)
+    paddingRight: 10, // Safe press zone from edge
     backgroundColor: '#000', // Opaque background
+    overflow: 'hidden', // Clip any button overflow
     zIndex: 100, // Above grid
   },
   
