@@ -9,6 +9,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { isLiveOwnerUser } from '@/lib/livekit-constants';
 
+// Force cache bust for banner images
+
 type RoomCategory = 'gaming' | 'music' | 'entertainment' | 'Gaming' | 'Music' | 'Entertainment';
 type RoomStatus = 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused' | 'coming_soon';
 
