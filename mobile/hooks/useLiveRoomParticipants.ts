@@ -172,7 +172,45 @@ export function useLiveRoomParticipants(
       // Generate session ID for this connection
       const sessionId = generateSessionId();
 
-      const accessToken = await getAccessToken();
+      let accessToken = await getAccessToken();
+
+      // Ensure token freshness (mobile must use Bearer token)
+      // If token is missing OR session is expired/near-expiry, refresh session then re-check token.
+      try {
+        const { data } = await supabase.auth.getSession();
+        const session = data?.session;
+        const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : null;
+        const refreshSkewMs = 60_000;
+        const isExpiredOrSoon = expiresAtMs != null && expiresAtMs <= Date.now() + refreshSkewMs;
+
+        if (!accessToken || isExpiredOrSoon) {
+          if (isExpiredOrSoon) {
+            await supabase.auth.refreshSession();
+          }
+          accessToken = await getAccessToken();
+          // Fallback: AuthContext state might not have updated yet; use session token if available.
+          if (!accessToken) {
+            const { data: refreshed } = await supabase.auth.getSession();
+            accessToken = refreshed?.session?.access_token ?? null;
+          }
+        }
+      } catch (err) {
+        console.warn('[TOKEN] Session refresh check failed:', err);
+        // Fall through; if we still don't have a token, we will hard-stop below.
+      }
+
+      // 1) Make Bearer token mandatory and blocking
+      if (!accessToken) {
+        lastTokenStatusRef.current = null;
+        setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: null, bodySnippet: null });
+        setLastTokenError({
+          status: null,
+          bodySnippet: '',
+          message: 'No Supabase access token available on mobile',
+        });
+        setConnectionError('No Supabase access token available on mobile');
+        throw new Error('No Supabase access token available on mobile');
+      }
 
       console.log('[PARITY-PROOF] token_fetch_inputs', {
         EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
@@ -214,11 +252,14 @@ export function useLiveRoomParticipants(
         });
       }
 
+      // 3) Guarantee Authorization header is sent (TEMP log; do not log token)
+      console.log('[TOKEN] Authorization header present:', true);
+
       const response = await fetch(TOKEN_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           roomName: ROOM_NAME,
@@ -309,7 +350,7 @@ export function useLiveRoomParticipants(
       profileId: null,
       anonIdentity,
     };
-  }, []);
+  }, [user?.id]);
 
   /**
    * Map LiveKit participant to ParticipantLite for selection engine
@@ -426,6 +467,20 @@ export function useLiveRoomParticipants(
           if (DEBUG) {
             console.log('[ROOM] Skipping connect (not authenticated)');
           }
+          isConnectingRef.current = false;
+          hasConnectedRef.current = false;
+          return;
+        }
+
+        // 4) Guard against race conditions: do not attempt token fetch until AuthContext has a token.
+        const bearer = await getAccessToken();
+        if (!bearer) {
+          setLastTokenError({
+            status: null,
+            bodySnippet: '',
+            message: 'No Supabase access token available on mobile',
+          });
+          setConnectionError('No Supabase access token available on mobile');
           isConnectingRef.current = false;
           hasConnectedRef.current = false;
           return;
@@ -580,7 +635,7 @@ export function useLiveRoomParticipants(
     };
 
     connectToRoom();
-  }, [enabled, updateParticipants]);
+  }, [enabled, getAccessToken, getAuthContext, updateParticipants]);
 
   useEffect(() => {
     return () => {
