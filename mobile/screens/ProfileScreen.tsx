@@ -426,6 +426,60 @@ export function ProfileScreen({
     }
   }, []);
 
+  const formatPrice = useCallback((priceCents: number | null, currency: string | null | undefined) => {
+    if (priceCents === null || typeof priceCents !== 'number' || !Number.isFinite(priceCents)) return undefined;
+    const cur = String(currency || 'USD').toUpperCase();
+    try {
+      return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(priceCents / 100);
+    } catch {
+      return `${cur} ${(priceCents / 100).toFixed(2)}`;
+    }
+  }, []);
+
+  const parsePriceToCents = useCallback((input: unknown): number | null => {
+    const raw = typeof input === 'string' ? input.trim() : '';
+    if (!raw) return null;
+    const cleaned = raw.replace(/,/g, '').replace(/^\$/g, '');
+    if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) {
+      throw new Error('Please enter a valid price like 29.99');
+    }
+    const [dollarsStr, centsStrRaw] = cleaned.split('.');
+    const dollars = Number(dollarsStr);
+    const centsStr = (centsStrRaw ?? '').padEnd(2, '0');
+    const cents = centsStr ? Number(centsStr) : 0;
+    return dollars * 100 + cents;
+  }, []);
+
+  const loadMerch = useCallback(
+    async (profileId: string) => {
+      try {
+        const { data, error } = await supabase.rpc('get_profile_merch', { p_profile_id: profileId });
+        if (error) {
+          console.error('[Mobile] get_profile_merch failed:', error);
+          setMerch([]);
+          return;
+        }
+        const rows = Array.isArray(data) ? (data as any[]) : [];
+        setMerch(
+          rows.map((r: any) => ({
+            id: String(r.id),
+            name: String(r.name ?? ''),
+            description: r.description ?? undefined,
+            price: formatPrice(r.price_cents ?? null, r.currency ?? 'USD'),
+            image_url: r.image_url ?? undefined,
+            buy_url: r.url ?? undefined,
+            is_featured: r.is_featured ?? false,
+            sort_order: r.sort_order ?? 0,
+          }))
+        );
+      } catch (e: any) {
+        console.error('[Mobile] loadMerch failed:', e?.message || e);
+        setMerch([]);
+      }
+    },
+    [formatPrice]
+  );
+
   const loadBlocksBundle = useCallback(
     async (uname: string) => {
       setBlocksLoading(true);
@@ -437,7 +491,6 @@ export function ProfileScreen({
         const json = await res.json().catch(() => null);
         if (!res.ok || !json || json.error) {
           setShows([]);
-          setMerch([]);
           setPortfolioItems([]);
           setSchedule([]);
           setFeatured([]);
@@ -453,7 +506,6 @@ export function ProfileScreen({
           return Array.isArray(direct) ? direct : [];
         };
 
-        const merchBlocks = getByType('merch');
         const scheduleBlocks = getByType('schedule_item');
         const featuredBlocks = getByType('featured_link');
         const clipBlocks = getByType('clip');
@@ -515,17 +567,6 @@ export function ProfileScreen({
         } catch (e) {
           if (!cancelled) setPortfolioItems([]);
         }
-
-        setMerch(
-          merchBlocks.map((b) => ({
-            id: String((b as any).id),
-            name: String((b as any).title ?? ''),
-            description: (b as any)?.metadata?.description ?? undefined,
-            price: (b as any)?.metadata?.price ?? undefined,
-            image_url: (b as any)?.metadata?.image_url ?? undefined,
-            buy_url: (b as any).url ?? undefined,
-          }))
-        );
 
         setSchedule(
           scheduleBlocks.map((b) => ({
@@ -697,6 +738,81 @@ export function ProfileScreen({
     [requireOwner]
   );
 
+  // Merchandise CRUD (new dedicated profile_merch table)
+  const saveMerchItem = useCallback(
+    async (values: any) => {
+      if (!requireOwner()) return;
+      const name = String(values.name ?? '').trim();
+      if (!name) {
+        Alert.alert('Error', 'Product Name is required.');
+        return;
+      }
+
+      const buyUrl = String(values.buy_url ?? '').trim() || null;
+      const imageUrl = String(values.image_url ?? '').trim() || null;
+      const description = String(values.description ?? '').trim() || null;
+      const isFeatured = values.is_featured === true;
+
+      let priceCents: number | null = null;
+      try {
+        priceCents = parsePriceToCents(values.price);
+      } catch (e: any) {
+        Alert.alert('Error', String(e?.message || 'Invalid price'));
+        return;
+      }
+
+      const existingIndex = editingMerch?.id ? merch.findIndex((m) => m.id === editingMerch.id) : -1;
+      const sortOrder = existingIndex >= 0 ? existingIndex : merch.length;
+
+      const { error } = await supabase.rpc('upsert_profile_merch_item', {
+        p_item: {
+          id: editingMerch?.id ?? null,
+          name,
+          price_cents: priceCents,
+          currency: 'USD',
+          url: buyUrl,
+          image_url: imageUrl,
+          description,
+          is_featured: isFeatured,
+          sort_order: sortOrder,
+        },
+      });
+      if (error) throw error;
+      setModulesReloadNonce((n) => n + 1);
+    },
+    [editingMerch?.id, merch, parsePriceToCents, requireOwner]
+  );
+
+  const deleteMerchItem = useCallback(
+    async (id: string) => {
+      if (!requireOwner()) return;
+      const { error } = await supabase.rpc('delete_profile_merch_item', { p_item_id: id });
+      if (error) throw error;
+      setModulesReloadNonce((n) => n + 1);
+    },
+    [requireOwner]
+  );
+
+  const moveMerchItem = useCallback(
+    async (itemId: string, direction: -1 | 1, profileId: string) => {
+      if (!requireOwner()) return;
+      const idx = merch.findIndex((m) => m.id === itemId);
+      if (idx < 0) return;
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= merch.length) return;
+
+      const next = [...merch];
+      const [it] = next.splice(idx, 1);
+      next.splice(nextIdx, 0, it);
+      setMerch(next);
+
+      const orderedIds = next.map((m) => m.id);
+      const { error } = await supabase.rpc('reorder_profile_merch', { p_profile_id: profileId, p_ordered_ids: orderedIds });
+      if (error) throw error;
+    },
+    [merch, requireOwner]
+  );
+
   // Generic content block upsert
   const saveBlock = useCallback(
     async (blockType: string, id: string | null, title: string, url: string | null, metadata: any, sortOrder: number) => {
@@ -787,7 +903,7 @@ export function ProfileScreen({
         const ptype = String(p?.profile_type || 'default');
         if (pid && ptype === 'musician') {
           setMusicVideosLoading(true);
-          const { data: list, error: listErr } = await supabase.rpc('get_music_videos', { p_profile_id: pid });
+          const { data: list, error: listErr } = await supabase.rpc('get_profile_music_videos', { p_profile_id: pid });
           if (listErr) {
             console.log('[MusicVideos] load failed:', listErr.message);
             setMusicVideos([]);
@@ -1225,12 +1341,19 @@ export function ProfileScreen({
     loadMusicTracks(pid);
   }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadMusicTracks, modulesReloadNonce]);
 
-  // Load content blocks bundle (events/merch/products/schedule/featured/clips)
+  // Load content blocks bundle (schedule/featured/clips; events/portfolio are dedicated)
   useEffect(() => {
     const uname = profileData?.profile?.username;
     if (!uname) return;
     loadBlocksBundle(uname);
   }, [profileData?.profile?.username, loadBlocksBundle, modulesReloadNonce]);
+
+  // Load merchandise (dedicated profile_merch RPC)
+  useEffect(() => {
+    const pid = profileData?.profile?.id;
+    if (!pid) return;
+    loadMerch(pid);
+  }, [profileData?.profile?.id, loadMerch, modulesReloadNonce]);
   
   const gifterStatus = profileData.gifter_statuses?.[profile.id];
   const gifterLevelDisplay =
@@ -1758,10 +1881,14 @@ export function ProfileScreen({
                       text: 'Delete',
                       style: 'destructive',
                       onPress: () => {
-                        void deleteBlock(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
+                        void deleteMerchItem(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
                       },
                     },
                   ]);
+                }}
+                onMove={(id, dir) => {
+                  if (!requireOwner()) return;
+                  void moveMerchItem(id, dir, profile.id).catch((e) => Alert.alert('Reorder failed', String(e?.message || e)));
                 }}
                 cardOpacity={cardOpacity}
               />
@@ -1879,6 +2006,7 @@ export function ProfileScreen({
                     image_url: editingMerch?.image_url ?? '',
                     buy_url: editingMerch?.buy_url ?? '',
                     description: editingMerch?.description ?? '',
+                    is_featured: editingMerch?.is_featured === true,
                   }}
                   fields={[
                     { key: 'name', label: 'Product Name', type: 'text', required: true },
@@ -1886,17 +2014,9 @@ export function ProfileScreen({
                     { key: 'image_url', label: 'Image URL', type: 'url' },
                     { key: 'buy_url', label: 'Purchase URL', type: 'url' },
                     { key: 'description', label: 'Description', type: 'textarea' },
+                    { key: 'is_featured', label: 'Featured', type: 'checkbox', checkboxLabel: 'Show this item as featured.' },
                   ]}
-                  onSubmit={async (vals) => {
-                    const title = String(vals.name ?? '').trim();
-                    const url = String(vals.buy_url ?? '').trim() || null;
-                    const metadata = {
-                      price: String(vals.price ?? '').trim() || null,
-                      image_url: String(vals.image_url ?? '').trim() || null,
-                      description: String(vals.description ?? '').trim() || null,
-                    };
-                    await saveBlock('merch', editingMerch?.id ?? null, title, url, metadata, merch.length);
-                  }}
+                  onSubmit={saveMerchItem}
                 />
 
                 <SectionEditModal
