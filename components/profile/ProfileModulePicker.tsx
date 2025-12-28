@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Plus } from 'lucide-react';
+import { Button } from '@/components/ui';
 import { 
   ProfileSection, 
   ProfileType, 
@@ -150,13 +151,15 @@ export default function ProfileModulePicker({
             Choose which modules appear on your profile
           </p>
         </div>
-        <button
+        <Button
           onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-2"
+          variant="primary"
+          size="sm"
+          className="flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Add Modules
-        </button>
+        </Button>
       </div>
 
       {/* Enabled Modules (Chips) */}
@@ -234,12 +237,13 @@ export default function ProfileModulePicker({
             </div>
 
             <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-              <button
+              <Button
                 onClick={() => setShowModal(false)}
-                className="w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+                variant="primary"
+                className="w-full"
               >
                 Done
-              </button>
+              </Button>
             </div>
           </div>
         </div>
