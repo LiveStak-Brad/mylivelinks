@@ -19,7 +19,6 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { Grid12 } from '../components/live/Grid12';
 import { ChatOverlay } from '../overlays/ChatOverlay';
 import { ViewersLeaderboardsOverlay } from '../overlays/ViewersLeaderboardsOverlay';
-import { MenuOverlay } from '../overlays/MenuOverlay';
 import { StatsOverlay } from '../overlays/StatsOverlay';
 import { GiftOverlay } from '../overlays/GiftOverlay';
 import { DebugPill } from '../components/DebugPill';
@@ -56,8 +55,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   
-  // Modal states for Options and Mixer
-  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  // Modal states for Mixer (Options uses overlay system for parity with swipe-right menu)
   const [showMixerModal, setShowMixerModal] = useState(false);
   
   // 🔒 LOCK ORIENTATION TO LANDSCAPE on mount/focus
@@ -342,8 +340,8 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
   }, [currentUser?.username]);
 
   const handleOptionsPress = useCallback(() => {
-    setShowOptionsModal(true);
-  }, []);
+    openOverlay('menu');
+  }, [openOverlay]);
 
   const handleMixerPress = useCallback(() => {
     setShowMixerModal(true);
@@ -521,7 +519,14 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         <>
           <ChatOverlay visible={state.activeOverlay === 'chat'} onClose={handleCloseOverlay} />
           <ViewersLeaderboardsOverlay visible={state.activeOverlay === 'viewers'} onClose={handleCloseOverlay} />
-          <MenuOverlay visible={state.activeOverlay === 'menu'} onClose={handleCloseOverlay} onOpenWallet={onNavigateWallet} />
+          <OptionsMenu
+            visible={state.activeOverlay === 'menu'}
+            onClose={handleCloseOverlay}
+            onNavigateToWallet={() => {
+              handleCloseOverlay();
+              onNavigateWallet();
+            }}
+          />
           <StatsOverlay visible={state.activeOverlay === 'stats'} onClose={handleCloseOverlay} roomStats={{ viewerCount: 0, liveCount: participants.length }} showDebug={false} />
           <GiftOverlay
             visible={state.activeOverlay === 'gift'}
@@ -532,16 +537,6 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
           />
         </>
       )}
-
-      {/* Options Modal - Independent of overlay system */}
-      <OptionsMenu
-        visible={showOptionsModal}
-        onClose={() => setShowOptionsModal(false)}
-        onNavigateToWallet={() => {
-          setShowOptionsModal(false);
-          onNavigateWallet();
-        }}
-      />
 
       {/* Mixer Modal - 12-slot volume control */}
       <MixerModal
