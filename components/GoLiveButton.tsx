@@ -346,15 +346,33 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     try {
       setPermissionError(null);
       
-      // Request screen share
-      const displayMediaOptions: DisplayMediaStreamOptions = {
-        video: {
-          displaySurface: 'monitor',
-        } as MediaTrackConstraints,
-        audio: true, // Request system audio (may not be supported on all platforms)
+      const tryGetDisplayMedia = async (options: DisplayMediaStreamOptions) => {
+        return await navigator.mediaDevices.getDisplayMedia(options);
       };
 
-      const screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+      let screenStream: MediaStream;
+      try {
+        const displayMediaOptions: DisplayMediaStreamOptions = {
+          video: {
+            displaySurface: 'monitor',
+          } as MediaTrackConstraints,
+          audio: true,
+        };
+        screenStream = await tryGetDisplayMedia(displayMediaOptions);
+      } catch (err: any) {
+        const name = err?.name;
+        const isOverconstrained = name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError';
+        if (!isOverconstrained) throw err;
+
+        try {
+          screenStream = await tryGetDisplayMedia({ video: true, audio: true });
+        } catch (err2: any) {
+          const name2 = err2?.name;
+          const isOverconstrained2 = name2 === 'OverconstrainedError' || name2 === 'ConstraintNotSatisfiedError';
+          if (!isOverconstrained2) throw err2;
+          screenStream = await tryGetDisplayMedia({ video: true, audio: false });
+        }
+      }
       
       // Stop current preview
       stopPreview();
@@ -390,6 +408,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       console.error('Error starting screen share:', err);
       if (err.name === 'NotAllowedError') {
         setPermissionError('Screen share was cancelled or denied. Please try again and select a screen to share.');
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        setPermissionError('Screen share constraints not supported by this browser/display. Please try again and select a different screen/window.');
       } else {
         setPermissionError(err.message || 'Failed to start screen share');
       }
