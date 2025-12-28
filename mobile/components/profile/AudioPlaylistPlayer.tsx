@@ -14,7 +14,6 @@ import { Audio } from 'expo-av';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { uploadProfileMediaFromUri } from '../../lib/profileMedia';
-import { supabase } from '../../lib/supabase';
 
 export type ProfileMusicTrack = {
   id: string;
@@ -158,20 +157,6 @@ export function AudioPlaylistPlayer({
   const setTracks = (next: ProfileMusicTrack[]) => {
     setUiTracks(next);
     onTracksChange?.(next);
-  };
-
-  const persistReorder = async (next: ProfileMusicTrack[]) => {
-    if (!isOwner) return;
-    if (!profileId) return;
-    try {
-      const { error } = await supabase.rpc('reorder_music_tracks', {
-        p_ordered_ids: next.map((t) => t.id),
-      });
-      if (error) throw error;
-    } catch (e) {
-      console.error('[AudioPlaylistPlayer] reorder failed', e);
-      Alert.alert('Unable to reorder', 'Please try again.');
-    }
   };
 
   const stop = async () => {
@@ -525,31 +510,32 @@ export function AudioPlaylistPlayer({
             {!canPlay && (
               <Text style={styles.cantPlay}>This track needs an audio URL to play.</Text>
             )}
-                <Ionicons name="list" size={18} color={styles._accent.color as any} />
-                <Text style={styles.playlistButtonText}>Playlist ({uiTracks.length})</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.controlsRow}>
-              <Pressable onPress={goPrev} style={styles.controlBtn}>
-                <Ionicons name="play-skip-back" size={20} color={theme.colors.textPrimary} />
-              </Pressable>
-
-              <Pressable
-                onPress={togglePlay}
-                style={[styles.playBtn, !canPlay && styles.playBtnDisabled]}
-                disabled={!canPlay}
-              >
-                <Ionicons name={isPlaying ? 'pause' : 'play'} size={22} color="#fff" />
-              </Pressable>
-
-              <Pressable onPress={goNext} style={styles.controlBtn}>
-                <Ionicons name="play-skip-forward" size={20} color={theme.colors.textPrimary} />
-              </Pressable>
-            </View>
           </View>
-        </>
-      )}
+
+          <Pressable onPress={() => setPlaylistOpen(true)} style={styles.playlistButton}>
+            <Ionicons name="list" size={18} color={styles._accent.color as any} />
+            <Text style={styles.playlistButtonText}>Playlist ({uiTracks.length})</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.controlsRow}>
+          <Pressable onPress={goPrev} style={styles.controlBtn}>
+            <Ionicons name="play-skip-back" size={20} color={theme.colors.textPrimary} />
+          </Pressable>
+
+          <Pressable
+            onPress={togglePlay}
+            style={[styles.playBtn, !canPlay && styles.playBtnDisabled]}
+            disabled={!canPlay}
+          >
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={22} color="#fff" />
+          </Pressable>
+
+          <Pressable onPress={goNext} style={styles.controlBtn}>
+            <Ionicons name="play-skip-forward" size={20} color={theme.colors.textPrimary} />
+          </Pressable>
+        </View>
+      </View>
 
       {/* Playlist Modal */}
       <Modal visible={playlistOpen} transparent animationType="fade" onRequestClose={() => setPlaylistOpen(false)}>

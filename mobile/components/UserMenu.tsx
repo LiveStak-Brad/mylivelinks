@@ -359,7 +359,7 @@ export function UserMenu({
                   <MenuDivider styles={styles} />
 
                   <MenuItem
-                    icon="crown-outline"
+                    icon="trophy-outline"
                     iconColor="#f59e0b"
                     label="Owner Panel"
                     onPress={() => {
