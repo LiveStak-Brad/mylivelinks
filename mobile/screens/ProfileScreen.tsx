@@ -25,7 +25,6 @@ import { getAvatarSource } from '../lib/defaultAvatar';
 import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { 
   getEnabledTabs, 
-  getEnabledSections, 
   isSectionEnabled,
   type ProfileType 
 } from '../config/profileTypeConfig';
@@ -1306,6 +1305,43 @@ export function ProfileScreen({
     }
   };
 
+  const profileType = (profileData?.profile?.profile_type || 'default') as ProfileType; // Get profile type, default to 'default'
+  const enabledTabs = useMemo(() => getEnabledTabs(profileType), [profileType]);
+
+  // Load business module data (business profiles only)
+  useEffect(() => {
+    const pid = profileData?.profile?.id;
+    const pt = profileData?.profile?.profile_type || 'default';
+    if (!pid) return;
+    if (pt !== 'business') return;
+    void loadBusiness(pid);
+  }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadBusiness, modulesReloadNonce]);
+
+  // Load musician tracks (musician only)
+  useEffect(() => {
+    const pid = profileData?.profile?.id;
+    const pt = profileData?.profile?.profile_type || 'default';
+    if (!pid) return;
+    if (pt !== 'musician') return;
+    void loadMusicTracks(pid);
+  }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadMusicTracks, modulesReloadNonce]);
+
+  // Load content blocks bundle (schedule/featured/clips; events/portfolio are dedicated)
+  useEffect(() => {
+    const uname = profileData?.profile?.username;
+    const pid = profileData?.profile?.id;
+    if (!uname) return;
+    if (!pid) return;
+    void loadBlocksBundle(uname, pid);
+  }, [profileData?.profile?.id, profileData?.profile?.username, loadBlocksBundle, modulesReloadNonce]);
+
+  // Load merchandise (dedicated profile_merch RPC)
+  useEffect(() => {
+    const pid = profileData?.profile?.id;
+    if (!pid) return;
+    void loadMerch(pid);
+  }, [profileData?.profile?.id, loadMerch, modulesReloadNonce]);
+
   // Loading state - show minimal UI immediately
   if (loading && !profileData) {
     return (
@@ -1346,44 +1382,7 @@ export function ProfileScreen({
   }
 
   const { profile } = profileData;
-  const profileType = profile.profile_type || 'default'; // Get profile type, default to 'default'
-  const enabledTabs = useMemo(() => getEnabledTabs(profileType), [profileType]);
-  const enabledSections = useMemo(() => getEnabledSections(profileType), [profileType]);
 
-  // Load business module data (business profiles only)
-  useEffect(() => {
-    const pid = profileData?.profile?.id;
-    const pt = profileData?.profile?.profile_type || 'default';
-    if (!pid) return;
-    if (pt !== 'business') return;
-    loadBusiness(pid);
-  }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadBusiness, modulesReloadNonce]);
-
-  // Load musician tracks (musician only)
-  useEffect(() => {
-    const pid = profileData?.profile?.id;
-    const pt = profileData?.profile?.profile_type || 'default';
-    if (!pid) return;
-    if (pt !== 'musician') return;
-    loadMusicTracks(pid);
-  }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadMusicTracks, modulesReloadNonce]);
-
-  // Load content blocks bundle (schedule/featured/clips; events/portfolio are dedicated)
-  useEffect(() => {
-    const uname = profileData?.profile?.username;
-    const pid = profileData?.profile?.id;
-    if (!uname) return;
-    if (!pid) return;
-    loadBlocksBundle(uname, pid);
-  }, [profileData?.profile?.id, profileData?.profile?.username, loadBlocksBundle, modulesReloadNonce]);
-
-  // Load merchandise (dedicated profile_merch RPC)
-  useEffect(() => {
-    const pid = profileData?.profile?.id;
-    if (!pid) return;
-    loadMerch(pid);
-  }, [profileData?.profile?.id, loadMerch, modulesReloadNonce]);
-  
   const gifterStatus = profileData.gifter_statuses?.[profile.id];
   const gifterLevelDisplay =
     gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0
