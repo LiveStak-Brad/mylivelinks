@@ -58,6 +58,7 @@ type ProfileTypePickerModalProps = {
   currentType?: ProfileType;
   onSelect?: (type: ProfileType) => void;
   allowSkip?: boolean;
+  cardOpacity?: number; // User-selected opacity (from profile settings)
 };
 
 export function ProfileTypePickerModal({
@@ -66,6 +67,7 @@ export function ProfileTypePickerModal({
   currentType = 'creator',
   onSelect,
   allowSkip = false,
+  cardOpacity = 0.95, // Default opacity to match profile cards
 }: ProfileTypePickerModalProps) {
   const [selectedType, setSelectedType] = useState<ProfileType>(currentType);
 
@@ -98,6 +100,7 @@ export function ProfileTypePickerModal({
     >
       <div
         className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden"
+        style={{ opacity: cardOpacity }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

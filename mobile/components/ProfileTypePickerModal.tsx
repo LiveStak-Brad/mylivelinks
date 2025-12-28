@@ -64,6 +64,7 @@ type ProfileTypePickerModalProps = {
   currentType?: ProfileType;
   onSelect?: (type: ProfileType) => void;
   allowSkip?: boolean;
+  cardOpacity?: number; // User-selected opacity (from profile settings)
 };
 
 export function ProfileTypePickerModal({
@@ -72,9 +73,10 @@ export function ProfileTypePickerModal({
   currentType = 'creator',
   onSelect,
   allowSkip = false,
+  cardOpacity = 0.95, // Default opacity to match profile cards
 }: ProfileTypePickerModalProps) {
   const { theme } = useThemeMode();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, cardOpacity), [theme, cardOpacity]);
   const [selectedType, setSelectedType] = useState<ProfileType>(currentType);
 
   const handleContinue = () => {
@@ -201,7 +203,7 @@ function ProfileTypeCard({ option, selected, onPress, styles }: ProfileTypeCardP
 
 type Styles = ReturnType<typeof createStyles>;
 
-function createStyles(theme: ThemeDefinition) {
+function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
   const isLight = theme.mode === 'light';
   const modalShadow = theme.elevations.modal;
 
@@ -215,6 +217,7 @@ function createStyles(theme: ThemeDefinition) {
     modalCard: {
       borderRadius: 18,
       backgroundColor: isLight ? theme.colors.surfaceCard : theme.tokens.surfaceModal,
+      opacity: cardOpacity, // Apply user-selected opacity
       borderWidth: 1,
       borderColor: theme.colors.border,
       overflow: 'hidden',
@@ -266,7 +269,7 @@ function createStyles(theme: ThemeDefinition) {
     },
     typeCardSelected: {
       borderColor: theme.colors.accent,
-      backgroundColor: isLight ? 'rgba(139, 92, 246, 0.08)' : 'rgba(139, 92, 246, 0.15)',
+      backgroundColor: isLight ? theme.colors.highlight : 'rgba(139, 92, 246, 0.15)',
     },
     typeCardPressed: {
       opacity: 0.8,

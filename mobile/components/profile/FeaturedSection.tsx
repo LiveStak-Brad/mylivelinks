@@ -16,6 +16,7 @@ interface FeaturedSectionProps {
   onAdd?: () => void;
   onEdit?: (item: FeaturedItem) => void;
   onDelete?: (itemId: string) => void;
+  cardOpacity?: number; // User-selected opacity (from profile settings)
 }
 
 /**
@@ -33,9 +34,10 @@ export function FeaturedSection({
   onAdd,
   onEdit,
   onDelete,
+  cardOpacity = 0.95, // Default opacity to match profile cards
 }: FeaturedSectionProps) {
   const { theme } = useThemeMode();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, cardOpacity), [theme, cardOpacity]);
 
   // Empty state for owners
   if (items.length === 0 && isOwner) {

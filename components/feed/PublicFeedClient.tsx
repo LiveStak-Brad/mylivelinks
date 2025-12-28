@@ -59,6 +59,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
 
   const [composerText, setComposerText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const composerInFlightRef = useRef(false);
   const [composerMediaFile, setComposerMediaFile] = useState<File | null>(null);
   const [composerMediaPreviewUrl, setComposerMediaPreviewUrl] = useState<string | null>(null);
   const [composerMediaKind, setComposerMediaKind] = useState<'image' | 'video' | null>(null);
@@ -153,8 +154,16 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
   }, [loadFeed]);
 
   const createPost = useCallback(async () => {
+    if (!currentUserId) {
+      setLoadError('Please log in to post.');
+      return;
+    }
+
     const text = composerText.trim();
-    if (!text) return;
+    if (!text && !composerMediaFile) return;
+
+    if (composerInFlightRef.current) return;
+    composerInFlightRef.current = true;
 
     if (composerMediaFile && !currentUserId) {
       setLoadError('Please log in to upload media.');
@@ -191,6 +200,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
       setLoadError(err instanceof Error ? err.message : 'Failed to create post');
     } finally {
       setIsPosting(false);
+      composerInFlightRef.current = false;
     }
   }, [composerMediaFile, composerMediaPreviewUrl, composerText, currentUserId, loadFeed]);
 
@@ -415,7 +425,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
                     Add photo/video
                   </Button>
                 </div>
-                <Button onClick={createPost} disabled={isPosting || !composerText.trim()} isLoading={isPosting}>
+                <Button onClick={createPost} disabled={isPosting || (!composerText.trim() && !composerMediaFile)} isLoading={isPosting}>
                   Post
                 </Button>
               </div>

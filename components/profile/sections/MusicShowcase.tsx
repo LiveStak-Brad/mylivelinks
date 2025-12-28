@@ -16,6 +16,8 @@ interface MusicShowcaseProps {
   isOwner?: boolean;
   tracks?: MusicTrack[]; // Real data when available
   onAddTrack?: () => void;
+  cardStyle?: React.CSSProperties; // Dynamic opacity from settings
+  borderRadiusClass?: string;
 }
 
 export default function MusicShowcase({ 
@@ -23,6 +25,8 @@ export default function MusicShowcase({
   isOwner = false,
   tracks,
   onAddTrack,
+  cardStyle,
+  borderRadiusClass = 'rounded-2xl',
 }: MusicShowcaseProps) {
   // Use real data if provided, otherwise fall back to mock data
   const musicTracks = tracks || getMockMusicShowcase(profileType);
@@ -31,7 +35,10 @@ export default function MusicShowcase({
   // Empty state
   if (musicTracks.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
+      <div 
+        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg`}
+        style={cardStyle}
+      >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
             <Music className="w-5 h-5 text-purple-500" />
@@ -61,7 +68,10 @@ export default function MusicShowcase({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg">
+    <div 
+      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg`}
+      style={cardStyle}
+    >
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
           <Music className="w-5 h-5 text-purple-500" />

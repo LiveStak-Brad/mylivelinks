@@ -20,6 +20,8 @@ import ProfileTypeBadge, { ProfileType } from '@/components/profile/ProfileTypeB
 import ProfileQuickActionsRow from '@/components/profile/ProfileQuickActionsRow';
 import { getEnabledSections, isSectionEnabled, type ProfileType as ConfigProfileType } from '@/lib/profileTypeConfig';
 import { MusicShowcase, UpcomingEvents, Merchandise, BusinessInfo, Portfolio, TabEmptyState } from '@/components/profile/sections';
+import PublicFeedClient from '@/components/feed/PublicFeedClient';
+import ProfilePhotosClient from '@/components/photos/ProfilePhotosClient';
 
 interface ProfileData {
   profile: {
@@ -690,6 +692,8 @@ export default function ModernProfilePage() {
           <MusicShowcase 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
           />
         )}
         
@@ -698,6 +702,8 @@ export default function ModernProfilePage() {
           <UpcomingEvents 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
           />
         )}
         
@@ -706,6 +712,8 @@ export default function ModernProfilePage() {
           <Merchandise 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
           />
         )}
         
@@ -714,6 +722,8 @@ export default function ModernProfilePage() {
           <BusinessInfo 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
           />
         )}
         
@@ -722,6 +732,8 @@ export default function ModernProfilePage() {
           <Portfolio 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
           />
         )}
         
@@ -924,12 +936,12 @@ export default function ModernProfilePage() {
         
         {/* Feed Tab */}
         {activeTab === 'feed' && (
-          <TabEmptyState type="feed" isOwner={isOwnProfile} />
+          <PublicFeedClient username={profile.username} />
         )}
         
         {/* Photos Tab */}
         {activeTab === 'photos' && (
-          <TabEmptyState type="photos" isOwner={isOwnProfile} />
+          <ProfilePhotosClient username={profile.username} />
         )}
         
         {/* Videos Tab */}
@@ -942,6 +954,8 @@ export default function ModernProfilePage() {
           <MusicShowcase 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
           />
         )}
         
@@ -950,6 +964,8 @@ export default function ModernProfilePage() {
           <UpcomingEvents 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
           />
         )}
         
@@ -958,6 +974,8 @@ export default function ModernProfilePage() {
           <Portfolio 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
           />
         )}
         

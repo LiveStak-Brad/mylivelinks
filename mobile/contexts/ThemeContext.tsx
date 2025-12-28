@@ -72,9 +72,12 @@ type ThemeContextValue = {
   toggleMode: () => void;
   setMode: (mode: ThemeMode) => void;
   hydrated: boolean;
+  cardOpacity: number;
+  setCardOpacity: (opacity: number) => void;
 };
 
 const STORAGE_KEY = 'mylivelinks_theme_mode';
+const OPACITY_KEY = 'mylivelinks_card_opacity';
 const LEGACY_KEY = 'theme_preference';
 
 const lightTokens: ThemeTokens = {
@@ -117,83 +120,114 @@ const darkTokens: ThemeTokens = {
   },
 };
 
-const buildTheme = (mode: ThemeMode, tokens: ThemeTokens): ThemeDefinition => ({
-  mode,
-  tokens,
-  colors: {
-    background: tokens.backgroundPrimary,
-    surface: tokens.backgroundSecondary,
-    card: tokens.surfaceCard,
-    cardAlt: mode === 'light' ? '#F5F3FF' : 'rgba(255,255,255,0.08)',
-    cardSurface: mode === 'light' ? 'rgba(255,255,255,0.92)' : tokens.surfaceModal,
-    surfaceCard: tokens.surfaceCard,
-    surfaceModal: tokens.surfaceModal,
-    border: tokens.borderSubtle,
-    textPrimary: tokens.textPrimary,
-    textSecondary: tokens.textSecondary,
-    textMuted: tokens.textMuted,
-    text: tokens.textPrimary,
-    mutedText: tokens.textMuted,
-    icon: mode === 'light' ? '#0F172A' : '#E2E8F0',
-    overlay: mode === 'light' ? 'rgba(15, 23, 42, 0.3)' : 'rgba(0, 0, 0, 0.55)',
-    menuBackdrop: mode === 'light' ? 'rgba(15, 23, 42, 0.25)' : 'rgba(0, 0, 0, 0.6)',
-    menuBackground: mode === 'light' ? tokens.surfaceModal : '#0F172A',
-    menuBorder: mode === 'light' ? 'rgba(15, 23, 42, 0.08)' : tokens.borderSubtle,
-    menuShadow: mode === 'light' ? 'rgba(15, 23, 42, 0.12)' : 'rgba(0, 0, 0, 0.45)',
-    tabBar: mode === 'light' ? tokens.surfaceCard : '#0D1220',
-    tabBorder: tokens.borderSubtle,
-    accent: tokens.accentPrimary,
-    accentSecondary: tokens.accentSecondary,
-    success: '#16A34A',
-    danger: '#EF4444',
-    highlight: mode === 'light' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(139, 92, 246, 0.18)',
-  },
-  elevations: {
-    card: tokens.shadow,
-    modal: {
-      ...tokens.shadow,
-      opacity: tokens.shadow.opacity + 0.05,
-      radius: tokens.shadow.radius + 2,
-      elevation: tokens.shadow.elevation + 2,
+const buildTheme = (mode: ThemeMode, tokens: ThemeTokens, cardOpacity: number = 1): ThemeDefinition => {
+  // Apply user-customizable opacity to surface cards
+  const adjustOpacity = (color: string, opacity: number): string => {
+    // Parse rgba or rgb
+    const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (rgbaMatch) {
+      const r = rgbaMatch[1];
+      const g = rgbaMatch[2];
+      const b = rgbaMatch[3];
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    // If not rgba, return as-is
+    return color;
+  };
+
+  const surfaceCardWithOpacity = mode === 'light' 
+    ? adjustOpacity('rgb(255, 255, 255)', cardOpacity)
+    : adjustOpacity('rgb(255, 255, 255)', 0.06 * cardOpacity);
+
+  return {
+    mode,
+    tokens: {
+      ...tokens,
+      surfaceCard: surfaceCardWithOpacity,
     },
-    floating: {
-      ...tokens.shadow,
-      opacity: tokens.shadow.opacity + (mode === 'light' ? 0.02 : 0.06),
-      radius: tokens.shadow.radius + 4,
-      elevation: tokens.shadow.elevation + 4,
+    colors: {
+      background: tokens.backgroundPrimary,
+      surface: tokens.backgroundSecondary,
+      card: surfaceCardWithOpacity,
+      cardAlt: mode === 'light' ? '#F5F3FF' : 'rgba(255,255,255,0.08)',
+      cardSurface: mode === 'light' ? adjustOpacity('rgb(255, 255, 255)', 0.92 * cardOpacity) : tokens.surfaceModal,
+      surfaceCard: surfaceCardWithOpacity,
+      surfaceModal: tokens.surfaceModal,
+      border: tokens.borderSubtle,
+      textPrimary: tokens.textPrimary,
+      textSecondary: tokens.textSecondary,
+      textMuted: tokens.textMuted,
+      text: tokens.textPrimary,
+      mutedText: tokens.textMuted,
+      icon: mode === 'light' ? '#0F172A' : '#E2E8F0',
+      overlay: mode === 'light' ? 'rgba(15, 23, 42, 0.3)' : 'rgba(0, 0, 0, 0.55)',
+      menuBackdrop: mode === 'light' ? 'rgba(15, 23, 42, 0.25)' : 'rgba(0, 0, 0, 0.6)',
+      menuBackground: mode === 'light' ? tokens.surfaceModal : '#0F172A',
+      menuBorder: mode === 'light' ? 'rgba(15, 23, 42, 0.08)' : tokens.borderSubtle,
+      menuShadow: mode === 'light' ? 'rgba(15, 23, 42, 0.12)' : 'rgba(0, 0, 0, 0.45)',
+      tabBar: mode === 'light' ? surfaceCardWithOpacity : '#0D1220',
+      tabBorder: tokens.borderSubtle,
+      accent: tokens.accentPrimary,
+      accentSecondary: tokens.accentSecondary,
+      success: '#16A34A',
+      danger: '#EF4444',
+      highlight: mode === 'light' ? 'rgba(139, 92, 246, 0.12)' : 'rgba(139, 92, 246, 0.18)',
     },
-  },
-});
+    elevations: {
+      card: tokens.shadow,
+      modal: {
+        ...tokens.shadow,
+        opacity: tokens.shadow.opacity + 0.05,
+        radius: tokens.shadow.radius + 2,
+        elevation: tokens.shadow.elevation + 2,
+      },
+      floating: {
+        ...tokens.shadow,
+        opacity: tokens.shadow.opacity + (mode === 'light' ? 0.02 : 0.06),
+        radius: tokens.shadow.radius + 4,
+        elevation: tokens.shadow.elevation + 4,
+      },
+    },
+  };
+};
 
 export const themeTokens = {
   light: lightTokens,
   dark: darkTokens,
 };
 
-const lightTheme = buildTheme('light', lightTokens);
-const darkTheme = buildTheme('dark', darkTokens);
-
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>('light');
+  const [cardOpacity, setCardOpacityState] = useState<number>(0.95);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
+        // Load theme mode
         const saved = (await SecureStore.getItemAsync(STORAGE_KEY)) as ThemeMode | null;
         if (saved === 'light' || saved === 'dark') {
           setModeState(saved);
-          return;
+        } else {
+          const legacy = (await SecureStore.getItemAsync(LEGACY_KEY)) as ThemeMode | null;
+          if (legacy === 'light' || legacy === 'dark') {
+            setModeState(legacy);
+            await SecureStore.setItemAsync(STORAGE_KEY, legacy);
+          }
         }
-        const legacy = (await SecureStore.getItemAsync(LEGACY_KEY)) as ThemeMode | null;
-        if (legacy === 'light' || legacy === 'dark') {
-          setModeState(legacy);
-          await SecureStore.setItemAsync(STORAGE_KEY, legacy);
+        
+        // Load card opacity
+        const savedOpacity = await SecureStore.getItemAsync(OPACITY_KEY);
+        if (savedOpacity) {
+          const opacity = parseFloat(savedOpacity);
+          if (!isNaN(opacity) && opacity >= 0.3 && opacity <= 1) {
+            setCardOpacityState(opacity);
+          }
         }
       } catch {
-        // fall back to default light mode
+        // fall back to defaults
       } finally {
         setHydrated(true);
       }
@@ -210,6 +244,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const persistOpacity = async (opacity: number) => {
+    setCardOpacityState(opacity);
+    try {
+      await SecureStore.setItemAsync(OPACITY_KEY, opacity.toString());
+    } catch {
+      // ignore persistence error; in-memory opacity still updates
+    }
+  };
+
   const toggleMode = () => {
     setModeState((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
@@ -218,7 +261,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const theme = mode === 'dark' ? darkTheme : lightTheme;
+  const theme = useMemo(() => {
+    const tokens = mode === 'dark' ? darkTokens : lightTokens;
+    return buildTheme(mode, tokens, cardOpacity);
+  }, [mode, cardOpacity]);
 
   const navigationTheme = useMemo<NavigationTheme>(
     () => ({
@@ -243,8 +289,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       toggleMode,
       setMode: persistMode,
       hydrated,
+      cardOpacity,
+      setCardOpacity: persistOpacity,
     }),
-    [mode, theme, navigationTheme, hydrated]
+    [mode, theme, navigationTheme, hydrated, cardOpacity]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

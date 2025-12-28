@@ -18,6 +18,7 @@ interface ClipsSectionProps {
   onEdit?: (item: ClipItem) => void;
   onDelete?: (itemId: string) => void;
   onPlay?: (item: ClipItem) => void;
+  cardOpacity?: number; // User-selected opacity (from profile settings)
 }
 
 /**
@@ -37,9 +38,10 @@ export function ClipsSection({
   onEdit,
   onDelete,
   onPlay,
+  cardOpacity = 0.95, // Default opacity to match profile cards
 }: ClipsSectionProps) {
   const { theme } = useThemeMode();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, cardOpacity), [theme, cardOpacity]);
 
   // Empty state for owners
   if (items.length === 0 && isOwner) {
@@ -154,7 +156,7 @@ export function ClipsSection({
   );
 }
 
-function createStyles(theme: ThemeDefinition) {
+function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
   const cardShadow = theme.elevations.card;
 
   return StyleSheet.create({
@@ -191,6 +193,7 @@ function createStyles(theme: ThemeDefinition) {
     clipCard: {
       width: 200,
       backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity, // Apply user-selected opacity
       borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -311,6 +314,7 @@ function createStyles(theme: ThemeDefinition) {
       paddingVertical: 40,
       marginHorizontal: 16,
       backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity, // Apply user-selected opacity
       borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.colors.border,
