@@ -15,6 +15,7 @@ type ProfileRow = {
   username?: string | null;
   display_name?: string | null;
   bio?: string | null;
+  profile_type?: ProfileType | null;
 };
 
 export function EditProfileScreen({ navigation }: Props) {
@@ -52,7 +53,7 @@ export function EditProfileScreen({ navigation }: Props) {
     try {
       const { data, error: e } = await supabase
         .from('profiles')
-        .select('id, username, display_name, bio')
+        .select('id, username, display_name, bio, profile_type')
         .eq('id', userId)
         .single();
 
@@ -90,14 +91,31 @@ export function EditProfileScreen({ navigation }: Props) {
     setError(null);
 
     try {
+      let profileTypeSavedViaRpc = false;
+      try {
+        const { error: typeErr } = await supabase.rpc('set_profile_type', {
+          p_profile_type: profileType,
+        });
+        if (!typeErr) {
+          profileTypeSavedViaRpc = true;
+        }
+      } catch {
+        profileTypeSavedViaRpc = false;
+      }
+
+      const updatePayload: any = {
+        display_name: displayName.trim() || null,
+        bio: bio.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (!profileTypeSavedViaRpc) {
+        updatePayload.profile_type = profileType;
+      }
+
       const { error: e } = await supabase
         .from('profiles')
-        .update({
-          display_name: displayName.trim() || null,
-          bio: bio.trim() || null,
-          profile_type: profileType,
-          updated_at: new Date().toISOString(),
-        } as any)
+        .update(updatePayload)
         .eq('id', userId);
 
       if (e) throw e;
@@ -108,7 +126,7 @@ export function EditProfileScreen({ navigation }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [bio, displayName, navigation, userId]);
+  }, [bio, displayName, navigation, profileType, userId]);
 
   return (
     <PageShell

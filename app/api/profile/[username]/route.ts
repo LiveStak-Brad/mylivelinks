@@ -77,7 +77,7 @@ export async function GET(
       if (ids.length > 0) {
         const { data: rows, error: rowsErr } = await supabase
           .from('profiles')
-          .select('id, lifetime_coins_gifted')
+          .select('id, lifetime_coins_gifted, profile_type')
           .in('id', ids);
 
         if (!rowsErr && Array.isArray(rows)) {
@@ -86,6 +86,14 @@ export async function GET(
             if (!id) continue;
             const lifetimeCoins = Number((row as any)?.lifetime_coins_gifted ?? 0);
             gifter_statuses[id] = getGifterStatus(lifetimeCoins, { is_admin: viewerIsAdmin });
+
+            if (
+              id === profileId &&
+              (data as any)?.profile &&
+              ((data as any).profile as any).profile_type == null
+            ) {
+              ((data as any).profile as any).profile_type = (row as any)?.profile_type ?? null;
+            }
           }
         }
       }

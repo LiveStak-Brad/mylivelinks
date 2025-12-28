@@ -224,40 +224,56 @@ export default function ProfileSettingsPage() {
         }
       }
 
+      let profileTypeSavedViaRpc = false;
+      try {
+        const { error: typeErr } = await supabase.rpc('set_profile_type', {
+          p_profile_type: profileType,
+        });
+        if (!typeErr) {
+          profileTypeSavedViaRpc = true;
+        }
+      } catch {
+        profileTypeSavedViaRpc = false;
+      }
+
+      const updatePayload: any = {
+        display_name: displayName,
+        bio: bio,
+        avatar_url: finalAvatarUrl,
+        // Social media fields (strip @ if user included it)
+        social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
+        social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
+        social_youtube: socialYoutube.trim().replace(/^@/, '') || null,
+        social_tiktok: socialTiktok.trim().replace(/^@/, '') || null,
+        social_facebook: socialFacebook.trim().replace(/^@/, '') || null,
+        social_twitch: socialTwitch.trim().replace(/^@/, '') || null,
+        social_discord: socialDiscord.trim() || null,
+        social_snapchat: socialSnapchat.trim().replace(/^@/, '') || null,
+        social_linkedin: socialLinkedin.trim().replace(/^@/, '') || null,
+        social_github: socialGithub.trim().replace(/^@/, '') || null,
+        social_spotify: socialSpotify.trim() || null,
+        social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
+        // Display preferences
+        hide_streaming_stats: hideStreamingStats,
+        // Customization fields
+        profile_bg_url: customization.profile_bg_url || null,
+        profile_bg_overlay: customization.profile_bg_overlay,
+        card_color: customization.card_color,
+        card_opacity: customization.card_opacity,
+        card_border_radius: customization.card_border_radius,
+        font_preset: customization.font_preset,
+        accent_color: customization.accent_color,
+        links_section_title: customization.links_section_title,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (!profileTypeSavedViaRpc) {
+        updatePayload.profile_type = profileType;
+      }
+
       // Update profile
       const { data: profileData, error: profileError } = await (supabase.from('profiles') as any)
-        .update({
-          display_name: displayName,
-          bio: bio,
-          avatar_url: finalAvatarUrl,
-          // Social media fields (strip @ if user included it)
-          social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
-          social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
-          social_youtube: socialYoutube.trim().replace(/^@/, '') || null,
-          social_tiktok: socialTiktok.trim().replace(/^@/, '') || null,
-          social_facebook: socialFacebook.trim().replace(/^@/, '') || null,
-          social_twitch: socialTwitch.trim().replace(/^@/, '') || null,
-          social_discord: socialDiscord.trim() || null,
-          social_snapchat: socialSnapchat.trim().replace(/^@/, '') || null,
-          social_linkedin: socialLinkedin.trim().replace(/^@/, '') || null,
-          social_github: socialGithub.trim().replace(/^@/, '') || null,
-          social_spotify: socialSpotify.trim() || null,
-          social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
-          // Display preferences
-          hide_streaming_stats: hideStreamingStats,
-          // Profile type
-          profile_type: profileType,
-          // Customization fields
-          profile_bg_url: customization.profile_bg_url || null,
-          profile_bg_overlay: customization.profile_bg_overlay,
-          card_color: customization.card_color,
-          card_opacity: customization.card_opacity,
-          card_border_radius: customization.card_border_radius,
-          font_preset: customization.font_preset,
-          accent_color: customization.accent_color,
-          links_section_title: customization.links_section_title,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', currentUserId)
         .select();
       

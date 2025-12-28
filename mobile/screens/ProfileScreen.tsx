@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -215,18 +215,7 @@ export function ProfileScreen({
   const [connections, setConnections] = useState<any[]>([]);
   const [connectionsLoading, setConnectionsLoading] = useState(false);
 
-  useEffect(() => {
-    loadProfile();
-  }, [username]);
-
-  // Load connections when tab changes or expanded state changes
-  useEffect(() => {
-    if (connectionsExpanded && profileData) {
-      loadConnections();
-    }
-  }, [activeConnectionsTab, connectionsExpanded, profileData?.profile.id]);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -260,7 +249,26 @@ export function ProfileScreen({
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiBaseUrl, authToken, username]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (!navigation?.addListener) return;
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProfile();
+    });
+    return unsubscribe;
+  }, [loadProfile, navigation]);
+
+  // Load connections when tab changes or expanded state changes
+  useEffect(() => {
+    if (connectionsExpanded && profileData) {
+      loadConnections();
+    }
+  }, [activeConnectionsTab, connectionsExpanded, profileData?.profile.id]);
 
   const loadConnections = async () => {
     if (!profileData) return;
