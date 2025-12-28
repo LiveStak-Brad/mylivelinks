@@ -110,7 +110,7 @@ interface ProfileData {
     earnings_balance?: number;
     hide_streaming_stats?: boolean;
     profile_type?: ProfileType; // PROFILE TYPE for conditional rendering
-    enabled_sections?: string[] | null; // CUSTOM ENABLED SECTIONS
+    enabled_modules?: string[] | null; // OPTIONAL MODULES (no core shell)
     // Customization (MATCH WEB)
     profile_bg_url?: string;
     profile_bg_overlay?: string;
@@ -1610,7 +1610,7 @@ export function ProfileScreen({
         {activeTab === 'info' && (
           <>
             {/* BUSINESS INFO (Business profile type) */}
-            {isSectionEnabled('business_info', profileType as any, profile.enabled_sections as any) && (isOwnProfile || businessLoading || hasAnyBusinessInfo) && (
+            {isSectionEnabled('business_info', profileType as any, profile.enabled_modules as any) && (isOwnProfile || businessLoading || hasAnyBusinessInfo) && (
               <View style={[styles.card, customCardStyle]}>
                 <View style={styles.businessHeaderRow}>
                   <View style={styles.businessTitleRow}>
@@ -1810,7 +1810,7 @@ export function ProfileScreen({
             )}
 
             {/* MUSIC SHOWCASE (Musician) */}
-            {isSectionEnabled('music_showcase', profileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('music_showcase', profileType, profile.enabled_modules as any) && (
               <MusicSection
                 items={musicTracks.map((t) => ({
                   id: t.id,
@@ -1853,7 +1853,7 @@ export function ProfileScreen({
             )}
 
             {/* UPCOMING EVENTS / SHOWS (Musician + Comedian) */}
-            {isSectionEnabled('upcoming_events', profileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('upcoming_events', profileType, profile.enabled_modules as any) && (
               <ShowsSection
                 items={shows}
                 isOwner={isOwnProfile}
@@ -1888,7 +1888,7 @@ export function ProfileScreen({
             )}
 
             {/* MERCHANDISE (Musician + Comedian) */}
-            {isSectionEnabled('merchandise', profileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('merchandise', profileType, profile.enabled_modules as any) && (
               <MerchSection
                 items={merch}
                 isOwner={isOwnProfile}
@@ -1924,7 +1924,7 @@ export function ProfileScreen({
             )}
 
             {/* PORTFOLIO / PRODUCTS (Business + Creator) */}
-            {isSectionEnabled('portfolio', profileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('portfolio', profileType, profile.enabled_modules as any) && (
               <PortfolioSection
                 items={portfolioItems}
                 isOwner={isOwnProfile}
@@ -2144,7 +2144,7 @@ export function ProfileScreen({
             )}
 
             {/* STATS CARDS SECTION (Social Counts, Top Supporters, Top Streamers) */}
-        {!profile.hide_streaming_stats && isSectionEnabled('social_counts', profileType, profile.enabled_sections as any) && (
+        {!profile.hide_streaming_stats && isSectionEnabled('social_counts', profileType, profile.enabled_modules as any) && (
           <View style={styles.statsCardsContainer}>
             {/* Social Counts Card */}
             <View style={[styles.card, customCardStyle]}>
@@ -2174,7 +2174,7 @@ export function ProfileScreen({
             </View>
 
             {/* Top Supporters Card */}
-            {isSectionEnabled('top_supporters', profileType, profile.enabled_sections as any) && profileData.top_supporters.length > 0 && (
+            {isSectionEnabled('top_supporters', profileType, profile.enabled_modules as any) && profileData.top_supporters.length > 0 && (
               <View style={[styles.card, customCardStyle]}>
                 <Text style={styles.cardTitle}>🎁 Top Supporters</Text>
                 {profileData.top_supporters.slice(0, 3).map((supporter, idx) => (
@@ -2206,7 +2206,7 @@ export function ProfileScreen({
             )}
 
             {/* Top Streamers Card */}
-            {isSectionEnabled('top_streamers', profileType, profile.enabled_sections as any) && profileData.top_streamers.length > 0 && (
+            {isSectionEnabled('top_streamers', profileType, profile.enabled_modules as any) && profileData.top_streamers.length > 0 && (
               <View style={[styles.card, customCardStyle]}>
                 <Text style={styles.cardTitle}>🌟 Top Streamers</Text>
                 {profileData.top_streamers.slice(0, 3).map((streamer, idx) => (
@@ -2241,7 +2241,7 @@ export function ProfileScreen({
         )}
 
         {/* SOCIAL MEDIA CARD */}
-        {isSectionEnabled('social_media', profileType, profile.enabled_sections as any) && (profile.social_instagram ||
+        {isSectionEnabled('social_media', profileType, profile.enabled_modules as any) && (profile.social_instagram ||
           profile.social_twitter ||
           profile.social_youtube ||
           profile.social_tiktok ||
@@ -2311,7 +2311,7 @@ export function ProfileScreen({
         )}
 
         {/* CONNECTIONS CARD */}
-        {isSectionEnabled('connections', profileType, profile.enabled_sections as any) && (
+        {isSectionEnabled('connections', profileType, profile.enabled_modules as any) && (
         <View style={[styles.card, customCardStyle]}>
           <Pressable
             onPress={() => setConnectionsExpanded(!connectionsExpanded)}
@@ -2426,7 +2426,7 @@ export function ProfileScreen({
         )}
 
         {/* LINKS CARD */}
-        {isSectionEnabled('links', profileType, profile.enabled_sections as any) && profileData.links.length > 0 && (
+        {isSectionEnabled('links', profileType, profile.enabled_modules as any) && profileData.links.length > 0 && (
           <View style={[styles.card, customCardStyle]}>
             <Text style={styles.cardTitle}>My Links</Text>
             {profileData.links.map((link) => (
@@ -2451,7 +2451,7 @@ export function ProfileScreen({
         )}
 
         {/* PROFILE STATS CARD */}
-        {isSectionEnabled('profile_stats', profileType, profile.enabled_sections as any) && !profile.hide_streaming_stats && (
+        {isSectionEnabled('profile_stats', profileType, profile.enabled_modules as any) && !profile.hide_streaming_stats && (
           <View style={[styles.card, customCardStyle]}>
             <Text style={styles.cardTitle}>📊 Profile Stats</Text>
             <View style={styles.statsDetailRow}>
@@ -2492,7 +2492,7 @@ export function ProfileScreen({
         )}
 
         {/* FOOTER CARD */}
-        {isSectionEnabled('footer', profileType, profile.enabled_sections as any) && (
+        {isSectionEnabled('footer', profileType, profile.enabled_modules as any) && (
         <View style={[styles.card, customCardStyle]}>
           <View style={styles.footerContent}>
             <Text style={[styles.footerBrand, { color: accentColor }]}>MyLiveLinks</Text>

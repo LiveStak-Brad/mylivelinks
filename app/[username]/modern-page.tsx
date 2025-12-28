@@ -77,7 +77,7 @@ interface ProfileData {
     gifter_level: number;
     created_at: string;
     profile_type?: ProfileType;
-    enabled_sections?: string[] | null;
+    enabled_modules?: string[] | null; // Optional modules only
     // Customization
     profile_bg_url?: string;
     profile_bg_overlay?: string;
@@ -1121,7 +1121,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for musician showcase */}
-            {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
               <MusicShowcase 
                 profileType={profile.profile_type as ConfigProfileType}
                 isOwner={isOwnProfile}
@@ -1132,7 +1132,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for upcoming events */}
-            {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
               <UpcomingEvents 
                 profileType={profile.profile_type as ConfigProfileType}
                 isOwner={isOwnProfile}
@@ -1146,7 +1146,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for merchandise */}
-            {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
               <Merchandise 
                 profileId={profile.id}
                 profileType={profile.profile_type as ConfigProfileType}
@@ -1157,7 +1157,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for business info */}
-            {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
               <BusinessInfo 
                 profileId={profile.id}
                 profileType={profile.profile_type as ConfigProfileType}
@@ -1168,7 +1168,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for portfolio */}
-            {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
+            {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
               <Portfolio 
                 profileType={profile.profile_type as ConfigProfileType}
                 isOwner={isOwnProfile}

@@ -6,7 +6,7 @@ import { supabase, supabaseConfigured } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { Button, Input, PageShell } from '../components/ui';
 import { ProfileTypePickerModal, type ProfileType } from '../components/ProfileTypePickerModal';
-import ProfileSectionToggle from '../components/ProfileSectionToggle';
+import ProfileModulePicker from '../components/ProfileModulePicker';
 import type { ProfileSection } from '../config/profileTypeConfig';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -18,7 +18,7 @@ type ProfileRow = {
   display_name?: string | null;
   bio?: string | null;
   profile_type?: ProfileType | null;
-  enabled_sections?: string[] | null;
+  enabled_modules?: string[] | null;
 };
 
 export function EditProfileScreen({ navigation }: Props) {
@@ -34,7 +34,7 @@ export function EditProfileScreen({ navigation }: Props) {
   const [bio, setBio] = useState('');
   const [profileType, setProfileType] = useState<ProfileType>('creator');
   const [showTypePickerModal, setShowTypePickerModal] = useState(false);
-  const [enabledSections, setEnabledSections] = useState<ProfileSection[] | null>(null);
+  const [enabledModules, setEnabledModules] = useState<ProfileSection[] | null>(null);
 
   const canSave = useMemo(() => !!userId && !saving && !loading, [loading, saving, userId]);
 
@@ -69,11 +69,11 @@ export function EditProfileScreen({ navigation }: Props) {
       setBio(String(row.bio ?? ''));
       // Load profile type from backend
       setProfileType((row as any).profile_type || 'creator');
-      // Load enabled sections (custom toggle state)
-      if (row.enabled_sections && Array.isArray(row.enabled_sections)) {
-        setEnabledSections(row.enabled_sections as ProfileSection[]);
+      // Load enabled modules (optional modules only)
+      if (row.enabled_modules && Array.isArray(row.enabled_modules)) {
+        setEnabledModules(row.enabled_modules as ProfileSection[]);
       } else {
-        setEnabledSections(null); // null = use profile_type defaults
+        setEnabledModules(null); // null = use profile_type defaults
       }
     } catch (e: any) {
       setError(e?.message || 'Failed to load profile');
@@ -116,7 +116,7 @@ export function EditProfileScreen({ navigation }: Props) {
       const updatePayload: any = {
         display_name: displayName.trim() || null,
         bio: bio.trim() || null,
-        enabled_sections: enabledSections || null,
+        enabled_modules: enabledModules || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -206,11 +206,11 @@ export function EditProfileScreen({ navigation }: Props) {
             </Text>
           </View>
 
-          {/* Section Customization */}
-          <ProfileSectionToggle
+          {/* Optional Modules */}
+          <ProfileModulePicker
             profileType={profileType}
-            currentEnabledSections={enabledSections}
-            onChange={setEnabledSections}
+            currentEnabledModules={enabledModules}
+            onChange={setEnabledModules}
           />
 
           <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} loading={saving} />

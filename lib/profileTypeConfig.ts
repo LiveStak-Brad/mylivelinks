@@ -296,16 +296,23 @@ export function getEnabledQuickActions(profileType?: ProfileType): QuickActionCo
 
 /**
  * Check if a specific section is enabled for a profile type
- * If customEnabledSections is provided, check that instead
+ * Core sections (hero, footer, connections, social_media, links) ALWAYS return true
+ * If customEnabledModules is provided, check that for optional modules
  */
 export function isSectionEnabled(
   section: ProfileSection, 
   profileType?: ProfileType,
-  customEnabledSections?: ProfileSection[] | null
+  customEnabledModules?: ProfileSection[] | null
 ): boolean {
-  // If custom list exists, use it
-  if (customEnabledSections && customEnabledSections.length > 0) {
-    return customEnabledSections.includes(section);
+  // Core sections are ALWAYS enabled (not customizable)
+  const CORE_SECTIONS: ProfileSection[] = ['hero', 'footer', 'connections', 'social_media', 'links'];
+  if (CORE_SECTIONS.includes(section)) {
+    return true;
+  }
+  
+  // For optional modules, check custom list if provided
+  if (customEnabledModules && customEnabledModules.length > 0) {
+    return customEnabledModules.includes(section);
   }
   
   // Fallback to profile_type defaults

@@ -9,7 +9,7 @@ import { uploadAvatar, uploadPinnedPostMedia, deleteAvatar, deletePinnedPostMedi
 import Image from 'next/image';
 import ProfileCustomization from '@/components/profile/ProfileCustomization';
 import { ProfileTypePickerModal, ProfileType } from '@/components/ProfileTypePickerModal';
-import ProfileSectionToggle from '@/components/profile/ProfileSectionToggle';
+import ProfileModulePicker from '@/components/profile/ProfileModulePicker';
 import { ProfileSection } from '@/lib/profileTypeConfig';
 
 interface UserLink {
@@ -69,8 +69,8 @@ export default function ProfileSettingsPage() {
   const [profileType, setProfileType] = useState<ProfileType>('creator');
   const [showProfileTypePicker, setShowProfileTypePicker] = useState(false);
   
-  // Enabled Sections (custom toggle state)
-  const [enabledSections, setEnabledSections] = useState<ProfileSection[] | null>(null);
+  // Enabled Modules (optional modules only, no core shell)
+  const [enabledModules, setEnabledModules] = useState<ProfileSection[] | null>(null);
   
   // Pinned post
   const [pinnedPost, setPinnedPost] = useState<PinnedPost | null>(null);
@@ -146,11 +146,11 @@ export default function ProfileSettingsPage() {
         // Load profile type
         setProfileType((p.profile_type || 'creator') as ProfileType);
         
-        // Load enabled sections (custom toggle state)
-        if (p.enabled_sections && Array.isArray(p.enabled_sections)) {
-          setEnabledSections(p.enabled_sections as ProfileSection[]);
+        // Load enabled modules (optional modules only)
+        if (p.enabled_modules && Array.isArray(p.enabled_modules)) {
+          setEnabledModules(p.enabled_modules as ProfileSection[]);
         } else {
-          setEnabledSections(null); // null = use profile_type defaults
+          setEnabledModules(null); // null = use profile_type defaults
         }
         
         // Load customization fields
@@ -253,8 +253,8 @@ export default function ProfileSettingsPage() {
         display_name: displayName,
         bio: bio,
         avatar_url: finalAvatarUrl,
-        // Enabled sections (custom toggle state)
-        enabled_sections: enabledSections || null,
+        // Enabled modules (optional modules only)
+        enabled_modules: enabledModules || null,
         // Social media fields (strip @ if user included it)
         social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
         social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
@@ -564,11 +564,11 @@ export default function ProfileSettingsPage() {
           </p>
         </div>
 
-        {/* Section Customization */}
-        <ProfileSectionToggle
+        {/* Optional Modules */}
+        <ProfileModulePicker
           profileType={profileType}
-          currentEnabledSections={enabledSections}
-          onChange={setEnabledSections}
+          currentEnabledModules={enabledModules}
+          onChange={setEnabledModules}
         />
 
         {/* Save Button (Top) */}
