@@ -57,12 +57,10 @@ const PROFILE_SECTIONS: Record<ProfileType, SectionTab[]> = {
   ],
   creator: [
     { id: 'info', label: 'Info' },
-    { id: 'featured', label: 'Featured', emoji: '✨' },
-    { id: 'gallery', label: 'Gallery', emoji: '🖼️' },
-    { id: 'posts', label: 'Posts', emoji: '📝' },
-    { id: 'links', label: 'Links', emoji: '🔗' },
-    { id: 'feed', label: 'Feed', emoji: '📰' },
-    { id: 'photos', label: 'Photos', emoji: '📸' },
+    { id: 'feed', label: 'Feed' },
+    { id: 'photos', label: 'Photos' },
+    { id: 'videos', label: 'Videos' },
+  ],
 };
 
 export function ProfileSectionTabs({
@@ -114,4 +112,3 @@ export function ProfileSectionTabs({
 }
 
 export default ProfileSectionTabs;
-

@@ -628,7 +628,7 @@ export default function ModernProfilePage() {
         </div>
         
         {/* Profile Type Quick Actions Row */}
-        {(profile.profile_type && profile.profile_type !== 'default') && (
+        {(profile.profile_type && profile.profile_type !== 'creator') && (
           <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
             <ProfileQuickActionsRow 
               profileType={profile.profile_type}
