@@ -138,9 +138,8 @@ export default function ProfileSettingsPage() {
         // Load display preferences
         setHideStreamingStats(p.hide_streaming_stats || false);
         
-        // TODO: Load profile type from backend when profiles.profile_type is ready
-        // setProfileType((p.profile_type || 'creator') as ProfileType);
-        setProfileType('creator'); // Default for now
+        // Load profile type
+        setProfileType((p.profile_type || 'creator') as ProfileType);
         
         // Load customization fields
         setCustomization({
@@ -246,8 +245,8 @@ export default function ProfileSettingsPage() {
           social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
           // Display preferences
           hide_streaming_stats: hideStreamingStats,
-          // TODO: Save profile type to backend when profiles.profile_type is ready
-          // profile_type: profileType,
+          // Profile type
+          profile_type: profileType,
           // Customization fields
           profile_bg_url: customization.profile_bg_url || null,
           profile_bg_overlay: customization.profile_bg_overlay,

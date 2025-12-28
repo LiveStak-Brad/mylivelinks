@@ -18,7 +18,6 @@ import ProfileLivePlayer from '@/components/ProfileLivePlayer';
 import UserConnectionsList from '@/components/UserConnectionsList';
 import ProfileTypeBadge, { ProfileType } from '@/components/profile/ProfileTypeBadge';
 import ProfileQuickActionsRow from '@/components/profile/ProfileQuickActionsRow';
-import ProfileSectionTabs from '@/components/profile/ProfileSectionTabs';
 import { getEnabledSections, isSectionEnabled, type ProfileType as ConfigProfileType } from '@/lib/profileTypeConfig';
 import { MusicShowcase, UpcomingEvents, Merchandise, BusinessInfo, Portfolio, TabEmptyState } from '@/components/profile/sections';
 
@@ -138,7 +137,6 @@ export default function ModernProfilePage() {
   const [liveStreamId, setLiveStreamId] = useState<number | undefined>(undefined);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'feed' | 'photos'>('info');
-  const [activeSectionTab, setActiveSectionTab] = useState<string>('info');
   const [activeConnectionsTab, setActiveConnectionsTab] = useState<'following' | 'followers' | 'friends'>('following');
   const [connectionsExpanded, setConnectionsExpanded] = useState(true);
   
@@ -636,17 +634,7 @@ export default function ModernProfilePage() {
           </div>
         )}
         
-        {/* Profile Section Tabs (Type-specific) */}
-        <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
-          <ProfileSectionTabs
-            profileType={profile.profile_type || 'creator'}
-            activeTab={activeSectionTab}
-            onTabChange={setActiveSectionTab}
-            accentColor={accentColor}
-          />
-        </div>
-        
-        {/* Profile Tabs (Info | Feed | Photos) - Legacy tabs for backward compatibility */}
+        {/* Profile Tabs (Info | Feed | Photos) */}
         <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
           <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
@@ -694,8 +682,8 @@ export default function ModernProfilePage() {
           </div>
         </div>
         
-        {/* Tab Content - Render based on activeSectionTab (CONFIG-DRIVEN) */}
-        {activeSectionTab === 'info' && (
+        {/* Tab Content - Render based on activeTab */}
+        {activeTab === 'info' && (
           <>
         {/* Config-driven section rendering for musician showcase */}
         {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType) && (
@@ -935,22 +923,22 @@ export default function ModernProfilePage() {
         )}
         
         {/* Feed Tab */}
-        {activeSectionTab === 'feed' && (
+        {activeTab === 'feed' && (
           <TabEmptyState type="feed" isOwner={isOwnProfile} />
         )}
         
         {/* Photos Tab */}
-        {activeSectionTab === 'photos' && (
+        {activeTab === 'photos' && (
           <TabEmptyState type="photos" isOwner={isOwnProfile} />
         )}
         
         {/* Videos Tab */}
-        {activeSectionTab === 'videos' && (
+        {activeTab === 'videos' && (
           <TabEmptyState type="videos" isOwner={isOwnProfile} />
         )}
         
         {/* Music Tab - Musician-specific (shows MusicShowcase) */}
-        {activeSectionTab === 'music' && (
+        {activeTab === 'music' && (
           <MusicShowcase 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
@@ -958,7 +946,7 @@ export default function ModernProfilePage() {
         )}
         
         {/* Events Tab - Musician/Comedian-specific (shows UpcomingEvents) */}
-        {activeSectionTab === 'events' && (
+        {activeTab === 'events' && (
           <UpcomingEvents 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
@@ -966,7 +954,7 @@ export default function ModernProfilePage() {
         )}
         
         {/* Products Tab - Business-specific (shows Portfolio for now) */}
-        {activeSectionTab === 'products' && (
+        {activeTab === 'products' && (
           <Portfolio 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}

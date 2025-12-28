@@ -62,8 +62,8 @@ export function EditProfileScreen({ navigation }: Props) {
       setProfile(row);
       setDisplayName(String(row.display_name ?? ''));
       setBio(String(row.bio ?? ''));
-      // TODO: Load actual profile type from backend when field exists
-      setProfileType('creator');
+      // Load profile type from backend
+      setProfileType((row as any).profile_type || 'creator');
     } catch (e: any) {
       setError(e?.message || 'Failed to load profile');
       setProfile(null);
@@ -90,12 +90,12 @@ export function EditProfileScreen({ navigation }: Props) {
     setError(null);
 
     try {
-      // TODO: Save profileType to backend when field is added
       const { error: e } = await supabase
         .from('profiles')
         .update({
           display_name: displayName.trim() || null,
           bio: bio.trim() || null,
+          profile_type: profileType,
           updated_at: new Date().toISOString(),
         } as any)
         .eq('id', userId);
