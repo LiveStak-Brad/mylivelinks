@@ -234,7 +234,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
       {/* Dropdown Menu */}
       {showMenu && (
         <div 
-          className="absolute right-0 mt-2 w-64 bg-card rounded-xl shadow-xl border border-border overflow-hidden animate-scale-in z-[1200]"
+          className="absolute right-0 mt-2 w-64 bg-card rounded-xl shadow-xl border border-border overflow-hidden animate-scale-in z-popover"
           role="menu"
           aria-orientation="vertical"
         >
