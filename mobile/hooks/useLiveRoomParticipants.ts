@@ -23,9 +23,22 @@ import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT } from '../lib/li
 
 const DEBUG = DEBUG_LIVEKIT;
 const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
-const TOKEN_ENDPOINT = process.env.EXPO_PUBLIC_API_URL
-  ? `${process.env.EXPO_PUBLIC_API_URL}${TOKEN_ENDPOINT_PATH}`
-  : '';
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com').replace(/\/+$/, '');
+const TOKEN_ENDPOINT = `${API_BASE_URL}${TOKEN_ENDPOINT_PATH}`;
+
+const redactTokenFromText = (text: string): string => {
+  if (!text) return text;
+  // Best-effort redact any token fields in JSON.
+  return text.replace(/"token"\s*:\s*"[^"]+"/gi, '"token":"[redacted]"');
+};
+
+const toSnippet = (text: string, limit = 500): string => {
+  return (text || '').slice(0, limit);
+};
+
+const isValidWsUrl = (url: string | null | undefined): url is string => {
+  return typeof url === 'string' && url.length > 0 && url.startsWith('wss://');
+};
 
 interface UseLiveRoomParticipantsReturn {
   participants: Participant[];
@@ -194,10 +207,10 @@ export function useLiveRoomParticipants(
 
       // 1) Make Bearer token mandatory and blocking
       if (!accessToken) {
-        lastTokenStatusRef.current = null;
-        setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: null, bodySnippet: null });
+        lastTokenStatusRef.current = 0;
+        setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: 0, bodySnippet: null });
         setLastTokenError({
-          status: null,
+          status: 0,
           bodySnippet: '',
           message: 'No Supabase access token available on mobile',
         });
@@ -248,36 +261,68 @@ export function useLiveRoomParticipants(
       // TEMP: Prove whether we actually have a token at the moment we send the request (do not log token)
       console.log('[TOKEN] hasAccessToken:', !!accessToken);
 
+      const requestBody = {
+        roomName: ROOM_NAME,
+        participantName: params.participantName,
+        canPublish: params.canPublish,
+        canSubscribe: params.canSubscribe,
+        deviceType: 'mobile',
+        deviceId,
+        sessionId,
+        role: params.role,
+        participantMetadata: params.participantMetadata,
+      };
+
+      // Ensure the modal never shows "no response" due to null status.
+      lastTokenStatusRef.current = 0;
+      setTokenDebug(prev => ({ ...prev, status: 0, bodySnippet: null }));
+      setLastTokenError({ status: 0, bodySnippet: '', message: 'Token request in flight' });
+
+      console.log('[TOKEN][HTTP] request', {
+        endpoint: TOKEN_ENDPOINT,
+        method: 'POST',
+        bodyKeys: Object.keys(requestBody),
+        headerKeys: ['Content-Type', 'Authorization'],
+      });
+
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timeoutMs = 15_000;
+      const timeoutId = setTimeout(() => {
+        try {
+          controller?.abort();
+        } catch {
+          // ignore
+        }
+      }, timeoutMs);
+
       const response = await fetch(TOKEN_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({
-          roomName: ROOM_NAME,
-          deviceType: 'mobile',
-          deviceId,
-          sessionId,
-          role: params.role,
-          participantName: params.participantName,
-          canPublish: params.canPublish,
-          canSubscribe: params.canSubscribe,
-          participantMetadata: params.participantMetadata,
-        }),
-      });
+        body: JSON.stringify(requestBody),
+        ...(controller ? { signal: controller.signal } : {}),
+      }).finally(() => clearTimeout(timeoutId));
 
       lastTokenStatusRef.current = response.status;
       setTokenDebug(prev => ({ ...prev, status: response.status }));
 
+      const responseTextRaw = await response.text().catch(() => '');
+      const responseText = redactTokenFromText(responseTextRaw);
+      const snippet500 = toSnippet(responseText, 500);
+      console.log('[TOKEN][HTTP] response', {
+        status: response.status,
+        ok: response.ok,
+        textSnippet: snippet500,
+      });
+
       if (!response.ok) {
-        const bodyText = await response.text().catch(() => '');
-        const snippet = (bodyText || '').slice(0, 300);
-        setTokenDebug(prev => ({ ...prev, bodySnippet: snippet }));
+        setTokenDebug(prev => ({ ...prev, bodySnippet: snippet500 }));
 
         setLastTokenError({
           status: response.status,
-          bodySnippet: snippet,
+          bodySnippet: snippet500,
           message: `Token fetch failed: ${response.status}`,
         });
 
@@ -286,7 +331,7 @@ export function useLiveRoomParticipants(
           message = 'Auth token missing/expired – Bearer token not being sent or Supabase session invalid';
           setLastTokenError({
             status: response.status,
-            bodySnippet: snippet,
+            bodySnippet: snippet500,
             message,
           });
         }
@@ -294,10 +339,35 @@ export function useLiveRoomParticipants(
         throw new Error(message);
       }
 
-      const data = await response.json();
-      setTokenDebug(prev => ({ ...prev, bodySnippet: null }));
+      let data: any = null;
+      try {
+        data = JSON.parse(responseTextRaw);
+      } catch (e: any) {
+        setTokenDebug(prev => ({ ...prev, bodySnippet: snippet500 }));
+        setLastTokenError({
+          status: response.status,
+          bodySnippet: snippet500,
+          message: 'Token endpoint returned non-JSON response',
+        });
+        setConnectionError('Token endpoint returned non-JSON response');
+        throw new Error(e?.message || 'Token endpoint returned non-JSON response');
+      }
 
-      setLastWsUrl(data?.url ?? null);
+      setTokenDebug(prev => ({ ...prev, bodySnippet: snippet500 }));
+
+      const wsUrl = typeof data?.url === 'string' ? String(data.url) : '';
+      setLastWsUrl(wsUrl || null);
+
+      if (!isValidWsUrl(wsUrl)) {
+        const msg = `LIVEKIT_WS_URL missing/invalid (expected wss://...). Received: ${wsUrl || '(empty)'}`;
+        setLastTokenError({
+          status: response.status,
+          bodySnippet: snippet500,
+          message: msg,
+        });
+        setConnectionError(msg);
+        throw new Error(msg);
+      }
       
       if (DEBUG) {
         console.log('[TOKEN] Fetched successfully:', {
@@ -313,13 +383,16 @@ export function useLiveRoomParticipants(
       return data;
     } catch (error: any) {
       const msg = error?.message || 'Token fetch error';
-      console.error('[TOKEN] Fetch error:', msg);
+      const stack = error?.stack ? String(error.stack).slice(0, 1200) : null;
+      console.error('[TOKEN] Fetch error:', { msg, stack });
+
+      // 0 = no HTTP response (network/SSL/DNS failure)
       setTokenDebug(prev => ({ ...prev, status: prev.status ?? 0 }));
       if (lastTokenStatusRef.current == null) lastTokenStatusRef.current = 0;
       setConnectionError(prev => prev || 'Network/SSL error calling TOKEN_ENDPOINT');
       setLastTokenError({
-        status: lastTokenStatusRef.current,
-        bodySnippet: '',
+        status: lastTokenStatusRef.current ?? 0,
+        bodySnippet: stack ? toSnippet(stack, 500) : '',
         message: msg,
       });
       throw error;
@@ -437,22 +510,6 @@ export function useLiveRoomParticipants(
       return;
     }
 
-    // Ensure env is present
-    if (!TOKEN_ENDPOINT) {
-      const message =
-        '[ROOM] Missing EXPO_PUBLIC_API_URL. Refusing to default LiveKit token endpoint to production. Set EXPO_PUBLIC_API_URL (e.g. in mobile/.env for local Expo dev, or in mobile/eas.json for EAS builds) and restart the dev server.';
-      console.error(message);
-
-      setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: null, bodySnippet: null });
-      setLastTokenError({ status: null, bodySnippet: '', message });
-      setConnectionError(message);
-      setConnectDebug({ wsUrl: null, errorMessage: message, reachedConnected: false });
-      setLastConnectError(message);
-      isConnectingRef.current = false;
-      hasConnectedRef.current = false;
-      return;
-    }
-
     isConnectingRef.current = true;
 
     const connectToRoom = async () => {
@@ -476,8 +533,10 @@ export function useLiveRoomParticipants(
         // 4) Guard against race conditions: do not attempt token fetch until AuthContext has a token.
         const bearer = await getAccessToken();
         if (!bearer) {
+          lastTokenStatusRef.current = 0;
+          setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: 0, bodySnippet: null });
           setLastTokenError({
-            status: null,
+            status: 0,
             bodySnippet: '',
             message: 'No Supabase access token available on mobile',
           });
