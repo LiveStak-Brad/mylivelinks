@@ -1900,39 +1900,32 @@ export function ProfileScreen({
                 />
 
                 <SectionEditModal
-                  visible={productModalVisible}
-                  title={editingProduct ? 'Edit Item' : 'Add Item'}
+                  visible={portfolioModalVisible}
+                  title={editingPortfolio ? 'Edit Portfolio Item' : 'Add Portfolio Item'}
                   onClose={() => {
-                    setProductModalVisible(false);
-                    setEditingProduct(null);
+                    setPortfolioModalVisible(false);
+                    setEditingPortfolio(null);
                   }}
                   initialValues={{
-                    name: editingProduct?.name ?? '',
-                    price: editingProduct?.price ?? '',
-                    image_url: editingProduct?.image_url ?? '',
-                    link: editingProduct?.link ?? '',
-                    description: editingProduct?.description ?? '',
-                    category: editingProduct?.category ?? '',
+                    title: editingPortfolio?.title ?? '',
+                    subtitle: editingPortfolio?.subtitle ?? '',
+                    description: editingPortfolio?.description ?? '',
+                    media_type: editingPortfolio?.media_type ?? 'image',
+                    media_url: editingPortfolio?.media_url ?? '',
+                    thumbnail_url: editingPortfolio?.thumbnail_url ?? '',
                   }}
                   fields={[
-                    { key: 'name', label: 'Title', type: 'text', required: true },
-                    { key: 'price', label: 'Price', type: 'text' },
-                    { key: 'image_url', label: 'Image URL', type: 'url' },
-                    { key: 'link', label: 'Link URL', type: 'url' },
-                    { key: 'category', label: 'Category', type: 'text' },
-                    { key: 'description', label: 'Description', type: 'textarea' },
+                    { key: 'title', label: 'Title (optional)', type: 'text' },
+                    { key: 'subtitle', label: 'Subtitle (optional)', type: 'text' },
+                    { key: 'media_type', label: 'Media Type', type: 'text', required: true, placeholder: 'image | video | link' },
+                    { key: 'media_url', label: 'Media URL', type: 'url', required: true },
+                    { key: 'thumbnail_url', label: 'Thumbnail URL (optional)', type: 'url' },
+                    { key: 'description', label: 'Description (optional)', type: 'textarea' },
                   ]}
                   onSubmit={async (vals) => {
-                    const title = String(vals.name ?? '').trim();
-                    const url = String(vals.link ?? '').trim() || null;
-                    const metadata = {
-                      price: String(vals.price ?? '').trim() || null,
-                      image_url: String(vals.image_url ?? '').trim() || null,
-                      description: String(vals.description ?? '').trim() || null,
-                      category: String(vals.category ?? '').trim() || null,
-                      availability: 'available',
-                    };
-                    await saveBlock('product', editingProduct?.id ?? null, title, url, metadata, products.length);
+                    await savePortfolioItem(vals);
+                    setPortfolioModalVisible(false);
+                    setEditingPortfolio(null);
                   }}
                 />
 

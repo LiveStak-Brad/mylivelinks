@@ -20,6 +20,15 @@ export type { ClipItem } from './ClipsSection';
 export { MusicSection } from './MusicSection';
 export type { MusicItem } from './MusicSection';
 
+export { MusicVideosSection } from './MusicVideosSection';
+export type { MusicVideoItem } from './MusicVideosSection';
+
+export { ComedySpecialsSection } from './ComedySpecialsSection';
+export type { ComedySpecialItem } from './ComedySpecialsSection';
+
+export { AudioPlaylistPlayer } from './AudioPlaylistPlayer';
+export type { ProfileMusicTrack } from './AudioPlaylistPlayer';
+
 export { ShowsSection } from './ShowsSection';
 export type { ShowItem } from './ShowsSection';
 
@@ -29,3 +38,13 @@ export type { PressKitItem } from './PressKitSection';
 // Business sections
 export { ProductsOrServicesSection } from './ProductsOrServicesSection';
 export type { ProductOrServiceItem } from './ProductsOrServicesSection';
+
+export { BusinessInfoSection } from './BusinessInfoSection';
+export type { BusinessInfoData } from './BusinessInfoSection';
+
+export { MerchSection } from './MerchSection';
+export type { MerchItem } from './MerchSection';
+
+// Portfolio (Business + Creator)
+export { PortfolioSection } from './PortfolioSection';
+export type { PortfolioItem, PortfolioMediaType } from './PortfolioSection';

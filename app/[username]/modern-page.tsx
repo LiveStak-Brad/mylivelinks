@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
@@ -41,11 +41,21 @@ import {
   type ProfileTab as ConfigProfileTab,
   type ProfileType as ConfigProfileType,
 } from '@/lib/profileTypeConfig';
-import { MusicShowcase, MusicVideos, ComedySpecials, UpcomingEvents, Merchandise, BusinessInfo, Portfolio, Schedule, TabEmptyState } from '@/components/profile/sections';
+import {
+  MusicShowcase,
+  MusicVideos,
+  ComedySpecials,
+  Vlogs,
+  UpcomingEvents,
+  Merchandise,
+  BusinessInfo,
+  Portfolio,
+  Schedule,
+  TabEmptyState,
+} from '@/components/profile/sections';
 import SectionEditModal from '@/components/profile/edit/SectionEditModal';
 import type { MusicTrackRow } from '@/components/profile/sections/MusicShowcase';
 import type { ShowEventRow } from '@/components/profile/sections/UpcomingEvents';
-import type { MerchItemRow } from '@/components/profile/sections/Merchandise';
 import type { PortfolioItemRow } from '@/components/profile/sections/Portfolio';
 import type { ScheduleItemRow } from '@/components/profile/sections/Schedule';
 import PublicFeedClient from '@/components/feed/PublicFeedClient';
@@ -175,7 +185,6 @@ export default function ModernProfilePage() {
   // Profile-type modules (real data; no mocks for visitors)
   const [musicTracks, setMusicTracks] = useState<MusicTrackRow[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<ShowEventRow[]>([]);
-  const [merchItems, setMerchItems] = useState<MerchItemRow[]>([]);
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItemRow[]>([]);
   const [scheduleItems, setScheduleItems] = useState<ScheduleItemRow[]>([]);
   const [modulesReloadNonce, setModulesReloadNonce] = useState(0);
@@ -186,9 +195,6 @@ export default function ModernProfilePage() {
 
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ShowEventRow | null>(null);
-
-  const [merchModalOpen, setMerchModalOpen] = useState(false);
-  const [editingMerch, setEditingMerch] = useState<MerchItemRow | null>(null);
 
   const [portfolioModalOpen, setPortfolioModalOpen] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState<PortfolioItemRow | null>(null);
@@ -295,7 +301,6 @@ export default function ModernProfilePage() {
     if (!profileId) {
       setMusicTracks([]);
       setUpcomingEvents([]);
-      setMerchItems([]);
       setPortfolioItems([]);
       setScheduleItems([]);
       return;
@@ -361,36 +366,40 @@ export default function ModernProfilePage() {
         if (!cancelled) setUpcomingEvents([]);
       }
 
+      // Portfolio (new dedicated table + RPC)
+      try {
+        const { data, error } = await supabase.rpc('get_profile_portfolio', { p_profile_id: profileId });
+        if (!cancelled) {
+          if (error) {
+            console.error('[ProfileModules] get_profile_portfolio failed:', error);
+            setPortfolioItems([]);
+          } else {
+            const rows = Array.isArray(data) ? (data as any[]) : [];
+            setPortfolioItems(
+              rows.map((r) => ({
+                id: String((r as any).id),
+                title: (r as any).title ?? null,
+                subtitle: (r as any).subtitle ?? null,
+                description: (r as any).description ?? null,
+                media_type: (r as any).media_type as 'image' | 'video' | 'link',
+                media_url: String((r as any).media_url ?? ''),
+                thumbnail_url: (r as any).thumbnail_url ?? null,
+                sort_order: (r as any).sort_order ?? 0,
+              }))
+            );
+          }
+        }
+      } catch (e) {
+        if (!cancelled) setPortfolioItems([]);
+      }
+
       // Blocks (merch/portfolio/etc)
       try {
         const res = await fetch(`/api/profile/${encodeURIComponent(username)}/bundle`, { cache: 'no-store' });
         const json = await res.json().catch(() => null);
         const blocks = (json as any)?.blocks ?? null;
         if (!cancelled) {
-          const merchBlocks = getBlocksByType(blocks, 'merch');
-          const productBlocks = getBlocksByType(blocks, 'product');
           const scheduleBlocks = getBlocksByType(blocks, 'schedule_item');
-
-          setMerchItems(
-            merchBlocks.map((b) => ({
-              id: String((b as any).id),
-              name: String((b as any).title ?? ''),
-              price: (b as any)?.metadata?.price ?? null,
-              image_url: (b as any)?.metadata?.image_url ?? null,
-              description: (b as any)?.metadata?.description ?? null,
-              buy_url: (b as any).url ?? null,
-            }))
-          );
-
-          setPortfolioItems(
-            productBlocks.map((b) => ({
-              id: String((b as any).id),
-              title: String((b as any).title ?? ''),
-              image_url: (b as any)?.metadata?.image_url ?? null,
-              description: (b as any)?.metadata?.description ?? null,
-              url: (b as any).url ?? null,
-            }))
-          );
 
           setScheduleItems(
             scheduleBlocks.map((b) => ({
@@ -405,8 +414,6 @@ export default function ModernProfilePage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setMerchItems([]);
-          setPortfolioItems([]);
           setScheduleItems([]);
         }
       }
@@ -635,61 +642,6 @@ export default function ModernProfilePage() {
     setModulesReloadNonce((n) => n + 1);
   };
 
-  const openAddMerch = () => {
-    if (!requireOwner()) return;
-    setEditingMerch(null);
-    setMerchModalOpen(true);
-  };
-  const openEditMerch = (m: MerchItemRow) => {
-    if (!requireOwner()) return;
-    setEditingMerch(m);
-    setMerchModalOpen(true);
-  };
-  const deleteMerch = async (id: string) => {
-    if (!requireOwner()) return;
-    if (!confirm('Delete this merch item?')) return;
-    const { error } = await supabase.rpc('delete_profile_block', { p_id: Number(id) });
-    if (error) {
-      alert(error.message || 'Failed to delete merch item.');
-      return;
-    }
-    setModulesReloadNonce((n) => n + 1);
-  };
-
-  const saveMerch = async (values: Record<string, any>) => {
-    if (!requireOwner()) return;
-    const name = String(values.name ?? '').trim();
-    const meta = {
-      price: String(values.price ?? '').trim() || null,
-      image_url: String(values.image_url ?? '').trim() || null,
-      description: String(values.description ?? '').trim() || null,
-    };
-    const buyUrl = String(values.buy_url ?? '').trim();
-
-    if (editingMerch?.id) {
-      const { error } = await supabase.rpc('update_profile_block', {
-        p_id: Number(editingMerch.id),
-        p_title: name,
-        p_url: buyUrl || null,
-        p_metadata: meta,
-        p_sort_order: 0,
-      });
-      if (error) throw error;
-    } else {
-      const { error } = await supabase.rpc('add_profile_block', {
-        p_block_type: 'merch',
-        p_title: name,
-        p_url: buyUrl || null,
-        p_metadata: meta,
-        p_sort_order: merchItems.length,
-      });
-      if (error) throw error;
-    }
-    setMerchModalOpen(false);
-    setEditingMerch(null);
-    setModulesReloadNonce((n) => n + 1);
-  };
-
   const openAddPortfolio = () => {
     if (!requireOwner()) return;
     setEditingPortfolio(null);
@@ -703,7 +655,7 @@ export default function ModernProfilePage() {
   const deletePortfolio = async (id: string) => {
     if (!requireOwner()) return;
     if (!confirm('Delete this portfolio item?')) return;
-    const { error } = await supabase.rpc('delete_profile_block', { p_id: Number(id) });
+    const { error } = await supabase.rpc('delete_profile_portfolio_item', { p_item_id: id });
     if (error) {
       alert(error.message || 'Failed to delete portfolio item.');
       return;
@@ -714,31 +666,32 @@ export default function ModernProfilePage() {
   const savePortfolio = async (values: Record<string, any>) => {
     if (!requireOwner()) return;
     const title = String(values.title ?? '').trim();
-    const url = String(values.url ?? '').trim();
-    const meta = {
-      image_url: String(values.image_url ?? '').trim() || null,
-      description: String(values.description ?? '').trim() || null,
-    };
+    const subtitle = String(values.subtitle ?? '').trim();
+    const description = String(values.description ?? '').trim();
+    const mediaTypeRaw = String(values.media_type ?? '').trim().toLowerCase();
+    const mediaUrl = String(values.media_url ?? '').trim();
+    const thumbnailUrl = String(values.thumbnail_url ?? '').trim();
 
-    if (editingPortfolio?.id) {
-      const { error } = await supabase.rpc('update_profile_block', {
-        p_id: Number(editingPortfolio.id),
-        p_title: title,
-        p_url: url || null,
-        p_metadata: meta,
-        p_sort_order: 0,
-      });
-      if (error) throw error;
-    } else {
-      const { error } = await supabase.rpc('add_profile_block', {
-        p_block_type: 'product',
-        p_title: title,
-        p_url: url || null,
-        p_metadata: meta,
-        p_sort_order: portfolioItems.length,
-      });
-      if (error) throw error;
+    if (!['image', 'video', 'link'].includes(mediaTypeRaw)) {
+      throw new Error('Media Type must be one of: image, video, link.');
     }
+    if (!mediaUrl) {
+      throw new Error('Media URL is required.');
+    }
+
+    const payload: any = {
+      title: title || null,
+      subtitle: subtitle || null,
+      description: description || null,
+      media_type: mediaTypeRaw,
+      media_url: mediaUrl,
+      thumbnail_url: thumbnailUrl || null,
+      sort_order: editingPortfolio?.id ? (editingPortfolio.sort_order ?? 0) : portfolioItems.length,
+    };
+    if (editingPortfolio?.id) payload.id = editingPortfolio.id;
+
+    const { error } = await supabase.rpc('upsert_profile_portfolio_item', { p_item: payload });
+    if (error) throw error;
     setPortfolioModalOpen(false);
     setEditingPortfolio(null);
     setModulesReloadNonce((n) => n + 1);
@@ -1138,288 +1091,285 @@ export default function ModernProfilePage() {
         {/* Tab Content - Render based on activeTab */}
         {activeTab === 'info' && (
           <>
-        {/* Referral Progress Module - Owner View Only */}
-        {isOwnProfile && (
-          <div className="mb-4 sm:mb-6">
-            <ReferralProgressModule
-              cardStyle={cardStyle}
-              borderRadiusClass={borderRadiusClass}
-              accentColor={accentColor}
-            />
-          </div>
-        )}
+            {/* Referral Progress Module - Owner View Only */}
+            {isOwnProfile && (
+              <div className="mb-4 sm:mb-6">
+                <ReferralProgressModule
+                  cardStyle={cardStyle}
+                  borderRadiusClass={borderRadiusClass}
+                  accentColor={accentColor}
+                />
+              </div>
+            )}
 
-        {/* Streamer schedule (real data, owner-only empty state) */}
-        {profile.profile_type === 'streamer' && (
-          <Schedule
-            isOwner={isOwnProfile}
-            items={scheduleItems}
-            onAdd={openAddSchedule}
-            onEdit={openEditSchedule}
-            onDelete={deleteSchedule}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-          />
-        )}
-        
-        {/* Config-driven section rendering for musician showcase */}
-        {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType) && (
-          <MusicShowcase 
-            profileType={profile.profile_type as ConfigProfileType}
-            isOwner={isOwnProfile}
-            tracks={musicTracks}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-          />
-        )}
-        
-        {/* Config-driven section rendering for upcoming events */}
-        {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType) && (
-          <UpcomingEvents 
-            profileType={profile.profile_type as ConfigProfileType}
-            isOwner={isOwnProfile}
-            events={upcomingEvents}
-            onAddEvent={openAddEvent}
-            onEditEvent={openEditEvent}
-            onDeleteEvent={deleteEvent}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-          />
-        )}
-        
-        {/* Config-driven section rendering for merchandise */}
-        {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType) && (
-          <Merchandise 
-            profileType={profile.profile_type as ConfigProfileType}
-            isOwner={isOwnProfile}
-            products={merchItems}
-            onAddProduct={openAddMerch}
-            onEditProduct={openEditMerch}
-            onDeleteProduct={deleteMerch}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-          />
-        )}
-        
-        {/* Config-driven section rendering for business info */}
-        {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType) && (
-          <BusinessInfo 
-            profileId={profile.id}
-            profileType={profile.profile_type as ConfigProfileType}
-            isOwner={isOwnProfile}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-          />
-        )}
-        
-        {/* Config-driven section rendering for portfolio */}
-        {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType) && (
-          <Portfolio 
-            profileType={profile.profile_type as ConfigProfileType}
-            isOwner={isOwnProfile}
-            items={portfolioItems}
-            onAddItem={openAddPortfolio}
-            onEditItem={openEditPortfolio}
-            onDeleteItem={deletePortfolio}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-          />
-        )}
-        
-        {/* Stats & Social Grid - Hide if hideStreamingStats is true */}
-        {!profile.hide_streaming_stats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
-            <SocialCountsWidget
-              followerCount={profileData.follower_count}
-              followingCount={profileData.following_count}
-              friendsCount={profileData.friends_count}
-              onShowFollowers={() => setShowFollowersModal(true)}
-              onShowFollowing={() => setShowFollowingModal(true)}
-              onShowFriends={() => setShowFriendsModal(true)}
-              cardStyle={cardStyle}
-              borderRadiusClass={borderRadiusClass}
-              accentColor={accentColor}
-            />
+            {/* Streamer schedule (real data, owner-only empty state) */}
+            {profile.profile_type === 'streamer' && (
+              <Schedule
+                isOwner={isOwnProfile}
+                items={scheduleItems}
+                onAdd={openAddSchedule}
+                onEdit={openEditSchedule}
+                onDelete={deleteSchedule}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
             
-            <TopSupportersWidget
-              supporters={profileData.top_supporters}
-              cardStyle={cardStyle}
-              borderRadiusClass={borderRadiusClass}
-              accentColor={accentColor}
-              gifterStatuses={profileData.gifter_statuses}
-            />
+            {/* Config-driven section rendering for musician showcase */}
+            {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType) && (
+              <MusicShowcase 
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                tracks={musicTracks}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
             
-            <TopStreamersWidget
-              streamers={profileData.top_streamers}
-              cardStyle={cardStyle}
-              borderRadiusClass={borderRadiusClass}
-              accentColor={accentColor}
-            />
-          </div>
-        )}
-        
-        {/* Social Media Bar */}
-        {(profile.social_instagram || profile.social_twitter || profile.social_youtube || 
-          profile.social_tiktok || profile.social_facebook || profile.social_twitch ||
-          profile.social_discord || profile.social_snapchat || profile.social_linkedin ||
-          profile.social_github || profile.social_spotify || profile.social_onlyfans) && (
-          <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6 p-4 sm:p-6`} style={cardStyle}>
-            <SocialMediaBar
-              socials={{
-                social_instagram: profile.social_instagram,
-                social_twitter: profile.social_twitter,
-                social_youtube: profile.social_youtube,
-                social_tiktok: profile.social_tiktok,
-                social_facebook: profile.social_facebook,
-                social_twitch: profile.social_twitch,
-                social_discord: profile.social_discord,
-                social_snapchat: profile.social_snapchat,
-                social_linkedin: profile.social_linkedin,
-                social_github: profile.social_github,
-                social_spotify: profile.social_spotify,
-                social_onlyfans: profile.social_onlyfans
-              }}
-              accentColor={accentColor}
-            />
-          </div>
-        )}
-        
-        {/* Connections Section - Following, Followers, Friends */}
-        <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
-          {/* Header with Collapse Button */}
-          <div className="p-4 sm:p-6 pb-0">
-            <button
-              onClick={() => setConnectionsExpanded(!connectionsExpanded)}
-              className="w-full flex items-center justify-between text-left group"
-            >
-              <h3 className="text-xl font-bold">Connections</h3>
-              <svg
-                className={`w-6 h-6 transition-transform duration-200 ${connectionsExpanded ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Collapsible Content */}
-          {connectionsExpanded && (
-            <div className="p-4 sm:p-6 pt-4">
-              {/* Tab Headers */}
-              <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+            {/* Config-driven section rendering for upcoming events */}
+            {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType) && (
+              <UpcomingEvents 
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                events={upcomingEvents}
+                onAddEvent={openAddEvent}
+                onEditEvent={openEditEvent}
+                onDeleteEvent={deleteEvent}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+            
+            {/* Config-driven section rendering for merchandise */}
+            {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType) && (
+              <Merchandise 
+                profileId={profile.id}
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+            
+            {/* Config-driven section rendering for business info */}
+            {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType) && (
+              <BusinessInfo 
+                profileId={profile.id}
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+            
+            {/* Config-driven section rendering for portfolio */}
+            {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType) && (
+              <Portfolio 
+                profileType={profile.profile_type as ConfigProfileType}
+                isOwner={isOwnProfile}
+                items={portfolioItems}
+                onAddItem={openAddPortfolio}
+                onEditItem={openEditPortfolio}
+                onDeleteItem={deletePortfolio}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+            
+            {/* Stats & Social Grid - Hide if hideStreamingStats is true */}
+            {!profile.hide_streaming_stats && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
+                <SocialCountsWidget
+                  followerCount={profileData.follower_count}
+                  followingCount={profileData.following_count}
+                  friendsCount={profileData.friends_count}
+                  onShowFollowers={() => setShowFollowersModal(true)}
+                  onShowFollowing={() => setShowFollowingModal(true)}
+                  onShowFriends={() => setShowFriendsModal(true)}
+                  cardStyle={cardStyle}
+                  borderRadiusClass={borderRadiusClass}
+                  accentColor={accentColor}
+                />
+                
+                <TopSupportersWidget
+                  supporters={profileData.top_supporters}
+                  cardStyle={cardStyle}
+                  borderRadiusClass={borderRadiusClass}
+                  accentColor={accentColor}
+                  gifterStatuses={profileData.gifter_statuses}
+                />
+                
+                <TopStreamersWidget
+                  streamers={profileData.top_streamers}
+                  cardStyle={cardStyle}
+                  borderRadiusClass={borderRadiusClass}
+                  accentColor={accentColor}
+                />
+              </div>
+            )}
+            
+            {/* Social Media Bar */}
+            {(profile.social_instagram || profile.social_twitter || profile.social_youtube || 
+              profile.social_tiktok || profile.social_facebook || profile.social_twitch ||
+              profile.social_discord || profile.social_snapchat || profile.social_linkedin ||
+              profile.social_github || profile.social_spotify || profile.social_onlyfans) && (
+              <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6 p-4 sm:p-6`} style={cardStyle}>
+                <SocialMediaBar
+                  socials={{
+                    social_instagram: profile.social_instagram,
+                    social_twitter: profile.social_twitter,
+                    social_youtube: profile.social_youtube,
+                    social_tiktok: profile.social_tiktok,
+                    social_facebook: profile.social_facebook,
+                    social_twitch: profile.social_twitch,
+                    social_discord: profile.social_discord,
+                    social_snapchat: profile.social_snapchat,
+                    social_linkedin: profile.social_linkedin,
+                    social_github: profile.social_github,
+                    social_spotify: profile.social_spotify,
+                    social_onlyfans: profile.social_onlyfans
+                  }}
+                  accentColor={accentColor}
+                />
+              </div>
+            )}
+            
+            {/* Connections Section - Following, Followers, Friends */}
+            <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
+              {/* Header with Collapse Button */}
+              <div className="p-4 sm:p-6 pb-0">
                 <button
-                  onClick={() => setActiveConnectionsTab('following')}
-                  className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
-                    activeConnectionsTab === 'following'
-                      ? 'border-purple-500 text-purple-500'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
-                  style={activeConnectionsTab === 'following' ? { borderColor: accentColor, color: accentColor } : {}}
+                  onClick={() => setConnectionsExpanded(!connectionsExpanded)}
+                  className="w-full flex items-center justify-between text-left group"
                 >
-                  Following ({profileData.following_count})
-                </button>
-                <button
-                  onClick={() => setActiveConnectionsTab('followers')}
-                  className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
-                    activeConnectionsTab === 'followers'
-                      ? 'border-purple-500 text-purple-500'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
-                  style={activeConnectionsTab === 'followers' ? { borderColor: accentColor, color: accentColor } : {}}
-                >
-                  Followers ({profileData.follower_count})
-                </button>
-                <button
-                  onClick={() => setActiveConnectionsTab('friends')}
-                  className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
-                    activeConnectionsTab === 'friends'
-                      ? 'border-purple-500 text-purple-500'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-                  }`}
-                  style={activeConnectionsTab === 'friends' ? { borderColor: accentColor, color: accentColor } : {}}
-                >
-                  Friends ({profileData.friends_count})
+                  <h3 className="text-xl font-bold">Connections</h3>
+                  <svg
+                    className={`w-6 h-6 transition-transform duration-200 ${connectionsExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </button>
               </div>
-              
-              {/* Tab Content */}
-              <UserConnectionsList
-                userId={profile.id}
-                listType={activeConnectionsTab}
-                currentUserId={currentUser?.id}
-              />
-            </div>
-          )}
-        </div>
-        
-        {/* Links Section */}
-        {profileData.links.length > 0 && (
-          <ModernLinksSection
-            links={profileData.links}
-            sectionTitle={profile.links_section_title || 'My Links'}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-            accentColor={accentColor}
-            isOwner={isOwnProfile}
-          />
-        )}
-        
-        {/* Adult Links Section (WEB ONLY, 18+, CONSENT REQUIRED) */}
-        <AdultLinksSection
-          links={profileData.adult_links || []}
-          show={profileData.show_adult_section || false}
-          cardStyle={cardStyle}
-          borderRadiusClass={borderRadiusClass}
-          accentColor={accentColor}
-        />
-        
-        {/* Stats Card - Hide if hideStreamingStats is true */}
-        {!profile.hide_streaming_stats && (
-          <StatsCard
-            streamStats={profileData.stream_stats}
-            gifterLevel={profile.gifter_level}
-            gifterStatus={(profileData as any)?.gifter_statuses?.[profile.id] ?? null}
-            totalGiftsSent={profile.total_gifts_sent}
-            totalGiftsReceived={profile.total_gifts_received}
-            cardStyle={cardStyle}
-            borderRadiusClass={borderRadiusClass}
-            accentColor={accentColor}
-          />
-        )}
-        
-        {/* Premium Branding Footer - Powered by MyLiveLinks */}
-        <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 sm:p-8 text-center`} style={cardStyle}>
-          <div className="space-y-4">
-            <div className="flex items-center justify-center">
-              <Image
-                src="/branding/mylivelinkstransparent.png"
-                alt="MyLiveLinks"
-                width={240}
-                height={60}
-                className="h-12 sm:h-16 w-auto"
-                priority
-              />
+
+              {/* Collapsible Content */}
+              {connectionsExpanded && (
+                <div className="p-4 sm:p-6 pt-4">
+                  {/* Tab Headers */}
+                  <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+                    <button
+                      onClick={() => setActiveConnectionsTab('following')}
+                      className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
+                        activeConnectionsTab === 'following'
+                          ? 'border-purple-500 text-purple-500'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      }`}
+                      style={activeConnectionsTab === 'following' ? { borderColor: accentColor, color: accentColor } : {}}
+                    >
+                      Following ({profileData.following_count})
+                    </button>
+                    <button
+                      onClick={() => setActiveConnectionsTab('followers')}
+                      className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
+                        activeConnectionsTab === 'followers'
+                          ? 'border-purple-500 text-purple-500'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      }`}
+                      style={activeConnectionsTab === 'followers' ? { borderColor: accentColor, color: accentColor } : {}}
+                    >
+                      Followers ({profileData.follower_count})
+                    </button>
+                    <button
+                      onClick={() => setActiveConnectionsTab('friends')}
+                      className={`flex-1 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
+                        activeConnectionsTab === 'friends'
+                          ? 'border-purple-500 text-purple-500'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                      }`}
+                      style={activeConnectionsTab === 'friends' ? { borderColor: accentColor, color: accentColor } : {}}
+                    >
+                      Friends ({profileData.friends_count})
+                    </button>
+                  </div>
+                  
+                  {/* Tab Content */}
+                  <UserConnectionsList
+                    userId={profile.id}
+                    listType={activeConnectionsTab}
+                    currentUserId={currentUser?.id}
+                  />
+                </div>
+              )}
             </div>
             
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-              Create your own stunning profile, go live, and connect with your audience.
-            </p>
+            {/* Links Section */}
+            {profileData.links.length > 0 && (
+              <ModernLinksSection
+                links={profileData.links}
+                sectionTitle={profile.links_section_title || 'My Links'}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+                accentColor={accentColor}
+                isOwner={isOwnProfile}
+              />
+            )}
             
-            <Link
-              href="/signup"
-              className="inline-block px-8 py-3 rounded-lg font-semibold text-white text-base transition shadow-lg hover:shadow-xl transform hover:scale-105"
-              style={{ backgroundColor: accentColor }}
-            >
-              Create Your Free Profile
-            </Link>
+            {/* Adult Links Section (WEB ONLY, 18+, CONSENT REQUIRED) */}
+            <AdultLinksSection
+              links={profileData.adult_links || []}
+              show={profileData.show_adult_section || false}
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+              accentColor={accentColor}
+            />
             
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-500">
-              All-in-one platform: Live streaming • Links • Social • Monetization
-            </p>
-          </div>
-        </div>
+            {/* Stats Card - Hide if hideStreamingStats is true */}
+            {!profile.hide_streaming_stats && (
+              <StatsCard
+                streamStats={profileData.stream_stats}
+                gifterLevel={profile.gifter_level}
+                gifterStatus={(profileData as any)?.gifter_statuses?.[profile.id] ?? null}
+                totalGiftsSent={profile.total_gifts_sent}
+                totalGiftsReceived={profile.total_gifts_received}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+                accentColor={accentColor}
+              />
+            )}
+            
+            {/* Premium Branding Footer - Powered by MyLiveLinks */}
+            <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 sm:p-8 text-center`} style={cardStyle}>
+              <div className="space-y-4">
+                <div className="flex items-center justify-center">
+                  <Image
+                    src="/branding/mylivelinkstransparent.png"
+                    alt="MyLiveLinks"
+                    width={240}
+                    height={60}
+                    className="h-12 sm:h-16 w-auto"
+                    priority
+                  />
+                </div>
+                
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                  Create your own stunning profile, go live, and connect with your audience.
+                </p>
+                
+                <Link
+                  href="/signup"
+                  className="inline-block px-8 py-3 rounded-lg font-semibold text-white text-base transition shadow-lg hover:shadow-xl transform hover:scale-105"
+                  style={{ backgroundColor: accentColor }}
+                >
+                  Create Your Free Profile
+                </Link>
+                
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-500">
+                  All-in-one platform: Live streaming • Links • Social • Monetization
+                </p>
+              </div>
+            </div>
           </>
         )}
         
@@ -1453,23 +1403,41 @@ export default function ModernProfilePage() {
         
         {/* Videos Tab */}
         {activeTab === 'videos' && (
-          profile.profile_type === 'musician' ? (
-            <MusicVideos
-              profileId={profile.id}
-              isOwner={isOwnProfile}
-              cardStyle={cardStyle}
-              borderRadiusClass={borderRadiusClass}
-            />
-          ) : profile.profile_type === 'comedian' ? (
-            <ComedySpecials
-              profileId={profile.id}
-              isOwner={isOwnProfile}
-              cardStyle={cardStyle}
-              borderRadiusClass={borderRadiusClass}
-            />
-          ) : (
-            <TabEmptyState type="videos" isOwner={isOwnProfile} />
-          )
+          <>
+            {profile.profile_type === 'musician' && (
+              <MusicVideos
+                profileId={profile.id}
+                isOwner={isOwnProfile}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+
+            {profile.profile_type === 'comedian' && (
+              <ComedySpecials
+                profileId={profile.id}
+                isOwner={isOwnProfile}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+
+            {(profile.profile_type === 'creator' || profile.profile_type === 'streamer') && (
+              <Vlogs
+                profileId={profile.id}
+                isOwner={isOwnProfile}
+                cardStyle={cardStyle}
+                borderRadiusClass={borderRadiusClass}
+              />
+            )}
+
+            {profile.profile_type !== 'musician' &&
+              profile.profile_type !== 'comedian' &&
+              profile.profile_type !== 'creator' &&
+              profile.profile_type !== 'streamer' && (
+                <TabEmptyState type="videos" isOwner={isOwnProfile} />
+              )}
+          </>
         )}
         
         {/* Music Tab - Musician-specific (shows MusicShowcase) */}
@@ -1600,30 +1568,6 @@ export default function ModernProfilePage() {
           />
 
           <SectionEditModal
-            isOpen={merchModalOpen}
-            onClose={() => {
-              setMerchModalOpen(false);
-              setEditingMerch(null);
-            }}
-            title={editingMerch ? 'Edit Merchandise' : 'Add Merchandise'}
-            initialValues={{
-              name: editingMerch?.name ?? '',
-              price: editingMerch?.price ?? '',
-              image_url: editingMerch?.image_url ?? '',
-              buy_url: editingMerch?.buy_url ?? '',
-              description: editingMerch?.description ?? '',
-            }}
-            fields={[
-              { key: 'name', label: 'Product Name', type: 'text', required: true },
-              { key: 'price', label: 'Price', type: 'text', placeholder: '$29.99' },
-              { key: 'image_url', label: 'Image URL', type: 'url', placeholder: 'https://.../image.jpg' },
-              { key: 'buy_url', label: 'Purchase URL', type: 'url', placeholder: 'https://shop...' },
-              { key: 'description', label: 'Description', type: 'textarea' },
-            ]}
-            onSubmit={saveMerch}
-          />
-
-          <SectionEditModal
             isOpen={portfolioModalOpen}
             onClose={() => {
               setPortfolioModalOpen(false);
@@ -1632,15 +1576,26 @@ export default function ModernProfilePage() {
             title={editingPortfolio ? 'Edit Portfolio Item' : 'Add Portfolio Item'}
             initialValues={{
               title: editingPortfolio?.title ?? '',
-              url: editingPortfolio?.url ?? '',
-              image_url: editingPortfolio?.image_url ?? '',
+              subtitle: editingPortfolio?.subtitle ?? '',
               description: editingPortfolio?.description ?? '',
+              media_type: editingPortfolio?.media_type ?? 'image',
+              media_url: editingPortfolio?.media_url ?? '',
+              thumbnail_url: editingPortfolio?.thumbnail_url ?? '',
             }}
             fields={[
-              { key: 'title', label: 'Title', type: 'text', required: true },
-              { key: 'url', label: 'Link URL (optional)', type: 'url', placeholder: 'https://...' },
-              { key: 'image_url', label: 'Image URL (optional)', type: 'url', placeholder: 'https://.../image.jpg' },
-              { key: 'description', label: 'Description', type: 'textarea' },
+              { key: 'title', label: 'Title (optional)', type: 'text' },
+              { key: 'subtitle', label: 'Subtitle (optional)', type: 'text' },
+              {
+                key: 'media_type',
+                label: 'Media Type',
+                type: 'text',
+                required: true,
+                placeholder: 'image | video | link',
+                helpText: 'Allowed values: image, video, link',
+              },
+              { key: 'media_url', label: 'Media URL', type: 'url', required: true, placeholder: 'https://...' },
+              { key: 'thumbnail_url', label: 'Thumbnail URL (optional)', type: 'url', placeholder: 'https://.../thumb.jpg' },
+              { key: 'description', label: 'Description (optional)', type: 'textarea' },
             ]}
             onSubmit={savePortfolio}
           />

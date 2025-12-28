@@ -1,42 +1,56 @@
 /**
- * Portfolio Section (Business/Creator Profile Types)
- * 
- * Displays portfolio items with images and descriptions in a grid.
- * Shows empty state with owner CTA if no items available.
+ * Portfolio Section (Business + Creator)
+ *
+ * IMPORTANT:
+ * - No mock data for visitors.
+ * - Owner actions must be wired to real forms + persistence via callbacks.
  */
 
 'use client';
 
-import { Briefcase } from 'lucide-react';
-import { getMockPortfolio, getEmptyStateText, PortfolioItem } from '@/lib/mockDataProviders';
-import { ProfileType } from '@/lib/profileTypeConfig';
+import { Briefcase, Pencil, Trash2, ExternalLink, Video as VideoIcon, Image as ImageIcon, Link2 } from 'lucide-react';
 import Image from 'next/image';
+import { getEmptyStateText } from '@/lib/mockDataProviders';
+import type { ProfileType } from '@/lib/profileTypeConfig';
+
+export type PortfolioItemRow = {
+  id: string;
+  title?: string | null;
+  subtitle?: string | null;
+  description?: string | null;
+  media_type: 'image' | 'video' | 'link';
+  media_url: string;
+  thumbnail_url?: string | null;
+  sort_order?: number | null;
+};
 
 interface PortfolioProps {
   profileType?: ProfileType;
   isOwner?: boolean;
-  items?: PortfolioItem[]; // Real data when available
+  items?: PortfolioItemRow[];
   onAddItem?: () => void;
-  cardStyle?: React.CSSProperties; // Dynamic opacity from settings
+  onEditItem?: (item: PortfolioItemRow) => void;
+  onDeleteItem?: (itemId: string) => void;
+  cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
 }
 
-export default function Portfolio({ 
-  profileType, 
+export default function Portfolio({
+  profileType,
   isOwner = false,
-  items,
+  items = [],
   onAddItem,
+  onEditItem,
+  onDeleteItem,
   cardStyle,
   borderRadiusClass = 'rounded-2xl',
 }: PortfolioProps) {
-  // Use real data if provided, otherwise fall back to mock data
-  const portfolioItems = items || getMockPortfolio(profileType);
   const emptyState = getEmptyStateText('portfolio', profileType);
 
-  // Empty state
-  if (portfolioItems.length === 0) {
+  if (!items.length) {
+    if (!isOwner) return null;
     return (
-      <div 
+      <div
         className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
         style={cardStyle}
       >
@@ -46,21 +60,17 @@ export default function Portfolio({
             🎨 Portfolio
           </h2>
         </div>
-        
+
         <div className="text-center py-12">
           <Briefcase className="w-16 h-16 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-            {emptyState.title}
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            {emptyState.text}
-          </p>
-          {isOwner && (
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">{emptyState.title}</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">{emptyState.text}</p>
+          {typeof onAddItem === 'function' && (
             <button
               onClick={onAddItem}
               className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors"
             >
-              {emptyState.ownerCTA}
+              {emptyState.ownerCTA || 'Add Portfolio Item'}
             </button>
           )}
         </div>
@@ -69,7 +79,7 @@ export default function Portfolio({
   }
 
   return (
-    <div 
+    <div
       className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
       style={cardStyle}
     >
@@ -78,39 +88,96 @@ export default function Portfolio({
           <Briefcase className="w-5 h-5 text-purple-500" />
           🎨 Portfolio
         </h2>
-        {isOwner && (
+        {isOwner && typeof onAddItem === 'function' && (
           <button
             onClick={onAddItem}
             className="text-sm font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
           >
-            + Add Item
+            + Add
           </button>
         )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {portfolioItems.map((item) => (
+        {items.map((item) => (
           <div
             key={item.id}
-            className="group relative overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-700 hover:shadow-lg transition-all cursor-pointer"
+            className="group relative overflow-hidden rounded-xl bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-all"
           >
-            <div className="relative w-full h-48">
-              <Image
-                src={item.imageUrl}
-                alt={item.title}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-            </div>
-            <div className="p-4 bg-white dark:bg-gray-800">
-              <h3 className="font-bold text-gray-900 dark:text-white mb-1">
-                {item.title}
-              </h3>
-              {item.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {item.description}
-                </p>
+            <div className="relative w-full h-48 bg-gray-200 dark:bg-gray-700">
+              {item.media_type === 'image' ? (
+                <Image src={item.media_url} alt={item.title || 'Portfolio item'} fill className="object-cover" />
+              ) : item.media_type === 'video' ? (
+                <video
+                  src={item.media_url}
+                  poster={item.thumbnail_url || undefined}
+                  controls
+                  className="w-full h-full object-cover"
+                />
+              ) : item.thumbnail_url ? (
+                <Image src={item.thumbnail_url} alt={item.title || 'Portfolio link'} fill className="object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300 font-semibold">
+                    <Link2 className="w-5 h-5" />
+                    Link
+                  </div>
+                </div>
               )}
+
+              <div className="absolute top-3 left-3 inline-flex items-center gap-2 rounded-full bg-black/60 text-white px-3 py-1 text-xs font-semibold">
+                {item.media_type === 'image' ? <ImageIcon className="w-4 h-4" /> : null}
+                {item.media_type === 'video' ? <VideoIcon className="w-4 h-4" /> : null}
+                {item.media_type === 'link' ? <Link2 className="w-4 h-4" /> : null}
+                {item.media_type.toUpperCase()}
+              </div>
+            </div>
+
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-1 truncate">
+                    {item.title || 'Untitled'}
+                  </h3>
+                  {item.subtitle ? (
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 truncate">{item.subtitle}</p>
+                  ) : null}
+                  {item.description ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{item.description}</p>
+                  ) : null}
+                </div>
+
+                {isOwner && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => onEditItem?.(item)}
+                      className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                      title="Edit"
+                    >
+                      <Pencil className="w-4 h-4 text-purple-700 dark:text-purple-300" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteItem?.(item.id)}
+                      className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {item.media_type === 'link' ? (
+                <a
+                  href={item.media_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-purple-700 dark:text-purple-300 hover:underline"
+                >
+                  View
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              ) : null}
             </div>
           </div>
         ))}
@@ -118,4 +185,5 @@ export default function Portfolio({
     </div>
   );
 }
+
 
