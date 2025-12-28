@@ -13,7 +13,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, withSpring, useSharedValue } from 'react-native-reanimated';
 import { VideoView } from '@livekit/react-native';
 import type { TileItem } from '../../types/live';
-import type { Room, VideoTrack } from 'livekit-client';
+import { Track, type Room, type VideoTrack } from 'livekit-client';
 import { useThemeMode } from '../../contexts/ThemeContext';
 
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
@@ -51,14 +51,24 @@ export const Tile: React.FC<TileProps> = ({
     const remoteParticipant = room.remoteParticipants.get(participant.identity);
     if (!remoteParticipant) return null;
 
-    // Find first video track publication
-    const videoPublication = Array.from(remoteParticipant.videoTrackPublications.values())[0];
-    if (!videoPublication || !videoPublication.isSubscribed) return null;
+    const videoPublications = Array.from(remoteParticipant.videoTrackPublications.values());
+
+    const screenPub = videoPublications.find(
+      (pub: any) => pub?.source === Track.Source.ScreenShare && pub?.isSubscribed && pub?.track
+    );
+    const cameraPub = videoPublications.find(
+      (pub: any) => pub?.source === Track.Source.Camera && pub?.isSubscribed && pub?.track
+    );
+    const anySubscribedPub = videoPublications.find((pub: any) => pub?.isSubscribed && pub?.track);
+
+    const videoPublication: any = screenPub || cameraPub || anySubscribedPub;
+    if (!videoPublication) return null;
 
     if (DEBUG) {
       console.log('[TRACK] Rendering video for:', {
         identity: participant.identity,
         trackSid: videoPublication.trackSid,
+        source: videoPublication.source,
       });
     }
 

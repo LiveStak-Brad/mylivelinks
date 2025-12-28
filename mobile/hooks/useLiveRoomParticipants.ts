@@ -784,6 +784,25 @@ export function useLiveRoomParticipants(
       try {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
+
+        if (DEBUG) {
+          const pubs = Array.from(room.localParticipant.trackPublications.values()).map((pub: any) => ({
+            source: pub.source,
+            kind: pub.kind,
+            trackSid: pub.trackSid,
+            isMuted: pub.isMuted,
+            hasTrack: !!pub.track,
+          }));
+          console.log('[PUBLISH-AUDIT][MOBILE] local_publish_state', {
+            roomState: room.state,
+            localParticipantSid: room.localParticipant.sid,
+            localParticipantIdentity: room.localParticipant.identity,
+            canPublish: room.localParticipant.permissions?.canPublish,
+            canSubscribe: room.localParticipant.permissions?.canSubscribe,
+            publicationsCount: room.localParticipant.trackPublications.size,
+            publications: pubs,
+          });
+        }
       } catch (err: any) {
         setIsPublishing(false);
         isPublishingRef.current = false;

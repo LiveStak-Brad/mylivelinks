@@ -33,6 +33,7 @@ export function useLiveKitPublisher({
   const [error, setError] = useState<Error | null>(null);
   const tracksRef = useRef<LocalTrack[]>([]);
   const isPublishingRef = useRef(false); // Track publishing state to prevent flashing
+  const isStartingRef = useRef(false); // Prevent concurrent startPublishing calls (manual + auto)
   const roomRef = useRef<Room | null>(null);
 
   // Update room ref when room prop changes
@@ -100,6 +101,21 @@ export function useLiveKitPublisher({
       console.log('Already publishing, skipping...');
       return;
     }
+
+    // Prevent concurrent starts (manual start + enabled auto-start can overlap)
+    if (isStartingRef.current) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[PUBLISH] start requested', {
+          reason,
+          enabledState: 'start already in progress',
+          blocked: true,
+        });
+      }
+      console.log('Start already in progress, skipping...');
+      return;
+    }
+
+    isStartingRef.current = true;
     
     if (DEBUG_LIVEKIT) {
       console.log('[PUBLISH] start requested', {
@@ -111,27 +127,34 @@ export function useLiveKitPublisher({
       });
     }
 
-    // CRITICAL: Clean up any existing tracks before creating new ones
-    // This prevents "publishing a second track with the same source" errors
+    // CRITICAL: Clean up any existing publications before creating new ones
+    // IMPORTANT: LocalTrack.sid is often undefined; unpublish by publication.track instead.
     if (room.localParticipant) {
-      const existingTracks = Array.from(room.localParticipant.trackPublications.values())
-        .filter(pub => {
-          const source = pub.source;
-          return (source === Track.Source.Camera || source === Track.Source.Microphone) && pub.track;
-        })
-        .map(pub => pub.track!);
-      
-      if (existingTracks.length > 0) {
-        console.log('Cleaning up existing tracks before creating new ones:', existingTracks.length);
-        for (const track of existingTracks) {
+      const existingPublications = Array.from(room.localParticipant.trackPublications.values()).filter((pub) => {
+        const source = pub.source;
+        return (
+          (source === Track.Source.Camera ||
+            source === Track.Source.Microphone ||
+            source === Track.Source.ScreenShare ||
+            source === Track.Source.ScreenShareAudio) &&
+          !!pub.track
+        );
+      });
+
+      if (existingPublications.length > 0) {
+        console.log('Cleaning up existing tracks before creating new ones:', existingPublications.length);
+        for (const pub of existingPublications) {
+          const track = pub.track!;
           try {
-            if (track.sid) {
-              await room.localParticipant.unpublishTrack(track);
-            }
+            await room.localParticipant.unpublishTrack(track);
+          } catch (err) {
+            console.warn('Error unpublishing existing track:', err);
+          }
+          try {
             track.stop();
             track.detach();
           } catch (err) {
-            console.warn('Error cleaning up existing track:', err);
+            console.warn('Error stopping existing track:', err);
           }
         }
         // Clear tracksRef to ensure we start fresh
@@ -175,12 +198,14 @@ export function useLiveKitPublisher({
         if (videoTrack) {
           // Create a LocalVideoTrack from the screen share video track
           const localVideoTrack = new LocalVideoTrack(videoTrack, undefined, false);
+          localVideoTrack.source = Track.Source.ScreenShare;
           tracks.push(localVideoTrack);
         }
         
         if (audioTrack) {
           // If screen share has audio, use it
           const localAudioTrack = new LocalAudioTrack(audioTrack, undefined, false);
+          localAudioTrack.source = Track.Source.ScreenShareAudio;
           tracks.push(localAudioTrack);
         } else if (audioDeviceId) {
           // Fallback to microphone for audio
@@ -269,7 +294,13 @@ export function useLiveKitPublisher({
             const publishedTracks = Array.from(room.localParticipant.trackPublications.values())
               .filter(pub => {
                 const source = pub.source;
-                return (source === Track.Source.Camera || source === Track.Source.Microphone) && pub.track;
+                return (
+                  (source === Track.Source.Camera ||
+                    source === Track.Source.Microphone ||
+                    source === Track.Source.ScreenShare ||
+                    source === Track.Source.ScreenShareAudio) &&
+                  pub.track
+                );
               })
               .map(pub => ({
                 kind: pub.track?.kind,
@@ -286,11 +317,14 @@ export function useLiveKitPublisher({
           }
           
           // CRITICAL: Verify tracks are actually published before marking as publishing
-          const verifiedPublishedTracks = Array.from(room.localParticipant.trackPublications.values())
-            .filter(pub => {
-              const source = pub.source;
-              return (source === Track.Source.Camera || source === Track.Source.Microphone) && pub.track;
-            });
+          const verifiedPublishedTracks = Array.from(room.localParticipant.trackPublications.values()).filter(
+            (pub) =>
+              !!pub.track &&
+              (pub.source === Track.Source.Camera ||
+                pub.source === Track.Source.Microphone ||
+                pub.source === Track.Source.ScreenShare ||
+                pub.source === Track.Source.ScreenShareAudio)
+          );
           
           if (verifiedPublishedTracks.length === 0) {
             throw new Error('No tracks were published - verification failed');
@@ -298,6 +332,8 @@ export function useLiveKitPublisher({
           
           const videoCount = verifiedPublishedTracks.filter(p => p.source === Track.Source.Camera).length;
           const audioCount = verifiedPublishedTracks.filter(p => p.source === Track.Source.Microphone).length;
+          const screenVideoCount = verifiedPublishedTracks.filter(p => p.source === Track.Source.ScreenShare).length;
+          const screenAudioCount = verifiedPublishedTracks.filter(p => p.source === Track.Source.ScreenShareAudio).length;
 
           if (DEBUG_LIVEKIT) {
             const cameraPublications = Array.from(room.localParticipant.trackPublications.values())
@@ -322,6 +358,8 @@ export function useLiveKitPublisher({
           console.log('Publishing verified:', {
             cameraTracks: videoCount,
             microphoneTracks: audioCount,
+            screenShareTracks: screenVideoCount,
+            screenShareAudioTracks: screenAudioCount,
           });
           
           if (DEBUG_LIVEKIT) {
@@ -369,6 +407,8 @@ export function useLiveKitPublisher({
       if (onError) {
         onError(err);
       }
+    } finally {
+      isStartingRef.current = false;
     }
   }, [room, isRoomConnected, videoDeviceId, audioDeviceId, isScreenShare, screenShareStream, onPublished, onError]);
 
@@ -402,35 +442,25 @@ export function useLiveKitPublisher({
       if (room && room.state === 'connected') {
         const participant = room.localParticipant;
         if (participant) {
-          // CRITICAL: Unpublish using actual published tracks from participant, not stale refs
-          // This prevents "no publication was found" errors
-          const publishedTracks = Array.from(participant.trackPublications.values())
-            .filter(pub => {
-              // Only unpublish camera/microphone tracks (not screen share, etc.)
-              const source = pub.source;
-              return (source === Track.Source.Camera || source === Track.Source.Microphone) && pub.track;
-            })
-            .map(pub => pub.track!);
-          
-          // Unpublish all camera/microphone tracks
-          for (const track of publishedTracks) {
+          const publications = Array.from(participant.trackPublications.values()).filter((pub) => {
+            const source = pub.source;
+            return (
+              (source === Track.Source.Camera ||
+                source === Track.Source.Microphone ||
+                source === Track.Source.ScreenShare ||
+                source === Track.Source.ScreenShareAudio) &&
+              !!pub.track
+            );
+          });
+
+          for (const pub of publications) {
+            const track = pub.track!;
             try {
-              if (!track.sid) {
-                console.log('Track has no sid, skipping:', track.kind);
-                continue;
-              }
-              const publication = participant.trackPublications.get(track.sid);
-              if (publication) {
-                await participant.unpublishTrack(track);
-                console.log('Unpublished track:', track.kind);
-              } else {
-                // Track might already be unpublished, skip silently
-                console.log('Track already unpublished:', track.kind);
-              }
+              await participant.unpublishTrack(track);
+              console.log('Unpublished track:', { kind: track.kind, source: pub.source, trackSid: pub.trackSid });
             } catch (err: any) {
-              // Ignore "no publication found" errors - track might already be unpublished
               if (err?.message?.includes('no publication') || err?.message?.includes('not found')) {
-                console.log('Track already unpublished (ignoring):', track.kind);
+                console.log('Track already unpublished (ignoring):', { kind: track.kind, source: pub.source, trackSid: pub.trackSid });
               } else {
                 console.warn('Error unpublishing track:', err);
               }

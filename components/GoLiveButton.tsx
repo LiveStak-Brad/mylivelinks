@@ -473,6 +473,10 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     },
   });
 
+  useEffect(() => {
+    isPublishingRef.current = isPublishing;
+  }, [isPublishing]);
+
   // Store stopPublishing function in ref so realtime handler can access it
   // CRITICAL: This must be AFTER useLiveKitPublisher hook call
   // Store stopPublishing without extra params (hook signature expects none)
@@ -742,12 +746,20 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
           console.log('[PUBLISH] Manual start blocked: publishAllowed=false (waiting for layout)');
           return;
         }
+        if (!shouldEnablePublisher) {
+          console.log('[PUBLISH] Manual start blocked: shouldEnablePublisher=false');
+          return;
+        }
+        if (isPublishingRef.current) {
+          console.log('[PUBLISH] Manual start skipped: already publishing');
+          return;
+        }
         try {
           console.log('Attempting manual start...');
           await startPublishing();
           // If we get here, check if publishing started
           setTimeout(() => {
-            if (!isPublishing && loading) {
+            if (!isPublishingRef.current && loading) {
               console.warn('Publishing did not start after manual attempt');
               handleConnectionError('Connection attempt completed but publishing did not start. Please check your LiveKit configuration.');
             }

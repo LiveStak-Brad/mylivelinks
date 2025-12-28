@@ -354,6 +354,23 @@ export async function POST(request: NextRequest) {
       } : null,
     });
 
+    // PARITY AUDIT: Log decoded grants (no secrets) to prove publish/subscribe/room/identity correctness
+    console.log('[PARITY-PROOF][TOKEN_AUDIT] decoded_grants', {
+      requestedRoomName: roomName,
+      requestedCanPublish: canPublish === true,
+      requestedCanSubscribe: canSubscribe !== false,
+      identity,
+      decoded: tokenPayload
+        ? {
+            room: tokenPayload.video?.room,
+            roomJoin: tokenPayload.video?.roomJoin,
+            canPublish: tokenPayload.video?.canPublish,
+            canSubscribe: tokenPayload.video?.canSubscribe,
+            canPublishData: tokenPayload.video?.canPublishData,
+          }
+        : null,
+    });
+
     // Validate URL format
     if (!LIVEKIT_URL || (!LIVEKIT_URL.startsWith('wss://') && !LIVEKIT_URL.startsWith('ws://') && !LIVEKIT_URL.startsWith('https://'))) {
       console.error('Invalid LIVEKIT_URL format:', LIVEKIT_URL);

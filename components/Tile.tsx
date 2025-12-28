@@ -88,6 +88,8 @@ export default function Tile({
   const subscriptionRef = useRef<{ streamerId: string | null; subscribed: boolean }>({ streamerId: null, subscribed: false });
   // Track if we have tracks (for retry timer to check current state)
   const hasTracksRef = useRef<{ video: boolean; audio: boolean }>({ video: false, audio: false });
+  const currentVideoSourceRef = useRef<Track.Source | null>(null);
+  const currentAudioSourceRef = useRef<Track.Source | null>(null);
 
   // Use shared room connection instead of creating our own
   // Subscribe to tracks from the streamer when room is connected
@@ -162,18 +164,52 @@ export default function Tile({
       const participantUserId = extractUserId(participant.identity);
       if (participantUserId === streamerId) {
         const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+        const source = (publication as any)?.source as Track.Source | undefined;
         if (DEBUG_LIVEKIT) {
           console.log('[SUB] trackSubscribed', {
             slotIndex,
             participantIdentity: participant.identity,
             trackKind: track.kind,
             trackSid: track.sid,
+            source,
           });
         }
         if (track.kind === Track.Kind.Video) {
-          // Only update if we don't already have this track (prevent flicker)
+          const isScreen = source === Track.Source.ScreenShare;
+          const isCamera = source === Track.Source.Camera;
+
+          if (isScreen) {
+            hasTracksRef.current.video = true;
+            currentVideoSourceRef.current = Track.Source.ScreenShare;
+            setVideoTrack(track);
+            if (videoRef.current) {
+              track.attach(videoRef.current);
+              if (DEBUG_LIVEKIT) {
+                console.log('[DEBUG] Video track attached to DOM:', { slotIndex, streamerId, trackSid: track.sid });
+              }
+            }
+            return;
+          }
+
+          if (isCamera) {
+            if (currentVideoSourceRef.current === Track.Source.ScreenShare) return;
+            if (!hasTracksRef.current.video || currentVideoSourceRef.current !== Track.Source.Camera) {
+              hasTracksRef.current.video = true;
+              currentVideoSourceRef.current = Track.Source.Camera;
+              setVideoTrack(track);
+              if (videoRef.current) {
+                track.attach(videoRef.current);
+                if (DEBUG_LIVEKIT) {
+                  console.log('[DEBUG] Video track attached to DOM:', { slotIndex, streamerId, trackSid: track.sid });
+                }
+              }
+            }
+            return;
+          }
+
           if (!hasTracksRef.current.video) {
             hasTracksRef.current.video = true;
+            currentVideoSourceRef.current = source ?? null;
             setVideoTrack(track);
             if (videoRef.current) {
               track.attach(videoRef.current);
@@ -183,9 +219,41 @@ export default function Tile({
             }
           }
         } else if (track.kind === Track.Kind.Audio) {
-          // Only update if we don't already have this track (prevent flicker)
+          const isScreenAudio = source === Track.Source.ScreenShareAudio;
+          const isMic = source === Track.Source.Microphone;
+
+          if (isScreenAudio) {
+            hasTracksRef.current.audio = true;
+            currentAudioSourceRef.current = Track.Source.ScreenShareAudio;
+            setAudioTrack(track);
+            if (audioRef.current) {
+              track.attach(audioRef.current);
+              if (DEBUG_LIVEKIT) {
+                console.log('[DEBUG] Audio track attached to DOM:', { slotIndex, streamerId, trackSid: track.sid });
+              }
+            }
+            return;
+          }
+
+          if (isMic) {
+            if (currentAudioSourceRef.current === Track.Source.ScreenShareAudio) return;
+            if (!hasTracksRef.current.audio || currentAudioSourceRef.current !== Track.Source.Microphone) {
+              hasTracksRef.current.audio = true;
+              currentAudioSourceRef.current = Track.Source.Microphone;
+              setAudioTrack(track);
+              if (audioRef.current) {
+                track.attach(audioRef.current);
+                if (DEBUG_LIVEKIT) {
+                  console.log('[DEBUG] Audio track attached to DOM:', { slotIndex, streamerId, trackSid: track.sid });
+                }
+              }
+            }
+            return;
+          }
+
           if (!hasTracksRef.current.audio) {
             hasTracksRef.current.audio = true;
+            currentAudioSourceRef.current = source ?? null;
             setAudioTrack(track);
             if (audioRef.current) {
               track.attach(audioRef.current);
@@ -295,9 +363,13 @@ export default function Tile({
         
         // Handle local tracks - attach them to this tile so user can see themselves
         localParticipant.trackPublications.forEach((publication) => {
-          const isCameraOrMic = publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone;
+          const isPreferred =
+            publication.source === Track.Source.ScreenShare ||
+            publication.source === Track.Source.ScreenShareAudio ||
+            publication.source === Track.Source.Camera ||
+            publication.source === Track.Source.Microphone;
           
-          if (isCameraOrMic && publication.track) {
+          if (isPreferred && publication.track) {
             const track = publication.track;
             if (DEBUG_LIVEKIT) {
               console.log('[SUB] Attaching LOCAL track to tile:', {
@@ -308,23 +380,7 @@ export default function Tile({
             }
             
             // Attach local tracks to this tile's video/audio elements
-            if (track.kind === Track.Kind.Video) {
-              if (!hasTracksRef.current.video) {
-                hasTracksRef.current.video = true;
-                setVideoTrack(track as any); // Cast to RemoteTrack type for state
-                if (videoRef.current) {
-                  track.attach(videoRef.current);
-                }
-              }
-            } else if (track.kind === Track.Kind.Audio) {
-              if (!hasTracksRef.current.audio) {
-                hasTracksRef.current.audio = true;
-                setAudioTrack(track as any); // Cast to RemoteTrack type for state
-                if (audioRef.current) {
-                  track.attach(audioRef.current);
-                }
-              }
-            }
+            handleTrackSubscribed(track as any, publication as any, localParticipant as any);
           }
         });
         
@@ -363,10 +419,13 @@ export default function Tile({
           // CRITICAL: Explicitly subscribe to ALL camera/microphone publications
           // In LiveKit, publications exist but must be explicitly subscribed to
           participant.trackPublications.forEach((publication) => {
-            // Only subscribe to camera and microphone tracks
-            const isCameraOrMic = publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone;
+            const isPreferred =
+              publication.source === Track.Source.ScreenShare ||
+              publication.source === Track.Source.ScreenShareAudio ||
+              publication.source === Track.Source.Camera ||
+              publication.source === Track.Source.Microphone;
             
-            if (isCameraOrMic) {
+            if (isPreferred) {
               // CRITICAL: Only subscribe if publication has a trackSid (track is actually ready)
               // Subscribing to publications without tracks causes rapid subscribe/unsubscribe cycles
               if (!publication.trackSid) {
@@ -423,12 +482,13 @@ export default function Tile({
       } else {
         // Log when participant IS found (even if no tracks yet)
         if (DEBUG_LIVEKIT) {
+          const targetParticipant = Array.from(sharedRoom.remoteParticipants.values()).find((p) => extractUserId(p.identity) === streamerId) || null;
           console.log('[SUB] subscribe attempt', {
             slotIndex,
             participantIdentityFound: true,
             streamerId,
             trackCount,
-            publicationsSubscribed: Array.from(sharedRoom.remoteParticipants.get(streamerId)?.trackPublications.values() || []).filter(p => p.isSubscribed).length,
+            publicationsSubscribed: Array.from(targetParticipant?.trackPublications.values() || []).filter(p => p.isSubscribed).length,
           });
         }
       }
@@ -481,7 +541,7 @@ export default function Tile({
     // CRITICAL: Also listen for LOCAL participant track publications (when current user goes live)
     // This ensures we see our own video when we publish
     const handleLocalTrackPublished = () => {
-      if (sharedRoom.localParticipant && sharedRoom.localParticipant.identity === streamerId) {
+      if (sharedRoom.localParticipant && extractUserId(sharedRoom.localParticipant.identity) === streamerId) {
         if (DEBUG_LIVEKIT) {
           console.log('[SUB] Local track published, re-checking for self-view:', {
             slotIndex,
@@ -498,7 +558,7 @@ export default function Tile({
     // CRITICAL: Also listen for when participants connect and when they publish tracks
     // This ensures we subscribe to tracks even if they're published after the Tile mounts
     const handleParticipantConnected = (participant: RemoteParticipant) => {
-      if (participant.identity === streamerId) {
+      if (extractUserId(participant.identity) === streamerId) {
         if (DEBUG_LIVEKIT) {
           console.log('[DEBUG] Target participant connected, checking for publications:', {
             slotIndex,
@@ -600,6 +660,97 @@ export default function Tile({
           attachedVideoTrackRef.current.detach();
         }
         videoTrack.attach(videoRef.current);
+        if (DEBUG_LIVEKIT) {
+          const el = videoRef.current;
+          const mst: any = (videoTrack as any)?.mediaStreamTrack;
+          console.log('[VIDEO-AUDIT] attach', {
+            slotIndex,
+            streamerId,
+            trackSid: (videoTrack as any)?.sid,
+            element: {
+              paused: el?.paused,
+              readyState: el?.readyState,
+              videoWidth: el?.videoWidth,
+              videoHeight: el?.videoHeight,
+              currentTime: el?.currentTime,
+            },
+            mediaStreamTrack: mst
+              ? {
+                  readyState: mst.readyState,
+                  enabled: mst.enabled,
+                  muted: mst.muted,
+                  settings: typeof mst.getSettings === 'function' ? mst.getSettings() : null,
+                }
+              : null,
+          });
+        }
+
+        const el = videoRef.current;
+        if (el) {
+          const onLoadedMetadata = () => {
+            if (DEBUG_LIVEKIT) {
+              console.log('[VIDEO-AUDIT] loadedmetadata', {
+                slotIndex,
+                streamerId,
+                readyState: el.readyState,
+                paused: el.paused,
+                videoWidth: el.videoWidth,
+                videoHeight: el.videoHeight,
+              });
+            }
+          };
+          const onPlaying = () => {
+            if (DEBUG_LIVEKIT) {
+              console.log('[VIDEO-AUDIT] playing', {
+                slotIndex,
+                streamerId,
+                readyState: el.readyState,
+                paused: el.paused,
+                videoWidth: el.videoWidth,
+                videoHeight: el.videoHeight,
+              });
+            }
+          };
+          const onError = () => {
+            if (DEBUG_LIVEKIT) {
+              console.log('[VIDEO-AUDIT] error', {
+                slotIndex,
+                streamerId,
+                error: (el as any)?.error,
+              });
+            }
+          };
+          el.addEventListener('loadedmetadata', onLoadedMetadata);
+          el.addEventListener('playing', onPlaying);
+          el.addEventListener('error', onError);
+
+          el.play().catch((err) => {
+            if (DEBUG_LIVEKIT) {
+              console.log('[VIDEO-AUDIT] play() rejected', { slotIndex, streamerId, err: String(err) });
+            }
+          });
+
+          setTimeout(() => {
+            if (DEBUG_LIVEKIT) {
+              console.log('[VIDEO-AUDIT] post-attach snapshot', {
+                slotIndex,
+                streamerId,
+                readyState: el.readyState,
+                paused: el.paused,
+                videoWidth: el.videoWidth,
+                videoHeight: el.videoHeight,
+                currentTime: el.currentTime,
+              });
+            }
+          }, 750);
+
+          return () => {
+            el.removeEventListener('loadedmetadata', onLoadedMetadata);
+            el.removeEventListener('playing', onPlaying);
+            el.removeEventListener('error', onError);
+          };
+        }
+
         attachedVideoTrackRef.current = videoTrack;
         hasTracksRef.current.video = true; // Sync ref for retry timer
       }

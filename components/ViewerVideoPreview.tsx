@@ -24,6 +24,14 @@ export default function ViewerVideoPreview({
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
   const [canOpenLive, setCanOpenLive] = useState(false);
 
+  const extractUserId = (identity: string): string => {
+    if (identity.startsWith('u_')) {
+      const parts = identity.split(':');
+      if (parts.length >= 1) return parts[0].substring(2);
+    }
+    return identity;
+  };
+
   // Use single global room for all streamers
   const roomName = LIVEKIT_ROOM_NAME;
 
@@ -44,8 +52,8 @@ export default function ViewerVideoPreview({
     enabled: canOpenLive && isLive && !!liveStreamId,
     onTrackSubscribed: (track, publication, participant) => {
       // Only subscribe to tracks from this specific viewer
-      // Participant identity should match the viewer's profile_id (UUID)
-      if (participant.identity === viewerId && track.kind === Track.Kind.Video) {
+      const participantUserId = extractUserId(participant.identity);
+      if (participantUserId === viewerId && track.kind === Track.Kind.Video) {
         console.log('Viewer video track subscribed:', { viewerId, participantIdentity: participant.identity });
         setVideoTrack(track);
         // Attach video track to video element
