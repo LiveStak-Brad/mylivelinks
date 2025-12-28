@@ -127,7 +127,39 @@ export default function ProfileLivePlayer({
   // Attach tracks to video/audio elements
   useEffect(() => {
     if (videoTrack && videoRef.current) {
+      videoTrack.detach();
       videoTrack.attach(videoRef.current);
+
+      const el = videoRef.current;
+      const DEBUG = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+      if (DEBUG) {
+        const mst: any = (videoTrack as any)?.mediaStreamTrack;
+        console.log('[PROFILE_LIVE][VIDEO-AUDIT] attach', {
+          profileId,
+          trackSid: (videoTrack as any)?.sid,
+          element: {
+            paused: el?.paused,
+            readyState: el?.readyState,
+            videoWidth: el?.videoWidth,
+            videoHeight: el?.videoHeight,
+            currentTime: el?.currentTime,
+          },
+          mediaStreamTrack: mst
+            ? {
+                readyState: mst.readyState,
+                enabled: mst.enabled,
+                muted: mst.muted,
+                settings: typeof mst.getSettings === 'function' ? mst.getSettings() : null,
+              }
+            : null,
+        });
+      }
+
+      el.play().catch((err) => {
+        if (DEBUG) {
+          console.log('[PROFILE_LIVE][VIDEO-AUDIT] play() rejected', { profileId, err: String(err) });
+        }
+      });
     }
     return () => {
       if (videoTrack && videoRef.current) {
@@ -280,50 +312,17 @@ export default function ProfileLivePlayer({
         isOwnProfile,
       });
       
-      // If viewing own profile, subscribe to local participant (yourself)
-      if (isOwnProfile) {
-        console.log('[PROFILE_LIVE] Subscribing to own tracks (local participant)');
-        const localParticipant = newRoom.localParticipant;
-        
-        // Subscribe to your own published tracks
-        localParticipant.trackPublications.forEach((publication) => {
-          if (publication.track) {
-            console.log('[PROFILE_LIVE] Found local track:', publication.track.kind);
-            if (publication.track.kind === 'video') {
-              setVideoTrack(publication.track as any);
-            } else if (publication.track.kind === 'audio') {
-              setAudioTrack(publication.track as any);
-            }
-          }
-        });
-        
-        // Listen for new local tracks being published
-        localParticipant.on('trackPublished', (publication) => {
-          console.log('[PROFILE_LIVE] Local track published:', publication.kind);
-          if (publication.track) {
-            if (publication.track.kind === 'video') {
-              setVideoTrack(publication.track as any);
-            } else if (publication.track.kind === 'audio') {
-              setAudioTrack(publication.track as any);
-            }
-          }
-        });
-      } else {
-        // Subscribe to remote participant tracks (the streamer)
-        subscribeToParticipant(newRoom, profileId);
-      }
+      void subscribeToParticipant(newRoom, profileId);
 
       // Listen for new participants (when not own profile)
-      if (!isOwnProfile) {
-        newRoom.on('participantConnected', (participant: RemoteParticipant) => {
-          console.log('[PROFILE_LIVE] Participant connected:', participant.identity);
-          const participantUserId = extractUserId(participant.identity);
-          if (participantUserId === profileId) {
-            console.log('[PROFILE_LIVE] Target user connected!');
-            subscribeToParticipant(newRoom, profileId);
-          }
-        });
-      }
+      newRoom.on('participantConnected', (participant: RemoteParticipant) => {
+        console.log('[PROFILE_LIVE] Participant connected:', participant.identity);
+        const participantUserId = extractUserId(participant.identity);
+        if (participantUserId === profileId) {
+          console.log('[PROFILE_LIVE] Target user connected!');
+          void subscribeToParticipant(newRoom, profileId);
+        }
+      });
 
       // Handle track subscribed
       newRoom.on('trackSubscribed', (track: RemoteTrack, publication, participant: RemoteParticipant) => {
@@ -358,7 +357,7 @@ export default function ProfileLivePlayer({
     }
   };
 
-  const subscribeToParticipant = (room: Room, userId: string) => {
+  const subscribeToParticipant = async (room: Room, userId: string) => {
     const participants = Array.from(room.remoteParticipants.values());
     
     console.log('[PROFILE_LIVE] Looking for user:', userId);
@@ -376,25 +375,63 @@ export default function ProfileLivePlayer({
       
       if (participantUserId === userId) {
         console.log('[PROFILE_LIVE] Found matching participant!');
+
+        const publications = Array.from(participant.trackPublications.values());
+        for (const pub of publications) {
+          const source = (pub as any)?.source as Track.Source | undefined;
+          const isPreferred =
+            source === Track.Source.ScreenShare ||
+            source === Track.Source.ScreenShareAudio ||
+            source === Track.Source.Camera ||
+            source === Track.Source.Microphone;
+
+          if (!isPreferred) continue;
+          if (pub.isSubscribed) continue;
+          try {
+            await (pub as any).setSubscribed(true);
+            console.log('[PROFILE_LIVE] setSubscribed(true)', {
+              kind: pub.kind,
+              source,
+              trackSid: pub.trackSid,
+            });
+          } catch (err: any) {
+            console.warn('[PROFILE_LIVE] setSubscribed(true) failed', {
+              kind: pub.kind,
+              source,
+              trackSid: pub.trackSid,
+              err: err?.message || String(err),
+            });
+          }
+        }
         
-        // Subscribe to video track
-        const videoPublication = Array.from(participant.trackPublications.values()).find(
-          pub => pub.kind === Track.Kind.Video
-        );
-        if (videoPublication && videoPublication.track) {
-          console.log('[PROFILE_LIVE] Found video track, subscribing...');
-          setVideoTrack(videoPublication.track as RemoteTrack);
+        const videoPubs = publications.filter((p) => p.kind === Track.Kind.Video);
+        const screenVideoPub = videoPubs.find((p: any) => p?.source === Track.Source.ScreenShare && !!p.track);
+        const cameraVideoPub = videoPubs.find((p: any) => p?.source === Track.Source.Camera && !!p.track);
+        const anyVideoPub = videoPubs.find((p) => !!p.track);
+        const chosenVideoPub: any = screenVideoPub || cameraVideoPub || anyVideoPub;
+
+        if (chosenVideoPub?.track) {
+          console.log('[PROFILE_LIVE] Found video track, attaching...', {
+            source: chosenVideoPub.source,
+            trackSid: chosenVideoPub.trackSid,
+          });
+          setVideoTrack(chosenVideoPub.track as RemoteTrack);
         } else {
           console.log('[PROFILE_LIVE] No video track found');
         }
 
         // Subscribe to audio track
-        const audioPublication = Array.from(participant.trackPublications.values()).find(
-          pub => pub.kind === Track.Kind.Audio
-        );
-        if (audioPublication && audioPublication.track) {
-          console.log('[PROFILE_LIVE] Found audio track, subscribing...');
-          setAudioTrack(audioPublication.track as RemoteTrack);
+        const audioPubs = publications.filter((p) => p.kind === Track.Kind.Audio);
+        const screenAudioPub = audioPubs.find((p: any) => p?.source === Track.Source.ScreenShareAudio && !!p.track);
+        const micPub = audioPubs.find((p: any) => p?.source === Track.Source.Microphone && !!p.track);
+        const anyAudioPub = audioPubs.find((p) => !!p.track);
+        const chosenAudioPub: any = screenAudioPub || micPub || anyAudioPub;
+        if (chosenAudioPub?.track) {
+          console.log('[PROFILE_LIVE] Found audio track, attaching...', {
+            source: chosenAudioPub.source,
+            trackSid: chosenAudioPub.trackSid,
+          });
+          setAudioTrack(chosenAudioPub.track as RemoteTrack);
         } else {
           console.log('[PROFILE_LIVE] No audio track found');
         }
