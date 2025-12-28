@@ -35,21 +35,23 @@ This document provides a complete specification for redesigning the **Photos/Vid
 
 ### Design Specifications
 
-#### Grid Layout
+#### Grid Layout (Photos/Videos Tab - Always 1:1 Crop)
 ```
 Desktop (1024px+):     3 columns, 12px gap
 Tablet (640-1024px):   3 columns, 8px gap
 Mobile (<640px):       3 columns, 4px gap
 ```
 
-#### Individual Tile Specs
+#### Individual Tile Specs (Grid Mode)
 ```
-Aspect Ratio:  1:1 (square)
+Aspect Ratio:  1:1 (square) - ALWAYS ENFORCED
 Corner Radius: 4px (subtle, Instagram-like)
 Hover Effect:  Dark overlay (rgba(0,0,0,0.3)) with stats
 Border:        None (clean look)
-Object Fit:    cover (fills entire square)
+Object Fit:    cover (crops to fill square, center crop)
 ```
+
+**Critical Rule:** Grid tiles MUST always be 1:1 square with `object-fit: cover`. Images are cropped to fit, never letterboxed.
 
 #### Tile Overlay (on hover/tap)
 ```
@@ -66,6 +68,24 @@ Full Size:       1080x1080px (Instagram standard)
 Format:          WebP with JPEG fallback
 Quality:         85% (balance size/quality)
 Lazy Loading:    Yes (IntersectionObserver)
+```
+
+### Shared PostMedia Component
+
+**File:** `components/feed/PostMedia.tsx` (NEW - Shared Component)
+
+```typescript
+interface PostMediaProps {
+  mediaUrl: string;
+  mediaType: 'photo' | 'video';
+  mode: 'feed' | 'grid'; // NEW: Two distinct modes
+  alt?: string;
+  onClick?: () => void;
+}
+
+// Mode behavior:
+// - 'feed': Auto-size container to aspect ratio (no bars)
+// - 'grid': 1:1 square crop with object-fit: cover
 ```
 
 ### Component Structure
