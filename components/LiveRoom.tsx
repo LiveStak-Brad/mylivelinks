@@ -868,13 +868,14 @@ export default function LiveRoom() {
     
     const ensureUserInSlot1 = async () => {
       try {
-        // Use maybeSingle() instead of single() to handle no-row case gracefully
-        const { data: userLiveStream, error: queryError } = await supabase
+        const { data: userLiveStreams, error: queryError } = await supabase
           .from('live_streams')
           .select('id, live_available')
           .eq('profile_id', currentUserId)
           .eq('live_available', true)
-          .maybeSingle();
+          .limit(1);
+
+        const userLiveStream = userLiveStreams?.[0] ?? null;
         
         // If query fails with 406, skip silently (RLS or query issue)
         if (queryError) {
@@ -1344,12 +1345,14 @@ export default function LiveRoom() {
         }
 
         // Always include the current user's own stream if they're live
-        const { data: ownLiveStream, error: ownLiveStreamError } = await supabase
+        const { data: ownLiveStreams, error: ownLiveStreamError } = await supabase
           .from('live_streams')
           .select('id, profile_id, live_available')
           .eq('profile_id', user.id)
           .eq('live_available', true)
-          .maybeSingle();
+          .limit(1);
+
+        const ownLiveStream = ownLiveStreams?.[0] ?? null;
 
         if (ownLiveStreamError) {
           const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
@@ -1529,12 +1532,14 @@ export default function LiveRoom() {
       const availableStreamers = streamers || liveStreamers;
 
       // Check if user is live - if so, ensure they're in slot 1
-      const { data: userLiveStream, error: userLiveStreamError } = await supabase
+      const { data: userLiveStreams, error: userLiveStreamError } = await supabase
         .from('live_streams')
         .select('id, live_available')
         .eq('profile_id', user.id)
         .eq('live_available', true)
-        .maybeSingle();
+        .limit(1);
+
+      const userLiveStream = userLiveStreams?.[0] ?? null;
 
       if (userLiveStreamError) {
         const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';

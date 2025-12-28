@@ -61,14 +61,20 @@ export function useRoomPresence({ userId, username, enabled = true }: UseRoomPre
 
     // Check if user is live_available
     const checkLiveStatus = async () => {
-      const { data: liveStream } = await supabase
+      const { data: liveStreams, error } = await supabase
         .from('live_streams')
         .select('live_available')
         .eq('profile_id', userId)
-        .eq('live_available', true)
-        .single();
-      
-      return !!liveStream;
+        .limit(1);
+
+      const liveStream = liveStreams?.[0] ?? null;
+
+      if (error) {
+        console.error('Error checking live status:', error);
+        return false;
+      }
+
+      return !!liveStream?.live_available;
     };
 
     // Set initial presence
@@ -120,6 +126,8 @@ export function useRoomPresence({ userId, username, enabled = true }: UseRoomPre
 
   return null; // This hook doesn't render anything
 }
+
+
 
 
 

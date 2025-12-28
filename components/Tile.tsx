@@ -341,10 +341,22 @@ export default function Tile({
       
       // If so, use local participant's published tracks instead of remote
       if (sharedRoom.localParticipant && extractUserId(sharedRoom.localParticipant.identity) === streamerId) {
-        foundParticipant = true;
-        isLocalParticipant = true;
         const localParticipant = sharedRoom.localParticipant;
-        trackCount = localParticipant.trackPublications.size;
+        const hasPreferredLocalTrack = Array.from(localParticipant.trackPublications.values()).some((publication) => {
+          const isPreferred =
+            publication.source === Track.Source.ScreenShare ||
+            publication.source === Track.Source.ScreenShareAudio ||
+            publication.source === Track.Source.Camera ||
+            publication.source === Track.Source.Microphone;
+          return isPreferred && !!publication.track;
+        });
+
+        // Only treat localParticipant as the streamer if it actually has usable tracks.
+        if (hasPreferredLocalTrack) {
+          foundParticipant = true;
+          isLocalParticipant = true;
+          trackCount = localParticipant.trackPublications.size;
+        }
         
         if (DEBUG_LIVEKIT) {
           console.log('[SUB] Found LOCAL participant (self) for tile:', {
@@ -358,6 +370,7 @@ export default function Tile({
               sid: p.trackSid,
               hasTrack: !!p.track,
             })),
+            hasPreferredLocalTrack,
           });
         }
         
