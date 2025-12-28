@@ -5,8 +5,8 @@ import { createClient } from '@/lib/supabase';
 
 interface Streamer {
   profile_id: string;
-  username: string;
-  display_name?: string;
+  username: string | null;
+  display_name?: string | null;
   avatar_url?: string;
   live_available: boolean;
   is_published: boolean;
@@ -76,8 +76,8 @@ export default function StreamerSelectionModal({
   }, [isOpen, supabase]);
 
   const filteredStreamers = streamers.filter(s =>
-    s.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.display_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    (s.username ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.display_name ?? '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (!isOpen) return null;
@@ -115,21 +115,21 @@ export default function StreamerSelectionModal({
                     {streamer.avatar_url ? (
                       <img
                         src={streamer.avatar_url}
-                        alt={streamer.username}
+                        alt={streamer.username || 'Streamer avatar'}
                         className="w-10 h-10 rounded-full"
                       />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center">
                         <span className="text-gray-600 dark:text-gray-300">
-                          {(streamer.username?.charAt(0) ?? '?').toUpperCase()}
+                          {((streamer.username ?? streamer.display_name ?? '').charAt(0) || '?').toUpperCase()}
                         </span>
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">
-                        {streamer.display_name || streamer.username}
+                        {streamer.display_name || streamer.username || 'Unknown'}
                       </div>
-                      <div className="text-xs text-gray-500 truncate">@{streamer.username}</div>
+                      <div className="text-xs text-gray-500 truncate">@{streamer.username || 'unknown'}</div>
                     </div>
                   </div>
                   {streamer.live_available && (

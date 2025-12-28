@@ -11,13 +11,13 @@ import Link from 'next/link';
 interface Room {
   id: string;
   slug: string;
-  display_name: string;
+  display_name: string | null;
   description: string | null;
   thumbnail_url: string | null;
   is_live: boolean;
   viewer_count: number;
   category: string | null;
-  tags: string[];
+  tags: string[] | null;
 }
 
 /**
@@ -86,10 +86,10 @@ export default function RoomsPage() {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
-      room.display_name.toLowerCase().includes(query) ||
+      (room.display_name ?? '').toLowerCase().includes(query) ||
       room.description?.toLowerCase().includes(query) ||
       room.category?.toLowerCase().includes(query) ||
-      room.tags?.some(tag => tag.toLowerCase().includes(query))
+      (Array.isArray(room.tags) ? room.tags : []).some(tag => (tag ?? '').toLowerCase().includes(query))
     );
   });
 
@@ -205,7 +205,7 @@ export default function RoomsPage() {
                     {room.thumbnail_url ? (
                       <Image
                         src={room.thumbnail_url}
-                        alt={room.display_name}
+                        alt={room.display_name || 'Room thumbnail'}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -238,7 +238,7 @@ export default function RoomsPage() {
                   {/* Content */}
                   <CardContent className="p-4">
                     <h3 className="font-semibold text-foreground mb-1 line-clamp-1 group-hover:text-primary transition-colors">
-                      {room.display_name}
+                      {room.display_name || 'Untitled room'}
                     </h3>
                     
                     {room.description && (
@@ -248,14 +248,14 @@ export default function RoomsPage() {
                     )}
 
                     {/* Category/Tags */}
-                    {(room.category || room.tags?.length > 0) && (
+                    {(room.category || (Array.isArray(room.tags) && room.tags.length > 0)) && (
                       <div className="flex items-center gap-1.5 flex-wrap mt-2">
                         {room.category && (
                           <Badge variant="secondary" className="text-xs">
                             {room.category}
                           </Badge>
                         )}
-                        {room.tags?.slice(0, 2).map(tag => (
+                        {(Array.isArray(room.tags) ? room.tags : []).slice(0, 2).map(tag => (
                           <Badge key={tag} variant="outline" className="text-xs">
                             #{tag}
                           </Badge>

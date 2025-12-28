@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
-import { Send, Gift, Smile, ArrowLeft, MoreVertical, Loader2, ExternalLink, ImagePlus } from 'lucide-react';
+import { Send, Gift, Smile, ArrowLeft, Loader2, ExternalLink, ImagePlus } from 'lucide-react';
 import { useMessages, Message, Conversation } from './MessagesContext';
 import GiftPickerMini from './GiftPickerMini';
 import { useIM } from '@/components/im';
@@ -252,9 +252,6 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
             title="Pop out"
           >
             <ExternalLink className="w-5 h-5" />
-          </button>
-          <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition">
-            <MoreVertical className="w-5 h-5" />
           </button>
         </div>
       </div>
