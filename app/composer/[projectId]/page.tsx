@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase';
 
 /* =============================================================================
    COMPOSER EDITOR PAGE - Creator-Grade Canvas
@@ -61,6 +62,7 @@ export default function ComposerEditorPage() {
   const [showSafeArea, setShowSafeArea] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
   
   // Inspector panel states (compact by default)
   const [expandedPanels, setExpandedPanels] = useState<{
@@ -104,8 +106,40 @@ export default function ComposerEditorPage() {
     alert('Save functionality not wired yet');
   };
 
-  const handlePublish = () => {
-    alert('Publish functionality not wired yet');
+  const handlePublish = async () => {
+    if (isPublishing) return;
+
+    if (!projectId || isNewProject) {
+      showTemporaryToast('Create a project before publishing');
+      return;
+    }
+
+    setIsPublishing(true);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc('create_feed_post_from_clip_project', {
+        p_project_id: projectId,
+        p_caption: null,
+      });
+
+      if (error) throw error;
+
+      const row = Array.isArray(data) ? data[0] : data;
+      const postId = row?.post_id as string | undefined;
+
+      if (!postId) {
+        throw new Error('Publish succeeded but no post_id was returned');
+      }
+
+      showTemporaryToast('Published');
+      router.push(`/feed?postId=${postId}`);
+    } catch (err: any) {
+      console.error('Publish error:', err);
+      showTemporaryToast(err?.message || 'Publish failed');
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -186,6 +220,7 @@ export default function ComposerEditorPage() {
               </button>
               <button
                 onClick={handlePublish}
+                disabled={isPublishing || isNewProject}
                 className="
                   inline-flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 md:py-2.5
                   bg-gradient-to-r from-primary to-accent text-white
@@ -194,10 +229,11 @@ export default function ComposerEditorPage() {
                   transition-all duration-200
                   shadow-lg shadow-primary/30
                   touch-manipulation
+                  disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
                 "
               >
                 <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">Publish</span>
+                <span className="hidden sm:inline">{isPublishing ? 'Publishing…' : 'Publish'}</span>
               </button>
             </div>
           </div>
