@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { 
   Users, 
   TrendingUp, 
@@ -55,189 +55,36 @@ interface ReferrerData {
   rank: number;
 }
 
-/* =============================================================================
-   MOCK DATA
-============================================================================= */
+type AdminLeaderboardRow = {
+  profile_id: string;
+  username: string | null;
+  avatar_url: string | null;
+  display_name: string | null;
+  clicks: number;
+  joined: number;
+  active: number;
+  joined_7d?: number;
+  joined_30d?: number;
+  active_7d?: number;
+  active_30d?: number;
+  last_click_at?: string | null;
+  last_referral_at?: string | null;
+  last_activity_at?: string | null;
+  rank: number;
+};
 
-const MOCK_REFERRERS: ReferrerData[] = [
-  {
-    id: '1',
-    username: 'influencer_jane',
-    display_name: 'Jane Smith',
-    avatar_url: null,
-    total_joined: 247,
-    total_active: 189,
-    growth_7d: 23,
-    growth_30d: 45,
-    joined_7d: 23,
-    joined_30d: 45,
-    active_7d: 18,
-    active_30d: 35,
-    rank: 1,
-    referred_users: [
-      {
-        id: 'u1',
-        username: 'newuser_mike',
-        display_name: 'Mike Johnson',
-        avatar_url: null,
-        joined_date: '2025-12-20T10:30:00Z',
-        is_active: true,
-        last_active: '2025-12-27T08:15:00Z',
-        activity_level: 'high',
-        total_posts: 45,
-        total_streams: 12,
-      },
-      {
-        id: 'u2',
-        username: 'creator_sarah',
-        display_name: 'Sarah Williams',
-        avatar_url: null,
-        joined_date: '2025-12-18T14:20:00Z',
-        is_active: true,
-        last_active: '2025-12-26T19:30:00Z',
-        activity_level: 'high',
-        total_posts: 38,
-        total_streams: 8,
-      },
-      {
-        id: 'u3',
-        username: 'viewer_tom',
-        display_name: 'Tom Brown',
-        avatar_url: null,
-        joined_date: '2025-12-15T09:45:00Z',
-        is_active: true,
-        last_active: '2025-12-27T07:00:00Z',
-        activity_level: 'medium',
-        total_posts: 12,
-        total_streams: 0,
-      },
-      {
-        id: 'u4',
-        username: 'lurker_alice',
-        display_name: 'Alice Davis',
-        avatar_url: null,
-        joined_date: '2025-11-28T16:10:00Z',
-        is_active: false,
-        last_active: '2025-12-10T11:20:00Z',
-        activity_level: 'low',
-        total_posts: 2,
-        total_streams: 0,
-      },
-    ],
-  },
-  {
-    id: '2',
-    username: 'promo_king',
-    display_name: 'David Chen',
-    avatar_url: null,
-    total_joined: 198,
-    total_active: 142,
-    growth_7d: 15,
-    growth_30d: 38,
-    joined_7d: 15,
-    joined_30d: 38,
-    active_7d: 12,
-    active_30d: 29,
-    rank: 2,
-    referred_users: [],
-  },
-  {
-    id: '3',
-    username: 'network_pro',
-    display_name: 'Emily Rodriguez',
-    avatar_url: null,
-    total_joined: 176,
-    total_active: 134,
-    growth_7d: 18,
-    growth_30d: 32,
-    joined_7d: 18,
-    joined_30d: 32,
-    active_7d: 14,
-    active_30d: 25,
-    rank: 3,
-    referred_users: [],
-  },
-  {
-    id: '4',
-    username: 'connector_alex',
-    display_name: 'Alex Martinez',
-    avatar_url: null,
-    total_joined: 152,
-    total_active: 118,
-    growth_7d: 12,
-    growth_30d: 28,
-    joined_7d: 12,
-    joined_30d: 28,
-    active_7d: 10,
-    active_30d: 22,
-    rank: 4,
-    referred_users: [],
-  },
-  {
-    id: '5',
-    username: 'ambassador_lisa',
-    display_name: 'Lisa Thompson',
-    avatar_url: null,
-    total_joined: 134,
-    total_active: 97,
-    growth_7d: 8,
-    growth_30d: 24,
-    joined_7d: 8,
-    joined_30d: 24,
-    active_7d: 6,
-    active_30d: 18,
-    rank: 5,
-    referred_users: [],
-  },
-  {
-    id: '6',
-    username: 'viral_victor',
-    display_name: 'Victor Kumar',
-    avatar_url: null,
-    total_joined: 119,
-    total_active: 85,
-    growth_7d: 10,
-    growth_30d: 21,
-    joined_7d: 10,
-    joined_30d: 21,
-    active_7d: 8,
-    active_30d: 16,
-    rank: 6,
-    referred_users: [],
-  },
-  {
-    id: '7',
-    username: 'growth_guru',
-    display_name: 'Rachel Green',
-    avatar_url: null,
-    total_joined: 94,
-    total_active: 71,
-    growth_7d: 6,
-    growth_30d: 15,
-    joined_7d: 6,
-    joined_30d: 15,
-    active_7d: 5,
-    active_30d: 12,
-    rank: 7,
-    referred_users: [],
-  },
-  {
-    id: '8',
-    username: 'refer_master',
-    display_name: 'James Wilson',
-    avatar_url: null,
-    total_joined: 78,
-    total_active: 58,
-    growth_7d: 4,
-    growth_30d: 12,
-    joined_7d: 4,
-    joined_30d: 12,
-    active_7d: 3,
-    active_30d: 9,
-    rank: 8,
-    referred_users: [],
-  },
-];
+type AdminReferrerDetails = {
+  referrer: { id: string; username: string | null; avatar_url: string | null; display_name: string | null } | null;
+  referred_users: Array<{
+    profile_id: string;
+    username: string | null;
+    avatar_url: string | null;
+    display_name: string | null;
+    joined_at: string | null;
+    is_active: boolean;
+    last_activity_at: string | null;
+  }>;
+};
 
 /* =============================================================================
    MAIN COMPONENT
@@ -249,17 +96,64 @@ export default function ReferralDashboard() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedReferrer, setSelectedReferrer] = useState<ReferrerData | null>(null);
 
+  const [loading, setLoading] = useState(true);
+  const [referrers, setReferrers] = useState<ReferrerData[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/referrals/leaderboard?range=all&limit=100');
+        const json = (await res.json().catch(() => [])) as AdminLeaderboardRow[];
+        const rows = res.ok && Array.isArray(json) ? json : [];
+
+        const mapped: ReferrerData[] = rows.map((r) => {
+          const displayName = r.display_name || r.username || 'Unknown';
+          return {
+            id: String(r.profile_id),
+            username: String(r.username ?? ''),
+            display_name: displayName,
+            avatar_url: r.avatar_url ?? null,
+            total_joined: Number(r.joined ?? 0),
+            total_active: Number(r.active ?? 0),
+            growth_7d: 0,
+            growth_30d: 0,
+            joined_7d: Number((r as any).joined_7d ?? 0),
+            joined_30d: Number((r as any).joined_30d ?? 0),
+            active_7d: Number((r as any).active_7d ?? 0),
+            active_30d: Number((r as any).active_30d ?? 0),
+            referred_users: [],
+            rank: Number(r.rank ?? 0),
+          };
+        });
+
+        if (mounted) setReferrers(mapped);
+      } catch (err) {
+        console.warn('[admin] Failed to load referral leaderboard (non-blocking):', err);
+        if (mounted) setReferrers([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // Calculate aggregate KPIs
   const kpiData = useMemo(() => {
-    const totalJoined = MOCK_REFERRERS.reduce((sum, r) => sum + r.total_joined, 0);
-    const totalActive = MOCK_REFERRERS.reduce((sum, r) => sum + r.total_active, 0);
-    const totalJoined7d = MOCK_REFERRERS.reduce((sum, r) => sum + r.joined_7d, 0);
-    const totalJoined30d = MOCK_REFERRERS.reduce((sum, r) => sum + r.joined_30d, 0);
-    const totalActive7d = MOCK_REFERRERS.reduce((sum, r) => sum + r.active_7d, 0);
-    const totalActive30d = MOCK_REFERRERS.reduce((sum, r) => sum + r.active_30d, 0);
+    const totalJoined = referrers.reduce((sum, r) => sum + r.total_joined, 0);
+    const totalActive = referrers.reduce((sum, r) => sum + r.total_active, 0);
+    const totalJoined7d = referrers.reduce((sum, r) => sum + r.joined_7d, 0);
+    const totalJoined30d = referrers.reduce((sum, r) => sum + r.joined_30d, 0);
+    const totalActive7d = referrers.reduce((sum, r) => sum + r.active_7d, 0);
+    const totalActive30d = referrers.reduce((sum, r) => sum + r.active_30d, 0);
 
     const conversionRate = totalJoined > 0 ? ((totalActive / totalJoined) * 100).toFixed(1) : '0.0';
-    const activeReferrers = MOCK_REFERRERS.filter(r => r.joined_7d > 0).length;
+    const activeReferrers = referrers.filter(r => r.joined_7d > 0).length;
 
     return {
       totalJoined,
@@ -271,11 +165,11 @@ export default function ReferralDashboard() {
       conversionRate,
       activeReferrers,
     };
-  }, []);
+  }, [referrers]);
 
   // Sort and filter referrer data
   const sortedReferrers = useMemo(() => {
-    const sorted = [...MOCK_REFERRERS].sort((a, b) => {
+    const sorted = [...referrers].sort((a, b) => {
       let aValue: any;
       let bValue: any;
 
@@ -297,12 +191,12 @@ export default function ReferralDashboard() {
           bValue = b.total_active;
           break;
         case 'growth_7d':
-          aValue = a.growth_7d;
-          bValue = b.growth_7d;
+          aValue = a.joined_7d;
+          bValue = b.joined_7d;
           break;
         case 'growth_30d':
-          aValue = a.growth_30d;
-          bValue = b.growth_30d;
+          aValue = a.joined_30d;
+          bValue = b.joined_30d;
           break;
         default:
           aValue = a.rank;
@@ -317,7 +211,54 @@ export default function ReferralDashboard() {
     });
 
     return sorted;
-  }, [sortColumn, sortDirection]);
+  }, [referrers, sortColumn, sortDirection]);
+
+  useEffect(() => {
+    if (!selectedReferrer) return;
+
+    let mounted = true;
+    const loadDetails = async () => {
+      try {
+        const res = await fetch(`/api/admin/referrals/referrer/${encodeURIComponent(selectedReferrer.id)}`);
+        const json = (await res.json().catch(() => null)) as AdminReferrerDetails | null;
+        if (!mounted) return;
+        if (!res.ok || !json) return;
+
+        const referred_users: ReferredUser[] = (Array.isArray(json.referred_users) ? json.referred_users : []).map((u) => {
+          const last = u.last_activity_at || u.joined_at || new Date(0).toISOString();
+          const lastDate = new Date(last);
+          const days = (Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
+          const activity_level: ReferredUser['activity_level'] = u.is_active ? (days <= 2 ? 'high' : days <= 7 ? 'medium' : 'low') : 'low';
+
+          return {
+            id: String(u.profile_id),
+            username: String(u.username ?? ''),
+            display_name: String(u.display_name ?? u.username ?? 'Unknown'),
+            avatar_url: u.avatar_url ?? null,
+            joined_date: String(u.joined_at ?? ''),
+            is_active: Boolean(u.is_active),
+            last_active: String(u.last_activity_at ?? u.joined_at ?? ''),
+            activity_level,
+            total_posts: 0,
+            total_streams: 0,
+          };
+        });
+
+        setSelectedReferrer((prev) => {
+          if (!prev) return prev;
+          if (prev.id !== selectedReferrer.id) return prev;
+          return { ...prev, referred_users };
+        });
+      } catch (err) {
+        console.warn('[admin] Failed to load referrer details (non-blocking):', err);
+      }
+    };
+
+    void loadDetails();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedReferrer?.id]);
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -400,15 +341,10 @@ export default function ReferralDashboard() {
       render: (row) => (
         <div className="text-right">
           <div className="flex items-center justify-end gap-1">
-            {row.growth_7d > 0 ? (
+            {row.joined_7d > 0 ? (
               <>
                 <ChevronUp className="w-4 h-4 text-green-400" />
-                <span className="font-semibold text-green-400">+{row.growth_7d}</span>
-              </>
-            ) : row.growth_7d < 0 ? (
-              <>
-                <ChevronDown className="w-4 h-4 text-red-400" />
-                <span className="font-semibold text-red-400">{row.growth_7d}</span>
+                <span className="font-semibold text-green-400">+{row.joined_7d}</span>
               </>
             ) : (
               <span className="font-semibold text-gray-500">0</span>
@@ -427,15 +363,10 @@ export default function ReferralDashboard() {
       render: (row) => (
         <div className="text-right">
           <div className="flex items-center justify-end gap-1">
-            {row.growth_30d > 0 ? (
+            {row.joined_30d > 0 ? (
               <>
                 <ChevronUp className="w-4 h-4 text-green-400" />
-                <span className="font-semibold text-green-400">+{row.growth_30d}</span>
-              </>
-            ) : row.growth_30d < 0 ? (
-              <>
-                <ChevronDown className="w-4 h-4 text-red-400" />
-                <span className="font-semibold text-red-400">{row.growth_30d}</span>
+                <span className="font-semibold text-green-400">+{row.joined_30d}</span>
               </>
             ) : (
               <span className="font-semibold text-gray-500">0</span>
@@ -763,4 +694,5 @@ export default function ReferralDashboard() {
     </div>
   );
 }
+
 

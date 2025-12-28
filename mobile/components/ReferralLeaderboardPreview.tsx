@@ -16,11 +16,11 @@ import {
   Image,
 } from 'react-native';
 import {
-  getMockReferralLeaderboard,
   formatReferralCount,
   type LeaderboardEntry,
 } from '../../lib/referralMockData';
 import { ThemeDefinition } from '../contexts/ThemeContext';
+import { useAuthContext } from '../contexts/AuthContext';
 
 interface ReferralLeaderboardPreviewProps {
   showCurrentUser?: boolean;
@@ -34,24 +34,75 @@ export function ReferralLeaderboardPreview({
   theme,
 }: ReferralLeaderboardPreviewProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { session } = useAuthContext();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [currentUserEntry, setCurrentUserEntry] = useState<LeaderboardEntry | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate loading mock data
-    const timer = setTimeout(() => {
-      setEntries(getMockReferralLeaderboard(showCurrentUser));
-      setLoading(false);
-    }, 300);
+  const apiBaseUrl = useMemo(() => {
+    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com';
+    return raw.replace(/\/+$/, '');
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [showCurrentUser]);
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const userId = session?.user?.id ?? null;
+        const limit = showCurrentUser ? 100 : 5;
+        const res = await fetch(`${apiBaseUrl}/api/referrals/leaderboard?range=all&limit=${limit}`);
+        const json = await res.json().catch(() => []);
+        const rows = res.ok && Array.isArray(json) ? json : [];
+
+        const top: LeaderboardEntry[] = rows.slice(0, 5).map((r: any) => ({
+          rank: Number(r?.rank ?? 0),
+          username: String(r?.username ?? 'Unknown'),
+          avatarUrl: r?.avatar_url ? String(r.avatar_url) : undefined,
+          referralCount: Number(r?.joined ?? 0),
+          isCurrentUser: userId ? String(r?.profile_id ?? '') === String(userId) : false,
+        }));
+
+        let me: LeaderboardEntry | null = null;
+        if (showCurrentUser && userId) {
+          const found = rows.find((r: any) => String(r?.profile_id ?? '') === String(userId));
+          if (found && Number(found?.rank ?? 0) > 5) {
+            me = {
+              rank: Number(found?.rank ?? 0),
+              username: String(found?.username ?? 'You'),
+              avatarUrl: found?.avatar_url ? String(found.avatar_url) : undefined,
+              referralCount: Number(found?.joined ?? 0),
+              isCurrentUser: true,
+            };
+          }
+        }
+
+        if (mounted) {
+          setEntries(top);
+          setCurrentUserEntry(me);
+        }
+      } catch (err) {
+        console.warn('[referrals] Failed to load leaderboard (non-blocking):', err);
+        if (mounted) {
+          setEntries([]);
+          setCurrentUserEntry(null);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, [apiBaseUrl, session?.user?.id, showCurrentUser]);
 
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={theme.colors.accent} />
         </View>
       </View>
     );
@@ -66,7 +117,7 @@ export function ReferralLeaderboardPreview({
       case 3:
         return '#FB923C'; // orange
       default:
-        return theme.isDark ? '#6B7280' : '#9CA3AF';
+        return theme.mode === 'dark' ? '#6B7280' : '#9CA3AF';
     }
   };
 
@@ -98,25 +149,12 @@ export function ReferralLeaderboardPreview({
 
       {/* Leaderboard List */}
       <View style={styles.list}>
-        {entries.map((entry, index) => {
+        {entries.map((entry) => {
           const isCurrentUser = entry.isCurrentUser;
-          const isGap = showCurrentUser && index === 5;
-
-          if (isGap) {
-            return (
-              <View key="gap" style={styles.gap}>
-                <Text style={styles.gapText}>...</Text>
-              </View>
-            );
-          }
-
           return (
             <View
               key={`${entry.rank}-${entry.username}`}
-              style={[
-                styles.entryCard,
-                isCurrentUser && styles.entryCardHighlighted,
-              ]}
+              style={[styles.entryCard, isCurrentUser && styles.entryCardHighlighted]}
             >
               {/* Rank */}
               <View style={styles.rankContainer}>
@@ -184,6 +222,40 @@ export function ReferralLeaderboardPreview({
             </View>
           );
         })}
+
+        {showCurrentUser && currentUserEntry ? (
+          <>
+            <View style={styles.gap}>
+              <Text style={styles.gapText}>...</Text>
+            </View>
+            <View style={[styles.entryCard, styles.entryCardHighlighted]}>
+              <View style={styles.rankContainer}>
+                <Text style={styles.rankText}>#{currentUserEntry.rank}</Text>
+              </View>
+              {currentUserEntry.avatarUrl ? (
+                <View style={styles.avatarContainer}>
+                  <Image source={{ uri: currentUserEntry.avatarUrl }} style={[styles.avatar, styles.avatarHighlighted]} />
+                </View>
+              ) : null}
+              <View style={styles.userInfo}>
+                <View style={styles.usernameRow}>
+                  <Text style={styles.username} numberOfLines={1}>
+                    {currentUserEntry.username}
+                  </Text>
+                  <View style={styles.youBadge}>
+                    <Text style={styles.youBadgeText}>YOU</Text>
+                  </View>
+                </View>
+                <Text style={styles.referralsSubtext}>
+                  {formatReferralCount(currentUserEntry.referralCount)} referrals
+                </Text>
+              </View>
+              <View style={styles.countBadge}>
+                <Text style={styles.countText}>{formatReferralCount(currentUserEntry.referralCount)}</Text>
+              </View>
+            </View>
+          </>
+        ) : null}
       </View>
 
       {/* View Full CTA */}
@@ -214,6 +286,7 @@ export function ReferralLeaderboardPreview({
 }
 
 function createStyles(theme: ThemeDefinition) {
+  const isDark = theme.mode === 'dark';
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -234,7 +307,7 @@ function createStyles(theme: ThemeDefinition) {
     headerIconContainer: {
       width: 48,
       height: 48,
-      backgroundColor: theme.isDark ? 'rgba(168, 85, 247, 0.2)' : '#F3E8FF',
+      backgroundColor: isDark ? 'rgba(168, 85, 247, 0.2)' : '#F3E8FF',
       borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
@@ -262,16 +335,16 @@ function createStyles(theme: ThemeDefinition) {
     entryCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: theme.isDark ? 'rgba(255, 255, 255, 0.05)' : '#F9FAFB',
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F9FAFB',
       borderRadius: 12,
       padding: 12,
       marginBottom: 8,
       borderWidth: 1,
-      borderColor: theme.isDark ? '#374151' : '#E5E7EB',
+      borderColor: isDark ? '#374151' : '#E5E7EB',
     },
     entryCardHighlighted: {
-      backgroundColor: theme.isDark ? 'rgba(168, 85, 247, 0.2)' : '#F3E8FF',
-      borderColor: theme.isDark ? '#9333EA' : '#A855F7',
+      backgroundColor: isDark ? 'rgba(168, 85, 247, 0.2)' : '#F3E8FF',
+      borderColor: isDark ? '#9333EA' : '#A855F7',
       borderWidth: 2,
     },
     rankContainer: {
@@ -294,7 +367,7 @@ function createStyles(theme: ThemeDefinition) {
       height: 40,
       borderRadius: 20,
       borderWidth: 2,
-      borderColor: theme.isDark ? '#4B5563' : '#D1D5DB',
+      borderColor: isDark ? '#4B5563' : '#D1D5DB',
     },
     avatarHighlighted: {
       borderColor: '#A855F7',
@@ -384,14 +457,14 @@ function createStyles(theme: ThemeDefinition) {
       margin: 16,
       marginTop: 0,
       padding: 12,
-      backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: theme.isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE',
+      borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE',
     },
     encouragementText: {
       fontSize: 12,
-      color: theme.isDark ? '#BFDBFE' : '#1E40AF',
+      color: isDark ? '#BFDBFE' : '#1E40AF',
       lineHeight: 18,
       textAlign: 'center',
     },
@@ -400,4 +473,5 @@ function createStyles(theme: ThemeDefinition) {
     },
   });
 }
+
 

@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import {
-  getMockReferralLeaderboard,
   formatReferralCount,
   type LeaderboardEntry,
 } from '@/lib/referralMockData';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import { createClient } from '@/lib/supabase';
 
 interface ReferralLeaderboardPreviewProps {
   className?: string;
@@ -20,16 +20,79 @@ export default function ReferralLeaderboardPreview({
   onViewFull,
 }: ReferralLeaderboardPreviewProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [currentUserEntry, setCurrentUserEntry] = useState<LeaderboardEntry | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading mock data
-    const timer = setTimeout(() => {
-      setEntries(getMockReferralLeaderboard(showCurrentUser));
-      setLoading(false);
-    }, 300);
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const supabase = createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id ?? null;
 
-    return () => clearTimeout(timer);
+        const res = await fetch('/api/referrals/leaderboard?range=all&limit=5');
+        const json = await res.json().catch(() => []);
+        const rows = res.ok && Array.isArray(json) ? json : [];
+
+        const mapped: LeaderboardEntry[] = rows.slice(0, 5).map((r: any) => ({
+          rank: Number(r?.rank ?? 0),
+          username: String(r?.username ?? 'Unknown'),
+          avatarUrl: r?.avatar_url ? String(r.avatar_url) : undefined,
+          referralCount: Number(r?.joined ?? 0),
+          isCurrentUser: userId ? String(r?.profile_id ?? '') === String(userId) : false,
+        }));
+
+        let me: LeaderboardEntry | null = null;
+        if (showCurrentUser && userId) {
+          const inTop = mapped.some((e) => e.isCurrentUser);
+          if (!inTop) {
+            const [{ data: profile }, statsRes, rankRes] = await Promise.all([
+              supabase.from('profiles').select('username, avatar_url').eq('id', userId).maybeSingle(),
+              fetch('/api/referrals/me/stats?range=all'),
+              fetch('/api/referrals/me/rank'),
+            ]);
+
+            const statsJson = await statsRes.json().catch(() => null);
+            const rankJson = await rankRes.json().catch(() => null);
+
+            const rank = rankRes.ok && typeof rankJson?.rank === 'number' ? Number(rankJson.rank) : null;
+            const joined = statsRes.ok ? Number(statsJson?.joined ?? 0) : 0;
+            const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username) : 'You';
+            const avatarUrl = (profile as any)?.avatar_url ? String((profile as any).avatar_url) : undefined;
+
+            if (rank && rank > 5) {
+              me = {
+                rank,
+                username: uname || 'You',
+                avatarUrl,
+                referralCount: joined,
+                isCurrentUser: true,
+              };
+            }
+          }
+        }
+
+        if (mounted) {
+          setEntries(mapped);
+          setCurrentUserEntry(me);
+        }
+      } catch (err) {
+        console.warn('[referrals] Failed to load leaderboard (non-blocking):', err);
+        if (mounted) {
+          setEntries([]);
+          setCurrentUserEntry(null);
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      mounted = false;
+    };
   }, [showCurrentUser]);
 
   if (loading) {
@@ -176,12 +239,45 @@ export default function ReferralLeaderboardPreview({
           </div>
         ))}
 
-        {/* Show gap if current user is included */}
-        {showCurrentUser && entries.length > 5 && (
-          <div className="text-center py-2 text-gray-400 dark:text-gray-600 text-sm">
-            ...
-          </div>
-        )}
+        {showCurrentUser && currentUserEntry ? (
+          <>
+            <div className="text-center py-2 text-gray-400 dark:text-gray-600 text-sm">...</div>
+            <div
+              key={`me-${currentUserEntry.rank}`}
+              className="flex items-center gap-3 p-3 rounded-lg transition-all bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 border-2 border-purple-300 dark:border-purple-700"
+            >
+              <div className="flex-shrink-0 w-10 flex items-center justify-center">
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-200">#{currentUserEntry.rank}</span>
+              </div>
+
+              {currentUserEntry.avatarUrl ? (
+                <div className="flex-shrink-0">
+                  <img
+                    src={getAvatarUrl(currentUserEntry.avatarUrl)}
+                    alt={currentUserEntry.username}
+                    className="w-10 h-10 rounded-full border-2 border-purple-400 dark:border-purple-500"
+                  />
+                </div>
+              ) : null}
+
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-900 dark:text-white truncate">
+                  {currentUserEntry.username}
+                  <span className="ml-2 text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">YOU</span>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {formatReferralCount(currentUserEntry.referralCount)} referrals
+                </div>
+              </div>
+
+              <div className="flex-shrink-0">
+                <div className="text-right text-gray-700 dark:text-gray-300">
+                  <div className="text-lg font-bold">{formatReferralCount(currentUserEntry.referralCount)}</div>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
 
       {/* View Full CTA */}
@@ -229,4 +325,5 @@ export default function ReferralLeaderboardPreview({
     </div>
   );
 }
+
 

@@ -14,6 +14,12 @@ export async function GET(request: NextRequest) {
 
     const admin = getSupabaseAdmin();
 
+    const { count: totalReferrers, error: countError } = await admin
+      .from('referral_rollups')
+      .select('referrer_profile_id', { count: 'exact', head: true });
+
+    if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
+
     const { data, error } = await admin
       .from('referral_rollups')
       .select('referrer_profile_id, click_count, referral_count, activation_count, profiles!referral_rollups_referrer_profile_id_fkey(username, avatar_url)')
@@ -33,6 +39,7 @@ export async function GET(request: NextRequest) {
       joined: Number(r?.referral_count ?? 0),
       active: Number(r?.activation_count ?? 0),
       rank: idx + 1,
+      total_referrers: Number(totalReferrers ?? 0),
     }));
 
     return NextResponse.json(leaderboard, { status: 200 });

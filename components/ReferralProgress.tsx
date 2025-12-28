@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import {
-  getMockReferralStats,
   getReferralEncouragementMessage,
   type ReferralStats,
 } from '@/lib/referralMockData';
+import { createClient } from '@/lib/supabase';
 
 interface ReferralProgressProps {
   className?: string;
@@ -20,13 +20,61 @@ export default function ReferralProgress({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading mock data
-    const timer = setTimeout(() => {
-      setStats(getMockReferralStats());
-      setLoading(false);
-    }, 300);
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const supabase = createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id ?? null;
 
-    return () => clearTimeout(timer);
+        const statsRes = await fetch('/api/referrals/me/stats?range=all');
+        const statsJson = await statsRes.json().catch(() => null);
+        const clicks = statsRes.ok ? Number(statsJson?.clicks ?? 0) : 0;
+        const joined = statsRes.ok ? Number(statsJson?.joined ?? 0) : 0;
+        const active = statsRes.ok ? Number(statsJson?.active ?? 0) : 0;
+
+        let currentRank: number | null = null;
+        let totalReferrers: number = 0;
+
+        const rankRes = await fetch('/api/referrals/me/rank');
+        const rankJson = await rankRes.json().catch(() => null);
+        if (rankRes.ok) {
+          currentRank = typeof rankJson?.rank === 'number' ? rankJson.rank : null;
+          totalReferrers = typeof rankJson?.total_referrers === 'number' ? rankJson.total_referrers : 0;
+        }
+
+        if (mounted) {
+          setStats({
+            invitesSent: clicks,
+            inviteClicks: clicks,
+            usersJoined: joined,
+            activeUsers: active,
+            currentRank,
+            totalReferrers,
+          });
+        }
+      } catch (err) {
+        console.warn('[referrals] Failed to load referral stats (non-blocking):', err);
+        if (mounted) {
+          setStats({
+            invitesSent: 0,
+            inviteClicks: 0,
+            usersJoined: 0,
+            activeUsers: 0,
+            currentRank: null,
+            totalReferrers: 0,
+          });
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (loading) {
@@ -237,4 +285,5 @@ export default function ReferralProgress({
     </div>
   );
 }
+
 

@@ -15,10 +15,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {
-  getMockReferralStats,
   getReferralEncouragementMessage,
   type ReferralStats,
 } from '../../lib/referralMockData';
+import { fetchAuthed } from '../lib/api';
+import { useAuthContext } from '../contexts/AuthContext';
 import { ThemeDefinition } from '../contexts/ThemeContext';
 
 interface ReferralProgressProps {
@@ -31,24 +32,76 @@ export function ReferralProgress({
   theme,
 }: ReferralProgressProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { session, getAccessToken } = useAuthContext();
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Simulate loading mock data
-    const timer = setTimeout(() => {
-      setStats(getMockReferralStats());
-      setLoading(false);
-    }, 300);
-
-    return () => clearTimeout(timer);
+  const apiBaseUrl = useMemo(() => {
+    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com';
+    return raw.replace(/\/+$/, '');
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const accessToken = await getAccessToken();
+        const userId = session?.user?.id ?? null;
+
+        const statsRes = await fetchAuthed('/api/referrals/me/stats?range=all', {}, accessToken);
+        const clicks = statsRes.ok ? Number((statsRes.data as any)?.clicks ?? 0) : 0;
+        const joined = statsRes.ok ? Number((statsRes.data as any)?.joined ?? 0) : 0;
+        const active = statsRes.ok ? Number((statsRes.data as any)?.active ?? 0) : 0;
+
+        let currentRank: number | null = null;
+        let totalReferrers = 0;
+
+        const rankRes = await fetchAuthed('/api/referrals/me/rank', {}, accessToken);
+        if (rankRes.ok) {
+          currentRank = typeof (rankRes.data as any)?.rank === 'number' ? Number((rankRes.data as any).rank) : null;
+          totalReferrers = Number((rankRes.data as any)?.total_referrers ?? 0);
+        }
+
+        if (mounted) {
+          setStats({
+            invitesSent: clicks,
+            inviteClicks: clicks,
+            usersJoined: joined,
+            activeUsers: active,
+            currentRank,
+            totalReferrers,
+          });
+        }
+      } catch (err) {
+        console.warn('[referrals] Failed to load referral stats (non-blocking):', err);
+        if (mounted) {
+          setStats({
+            invitesSent: 0,
+            inviteClicks: 0,
+            usersJoined: 0,
+            activeUsers: 0,
+            currentRank: null,
+            totalReferrers: 0,
+          });
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, [apiBaseUrl, getAccessToken, session?.user?.id]);
 
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <ActivityIndicator size="large" color={theme.colors.accent} />
         </View>
       </View>
     );
@@ -189,6 +242,7 @@ export function ReferralProgress({
 }
 
 function createStyles(theme: ThemeDefinition) {
+  const isDark = theme.mode === 'dark';
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -268,20 +322,20 @@ function createStyles(theme: ThemeDefinition) {
       elevation: 2,
     },
     metricCardBlue: {
-      backgroundColor: theme.isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
-      borderColor: theme.isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE',
+      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+      borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE',
     },
     metricCardGreen: {
-      backgroundColor: theme.isDark ? 'rgba(34, 197, 94, 0.15)' : '#F0FDF4',
-      borderColor: theme.isDark ? 'rgba(34, 197, 94, 0.3)' : '#BBF7D0',
+      backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : '#F0FDF4',
+      borderColor: isDark ? 'rgba(34, 197, 94, 0.3)' : '#BBF7D0',
     },
     metricCardPurple: {
-      backgroundColor: theme.isDark ? 'rgba(168, 85, 247, 0.15)' : '#FAF5FF',
-      borderColor: theme.isDark ? 'rgba(168, 85, 247, 0.3)' : '#E9D5FF',
+      backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : '#FAF5FF',
+      borderColor: isDark ? 'rgba(168, 85, 247, 0.3)' : '#E9D5FF',
     },
     metricCardOrange: {
-      backgroundColor: theme.isDark ? 'rgba(249, 115, 22, 0.15)' : '#FFF7ED',
-      borderColor: theme.isDark ? 'rgba(249, 115, 22, 0.3)' : '#FED7AA',
+      backgroundColor: isDark ? 'rgba(249, 115, 22, 0.15)' : '#FFF7ED',
+      borderColor: isDark ? 'rgba(249, 115, 22, 0.3)' : '#FED7AA',
     },
     metricHeader: {
       flexDirection: 'row',
@@ -298,16 +352,16 @@ function createStyles(theme: ThemeDefinition) {
       letterSpacing: 0.5,
     },
     metricLabelBlue: {
-      color: theme.isDark ? '#93C5FD' : '#1E40AF',
+      color: isDark ? '#93C5FD' : '#1E40AF',
     },
     metricLabelGreen: {
-      color: theme.isDark ? '#86EFAC' : '#15803D',
+      color: isDark ? '#86EFAC' : '#15803D',
     },
     metricLabelPurple: {
-      color: theme.isDark ? '#D8B4FE' : '#7C3AED',
+      color: isDark ? '#D8B4FE' : '#7C3AED',
     },
     metricLabelOrange: {
-      color: theme.isDark ? '#FED7AA' : '#C2410C',
+      color: isDark ? '#FED7AA' : '#C2410C',
     },
     metricValue: {
       fontSize: 32,
@@ -315,32 +369,32 @@ function createStyles(theme: ThemeDefinition) {
       marginBottom: 4,
     },
     metricValueBlue: {
-      color: theme.isDark ? '#DBEAFE' : '#1E3A8A',
+      color: isDark ? '#DBEAFE' : '#1E3A8A',
     },
     metricValueGreen: {
-      color: theme.isDark ? '#DCFCE7' : '#14532D',
+      color: isDark ? '#DCFCE7' : '#14532D',
     },
     metricValuePurple: {
-      color: theme.isDark ? '#F3E8FF' : '#581C87',
+      color: isDark ? '#F3E8FF' : '#581C87',
     },
     metricValueOrange: {
-      color: theme.isDark ? '#FFEDD5' : '#7C2D12',
+      color: isDark ? '#FFEDD5' : '#7C2D12',
     },
     metricSubtext: {
       fontSize: 11,
       marginTop: 2,
     },
     metricSubtextBlue: {
-      color: theme.isDark ? '#93C5FD' : '#2563EB',
+      color: isDark ? '#93C5FD' : '#2563EB',
     },
     metricSubtextGreen: {
-      color: theme.isDark ? '#86EFAC' : '#16A34A',
+      color: isDark ? '#86EFAC' : '#16A34A',
     },
     metricSubtextPurple: {
-      color: theme.isDark ? '#D8B4FE' : '#9333EA',
+      color: isDark ? '#D8B4FE' : '#9333EA',
     },
     metricSubtextOrange: {
-      color: theme.isDark ? '#FED7AA' : '#EA580C',
+      color: isDark ? '#FED7AA' : '#EA580C',
     },
     ctaContainer: {
       padding: 16,
@@ -356,10 +410,10 @@ function createStyles(theme: ThemeDefinition) {
       elevation: 3,
     },
     secondaryButton: {
-      backgroundColor: theme.isDark ? theme.colors.surface : '#FFFFFF',
+      backgroundColor: isDark ? theme.colors.surface : '#FFFFFF',
       borderRadius: 12,
       borderWidth: 2,
-      borderColor: theme.isDark ? '#6B7280' : '#D1D5DB',
+      borderColor: isDark ? '#6B7280' : '#D1D5DB',
     },
     buttonContent: {
       paddingVertical: 16,
@@ -384,14 +438,14 @@ function createStyles(theme: ThemeDefinition) {
       margin: 16,
       marginTop: 8,
       padding: 12,
-      backgroundColor: theme.isDark ? 'rgba(250, 204, 21, 0.15)' : '#FEF3C7',
+      backgroundColor: isDark ? 'rgba(250, 204, 21, 0.15)' : '#FEF3C7',
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: theme.isDark ? 'rgba(250, 204, 21, 0.3)' : '#FDE68A',
+      borderColor: isDark ? 'rgba(250, 204, 21, 0.3)' : '#FDE68A',
     },
     disclaimerText: {
       fontSize: 12,
-      color: theme.isDark ? '#FEF08A' : '#854D0E',
+      color: isDark ? '#FEF08A' : '#854D0E',
       lineHeight: 18,
     },
     disclaimerBold: {
@@ -399,4 +453,5 @@ function createStyles(theme: ThemeDefinition) {
     },
   });
 }
+
 

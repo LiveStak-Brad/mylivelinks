@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Users, UserPlus, Activity, Trophy, Share2, ExternalLink, TrendingUp, Award } from 'lucide-react';
 import { Button } from '@/components/ui';
 import Link from 'next/link';
@@ -22,14 +22,48 @@ export default function ReferralProgressModule({
   const [copied, setCopied] = useState(false);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [loadingInviteUrl, setLoadingInviteUrl] = useState(false);
+
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [joinedCount, setJoinedCount] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [rank, setRank] = useState<number | null>(null);
+  const [totalReferrers, setTotalReferrers] = useState<number | null>(null);
   
-  // Mock data - in production, fetch from API/database
-  const referralStats = {
-    joinedCount: 12,
-    activeCount: 8,
-    rank: 247,
-    totalReferrers: 1853
-  };
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      setLoadingStats(true);
+      try {
+        const supabase = createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id ?? null;
+
+        const statsRes = await fetch('/api/referrals/me/stats?range=all');
+        const statsJson = await statsRes.json().catch(() => null);
+        if (mounted && statsRes.ok) {
+          setJoinedCount(Number(statsJson?.joined ?? 0));
+          setActiveCount(Number(statsJson?.active ?? 0));
+        }
+
+        const rankRes = await fetch('/api/referrals/me/rank');
+        const rankJson = await rankRes.json().catch(() => null);
+        if (mounted && rankRes.ok) {
+          setRank(typeof rankJson?.rank === 'number' ? rankJson.rank : null);
+          setTotalReferrers(typeof rankJson?.total_referrers === 'number' ? rankJson.total_referrers : null);
+        }
+      } catch (err) {
+        console.warn('[referrals] Failed to load referral stats (non-blocking):', err);
+      } finally {
+        if (mounted) setLoadingStats(false);
+      }
+    };
+
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const ensureInviteUrl = async () => {
     if (inviteUrl) return inviteUrl;
@@ -95,8 +129,8 @@ export default function ReferralProgressModule({
     }
   };
 
-  const activePercentage = referralStats.joinedCount > 0 
-    ? Math.round((referralStats.activeCount / referralStats.joinedCount) * 100)
+  const activePercentage = joinedCount > 0 
+    ? Math.round((activeCount / joinedCount) * 100)
     : 0;
 
   return (
@@ -131,7 +165,7 @@ export default function ReferralProgressModule({
           >
             <Trophy className="w-4 h-4" style={{ color: accentColor }} />
             <span className="text-sm font-bold" style={{ color: accentColor }}>
-              #{referralStats.rank}
+              {loadingStats ? '—' : rank ? `#${rank}` : '—'}
             </span>
           </div>
         </div>
@@ -149,7 +183,7 @@ export default function ReferralProgressModule({
               </span>
             </div>
             <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">
-              {referralStats.joinedCount}
+              {loadingStats ? '—' : joinedCount}
             </p>
             <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
               Total signups
@@ -165,7 +199,7 @@ export default function ReferralProgressModule({
               </span>
             </div>
             <p className="text-3xl font-bold text-green-900 dark:text-green-100">
-              {referralStats.activeCount}
+              {loadingStats ? '—' : activeCount}
             </p>
             <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
               {activePercentage}% active rate
@@ -193,7 +227,7 @@ export default function ReferralProgressModule({
             />
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {referralStats.activeCount} out of {referralStats.joinedCount} referrals are active users
+            {activeCount} out of {joinedCount} referrals are active users
           </p>
         </div>
         
@@ -211,10 +245,10 @@ export default function ReferralProgressModule({
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">
-                Ranked #{referralStats.rank}
+                {rank ? `Ranked #${rank}` : 'Ranked —'}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Out of {referralStats.totalReferrers.toLocaleString()} total referrers
+                {totalReferrers ? `Out of ${totalReferrers.toLocaleString()} total referrers` : 'Out of — total referrers'}
               </p>
             </div>
             <TrendingUp className="w-5 h-5 text-gray-400" />
