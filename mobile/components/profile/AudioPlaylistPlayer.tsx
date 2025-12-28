@@ -13,6 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
+import { uploadProfileMediaFromUri } from '../../lib/profileMedia';
+import { supabase } from '../../lib/supabase';
 
 export type ProfileMusicTrack = {
   id: string;
@@ -25,10 +27,10 @@ export type ProfileMusicTrack = {
 };
 
 type Props = {
-  profileId?: string | null;
+  profileId: string;
   tracks: ProfileMusicTrack[];
   isOwner: boolean;
-  onTracksChange?: (next: ProfileMusicTrack[]) => void; // UI-only for now
+  onTracksChange?: (next: ProfileMusicTrack[]) => void;
   accentColor?: string;
   cardOpacity?: number;
 };
@@ -51,14 +53,23 @@ export function AudioPlaylistPlayer({
   const [uiTracks, setUiTracks] = useState<ProfileMusicTrack[]>(tracks);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState<ProfileMusicTrack | null>(null);
 
   const [newTitle, setNewTitle] = useState('');
   const [newArtist, setNewArtist] = useState('');
   const [newAudioUrl, setNewAudioUrl] = useState('');
   const [newCoverUrl, setNewCoverUrl] = useState('');
+  const [pickedAudioUri, setPickedAudioUri] = useState<string | null>(null);
+  const [pickedAudioMime, setPickedAudioMime] = useState<string | null>(null);
+  const [pickedCoverUri, setPickedCoverUri] = useState<string | null>(null);
+  const [pickedCoverMime, setPickedCoverMime] = useState<string | null>(null);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const soundRef = useRef<Audio.Sound | null>(null);
   const tracksRef = useRef<ProfileMusicTrack[]>(tracks);
@@ -66,7 +77,42 @@ export function AudioPlaylistPlayer({
   const currentTrack = uiTracks[currentIndex] ?? null;
   const canPlay = !!currentTrack?.audio_url;
 
-  // Sync incoming tracks
+  const loadFromDb = async () => {
+    if (!profileId) return;
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_music_tracks', { p_profile_id: profileId });
+      if (error) throw error;
+      const rows = Array.isArray(data) ? (data as any[]) : [];
+      const next: ProfileMusicTrack[] = rows.map((r) => ({
+        id: String((r as any)?.id ?? ''),
+        title: String((r as any)?.title ?? ''),
+        artist_name: (r as any)?.artist_name ?? null,
+        audio_url: String((r as any)?.audio_url ?? ''),
+        cover_art_url: (r as any)?.cover_art_url ?? null,
+        sort_order: (r as any)?.sort_order ?? null,
+        rights_confirmed: (r as any)?.rights_confirmed ?? null,
+      }));
+      setUiTracks(next);
+      onTracksChange?.(next);
+      setCurrentIndex((idx) => {
+        const max = Math.max(next.length - 1, 0);
+        return Math.min(Math.max(idx, 0), max);
+      });
+    } catch (e: any) {
+      console.error('[AudioPlaylistPlayer] load failed', e);
+      setUiTracks([]);
+      onTracksChange?.([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadFromDb();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
+
   useEffect(() => {
     setUiTracks(tracks);
     setCurrentIndex((idx) => {
@@ -83,7 +129,6 @@ export function AudioPlaylistPlayer({
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
 
-  // Setup audio mode once
   useEffect(() => {
     void Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
@@ -93,12 +138,12 @@ export function AudioPlaylistPlayer({
     });
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       void (async () => {
         try {
           if (soundRef.current) {
+            await soundRef.current.stopAsync();
             await soundRef.current.unloadAsync();
           }
         } catch {
@@ -119,8 +164,7 @@ export function AudioPlaylistPlayer({
     if (!isOwner) return;
     if (!profileId) return;
     try {
-      const { error } = await supabase.rpc('reorder_profile_music_tracks', {
-        p_profile_id: profileId,
+      const { error } = await supabase.rpc('reorder_music_tracks', {
         p_ordered_ids: next.map((t) => t.id),
       });
       if (error) throw error;
@@ -139,14 +183,21 @@ export function AudioPlaylistPlayer({
       // ignore
     } finally {
       setIsPlaying(false);
+      setIsBuffering(false);
     }
   };
 
   const loadAndPlay = async (track: ProfileMusicTrack) => {
     if (!track.audio_url) return;
     try {
+      setIsBuffering(true);
       // unload previous
       if (soundRef.current) {
+        try {
+          await soundRef.current.stopAsync();
+        } catch {
+          // ignore
+        }
         await soundRef.current.unloadAsync();
         soundRef.current = null;
       }
@@ -156,24 +207,28 @@ export function AudioPlaylistPlayer({
         { shouldPlay: true },
         (status) => {
           if (!status.isLoaded) return;
+          if ((status as any).isBuffering) {
+            setIsBuffering(true);
+          } else {
+            setIsBuffering(false);
+          }
           if (status.didJustFinish) {
             // cycle playlist
-            const list = tracksRef.current;
-            if (list.length <= 1) {
+            if (uiTracks.length <= 1) {
               setIsPlaying(false);
               return;
             }
-            const nextIndex = (currentIndexRef.current + 1) % list.length;
-            setCurrentIndex(nextIndex);
+            setCurrentIndex((i) => (i + 1) % uiTracks.length);
             setIsPlaying(true);
-            void loadAndPlay(list[nextIndex]);
           }
         }
       );
       soundRef.current = sound;
       setIsPlaying(true);
+      setIsBuffering(false);
     } catch (e) {
       setIsPlaying(false);
+      setIsBuffering(false);
       Alert.alert('Unable to play audio', 'Please check the audio URL and try again.');
     }
   };
@@ -221,39 +276,30 @@ export function AudioPlaylistPlayer({
   };
 
   const removeTrack = async (id: string) => {
-    const idx = uiTracks.findIndex((t) => t.id === id);
-    const next = uiTracks.filter((t) => t.id !== id);
-    if (isOwner && profileId) {
-      try {
-        const { error } = await supabase.rpc('delete_profile_music_track', { p_track_id: id });
+    try {
+      if (isOwner) {
+        const { error } = await supabase.rpc('delete_music_track', { p_id: id });
         if (error) throw error;
-        if (next.length) {
-          await supabase.rpc('reorder_profile_music_tracks', {
-            p_profile_id: profileId,
-            p_ordered_ids: next.map((t) => t.id),
-          });
-        }
-      } catch (e) {
-        console.error('[AudioPlaylistPlayer] delete failed', e);
-        Alert.alert('Unable to delete', 'Please try again.');
+      }
+      const idx = uiTracks.findIndex((t) => t.id === id);
+      const next = uiTracks.filter((t) => t.id !== id);
+      setTracks(next);
+      if (currentTrack?.id === id) {
+        await stop();
+      }
+      if (next.length === 0) {
+        setCurrentIndex(0);
         return;
       }
-    }
-
-    setTracks(next);
-    if (currentTrack?.id === id) {
-      await stop();
-    }
-    if (next.length === 0) {
-      setCurrentIndex(0);
-      return;
-    }
-    if (idx >= 0) {
-      setCurrentIndex((cur) => Math.min(cur, next.length - 1));
+      if (idx >= 0) {
+        setCurrentIndex((cur) => Math.min(cur, next.length - 1));
+      }
+    } catch (e: any) {
+      Alert.alert('Delete failed', String(e?.message || 'Could not delete track.'));
     }
   };
 
-  const moveTrack = (id: string, dir: -1 | 1) => {
+  const moveTrack = async (id: string, dir: -1 | 1) => {
     const idx = uiTracks.findIndex((t) => t.id === id);
     const nextIdx = idx + dir;
     if (idx < 0 || nextIdx < 0 || nextIdx >= uiTracks.length) return;
@@ -264,83 +310,184 @@ export function AudioPlaylistPlayer({
     // keep selection by id
     const selectedId = currentTrack?.id ?? item.id;
     setCurrentIndex(next.findIndex((t) => t.id === selectedId));
-    void persistReorder(next);
+
+    if (isOwner) {
+      try {
+        const orderedIds = next.map((t) => t.id);
+        const { error } = await supabase.rpc('reorder_music_tracks', { p_ordered_ids: orderedIds });
+        if (error) throw error;
+      } catch (e: any) {
+        Alert.alert('Reorder failed', String(e?.message || 'Could not reorder tracks.'));
+      }
+    }
   };
 
   const openAdd = () => {
+    setEditing(null);
     setNewTitle('');
     setNewArtist('');
     setNewAudioUrl('');
     setNewCoverUrl('');
+    setPickedAudioUri(null);
+    setPickedAudioMime(null);
+    setPickedCoverUri(null);
+    setPickedCoverMime(null);
     setRightsConfirmed(false);
     setAddOpen(true);
   };
 
+  const openEdit = (t: ProfileMusicTrack) => {
+    setEditing(t);
+    setNewTitle(t.title || '');
+    setNewArtist(t.artist_name || '');
+    setNewAudioUrl(t.audio_url || '');
+    setNewCoverUrl(t.cover_art_url || '');
+    setPickedAudioUri(null);
+    setPickedAudioMime(null);
+    setPickedCoverUri(null);
+    setPickedCoverMime(null);
+    setRightsConfirmed(false);
+    setEditOpen(true);
+  };
+
+  const pickAudio = async () => {
+    try {
+      let DocumentPicker: any = null;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        DocumentPicker = require('expo-document-picker');
+      } catch {
+        Alert.alert('Uploader not installed', 'Install expo-document-picker to select audio files.');
+        return;
+      }
+
+      const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', multiple: false, copyToCacheDirectory: true });
+      if (res?.canceled) return;
+      const asset = Array.isArray(res?.assets) ? res.assets[0] : null;
+      const uri = typeof asset?.uri === 'string' ? asset.uri : null;
+      if (!uri) return;
+      setPickedAudioUri(uri);
+      setPickedAudioMime(typeof asset?.mimeType === 'string' ? asset.mimeType : 'audio/mpeg');
+    } catch (e: any) {
+      Alert.alert('Pick failed', String(e?.message || e || 'Failed to pick audio'));
+    }
+  };
+
+  const pickCover = async () => {
+    try {
+      let ImagePicker: any = null;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        ImagePicker = require('expo-image-picker');
+      } catch {
+        Alert.alert('Uploader not installed', 'Install expo-image-picker to select images.');
+        return;
+      }
+
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm?.granted) {
+        Alert.alert('Permission required', 'Please allow photo library access.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+        allowsEditing: false,
+      });
+      if (result?.canceled) return;
+      const asset = Array.isArray(result?.assets) ? result.assets[0] : null;
+      const uri = typeof asset?.uri === 'string' ? asset.uri : null;
+      if (!uri) return;
+      setPickedCoverUri(uri);
+      setPickedCoverMime(typeof asset?.mimeType === 'string' ? asset.mimeType : 'image/jpeg');
+    } catch (e: any) {
+      Alert.alert('Pick failed', String(e?.message || e || 'Failed to pick image'));
+    }
+  };
+
   const submitAdd = async () => {
     const title = newTitle.trim();
-    const audioUrl = newAudioUrl.trim();
     const artist = newArtist.trim();
-    const cover = newCoverUrl.trim();
     if (!title) return Alert.alert('Missing title', 'Track title is required.');
-    if (!audioUrl) return Alert.alert('Missing audio URL', 'Audio URL is required.');
     if (!rightsConfirmed) return Alert.alert('Rights required', 'You must confirm you own the rights or have permission.');
 
-    // If we don't have a profileId yet, keep UI usable (but persistence won't happen).
-    if (!profileId) {
-      const nextTrack: ProfileMusicTrack = {
-        id: safeId(),
-        title,
-        artist_name: artist || null,
-        audio_url: audioUrl,
-        cover_art_url: cover || null,
-        rights_confirmed: true,
-      };
-      const next = [...uiTracks, nextTrack];
-      setTracks(next);
-      setAddOpen(false);
-      setPlaylistOpen(false);
-      setCurrentIndex(next.length - 1);
-      await loadAndPlay(nextTrack);
-      return;
-    }
-
+    setSaving(true);
     try {
+      // Build audio_url
+      let audioUrl = newAudioUrl.trim();
+      if (pickedAudioUri) {
+        const idForPath = editing?.id || safeId();
+        const { publicUrl } = await uploadProfileMediaFromUri({
+          profileId,
+          relativePath: `music/tracks/${idForPath}/audio`,
+          uri: pickedAudioUri,
+          opts: { contentType: pickedAudioMime, upsert: Boolean(editing), maxBytes: 50 * 1024 * 1024 },
+        });
+        audioUrl = publicUrl;
+      }
+      if (!audioUrl) return Alert.alert('Missing audio', 'Please provide an audio URL or upload an audio file.');
+
+      // Build cover_art_url
+      let cover = newCoverUrl.trim();
+      if (pickedCoverUri) {
+        const idForPath = editing?.id || safeId();
+        const { publicUrl } = await uploadProfileMediaFromUri({
+          profileId,
+          relativePath: `music/tracks/${idForPath}/cover`,
+          uri: pickedCoverUri,
+          opts: { contentType: pickedCoverMime, upsert: Boolean(editing), maxBytes: 5 * 1024 * 1024 },
+        });
+        cover = publicUrl;
+      }
+
       const payload: any = {
         title,
         artist_name: artist || null,
         audio_url: audioUrl,
         cover_art_url: cover || null,
-        sort_order: uiTracks.length,
         rights_confirmed: true,
+        sort_order: uiTracks.length,
       };
-      const { data, error } = await supabase.rpc('upsert_profile_music_track', { p_track: payload });
+
+      const { error } = await supabase.rpc('upsert_music_track', {
+        p_id: editing?.id ?? null,
+        p_payload: payload,
+      });
       if (error) throw error;
-      const row: any = data ?? null;
-      if (!row?.id) throw new Error('Missing track id');
-      const nextTrack: ProfileMusicTrack = {
-        id: String(row.id),
-        title: String(row.title ?? title),
-        artist_name: row.artist_name ?? (artist || null),
-        audio_url: String(row.audio_url ?? audioUrl),
-        cover_art_url: row.cover_art_url ?? (cover || null),
-        rights_confirmed: row.rights_confirmed ?? true,
-        sort_order: row.sort_order ?? uiTracks.length,
-      };
-      const next = [...uiTracks, nextTrack];
-      setTracks(next);
+
+      await loadFromDb();
       setAddOpen(false);
+      setEditOpen(false);
       setPlaylistOpen(false);
-      setCurrentIndex(next.length - 1);
-      await loadAndPlay(nextTrack);
-    } catch (e) {
-      console.error('[AudioPlaylistPlayer] save failed', e);
-      Alert.alert('Unable to save', 'Please try again.');
+    } catch (e: any) {
+      Alert.alert('Save failed', String(e?.message || 'Could not save track.'));
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Requirement: empty state is owner-only
-  if (uiTracks.length === 0 && !isOwner) {
-    return null;
+  if (isLoading) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyIcon}>🎵</Text>
+        <Text style={styles.emptyTitle}>Loading…</Text>
+        <Text style={styles.emptyText}>Fetching your tracks.</Text>
+      </View>
+    );
+  }
+
+  if (uiTracks.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyIcon}>🎵</Text>
+        <Text style={styles.emptyTitle}>No Tracks Yet</Text>
+        <Text style={styles.emptyText}>Add a track to enable your playlist player.</Text>
+        <Pressable onPress={openAdd} style={styles.primaryCta}>
+          <Text style={styles.primaryCtaText}>Add Track</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (
@@ -362,35 +509,22 @@ export function AudioPlaylistPlayer({
         )}
       </View>
 
-      {/* Empty owner-only state */}
-      {uiTracks.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🎵</Text>
-          <Text style={styles.emptyTitle}>No Music Yet</Text>
-          <Text style={styles.emptyText}>Music tracks and releases will appear here</Text>
-          <Pressable onPress={openAdd} style={styles.primaryCta}>
-            <Text style={styles.primaryCtaText}>Add Your First Track</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <>
-          {/* Player */}
-          <View style={styles.playerCard}>
-            <View style={styles.nowRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.nowTitle} numberOfLines={1}>
-                  {currentTrack?.title ?? '—'}
-                </Text>
-                {!!currentTrack?.artist_name && (
-                  <Text style={styles.nowArtist} numberOfLines={1}>
-                    {currentTrack.artist_name}
-                  </Text>
-                )}
-                {!canPlay && (
-                  <Text style={styles.cantPlay}>This track needs an audio URL to play.</Text>
-                )}
-              </View>
-              <Pressable onPress={() => setPlaylistOpen(true)} style={styles.playlistButton}>
+      {/* Player */}
+      <View style={styles.playerCard}>
+        <View style={styles.nowRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.nowTitle} numberOfLines={1}>
+              {currentTrack?.title ?? '—'}
+            </Text>
+            {!!currentTrack?.artist_name && (
+              <Text style={styles.nowArtist} numberOfLines={1}>
+                {currentTrack.artist_name}
+              </Text>
+            )}
+            {isBuffering && <Text style={styles.bufferingText}>Buffering…</Text>}
+            {!canPlay && (
+              <Text style={styles.cantPlay}>This track needs an audio URL to play.</Text>
+            )}
                 <Ionicons name="list" size={18} color={styles._accent.color as any} />
                 <Text style={styles.playlistButtonText}>Playlist ({uiTracks.length})</Text>
               </Pressable>
@@ -452,6 +586,9 @@ export function AudioPlaylistPlayer({
 
                   {isOwner && (
                     <View style={styles.trackActions}>
+                      <Pressable onPress={() => openEdit(t)} style={styles.iconBtn} accessibilityLabel="Edit">
+                        <Ionicons name="pencil" size={16} color={theme.colors.textSecondary} />
+                      </Pressable>
                       <Pressable onPress={() => moveTrack(t.id, -1)} style={styles.iconBtn} accessibilityLabel="Move up">
                         <Ionicons name="chevron-up" size={18} color={theme.colors.textSecondary} />
                       </Pressable>
@@ -473,7 +610,7 @@ export function AudioPlaylistPlayer({
 
             {isOwner && (
               <View style={styles.modalFooter}>
-                <Text style={styles.modalHint}>Reordering is UI-only for now (saving is wired later).</Text>
+                <Text style={styles.modalHint}>Reordering and edits save to your profile.</Text>
                 <Pressable onPress={openAdd} style={styles.primaryCta}>
                   <Text style={styles.primaryCtaText}>+ Add Track</Text>
                 </Pressable>
@@ -484,12 +621,12 @@ export function AudioPlaylistPlayer({
       </Modal>
 
       {/* Add Track Modal */}
-      <Modal visible={addOpen} transparent animationType="slide" onRequestClose={() => setAddOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setAddOpen(false)}>
+      <Modal visible={addOpen || editOpen} transparent animationType="slide" onRequestClose={() => (saving ? null : (addOpen ? setAddOpen(false) : setEditOpen(false)))}>
+        <Pressable style={styles.modalBackdrop} onPress={() => (saving ? null : (addOpen ? setAddOpen(false) : setEditOpen(false)))}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Track</Text>
-              <Pressable onPress={() => setAddOpen(false)}>
+              <Text style={styles.modalTitle}>{editOpen ? 'Edit Track' : 'Add Track'}</Text>
+              <Pressable onPress={() => (saving ? null : (addOpen ? setAddOpen(false) : setEditOpen(false)))}>
                 <Ionicons name="close" size={22} color={theme.colors.textPrimary} />
               </Pressable>
             </View>
@@ -530,6 +667,12 @@ export function AudioPlaylistPlayer({
             </View>
 
             <View style={styles.formRow}>
+              <Pressable onPress={() => void pickAudio()} style={styles.secondaryBtn} disabled={saving}>
+                <Text style={styles.secondaryBtnText}>{pickedAudioUri ? 'Change Audio File' : 'Pick Audio File'}</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.formRow}>
               <Text style={styles.formLabel}>Cover Art URL</Text>
               <TextInput
                 value={newCoverUrl}
@@ -540,6 +683,12 @@ export function AudioPlaylistPlayer({
                 autoCorrect={false}
                 style={styles.input}
               />
+            </View>
+
+            <View style={styles.formRow}>
+              <Pressable onPress={() => void pickCover()} style={styles.secondaryBtn} disabled={saving}>
+                <Text style={styles.secondaryBtnText}>{pickedCoverUri ? 'Change Cover Image' : 'Pick Cover Image'}</Text>
+              </Pressable>
             </View>
 
             <View style={styles.rightsRow}>
@@ -555,11 +704,11 @@ export function AudioPlaylistPlayer({
             </View>
 
             <View style={styles.modalFooterRow}>
-              <Pressable onPress={() => setAddOpen(false)} style={styles.secondaryBtn}>
+              <Pressable onPress={() => (saving ? null : (addOpen ? setAddOpen(false) : setEditOpen(false)))} style={styles.secondaryBtn}>
                 <Text style={styles.secondaryBtnText}>Cancel</Text>
               </Pressable>
-              <Pressable onPress={() => void submitAdd()} style={styles.primaryCta}>
-                <Text style={styles.primaryCtaText}>Add Track</Text>
+              <Pressable onPress={() => void submitAdd()} style={styles.primaryCta} disabled={saving}>
+                <Text style={styles.primaryCtaText}>{saving ? 'Saving…' : editOpen ? 'Save' : 'Add Track'}</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -639,6 +788,7 @@ function createStyles(theme: ThemeDefinition, accentColor?: string, cardOpacity:
     nowTitle: { fontSize: 16, fontWeight: '900', color: theme.colors.textPrimary },
     nowArtist: { marginTop: 2, fontSize: 12, fontWeight: '700', color: theme.colors.textMuted },
     cantPlay: { marginTop: 6, fontSize: 12, fontWeight: '800', color: theme.colors.danger },
+    bufferingText: { marginTop: 6, fontSize: 12, fontWeight: '800', color: theme.colors.textMuted },
     playlistButton: {
       flexDirection: 'row',
       alignItems: 'center',

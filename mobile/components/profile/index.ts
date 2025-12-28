@@ -26,6 +26,12 @@ export type { MusicVideoItem } from './MusicVideosSection';
 export { ComedySpecialsSection } from './ComedySpecialsSection';
 export type { ComedySpecialItem } from './ComedySpecialsSection';
 
+export { VideoPlaylistPlayer } from './VideoPlaylistPlayer';
+export type { VideoPlaylistItem } from './VideoPlaylistPlayer';
+
+export { VlogReelsSection } from './VlogReelsSection';
+export type { VlogItem } from './VlogReelsSection';
+
 export { AudioPlaylistPlayer } from './AudioPlaylistPlayer';
 export type { ProfileMusicTrack } from './AudioPlaylistPlayer';
 
