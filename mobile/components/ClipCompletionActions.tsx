@@ -127,11 +127,11 @@ export function ClipCompletionActions({
           onPress={handlePostToFeed}
           disabled={isLoading}
         >
-          <View style={[styles.actionIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
+          <View style={styles.actionIcon}>
             {isPosting ? (
-              <ActivityIndicator size="small" color="#8b5cf6" />
+              <ActivityIndicator size="small" color={theme.colors.accent} />
             ) : (
-              <Ionicons name="paper-plane" size={24} color="#8b5cf6" />
+              <Ionicons name="paper-plane" size={24} color={theme.colors.accent} />
             )}
           </View>
           <Text style={styles.actionLabel}>Post to Feed</Text>
@@ -147,11 +147,11 @@ export function ClipCompletionActions({
           onPress={handleSave}
           disabled={isLoading}
         >
-          <View style={[styles.actionIcon, { backgroundColor: 'rgba(236, 72, 153, 0.1)' }]}>
+          <View style={styles.actionIcon}>
             {isSaving ? (
-              <ActivityIndicator size="small" color="#ec4899" />
+              <ActivityIndicator size="small" color={theme.colors.accent} />
             ) : (
-              <Ionicons name="save" size={24} color="#ec4899" />
+              <Ionicons name="save" size={24} color={theme.colors.accent} />
             )}
           </View>
           <Text style={styles.actionLabel}>Save</Text>
@@ -167,11 +167,11 @@ export function ClipCompletionActions({
           onPress={handlePostAndSave}
           disabled={isLoading}
         >
-          <View style={[styles.actionIcon, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
+          <View style={styles.actionIcon}>
             {isPosting && isSaving ? (
-              <ActivityIndicator size="small" color="#6366f1" />
+              <ActivityIndicator size="small" color={theme.colors.accent} />
             ) : (
-              <Ionicons name="checkmark-done" size={24} color="#6366f1" />
+              <Ionicons name="checkmark-done" size={24} color={theme.colors.accent} />
             )}
           </View>
           <Text style={styles.actionLabel}>Post + Save</Text>
@@ -187,8 +187,8 @@ export function ClipCompletionActions({
           onPress={handleSendToComposer}
           disabled={isLoading}
         >
-          <View style={[styles.actionIcon, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-            <Ionicons name="film" size={24} color="#f59e0b" />
+          <View style={styles.actionIcon}>
+            <Ionicons name="film" size={24} color={theme.colors.accent} />
           </View>
           <Text style={styles.actionLabel}>Send to Composer</Text>
         </Pressable>
@@ -239,6 +239,7 @@ function createStyles(theme: ThemeDefinition) {
       width: 56,
       height: 56,
       borderRadius: 28,
+      backgroundColor: theme.colors.highlight,
       alignItems: 'center',
       justifyContent: 'center',
     },
