@@ -1,11 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
 import Link from 'next/link';
-import { UserPlus, UserCheck, Users, Share2, MessageCircle, BarChart3, Flame, Trophy, Star } from 'lucide-react';
+import {
+  UserPlus,
+  UserCheck,
+  Users,
+  Share2,
+  MessageCircle,
+  BarChart3,
+  Flame,
+  Trophy,
+  Star,
+  Info,
+  LayoutGrid,
+  Image as ImageIcon,
+  Video,
+  Clapperboard,
+  Music,
+  Calendar,
+  ShoppingCart,
+} from 'lucide-react';
 import SocialCountsWidget from '@/components/profile/SocialCountsWidget';
 import TopSupportersWidget from '@/components/profile/TopSupportersWidget';
 import TopStreamersWidget from '@/components/profile/TopStreamersWidget';
@@ -17,11 +35,22 @@ import SocialMediaBar from '@/components/profile/SocialMediaBar';
 import ProfileLivePlayer from '@/components/ProfileLivePlayer';
 import UserConnectionsList from '@/components/UserConnectionsList';
 import ProfileTypeBadge, { ProfileType } from '@/components/profile/ProfileTypeBadge';
-import ProfileQuickActionsRow from '@/components/profile/ProfileQuickActionsRow';
-import { getEnabledSections, isSectionEnabled, type ProfileType as ConfigProfileType } from '@/lib/profileTypeConfig';
-import { MusicShowcase, UpcomingEvents, Merchandise, BusinessInfo, Portfolio, TabEmptyState } from '@/components/profile/sections';
+import {
+  getEnabledTabs,
+  isSectionEnabled,
+  type ProfileTab as ConfigProfileTab,
+  type ProfileType as ConfigProfileType,
+} from '@/lib/profileTypeConfig';
+import { MusicShowcase, MusicVideos, ComedySpecials, UpcomingEvents, Merchandise, BusinessInfo, Portfolio, Schedule, TabEmptyState } from '@/components/profile/sections';
+import SectionEditModal from '@/components/profile/edit/SectionEditModal';
+import type { MusicTrackRow } from '@/components/profile/sections/MusicShowcase';
+import type { ShowEventRow } from '@/components/profile/sections/UpcomingEvents';
+import type { MerchItemRow } from '@/components/profile/sections/Merchandise';
+import type { PortfolioItemRow } from '@/components/profile/sections/Portfolio';
+import type { ScheduleItemRow } from '@/components/profile/sections/Schedule';
 import PublicFeedClient from '@/components/feed/PublicFeedClient';
 import ProfilePhotosClient from '@/components/photos/ProfilePhotosClient';
+import VlogReelsClient from '@/components/profile/VlogReelsClient';
 import { ReferralProgressModule } from '@/components/referral';
 
 interface ProfileData {
@@ -142,6 +171,30 @@ export default function ModernProfilePage() {
   const [activeTab, setActiveTab] = useState<string>('info');
   const [activeConnectionsTab, setActiveConnectionsTab] = useState<'following' | 'followers' | 'friends'>('following');
   const [connectionsExpanded, setConnectionsExpanded] = useState(true);
+
+  // Profile-type modules (real data; no mocks for visitors)
+  const [musicTracks, setMusicTracks] = useState<MusicTrackRow[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<ShowEventRow[]>([]);
+  const [merchItems, setMerchItems] = useState<MerchItemRow[]>([]);
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItemRow[]>([]);
+  const [scheduleItems, setScheduleItems] = useState<ScheduleItemRow[]>([]);
+  const [modulesReloadNonce, setModulesReloadNonce] = useState(0);
+
+  // Universal edit modals (one at a time)
+  const [trackModalOpen, setTrackModalOpen] = useState(false);
+  const [editingTrack, setEditingTrack] = useState<MusicTrackRow | null>(null);
+
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ShowEventRow | null>(null);
+
+  const [merchModalOpen, setMerchModalOpen] = useState(false);
+  const [editingMerch, setEditingMerch] = useState<MerchItemRow | null>(null);
+
+  const [portfolioModalOpen, setPortfolioModalOpen] = useState(false);
+  const [editingPortfolio, setEditingPortfolio] = useState<PortfolioItemRow | null>(null);
+
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleItemRow | null>(null);
   
   const supabase = createClient();
   
@@ -235,6 +288,135 @@ export default function ModernProfilePage() {
       setLoading(false);
     }
   };
+
+  // Load profile-type module data (tracks + profile_content_blocks) after the main profile loads.
+  useEffect(() => {
+    const profileId = profileData?.profile?.id;
+    if (!profileId) {
+      setMusicTracks([]);
+      setUpcomingEvents([]);
+      setMerchItems([]);
+      setPortfolioItems([]);
+      setScheduleItems([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const getBlocksByType = (blocks: any, blockType: string): any[] => {
+      const byType = blocks?.blocks_by_type?.[blockType];
+      if (Array.isArray(byType)) return byType;
+      const direct = blocks?.[blockType];
+      return Array.isArray(direct) ? direct : [];
+    };
+
+    const load = async () => {
+      // Music tracks (musician)
+      try {
+        const { data, error } = await supabase.rpc('get_music_tracks', { p_profile_id: profileId });
+        if (!cancelled) {
+          if (error) {
+            console.error('[ProfileModules] get_music_tracks failed:', error);
+            setMusicTracks([]);
+          } else {
+            const rows = Array.isArray(data) ? (data as any[]) : [];
+            setMusicTracks(
+              rows.map((r) => ({
+                id: String((r as any).id),
+                title: String((r as any).title ?? ''),
+                artist_name: (r as any).artist_name ?? null,
+                audio_url: String((r as any).audio_url ?? ''),
+                cover_art_url: (r as any).cover_art_url ?? null,
+                rights_confirmed: (r as any).rights_confirmed ?? null,
+              }))
+            );
+          }
+        }
+      } catch (e) {
+        if (!cancelled) setMusicTracks([]);
+      }
+
+      // Upcoming Events (new dedicated table + RPC)
+      try {
+        const { data, error } = await supabase.rpc('get_profile_events', { p_profile_id: profileId });
+        if (!cancelled) {
+          if (error) {
+            console.error('[ProfileModules] get_profile_events failed:', error);
+            setUpcomingEvents([]);
+          } else {
+            const rows = Array.isArray(data) ? (data as any[]) : [];
+            setUpcomingEvents(
+              rows.map((r) => ({
+                id: String((r as any).id),
+                title: String((r as any).title ?? ''),
+                date: (r as any).start_at ? new Date((r as any).start_at).toLocaleString() : null,
+                location: (r as any).location ?? null,
+                ticket_url: (r as any).url ?? null,
+                description: (r as any).notes ?? null,
+              }))
+            );
+          }
+        }
+      } catch (e) {
+        if (!cancelled) setUpcomingEvents([]);
+      }
+
+      // Blocks (merch/portfolio/etc)
+      try {
+        const res = await fetch(`/api/profile/${encodeURIComponent(username)}/bundle`, { cache: 'no-store' });
+        const json = await res.json().catch(() => null);
+        const blocks = (json as any)?.blocks ?? null;
+        if (!cancelled) {
+          const merchBlocks = getBlocksByType(blocks, 'merch');
+          const productBlocks = getBlocksByType(blocks, 'product');
+          const scheduleBlocks = getBlocksByType(blocks, 'schedule_item');
+
+          setMerchItems(
+            merchBlocks.map((b) => ({
+              id: String((b as any).id),
+              name: String((b as any).title ?? ''),
+              price: (b as any)?.metadata?.price ?? null,
+              image_url: (b as any)?.metadata?.image_url ?? null,
+              description: (b as any)?.metadata?.description ?? null,
+              buy_url: (b as any).url ?? null,
+            }))
+          );
+
+          setPortfolioItems(
+            productBlocks.map((b) => ({
+              id: String((b as any).id),
+              title: String((b as any).title ?? ''),
+              image_url: (b as any)?.metadata?.image_url ?? null,
+              description: (b as any)?.metadata?.description ?? null,
+              url: (b as any).url ?? null,
+            }))
+          );
+
+          setScheduleItems(
+            scheduleBlocks.map((b) => ({
+              id: String((b as any).id),
+              title: String((b as any).title ?? ''),
+              day_of_week: (b as any)?.metadata?.day_of_week ?? null,
+              time: (b as any)?.metadata?.time ?? null,
+              description: (b as any)?.metadata?.description ?? null,
+              recurring: (b as any)?.metadata?.recurring ?? null,
+            }))
+          );
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setMerchItems([]);
+          setPortfolioItems([]);
+          setScheduleItems([]);
+        }
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [profileData?.profile?.id, supabase, username, modulesReloadNonce]);
 
   const handleMessage = async () => {
     if (!profileData) return;
@@ -339,6 +521,283 @@ export default function ModernProfilePage() {
       alert('Profile link and message copied to clipboard! 🎉');
     }
   };
+
+  // ---------------------------------------------------------------------------
+  // Profile Type Section Editing (universal modal-backed)
+  // ---------------------------------------------------------------------------
+
+  const requireOwner = () => {
+    if (!isOwnProfile) {
+      alert('Only the profile owner can edit this section.');
+      return false;
+    }
+    return true;
+  };
+
+  const openAddTrack = () => {
+    if (!requireOwner()) return;
+    setEditingTrack(null);
+    setTrackModalOpen(true);
+  };
+  const openEditTrack = (t: MusicTrackRow) => {
+    if (!requireOwner()) return;
+    setEditingTrack(t);
+    setTrackModalOpen(true);
+  };
+  const deleteTrack = async (trackId: string) => {
+    if (!requireOwner()) return;
+    if (!confirm('Delete this track?')) return;
+    const { error } = await supabase.rpc('delete_music_track', { p_id: trackId });
+    if (error) {
+      alert(error.message || 'Failed to delete track.');
+      return;
+    }
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const saveTrack = async (values: Record<string, any>) => {
+    if (!requireOwner()) return;
+    const payload = {
+      title: String(values.title ?? ''),
+      artist_name: String(values.artist_name ?? ''),
+      audio_url: String(values.audio_url ?? ''),
+      cover_art_url: String(values.cover_art_url ?? ''),
+      rights_confirmed: values.rights_confirmed === true,
+    };
+
+    const { error } = await supabase.rpc('upsert_music_track', {
+      p_id: editingTrack?.id ?? null,
+      p_payload: payload,
+    });
+    if (error) throw error;
+    setTrackModalOpen(false);
+    setEditingTrack(null);
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const openAddEvent = () => {
+    if (!requireOwner()) return;
+    setEditingEvent(null);
+    setEventModalOpen(true);
+  };
+  const openEditEvent = (e: ShowEventRow) => {
+    if (!requireOwner()) return;
+    setEditingEvent(e);
+    setEventModalOpen(true);
+  };
+  const deleteEvent = async (eventId: string) => {
+    if (!requireOwner()) return;
+    if (!confirm('Delete this event?')) return;
+    const { error } = await supabase.rpc('delete_profile_event', { p_event_id: eventId });
+    if (error) {
+      alert(error.message || 'Failed to delete event.');
+      return;
+    }
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const saveEvent = async (values: Record<string, any>) => {
+    if (!requireOwner()) return;
+    const title = String(values.title ?? '').trim();
+    const startAt = String(values.start_at ?? '').trim();
+    const endAt = String(values.end_at ?? '').trim();
+    const location = String(values.location ?? '').trim();
+    const url = String(values.url ?? '').trim();
+    const notes = String(values.notes ?? '').trim();
+
+    if (!startAt) {
+      alert('Start date/time is required.');
+      return;
+    }
+
+    const payload: Record<string, any> = {
+      title: title || null,
+      start_at: startAt,
+      location: location || null,
+      url: url || null,
+      notes: notes || null,
+      sort_order: upcomingEvents.length,
+    };
+
+    if (endAt) {
+      payload.end_at = endAt;
+    }
+
+    if (editingEvent?.id) {
+      payload.id = editingEvent.id;
+    }
+
+    const { error } = await supabase.rpc('upsert_profile_event', { p_event: payload });
+    if (error) throw error;
+
+    setEventModalOpen(false);
+    setEditingEvent(null);
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const openAddMerch = () => {
+    if (!requireOwner()) return;
+    setEditingMerch(null);
+    setMerchModalOpen(true);
+  };
+  const openEditMerch = (m: MerchItemRow) => {
+    if (!requireOwner()) return;
+    setEditingMerch(m);
+    setMerchModalOpen(true);
+  };
+  const deleteMerch = async (id: string) => {
+    if (!requireOwner()) return;
+    if (!confirm('Delete this merch item?')) return;
+    const { error } = await supabase.rpc('delete_profile_block', { p_id: Number(id) });
+    if (error) {
+      alert(error.message || 'Failed to delete merch item.');
+      return;
+    }
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const saveMerch = async (values: Record<string, any>) => {
+    if (!requireOwner()) return;
+    const name = String(values.name ?? '').trim();
+    const meta = {
+      price: String(values.price ?? '').trim() || null,
+      image_url: String(values.image_url ?? '').trim() || null,
+      description: String(values.description ?? '').trim() || null,
+    };
+    const buyUrl = String(values.buy_url ?? '').trim();
+
+    if (editingMerch?.id) {
+      const { error } = await supabase.rpc('update_profile_block', {
+        p_id: Number(editingMerch.id),
+        p_title: name,
+        p_url: buyUrl || null,
+        p_metadata: meta,
+        p_sort_order: 0,
+      });
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.rpc('add_profile_block', {
+        p_block_type: 'merch',
+        p_title: name,
+        p_url: buyUrl || null,
+        p_metadata: meta,
+        p_sort_order: merchItems.length,
+      });
+      if (error) throw error;
+    }
+    setMerchModalOpen(false);
+    setEditingMerch(null);
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const openAddPortfolio = () => {
+    if (!requireOwner()) return;
+    setEditingPortfolio(null);
+    setPortfolioModalOpen(true);
+  };
+  const openEditPortfolio = (p: PortfolioItemRow) => {
+    if (!requireOwner()) return;
+    setEditingPortfolio(p);
+    setPortfolioModalOpen(true);
+  };
+  const deletePortfolio = async (id: string) => {
+    if (!requireOwner()) return;
+    if (!confirm('Delete this portfolio item?')) return;
+    const { error } = await supabase.rpc('delete_profile_block', { p_id: Number(id) });
+    if (error) {
+      alert(error.message || 'Failed to delete portfolio item.');
+      return;
+    }
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const savePortfolio = async (values: Record<string, any>) => {
+    if (!requireOwner()) return;
+    const title = String(values.title ?? '').trim();
+    const url = String(values.url ?? '').trim();
+    const meta = {
+      image_url: String(values.image_url ?? '').trim() || null,
+      description: String(values.description ?? '').trim() || null,
+    };
+
+    if (editingPortfolio?.id) {
+      const { error } = await supabase.rpc('update_profile_block', {
+        p_id: Number(editingPortfolio.id),
+        p_title: title,
+        p_url: url || null,
+        p_metadata: meta,
+        p_sort_order: 0,
+      });
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.rpc('add_profile_block', {
+        p_block_type: 'product',
+        p_title: title,
+        p_url: url || null,
+        p_metadata: meta,
+        p_sort_order: portfolioItems.length,
+      });
+      if (error) throw error;
+    }
+    setPortfolioModalOpen(false);
+    setEditingPortfolio(null);
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const openAddSchedule = () => {
+    if (!requireOwner()) return;
+    setEditingSchedule(null);
+    setScheduleModalOpen(true);
+  };
+  const openEditSchedule = (it: ScheduleItemRow) => {
+    if (!requireOwner()) return;
+    setEditingSchedule(it);
+    setScheduleModalOpen(true);
+  };
+  const deleteSchedule = async (id: string) => {
+    if (!requireOwner()) return;
+    if (!confirm('Delete this schedule item?')) return;
+    const { error } = await supabase.rpc('delete_profile_block', { p_id: Number(id) });
+    if (error) {
+      alert(error.message || 'Failed to delete schedule item.');
+      return;
+    }
+    setModulesReloadNonce((n) => n + 1);
+  };
+
+  const saveSchedule = async (values: Record<string, any>) => {
+    if (!requireOwner()) return;
+    const title = String(values.title ?? '').trim();
+    const meta = {
+      day_of_week: String(values.day_of_week ?? '').trim() || null,
+      time: String(values.time ?? '').trim() || null,
+      description: String(values.description ?? '').trim() || null,
+      recurring: values.recurring === true,
+    };
+
+    if (editingSchedule?.id) {
+      const { error } = await supabase.rpc('update_profile_block', {
+        p_id: Number(editingSchedule.id),
+        p_title: title,
+        p_url: null,
+        p_metadata: meta,
+        p_sort_order: 0,
+      });
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.rpc('add_profile_block', {
+        p_block_type: 'schedule_item',
+        p_title: title,
+        p_url: null,
+        p_metadata: meta,
+        p_sort_order: scheduleItems.length,
+      });
+      if (error) throw error;
+    }
+    setScheduleModalOpen(false);
+    setEditingSchedule(null);
+    setModulesReloadNonce((n) => n + 1);
+  };
   
   if (loading) {
     return (
@@ -369,6 +828,29 @@ export default function ModernProfilePage() {
   }
   
   const { profile } = profileData;
+
+  // Tabs are config-driven (parity with mobile). Ensure active tab is valid for this profile type.
+  const enabledTabs = getEnabledTabs((profile.profile_type || 'creator') as ConfigProfileType);
+  useEffect(() => {
+    if (!enabledTabs?.length) return;
+    const allowed = new Set(enabledTabs.map((t) => t.id));
+    if (!allowed.has(activeTab as any)) {
+      setActiveTab(enabledTabs[0].id);
+    }
+    // Only re-run when profile type changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.profile_type]);
+
+  const tabIconMap: Record<ConfigProfileTab, any> = {
+    info: Info,
+    feed: LayoutGrid,
+    reels: Clapperboard,
+    photos: ImageIcon,
+    videos: Video,
+    music: Music,
+    events: Calendar,
+    products: ShoppingCart,
+  };
   
   // Apply customization
   const bgOverlay = profile.profile_bg_overlay || 'dark-medium';
@@ -628,60 +1110,28 @@ export default function ModernProfilePage() {
           </div>
         </div>
         
-        {/* Profile Type Quick Actions Row */}
-        {(profile.profile_type && profile.profile_type !== 'creator') && (
-          <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
-            <ProfileQuickActionsRow 
-              profileType={profile.profile_type}
-            />
-          </div>
-        )}
-        
-        {/* Profile Tabs (Info | Feed | Photos) */}
+        {/* Profile Tabs (config-driven, parity with mobile) */}
         <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
           <div className="flex border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setActiveTab('info')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
-                activeTab === 'info'
-                  ? 'border-purple-500 text-purple-500'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-              style={activeTab === 'info' ? { borderColor: accentColor, color: accentColor } : {}}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Info
-            </button>
-            <button
-              onClick={() => setActiveTab('feed')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
-                activeTab === 'feed'
-                  ? 'border-purple-500 text-purple-500'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-              style={activeTab === 'feed' ? { borderColor: accentColor, color: accentColor } : {}}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              Feed
-            </button>
-            <button
-              onClick={() => setActiveTab('photos')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
-                activeTab === 'photos'
-                  ? 'border-purple-500 text-purple-500'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
-              style={activeTab === 'photos' ? { borderColor: accentColor, color: accentColor } : {}}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Photos
-            </button>
+            {enabledTabs.map((tab) => {
+              const TabIcon = tabIconMap[tab.id as ConfigProfileTab] || Info;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
+                    isActive
+                      ? 'border-purple-500 text-purple-500'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                  }`}
+                  style={isActive ? { borderColor: accentColor, color: accentColor } : {}}
+                >
+                  <TabIcon className="w-5 h-5" />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
         
@@ -698,12 +1148,26 @@ export default function ModernProfilePage() {
             />
           </div>
         )}
+
+        {/* Streamer schedule (real data, owner-only empty state) */}
+        {profile.profile_type === 'streamer' && (
+          <Schedule
+            isOwner={isOwnProfile}
+            items={scheduleItems}
+            onAdd={openAddSchedule}
+            onEdit={openEditSchedule}
+            onDelete={deleteSchedule}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
+        )}
         
         {/* Config-driven section rendering for musician showcase */}
         {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType) && (
           <MusicShowcase 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            tracks={musicTracks}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -714,6 +1178,10 @@ export default function ModernProfilePage() {
           <UpcomingEvents 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            events={upcomingEvents}
+            onAddEvent={openAddEvent}
+            onEditEvent={openEditEvent}
+            onDeleteEvent={deleteEvent}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -724,6 +1192,10 @@ export default function ModernProfilePage() {
           <Merchandise 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            products={merchItems}
+            onAddProduct={openAddMerch}
+            onEditProduct={openEditMerch}
+            onDeleteProduct={deleteMerch}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -732,6 +1204,7 @@ export default function ModernProfilePage() {
         {/* Config-driven section rendering for business info */}
         {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType) && (
           <BusinessInfo 
+            profileId={profile.id}
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
             cardStyle={cardStyle}
@@ -744,6 +1217,10 @@ export default function ModernProfilePage() {
           <Portfolio 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            items={portfolioItems}
+            onAddItem={openAddPortfolio}
+            onEditItem={openEditPortfolio}
+            onDeleteItem={deletePortfolio}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -954,6 +1431,16 @@ export default function ModernProfilePage() {
             borderRadiusClass={borderRadiusClass}
           />
         )}
+
+        {/* Reels Tab (Creator + Streamer: VLOG / Reels <= 60s) */}
+        {activeTab === 'reels' && (
+          <VlogReelsClient
+            profileId={profile.id}
+            isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
+        )}
         
         {/* Photos Tab */}
         {activeTab === 'photos' && (
@@ -966,7 +1453,23 @@ export default function ModernProfilePage() {
         
         {/* Videos Tab */}
         {activeTab === 'videos' && (
-          <TabEmptyState type="videos" isOwner={isOwnProfile} />
+          profile.profile_type === 'musician' ? (
+            <MusicVideos
+              profileId={profile.id}
+              isOwner={isOwnProfile}
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+            />
+          ) : profile.profile_type === 'comedian' ? (
+            <ComedySpecials
+              profileId={profile.id}
+              isOwner={isOwnProfile}
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+            />
+          ) : (
+            <TabEmptyState type="videos" isOwner={isOwnProfile} />
+          )
         )}
         
         {/* Music Tab - Musician-specific (shows MusicShowcase) */}
@@ -974,6 +1477,7 @@ export default function ModernProfilePage() {
           <MusicShowcase 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            tracks={musicTracks}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -984,6 +1488,10 @@ export default function ModernProfilePage() {
           <UpcomingEvents 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            events={upcomingEvents}
+            onAddEvent={openAddEvent}
+            onEditEvent={openEditEvent}
+            onDeleteEvent={deleteEvent}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -994,6 +1502,10 @@ export default function ModernProfilePage() {
           <Portfolio 
             profileType={profile.profile_type as ConfigProfileType}
             isOwner={isOwnProfile}
+            items={portfolioItems}
+            onAddItem={openAddPortfolio}
+            onEditItem={openEditPortfolio}
+            onDeleteItem={deletePortfolio}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
@@ -1024,6 +1536,139 @@ export default function ModernProfilePage() {
           type="friends"
           onClose={() => setShowFriendsModal(false)}
         />
+      )}
+
+      {/* Universal Edit Section Modals */}
+      {isOwnProfile && (
+        <>
+          <SectionEditModal
+            isOpen={trackModalOpen}
+            onClose={() => {
+              setTrackModalOpen(false);
+              setEditingTrack(null);
+            }}
+            title={editingTrack ? 'Edit Track' : 'Add Track'}
+            description="Add a public audio URL and confirm you have rights to share it."
+            initialValues={{
+              title: editingTrack?.title ?? '',
+              artist_name: editingTrack?.artist_name ?? '',
+              audio_url: editingTrack?.audio_url ?? '',
+              cover_art_url: editingTrack?.cover_art_url ?? '',
+              rights_confirmed: true,
+            }}
+            fields={[
+              { key: 'title', label: 'Track Title', type: 'text', required: true },
+              { key: 'artist_name', label: 'Artist Name', type: 'text' },
+              { key: 'audio_url', label: 'Audio URL', type: 'url', required: true, placeholder: 'https://.../track.mp3' },
+              { key: 'cover_art_url', label: 'Cover Art URL (optional)', type: 'url', placeholder: 'https://.../cover.jpg' },
+              {
+                key: 'rights_confirmed',
+                label: 'Rights Confirmation',
+                type: 'checkbox',
+                required: true,
+                checkboxLabel: 'I own the rights or have permission to upload/share this content.',
+              },
+            ]}
+            onSubmit={saveTrack}
+          />
+
+          <SectionEditModal
+            isOpen={eventModalOpen}
+            onClose={() => {
+              setEventModalOpen(false);
+              setEditingEvent(null);
+            }}
+            title={editingEvent ? 'Edit Event' : 'Add Event'}
+            description="Add event details. Start date/time is required."
+            initialValues={{
+              title: editingEvent?.title ?? '',
+              start_at: editingEvent?.date ?? '',
+              end_at: '',
+              location: editingEvent?.location ?? '',
+              url: editingEvent?.ticket_url ?? '',
+              notes: editingEvent?.description ?? '',
+            }}
+            fields={[
+              { key: 'title', label: 'Event Title', type: 'text', required: true },
+              { key: 'start_at', label: 'Start Date/Time', type: 'text', required: true, placeholder: '2026-01-15 20:00:00' },
+              { key: 'end_at', label: 'End Date/Time (optional)', type: 'text', placeholder: '2026-01-15 23:00:00' },
+              { key: 'location', label: 'Location', type: 'text', placeholder: 'Venue, City' },
+              { key: 'url', label: 'Ticket/Event URL', type: 'url', placeholder: 'https://tickets...' },
+              { key: 'notes', label: 'Notes/Description', type: 'textarea' },
+            ]}
+            onSubmit={saveEvent}
+          />
+
+          <SectionEditModal
+            isOpen={merchModalOpen}
+            onClose={() => {
+              setMerchModalOpen(false);
+              setEditingMerch(null);
+            }}
+            title={editingMerch ? 'Edit Merchandise' : 'Add Merchandise'}
+            initialValues={{
+              name: editingMerch?.name ?? '',
+              price: editingMerch?.price ?? '',
+              image_url: editingMerch?.image_url ?? '',
+              buy_url: editingMerch?.buy_url ?? '',
+              description: editingMerch?.description ?? '',
+            }}
+            fields={[
+              { key: 'name', label: 'Product Name', type: 'text', required: true },
+              { key: 'price', label: 'Price', type: 'text', placeholder: '$29.99' },
+              { key: 'image_url', label: 'Image URL', type: 'url', placeholder: 'https://.../image.jpg' },
+              { key: 'buy_url', label: 'Purchase URL', type: 'url', placeholder: 'https://shop...' },
+              { key: 'description', label: 'Description', type: 'textarea' },
+            ]}
+            onSubmit={saveMerch}
+          />
+
+          <SectionEditModal
+            isOpen={portfolioModalOpen}
+            onClose={() => {
+              setPortfolioModalOpen(false);
+              setEditingPortfolio(null);
+            }}
+            title={editingPortfolio ? 'Edit Portfolio Item' : 'Add Portfolio Item'}
+            initialValues={{
+              title: editingPortfolio?.title ?? '',
+              url: editingPortfolio?.url ?? '',
+              image_url: editingPortfolio?.image_url ?? '',
+              description: editingPortfolio?.description ?? '',
+            }}
+            fields={[
+              { key: 'title', label: 'Title', type: 'text', required: true },
+              { key: 'url', label: 'Link URL (optional)', type: 'url', placeholder: 'https://...' },
+              { key: 'image_url', label: 'Image URL (optional)', type: 'url', placeholder: 'https://.../image.jpg' },
+              { key: 'description', label: 'Description', type: 'textarea' },
+            ]}
+            onSubmit={savePortfolio}
+          />
+
+          <SectionEditModal
+            isOpen={scheduleModalOpen}
+            onClose={() => {
+              setScheduleModalOpen(false);
+              setEditingSchedule(null);
+            }}
+            title={editingSchedule ? 'Edit Schedule Item' : 'Add Schedule Item'}
+            initialValues={{
+              title: editingSchedule?.title ?? '',
+              day_of_week: editingSchedule?.day_of_week ?? '',
+              time: editingSchedule?.time ?? '',
+              description: editingSchedule?.description ?? '',
+              recurring: editingSchedule?.recurring === true,
+            }}
+            fields={[
+              { key: 'title', label: 'Title', type: 'text', required: true },
+              { key: 'day_of_week', label: 'Day of Week', type: 'text', placeholder: 'e.g. Monday' },
+              { key: 'time', label: 'Time', type: 'text', placeholder: 'e.g. 8:00 PM EST' },
+              { key: 'description', label: 'Description', type: 'textarea' },
+              { key: 'recurring', label: 'Recurring', type: 'checkbox', checkboxLabel: 'This schedule repeats weekly.' },
+            ]}
+            onSubmit={saveSchedule}
+          />
+        </>
       )}
     </div>
   );

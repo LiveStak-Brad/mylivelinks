@@ -29,7 +29,29 @@ import {
   isSectionEnabled,
   type ProfileType 
 } from '../config/profileTypeConfig';
-import { AudioPlaylistPlayer, type ProfileMusicTrack } from '../components/profile';
+import {
+  FeaturedSection,
+  type FeaturedItem,
+  ScheduleSection,
+  type ScheduleItem,
+  ClipsSection,
+  type ClipItem,
+  MusicSection,
+  type MusicItem,
+  ShowsSection,
+  type ShowItem,
+  MerchSection,
+  type MerchItem,
+  ProductsOrServicesSection,
+  type ProductOrServiceItem,
+  AudioPlaylistPlayer,
+  type ProfileMusicTrack,
+  MusicVideosSection,
+  type MusicVideoItem,
+  ComedySpecialsSection,
+  type ComedySpecialItem,
+} from '../components/profile';
+import { SectionEditModal } from '../components/profile/SectionEditModal';
 
 type BusinessRow = {
   profile_id: string;
@@ -41,14 +63,6 @@ type BusinessRow = {
   hours: any | null;
   updated_at: string;
 };
-
-type EditableBusinessField =
-  | 'business_description'
-  | 'website_url'
-  | 'contact_email'
-  | 'contact_phone'
-  | 'location_or_service_area'
-  | 'hours';
 
 /* =============================================================================
    PROFILE SCREEN v2 - FULL VISUAL PARITY WITH WEB
@@ -166,7 +180,7 @@ interface ProfileData {
 }
 
 type ConnectionsTab = 'following' | 'followers' | 'friends';
-type ProfileTab = 'info' | 'feed' | 'photos' | 'videos' | 'music' | 'events' | 'products';
+type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products';
 
 type ProfileScreenProps = {
   /** The username to display */
@@ -264,15 +278,59 @@ export function ProfileScreen({
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
 
-  // Musician: local UI state for playlist player (persistence wired later)
-  const [musicTracks, setMusicTracks] = useState<ProfileMusicTrack[]>([]);
+  // Musician: real DB-backed tracks via RPC get_music_tracks / upsert_music_track
+  type DbMusicTrack = {
+    id: string;
+    title: string;
+    artist_name?: string | null;
+    audio_url: string;
+    cover_art_url?: string | null;
+    rights_confirmed?: boolean | null;
+  };
+  const [musicTracks, setMusicTracks] = useState<DbMusicTrack[]>([]);
+  const [musicTracksLoading, setMusicTracksLoading] = useState(false);
+
+  // Blocks-backed sections (profile_content_blocks via /api/profile/[username]/bundle)
+  const [shows, setShows] = useState<ShowItem[]>([]);
+  const [clips, setClips] = useState<ClipItem[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+  const [featured, setFeatured] = useState<FeaturedItem[]>([]);
+  const [merch, setMerch] = useState<MerchItem[]>([]);
+  const [products, setProducts] = useState<ProductOrServiceItem[]>([]);
+  const [blocksLoading, setBlocksLoading] = useState(false);
+  const [modulesReloadNonce, setModulesReloadNonce] = useState(0);
+
+  // Universal section edit modals (mobile)
+  const [trackModalVisible, setTrackModalVisible] = useState(false);
+  const [editingTrack, setEditingTrack] = useState<DbMusicTrack | null>(null);
+
+  const [showModalVisible, setShowModalVisible] = useState(false);
+  const [editingShow, setEditingShow] = useState<ShowItem | null>(null);
+
+  const [merchModalVisible, setMerchModalVisible] = useState(false);
+  const [editingMerch, setEditingMerch] = useState<MerchItem | null>(null);
+
+  const [productModalVisible, setProductModalVisible] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductOrServiceItem | null>(null);
+
+  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
+
+  const [featuredModalVisible, setFeaturedModalVisible] = useState(false);
+  const [editingFeatured, setEditingFeatured] = useState<FeaturedItem | null>(null);
+
+  // Musician: music videos (real data via profile type modules)
+  const [musicVideos, setMusicVideos] = useState<MusicVideoItem[]>([]);
+  const [musicVideosLoading, setMusicVideosLoading] = useState(false);
+
+  // Comedian: comedy specials (real data via profile type modules)
+  const [comedySpecials, setComedySpecials] = useState<ComedySpecialItem[]>([]);
+  const [comedySpecialsLoading, setComedySpecialsLoading] = useState(false);
 
   // Business profile module (real data, no mock)
   const [business, setBusiness] = useState<BusinessRow | null>(null);
   const [businessLoading, setBusinessLoading] = useState(false);
-  const [businessEditField, setBusinessEditField] = useState<EditableBusinessField | null>(null);
-  const [businessEditValue, setBusinessEditValue] = useState('');
-  const [businessSaving, setBusinessSaving] = useState(false);
+  const [businessModalVisible, setBusinessModalVisible] = useState(false);
 
   const canPost = (composerText.trim().length > 0 || !!mediaUrl) && !composerLoading && !mediaUploading;
 
@@ -342,57 +400,295 @@ export function ProfileScreen({
     }
   }, []);
 
-  const openBusinessEdit = useCallback(
-    (field: EditableBusinessField) => {
-      setBusinessEditField(field);
-      if (field === 'hours') setBusinessEditValue(hoursText || '');
-      else setBusinessEditValue(((business as any)?.[field] as string | null) ?? '');
-    },
-    [business, hoursText]
-  );
-
-  const closeBusinessEdit = useCallback(() => {
-    if (businessSaving) return;
-    setBusinessEditField(null);
-    setBusinessEditValue('');
-  }, [businessSaving]);
-
-  const buildFullBusinessPayload = useCallback(
-    (patch: Partial<Record<EditableBusinessField, any>>) => {
-      const b = business;
-      return {
-        business_description: patch.business_description ?? (b?.business_description ?? ''),
-        website_url: patch.website_url ?? (b?.website_url ?? ''),
-        contact_email: patch.contact_email ?? (b?.contact_email ?? ''),
-        contact_phone: patch.contact_phone ?? (b?.contact_phone ?? ''),
-        location_or_service_area: patch.location_or_service_area ?? (b?.location_or_service_area ?? ''),
-        hours: patch.hours !== undefined ? patch.hours : b?.hours ?? null,
-      };
-    },
-    [business]
-  );
-
-  const saveBusinessEdit = useCallback(async () => {
-    if (!businessEditField) return;
+  const loadMusicTracks = useCallback(async (profileId: string) => {
+    setMusicTracksLoading(true);
     try {
-      setBusinessSaving(true);
-      const trimmed = businessEditValue.trim();
-      const patch: Partial<Record<EditableBusinessField, any>> = {};
-      if (businessEditField === 'hours') patch.hours = trimmed ? { text: trimmed } : null;
-      else patch[businessEditField] = trimmed;
-
-      const payload = buildFullBusinessPayload(patch);
-      const { data, error } = await supabase.rpc('upsert_business', { p_payload: payload });
+      const { data, error } = await supabase.rpc('get_music_tracks', { p_profile_id: profileId });
       if (error) {
-        Alert.alert('Save failed', error.message || 'Failed to save business info.');
+        console.log('[Music] Failed to load tracks:', error.message);
+        setMusicTracks([]);
         return;
       }
-      setBusiness((data as any) ?? null);
-      closeBusinessEdit();
+      const rows = Array.isArray(data) ? (data as any[]) : [];
+      setMusicTracks(
+        rows.map((r) => ({
+          id: String((r as any)?.id ?? ''),
+          title: String((r as any)?.title ?? ''),
+          artist_name: (r as any)?.artist_name ?? null,
+          audio_url: String((r as any)?.audio_url ?? ''),
+          cover_art_url: (r as any)?.cover_art_url ?? null,
+          rights_confirmed: (r as any)?.rights_confirmed ?? null,
+        }))
+      );
     } finally {
-      setBusinessSaving(false);
+      setMusicTracksLoading(false);
     }
-  }, [businessEditField, businessEditValue, buildFullBusinessPayload, closeBusinessEdit]);
+  }, []);
+
+  const loadBlocksBundle = useCallback(
+    async (uname: string) => {
+      setBlocksLoading(true);
+      try {
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+        const res = await fetch(`${apiBaseUrl}/api/profile/${encodeURIComponent(uname)}/bundle`, { headers });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json || json.error) {
+          setShows([]);
+          setMerch([]);
+          setProducts([]);
+          setSchedule([]);
+          setFeatured([]);
+          setClips([]);
+          return;
+        }
+
+        const blocks = (json as any)?.blocks ?? {};
+        const getByType = (t: string): any[] => {
+          const arr = blocks?.blocks_by_type?.[t];
+          if (Array.isArray(arr)) return arr;
+          const direct = blocks?.[t];
+          return Array.isArray(direct) ? direct : [];
+        };
+
+        const merchBlocks = getByType('merch');
+        const productBlocks = getByType('product');
+        const serviceBlocks = getByType('service');
+        const scheduleBlocks = getByType('schedule_item');
+        const featuredBlocks = getByType('featured_link');
+        const clipBlocks = getByType('clip');
+
+        // Load shows/events from dedicated profile_events table
+        try {
+          const { data: eventsData, error: eventsError } = await supabase.rpc('get_profile_events', {
+            p_profile_id: profileId,
+          });
+          if (!cancelled) {
+            if (eventsError) {
+              console.error('[Mobile] get_profile_events failed:', eventsError);
+              setShows([]);
+            } else {
+              const rows = Array.isArray(eventsData) ? eventsData : [];
+              setShows(
+                rows.map((r: any) => ({
+                  id: String(r.id),
+                  title: String(r.title ?? ''),
+                  venue: undefined, // not in new schema
+                  location: r.location ?? undefined,
+                  date: r.start_at ? new Date(r.start_at).toLocaleDateString() : undefined,
+                  time: r.start_at ? new Date(r.start_at).toLocaleTimeString() : undefined,
+                  poster_url: undefined, // not in new schema
+                  ticket_link: r.url ?? undefined,
+                  status: 'upcoming',
+                }))
+              );
+            }
+          }
+        } catch (e) {
+          if (!cancelled) setShows([]);
+        }
+
+        setMerch(
+          merchBlocks.map((b) => ({
+            id: String((b as any).id),
+            name: String((b as any).title ?? ''),
+            description: (b as any)?.metadata?.description ?? undefined,
+            price: (b as any)?.metadata?.price ?? undefined,
+            image_url: (b as any)?.metadata?.image_url ?? undefined,
+            buy_url: (b as any).url ?? undefined,
+          }))
+        );
+
+        const mergedProducts = [...productBlocks, ...serviceBlocks];
+        setProducts(
+          mergedProducts.map((b) => ({
+            id: String((b as any).id),
+            name: String((b as any).title ?? ''),
+            description: (b as any)?.metadata?.description ?? undefined,
+            price: (b as any)?.metadata?.price ?? undefined,
+            image_url: (b as any)?.metadata?.image_url ?? undefined,
+            category: (b as any)?.metadata?.category ?? undefined,
+            link: (b as any).url ?? undefined,
+            availability: (b as any)?.metadata?.availability ?? 'available',
+          }))
+        );
+
+        setSchedule(
+          scheduleBlocks.map((b) => ({
+            id: String((b as any).id),
+            title: String((b as any).title ?? ''),
+            day_of_week: (b as any)?.metadata?.day_of_week ?? undefined,
+            time: (b as any)?.metadata?.time ?? undefined,
+            description: (b as any)?.metadata?.description ?? undefined,
+            recurring: (b as any)?.metadata?.recurring ?? undefined,
+          }))
+        );
+
+        setFeatured(
+          featuredBlocks.map((b) => ({
+            id: String((b as any).id),
+            title: String((b as any).title ?? ''),
+            description: (b as any)?.metadata?.description ?? undefined,
+            thumbnail_url: (b as any)?.metadata?.thumbnail_url ?? undefined,
+            type: 'link',
+          }))
+        );
+
+        setClips(
+          clipBlocks.map((b) => ({
+            id: String((b as any).id),
+            title: String((b as any).title ?? ''),
+            thumbnail_url: (b as any)?.metadata?.thumbnail_url ?? undefined,
+            duration: (b as any)?.metadata?.duration ?? undefined,
+            views: (b as any)?.metadata?.views ?? undefined,
+            created_at: (b as any)?.created_at ?? undefined,
+          }))
+        );
+      } finally {
+        setBlocksLoading(false);
+      }
+    },
+    [apiBaseUrl, authToken]
+  );
+
+  const requireOwner = useCallback(() => {
+    if (!isOwnProfile) {
+      Alert.alert('Owner only', 'Only the profile owner can edit this section.');
+      return false;
+    }
+    return true;
+  }, [isOwnProfile]);
+
+  const deleteBlock = useCallback(async (id: string) => {
+    if (!requireOwner()) return;
+    const { error } = await supabase.rpc('delete_profile_block', { p_id: Number(id) });
+    if (error) throw error;
+    setModulesReloadNonce((n) => n + 1);
+  }, [requireOwner]);
+
+  // Track CRUD
+  const saveTrack = useCallback(async (values: any) => {
+    if (!requireOwner()) return;
+    const payload = {
+      title: String(values.title ?? ''),
+      artist_name: String(values.artist_name ?? ''),
+      audio_url: String(values.audio_url ?? ''),
+      cover_art_url: String(values.cover_art_url ?? ''),
+      rights_confirmed: values.rights_confirmed === true,
+    };
+    const { error } = await supabase.rpc('upsert_music_track', {
+      p_id: editingTrack?.id ?? null,
+      p_payload: payload,
+    });
+    if (error) throw error;
+    setModulesReloadNonce((n) => n + 1);
+  }, [editingTrack?.id, requireOwner]);
+
+  const deleteTrack = useCallback(async (id: string) => {
+    if (!requireOwner()) return;
+    const { error } = await supabase.rpc('delete_music_track', { p_id: id });
+    if (error) throw error;
+    setModulesReloadNonce((n) => n + 1);
+  }, [requireOwner]);
+
+  // Event CRUD (new dedicated profile_events table)
+  const saveEvent = useCallback(async (values: any) => {
+    if (!requireOwner()) return;
+    const title = String(values.title ?? '').trim();
+    const startAt = String(values.start_at ?? '').trim();
+    const endAt = String(values.end_at ?? '').trim();
+    const location = String(values.location ?? '').trim();
+    const url = String(values.url ?? '').trim();
+    const notes = String(values.notes ?? '').trim();
+
+    if (!startAt) {
+      Alert.alert('Error', 'Start date/time is required.');
+      return;
+    }
+
+    const payload: any = {
+      title: title || null,
+      start_at: startAt,
+      location: location || null,
+      url: url || null,
+      notes: notes || null,
+      sort_order: shows.length,
+    };
+
+    if (endAt) {
+      payload.end_at = endAt;
+    }
+
+    if (editingShow?.id) {
+      payload.id = editingShow.id;
+    }
+
+    const { error } = await supabase.rpc('upsert_profile_event', { p_event: payload });
+    if (error) throw error;
+    setModulesReloadNonce((n) => n + 1);
+  }, [editingShow?.id, requireOwner, shows.length]);
+
+  const deleteEvent = useCallback(async (id: string) => {
+    if (!requireOwner()) return;
+    const { error } = await supabase.rpc('delete_profile_event', { p_event_id: id });
+    if (error) throw error;
+    setModulesReloadNonce((n) => n + 1);
+  }, [requireOwner]);
+
+  // Generic content block upsert
+  const saveBlock = useCallback(
+    async (blockType: string, id: string | null, title: string, url: string | null, metadata: any, sortOrder: number) => {
+      if (!requireOwner()) return;
+      if (id) {
+        const { error } = await supabase.rpc('update_profile_block', {
+          p_id: Number(id),
+          p_title: title,
+          p_url: url,
+          p_metadata: metadata,
+          p_sort_order: sortOrder,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.rpc('add_profile_block', {
+          p_block_type: blockType,
+          p_title: title,
+          p_url: url,
+          p_metadata: metadata,
+          p_sort_order: sortOrder,
+        });
+        if (error) throw error;
+      }
+      setModulesReloadNonce((n) => n + 1);
+    },
+    [requireOwner]
+  );
+
+  const openBusinessModal = useCallback(() => {
+    if (!requireOwner()) return;
+    setBusinessModalVisible(true);
+  }, [requireOwner]);
+
+  const saveBusiness = useCallback(
+    async (values: Record<string, any>) => {
+      if (!requireOwner()) return;
+      const payload = {
+        business_description: String(values.business_description ?? '').trim(),
+        website_url: String(values.website_url ?? '').trim(),
+        contact_email: String(values.contact_email ?? '').trim(),
+        contact_phone: String(values.contact_phone ?? '').trim(),
+        location_or_service_area: String(values.location_or_service_area ?? '').trim(),
+        hours: String(values.hours_text ?? '').trim()
+          ? { text: String(values.hours_text ?? '').trim() }
+          : null,
+      };
+
+      const { data, error } = await supabase.rpc('upsert_business', { p_payload: payload });
+      if (error) throw error;
+      setBusiness((data as any) ?? null);
+    },
+    [requireOwner]
+  );
 
   const loadProfile = useCallback(async () => {
     try {
@@ -422,6 +718,60 @@ export function ProfileScreen({
       }
 
       setProfileData(data);
+
+      // Load Music Videos module for musicians (public viewable, owner writable)
+      try {
+        const p = data?.profile as any;
+        const pid = typeof p?.id === 'string' ? p.id : null;
+        const ptype = String(p?.profile_type || 'default');
+        if (pid && ptype === 'musician') {
+          setMusicVideosLoading(true);
+          const { data: list, error: listErr } = await supabase.rpc('get_music_videos', { p_profile_id: pid });
+          if (listErr) {
+            console.log('[MusicVideos] load failed:', listErr.message);
+            setMusicVideos([]);
+          } else {
+            const next = (Array.isArray(list) ? list : []).map((r: any) => ({
+              id: String(r.id),
+              title: String(r.title || ''),
+              video_type: r.video_type as any,
+              video_url: String(r.video_url || ''),
+              youtube_id: r.youtube_id ?? null,
+            })) as MusicVideoItem[];
+            setMusicVideos(next);
+          }
+        } else {
+          setMusicVideos([]);
+        }
+
+        if (pid && ptype === 'comedian') {
+          setComedySpecialsLoading(true);
+          const { data: list, error: listErr } = await supabase.rpc('get_comedy_specials', { p_profile_id: pid });
+          if (listErr) {
+            console.log('[ComedySpecials] load failed:', listErr.message);
+            setComedySpecials([]);
+          } else {
+            const next = (Array.isArray(list) ? list : []).map((r: any) => ({
+              id: String(r.id),
+              title: String(r.title || ''),
+              description: r.description ?? null,
+              video_type: r.video_type as any,
+              video_url: String(r.video_url || ''),
+              youtube_id: r.youtube_id ?? null,
+            })) as ComedySpecialItem[];
+            setComedySpecials(next);
+          }
+        } else {
+          setComedySpecials([]);
+        }
+      } catch (e) {
+        console.log('[MusicVideos] load exception');
+        setMusicVideos([]);
+        setComedySpecials([]);
+      } finally {
+        setMusicVideosLoading(false);
+        setComedySpecialsLoading(false);
+      }
     } catch (err: any) {
       console.error('Profile load error:', err);
       setError(err.message || 'Failed to load profile');
@@ -803,7 +1153,23 @@ export function ProfileScreen({
     if (!pid) return;
     if (pt !== 'business') return;
     loadBusiness(pid);
-  }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadBusiness]);
+  }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadBusiness, modulesReloadNonce]);
+
+  // Load musician tracks (musician only)
+  useEffect(() => {
+    const pid = profileData?.profile?.id;
+    const pt = profileData?.profile?.profile_type || 'default';
+    if (!pid) return;
+    if (pt !== 'musician') return;
+    loadMusicTracks(pid);
+  }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadMusicTracks, modulesReloadNonce]);
+
+  // Load content blocks bundle (events/merch/products/schedule/featured/clips)
+  useEffect(() => {
+    const uname = profileData?.profile?.username;
+    if (!uname) return;
+    loadBlocksBundle(uname);
+  }, [profileData?.profile?.username, loadBlocksBundle, modulesReloadNonce]);
   
   const gifterStatus = profileData.gifter_statuses?.[profile.id];
   const gifterLevelDisplay =
@@ -1031,7 +1397,7 @@ export function ProfileScreen({
         {activeTab === 'info' && (
           <>
             {/* BUSINESS INFO (Business profile type) */}
-            {isSectionEnabled('business_info', profileType as any) && (
+            {isSectionEnabled('business_info', profileType as any) && (isOwnProfile || businessLoading || hasAnyBusinessInfo) && (
               <View style={[styles.card, customCardStyle]}>
                 <View style={styles.businessHeaderRow}>
                   <View style={styles.businessTitleRow}>
@@ -1039,71 +1405,27 @@ export function ProfileScreen({
                     <Text style={styles.cardTitle}>💼 Business Info</Text>
                   </View>
                   {isOwnProfile && (
-                    <Pressable onPress={() => openBusinessEdit('business_description')}>
+                    <Pressable onPress={openBusinessModal}>
                       <Text style={[styles.businessEditLink, { color: accentColor }]}>Edit</Text>
                     </Pressable>
                   )}
                 </View>
 
                 {!businessLoading && !hasAnyBusinessInfo ? (
-                  isOwnProfile ? (
-                    <View style={{ gap: 10 }}>
-                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('business_description')}>
-                        <Text style={styles.businessPromptText}>Add Business Description (Edit)</Text>
-                      </Pressable>
-                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('website_url')}>
-                        <Text style={styles.businessPromptText}>Add Business Website</Text>
-                      </Pressable>
-                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('contact_email')}>
-                        <Text style={styles.businessPromptText}>Add Business Email</Text>
-                      </Pressable>
-                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('contact_phone')}>
-                        <Text style={styles.businessPromptText}>Add Business Phone Number</Text>
-                      </Pressable>
-                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('location_or_service_area')}>
-                        <Text style={styles.businessPromptText}>Add Location/Service Area</Text>
-                      </Pressable>
-                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('hours')}>
-                        <Text style={styles.businessPromptText}>Add Hours (optional)</Text>
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <View style={{ paddingTop: 6 }}>
-                      <Text style={styles.businessEmptyTitle}>No business info yet</Text>
-                      <View style={{ gap: 10, marginTop: 12 }}>
-                        <View style={styles.businessPlaceholderRow}>
-                          <Text style={styles.businessPlaceholderLabel}>Business Description</Text>
-                          <Text style={styles.businessPlaceholderValue}>—</Text>
-                        </View>
-                        <View style={styles.businessPlaceholderRow}>
-                          <Text style={styles.businessPlaceholderLabel}>Business Website</Text>
-                          <Text style={styles.businessPlaceholderValue}>—</Text>
-                        </View>
-                        <View style={styles.businessPlaceholderRow}>
-                          <Text style={styles.businessPlaceholderLabel}>Business Email</Text>
-                          <Text style={styles.businessPlaceholderValue}>—</Text>
-                        </View>
-                        <View style={styles.businessPlaceholderRow}>
-                          <Text style={styles.businessPlaceholderLabel}>Business Phone Number</Text>
-                          <Text style={styles.businessPlaceholderValue}>—</Text>
-                        </View>
-                        <View style={styles.businessPlaceholderRow}>
-                          <Text style={styles.businessPlaceholderLabel}>Location/Service Area</Text>
-                          <Text style={styles.businessPlaceholderValue}>—</Text>
-                        </View>
-                        <View style={styles.businessPlaceholderRow}>
-                          <Text style={styles.businessPlaceholderLabel}>Hours</Text>
-                          <Text style={styles.businessPlaceholderValue}>—</Text>
-                        </View>
-                      </View>
-                    </View>
-                  )
+                  <View style={{ gap: 10 }}>
+                    <Pressable style={styles.businessPromptRow} onPress={openBusinessModal}>
+                      <Text style={styles.businessPromptText}>Add Business Description (Edit)</Text>
+                    </Pressable>
+                    <Pressable style={styles.businessPromptRow} onPress={openBusinessModal}>
+                      <Text style={styles.businessPromptText}>Add Website / Email / Phone / Location/Service Area</Text>
+                    </Pressable>
+                  </View>
                 ) : (
                   <View style={{ gap: 14 }}>
                     {!!business?.business_description?.trim() && (
                       <Pressable
                         disabled={!isOwnProfile}
-                        onPress={() => openBusinessEdit('business_description')}
+                        onPress={openBusinessModal}
                         style={styles.businessBlock}
                       >
                         <Text style={styles.businessBlockLabel}>Business Description</Text>
@@ -1114,7 +1436,7 @@ export function ProfileScreen({
                     {!!hoursText.trim() && (
                       <Pressable
                         disabled={!isOwnProfile}
-                        onPress={() => openBusinessEdit('hours')}
+                        onPress={openBusinessModal}
                         style={styles.businessLineRow}
                       >
                         <Ionicons name="time-outline" size={18} color={theme.colors.textMuted} />
@@ -1128,7 +1450,7 @@ export function ProfileScreen({
                     {!!business?.location_or_service_area?.trim() && (
                       <Pressable
                         disabled={!isOwnProfile}
-                        onPress={() => openBusinessEdit('location_or_service_area')}
+                        onPress={openBusinessModal}
                         style={styles.businessLineRow}
                       >
                         <Ionicons name="location-outline" size={18} color={theme.colors.textMuted} />
@@ -1143,7 +1465,7 @@ export function ProfileScreen({
 
                     {!!business?.website_url?.trim() && (
                       <Pressable
-                        onPress={() => (isOwnProfile ? openBusinessEdit('website_url') : Linking.openURL(business.website_url!))}
+                        onPress={() => (isOwnProfile ? openBusinessModal() : Linking.openURL(business.website_url!))}
                         style={styles.businessLineRow}
                       >
                         <Ionicons name="globe-outline" size={18} color={theme.colors.textMuted} />
@@ -1156,7 +1478,7 @@ export function ProfileScreen({
                     {!!business?.contact_email?.trim() && (
                       <Pressable
                         onPress={() =>
-                          isOwnProfile ? openBusinessEdit('contact_email') : Linking.openURL(`mailto:${business.contact_email}`)
+                          isOwnProfile ? openBusinessModal() : Linking.openURL(`mailto:${business.contact_email}`)
                         }
                         style={styles.businessLineRow}
                       >
@@ -1170,7 +1492,7 @@ export function ProfileScreen({
                     {!!business?.contact_phone?.trim() && (
                       <Pressable
                         onPress={() =>
-                          isOwnProfile ? openBusinessEdit('contact_phone') : Linking.openURL(`tel:${business.contact_phone}`)
+                          isOwnProfile ? openBusinessModal() : Linking.openURL(`tel:${business.contact_phone}`)
                         }
                         style={styles.businessLineRow}
                       >
@@ -1182,69 +1504,438 @@ export function ProfileScreen({
                     )}
                   </View>
                 )}
-
-                <Modal visible={!!businessEditField} onRequestClose={closeBusinessEdit}>
-                  <View style={{ gap: 12 }}>
-                    <Text style={styles.modalTitle}>
-                      {businessEditField === 'business_description'
-                        ? 'Business Description'
-                        : businessEditField === 'website_url'
-                          ? 'Business Website'
-                          : businessEditField === 'contact_email'
-                            ? 'Business Email'
-                            : businessEditField === 'contact_phone'
-                              ? 'Business Phone Number'
-                              : businessEditField === 'location_or_service_area'
-                                ? 'Location/Service Area'
-                                : businessEditField === 'hours'
-                                  ? 'Hours (optional)'
-                                  : 'Edit'}
-                    </Text>
-
-                    {businessEditField === 'business_description' ? (
-                      <Input
-                        value={businessEditValue}
-                        onChangeText={setBusinessEditValue}
-                        placeholder="Tell visitors what your business does…"
-                        multiline
-                        style={{ height: 120, textAlignVertical: 'top', paddingTop: 12 }}
-                      />
-                    ) : (
-                      <Input
-                        value={businessEditValue}
-                        onChangeText={setBusinessEditValue}
-                        placeholder={
-                          businessEditField === 'website_url'
-                            ? 'https://yourbusiness.com'
-                            : businessEditField === 'contact_email'
-                              ? 'hello@yourbusiness.com'
-                              : businessEditField === 'contact_phone'
-                                ? '+1 (555) 123-4567'
-                                : businessEditField === 'location_or_service_area'
-                                  ? 'City, State or Remote'
-                                  : businessEditField === 'hours'
-                                    ? 'Mon–Fri 9am–5pm'
-                                    : ''
-                        }
-                        keyboardType={
-                          businessEditField === 'contact_email'
-                            ? 'email-address'
-                            : businessEditField === 'contact_phone'
-                              ? 'phone-pad'
-                              : businessEditField === 'website_url'
-                                ? 'url'
-                                : 'default'
-                        }
-                      />
-                    )}
-
-                    <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
-                      <Button title="Cancel" onPress={closeBusinessEdit} variant="secondary" disabled={businessSaving} />
-                      <Button title={businessSaving ? 'Saving…' : 'Save'} onPress={saveBusinessEdit} loading={businessSaving} />
-                    </View>
-                  </View>
-                </Modal>
+                {isOwnProfile && (
+                  <SectionEditModal
+                    visible={businessModalVisible}
+                    title="Edit Business Info"
+                    description="Visitors only see what you fill in."
+                    onClose={() => setBusinessModalVisible(false)}
+                    initialValues={{
+                      business_description: business?.business_description ?? '',
+                      website_url: business?.website_url ?? '',
+                      contact_email: business?.contact_email ?? '',
+                      contact_phone: business?.contact_phone ?? '',
+                      location_or_service_area: business?.location_or_service_area ?? '',
+                      hours_text: hoursText ?? '',
+                    }}
+                    fields={[
+                      { key: 'business_description', label: 'Business Description', type: 'textarea' },
+                      { key: 'website_url', label: 'Website', type: 'url', placeholder: 'https://yourbusiness.com' },
+                      { key: 'contact_email', label: 'Email', type: 'email', placeholder: 'hello@yourbusiness.com' },
+                      { key: 'contact_phone', label: 'Phone', type: 'phone', placeholder: '+1 555-123-4567' },
+                      { key: 'location_or_service_area', label: 'Location / Service Area', type: 'text' },
+                      { key: 'hours_text', label: 'Hours (optional)', type: 'textarea', placeholder: 'Mon–Fri 9am–6pm' },
+                    ]}
+                    onSubmit={saveBusiness}
+                  />
+                )}
               </View>
+            )}
+
+            {/* FEATURED (Creator) */}
+            {profileType === 'creator' && (
+              <FeaturedSection
+                items={featured}
+                isOwner={isOwnProfile}
+                onAdd={() => {
+                  if (!requireOwner()) return;
+                  setEditingFeatured(null);
+                  setFeaturedModalVisible(true);
+                }}
+                onEdit={(it) => {
+                  if (!requireOwner()) return;
+                  setEditingFeatured(it);
+                  setFeaturedModalVisible(true);
+                }}
+                onDelete={(id) => {
+                  if (!requireOwner()) return;
+                  Alert.alert('Delete featured item?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        void deleteBlock(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
+                      },
+                    },
+                  ]);
+                }}
+                cardOpacity={cardOpacity}
+              />
+            )}
+
+            {/* STREAM SCHEDULE (Streamer) */}
+            {profileType === 'streamer' && (
+              <ScheduleSection
+                items={schedule}
+                isOwner={isOwnProfile}
+                onAdd={() => {
+                  if (!requireOwner()) return;
+                  setEditingSchedule(null);
+                  setScheduleModalVisible(true);
+                }}
+                onEdit={(it) => {
+                  if (!requireOwner()) return;
+                  setEditingSchedule(it);
+                  setScheduleModalVisible(true);
+                }}
+                onDelete={(id) => {
+                  if (!requireOwner()) return;
+                  Alert.alert('Delete schedule item?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        void deleteBlock(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
+                      },
+                    },
+                  ]);
+                }}
+                cardOpacity={cardOpacity}
+              />
+            )}
+
+            {/* MUSIC SHOWCASE (Musician) */}
+            {isSectionEnabled('music_showcase', profileType) && (
+              <MusicSection
+                items={musicTracks.map((t) => ({
+                  id: t.id,
+                  title: t.title,
+                  artist: t.artist_name ?? undefined,
+                  cover_url: t.cover_art_url ?? undefined,
+                }))}
+                isOwner={isOwnProfile}
+                onAdd={() => {
+                  if (!requireOwner()) return;
+                  setEditingTrack(null);
+                  setTrackModalVisible(true);
+                }}
+                onEdit={(it) => {
+                  if (!requireOwner()) return;
+                  const t = musicTracks.find((x) => x.id === it.id) ?? null;
+                  setEditingTrack(t);
+                  setTrackModalVisible(true);
+                }}
+                onDelete={(id) => {
+                  if (!requireOwner()) return;
+                  Alert.alert('Delete track?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        void deleteTrack(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
+                      },
+                    },
+                  ]);
+                }}
+                onPlay={(it) => {
+                  const t = musicTracks.find((x) => x.id === it.id);
+                  const url = t?.audio_url;
+                  if (url) void Linking.openURL(url);
+                }}
+                cardOpacity={cardOpacity}
+              />
+            )}
+
+            {/* UPCOMING EVENTS / SHOWS (Musician + Comedian) */}
+            {isSectionEnabled('upcoming_events', profileType) && (
+              <ShowsSection
+                items={shows}
+                isOwner={isOwnProfile}
+                onAdd={() => {
+                  if (!requireOwner()) return;
+                  setEditingShow(null);
+                  setShowModalVisible(true);
+                }}
+                onEdit={(it) => {
+                  if (!requireOwner()) return;
+                  setEditingShow(it);
+                  setShowModalVisible(true);
+                }}
+                onDelete={(id) => {
+                  if (!requireOwner()) return;
+                  Alert.alert('Delete event?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        void deleteEvent(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
+                      },
+                    },
+                  ]);
+                }}
+                onGetTickets={(it) => {
+                  if (it.ticket_link) void Linking.openURL(it.ticket_link);
+                }}
+                cardOpacity={cardOpacity}
+              />
+            )}
+
+            {/* MERCHANDISE (Musician + Comedian) */}
+            {isSectionEnabled('merchandise', profileType) && (
+              <MerchSection
+                items={merch}
+                isOwner={isOwnProfile}
+                onAdd={() => {
+                  if (!requireOwner()) return;
+                  setEditingMerch(null);
+                  setMerchModalVisible(true);
+                }}
+                onEdit={(it) => {
+                  if (!requireOwner()) return;
+                  setEditingMerch(it);
+                  setMerchModalVisible(true);
+                }}
+                onDelete={(id) => {
+                  if (!requireOwner()) return;
+                  Alert.alert('Delete merch item?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        void deleteBlock(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
+                      },
+                    },
+                  ]);
+                }}
+                cardOpacity={cardOpacity}
+              />
+            )}
+
+            {/* PORTFOLIO / PRODUCTS (Business + Creator) */}
+            {isSectionEnabled('portfolio', profileType) && (
+              <ProductsOrServicesSection
+                items={products}
+                isOwner={isOwnProfile}
+                onAdd={() => {
+                  if (!requireOwner()) return;
+                  setEditingProduct(null);
+                  setProductModalVisible(true);
+                }}
+                onEdit={(it) => {
+                  if (!requireOwner()) return;
+                  setEditingProduct(it);
+                  setProductModalVisible(true);
+                }}
+                onDelete={(id) => {
+                  if (!requireOwner()) return;
+                  Alert.alert('Delete item?', 'This cannot be undone.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        void deleteBlock(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
+                      },
+                    },
+                  ]);
+                }}
+                onViewDetails={(it) => {
+                  if (it.link) void Linking.openURL(it.link);
+                }}
+                cardOpacity={cardOpacity}
+              />
+            )}
+
+            {/* UNIVERSAL EDIT MODALS (owner only) */}
+            {isOwnProfile && (
+              <>
+                <SectionEditModal
+                  visible={trackModalVisible}
+                  title={editingTrack ? 'Edit Track' : 'Add Track'}
+                  description="Add a public audio URL and confirm you have rights to share it."
+                  onClose={() => {
+                    setTrackModalVisible(false);
+                    setEditingTrack(null);
+                  }}
+                  initialValues={{
+                    title: editingTrack?.title ?? '',
+                    artist_name: editingTrack?.artist_name ?? '',
+                    audio_url: editingTrack?.audio_url ?? '',
+                    cover_art_url: editingTrack?.cover_art_url ?? '',
+                    rights_confirmed: true,
+                  }}
+                  fields={[
+                    { key: 'title', label: 'Track Title', type: 'text', required: true },
+                    { key: 'artist_name', label: 'Artist Name', type: 'text' },
+                    { key: 'audio_url', label: 'Audio URL', type: 'url', required: true },
+                    { key: 'cover_art_url', label: 'Cover Art URL (optional)', type: 'url' },
+                    {
+                      key: 'rights_confirmed',
+                      label: 'Rights Confirmation',
+                      type: 'checkbox',
+                      required: true,
+                      checkboxLabel: 'I own the rights or have permission to upload/share this content.',
+                    },
+                  ]}
+                  onSubmit={async (vals) => {
+                    await saveTrack(vals);
+                  }}
+                />
+
+                <SectionEditModal
+                  visible={showModalVisible}
+                  title={editingShow ? 'Edit Event' : 'Add Event'}
+                  onClose={() => {
+                    setShowModalVisible(false);
+                    setEditingShow(null);
+                  }}
+                  initialValues={{
+                    title: editingShow?.title ?? '',
+                    start_at: '',
+                    end_at: '',
+                    location: editingShow?.location ?? '',
+                    url: editingShow?.ticket_link ?? '',
+                    notes: (editingShow as any)?.description ?? '',
+                  }}
+                  fields={[
+                    { key: 'title', label: 'Event Title', type: 'text', required: true },
+                    { key: 'start_at', label: 'Start Date/Time', type: 'text', required: true, placeholder: '2026-01-15 20:00:00' },
+                    { key: 'end_at', label: 'End Date/Time (optional)', type: 'text', placeholder: '2026-01-15 23:00:00' },
+                    { key: 'location', label: 'Location', type: 'text' },
+                    { key: 'url', label: 'Ticket/Event URL', type: 'url' },
+                    { key: 'notes', label: 'Notes/Description', type: 'textarea' },
+                  ]}
+                  onSubmit={saveEvent}
+                />
+
+                <SectionEditModal
+                  visible={merchModalVisible}
+                  title={editingMerch ? 'Edit Merchandise' : 'Add Merchandise'}
+                  onClose={() => {
+                    setMerchModalVisible(false);
+                    setEditingMerch(null);
+                  }}
+                  initialValues={{
+                    name: editingMerch?.name ?? '',
+                    price: editingMerch?.price ?? '',
+                    image_url: editingMerch?.image_url ?? '',
+                    buy_url: editingMerch?.buy_url ?? '',
+                    description: editingMerch?.description ?? '',
+                  }}
+                  fields={[
+                    { key: 'name', label: 'Product Name', type: 'text', required: true },
+                    { key: 'price', label: 'Price', type: 'text', placeholder: '$29.99' },
+                    { key: 'image_url', label: 'Image URL', type: 'url' },
+                    { key: 'buy_url', label: 'Purchase URL', type: 'url' },
+                    { key: 'description', label: 'Description', type: 'textarea' },
+                  ]}
+                  onSubmit={async (vals) => {
+                    const title = String(vals.name ?? '').trim();
+                    const url = String(vals.buy_url ?? '').trim() || null;
+                    const metadata = {
+                      price: String(vals.price ?? '').trim() || null,
+                      image_url: String(vals.image_url ?? '').trim() || null,
+                      description: String(vals.description ?? '').trim() || null,
+                    };
+                    await saveBlock('merch', editingMerch?.id ?? null, title, url, metadata, merch.length);
+                  }}
+                />
+
+                <SectionEditModal
+                  visible={productModalVisible}
+                  title={editingProduct ? 'Edit Item' : 'Add Item'}
+                  onClose={() => {
+                    setProductModalVisible(false);
+                    setEditingProduct(null);
+                  }}
+                  initialValues={{
+                    name: editingProduct?.name ?? '',
+                    price: editingProduct?.price ?? '',
+                    image_url: editingProduct?.image_url ?? '',
+                    link: editingProduct?.link ?? '',
+                    description: editingProduct?.description ?? '',
+                    category: editingProduct?.category ?? '',
+                  }}
+                  fields={[
+                    { key: 'name', label: 'Title', type: 'text', required: true },
+                    { key: 'price', label: 'Price', type: 'text' },
+                    { key: 'image_url', label: 'Image URL', type: 'url' },
+                    { key: 'link', label: 'Link URL', type: 'url' },
+                    { key: 'category', label: 'Category', type: 'text' },
+                    { key: 'description', label: 'Description', type: 'textarea' },
+                  ]}
+                  onSubmit={async (vals) => {
+                    const title = String(vals.name ?? '').trim();
+                    const url = String(vals.link ?? '').trim() || null;
+                    const metadata = {
+                      price: String(vals.price ?? '').trim() || null,
+                      image_url: String(vals.image_url ?? '').trim() || null,
+                      description: String(vals.description ?? '').trim() || null,
+                      category: String(vals.category ?? '').trim() || null,
+                      availability: 'available',
+                    };
+                    await saveBlock('product', editingProduct?.id ?? null, title, url, metadata, products.length);
+                  }}
+                />
+
+                <SectionEditModal
+                  visible={scheduleModalVisible}
+                  title={editingSchedule ? 'Edit Schedule Item' : 'Add Schedule Item'}
+                  onClose={() => {
+                    setScheduleModalVisible(false);
+                    setEditingSchedule(null);
+                  }}
+                  initialValues={{
+                    title: editingSchedule?.title ?? '',
+                    day_of_week: editingSchedule?.day_of_week ?? '',
+                    time: editingSchedule?.time ?? '',
+                    description: editingSchedule?.description ?? '',
+                    recurring: editingSchedule?.recurring === true,
+                  }}
+                  fields={[
+                    { key: 'title', label: 'Title', type: 'text', required: true },
+                    { key: 'day_of_week', label: 'Day of Week', type: 'text' },
+                    { key: 'time', label: 'Time', type: 'text' },
+                    { key: 'description', label: 'Description', type: 'textarea' },
+                    { key: 'recurring', label: 'Recurring', type: 'checkbox', checkboxLabel: 'This schedule repeats weekly.' },
+                  ]}
+                  onSubmit={async (vals) => {
+                    const title = String(vals.title ?? '').trim();
+                    const metadata = {
+                      day_of_week: String(vals.day_of_week ?? '').trim() || null,
+                      time: String(vals.time ?? '').trim() || null,
+                      description: String(vals.description ?? '').trim() || null,
+                      recurring: vals.recurring === true,
+                    };
+                    await saveBlock('schedule_item', editingSchedule?.id ?? null, title, null, metadata, schedule.length);
+                  }}
+                />
+
+                <SectionEditModal
+                  visible={featuredModalVisible}
+                  title={editingFeatured ? 'Edit Featured Link' : 'Add Featured Link'}
+                  onClose={() => {
+                    setFeaturedModalVisible(false);
+                    setEditingFeatured(null);
+                  }}
+                  initialValues={{
+                    title: editingFeatured?.title ?? '',
+                    url: (editingFeatured as any)?.url ?? '',
+                    description: editingFeatured?.description ?? '',
+                    thumbnail_url: editingFeatured?.thumbnail_url ?? '',
+                  }}
+                  fields={[
+                    { key: 'title', label: 'Title', type: 'text', required: true },
+                    { key: 'url', label: 'URL', type: 'url', required: true },
+                    { key: 'thumbnail_url', label: 'Thumbnail URL (optional)', type: 'url' },
+                    { key: 'description', label: 'Description', type: 'textarea' },
+                  ]}
+                  onSubmit={async (vals) => {
+                    const title = String(vals.title ?? '').trim();
+                    const url = String(vals.url ?? '').trim() || null;
+                    const metadata = {
+                      description: String(vals.description ?? '').trim() || null,
+                      thumbnail_url: String(vals.thumbnail_url ?? '').trim() || null,
+                    };
+                    await saveBlock('featured_link', editingFeatured?.id ?? null, title, url, metadata, featured.length);
+                  }}
+                />
+              </>
             )}
 
             {/* STATS CARDS SECTION (Social Counts, Top Supporters, Top Streamers) */}
@@ -1774,6 +2465,77 @@ export function ProfileScreen({
               accentColor={accentColor}
               cardOpacity={cardOpacity}
             />
+          </>
+        )}
+
+        {/* EVENTS TAB (Musician/Comedian) - empty state until backend wiring */}
+        {activeTab === 'events' && (
+          <View style={[styles.card, customCardStyle]}>
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="calendar-outline" size={64} color={theme.colors.textMuted} />
+              <Text style={styles.emptyStateTitle}>No Upcoming Events</Text>
+              <Text style={styles.emptyStateText}>Check back later for show dates and tickets</Text>
+            </View>
+          </View>
+        )}
+
+        {/* PRODUCTS TAB (Business) - empty state until backend wiring */}
+        {activeTab === 'products' && (
+          <View style={[styles.card, customCardStyle]}>
+            <View style={styles.emptyStateContainer}>
+              <Ionicons name="briefcase-outline" size={64} color={theme.colors.textMuted} />
+              <Text style={styles.emptyStateTitle}>No Portfolio Items</Text>
+              <Text style={styles.emptyStateText}>Work samples and projects will appear here</Text>
+            </View>
+          </View>
+        )}
+
+        {/* VIDEOS TAB (Musician/Artist) - Music Videos (upload or YouTube) */}
+        {activeTab === 'videos' && (
+          <>
+            {profileType === 'musician' ? (
+              musicVideosLoading ? (
+                <View style={[styles.card, customCardStyle]}>
+                  <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={accentColor} />
+                  </View>
+                </View>
+              ) : (
+                <MusicVideosSection
+                  profileId={profile.id}
+                  isOwner={isOwnProfile}
+                  items={musicVideos}
+                  onItemsChange={setMusicVideos}
+                  cardOpacity={cardOpacity}
+                  accentColor={accentColor}
+                />
+              )
+            ) : profileType === 'comedian' ? (
+              comedySpecialsLoading ? (
+                <View style={[styles.card, customCardStyle]}>
+                  <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={accentColor} />
+                  </View>
+                </View>
+              ) : (
+                <ComedySpecialsSection
+                  profileId={profile.id}
+                  isOwner={isOwnProfile}
+                  items={comedySpecials}
+                  onItemsChange={setComedySpecials}
+                  cardOpacity={cardOpacity}
+                  accentColor={accentColor}
+                />
+              )
+            ) : (
+              <View style={[styles.card, customCardStyle]}>
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="videocam-outline" size={64} color={theme.colors.textMuted} />
+                  <Text style={styles.emptyStateTitle}>No Videos Yet</Text>
+                  <Text style={styles.emptyStateText}>Video content will appear here</Text>
+                </View>
+              </View>
+            )}
           </>
         )}
 
