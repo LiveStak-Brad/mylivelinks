@@ -189,6 +189,143 @@ REVOKE ALL ON FUNCTION public.update_clip_project(uuid, text, jsonb, text) FROM 
 GRANT EXECUTE ON FUNCTION public.update_clip_project(uuid, text, jsonb, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.update_clip_project(uuid, text, jsonb, text) TO service_role;
 
+ DROP FUNCTION IF EXISTS public.save_clip_project(uuid, text, jsonb);
+
+ CREATE OR REPLACE FUNCTION public.save_clip_project(
+   p_project_id uuid,
+   p_caption text DEFAULT NULL,
+   p_overlay_json jsonb DEFAULT NULL
+ )
+ RETURNS public.clip_projects
+ LANGUAGE plpgsql
+ AS $$
+ DECLARE
+   v_row public.clip_projects;
+   v_existing public.clip_projects;
+   v_key text;
+   v_item jsonb;
+   v_item_key text;
+ BEGIN
+   IF auth.uid() IS NULL THEN
+     RAISE EXCEPTION 'Unauthorized';
+   END IF;
+
+   SELECT cp.*
+   INTO v_existing
+   FROM public.clip_projects cp
+   WHERE cp.id = p_project_id;
+
+   IF v_existing.id IS NULL THEN
+     RAISE EXCEPTION 'Clip project not found';
+   END IF;
+
+   IF v_existing.owner_profile_id <> auth.uid() THEN
+     RAISE EXCEPTION 'Unauthorized';
+   END IF;
+
+   IF v_existing.status <> 'draft' THEN
+     RAISE EXCEPTION 'Clip project is not a draft';
+   END IF;
+
+   IF p_overlay_json IS NOT NULL THEN
+     IF octet_length(p_overlay_json::text) > 50000 THEN
+       RAISE EXCEPTION 'overlay_json too large';
+     END IF;
+
+     IF jsonb_typeof(p_overlay_json) <> 'object' THEN
+       RAISE EXCEPTION 'overlay_json must be a JSON object';
+     END IF;
+
+     FOR v_key IN SELECT jsonb_object_keys(p_overlay_json)
+     LOOP
+       IF v_key <> 'text' THEN
+         RAISE EXCEPTION 'overlay_json contains unsupported key: %', v_key;
+       END IF;
+     END LOOP;
+
+     IF p_overlay_json ? 'text' THEN
+       IF jsonb_typeof(p_overlay_json->'text') <> 'array' THEN
+         RAISE EXCEPTION 'overlay_json.text must be an array';
+       END IF;
+
+       FOR v_item IN SELECT jsonb_array_elements(p_overlay_json->'text')
+       LOOP
+         IF jsonb_typeof(v_item) <> 'object' THEN
+           RAISE EXCEPTION 'overlay_json.text[] items must be objects';
+         END IF;
+
+         FOR v_item_key IN SELECT jsonb_object_keys(v_item)
+         LOOP
+           IF v_item_key NOT IN ('id','text','x','y','scale','color','font','startMs','endMs') THEN
+             RAISE EXCEPTION 'overlay_json.text[] contains unsupported key: %', v_item_key;
+           END IF;
+         END LOOP;
+
+         IF NOT (v_item ? 'id') OR jsonb_typeof(v_item->'id') <> 'string' THEN
+           RAISE EXCEPTION 'overlay_json.text[].id must be a string';
+         END IF;
+
+         IF NOT (v_item ? 'text') OR jsonb_typeof(v_item->'text') <> 'string' THEN
+           RAISE EXCEPTION 'overlay_json.text[].text must be a string';
+         END IF;
+
+         IF NOT (v_item ? 'x') OR jsonb_typeof(v_item->'x') <> 'number' THEN
+           RAISE EXCEPTION 'overlay_json.text[].x must be a number';
+         END IF;
+
+         IF NOT (v_item ? 'y') OR jsonb_typeof(v_item->'y') <> 'number' THEN
+           RAISE EXCEPTION 'overlay_json.text[].y must be a number';
+         END IF;
+
+         IF NOT (v_item ? 'scale') OR jsonb_typeof(v_item->'scale') <> 'number' THEN
+           RAISE EXCEPTION 'overlay_json.text[].scale must be a number';
+         END IF;
+
+         IF NOT (v_item ? 'color') OR jsonb_typeof(v_item->'color') <> 'string' THEN
+           RAISE EXCEPTION 'overlay_json.text[].color must be a string';
+         END IF;
+
+         IF NOT (v_item ? 'font') OR jsonb_typeof(v_item->'font') <> 'string' THEN
+           RAISE EXCEPTION 'overlay_json.text[].font must be a string';
+         END IF;
+
+         IF v_item ? 'startMs' THEN
+           IF jsonb_typeof(v_item->'startMs') NOT IN ('number','null') THEN
+             RAISE EXCEPTION 'overlay_json.text[].startMs must be a number or null';
+           END IF;
+         END IF;
+
+         IF v_item ? 'endMs' THEN
+           IF jsonb_typeof(v_item->'endMs') NOT IN ('number','null') THEN
+             RAISE EXCEPTION 'overlay_json.text[].endMs must be a number or null';
+           END IF;
+         END IF;
+       END LOOP;
+     END IF;
+   END IF;
+
+   UPDATE public.clip_projects
+   SET
+     caption = COALESCE(p_caption, caption),
+     overlay_json = COALESCE(p_overlay_json, overlay_json),
+     updated_at = now()
+   WHERE id = p_project_id
+     AND owner_profile_id = auth.uid()
+     AND status = 'draft'
+   RETURNING * INTO v_row;
+
+   IF v_row.id IS NULL THEN
+     RAISE EXCEPTION 'Clip project not found';
+   END IF;
+
+   RETURN v_row;
+ END;
+ $$;
+
+ REVOKE ALL ON FUNCTION public.save_clip_project(uuid, text, jsonb) FROM PUBLIC;
+ GRANT EXECUTE ON FUNCTION public.save_clip_project(uuid, text, jsonb) TO authenticated;
+ GRANT EXECUTE ON FUNCTION public.save_clip_project(uuid, text, jsonb) TO service_role;
+
 DROP FUNCTION IF EXISTS public.get_clip_project(uuid);
 
 CREATE OR REPLACE FUNCTION public.get_clip_project(
