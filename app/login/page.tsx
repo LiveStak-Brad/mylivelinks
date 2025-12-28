@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import SmartBrandLogo from '@/components/SmartBrandLogo';
 import { Button, Input, Card, CardContent } from '@/components/ui';
@@ -9,6 +9,7 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -17,6 +18,8 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const supabase = createClient();
+
+  const referralCode = (searchParams?.get('ref') || '').trim();
 
   const withTimeout = async <T = any,>(p: PromiseLike<T>, ms: number, label: string): Promise<T> => {
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
@@ -149,6 +152,18 @@ export default function LoginPage() {
             throw profileError;
           }
 
+          if (referralCode) {
+            try {
+              await supabase.rpc('claim_referral', {
+                p_code: referralCode,
+                p_click_id: null,
+                p_device_id: null,
+              });
+            } catch (claimErr) {
+              console.warn('[referrals] claim_referral failed (non-blocking):', claimErr);
+            }
+          }
+
           setMessage('Account created successfully! Redirecting...');
           // Redirect to onboarding to complete profile setup
           setTimeout(() => {
@@ -197,6 +212,18 @@ export default function LoginPage() {
               10000,
               'Creating profile'
             );
+          }
+
+          if (referralCode) {
+            try {
+              await supabase.rpc('claim_referral', {
+                p_code: referralCode,
+                p_click_id: null,
+                p_device_id: null,
+              });
+            } catch (claimErr) {
+              console.warn('[referrals] claim_referral failed (non-blocking):', claimErr);
+            }
           }
           
           if (profile?.username && profile?.date_of_birth) {

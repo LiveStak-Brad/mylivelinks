@@ -14,9 +14,10 @@
  * with the same 5-tab layout, icons, labels, and routing behavior.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Linking } from 'react-native';
 
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -44,11 +45,49 @@ import { OwnerPanelScreen } from './screens/OwnerPanelScreen';
 import { ModerationPanelScreen } from './screens/ModerationPanelScreen';
 import { AdminApplicationsScreen } from './screens/AdminApplicationsScreen';
 import { AdminGiftsScreen } from './screens/AdminGiftsScreen';
+import { setPendingReferralCode } from './lib/referrals';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+function extractReferralCode(url: string): string | null {
+  const match = url.match(/[?&]ref=([^&#]+)/i);
+  if (!match?.[1]) return null;
+  try {
+    const decoded = decodeURIComponent(match[1]);
+    const cleaned = decoded.trim();
+    return cleaned ? cleaned : null;
+  } catch {
+    const cleaned = match[1].trim();
+    return cleaned ? cleaned : null;
+  }
+}
+
 function AppNavigation() {
   const { navigationTheme, mode } = useThemeMode();
+
+  useEffect(() => {
+    const handleUrl = async (url: string | null | undefined) => {
+      if (!url) return;
+      const ref = extractReferralCode(url);
+      if (!ref) return;
+      try {
+        await setPendingReferralCode(ref);
+      } catch (e) {
+        console.warn('[referrals] Failed to store pending referral code:', e);
+      }
+    };
+
+    void Linking.getInitialURL().then(handleUrl);
+
+    const sub = Linking.addEventListener('url', (evt: any) => {
+      void handleUrl(evt?.url);
+    });
+
+    return () => {
+      // RN compatibility: newer versions return subscription with remove()
+      (sub as any)?.remove?.();
+    };
+  }, []);
 
   return (
     <>

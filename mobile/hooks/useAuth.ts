@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Session,
   User,
@@ -7,6 +7,8 @@ import type {
 } from '@supabase/supabase-js';
 
 import { supabase, supabaseConfigured } from '../lib/supabase';
+import { getDeviceId } from '../lib/deviceId';
+import { clearPendingReferralCode, getPendingReferralCode } from '../lib/referrals';
 
 type UseAuthReturn = {
   user: User | null;
@@ -22,6 +24,9 @@ export function useAuth(): UseAuthReturn {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const claimInFlightRef = useRef(false);
+  const lastClaimedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     let mounted = true;
 
@@ -31,6 +36,38 @@ export function useAuth(): UseAuthReturn {
       setLoading(false);
       return;
     }
+
+    const maybeClaimReferral = async (nextSession: Session | null) => {
+      if (!supabaseConfigured) return;
+      const userId = nextSession?.user?.id;
+      if (!userId) return;
+
+      const pendingCode = await getPendingReferralCode();
+      if (!pendingCode) return;
+
+      if (claimInFlightRef.current) return;
+      claimInFlightRef.current = true;
+
+      try {
+        const deviceId = await getDeviceId();
+        const { error } = await supabase.rpc('claim_referral', {
+          p_code: pendingCode,
+          p_click_id: null,
+          p_device_id: deviceId,
+        });
+
+        if (!error) {
+          await clearPendingReferralCode();
+          lastClaimedUserIdRef.current = userId;
+        } else {
+          console.warn('[referrals] claim_referral failed (non-blocking):', error);
+        }
+      } catch (e) {
+        console.warn('[referrals] claim_referral threw (non-blocking):', e);
+      } finally {
+        claimInFlightRef.current = false;
+      }
+    };
 
     const bootstrap = async () => {
       try {
@@ -44,6 +81,8 @@ export function useAuth(): UseAuthReturn {
           });
           setSession(data.session ?? null);
         }
+
+        await maybeClaimReferral(data.session ?? null);
       } catch (e) {
         console.warn('[AUTH] getSession failed', e);
         if (mounted) {
@@ -67,6 +106,12 @@ export function useAuth(): UseAuthReturn {
       });
       setSession(newSession);
       setLoading(false);
+
+      // Best-effort referral claim (non-blocking). Idempotent on the DB side.
+      // Only attempt on transitions where we have a session.
+      if (newSession?.user?.id && lastClaimedUserIdRef.current !== newSession.user.id) {
+        void maybeClaimReferral(newSession);
+      }
     });
 
     return () => {

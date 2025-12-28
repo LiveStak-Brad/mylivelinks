@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
 import SmartBrandLogo from '@/components/SmartBrandLogo';
@@ -10,6 +10,7 @@ import { AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
 
 export default function SignUpPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,6 +18,8 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const supabase = createClient();
+
+  const referralCode = (searchParams?.get('ref') || '').trim();
 
   useEffect(() => {
     // Check if already logged in
@@ -105,6 +108,18 @@ export default function SignUpPage() {
 
         if (profileError) {
           console.error('Profile creation error:', profileError);
+        }
+
+        if (referralCode) {
+          try {
+            await supabase.rpc('claim_referral', {
+              p_code: referralCode,
+              p_click_id: null,
+              p_device_id: null,
+            });
+          } catch (claimErr) {
+            console.warn('Referral claim failed (non-blocking):', claimErr);
+          }
         }
 
         setMessage('Account created! Redirecting to setup...');

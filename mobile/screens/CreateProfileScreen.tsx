@@ -201,6 +201,12 @@ export function CreateProfileScreen({ navigation }: Props) {
         return;
       }
 
+      try {
+        await supabase.rpc('log_referral_activity', { p_event_type: 'profile_completed' });
+      } catch (refErr) {
+        console.warn('[referrals] log_referral_activity failed (non-blocking):', refErr);
+      }
+
       navigation.reset({
         index: 0,
         routes: [{ name: 'Gate' }],

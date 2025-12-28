@@ -10,6 +10,7 @@ import ProfileCarousel from '@/components/ProfileCarousel';
 import { RoomsCarousel } from '@/components/rooms';
 import { LIVE_LAUNCH_ENABLED, isLiveOwnerUser } from '@/lib/livekit-constants';
 import { Input, Button, Badge, Card, CardContent, Skeleton } from '@/components/ui';
+import { ReferralCard } from '@/components/referral';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -126,6 +127,11 @@ export default function LandingPage() {
               className="w-full h-auto sm:rounded-3xl shadow-2xl"
             />
           </div>
+
+          {/* Referral Card - Logged-in users only */}
+          {currentUser && (
+            <ReferralCard className="mb-12" />
+          )}
 
           {/* Search Bar */}
           <Card className="mb-12 border-border/50 shadow-2xl">

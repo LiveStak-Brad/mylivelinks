@@ -22,6 +22,7 @@ import { getEnabledSections, isSectionEnabled, type ProfileType as ConfigProfile
 import { MusicShowcase, UpcomingEvents, Merchandise, BusinessInfo, Portfolio, TabEmptyState } from '@/components/profile/sections';
 import PublicFeedClient from '@/components/feed/PublicFeedClient';
 import ProfilePhotosClient from '@/components/photos/ProfilePhotosClient';
+import { ReferralProgressModule } from '@/components/referral';
 
 interface ProfileData {
   profile: {
@@ -687,6 +688,17 @@ export default function ModernProfilePage() {
         {/* Tab Content - Render based on activeTab */}
         {activeTab === 'info' && (
           <>
+        {/* Referral Progress Module - Owner View Only */}
+        {isOwnProfile && (
+          <div className="mb-4 sm:mb-6">
+            <ReferralProgressModule
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+              accentColor={accentColor}
+            />
+          </div>
+        )}
+        
         {/* Config-driven section rendering for musician showcase */}
         {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType) && (
           <MusicShowcase 

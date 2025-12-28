@@ -209,6 +209,12 @@ export default function OnboardingPage() {
         console.error('Profile upsert error:', profileError);
         throw new Error(`Failed to create profile: ${profileError.message}`);
       }
+
+      try {
+        await supabase.rpc('log_referral_activity', { p_event_type: 'profile_completed' });
+      } catch (refErr) {
+        console.warn('[referrals] log_referral_activity failed (non-blocking):', refErr);
+      }
       
       // If user is 18+ and accepted adult disclaimer, set up user_settings
       if (age >= 18 && formData.acceptAdultDisclaimer) {
