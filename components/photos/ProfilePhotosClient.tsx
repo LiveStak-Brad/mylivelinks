@@ -163,10 +163,12 @@ export default function ProfilePhotosClient({ username }: { username: string }) 
       const mediaUrl = await uploadPostMedia(currentUserId, composerMediaFile);
       const text = composerText.trim();
 
+      const safeTextContent = text.length ? text : ' ';
+
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text_content: text, media_url: mediaUrl }),
+        body: JSON.stringify({ text_content: safeTextContent, media_url: mediaUrl }),
       });
 
       const json = (await res.json()) as any;
