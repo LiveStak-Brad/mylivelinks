@@ -235,8 +235,6 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'profile_stats', enabled: true, order: 8 },
       { id: 'footer', enabled: true, order: 9 },
     ],
-      { id: 'footer', enabled: true, order: 8 },
-    ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
       { id: 'message', label: 'Message', icon: 'MessageCircle', enabled: true },
