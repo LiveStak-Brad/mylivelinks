@@ -268,3 +268,4 @@ All callbacks are optional (`?`), allowing progressive enhancement:
 
 **Ready for Integration** ✅
 
+

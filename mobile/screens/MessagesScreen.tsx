@@ -41,6 +41,7 @@ export function MessagesScreen({ navigation: _navigation, route }: Props) {
     messages,
     sendMessage,
     currentUserId,
+    resolveProfileIdByUsername,
   } = useMessages();
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -58,6 +59,29 @@ export function MessagesScreen({ navigation: _navigation, route }: Props) {
       // ignore
     }
   }, [_navigation, route.params?.openUserId, setActiveConversationId]);
+
+  useEffect(() => {
+    const openUsername = route.params?.openUsername;
+    if (!openUsername) return;
+
+    const normalized = String(openUsername).trim().replace(/^@/, '');
+    if (!normalized) return;
+    if (lastAutoOpenedRef.current === `u:${normalized.toLowerCase()}`) return;
+
+    void (async () => {
+      const resolved = await resolveProfileIdByUsername(normalized);
+      if (!resolved?.profileId) return;
+
+      lastAutoOpenedRef.current = `u:${normalized.toLowerCase()}`;
+      setActiveConversationId(resolved.profileId);
+
+      try {
+        _navigation.setParams({ openUsername: undefined });
+      } catch {
+        // ignore
+      }
+    })();
+  }, [_navigation, resolveProfileIdByUsername, route.params?.openUsername, setActiveConversationId]);
 
   const activeConversation = activeConversationId
     ? conversations.find((c) => c.id === activeConversationId)

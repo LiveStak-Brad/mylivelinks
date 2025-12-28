@@ -9,6 +9,8 @@ import { uploadAvatar, uploadPinnedPostMedia, deleteAvatar, deletePinnedPostMedi
 import Image from 'next/image';
 import ProfileCustomization from '@/components/profile/ProfileCustomization';
 import { ProfileTypePickerModal, ProfileType } from '@/components/ProfileTypePickerModal';
+import ProfileSectionToggle from '@/components/profile/ProfileSectionToggle';
+import { ProfileSection } from '@/lib/profileTypeConfig';
 
 interface UserLink {
   id?: number;
@@ -66,6 +68,9 @@ export default function ProfileSettingsPage() {
   // Profile Type
   const [profileType, setProfileType] = useState<ProfileType>('creator');
   const [showProfileTypePicker, setShowProfileTypePicker] = useState(false);
+  
+  // Enabled Sections (custom toggle state)
+  const [enabledSections, setEnabledSections] = useState<ProfileSection[] | null>(null);
   
   // Pinned post
   const [pinnedPost, setPinnedPost] = useState<PinnedPost | null>(null);
@@ -140,6 +145,13 @@ export default function ProfileSettingsPage() {
         
         // Load profile type
         setProfileType((p.profile_type || 'creator') as ProfileType);
+        
+        // Load enabled sections (custom toggle state)
+        if (p.enabled_sections && Array.isArray(p.enabled_sections)) {
+          setEnabledSections(p.enabled_sections as ProfileSection[]);
+        } else {
+          setEnabledSections(null); // null = use profile_type defaults
+        }
         
         // Load customization fields
         setCustomization({
@@ -241,6 +253,8 @@ export default function ProfileSettingsPage() {
         display_name: displayName,
         bio: bio,
         avatar_url: finalAvatarUrl,
+        // Enabled sections (custom toggle state)
+        enabled_sections: enabledSections || null,
         // Social media fields (strip @ if user included it)
         social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
         social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
@@ -549,6 +563,13 @@ export default function ProfileSettingsPage() {
             <span>Changing profile type may hide or show different sections on your profile. Nothing is deleted.</span>
           </p>
         </div>
+
+        {/* Section Customization */}
+        <ProfileSectionToggle
+          profileType={profileType}
+          currentEnabledSections={enabledSections}
+          onChange={setEnabledSections}
+        />
 
         {/* Save Button (Top) */}
         <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-lg p-4 mb-6 sticky top-4 z-10">

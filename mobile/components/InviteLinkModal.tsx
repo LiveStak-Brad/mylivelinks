@@ -261,7 +261,7 @@ function createStyles(theme: ThemeDefinition) {
       flex: 1,
     },
     container: {
-      backgroundColor: isLight ? theme.colors.cardSurface : theme.colors.menuBackground,
+      backgroundColor: isLight ? '#FFFFFF' : '#0F172A',
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       maxHeight: '90%',
@@ -459,7 +459,7 @@ function createStyles(theme: ThemeDefinition) {
     footer: {
       paddingHorizontal: 20,
       paddingVertical: 16,
-      backgroundColor: isLight ? theme.colors.cardAlt : theme.colors.menuBackground,
+      backgroundColor: isLight ? '#F9FAFB' : '#0D1220',
       borderTopWidth: 1,
       borderTopColor: isLight ? 'rgba(139, 92, 246, 0.18)' : theme.colors.menuBorder,
     },
@@ -470,6 +470,7 @@ function createStyles(theme: ThemeDefinition) {
     },
   });
 }
+
 
 
 

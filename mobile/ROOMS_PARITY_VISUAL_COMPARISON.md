@@ -256,3 +256,4 @@ The mobile Rooms experience is now **pixel-perfect** with web. All features, sta
 
 **Next Step:** Implement Room Viewer screen to complete the browsing → viewing flow.
 
+

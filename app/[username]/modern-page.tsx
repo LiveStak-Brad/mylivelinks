@@ -77,6 +77,7 @@ interface ProfileData {
     gifter_level: number;
     created_at: string;
     profile_type?: ProfileType;
+    enabled_sections?: string[] | null;
     // Customization
     profile_bg_url?: string;
     profile_bg_overlay?: string;
@@ -1120,7 +1121,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for musician showcase */}
-            {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType) && (
+            {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
               <MusicShowcase 
                 profileType={profile.profile_type as ConfigProfileType}
                 isOwner={isOwnProfile}
@@ -1131,7 +1132,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for upcoming events */}
-            {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType) && (
+            {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
               <UpcomingEvents 
                 profileType={profile.profile_type as ConfigProfileType}
                 isOwner={isOwnProfile}
@@ -1145,7 +1146,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for merchandise */}
-            {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType) && (
+            {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
               <Merchandise 
                 profileId={profile.id}
                 profileType={profile.profile_type as ConfigProfileType}
@@ -1156,7 +1157,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for business info */}
-            {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType) && (
+            {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
               <BusinessInfo 
                 profileId={profile.id}
                 profileType={profile.profile_type as ConfigProfileType}
@@ -1167,7 +1168,7 @@ export default function ModernProfilePage() {
             )}
             
             {/* Config-driven section rendering for portfolio */}
-            {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType) && (
+            {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType, profile.enabled_sections as any) && (
               <Portfolio 
                 profileType={profile.profile_type as ConfigProfileType}
                 isOwner={isOwnProfile}

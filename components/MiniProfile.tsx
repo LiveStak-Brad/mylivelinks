@@ -157,7 +157,7 @@ export default function MiniProfile({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={onClose}>
       <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-80 max-w-[90vw] relative"
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-80 max-w-[90vw] relative"
         onClick={(e) => e.stopPropagation()}
         style={position ? { position: 'fixed', left: position.x, top: position.y } : {}}
       >

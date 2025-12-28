@@ -110,3 +110,6 @@ echo "2. Metro bundler errors (from Step 3)"
 echo "3. Exact behavior (splash shows for how long? any error message?)"
 echo ""
 
+
+
+

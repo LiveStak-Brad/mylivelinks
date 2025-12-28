@@ -231,3 +231,4 @@ All blockers resolved:
 
 The modal/presentation issues are completely fixed. Both components now present exactly as intended - Options menu as a top-anchored dropdown, and Leaderboards as a centered modal appearing from the top portion of screen, both respecting device safe areas.
 
+

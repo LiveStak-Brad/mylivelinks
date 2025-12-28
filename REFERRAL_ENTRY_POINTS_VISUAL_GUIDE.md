@@ -342,3 +342,4 @@ Both components automatically adapt to the current theme!
 
 Both components follow the app's design system while maintaining their own premium, professional aesthetic. Ready for production use with mock data!
 
+

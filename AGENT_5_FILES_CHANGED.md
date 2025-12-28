@@ -60,3 +60,4 @@ Files changed list
 
 All changes are backward compatible. No database migrations required. No new dependencies added (uses existing @expo/vector-icons and Supabase client).
 
+

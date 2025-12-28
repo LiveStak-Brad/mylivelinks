@@ -182,3 +182,4 @@ CREATE POLICY "Owners can delete templates" ON room_templates
 COMMENT ON TABLE room_templates IS 'Reusable room templates for quick room creation. Owner Panel feature.';
 
 
+

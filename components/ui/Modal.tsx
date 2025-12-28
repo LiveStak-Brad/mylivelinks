@@ -132,7 +132,7 @@ function Modal({
             ? 'fixed inset-0 w-full h-full' 
             : 'relative w-full max-h-[90vh]'
           }
-          bg-card border border-border
+          bg-white dark:bg-gray-900 border border-border
           ${shouldBeFullScreen ? '' : 'animate-scale-in'}
           overflow-hidden flex flex-col
           ${className}

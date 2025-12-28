@@ -295,3 +295,4 @@ GRANT INSERT, UPDATE, DELETE ON TABLE public.profile_portfolio TO authenticated;
 COMMIT;
 
 
+

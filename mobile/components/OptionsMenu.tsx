@@ -492,7 +492,7 @@ function createStyles(theme: ThemeDefinition) {
       flex: 1,
     },
     menuContainer: {
-      backgroundColor: isLight ? theme.colors.cardSurface : theme.colors.menuBackground,
+      backgroundColor: isLight ? '#FFFFFF' : '#0F172A',
       borderBottomLeftRadius: 24,
       borderBottomRightRadius: 24,
       maxHeight: '80%',

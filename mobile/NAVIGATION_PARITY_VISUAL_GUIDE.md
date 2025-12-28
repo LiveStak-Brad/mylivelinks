@@ -152,3 +152,4 @@ eas build --profile preview --platform all --clear-cache
 
 (5% deduction for simplified top bar and pending badges)
 
+

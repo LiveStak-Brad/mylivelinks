@@ -354,3 +354,4 @@ Run the app with these fixes and you'll see:
 5. Verify web session not killed when logging into mobile
 6. Verify all screens show consistent auth state
 
+

@@ -138,3 +138,4 @@ This means the app will run in "offline mode" if env vars are missing, but it wo
 **Issue**: Missing environment variables causing immediate crash  
 **Status**: ✅ Fixed with graceful fallback + setup instructions
 
+

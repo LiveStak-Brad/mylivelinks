@@ -502,3 +502,4 @@ When testing, verify these visual elements:
 **For**: Web Profile Type Picker Implementation  
 **Files**: components/ProfileTypePickerModal.tsx, app/settings/profile/page.tsx
 
+

@@ -264,8 +264,22 @@ export function getEnabledTabs(profileType?: ProfileType): TabConfig[] {
 
 /**
  * Get enabled sections for a profile type (sorted by order)
+ * If customEnabledSections is provided, use that instead of profile_type defaults
  */
-export function getEnabledSections(profileType?: ProfileType): SectionConfig[] {
+export function getEnabledSections(
+  profileType?: ProfileType, 
+  customEnabledSections?: ProfileSection[] | null
+): SectionConfig[] {
+  // If custom list exists, use it (respecting order from config)
+  if (customEnabledSections && customEnabledSections.length > 0) {
+    const config = getProfileTypeConfig(profileType);
+    const customSet = new Set(customEnabledSections);
+    return config.sections
+      .filter(section => customSet.has(section.id))
+      .sort((a, b) => a.order - b.order);
+  }
+  
+  // Fallback to profile_type defaults
   const config = getProfileTypeConfig(profileType);
   return config.sections
     .filter(section => section.enabled)
@@ -282,8 +296,19 @@ export function getEnabledQuickActions(profileType?: ProfileType): QuickActionCo
 
 /**
  * Check if a specific section is enabled for a profile type
+ * If customEnabledSections is provided, check that instead
  */
-export function isSectionEnabled(section: ProfileSection, profileType?: ProfileType): boolean {
+export function isSectionEnabled(
+  section: ProfileSection, 
+  profileType?: ProfileType,
+  customEnabledSections?: ProfileSection[] | null
+): boolean {
+  // If custom list exists, use it
+  if (customEnabledSections && customEnabledSections.length > 0) {
+    return customEnabledSections.includes(section);
+  }
+  
+  // Fallback to profile_type defaults
   const config = getProfileTypeConfig(profileType);
   const sectionConfig = config.sections.find(s => s.id === section);
   return sectionConfig?.enabled ?? false;

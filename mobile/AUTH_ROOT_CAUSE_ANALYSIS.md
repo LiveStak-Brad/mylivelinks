@@ -160,3 +160,4 @@ This is likely a Supabase backend configuration issue:
    - Navigate between screens, verify consistent auth state
    - Kill and restart app, verify session persists
 
+

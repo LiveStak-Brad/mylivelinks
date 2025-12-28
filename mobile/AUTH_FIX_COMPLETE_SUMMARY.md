@@ -283,3 +283,4 @@ console.log('[AUTH] onAuthStateChange fired:', { event, hasSession, userId });
 
 **Next Steps**: Build preview and test on device per verification steps above.
 
+

@@ -328,3 +328,4 @@ npm start
 
 The only remaining task is implementing the Room Viewer screen (separate from this task), which will complete the full room browsing → viewing flow.
 
+

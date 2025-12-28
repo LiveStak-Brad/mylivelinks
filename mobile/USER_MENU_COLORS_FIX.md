@@ -76,3 +76,4 @@ The menu should now look vibrant with:
 
 **Colors are now properly applied and visible!** 🎨
 
+

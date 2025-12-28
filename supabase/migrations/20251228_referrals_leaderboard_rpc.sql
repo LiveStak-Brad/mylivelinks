@@ -113,3 +113,4 @@ GRANT EXECUTE ON FUNCTION public.get_referrals_leaderboard(text, integer, jsonb)
 COMMIT;
 
 
+

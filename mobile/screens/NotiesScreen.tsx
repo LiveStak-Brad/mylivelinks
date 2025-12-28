@@ -16,6 +16,7 @@ import type { MainTabsParamList } from '../types/navigation';
 import { useNoties } from '../hooks/useNoties';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import { getAvatarSource } from '../lib/defaultAvatar';
+import { resolveNotieAction } from '../lib/noties/resolveNotieAction';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Noties'>;
 
@@ -44,30 +45,56 @@ export function NotiesScreen({ navigation }: Props) {
     const url = typeof actionUrl === 'string' ? actionUrl.trim() : '';
     if (!url) return;
 
-    // Profile links like "/someuser"
-    const isProfilePath = /^\/[^/?#]+$/.test(url) && !['/wallet', '/rooms', '/feed', '/messages', '/noties', '/live'].includes(url);
-    if (isProfilePath) {
-      const username = url.slice(1);
-      navigation.navigate('Profile', { username });
-      return;
-    }
-
-    // Known internal destinations (web parity routes)
+    const resolved = resolveNotieAction(url);
     const parent = navigation.getParent?.();
-    if (url.startsWith('/wallet')) {
-      parent?.navigate?.('Wallet');
-      return;
-    }
-    if (url.startsWith('/me/analytics')) {
-      parent?.navigate?.('MyAnalytics');
-      return;
-    }
-    if (url.startsWith('/rooms') || url.startsWith('/live')) {
-      parent?.navigate?.('Rooms');
-      return;
+
+    if (resolved) {
+      switch (resolved.route) {
+        case 'profile': {
+          const username = resolved.params.username;
+          if (username) navigation.navigate('Profile', { username });
+          return;
+        }
+        case 'wallet': {
+          parent?.navigate?.('Wallet');
+          return;
+        }
+        case 'my_analytics': {
+          parent?.navigate?.('MyAnalytics');
+          return;
+        }
+        case 'rooms':
+        case 'live': {
+          parent?.navigate?.('Rooms');
+          return;
+        }
+        case 'messages': {
+          parent?.navigate?.('MainTabs', { screen: 'Messages' });
+          return;
+        }
+        case 'feed': {
+          parent?.navigate?.('MainTabs', { screen: 'Feed' });
+          return;
+        }
+        case 'noties': {
+          parent?.navigate?.('MainTabs', { screen: 'Noties' });
+          return;
+        }
+        case 'external': {
+          const externalUrl = resolved.params.url;
+          if (!externalUrl) return;
+          try {
+            void Linking.openURL(externalUrl);
+          } catch {
+            // ignore
+          }
+          return;
+        }
+        default:
+          break;
+      }
     }
 
-    // Fallback: open in the system browser
     try {
       const absolute = url.startsWith('http') ? url : `https://mylivelinks.com${url}`;
       void Linking.openURL(absolute);

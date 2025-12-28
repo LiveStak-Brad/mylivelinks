@@ -6,6 +6,8 @@ import { supabase, supabaseConfigured } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { Button, Input, PageShell } from '../components/ui';
 import { ProfileTypePickerModal, type ProfileType } from '../components/ProfileTypePickerModal';
+import ProfileSectionToggle from '../components/ProfileSectionToggle';
+import type { ProfileSection } from '../config/profileTypeConfig';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
@@ -16,6 +18,7 @@ type ProfileRow = {
   display_name?: string | null;
   bio?: string | null;
   profile_type?: ProfileType | null;
+  enabled_sections?: string[] | null;
 };
 
 export function EditProfileScreen({ navigation }: Props) {
@@ -31,6 +34,7 @@ export function EditProfileScreen({ navigation }: Props) {
   const [bio, setBio] = useState('');
   const [profileType, setProfileType] = useState<ProfileType>('creator');
   const [showTypePickerModal, setShowTypePickerModal] = useState(false);
+  const [enabledSections, setEnabledSections] = useState<ProfileSection[] | null>(null);
 
   const canSave = useMemo(() => !!userId && !saving && !loading, [loading, saving, userId]);
 
@@ -65,6 +69,12 @@ export function EditProfileScreen({ navigation }: Props) {
       setBio(String(row.bio ?? ''));
       // Load profile type from backend
       setProfileType((row as any).profile_type || 'creator');
+      // Load enabled sections (custom toggle state)
+      if (row.enabled_sections && Array.isArray(row.enabled_sections)) {
+        setEnabledSections(row.enabled_sections as ProfileSection[]);
+      } else {
+        setEnabledSections(null); // null = use profile_type defaults
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to load profile');
       setProfile(null);
@@ -106,6 +116,7 @@ export function EditProfileScreen({ navigation }: Props) {
       const updatePayload: any = {
         display_name: displayName.trim() || null,
         bio: bio.trim() || null,
+        enabled_sections: enabledSections || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -194,6 +205,13 @@ export function EditProfileScreen({ navigation }: Props) {
               Changing type may hide/show sections. Nothing is deleted.
             </Text>
           </View>
+
+          {/* Section Customization */}
+          <ProfileSectionToggle
+            profileType={profileType}
+            currentEnabledSections={enabledSections}
+            onChange={setEnabledSections}
+          />
 
           <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} loading={saving} />
         </View>

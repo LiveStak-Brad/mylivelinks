@@ -499,3 +499,4 @@ const { barsVisible, scrollHandlers } = useAutoHideBars();
 
 **Facebook-style auto-hiding bars are now live on ProfileScreen, with infrastructure in place to add to any screen in ~3 lines of code!** 🎉
 
+

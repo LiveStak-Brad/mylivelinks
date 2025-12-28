@@ -37,3 +37,6 @@ echo If the app still crashes, please tell me:
 echo 1. Android or iOS?
 echo 2. Physical device or emulator/simulator?
 
+
+
+

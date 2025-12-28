@@ -68,3 +68,6 @@ echo "3. Run: cd mobile && npx expo start -c"
 echo ""
 echo "See mobile/CRASH_FIX_ENV_SETUP.md for detailed instructions"
 
+
+
+

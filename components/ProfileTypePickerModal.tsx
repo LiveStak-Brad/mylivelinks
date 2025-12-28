@@ -134,7 +134,7 @@ export function ProfileTypePickerModal({
       onClick={onClose}
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden"
         style={{ opacity: cardOpacity }}
         onClick={(e) => e.stopPropagation()}
       >

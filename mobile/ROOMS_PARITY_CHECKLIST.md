@@ -89,3 +89,4 @@
 - [ ] Tap navigation works (even if viewer screen is placeholder)
 - [ ] No "Rooms disabled" or "Live disabled" messages
 
+

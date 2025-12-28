@@ -246,6 +246,34 @@ export function useMessages() {
     [currentUserId]
   );
 
+  const resolveProfileIdByUsername = useCallback(
+    async (usernameRaw: string): Promise<{ profileId: string; username: string } | null> => {
+      const username = typeof usernameRaw === 'string' ? usernameRaw.trim().replace(/^@/, '') : '';
+      if (!username) return null;
+
+      try {
+        const accessToken = await getAccessToken();
+        const res = await fetchAuthed(
+          `/api/resolve/username?u=${encodeURIComponent(username)}`,
+          { method: 'GET' },
+          accessToken
+        );
+
+        if (!res.ok) return null;
+
+        const profileId = String((res.data as any)?.profile_id || '');
+        const resolvedUsername = String((res.data as any)?.username || username);
+        if (!profileId) return null;
+
+        return { profileId, username: resolvedUsername };
+      } catch (error) {
+        console.error('[Messages] resolveProfileIdByUsername error:', error);
+        return null;
+      }
+    },
+    [getAccessToken]
+  );
+
   const sendMessage = useCallback(
     async (recipientId: string, content: string): Promise<boolean> => {
       const client = supabase;
@@ -538,9 +566,11 @@ export function useMessages() {
     sendImage,
     markConversationRead,
     refreshConversations: loadConversations,
+    resolveProfileIdByUsername,
     currentUserId,
   };
 }
+
 
 
 
