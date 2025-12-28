@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { 
@@ -125,20 +125,20 @@ export default function ProfileModulePicker({
   // Users can mix and match any modules from any profile type
   const availableModules = Object.keys(OPTIONAL_MODULES) as ProfileSection[];
 
-  // Initialize defaults on mount
-  useState(() => {
+  // Initialize defaults when component mounts OR when profile type changes (if no custom selection)
+  useEffect(() => {
     if (currentEnabledModules && currentEnabledModules.length > 0) {
-      // User has custom selection
+      // User has custom selection - keep it
       setEnabledModules(new Set(currentEnabledModules));
     } else {
-      // Default to enabled sections from profile_type config (excluding core)
+      // No custom selection - use profile_type defaults
       const defaults = PROFILE_TYPE_CONFIG[profileType].sections
         .filter((s) => s.enabled && OPTIONAL_MODULES[s.id])
         .map((s) => s.id);
       setEnabledModules(new Set(defaults));
       onChange(Array.from(defaults));
     }
-  });
+  }, [profileType]); // Re-run when profileType changes
 
   const toggleModule = (moduleId: ProfileSection) => {
     const newSet = new Set(enabledModules);
