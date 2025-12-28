@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { MessageCircle, Gift, RefreshCw, Upload, X } from 'lucide-react';
 import { Button, Card, Modal, Textarea } from '@/components/ui';
+import PostMedia from './PostMedia';
 import { createClient } from '@/lib/supabase';
 import { uploadPostMedia } from '@/lib/storage';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
@@ -446,12 +447,12 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
               {composerMediaPreviewUrl && composerMediaKind && (
                 <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
                   {composerMediaKind === 'video' ? (
-                    <video src={composerMediaPreviewUrl} controls className="w-full max-h-[420px] object-contain" />
+                    <video src={composerMediaPreviewUrl} controls className="w-full h-auto block" />
                   ) : (
                     <img
                       src={composerMediaPreviewUrl}
                       alt="Selected media"
-                      className="w-full max-h-[420px] object-contain"
+                      className="w-full h-auto block"
                       style={{ filter: getPhotoFilterPreset(composerPhotoFilterId).cssFilter }}
                     />
                   )}
@@ -532,6 +533,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
             const isExpanded = !!expandedComments[post.id];
             const comments = commentsByPost[post.id] || [];
             const isCommentsLoading = !!commentsLoading[post.id];
+            const isVideo = !!post.media_url && /(\.mp4|\.webm|\.mov|\.m4v)(\?|$)/i.test(post.media_url);
 
             return (
               <Card key={post.id} className={`overflow-hidden backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>
@@ -554,11 +556,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
 
                   {post.media_url && (
                     <div className="rounded-xl overflow-hidden border border-border bg-muted/20">
-                      {/(\.mp4|\.webm|\.mov|\.m4v)(\?|$)/i.test(post.media_url) ? (
-                        <video src={post.media_url} controls className="w-full max-h-[520px] object-contain" />
-                      ) : (
-                        <img src={post.media_url} alt="Post media" className="w-full max-h-[520px] object-contain" />
-                      )}
+                      <PostMedia mediaUrl={post.media_url} mediaType={isVideo ? 'video' : 'photo'} mode="feed" alt="Post media" />
                     </div>
                   )}
 

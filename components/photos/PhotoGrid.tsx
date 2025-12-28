@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { Play, Film, Camera } from 'lucide-react';
+import { Play, Film, Camera, Heart, MessageCircle, Gift, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -23,6 +23,9 @@ export interface MediaItem {
   type: 'photo' | 'video';
   thumbnailUrl?: string;
   caption?: string;
+  likeCount?: number;
+  commentCount?: number;
+  giftTotalCoins?: number;
 }
 
 export interface PhotoGridProps {
@@ -58,11 +61,11 @@ export function PhotoGrid({
   // Loading skeleton
   if (isLoading) {
     return (
-      <div className={`grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-0.5 sm:gap-1 ${className}`}>
+      <div className={`grid grid-cols-3 gap-1 sm:gap-2 md:gap-3 ${className}`}>
         {Array.from({ length: skeletonCount }).map((_, index) => (
           <div key={index} className="aspect-square relative">
             <Skeleton 
-              className="absolute inset-0 rounded-none"
+              className="absolute inset-0 rounded"
               animation="shimmer"
               style={{ animationDelay: `${index * 50}ms` }}
             />
@@ -86,7 +89,7 @@ export function PhotoGrid({
   }
 
   return (
-    <div className={`grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-0.5 sm:gap-1 ${className}`}>
+    <div className={`grid grid-cols-3 gap-1 sm:gap-2 md:gap-3 ${className}`}>
       {items.map((item, index) => (
         <PhotoGridItem
           key={item.id}
@@ -139,27 +142,37 @@ function PhotoGridItem({ item, onClick }: PhotoGridItemProps) {
 
       {/* Video Play Badge */}
       {item.type === 'video' && (
-        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1.5 shadow-lg">
-          <Play className="w-3 h-3 text-white fill-white" />
+        <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded-full p-1 shadow-lg">
+          <Play className="w-4 h-4 text-white fill-white" />
         </div>
       )}
 
       {/* Hover Overlay */}
-      <div className="
-        absolute inset-0 bg-black/0 group-hover:bg-black/20 
-        transition-colors duration-200
-        flex items-center justify-center
-      ">
-        <div className="
-          opacity-0 group-hover:opacity-100 
-          transform scale-75 group-hover:scale-100
-          transition-all duration-200
-        ">
-          {item.type === 'video' ? (
-            <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-              <Play className="w-5 h-5 text-foreground fill-foreground ml-0.5" />
-            </div>
-          ) : null}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-150">
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white">
+          <div className="absolute top-2 left-2 right-2 flex items-center justify-between text-sm font-semibold">
+            <span className="flex items-center gap-1">
+              <Heart className="w-4 h-4" fill="white" />
+              {item.likeCount || 0}
+            </span>
+            <span className="flex items-center gap-1">
+              <MessageCircle className="w-4 h-4" fill="white" />
+              {item.commentCount || 0}
+            </span>
+          </div>
+
+          <div className="absolute inset-0 flex items-center justify-center">
+            {item.type === 'video' ? (
+              <Play className="w-10 h-10" fill="white" />
+            ) : (
+              <Eye className="w-10 h-10" />
+            )}
+          </div>
+
+          <div className="absolute bottom-2 right-2 text-sm font-semibold flex items-center gap-1">
+            <Gift className="w-4 h-4" />
+            {item.giftTotalCoins || 0}
+          </div>
         </div>
       </div>
     </button>
@@ -178,11 +191,11 @@ export function PhotoGridSkeleton({
   className?: string;
 }) {
   return (
-    <div className={`grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-0.5 sm:gap-1 ${className}`}>
+    <div className={`grid grid-cols-3 gap-1 sm:gap-2 md:gap-3 ${className}`}>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index} className="aspect-square relative">
           <Skeleton 
-            className="absolute inset-0 rounded-none"
+            className="absolute inset-0 rounded"
             animation="shimmer"
             style={{ animationDelay: `${index * 50}ms` }}
           />

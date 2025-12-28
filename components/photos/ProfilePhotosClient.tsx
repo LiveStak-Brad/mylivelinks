@@ -270,9 +270,9 @@ export default function ProfilePhotosClient({
             {composerMediaPreviewUrl && composerMediaKind && (
               <div className="relative rounded-xl overflow-hidden border border-border bg-muted/20">
                 {composerMediaKind === 'video' ? (
-                  <video src={composerMediaPreviewUrl} controls className="w-full max-h-[420px] object-contain" />
+                  <video src={composerMediaPreviewUrl} controls className="w-full h-auto block" />
                 ) : (
-                  <img src={composerMediaPreviewUrl} alt="Selected media" className="w-full max-h-[420px] object-contain" />
+                  <img src={composerMediaPreviewUrl} alt="Selected media" className="w-full h-auto block" />
                 )}
                 <button
                   type="button"
