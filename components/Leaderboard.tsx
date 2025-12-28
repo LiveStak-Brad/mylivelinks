@@ -238,15 +238,15 @@ export default function Leaderboard() {
           {entries.map((entry, index) => (
             <div
               key={entry.profile_id}
-              className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all group"
+              className="flex items-center gap-1.5 sm:gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all group"
               style={{
                 animation: `fadeIn 0.3s ease-out ${index * 0.05}s both`,
               }}
             >
               {/* Rank */}
-              <div className="flex-shrink-0 w-6 text-center">
+              <div className="flex-shrink-0 w-5 sm:w-6 text-center">
                 <span
-                  className={`text-sm font-bold ${
+                  className={`text-xs sm:text-sm font-bold ${
                     entry.rank === 1
                       ? 'text-yellow-500'
                       : entry.rank === 2
@@ -265,37 +265,36 @@ export default function Leaderboard() {
                 <img
                   src={getAvatarUrl(entry.avatar_url)}
                   alt={entry.username}
-                  className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-700"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 dark:border-gray-700"
                 />
               </div>
 
               {/* User Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="font-medium text-sm truncate">{entry.username}</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium text-xs sm:text-sm truncate">{entry.username}</span>
                   {(() => {
                     const status = gifterStatusMap[entry.profile_id];
                     if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
                     return (
-                      <TierBadge
-                        tier_key={status.tier_key}
-                        level={status.level_in_tier}
-                        size="sm"
-                      />
+                      <div className="flex items-center">
+                        <TierBadge
+                          tier_key={status.tier_key}
+                          level={status.level_in_tier}
+                          size="sm"
+                        />
+                      </div>
                     );
                   })()}
                 </div>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                  {type === 'top_streamers' ? 'Diamonds earned' : 'Coins gifted'}
-                </p>
               </div>
 
               {/* Metric Value */}
               <div className="flex-shrink-0 text-center">
-                <div className="text-sm font-bold text-gray-900 dark:text-white">
+                <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
                   {formatMetric(entry.metric_value)}
                 </div>
-                <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <div className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   {type === 'top_streamers' ? 'diamonds' : 'coins'}
                 </div>
               </div>
