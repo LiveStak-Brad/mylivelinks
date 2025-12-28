@@ -135,13 +135,15 @@ const FeedPostCard = memo(function FeedPostCard({
           </div>
         </div>
         
-        <button
-          onClick={onMore}
-          className="flex-shrink-0 p-1.5 -mr-1.5 rounded-full hover:bg-muted transition-colors"
-          aria-label="More options"
-        >
-          <MoreHorizontal className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
-        </button>
+        {typeof onMore === 'function' ? (
+          <button
+            onClick={onMore}
+            className="flex-shrink-0 p-1.5 -mr-1.5 rounded-full hover:bg-muted transition-colors"
+            aria-label="More options"
+          >
+            <MoreHorizontal className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
       
       {/* Content */}

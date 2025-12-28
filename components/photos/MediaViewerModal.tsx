@@ -9,7 +9,6 @@ import {
   MessageCircle, 
   Send, 
   Bookmark,
-  MoreHorizontal,
   Play,
   Pause,
   Volume2,
@@ -17,7 +16,6 @@ import {
   Camera,
   Film
 } from 'lucide-react';
-import { IconButton } from '@/components/ui/IconButton';
 import { Button } from '@/components/ui/Button';
 import type { MediaItem } from './PhotoGrid';
 
@@ -302,9 +300,6 @@ export function MediaViewerModal({
               <p className="font-semibold text-foreground truncate">{username}</p>
               <p className="text-xs text-muted-foreground">Original • 2h ago</p>
             </div>
-            <IconButton aria-label="More options" variant="ghost" size="sm">
-              <MoreHorizontal className="w-5 h-5" />
-            </IconButton>
           </div>
 
           {/* Caption */}
@@ -320,31 +315,14 @@ export function MediaViewerModal({
               <div className="flex-1">
                 <p className="text-sm text-foreground">
                   <span className="font-semibold">{username}</span>{' '}
-                  <span className="text-muted-foreground">
-                    {currentItem.caption || 'No caption provided. This is a placeholder for the media description.'}
-                  </span>
+                  {currentItem.caption ? (
+                    <span className="text-muted-foreground">{currentItem.caption}</span>
+                  ) : null}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">2 hours ago</p>
               </div>
             </div>
 
-            {/* Placeholder Comments */}
-            <div className="space-y-4 opacity-50">
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-muted flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm"><span className="font-semibold">commenter1</span> Great photo! 🔥</p>
-                  <p className="text-xs text-muted-foreground mt-1">1h</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-muted flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm"><span className="font-semibold">user_two</span> Amazing! 💯</p>
-                  <p className="text-xs text-muted-foreground mt-1">45m</p>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Actions */}
@@ -415,5 +393,7 @@ export function MediaViewerModal({
     </div>
   );
 }
+
+
 
 

@@ -45,6 +45,27 @@ export async function uploadAvatar(
   return urlData.publicUrl;
 }
 
+export async function uploadProfileMedia(profileId: string, relativePath: string, file: File, opts?: { upsert?: boolean }): Promise<string> {
+  const supabase = createClient();
+  const filePath = `${profileId}/${String(relativePath).replace(/^\/+/, '')}`;
+
+  const { error } = await supabase.storage.from('profile-media').upload(filePath, file, {
+    contentType: file.type || undefined,
+    upsert: opts?.upsert === true,
+  });
+
+  if (error) {
+    throw new Error(`Failed to upload profile media: ${error.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from('profile-media').getPublicUrl(filePath);
+  if (!urlData?.publicUrl) {
+    throw new Error('Failed to get profile media URL');
+  }
+
+  return urlData.publicUrl;
+}
+
 export async function uploadPostMedia(profileId: string, file: File): Promise<string> {
   const supabase = createClient();
 
