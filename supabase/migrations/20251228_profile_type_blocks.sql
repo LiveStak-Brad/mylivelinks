@@ -29,17 +29,6 @@ $$;
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS profile_type public.profile_type_enum NOT NULL DEFAULT 'creator';
 
--- 3) Shared updated_at trigger helper (create-or-replace so it's always present)
-CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
 -- 4) profile_content_blocks
 CREATE TABLE IF NOT EXISTS public.profile_content_blocks (
   id bigserial PRIMARY KEY,

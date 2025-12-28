@@ -10,7 +10,8 @@ import Image from 'next/image';
 import ProfileCustomization from '@/components/profile/ProfileCustomization';
 import { ProfileTypePickerModal, ProfileType } from '@/components/ProfileTypePickerModal';
 import ProfileModulePicker from '@/components/profile/ProfileModulePicker';
-import { ProfileSection } from '@/lib/profileTypeConfig';
+import ProfileTabPicker from '@/components/profile/ProfileTabPicker';
+import { ProfileSection, ProfileTab } from '@/lib/profileTypeConfig';
 
 interface UserLink {
   id?: number;
@@ -71,6 +72,7 @@ export default function ProfileSettingsPage() {
   
   // Enabled Modules (optional modules only, no core shell)
   const [enabledModules, setEnabledModules] = useState<ProfileSection[] | null>(null);
+  const [enabledTabs, setEnabledTabs] = useState<ProfileTab[] | null>(null);
   
   // Pinned post
   const [pinnedPost, setPinnedPost] = useState<PinnedPost | null>(null);
@@ -255,6 +257,8 @@ export default function ProfileSettingsPage() {
         avatar_url: finalAvatarUrl,
         // Enabled modules (optional modules only)
         enabled_modules: enabledModules || null,
+        // Enabled tabs (optional tabs only)
+        enabled_tabs: enabledTabs || null,
         // Social media fields (strip @ if user included it)
         social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
         social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
@@ -565,11 +569,24 @@ export default function ProfileSettingsPage() {
         </div>
 
         {/* Optional Modules */}
-        <ProfileModulePicker
-          profileType={profileType}
-          currentEnabledModules={enabledModules}
-          onChange={setEnabledModules}
-        />
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-2">Profile Sections</h2>
+          <ProfileModulePicker
+            profileType={profileType}
+            currentEnabledModules={enabledModules}
+            onChange={setEnabledModules}
+          />
+        </div>
+
+        {/* Optional Tabs */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-2">Profile Tabs</h2>
+          <ProfileTabPicker
+            profileType={profileType}
+            currentEnabledTabs={enabledTabs}
+            onChange={setEnabledTabs}
+          />
+        </div>
 
         {/* Save Button (Top) */}
         <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-lg p-4 mb-6 sticky top-4 z-10">

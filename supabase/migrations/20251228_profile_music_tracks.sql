@@ -14,17 +14,6 @@ BEGIN;
 --   as wrappers to avoid breaking older callers, but enforce rights rules centrally.
 -- -----------------------------------------------------------------------------
 
--- Updated-at helper (shared across tables)
-CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
 -- Create table if missing (some environments already have it from earlier migrations)
 CREATE TABLE IF NOT EXISTS public.profile_music_tracks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

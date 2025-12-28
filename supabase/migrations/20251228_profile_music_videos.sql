@@ -13,17 +13,6 @@ BEGIN;
 -- - RPC names in this migration are the *canonical* ones requested for P0.
 -- -----------------------------------------------------------------------------
 
--- Ensure helper exists (idempotent).
-CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
 -- -----------------------------------------------------------------------------
 -- YouTube normalization (extract strict 11-char ID)
 -- -----------------------------------------------------------------------------
@@ -339,9 +328,9 @@ AS $$
 DECLARE
   v_uid uuid;
   v_expected int;
+  v_distinct int;
+  v_nulls int;
   v_owned int;
-  v_id uuid;
-  v_i int;
 BEGIN
   v_uid := auth.uid();
   IF v_uid IS NULL THEN
@@ -352,26 +341,46 @@ BEGIN
     RAISE EXCEPTION 'unauthorized';
   END IF;
 
-  v_expected := COALESCE(array_length(p_ordered_ids, 1), 0);
+  WITH input AS (
+    SELECT x.id, x.ord
+    FROM unnest(p_ordered_ids) WITH ORDINALITY AS x(id, ord)
+  )
+  SELECT
+    count(*)::int,
+    count(distinct id)::int,
+    count(*) FILTER (WHERE id IS NULL)::int
+  INTO v_expected, v_distinct, v_nulls
+  FROM input;
 
-  SELECT count(*)
+  IF COALESCE(v_expected, 0) = 0 THEN
+    RETURN;
+  END IF;
+  IF COALESCE(v_nulls, 0) > 0 THEN
+    RAISE EXCEPTION 'null ids in reorder list';
+  END IF;
+  IF v_expected <> v_distinct THEN
+    RAISE EXCEPTION 'duplicate ids in reorder list';
+  END IF;
+
+  SELECT count(*)::int
   INTO v_owned
   FROM public.profile_music_videos
-  WHERE profile_id = v_uid
+  WHERE profile_id = p_profile_id
     AND id = ANY(p_ordered_ids);
 
   IF v_owned <> v_expected THEN
     RAISE EXCEPTION 'invalid reorder set';
   END IF;
 
-  v_i := 0;
-  FOREACH v_id IN ARRAY p_ordered_ids LOOP
-    UPDATE public.profile_music_videos
-    SET sort_order = v_i
-    WHERE id = v_id
-      AND profile_id = v_uid;
-    v_i := v_i + 1;
-  END LOOP;
+  WITH input AS (
+    SELECT x.id, x.ord
+    FROM unnest(p_ordered_ids) WITH ORDINALITY AS x(id, ord)
+  )
+  UPDATE public.profile_music_videos t
+  SET sort_order = (input.ord - 1)
+  FROM input
+  WHERE t.id = input.id
+    AND t.profile_id = p_profile_id;
 END;
 $$;
 

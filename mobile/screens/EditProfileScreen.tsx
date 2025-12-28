@@ -7,7 +7,8 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { Button, Input, PageShell } from '../components/ui';
 import { ProfileTypePickerModal, type ProfileType } from '../components/ProfileTypePickerModal';
 import ProfileModulePicker from '../components/ProfileModulePicker';
-import type { ProfileSection } from '../config/profileTypeConfig';
+import ProfileTabPicker from '../components/ProfileTabPicker';
+import type { ProfileSection, ProfileTab } from '../config/profileTypeConfig';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
@@ -35,6 +36,7 @@ export function EditProfileScreen({ navigation }: Props) {
   const [profileType, setProfileType] = useState<ProfileType>('creator');
   const [showTypePickerModal, setShowTypePickerModal] = useState(false);
   const [enabledModules, setEnabledModules] = useState<ProfileSection[] | null>(null);
+  const [enabledTabs, setEnabledTabs] = useState<ProfileTab[] | null>(null);
 
   const canSave = useMemo(() => !!userId && !saving && !loading, [loading, saving, userId]);
 
@@ -117,6 +119,7 @@ export function EditProfileScreen({ navigation }: Props) {
         display_name: displayName.trim() || null,
         bio: bio.trim() || null,
         enabled_modules: enabledModules || null,
+        enabled_tabs: enabledTabs || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -207,11 +210,24 @@ export function EditProfileScreen({ navigation }: Props) {
           </View>
 
           {/* Optional Modules */}
-          <ProfileModulePicker
-            profileType={profileType}
-            currentEnabledModules={enabledModules}
-            onChange={setEnabledModules}
-          />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Profile Sections</Text>
+            <ProfileModulePicker
+              profileType={profileType}
+              currentEnabledModules={enabledModules}
+              onChange={setEnabledModules}
+            />
+          </View>
+
+          {/* Optional Tabs */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Profile Tabs</Text>
+            <ProfileTabPicker
+              profileType={profileType}
+              currentEnabledTabs={enabledTabs}
+              onChange={setEnabledTabs}
+            />
+          </View>
 
           <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} loading={saving} />
         </View>

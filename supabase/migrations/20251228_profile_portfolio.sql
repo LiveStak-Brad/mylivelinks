@@ -258,8 +258,10 @@ SET row_security = off
 AS $$
 DECLARE
   v_uid uuid;
-  v_idx int;
-  v_item_id uuid;
+  v_expected int;
+  v_distinct int;
+  v_nulls int;
+  v_owned int;
 BEGIN
   v_uid := auth.uid();
   IF v_uid IS NULL THEN
@@ -270,16 +272,46 @@ BEGIN
     RAISE EXCEPTION 'unauthorized';
   END IF;
 
-  v_idx := 0;
-  FOREACH v_item_id IN ARRAY p_ordered_ids
-  LOOP
-    UPDATE public.profile_portfolio
-    SET sort_order = v_idx
-    WHERE id = v_item_id
-      AND profile_id = v_uid;
+  WITH input AS (
+    SELECT x.id, x.ord
+    FROM unnest(p_ordered_ids) WITH ORDINALITY AS x(id, ord)
+  )
+  SELECT
+    count(*)::int,
+    count(distinct id)::int,
+    count(*) FILTER (WHERE id IS NULL)::int
+  INTO v_expected, v_distinct, v_nulls
+  FROM input;
 
-    v_idx := v_idx + 1;
-  END LOOP;
+  IF COALESCE(v_expected, 0) = 0 THEN
+    RETURN;
+  END IF;
+  IF COALESCE(v_nulls, 0) > 0 THEN
+    RAISE EXCEPTION 'null ids in reorder list';
+  END IF;
+  IF v_expected <> v_distinct THEN
+    RAISE EXCEPTION 'duplicate ids in reorder list';
+  END IF;
+
+  SELECT count(*)::int
+  INTO v_owned
+  FROM public.profile_portfolio
+  WHERE profile_id = p_profile_id
+    AND id = ANY(p_ordered_ids);
+
+  IF v_owned <> v_expected THEN
+    RAISE EXCEPTION 'invalid reorder set';
+  END IF;
+
+  WITH input AS (
+    SELECT x.id, x.ord
+    FROM unnest(p_ordered_ids) WITH ORDINALITY AS x(id, ord)
+  )
+  UPDATE public.profile_portfolio t
+  SET sort_order = (input.ord - 1)
+  FROM input
+  WHERE t.id = input.id
+    AND t.profile_id = p_profile_id;
 END;
 $$;
 

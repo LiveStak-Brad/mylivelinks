@@ -257,8 +257,22 @@ export function getProfileTypeConfig(profileType?: ProfileType): ProfileTypeConf
 /**
  * Get enabled tabs for a profile type
  */
-export function getEnabledTabs(profileType?: ProfileType): TabConfig[] {
+/**
+ * Get enabled tabs for a profile type
+ * If customEnabledTabs is provided, use that instead of profile_type defaults
+ */
+export function getEnabledTabs(
+  profileType?: ProfileType,
+  customEnabledTabs?: ProfileTab[] | null
+): TabConfig[] {
   const config = getProfileTypeConfig(profileType);
+  
+  // If user has custom enabled tabs, use those
+  if (customEnabledTabs && customEnabledTabs.length > 0) {
+    return config.tabs.filter(tab => customEnabledTabs.includes(tab.id));
+  }
+  
+  // Otherwise use profile_type defaults
   return config.tabs.filter(tab => tab.enabled);
 }
 

@@ -25,17 +25,6 @@ BEGIN;
 -- 0) Helpers
 -- -----------------------------------------------------------------------------
 
--- Updated-at trigger helper (create-or-replace so it's always present)
-CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
 -- YouTube normalization helper.
 -- Stores both youtube_id and normalized watch URL (https://www.youtube.com/watch?v={id}).
 DROP FUNCTION IF EXISTS public.normalize_youtube_url(text);
