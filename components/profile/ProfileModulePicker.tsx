@@ -22,6 +22,40 @@ interface ModuleMetadata {
 }
 
 const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
+  // Content Modules (Photos, Videos, etc.)
+  feed: {
+    id: 'feed',
+    label: 'Feed',
+    description: 'Photo/video feed grid',
+  },
+  reels: {
+    id: 'reels',
+    label: 'Vlog / Reels',
+    description: 'Short-form video content',
+  },
+  photos: {
+    id: 'photos',
+    label: 'Photos',
+    description: 'Photo gallery',
+  },
+  videos: {
+    id: 'videos',
+    label: 'Videos',
+    description: 'Video gallery',
+  },
+  
+  // Music & Entertainment
+  music_showcase: {
+    id: 'music_showcase',
+    label: 'Music Tracks',
+    description: 'Your music library',
+  },
+  upcoming_events: {
+    id: 'upcoming_events',
+    label: 'Events / Shows',
+    description: 'Your event schedule',
+  },
+  
   // Streaming & Stats
   streaming_stats: {
     id: 'streaming_stats',
@@ -47,18 +81,6 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     id: 'top_streamers',
     label: 'Top Streamers',
     description: 'Streamers you support',
-  },
-  
-  // Music & Entertainment
-  music_showcase: {
-    id: 'music_showcase',
-    label: 'Music Tracks',
-    description: 'Your music library',
-  },
-  upcoming_events: {
-    id: 'upcoming_events',
-    label: 'Events / Shows',
-    description: 'Your event schedule',
   },
   
   // Products & Business
@@ -99,28 +121,21 @@ export default function ProfileModulePicker({
     new Set(currentEnabledModules || [])
   );
 
-  // Get available optional modules for this profile type
-  const availableModules = PROFILE_TYPE_CONFIG[profileType].sections
-    .filter((s) => OPTIONAL_MODULES[s.id])
-    .map((s) => s.id);
+  // Get ALL optional modules (not filtered by profile type)
+  // Users can mix and match any modules from any profile type
+  const availableModules = Object.keys(OPTIONAL_MODULES) as ProfileSection[];
 
-  // Initialize enabled modules from profile_type defaults if not set
-  const getDefaultModules = () => {
-    if (currentEnabledModules && currentEnabledModules.length > 0) {
-      return new Set(currentEnabledModules);
-    }
-    // Default to enabled sections from profile_type config (excluding core)
-    const defaults = PROFILE_TYPE_CONFIG[profileType].sections
-      .filter((s) => s.enabled && OPTIONAL_MODULES[s.id])
-      .map((s) => s.id);
-    return new Set(defaults);
-  };
-
-  // Load defaults on mount
+  // Initialize defaults on mount
   useState(() => {
-    const defaults = getDefaultModules();
-    setEnabledModules(defaults);
-    if (!currentEnabledModules || currentEnabledModules.length === 0) {
+    if (currentEnabledModules && currentEnabledModules.length > 0) {
+      // User has custom selection
+      setEnabledModules(new Set(currentEnabledModules));
+    } else {
+      // Default to enabled sections from profile_type config (excluding core)
+      const defaults = PROFILE_TYPE_CONFIG[profileType].sections
+        .filter((s) => s.enabled && OPTIONAL_MODULES[s.id])
+        .map((s) => s.id);
+      setEnabledModules(new Set(defaults));
       onChange(Array.from(defaults));
     }
   });
