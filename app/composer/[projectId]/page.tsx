@@ -57,6 +57,10 @@ export default function ComposerEditorPage() {
   const [projectTitle, setProjectTitle] = useState('');
   const [producer, setProducer] = useState<{ id: string; username: string } | null>(null);
   const [actors, setActors] = useState<{ id: string; username: string }[]>([]);
+
+  const [clipId, setClipId] = useState<string | null>(null);
+  const [clipAssetUrl, setClipAssetUrl] = useState<string | null>(null);
+  const [clipDurationSeconds, setClipDurationSeconds] = useState<number | null>(null);
   
   // Editor affordances (UI-only)
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '1:1' | '9:16'>('16:9');
@@ -188,6 +192,77 @@ export default function ComposerEditorPage() {
       showTemporaryToast(err?.message || 'Upload failed');
     }
   };
+
+  useEffect(() => {
+    if (!projectId || isNewProject) {
+      setClipId(null);
+      setClipAssetUrl(null);
+      setClipDurationSeconds(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const supabase = createClient();
+
+        const { data: projectJson, error: projectErr } = await supabase.rpc('get_clip_project', {
+          p_project_id: projectId,
+        });
+
+        if (projectErr) {
+          throw projectErr;
+        }
+
+        const clip = projectJson?.clip;
+        const id = typeof clip?.id === 'string' ? clip.id : null;
+        const durationSeconds = typeof clip?.duration_seconds === 'number' ? clip.duration_seconds : null;
+
+        if (!id) {
+          throw new Error('Clip id missing');
+        }
+
+        if (cancelled) return;
+
+        setClipId(id);
+        setClipDurationSeconds(durationSeconds);
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token || '';
+
+        const playbackRes = await fetch(`/api/clips/${id}/playback`, {
+          method: 'GET',
+          headers: {
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+        });
+
+        const playbackJson = await playbackRes.json().catch(() => null);
+        if (!playbackRes.ok) {
+          throw new Error(playbackJson?.error || 'Failed to load clip playback');
+        }
+
+        const assetUrl = typeof playbackJson?.asset_url === 'string' ? playbackJson.asset_url : null;
+        if (!assetUrl) {
+          throw new Error('Clip asset_url missing');
+        }
+
+        if (cancelled) return;
+        setClipAssetUrl(assetUrl);
+      } catch (err: any) {
+        console.error('Load project error:', err);
+        if (!cancelled) {
+          showTemporaryToast(err?.message || 'Failed to load project');
+        }
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, isNewProject]);
 
   const showTemporaryToast = (message: string) => {
     setToastMessage(message);
@@ -498,44 +573,53 @@ export default function ComposerEditorPage() {
                       ${aspectRatio === '16:9' ? 'aspect-video' : ''}
                     `}
                   >
-                    {/* Empty State */}
-                    <div className="text-center space-y-4 md:space-y-5 px-4 md:px-6 py-6 md:py-8">
-                      <div className="w-20 h-20 md:w-24 md:h-24 mx-auto rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center ring-4 ring-primary/10">
-                        <Film className="w-10 h-10 md:w-12 md:h-12 text-primary" />
+                    {clipAssetUrl ? (
+                      <video
+                        key={clipAssetUrl}
+                        src={clipAssetUrl}
+                        controls
+                        playsInline
+                        className="absolute inset-0 w-full h-full object-contain bg-black"
+                      />
+                    ) : (
+                      <div className="text-center space-y-4 md:space-y-5 px-4 md:px-6 py-6 md:py-8">
+                        <div className="w-20 h-20 md:w-24 md:h-24 mx-auto rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center ring-4 ring-primary/10">
+                          <Film className="w-10 h-10 md:w-12 md:h-12 text-primary" />
+                        </div>
+                        <div className="space-y-2">
+                          <h2 className="text-xl md:text-2xl font-bold text-foreground">
+                            Drop a clip here
+                          </h2>
+                          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                            Upload a video or add from your live streams to start creating
+                          </p>
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 md:gap-3">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="video/mp4"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0] || null;
+                              e.target.value = '';
+                              if (f) void handleUploadVideoSelected(f);
+                            }}
+                          />
+                          <button
+                            onClick={handleUploadVideoClick}
+                            className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-primary/30 touch-manipulation min-h-[48px]"
+                          >
+                            <Upload className="w-5 h-5" />
+                            Upload Video
+                          </button>
+                          <button className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors touch-manipulation min-h-[48px]">
+                            <Film className="w-5 h-5" />
+                            From Streams
+                          </button>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <h2 className="text-xl md:text-2xl font-bold text-foreground">
-                          Drop a clip here
-                        </h2>
-                        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                          Upload a video or add from your live streams to start creating
-                        </p>
-                      </div>
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 md:gap-3">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="video/mp4"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0] || null;
-                            e.target.value = '';
-                            if (f) void handleUploadVideoSelected(f);
-                          }}
-                        />
-                        <button
-                          onClick={handleUploadVideoClick}
-                          className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-primary/30 touch-manipulation min-h-[48px]"
-                        >
-                          <Upload className="w-5 h-5" />
-                          Upload Video
-                        </button>
-                        <button className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors touch-manipulation min-h-[48px]">
-                          <Film className="w-5 h-5" />
-                          From Streams
-                        </button>
-                      </div>
-                    </div>
+                    )}
                     
                     {/* Floating Indicators */}
                     <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
@@ -543,7 +627,7 @@ export default function ComposerEditorPage() {
                         {aspectRatio}
                       </span>
                       <span className="px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-sm border border-border text-xs font-medium text-muted-foreground shadow-sm">
-                        0:00
+                        {clipDurationSeconds ? `0:${String(clipDurationSeconds).padStart(2, '0')}` : '0:00'}
                       </span>
                     </div>
 
