@@ -37,7 +37,7 @@ export default function GifterLevelsPage() {
   }, []);
 
   return (
-    <PageShell maxWidth="lg" padding="lg" className="bg-gradient-to-b from-background via-background to-muted/30">
+    <PageShell maxWidth="lg" padding="lg" className="bg-gradient-to-b from-background via-background to-muted/30 pb-20 md:pb-8">
       <PageHeader 
         title="" 
         backLink="/" 

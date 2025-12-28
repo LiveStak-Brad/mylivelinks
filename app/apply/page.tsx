@@ -69,7 +69,7 @@ export default function ApplyPage() {
   };
 
   return (
-    <PageShell maxWidth="md" padding="md">
+    <PageShell maxWidth="md" padding="md" className="pb-20 md:pb-8">
       <PageHeader 
         title="Apply for a Room" 
         description="Tell us about your streaming room idea and how you plan to grow your audience."

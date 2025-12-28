@@ -888,7 +888,7 @@ export default function ModernProfilePage() {
       </div>
       
       {/* Content - Scrollable */}
-      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20">
+      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20 md:pb-8">
         {/* Login to See Live Banner (if not logged in and profile is live) */}
         {profile.is_live && !currentUser && (
           <div className="mb-4 sm:mb-6">

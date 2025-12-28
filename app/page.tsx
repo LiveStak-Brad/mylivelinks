@@ -96,7 +96,7 @@ export default function LandingPage() {
 
   if (loading) {
     return (
-      <main id="main" className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary">
+      <main id="main" className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary pb-20 md:pb-8">
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto space-y-8">
             <div className="text-center space-y-4">
@@ -112,7 +112,7 @@ export default function LandingPage() {
   }
 
   return (
-    <main id="main" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary">
+    <main id="main" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary pb-20 md:pb-8">
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">

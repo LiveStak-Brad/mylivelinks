@@ -32,7 +32,7 @@ export default function ComposerPage() {
   return (
     <main 
       id="main"
-      className="min-h-[calc(100vh-7rem)] bg-background"
+      className="min-h-[calc(100vh-7rem)] bg-background pb-20 md:pb-8"
     >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         
