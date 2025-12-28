@@ -9,6 +9,7 @@ export { FeedComposer } from './FeedComposer';
 export { FeedPostCard } from './FeedPostCard';
 export { FeedEmptyState } from './FeedEmptyState';
 export { FeedSkeleton, FeedComposerSkeleton, FeedSkeletonList } from './FeedSkeleton';
+export { default as PostMedia } from './PostMedia';
 
 // Re-export types
 export type { FeedComposerProps } from './FeedComposer';
