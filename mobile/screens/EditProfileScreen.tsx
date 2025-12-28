@@ -343,4 +343,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
+  section: {
+    marginTop: 10,
+    gap: 10,
+  },
+  sectionTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
 });

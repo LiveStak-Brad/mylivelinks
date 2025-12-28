@@ -6,7 +6,8 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, Modal, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ClipCompletionActions } from '../components/ClipCompletionActions';
 
 /**

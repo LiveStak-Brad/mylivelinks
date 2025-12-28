@@ -32,6 +32,7 @@ export function ComposerEditorScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const draftId = route.params?.draftId;
+  const producerId = route.params?.producerId;
 
   // Editor state
   const [state, setState] = useState<ComposerEditorState>({
@@ -48,11 +49,11 @@ export function ComposerEditorScreen() {
 
   // Producer (current user)
   const producer = useMemo(() => ({
-    id: topBar.userId || '',
+    id: typeof producerId === 'string' ? producerId : '',
     username: topBar.username || '',
     displayName: topBar.displayName || topBar.username || '',
     avatarUrl: topBar.avatarUrl,
-  }), [topBar]);
+  }), [producerId, topBar.avatarUrl, topBar.displayName, topBar.username]);
 
   const handleSave = useCallback(async () => {
     setState(prev => ({ ...prev, isSaving: true }));
