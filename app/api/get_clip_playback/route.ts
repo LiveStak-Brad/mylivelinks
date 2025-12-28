@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     const existingThumbUrl =
       typeof clip.thumbnail_url === 'string' && clip.thumbnail_url.trim().length > 0 ? clip.thumbnail_url.trim() : null;
 
-    if (clip.visibility === 'public' && clip.status === 'ready' && existingAssetUrl && existingThumbUrl) {
+    if (clip.visibility === 'public' && clip.status === 'ready' && existingAssetUrl) {
       return NextResponse.json(
         {
           asset_url: existingAssetUrl,
@@ -58,21 +58,13 @@ export async function GET(request: NextRequest) {
     const { data: assetSigned, error: assetErr } = await admin.storage.from(bucket).createSignedUrl(assetPath, expiresIn);
     const { data: thumbSigned, error: thumbErr } = await admin.storage.from(bucket).createSignedUrl(thumbPath, expiresIn);
 
-    if (assetErr || thumbErr || !assetSigned?.signedUrl || !thumbSigned?.signedUrl) {
-      return NextResponse.json(
-        {
-          asset_url: null,
-          thumbnail_url: null,
-          status,
-        },
-        { status: 200 }
-      );
-    }
+    const assetUrl = assetErr ? null : assetSigned?.signedUrl ?? null;
+    const thumbUrl = thumbErr ? null : thumbSigned?.signedUrl ?? null;
 
     return NextResponse.json(
       {
-        asset_url: assetSigned.signedUrl,
-        thumbnail_url: thumbSigned.signedUrl,
+        asset_url: assetUrl,
+        thumbnail_url: thumbUrl,
         status,
       },
       { status: 200 }

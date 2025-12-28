@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   Film, 
@@ -51,6 +51,8 @@ export default function ComposerEditorPage() {
   
   const isNewProject = projectId === 'new';
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   // Project state (placeholder)
   const [projectTitle, setProjectTitle] = useState('');
   const [producer, setProducer] = useState<{ id: string; username: string } | null>(null);
@@ -79,6 +81,112 @@ export default function ComposerEditorPage() {
 
   const togglePanel = (panel: keyof typeof expandedPanels) => {
     setExpandedPanels(prev => ({ ...prev, [panel]: !prev[panel] }));
+  };
+
+  const getVideoDurationSeconds = async (file: File): Promise<number> => {
+    const url = URL.createObjectURL(file);
+    try {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+
+      const duration = await new Promise<number>((resolve, reject) => {
+        const cleanup = () => {
+          video.removeEventListener('loadedmetadata', onLoaded);
+          video.removeEventListener('error', onError);
+        };
+
+        const onLoaded = () => {
+          cleanup();
+          resolve(video.duration);
+        };
+
+        const onError = () => {
+          cleanup();
+          reject(new Error('Failed to read video metadata'));
+        };
+
+        video.addEventListener('loadedmetadata', onLoaded);
+        video.addEventListener('error', onError);
+        video.src = url;
+      });
+
+      if (!Number.isFinite(duration) || duration <= 0) {
+        throw new Error('Invalid video duration');
+      }
+
+      return Math.max(1, Math.round(duration));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleUploadVideoClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleUploadVideoSelected = async (file: File) => {
+    try {
+      const supabase = createClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
+
+      const durationSeconds = await getVideoDurationSeconds(file);
+
+      const uploadPrepRes = await fetch('/api/clips/upload-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          mimeType: file.type || 'video/mp4',
+          durationSeconds,
+        }),
+      });
+
+      const uploadPrepJson = await uploadPrepRes.json().catch(() => null);
+      if (!uploadPrepRes.ok) {
+        throw new Error(uploadPrepJson?.error || 'Failed to prepare upload');
+      }
+
+      const bucket = String(uploadPrepJson?.bucket || '');
+      const path = String(uploadPrepJson?.path || '');
+      const uploadToken = String(uploadPrepJson?.token || '');
+      const clipId = String(uploadPrepJson?.clip_id || '');
+      const createdProjectId = String(uploadPrepJson?.project_id || '');
+
+      if (!bucket || !path || !uploadToken || !clipId || !createdProjectId) {
+        throw new Error('Upload response missing required fields');
+      }
+
+      const { error: uploadErr } = await supabase.storage.from(bucket).uploadToSignedUrl(path, uploadToken, file, {
+        contentType: file.type || 'video/mp4',
+      });
+
+      if (uploadErr) {
+        throw new Error(uploadErr.message);
+      }
+
+      const finalizeRes = await fetch('/api/clips/upload-complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ clip_id: clipId, project_id: createdProjectId }),
+      });
+
+      const finalizeJson = await finalizeRes.json().catch(() => null);
+      if (!finalizeRes.ok) {
+        throw new Error(finalizeJson?.error || 'Failed to finalize upload');
+      }
+
+      showTemporaryToast('Uploaded');
+      router.replace(`/composer/${createdProjectId}`);
+    } catch (err: any) {
+      console.error('Upload video error:', err);
+      showTemporaryToast(err?.message || 'Upload failed');
+    }
   };
 
   const showTemporaryToast = (message: string) => {
@@ -404,7 +512,21 @@ export default function ComposerEditorPage() {
                         </p>
                       </div>
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 md:gap-3">
-                        <button className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-primary/30 touch-manipulation min-h-[48px]">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="video/mp4"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] || null;
+                            e.target.value = '';
+                            if (f) void handleUploadVideoSelected(f);
+                          }}
+                        />
+                        <button
+                          onClick={handleUploadVideoClick}
+                          className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-primary/30 touch-manipulation min-h-[48px]"
+                        >
                           <Upload className="w-5 h-5" />
                           Upload Video
                         </button>
