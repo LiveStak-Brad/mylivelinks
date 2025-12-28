@@ -96,7 +96,7 @@ export function MainTabs() {
         name="Messages"
         component={MessagesScreen}
         options={{
-          tabBarLabel: 'Messys',
+          tabBarLabel: 'Messages',
           tabBarIcon: ({ color, size }) => (
             <Feather name="message-circle" size={size} color={color} style={{ color: '#00a8ff' }} />
           ),

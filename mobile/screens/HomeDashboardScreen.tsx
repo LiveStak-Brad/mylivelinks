@@ -105,7 +105,20 @@ export function HomeDashboardScreen({ navigation }: Props) {
   };
 
   const handleNavigateToSettings = () => {
-    // TODO: Navigate to settings
+    try {
+      const parent = navigation.getParent?.();
+      if (parent?.navigate) {
+        parent.navigate('EditProfile');
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      navigation.navigate('EditProfile');
+    } catch {
+      // ignore
+    }
   };
 
   const handleNavigateToWallet = () => {
@@ -125,7 +138,20 @@ export function HomeDashboardScreen({ navigation }: Props) {
   };
 
   const handleNavigateToAnalytics = () => {
-    // TODO: Navigate to analytics
+    try {
+      const parent = navigation.getParent?.();
+      if (parent?.navigate) {
+        parent.navigate('MyAnalytics');
+        return;
+      }
+    } catch {
+      // ignore
+    }
+    try {
+      navigation.navigate('MyAnalytics');
+    } catch {
+      // ignore
+    }
   };
 
   const handleApplyPress = () => {
@@ -345,18 +371,14 @@ export function HomeDashboardScreen({ navigation }: Props) {
             <Button
               title="Browse Live Streams"
               variant="secondary"
-              disabled
               onPress={() => {}}
               style={styles.actionButton}
+              disabled
             />
             <Button
               title="Browse Rooms"
-              onPress={() => {
-                // Navigate to Rooms tab (already in tab navigator)
-                // This button might be redundant since Rooms is a tab
-              }}
+              onPress={handleNavigateToRooms}
               style={styles.actionButton}
-              disabled
             />
           </View>
         </View>

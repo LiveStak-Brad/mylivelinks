@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { createTransfer, logStripeAction } from '@/lib/stripe';
 import { getSupabaseAdmin, completeCashout, failCashout } from '@/lib/supabase-admin';
+import { createAuthedRouteHandlerClient, getSessionUser } from '@/lib/admin';
 
 /**
  * POST /api/cashout/request
@@ -24,34 +23,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const diamondsRequested = body.diamondsRequested || 99999999; // Max if not specified
 
-    // Get authenticated user
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          },
-        },
-      }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Get authenticated user (supports cookie auth on web + bearer auth on mobile)
+    const user = await getSessionUser(request);
+    if (!user) {
       logStripeAction('cashout-unauthorized', { requestId });
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+
+    const supabase = createAuthedRouteHandlerClient(request);
 
     const purchasesOwnerOnly = (process.env.PURCHASES_OWNER_ONLY ?? 'true').toLowerCase() !== 'false';
     const { data: ownerOk } = await supabase.rpc('is_owner', { p_profile_id: user.id });
@@ -194,6 +176,8 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
 
 
 

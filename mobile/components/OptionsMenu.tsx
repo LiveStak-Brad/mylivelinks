@@ -15,6 +15,7 @@ import {
   ScrollView,
   Switch,
   Alert,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -127,6 +128,24 @@ export function OptionsMenu({
     navigation.getParent?.()?.navigate?.(routeName, params);
   };
 
+  const navigateToProfile = (username?: string | null) => {
+    const cleaned = typeof username === 'string' ? username.trim() : '';
+    if (!cleaned) return;
+
+    // Prefer Profile tab if it exists, since that's how most of mobile navigates to profiles.
+    try {
+      navigation.getParent?.()?.navigate?.('MainTabs', { screen: 'Profile', params: { username: cleaned } });
+      return;
+    } catch {
+      // ignore
+    }
+    try {
+      navigation.navigate?.('Profile', { username: cleaned });
+    } catch {
+      // ignore
+    }
+  };
+
   return (
     <>
       {/* Trigger Button - Only show if not controlled externally */}
@@ -170,7 +189,9 @@ export function OptionsMenu({
                   closeMenu();
                   if (onNavigateToProfile && topBar.username) {
                     onNavigateToProfile(topBar.username);
+                    return;
                   }
+                  navigateToProfile(topBar.username);
                 }}
                 disabled={!topBar.enabledItems.optionsMenu_myProfile}
               />
@@ -190,7 +211,9 @@ export function OptionsMenu({
                   closeMenu();
                   if (onNavigateToWallet) {
                     onNavigateToWallet();
+                    return;
                   }
+                  navigateRoot('Wallet');
                 }}
                 disabled={!topBar.enabledItems.optionsMenu_wallet}
               />
@@ -215,6 +238,12 @@ export function OptionsMenu({
                   closeMenu();
                   if (onNavigateToApply) {
                     onNavigateToApply();
+                    return;
+                  }
+                  try {
+                    void Linking.openURL('https://mylivelinks.com/apply');
+                  } catch {
+                    // ignore
                   }
                 }}
                 disabled={!topBar.enabledItems.optionsMenu_applyRoom}

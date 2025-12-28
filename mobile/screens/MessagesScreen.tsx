@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -25,15 +25,14 @@ type Props = BottomTabScreenProps<MainTabsParamList, 'Messages'>;
  * 
  * Structure:
  * - Global top bar (hamburger, logo, avatar)
- * - Page header: 💬 Messys (NO subtitle, NO "Messages")
+ * - Page header: 💬 Messages
  * - Search bar
  * - Conversations list OR thread view
- * 
- * Naming: "Messys" everywhere, never "Messages"
  */
-export function MessagesScreen({ navigation: _navigation }: Props) {
+export function MessagesScreen({ navigation: _navigation, route }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [draftMessage, setDraftMessage] = useState('');
+  const lastAutoOpenedRef = useRef<string>('');
   const {
     conversations,
     isLoading,
@@ -45,6 +44,20 @@ export function MessagesScreen({ navigation: _navigation }: Props) {
   } = useMessages();
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // If we were deep-linked here from a profile "Message" button, auto-open that conversation.
+  useEffect(() => {
+    const openUserId = route.params?.openUserId;
+    if (!openUserId) return;
+    if (lastAutoOpenedRef.current === openUserId) return;
+    lastAutoOpenedRef.current = openUserId;
+    setActiveConversationId(openUserId);
+    try {
+      _navigation.setParams({ openUserId: undefined });
+    } catch {
+      // ignore
+    }
+  }, [_navigation, route.params?.openUserId, setActiveConversationId]);
 
   const activeConversation = activeConversationId
     ? conversations.find((c) => c.id === activeConversationId)
@@ -64,20 +77,31 @@ export function MessagesScreen({ navigation: _navigation }: Props) {
   if (activeConversationId) {
     return (
       <PageShell
-        title={activeConversation?.recipientDisplayName || activeConversation?.recipientUsername || 'Messys'}
         contentStyle={styles.container}
-        left={
-          <Pressable
-            onPress={() => {
-              setDraftMessage('');
-              setActiveConversationId(null);
-            }}
-            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-          >
-            <Text style={styles.backButtonText}>Back</Text>
-          </Pressable>
-        }
+        useNewHeader
+        onNavigateHome={() => _navigation.navigate('Home')}
+        onNavigateToProfile={(username) => {
+          _navigation.navigate('Profile', { username });
+        }}
+        onNavigateToRooms={() => _navigation.getParent?.()?.navigate?.('Rooms')}
       >
+        <PageHeader
+          icon="message-circle"
+          iconColor="#00a8ff"
+          title={activeConversation?.recipientDisplayName || activeConversation?.recipientUsername || 'Messages'}
+          action={
+            <Pressable
+              onPress={() => {
+                setDraftMessage('');
+                setActiveConversationId(null);
+              }}
+              style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+            >
+              <Text style={styles.backButtonText}>Back</Text>
+            </Pressable>
+          }
+        />
+
         <View style={styles.threadContainer}>
           <ScrollView
             style={styles.threadScroll}
@@ -208,7 +232,7 @@ export function MessagesScreen({ navigation: _navigation }: Props) {
       onNavigateToRooms={() => _navigation.getParent?.()?.navigate?.('Rooms')}
     >
       {/* Page Header: MessageCircle icon + Messys */}
-      <PageHeader icon="message-circle" iconColor="#00a8ff" title="Messys" />
+      <PageHeader icon="message-circle" iconColor="#00a8ff" title="Messages" />
 
       <View style={styles.content}>
         {/* Search Bar - matches web */}

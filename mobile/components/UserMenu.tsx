@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   Image,
   Switch,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,7 +116,9 @@ export function UserMenu({
     closeMenu();
     if (onNavigateToWallet) {
       onNavigateToWallet();
+      return;
     }
+    navigateRoot('Wallet');
   };
 
   const handleAnalytics = () => {
@@ -129,10 +132,21 @@ export function UserMenu({
     navigateRoot('Transactions');
   };
 
+  const handleReferrals = () => {
+    closeMenu();
+    navigateRoot('Referrals');
+  };
+
   const handleApplyRoom = () => {
     closeMenu();
     if (onNavigateToApply) {
       onNavigateToApply();
+      return;
+    }
+    try {
+      void Linking.openURL('https://mylivelinks.com/apply');
+    } catch {
+      // ignore
     }
   };
 
@@ -280,6 +294,14 @@ export function UserMenu({
                 styles={styles}
               />
 
+              <MenuItem
+                icon="people-outline"
+                iconColor="#8b5cf6"
+                label="Referrals"
+                onPress={handleReferrals}
+                styles={styles}
+              />
+
               <MenuDivider styles={styles} />
 
               {/* Room / Live */}
@@ -330,6 +352,57 @@ export function UserMenu({
                 disabled={!topBar.enabledItems.optionsMenu_blockedUsers}
                 styles={styles}
               />
+
+              {/* Admin */}
+              {topBar.isAdmin && (
+                <>
+                  <MenuDivider styles={styles} />
+
+                  <MenuItem
+                    icon="crown-outline"
+                    iconColor="#f59e0b"
+                    label="Owner Panel"
+                    onPress={() => {
+                      closeMenu();
+                      navigateRoot('OwnerPanel');
+                    }}
+                    styles={styles}
+                  />
+
+                  <MenuItem
+                    icon="shield-checkmark-outline"
+                    iconColor="#6366f1"
+                    label="Moderation Panel"
+                    onPress={() => {
+                      closeMenu();
+                      navigateRoot('ModerationPanel');
+                    }}
+                    styles={styles}
+                  />
+
+                  <MenuItem
+                    icon="checkbox-outline"
+                    iconColor="#3b82f6"
+                    label="Approve Room Applications"
+                    onPress={() => {
+                      closeMenu();
+                      navigateRoot('AdminApplications');
+                    }}
+                    styles={styles}
+                  />
+
+                  <MenuItem
+                    icon="gift-outline"
+                    iconColor="#ec4899"
+                    label="Manage Gift Types / Coin Packs"
+                    onPress={() => {
+                      closeMenu();
+                      navigateRoot('AdminGifts');
+                    }}
+                    styles={styles}
+                  />
+                </>
+              )}
 
               <MenuDivider styles={styles} />
 

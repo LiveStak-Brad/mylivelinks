@@ -41,6 +41,8 @@ import { HelpFAQScreen } from './screens/HelpFAQScreen';
 import { BlockedUsersScreen } from './screens/BlockedUsersScreen';
 import { ReportUserScreen } from './screens/ReportUserScreen';
 import { ThemeScreen } from './screens/ThemeScreen';
+import { ReferralsScreen } from './screens/ReferralsScreen';
+import { ReferralsLeaderboardScreen } from './screens/ReferralsLeaderboardScreen';
 import { OwnerPanelScreen } from './screens/OwnerPanelScreen';
 import { ModerationPanelScreen } from './screens/ModerationPanelScreen';
 import { AdminApplicationsScreen } from './screens/AdminApplicationsScreen';
@@ -109,6 +111,8 @@ function AppNavigation() {
             <Stack.Screen name="BlockedUsers" component={BlockedUsersScreen} />
             <Stack.Screen name="ReportUser" component={ReportUserScreen} />
             <Stack.Screen name="Theme" component={ThemeScreen} />
+            <Stack.Screen name="Referrals" component={ReferralsScreen} />
+            <Stack.Screen name="ReferralsLeaderboard" component={ReferralsLeaderboardScreen} />
             <Stack.Screen name="OwnerPanel" component={OwnerPanelScreen} />
             <Stack.Screen name="ModerationPanel" component={ModerationPanelScreen} />
             <Stack.Screen name="AdminApplications" component={AdminApplicationsScreen} />

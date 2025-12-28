@@ -92,7 +92,7 @@ export function ProfileTabScreen({ navigation, route }: Props) {
         navigation.getParent?.()?.navigate?.('EditProfile');
       }}
       onMessage={(profileId) => {
-        navigation.navigate('Messages');
+        navigation.navigate('Messages', { openUserId: profileId });
       }}
       onStats={(username) => {
         navigation.getParent?.()?.navigate?.('MyAnalytics');
@@ -100,4 +100,6 @@ export function ProfileTabScreen({ navigation, route }: Props) {
     />
   );
 }
+
+
 

@@ -24,11 +24,13 @@ import { ThemeDefinition } from '../contexts/ThemeContext';
 
 interface ReferralProgressProps {
   onViewLeaderboard?: () => void;
+  onShareInvite?: () => void;
   theme: ThemeDefinition;
 }
 
 export function ReferralProgress({
   onViewLeaderboard,
+  onShareInvite,
   theme,
 }: ReferralProgressProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -203,7 +205,7 @@ export function ReferralProgress({
 
       {/* CTA Buttons */}
       <View style={styles.ctaContainer}>
-        <Pressable style={styles.primaryButton}>
+        <Pressable style={styles.primaryButton} onPress={onShareInvite} disabled={!onShareInvite}>
           {({ pressed }) => (
             <View style={[styles.buttonContent, pressed && styles.buttonPressed]}>
               <Text style={styles.primaryButtonText}>
@@ -453,5 +455,6 @@ function createStyles(theme: ThemeDefinition) {
     },
   });
 }
+
 
 

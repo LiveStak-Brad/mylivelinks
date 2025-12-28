@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Image,
+  Linking,
 } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
@@ -37,6 +38,42 @@ export function NotiesScreen({ navigation }: Props) {
   const handleMarkAllRead = () => {
     console.log('[Noties] Mark all as read');
     markAllAsRead();
+  };
+
+  const handleNavigateActionUrl = (actionUrl?: string) => {
+    const url = typeof actionUrl === 'string' ? actionUrl.trim() : '';
+    if (!url) return;
+
+    // Profile links like "/someuser"
+    const isProfilePath = /^\/[^/?#]+$/.test(url) && !['/wallet', '/rooms', '/feed', '/messages', '/noties', '/live'].includes(url);
+    if (isProfilePath) {
+      const username = url.slice(1);
+      navigation.navigate('Profile', { username });
+      return;
+    }
+
+    // Known internal destinations (web parity routes)
+    const parent = navigation.getParent?.();
+    if (url.startsWith('/wallet')) {
+      parent?.navigate?.('Wallet');
+      return;
+    }
+    if (url.startsWith('/me/analytics')) {
+      parent?.navigate?.('MyAnalytics');
+      return;
+    }
+    if (url.startsWith('/rooms') || url.startsWith('/live')) {
+      parent?.navigate?.('Rooms');
+      return;
+    }
+
+    // Fallback: open in the system browser
+    try {
+      const absolute = url.startsWith('http') ? url : `https://mylivelinks.com${url}`;
+      void Linking.openURL(absolute);
+    } catch {
+      // ignore
+    }
   };
 
   return (
@@ -96,7 +133,7 @@ export function NotiesScreen({ navigation }: Props) {
                   if (!notie.isRead) {
                     markAsRead(notie.id);
                   }
-                  // TODO: Navigate to action URL
+                  handleNavigateActionUrl(notie.actionUrl);
                 }}
               >
                 <View style={styles.avatarWrap}>

@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useFetchAuthed } from '../hooks/useFetchAuthed';
-import { Button, PageShell } from '../components/ui';
+import { Button, Modal, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
@@ -11,6 +11,28 @@ type WalletResponse = {
   coin_balance: number;
   diamond_balance: number;
   diamond_usd: number;
+};
+
+type CoinPack = {
+  sku: string;
+  price_id: string;
+  usd_amount: number;
+  coins_awarded: number;
+  pack_name: string;
+  description?: string | null;
+  is_vip: boolean;
+  vip_tier: number | null;
+};
+
+type ConnectStatus = {
+  hasAccount: boolean;
+  payoutsEnabled?: boolean;
+  chargesEnabled?: boolean;
+  detailsSubmitted?: boolean;
+  onboardingComplete?: boolean;
+  country?: string;
+  disabledReason?: string;
+  fromCache?: boolean;
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Wallet'>;
@@ -22,6 +44,15 @@ export function WalletScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
+
+  const [packs, setPacks] = useState<CoinPack[]>([]);
+  const [packsLoading, setPacksLoading] = useState(false);
+  const [showPacksModal, setShowPacksModal] = useState(false);
+  const [checkoutLoadingSku, setCheckoutLoadingSku] = useState<string | null>(null);
+
+  const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [cashoutLoading, setCashoutLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,9 +77,147 @@ export function WalletScreen({ navigation }: Props) {
     }
   }, [fetchAuthed]);
 
+  const loadPacks = useCallback(async () => {
+    setPacksLoading(true);
+    try {
+      // Public endpoint (no auth)
+      const baseUrl = (process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com').replace(/\/+$/, '');
+      const resp = await fetch(`${baseUrl}/api/coins/packs`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      const data = await resp.json().catch(() => null);
+      const list = Array.isArray(data?.packs) ? (data.packs as CoinPack[]) : [];
+      setPacks(list);
+    } catch (e) {
+      setPacks([]);
+    } finally {
+      setPacksLoading(false);
+    }
+  }, []);
+
+  const loadConnectStatus = useCallback(async () => {
+    setConnectLoading(true);
+    try {
+      const res = await fetchAuthed('/api/connect/status', { method: 'GET' });
+      if (!res.ok) {
+        throw new Error(res.message || 'Failed to load payout status');
+      }
+      setConnectStatus((res.data || null) as ConnectStatus | null);
+    } catch {
+      setConnectStatus(null);
+    } finally {
+      setConnectLoading(false);
+    }
+  }, [fetchAuthed]);
+
+  const ensurePacks = useCallback(async () => {
+    if (packsLoading) return;
+    if (packs.length > 0) return;
+    await loadPacks();
+  }, [loadPacks, packs.length, packsLoading]);
+
+  const openPacks = useCallback(async () => {
+    await ensurePacks();
+    setShowPacksModal(true);
+  }, [ensurePacks]);
+
+  const startCheckout = useCallback(
+    async (pack: CoinPack) => {
+      setCheckoutLoadingSku(pack.sku);
+      try {
+        const res = await fetchAuthed(
+          '/api/coins/create-checkout',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priceId: pack.price_id, packSku: pack.sku }),
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error(res.message || 'Failed to start checkout');
+        }
+
+        const url = String((res.data as any)?.url || '');
+        if (!url) {
+          throw new Error('No checkout URL returned');
+        }
+
+        setShowPacksModal(false);
+        const canOpen = await Linking.canOpenURL(url);
+        if (!canOpen) {
+          throw new Error('Unable to open checkout URL');
+        }
+        await Linking.openURL(url);
+      } catch (e: any) {
+        Alert.alert('Purchase failed', e?.message || 'Failed to start purchase');
+      } finally {
+        setCheckoutLoadingSku(null);
+      }
+    },
+    [fetchAuthed]
+  );
+
+  const startConnectOnboarding = useCallback(async () => {
+    setConnectLoading(true);
+    try {
+      const res = await fetchAuthed('/api/connect/onboard', { method: 'POST' });
+      if (!res.ok) {
+        throw new Error(res.message || 'Failed to start Stripe Connect');
+      }
+      const url = String((res.data as any)?.url || '');
+      if (!url) {
+        throw new Error('No onboarding URL returned');
+      }
+      const canOpen = await Linking.canOpenURL(url);
+      if (!canOpen) {
+        throw new Error('Unable to open onboarding URL');
+      }
+      await Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert('Setup failed', e?.message || 'Failed to start Stripe Connect');
+    } finally {
+      setConnectLoading(false);
+    }
+  }, [fetchAuthed]);
+
+  const requestCashout = useCallback(async () => {
+    setCashoutLoading(true);
+    try {
+      const res = await fetchAuthed(
+        '/api/cashout/request',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }
+      );
+      if (!res.ok) {
+        throw new Error(res.message || 'Cashout failed');
+      }
+
+      const amountUsd = Number((res.data as any)?.amountUsd ?? 0);
+      Alert.alert('Cashout requested', amountUsd > 0 ? `Success! $${amountUsd.toFixed(2)} is being transferred.` : 'Success!');
+      await load();
+      await loadConnectStatus();
+    } catch (e: any) {
+      Alert.alert('Cashout failed', e?.message || 'Failed to cash out');
+    } finally {
+      setCashoutLoading(false);
+    }
+  }, [fetchAuthed, load, loadConnectStatus]);
+
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    void loadConnectStatus();
+  }, [loadConnectStatus]);
 
   return (
     <PageShell
@@ -85,10 +254,82 @@ export function WalletScreen({ navigation }: Props) {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Coming Soon</Text>
-            <Button title="Purchase Coins (Coming Soon)" variant="secondary" onPress={() => {}} disabled />
-            <Button title="Cash Out Diamonds (Coming Soon)" variant="secondary" onPress={() => {}} disabled />
+            <Text style={styles.sectionTitle}>Actions</Text>
+            <Button title="Purchase Coins" variant="secondary" onPress={() => void openPacks()} />
+            <Button
+              title={
+                connectLoading
+                  ? 'Checking payout status…'
+                  : !connectStatus?.hasAccount
+                    ? 'Set Up Stripe Connect'
+                    : connectStatus?.payoutsEnabled
+                      ? 'Cash Out Diamonds'
+                      : 'Complete Stripe Setup'
+              }
+              variant="secondary"
+              onPress={() => {
+                if (!connectStatus?.hasAccount || !connectStatus?.payoutsEnabled) {
+                  void startConnectOnboarding();
+                  return;
+                }
+                void requestCashout();
+              }}
+              disabled={connectLoading || cashoutLoading}
+              loading={cashoutLoading}
+            />
+            <Button
+              title="View Transactions"
+              variant="secondary"
+              onPress={() => navigation.navigate('Transactions')}
+            />
+            <Button
+              title="View Analytics"
+              variant="secondary"
+              onPress={() => navigation.navigate('MyAnalytics')}
+            />
           </View>
+
+          <Modal visible={showPacksModal} onRequestClose={() => setShowPacksModal(false)}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Buy Coins</Text>
+              <Pressable onPress={() => setShowPacksModal(false)} hitSlop={12}>
+                <Text style={styles.modalClose}>✕</Text>
+              </Pressable>
+            </View>
+
+            {packsLoading ? (
+              <View style={styles.modalCenter}>
+                <ActivityIndicator size="large" color={theme.colors.accent} />
+                <Text style={styles.mutedText}>Loading packs…</Text>
+              </View>
+            ) : packs.length === 0 ? (
+              <View style={styles.modalCenter}>
+                <Text style={styles.mutedText}>No packs available.</Text>
+                <Button title="Close" variant="secondary" onPress={() => setShowPacksModal(false)} />
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={styles.packsList} showsVerticalScrollIndicator={false}>
+                {packs.map((p) => (
+                  <View key={p.sku} style={styles.packRow}>
+                    <View style={styles.packLeft}>
+                      <Text style={styles.packName} numberOfLines={1}>
+                        {p.pack_name}
+                      </Text>
+                      <Text style={styles.packMeta} numberOfLines={2}>
+                        {p.coins_awarded.toLocaleString()} coins · ${Number(p.usd_amount || 0).toFixed(2)}
+                      </Text>
+                    </View>
+                    <Button
+                      title={checkoutLoadingSku === p.sku ? 'Starting…' : 'Buy'}
+                      onPress={() => void startCheckout(p)}
+                      loading={checkoutLoadingSku === p.sku}
+                      disabled={!!checkoutLoadingSku}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </Modal>
         </View>
       )}
     </PageShell>
@@ -146,6 +387,58 @@ function createStyles(theme: ThemeDefinition) {
       color: theme.colors.textPrimary,
       fontSize: 16,
       fontWeight: '800',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    modalTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 18,
+      fontWeight: '900',
+    },
+    modalClose: {
+      color: theme.colors.textSecondary,
+      fontSize: 22,
+      fontWeight: '300',
+    },
+    modalCenter: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      paddingVertical: 12,
+    },
+    packsList: {
+      gap: 10,
+      paddingBottom: 6,
+    },
+    packRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardAlt,
+    },
+    packLeft: {
+      flex: 1,
+    },
+    packName: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '800',
+      marginBottom: 3,
+    },
+    packMeta: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
     },
     center: {
       flex: 1,

@@ -42,8 +42,14 @@ export function ProfileRouteScreen({ navigation, route }: Props) {
         navigation.getParent?.()?.navigate?.('EditProfile');
       }}
       onMessage={(profileId) => {
-        // TODO: Navigate to messenger with this profile
-        console.log('Message:', profileId);
+        try {
+          navigation.getParent?.()?.navigate?.('MainTabs', {
+            screen: 'Messages',
+            params: { openUserId: profileId },
+          });
+        } catch {
+          // ignore
+        }
       }}
       onStats={(username) => {
         navigation.getParent?.()?.navigate?.('MyAnalytics');

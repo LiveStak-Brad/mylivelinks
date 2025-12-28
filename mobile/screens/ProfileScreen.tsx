@@ -11,10 +11,11 @@ import {
   Alert,
   Share,
   Linking,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Button, Input, PageShell, BottomNav } from '../components/ui';
+import { Button, Input, Modal, PageShell, BottomNav } from '../components/ui';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useThemeMode } from '../contexts/ThemeContext';
@@ -28,15 +29,26 @@ import {
   isSectionEnabled,
   type ProfileType 
 } from '../config/profileTypeConfig';
-import { 
-  getMockMusicShowcase,
-  getMockUpcomingEvents,
-  getMockMerchandise,
-  getMockBusinessInfo,
-  getMockPortfolio,
-  hasMockData,
-  getEmptyStateText,
-} from '../config/mockDataProviders';
+import { AudioPlaylistPlayer, type ProfileMusicTrack } from '../components/profile';
+
+type BusinessRow = {
+  profile_id: string;
+  business_description: string | null;
+  website_url: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  location_or_service_area: string | null;
+  hours: any | null;
+  updated_at: string;
+};
+
+type EditableBusinessField =
+  | 'business_description'
+  | 'website_url'
+  | 'contact_email'
+  | 'contact_phone'
+  | 'location_or_service_area'
+  | 'hours';
 
 /* =============================================================================
    PROFILE SCREEN v2 - FULL VISUAL PARITY WITH WEB
@@ -252,7 +264,135 @@ export function ProfileScreen({
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
 
+  // Musician: local UI state for playlist player (persistence wired later)
+  const [musicTracks, setMusicTracks] = useState<ProfileMusicTrack[]>([]);
+
+  // Business profile module (real data, no mock)
+  const [business, setBusiness] = useState<BusinessRow | null>(null);
+  const [businessLoading, setBusinessLoading] = useState(false);
+  const [businessEditField, setBusinessEditField] = useState<EditableBusinessField | null>(null);
+  const [businessEditValue, setBusinessEditValue] = useState('');
+  const [businessSaving, setBusinessSaving] = useState(false);
+
   const canPost = (composerText.trim().length > 0 || !!mediaUrl) && !composerLoading && !mediaUploading;
+
+  const navigateToProfileRoute = useCallback(
+    (nextUsername: string) => {
+      const cleaned = String(nextUsername || '').trim();
+      if (!cleaned) return;
+
+      // Prefer root stack `ProfileRoute` (works even if profile isn't a tab).
+      try {
+        const parent = navigation?.getParent?.();
+        if (parent?.navigate) {
+          parent.navigate('ProfileRoute', { username: cleaned });
+          return;
+        }
+      } catch {
+        // ignore
+      }
+
+      // Fallback: try direct navigation if this navigator knows ProfileRoute.
+      try {
+        navigation?.navigate?.('ProfileRoute', { username: cleaned });
+      } catch {
+        // ignore
+      }
+    },
+    [navigation]
+  );
+
+  const hoursText = useMemo(() => {
+    const h = business?.hours;
+    if (!h) return '';
+    if (typeof h === 'string') return h;
+    if (typeof h === 'object' && typeof (h as any)?.text === 'string') return String((h as any).text);
+    try {
+      return JSON.stringify(h);
+    } catch {
+      return '';
+    }
+  }, [business?.hours]);
+
+  const hasAnyBusinessInfo = useMemo(() => {
+    const b = business;
+    if (!b) return false;
+    return Boolean(
+      (b.business_description && b.business_description.trim()) ||
+        (b.website_url && b.website_url.trim()) ||
+        (b.contact_email && b.contact_email.trim()) ||
+        (b.contact_phone && b.contact_phone.trim()) ||
+        (b.location_or_service_area && b.location_or_service_area.trim()) ||
+        (hoursText && hoursText.trim())
+    );
+  }, [business, hoursText]);
+
+  const loadBusiness = useCallback(async (profileId: string) => {
+    setBusinessLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('get_business', { p_profile_id: profileId });
+      if (error) {
+        console.log('[BusinessInfo] Failed to load business:', error.message);
+        setBusiness(null);
+        return;
+      }
+      setBusiness((data as any) ?? null);
+    } finally {
+      setBusinessLoading(false);
+    }
+  }, []);
+
+  const openBusinessEdit = useCallback(
+    (field: EditableBusinessField) => {
+      setBusinessEditField(field);
+      if (field === 'hours') setBusinessEditValue(hoursText || '');
+      else setBusinessEditValue(((business as any)?.[field] as string | null) ?? '');
+    },
+    [business, hoursText]
+  );
+
+  const closeBusinessEdit = useCallback(() => {
+    if (businessSaving) return;
+    setBusinessEditField(null);
+    setBusinessEditValue('');
+  }, [businessSaving]);
+
+  const buildFullBusinessPayload = useCallback(
+    (patch: Partial<Record<EditableBusinessField, any>>) => {
+      const b = business;
+      return {
+        business_description: patch.business_description ?? (b?.business_description ?? ''),
+        website_url: patch.website_url ?? (b?.website_url ?? ''),
+        contact_email: patch.contact_email ?? (b?.contact_email ?? ''),
+        contact_phone: patch.contact_phone ?? (b?.contact_phone ?? ''),
+        location_or_service_area: patch.location_or_service_area ?? (b?.location_or_service_area ?? ''),
+        hours: patch.hours !== undefined ? patch.hours : b?.hours ?? null,
+      };
+    },
+    [business]
+  );
+
+  const saveBusinessEdit = useCallback(async () => {
+    if (!businessEditField) return;
+    try {
+      setBusinessSaving(true);
+      const trimmed = businessEditValue.trim();
+      const patch: Partial<Record<EditableBusinessField, any>> = {};
+      if (businessEditField === 'hours') patch.hours = trimmed ? { text: trimmed } : null;
+      else patch[businessEditField] = trimmed;
+
+      const payload = buildFullBusinessPayload(patch);
+      const { data, error } = await supabase.rpc('upsert_business', { p_payload: payload });
+      if (error) {
+        Alert.alert('Save failed', error.message || 'Failed to save business info.');
+        return;
+      }
+      setBusiness((data as any) ?? null);
+      closeBusinessEdit();
+    } finally {
+      setBusinessSaving(false);
+    }
+  }, [businessEditField, businessEditValue, buildFullBusinessPayload, closeBusinessEdit]);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -655,6 +795,15 @@ export function ProfileScreen({
   const profileType = profile.profile_type || 'default'; // Get profile type, default to 'default'
   const enabledTabs = useMemo(() => getEnabledTabs(profileType), [profileType]);
   const enabledSections = useMemo(() => getEnabledSections(profileType), [profileType]);
+
+  // Load business module data (business profiles only)
+  useEffect(() => {
+    const pid = profileData?.profile?.id;
+    const pt = profileData?.profile?.profile_type || 'default';
+    if (!pid) return;
+    if (pt !== 'business') return;
+    loadBusiness(pid);
+  }, [profileData?.profile?.id, profileData?.profile?.profile_type, loadBusiness]);
   
   const gifterStatus = profileData.gifter_statuses?.[profile.id];
   const gifterLevelDisplay =
@@ -881,6 +1030,223 @@ export function ProfileScreen({
         {/* TAB CONTENT */}
         {activeTab === 'info' && (
           <>
+            {/* BUSINESS INFO (Business profile type) */}
+            {isSectionEnabled('business_info', profileType as any) && (
+              <View style={[styles.card, customCardStyle]}>
+                <View style={styles.businessHeaderRow}>
+                  <View style={styles.businessTitleRow}>
+                    <Ionicons name="briefcase-outline" size={18} color={accentColor} />
+                    <Text style={styles.cardTitle}>💼 Business Info</Text>
+                  </View>
+                  {isOwnProfile && (
+                    <Pressable onPress={() => openBusinessEdit('business_description')}>
+                      <Text style={[styles.businessEditLink, { color: accentColor }]}>Edit</Text>
+                    </Pressable>
+                  )}
+                </View>
+
+                {!businessLoading && !hasAnyBusinessInfo ? (
+                  isOwnProfile ? (
+                    <View style={{ gap: 10 }}>
+                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('business_description')}>
+                        <Text style={styles.businessPromptText}>Add Business Description (Edit)</Text>
+                      </Pressable>
+                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('website_url')}>
+                        <Text style={styles.businessPromptText}>Add Business Website</Text>
+                      </Pressable>
+                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('contact_email')}>
+                        <Text style={styles.businessPromptText}>Add Business Email</Text>
+                      </Pressable>
+                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('contact_phone')}>
+                        <Text style={styles.businessPromptText}>Add Business Phone Number</Text>
+                      </Pressable>
+                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('location_or_service_area')}>
+                        <Text style={styles.businessPromptText}>Add Location/Service Area</Text>
+                      </Pressable>
+                      <Pressable style={styles.businessPromptRow} onPress={() => openBusinessEdit('hours')}>
+                        <Text style={styles.businessPromptText}>Add Hours (optional)</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <View style={{ paddingTop: 6 }}>
+                      <Text style={styles.businessEmptyTitle}>No business info yet</Text>
+                      <View style={{ gap: 10, marginTop: 12 }}>
+                        <View style={styles.businessPlaceholderRow}>
+                          <Text style={styles.businessPlaceholderLabel}>Business Description</Text>
+                          <Text style={styles.businessPlaceholderValue}>—</Text>
+                        </View>
+                        <View style={styles.businessPlaceholderRow}>
+                          <Text style={styles.businessPlaceholderLabel}>Business Website</Text>
+                          <Text style={styles.businessPlaceholderValue}>—</Text>
+                        </View>
+                        <View style={styles.businessPlaceholderRow}>
+                          <Text style={styles.businessPlaceholderLabel}>Business Email</Text>
+                          <Text style={styles.businessPlaceholderValue}>—</Text>
+                        </View>
+                        <View style={styles.businessPlaceholderRow}>
+                          <Text style={styles.businessPlaceholderLabel}>Business Phone Number</Text>
+                          <Text style={styles.businessPlaceholderValue}>—</Text>
+                        </View>
+                        <View style={styles.businessPlaceholderRow}>
+                          <Text style={styles.businessPlaceholderLabel}>Location/Service Area</Text>
+                          <Text style={styles.businessPlaceholderValue}>—</Text>
+                        </View>
+                        <View style={styles.businessPlaceholderRow}>
+                          <Text style={styles.businessPlaceholderLabel}>Hours</Text>
+                          <Text style={styles.businessPlaceholderValue}>—</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )
+                ) : (
+                  <View style={{ gap: 14 }}>
+                    {!!business?.business_description?.trim() && (
+                      <Pressable
+                        disabled={!isOwnProfile}
+                        onPress={() => openBusinessEdit('business_description')}
+                        style={styles.businessBlock}
+                      >
+                        <Text style={styles.businessBlockLabel}>Business Description</Text>
+                        <Text style={styles.businessBlockValue}>{business.business_description}</Text>
+                      </Pressable>
+                    )}
+
+                    {!!hoursText.trim() && (
+                      <Pressable
+                        disabled={!isOwnProfile}
+                        onPress={() => openBusinessEdit('hours')}
+                        style={styles.businessLineRow}
+                      >
+                        <Ionicons name="time-outline" size={18} color={theme.colors.textMuted} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.businessBlockLabel}>Hours</Text>
+                          <Text style={styles.businessInlineValue}>{hoursText}</Text>
+                        </View>
+                      </Pressable>
+                    )}
+
+                    {!!business?.location_or_service_area?.trim() && (
+                      <Pressable
+                        disabled={!isOwnProfile}
+                        onPress={() => openBusinessEdit('location_or_service_area')}
+                        style={styles.businessLineRow}
+                      >
+                        <Ionicons name="location-outline" size={18} color={theme.colors.textMuted} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.businessBlockLabel}>Location/Service Area</Text>
+                          <Text style={styles.businessInlineValue}>{business.location_or_service_area}</Text>
+                        </View>
+                      </Pressable>
+                    )}
+
+                    <View style={styles.businessDivider} />
+
+                    {!!business?.website_url?.trim() && (
+                      <Pressable
+                        onPress={() => (isOwnProfile ? openBusinessEdit('website_url') : Linking.openURL(business.website_url!))}
+                        style={styles.businessLineRow}
+                      >
+                        <Ionicons name="globe-outline" size={18} color={theme.colors.textMuted} />
+                        <Text style={[styles.businessLinkText, { color: accentColor }]} numberOfLines={1}>
+                          {business.website_url}
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    {!!business?.contact_email?.trim() && (
+                      <Pressable
+                        onPress={() =>
+                          isOwnProfile ? openBusinessEdit('contact_email') : Linking.openURL(`mailto:${business.contact_email}`)
+                        }
+                        style={styles.businessLineRow}
+                      >
+                        <Ionicons name="mail-outline" size={18} color={theme.colors.textMuted} />
+                        <Text style={[styles.businessLinkText, { color: accentColor }]} numberOfLines={1}>
+                          {business.contact_email}
+                        </Text>
+                      </Pressable>
+                    )}
+
+                    {!!business?.contact_phone?.trim() && (
+                      <Pressable
+                        onPress={() =>
+                          isOwnProfile ? openBusinessEdit('contact_phone') : Linking.openURL(`tel:${business.contact_phone}`)
+                        }
+                        style={styles.businessLineRow}
+                      >
+                        <Ionicons name="call-outline" size={18} color={theme.colors.textMuted} />
+                        <Text style={[styles.businessLinkText, { color: accentColor }]} numberOfLines={1}>
+                          {business.contact_phone}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                )}
+
+                <Modal visible={!!businessEditField} onRequestClose={closeBusinessEdit}>
+                  <View style={{ gap: 12 }}>
+                    <Text style={styles.modalTitle}>
+                      {businessEditField === 'business_description'
+                        ? 'Business Description'
+                        : businessEditField === 'website_url'
+                          ? 'Business Website'
+                          : businessEditField === 'contact_email'
+                            ? 'Business Email'
+                            : businessEditField === 'contact_phone'
+                              ? 'Business Phone Number'
+                              : businessEditField === 'location_or_service_area'
+                                ? 'Location/Service Area'
+                                : businessEditField === 'hours'
+                                  ? 'Hours (optional)'
+                                  : 'Edit'}
+                    </Text>
+
+                    {businessEditField === 'business_description' ? (
+                      <Input
+                        value={businessEditValue}
+                        onChangeText={setBusinessEditValue}
+                        placeholder="Tell visitors what your business does…"
+                        multiline
+                        style={{ height: 120, textAlignVertical: 'top', paddingTop: 12 }}
+                      />
+                    ) : (
+                      <Input
+                        value={businessEditValue}
+                        onChangeText={setBusinessEditValue}
+                        placeholder={
+                          businessEditField === 'website_url'
+                            ? 'https://yourbusiness.com'
+                            : businessEditField === 'contact_email'
+                              ? 'hello@yourbusiness.com'
+                              : businessEditField === 'contact_phone'
+                                ? '+1 (555) 123-4567'
+                                : businessEditField === 'location_or_service_area'
+                                  ? 'City, State or Remote'
+                                  : businessEditField === 'hours'
+                                    ? 'Mon–Fri 9am–5pm'
+                                    : ''
+                        }
+                        keyboardType={
+                          businessEditField === 'contact_email'
+                            ? 'email-address'
+                            : businessEditField === 'contact_phone'
+                              ? 'phone-pad'
+                              : businessEditField === 'website_url'
+                                ? 'url'
+                                : 'default'
+                        }
+                      />
+                    )}
+
+                    <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
+                      <Button title="Cancel" onPress={closeBusinessEdit} variant="secondary" disabled={businessSaving} />
+                      <Button title={businessSaving ? 'Saving…' : 'Save'} onPress={saveBusinessEdit} loading={businessSaving} />
+                    </View>
+                  </View>
+                </Modal>
+              </View>
+            )}
+
             {/* STATS CARDS SECTION (Social Counts, Top Supporters, Top Streamers) */}
         {!profile.hide_streaming_stats && isSectionEnabled('social_counts', profileType) && (
           <View style={styles.statsCardsContainer}>
@@ -1127,7 +1493,7 @@ export function ProfileScreen({
                       key={user.id}
                       style={styles.connectionItem}
                       onPress={() => {
-                        /* Navigate to profile */
+                        navigateToProfileRoute(user.username);
                       }}
                     >
                       <View style={styles.connectionAvatar}>
@@ -1242,7 +1608,19 @@ export function ProfileScreen({
               variant="primary"
               style={styles.footerButton}
               onPress={() => {
-                /* Navigate to signup */
+                try {
+                  if (!session?.user?.id) {
+                    navigation?.getParent?.()?.navigate?.('Auth');
+                    return;
+                  }
+                } catch {
+                  // ignore
+                }
+                try {
+                  void Linking.openURL('https://mylivelinks.com/signup');
+                } catch {
+                  // ignore
+                }
               }}
             />
             <Text style={styles.footerSubtext}>
@@ -1383,6 +1761,19 @@ export function ProfileScreen({
                 <Button title="Load more" onPress={() => void loadMoreFeed()} variant="secondary" style={styles.stateButton} />
               )}
             </View>
+          </>
+        )}
+
+        {/* MUSIC TAB (Musician/Artist) - REAL audio player + playlist UI */}
+        {activeTab === 'music' && (
+          <>
+            <AudioPlaylistPlayer
+              tracks={musicTracks}
+              isOwner={isOwnProfile}
+              onTracksChange={setMusicTracks}
+              accentColor={accentColor}
+              cardOpacity={cardOpacity}
+            />
           </>
         )}
 
@@ -1974,6 +2365,107 @@ function createStyles(theme: any) {
       fontSize: 16,
       fontWeight: '800',
       marginBottom: 12,
+    },
+
+    // Business Info (Business profile type)
+    businessHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    businessTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    businessEditLink: {
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    businessPromptRow: {
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    businessPromptText: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: theme.colors.textPrimary,
+    },
+    businessEmptyTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: theme.colors.textPrimary,
+    },
+    businessPlaceholderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    businessPlaceholderLabel: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.colors.textSecondary,
+    },
+    businessPlaceholderValue: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: theme.colors.textMuted,
+    },
+    businessBlock: {
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    businessBlockLabel: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: theme.colors.textSecondary,
+      marginBottom: 6,
+    },
+    businessBlockValue: {
+      fontSize: 14,
+      color: theme.colors.textPrimary,
+      lineHeight: 20,
+    },
+    businessLineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 10,
+    },
+    businessInlineValue: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+      lineHeight: 20,
+    },
+    businessDivider: {
+      height: 1,
+      backgroundColor: theme.colors.border,
+      opacity: 0.8,
+    },
+    businessLinkText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '900',
+      color: theme.colors.textPrimary,
     },
 
     // Stats Cards Container

@@ -537,21 +537,9 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
       <OptionsMenu
         visible={showOptionsModal}
         onClose={() => setShowOptionsModal(false)}
-        onNavigateToProfile={(username) => {
-          setShowOptionsModal(false);
-          // TODO: Navigate to profile
-        }}
-        onNavigateToSettings={() => {
-          setShowOptionsModal(false);
-          // TODO: Navigate to settings
-        }}
         onNavigateToWallet={() => {
           setShowOptionsModal(false);
           onNavigateWallet();
-        }}
-        onNavigateToApply={() => {
-          setShowOptionsModal(false);
-          // TODO: Navigate to apply
         }}
       />
 

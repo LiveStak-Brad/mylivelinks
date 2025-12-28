@@ -16,6 +16,8 @@ export type RootStackParamList = {
   BlockedUsers: undefined;
   ReportUser: { reportedUserId?: string; reportedUsername?: string } | undefined;
   Theme: undefined;
+  Referrals: undefined;
+  ReferralsLeaderboard: undefined;
   OwnerPanel: undefined;
   ModerationPanel: undefined;
   AdminApplications: undefined;
@@ -28,7 +30,7 @@ export type RootStackParamList = {
 export type MainTabsParamList = {
   Home: undefined;
   Feed: undefined;
-  Messages: undefined;
+  Messages: { openUserId?: string } | undefined;
   Noties: undefined;
   Profile: { username?: string };
 };
