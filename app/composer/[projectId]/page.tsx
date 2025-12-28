@@ -23,7 +23,7 @@ import {
   ImageIcon,
   ChevronDown,
   ChevronUp,
-  Grid3X3,
+  Grid,
   Maximize2,
   Undo2,
   Redo2,
@@ -318,7 +318,7 @@ export default function ComposerEditorPage() {
                   `}
                   title="Toggle alignment grid"
                 >
-                  <Grid3X3 className="w-3.5 h-3.5" />
+                  <Grid className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Grid</span>
                 </button>
                 <button
