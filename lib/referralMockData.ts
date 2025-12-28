@@ -16,9 +16,11 @@ export interface ReferralStats {
 
 export interface LeaderboardEntry {
   rank: number;
+  profileId?: string;
   username: string;
   avatarUrl?: string;
   referralCount: number;
+  activeCount?: number;
   isCurrentUser?: boolean;
 }
 
@@ -114,4 +116,6 @@ export function formatReferralCount(count: number): string {
   }
   return count.toString();
 }
+
+
 

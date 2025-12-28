@@ -33,14 +33,16 @@ export default function ReferralLeaderboardPreview({
         const userId = userData?.user?.id ?? null;
 
         const res = await fetch('/api/referrals/leaderboard?range=all&limit=5');
-        const json = await res.json().catch(() => []);
-        const rows = res.ok && Array.isArray(json) ? json : [];
+        const json = await res.json().catch(() => null);
+        const rows = res.ok && Array.isArray((json as any)?.items) ? (json as any).items : [];
 
         const mapped: LeaderboardEntry[] = rows.slice(0, 5).map((r: any) => ({
           rank: Number(r?.rank ?? 0),
+          profileId: r?.profile_id ? String(r.profile_id) : undefined,
           username: String(r?.username ?? 'Unknown'),
           avatarUrl: r?.avatar_url ? String(r.avatar_url) : undefined,
           referralCount: Number(r?.joined ?? 0),
+          activeCount: Number(r?.active ?? 0),
           isCurrentUser: userId ? String(r?.profile_id ?? '') === String(userId) : false,
         }));
 
@@ -65,6 +67,7 @@ export default function ReferralLeaderboardPreview({
             if (rank && rank > 5) {
               me = {
                 rank,
+                profileId: String(userId),
                 username: uname || 'You',
                 avatarUrl,
                 referralCount: joined,
@@ -166,13 +169,14 @@ export default function ReferralLeaderboardPreview({
       {/* Leaderboard List */}
       <div className="space-y-2 mb-4">
         {entries.map((entry, index) => (
-          <div
+          <a
             key={`${entry.rank}-${entry.username}`}
             className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
               entry.isCurrentUser
                 ? 'bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 border-2 border-purple-300 dark:border-purple-700'
                 : 'bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:shadow-sm'
             }`}
+            href={`/${encodeURIComponent(entry.username)}`}
             style={{
               animation: `slideIn 0.3s ease-out ${index * 0.08}s both`,
             }}
@@ -236,15 +240,16 @@ export default function ReferralLeaderboardPreview({
                 </div>
               </div>
             </div>
-          </div>
+          </a>
         ))}
 
         {showCurrentUser && currentUserEntry ? (
           <>
             <div className="text-center py-2 text-gray-400 dark:text-gray-600 text-sm">...</div>
-            <div
+            <a
               key={`me-${currentUserEntry.rank}`}
               className="flex items-center gap-3 p-3 rounded-lg transition-all bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 border-2 border-purple-300 dark:border-purple-700"
+              href={`/${encodeURIComponent(currentUserEntry.username)}`}
             >
               <div className="flex-shrink-0 w-10 flex items-center justify-center">
                 <span className="text-sm font-bold text-gray-700 dark:text-gray-200">#{currentUserEntry.rank}</span>
@@ -275,7 +280,7 @@ export default function ReferralLeaderboardPreview({
                   <div className="text-lg font-bold">{formatReferralCount(currentUserEntry.referralCount)}</div>
                 </div>
               </div>
-            </div>
+            </a>
           </>
         ) : null}
       </div>
@@ -325,5 +330,6 @@ export default function ReferralLeaderboardPreview({
     </div>
   );
 }
+
 
 

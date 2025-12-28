@@ -25,12 +25,14 @@ import { useAuthContext } from '../contexts/AuthContext';
 interface ReferralLeaderboardPreviewProps {
   showCurrentUser?: boolean;
   onViewFull?: () => void;
+  onPressEntry?: (entry: { profileId: string; username: string }) => void;
   theme: ThemeDefinition;
 }
 
 export function ReferralLeaderboardPreview({
   showCurrentUser = false,
   onViewFull,
+  onPressEntry,
   theme,
 }: ReferralLeaderboardPreviewProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -52,14 +54,16 @@ export function ReferralLeaderboardPreview({
         const userId = session?.user?.id ?? null;
         const limit = showCurrentUser ? 100 : 5;
         const res = await fetch(`${apiBaseUrl}/api/referrals/leaderboard?range=all&limit=${limit}`);
-        const json = await res.json().catch(() => []);
-        const rows = res.ok && Array.isArray(json) ? json : [];
+        const json = await res.json().catch(() => null);
+        const rows = res.ok && Array.isArray((json as any)?.items) ? (json as any).items : [];
 
         const top: LeaderboardEntry[] = rows.slice(0, 5).map((r: any) => ({
           rank: Number(r?.rank ?? 0),
+          profileId: r?.profile_id ? String(r.profile_id) : undefined,
           username: String(r?.username ?? 'Unknown'),
           avatarUrl: r?.avatar_url ? String(r.avatar_url) : undefined,
           referralCount: Number(r?.joined ?? 0),
+          activeCount: Number(r?.active ?? 0),
           isCurrentUser: userId ? String(r?.profile_id ?? '') === String(userId) : false,
         }));
 
@@ -69,9 +73,11 @@ export function ReferralLeaderboardPreview({
           if (found && Number(found?.rank ?? 0) > 5) {
             me = {
               rank: Number(found?.rank ?? 0),
+              profileId: found?.profile_id ? String(found.profile_id) : undefined,
               username: String(found?.username ?? 'You'),
               avatarUrl: found?.avatar_url ? String(found.avatar_url) : undefined,
               referralCount: Number(found?.joined ?? 0),
+              activeCount: Number(found?.active ?? 0),
               isCurrentUser: true,
             };
           }
@@ -151,10 +157,20 @@ export function ReferralLeaderboardPreview({
       <View style={styles.list}>
         {entries.map((entry) => {
           const isCurrentUser = entry.isCurrentUser;
+          const canPress = !!onPressEntry && !!entry.profileId && !!entry.username;
           return (
-            <View
+            <Pressable
               key={`${entry.rank}-${entry.username}`}
-              style={[styles.entryCard, isCurrentUser && styles.entryCardHighlighted]}
+              style={({ pressed }) => [
+                styles.entryCard,
+                isCurrentUser && styles.entryCardHighlighted,
+                pressed && canPress ? styles.entryCardPressed : null,
+              ]}
+              disabled={!canPress}
+              onPress={() => {
+                if (!canPress) return;
+                onPressEntry?.({ profileId: String(entry.profileId), username: String(entry.username) });
+              }}
             >
               {/* Rank */}
               <View style={styles.rankContainer}>
@@ -219,7 +235,7 @@ export function ReferralLeaderboardPreview({
                   {formatReferralCount(entry.referralCount)}
                 </Text>
               </View>
-            </View>
+            </Pressable>
           );
         })}
 
@@ -228,7 +244,18 @@ export function ReferralLeaderboardPreview({
             <View style={styles.gap}>
               <Text style={styles.gapText}>...</Text>
             </View>
-            <View style={[styles.entryCard, styles.entryCardHighlighted]}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.entryCard,
+                styles.entryCardHighlighted,
+                pressed && currentUserEntry.profileId && onPressEntry ? styles.entryCardPressed : null,
+              ]}
+              disabled={!onPressEntry || !currentUserEntry.profileId || !currentUserEntry.username}
+              onPress={() => {
+                if (!onPressEntry || !currentUserEntry.profileId || !currentUserEntry.username) return;
+                onPressEntry({ profileId: String(currentUserEntry.profileId), username: String(currentUserEntry.username) });
+              }}
+            >
               <View style={styles.rankContainer}>
                 <Text style={styles.rankText}>#{currentUserEntry.rank}</Text>
               </View>
@@ -253,7 +280,7 @@ export function ReferralLeaderboardPreview({
               <View style={styles.countBadge}>
                 <Text style={styles.countText}>{formatReferralCount(currentUserEntry.referralCount)}</Text>
               </View>
-            </View>
+            </Pressable>
           </>
         ) : null}
       </View>
@@ -346,6 +373,10 @@ function createStyles(theme: ThemeDefinition) {
       backgroundColor: isDark ? 'rgba(168, 85, 247, 0.2)' : '#F3E8FF',
       borderColor: isDark ? '#9333EA' : '#A855F7',
       borderWidth: 2,
+    },
+    entryCardPressed: {
+      opacity: 0.88,
+      transform: [{ scale: 0.99 }],
     },
     rankContainer: {
       width: 40,
@@ -473,5 +504,6 @@ function createStyles(theme: ThemeDefinition) {
     },
   });
 }
+
 
 

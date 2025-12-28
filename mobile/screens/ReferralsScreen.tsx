@@ -56,6 +56,9 @@ export function ReferralsScreen({ navigation }: Props) {
             theme={theme}
             showCurrentUser
             onViewFull={() => navigation.navigate('ReferralsLeaderboard')}
+            onPressEntry={({ username }) =>
+              navigation.getParent?.()?.navigate?.('MainTabs', { screen: 'Profile', params: { username } })
+            }
           />
         </View>
       </View>
