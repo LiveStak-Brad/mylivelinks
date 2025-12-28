@@ -16,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import { Ionicons } from '@expo/vector-icons';
 import { Grid12 } from '../components/live/Grid12';
 import { ChatOverlay } from '../overlays/ChatOverlay';
 import { ViewersLeaderboardsOverlay } from '../overlays/ViewersLeaderboardsOverlay';
@@ -126,12 +127,15 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
     stopLive,
     isLive,
     isPublishing,
+    connectionError,
     lastTokenEndpoint,
     lastTokenError,
     lastWsUrl,
     lastConnectError,
   } = useLiveRoomParticipants({ enabled });
   const { theme } = useThemeMode();
+
+  const error = connectionError || lastConnectError || lastTokenError?.message || null;
 
   const setRemoteAudioMuted = useCallback((muted: boolean, focusedIdentity?: string) => {
     if (!room) return;
@@ -442,22 +446,22 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
       <View style={styles.container}>
         
         {/* LEFT COLUMN - Controls */}
-        <View style={[styles.leftColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingLeft: insets.left || 8 }]}>
+        <View style={[styles.leftColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingLeft: insets.left || 12 }]}>
           {/* Back Button - TOP LEFT */}
-          <TouchableOpacity onPress={handleExitLive} style={styles.vectorButton}>
-            <Text style={[styles.vectorIcon, { color: '#4a9eff' }]}>←</Text>
+          <TouchableOpacity onPress={handleExitLive} style={styles.vectorButton} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={28} color="#4a9eff" />
           </TouchableOpacity>
           
           <View style={styles.spacer} />
           
           {/* GO LIVE - BOTTOM LEFT */}
           <TouchableOpacity
-            style={styles.goLiveButton}
+            style={[styles.goLiveButton, (isLive && isPublishing) && styles.goLiveButtonActive]}
             disabled={false}
             onPress={handleToggleGoLive}
+            activeOpacity={0.8}
           >
-            <View style={[styles.goLiveDot, (isLive && isPublishing) && styles.goLiveDotActive]} />
-            <Text style={styles.goLiveText}>GO{'\n'}LIVE</Text>
+            <Ionicons name="videocam" size={20} color="#ffffff" />
           </TouchableOpacity>
         </View>
 
@@ -479,37 +483,42 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
               />
             </View>
           </GestureDetector>
+
+          {!isConnected && !!error && (
+            <View style={styles.connectionErrorBanner} pointerEvents="none">
+              <Text style={styles.connectionErrorTitle}>Live connection failed</Text>
+              <Text style={styles.connectionErrorText} numberOfLines={4}>
+                {String(error)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* RIGHT COLUMN - Controls */}
-        <View style={[styles.rightColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingRight: insets.right || 8 }]}>
-          {/* Options - TOP RIGHT */}
-          <TouchableOpacity style={styles.vectorButton} onPress={handleOptionsPress}>
-            <Text style={[styles.vectorIcon, { color: '#fbbf24' }]}>⚙️</Text>
+        <View style={[styles.rightColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingRight: insets.right || 12 }]}>
+          {/* Options */}
+          <TouchableOpacity style={styles.vectorButton} onPress={handleOptionsPress} activeOpacity={0.7}>
+            <Ionicons name="settings-sharp" size={26} color="#fbbf24" />
           </TouchableOpacity>
 
           {/* Gift */}
-          <TouchableOpacity style={styles.vectorButton} onPress={handleGiftPress}>
-            <Text style={[styles.vectorIcon, { color: '#ff6b9d' }]}>🎁</Text>
+          <TouchableOpacity style={styles.vectorButton} onPress={handleGiftPress} activeOpacity={0.7}>
+            <Ionicons name="gift" size={26} color="#ff6b9d" />
           </TouchableOpacity>
 
-          <View style={styles.spacer} />
-
-          {/* PiP - MIDDLE RIGHT */}
-          <TouchableOpacity style={styles.vectorButton} onPress={handlePiPPress}>
-            <Text style={[styles.pipText, { color: '#a78bfa' }]}>PiP</Text>
+          {/* PiP */}
+          <TouchableOpacity style={styles.vectorButton} onPress={handlePiPPress} activeOpacity={0.7}>
+            <Ionicons name="contract" size={26} color="#a78bfa" />
           </TouchableOpacity>
-
-          <View style={styles.spacer} />
 
           {/* Mixer */}
-          <TouchableOpacity style={styles.vectorButton} onPress={handleMixerPress}>
-            <Text style={[styles.vectorLabel, { color: '#10b981' }]}>Mix</Text>
+          <TouchableOpacity style={styles.vectorButton} onPress={handleMixerPress} activeOpacity={0.7}>
+            <Ionicons name="options" size={26} color="#10b981" />
           </TouchableOpacity>
 
-          {/* Share - BOTTOM RIGHT */}
-          <TouchableOpacity style={styles.vectorButton} onPress={handleSharePress}>
-            <Text style={[styles.vectorIcon, { color: '#34d399' }]}>↗</Text>
+          {/* Share */}
+          <TouchableOpacity style={styles.vectorButton} onPress={handleSharePress} activeOpacity={0.7}>
+            <Ionicons name="share-outline" size={26} color="#34d399" />
           </TouchableOpacity>
         </View>
       </View>
@@ -568,53 +577,79 @@ const styles = StyleSheet.create({
     flexDirection: 'row', // Side by side columns
   },
   
-  // LEFT COLUMN (Back + GO LIVE) - BUTTON + SAFE AREA SPACE
+  // LEFT COLUMN (Back + GO LIVE) - Increased padding for breathing room
   leftColumn: {
-    width: 80, // Increased to contain GO LIVE glow (52px button + 8px shadow + padding)
+    width: 88,
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingLeft: 10, // Safe press zone from edge
-    paddingRight: 16, // Gutter from grid (prevents overlap)
-    backgroundColor: '#000', // Opaque background
-    overflow: 'hidden', // Clip any button glow overflow
-    zIndex: 100, // Above grid
+    paddingLeft: 12,
+    paddingRight: 20,
+    backgroundColor: '#000',
+    overflow: 'hidden',
+    zIndex: 100,
   },
   
-  // CENTER GRID WRAPPER - OWNS GRID WIDTH (prevents grid from rendering under controllers)
+  // CENTER GRID WRAPPER - OWNS GRID WIDTH (optimized for better fit)
   centerGridWrapper: {
-    flex: 1, // Takes remaining space between columns
-    overflow: 'hidden', // CRITICAL: Clips grid content to prevent overflow under controllers
+    flex: 1,
+    overflow: 'hidden',
     backgroundColor: '#000',
   },
   
   // CAMERA GRID - FULL HEIGHT/WIDTH within wrapper
   cameraGrid: {
-    flex: 1, // Fill centerGridWrapper completely
+    flex: 1,
     backgroundColor: '#000',
-    zIndex: 1, // Below controls
+    zIndex: 1,
+  },
+
+  connectionErrorBanner: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    zIndex: 999,
+  },
+  connectionErrorTitle: {
+    color: '#ef4444',
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  connectionErrorText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   
-  // RIGHT COLUMN (Gift + PiP + Share) - BUTTON + SAFE AREA SPACE
+  // RIGHT COLUMN - Increased padding, evenly distributed controls
   rightColumn: {
-    width: 80, // Increased to contain gift/PiP/share buttons fully
-    justifyContent: 'space-between',
+    width: 88,
+    justifyContent: 'space-evenly', // Even distribution (NO GROUPING)
     alignItems: 'center',
-    paddingLeft: 16, // Gutter from grid (prevents overlap)
-    paddingRight: 10, // Safe press zone from edge
-    backgroundColor: '#000', // Opaque background
-    overflow: 'hidden', // Clip any button overflow
-    zIndex: 100, // Above grid
+    paddingLeft: 20,
+    paddingRight: 12,
+    paddingVertical: 16,
+    backgroundColor: '#000',
+    overflow: 'hidden',
+    zIndex: 100,
   },
   
   spacer: {
     flex: 1,
   },
   
-  // GO LIVE BUTTON (ONLY circular button)
+  // GO LIVE BUTTON - Redesigned: smaller, red with white camera icon
   goLiveButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#ef4444',
     borderWidth: 2,
     borderColor: '#dc2626',
@@ -622,57 +657,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: '#ef4444',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 12,
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
   },
   
-  goLiveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    backgroundColor: 'transparent',
-    marginBottom: 2,
+  goLiveButtonActive: {
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 16,
   },
   
-  goLiveDotActive: {
-    backgroundColor: '#fff',
-  },
-  
-  goLiveText: {
-    color: '#fff',
-    fontSize: 8,
-    fontWeight: '900',
-    textAlign: 'center',
-    lineHeight: 9,
-    letterSpacing: 0.5,
-  },
-  
-  // VECTOR BUTTONS
+  // VECTOR BUTTONS - Consistent size and touch target (44x44 minimum)
   vectorButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  
-  vectorIcon: {
-    fontSize: 24,
-  },
-  
-  vectorLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  
-  // PiP text style
-  pipText: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
   },
   
   // Portrait hint
