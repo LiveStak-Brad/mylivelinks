@@ -62,6 +62,8 @@ export default function ComposerEditorPage() {
   const [clipAssetUrl, setClipAssetUrl] = useState<string | null>(null);
   const [clipDurationSeconds, setClipDurationSeconds] = useState<number | null>(null);
 
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+
   const [overlayText, setOverlayText] = useState<
     Array<{
       id: string;
@@ -75,6 +77,15 @@ export default function ComposerEditorPage() {
       endMs?: number | null;
     }>
   >([]);
+
+  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
+  const dragRef = useRef<{
+    overlayId: string;
+    pointerId: number;
+    rect: DOMRect;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
   
   // Editor affordances (UI-only)
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '1:1' | '9:16'>('16:9');
@@ -125,6 +136,72 @@ export default function ComposerEditorPage() {
         endMs: null,
       },
     ]);
+
+    setSelectedOverlayId(id);
+  };
+
+  const updateOverlay = (overlayId: string, patch: Partial<(typeof overlayText)[number]>) => {
+    setOverlayText((prev) => prev.map((o) => (o.id === overlayId ? { ...o, ...patch } : o)));
+  };
+
+  const deleteOverlay = (overlayId: string) => {
+    setOverlayText((prev) => prev.filter((o) => o.id !== overlayId));
+    setSelectedOverlayId((cur) => (cur === overlayId ? null : cur));
+  };
+
+  const startDragOverlay = (e: React.PointerEvent, overlayId: string) => {
+    const el = canvasRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+
+    setSelectedOverlayId(overlayId);
+
+    const overlay = overlayText.find((o) => o.id === overlayId);
+    if (!overlay) return;
+
+    dragRef.current = {
+      overlayId,
+      pointerId: e.pointerId,
+      rect,
+      offsetX: x - overlay.x,
+      offsetY: y - overlay.y,
+    };
+
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+  };
+
+  const moveDragOverlay = (e: React.PointerEvent) => {
+    const info = dragRef.current;
+    if (!info) return;
+    if (e.pointerId !== info.pointerId) return;
+
+    const x = (e.clientX - info.rect.left) / info.rect.width - info.offsetX;
+    const y = (e.clientY - info.rect.top) / info.rect.height - info.offsetY;
+
+    const clampedX = Math.min(1, Math.max(0, x));
+    const clampedY = Math.min(1, Math.max(0, y));
+
+    updateOverlay(info.overlayId, { x: clampedX, y: clampedY });
+  };
+
+  const endDragOverlay = (e: React.PointerEvent) => {
+    const info = dragRef.current;
+    if (!info) return;
+    if (e.pointerId !== info.pointerId) return;
+    dragRef.current = null;
+
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
   };
 
   const getVideoDurationSeconds = async (file: File): Promise<number> => {
@@ -240,6 +317,7 @@ export default function ComposerEditorPage() {
       setClipDurationSeconds(null);
       setProjectTitle('');
       setOverlayText([]);
+      setSelectedOverlayId(null);
       return;
     }
 
@@ -292,6 +370,11 @@ export default function ComposerEditorPage() {
 
         setProjectTitle(caption);
         setOverlayText(loadedText as any);
+        setSelectedOverlayId((cur) => {
+          if (cur && (loadedText as any[]).some((t) => t?.id === cur)) return cur;
+          const first = (loadedText as any[])[0];
+          return typeof first?.id === 'string' ? first.id : null;
+        });
         setClipId(id);
         setClipDurationSeconds(durationSeconds);
 
@@ -669,11 +752,20 @@ export default function ComposerEditorPage() {
                           playsInline
                           className="absolute inset-0 w-full h-full object-contain bg-black"
                         />
-                        <div className="absolute inset-0 pointer-events-none">
+                        <div
+                          ref={canvasRef}
+                          className="absolute inset-0"
+                          style={{ pointerEvents: 'none' }}
+                          onPointerMove={moveDragOverlay}
+                          onPointerUp={endDragOverlay}
+                          onPointerCancel={endDragOverlay}
+                        >
                           {overlayText.map((item) => (
                             <div
                               key={item.id}
                               className="absolute"
+                              onPointerDown={(e) => startDragOverlay(e, item.id)}
+                              onClick={() => setSelectedOverlayId(item.id)}
                               style={{
                                 left: `${Math.round(item.x * 100)}%`,
                                 top: `${Math.round(item.y * 100)}%`,
@@ -684,6 +776,13 @@ export default function ComposerEditorPage() {
                                 whiteSpace: 'pre-wrap',
                                 maxWidth: '90%',
                                 textAlign: 'center',
+                                cursor: 'grab',
+                                outline: item.id === selectedOverlayId ? '2px solid rgba(255,255,255,0.85)' : 'none',
+                                outlineOffset: 6,
+                                padding: '6px 10px',
+                                borderRadius: 10,
+                                background: item.id === selectedOverlayId ? 'rgba(0,0,0,0.25)' : 'transparent',
+                                pointerEvents: 'auto',
                               }}
                             >
                               {item.text}
@@ -921,6 +1020,98 @@ export default function ComposerEditorPage() {
                       onClick={() => addTextOverlay({ font: 'bold', scale: 1, color: '#a855f7' })}
                     />
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className="overflow-hidden bg-card/50 backdrop-blur-sm">
+                <div className="px-3 py-2.5 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <Type className="w-4 h-4 text-primary" />
+                    <span className="font-semibold text-sm text-foreground">Selected Text</span>
+                  </div>
+                </div>
+                <CardContent className="px-3 py-3">
+                  {selectedOverlayId ? (
+                    (() => {
+                      const selected = overlayText.find((o) => o.id === selectedOverlayId) || null;
+                      if (!selected) {
+                        return <div className="text-xs text-muted-foreground">Select a text layer</div>;
+                      }
+                      return (
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Text</div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium text-foreground truncate">{selected.text}</div>
+                              </div>
+                              <button
+                                className="px-2.5 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-xs font-semibold"
+                                onClick={() => {
+                                  const next = prompt('Edit text', selected.text) || '';
+                                  const trimmed = next.trim();
+                                  if (trimmed) updateOverlay(selected.id, { text: trimmed });
+                                }}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="px-2.5 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/15 text-destructive text-xs font-semibold"
+                                onClick={() => deleteOverlay(selected.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Color</div>
+                              <input
+                                type="color"
+                                value={selected.color}
+                                onChange={(e) => updateOverlay(selected.id, { color: e.target.value })}
+                                className="h-9 w-full rounded-lg border border-border bg-background"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Font</div>
+                              <select
+                                value={selected.font}
+                                onChange={(e) => updateOverlay(selected.id, { font: e.target.value })}
+                                className="h-9 w-full rounded-lg border border-border bg-background text-xs px-2"
+                              >
+                                <option value="bold">Bold</option>
+                                <option value="semibold">Semibold</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Size</div>
+                              <div className="text-[10px] text-muted-foreground">{selected.scale.toFixed(2)}x</div>
+                            </div>
+                            <input
+                              type="range"
+                              min={0.5}
+                              max={3}
+                              step={0.05}
+                              value={selected.scale}
+                              onChange={(e) => updateOverlay(selected.id, { scale: Number(e.target.value) })}
+                              className="w-full"
+                            />
+                          </div>
+
+                          <div className="text-[10px] text-muted-foreground">
+                            Drag text on the video to reposition
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-xs text-muted-foreground">Select a text layer</div>
+                  )}
                 </CardContent>
               </Card>
 
