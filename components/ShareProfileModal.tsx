@@ -22,7 +22,7 @@ export default function ShareProfileModal({
 
   if (!isOpen) return null;
 
-  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/${username}` : `https://mylivelinks.com/${username}`;
+  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/p/${username}` : `https://mylivelinks.com/p/${username}`;
   const shareTitle = `${displayName || username} on MyLiveLinks`;
   const shareText = `Check out ${displayName || username}'s profile on MyLiveLinks - Live streaming, links, and exclusive content! 🔥`;
 

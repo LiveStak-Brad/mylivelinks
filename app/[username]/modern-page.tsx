@@ -318,7 +318,7 @@ export default function ModernProfilePage() {
   };
   
   const handleShare = async () => {
-    const url = `${window.location.origin}/${username}`;
+    const url = `${window.location.origin}/p/${username}`;
     const title = `${profileData?.profile.display_name || username} on MyLiveLinks`;
     const text = `Check out ${profileData?.profile.display_name || username}'s profile on MyLiveLinks - Live streaming, links, and exclusive content! 🔥`;
     

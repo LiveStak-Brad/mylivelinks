@@ -18,11 +18,34 @@ export async function generateMetadata({ params }: { params: { username: string 
     ? `Join ${username} on MyLiveLinks. Share your links, make posts, go live, get paid.`
     : 'Join MyLiveLinks. Share your links, make posts, go live, get paid.';
 
-  const ogImage = username
-    ? `https://mylivelinks.com/api/og?mode=invite&username=${encodeURIComponent(username)}&displayName=${encodeURIComponent(username)}&bio=${encodeURIComponent(
-        `Join ${username} on MyLiveLinks`
-      )}`
-    : 'https://mylivelinks.com/mylivelinksmeta.png';
+  const baseUrl = 'https://mylivelinks.com';
+
+  let resolvedUsername = username;
+  let avatarUrl: string | null = null;
+
+  if (username) {
+    try {
+      const admin = getSupabaseAdmin();
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('username, avatar_url')
+        .ilike('username', username)
+        .maybeSingle();
+
+      resolvedUsername = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : username;
+      avatarUrl = (profile as any)?.avatar_url ? String((profile as any).avatar_url) : null;
+    } catch {
+      // best-effort
+    }
+  }
+
+  const ogImage = avatarUrl
+    ? `${baseUrl}/api/og/profile?mode=invite&username=${encodeURIComponent(resolvedUsername)}&avatar=${encodeURIComponent(avatarUrl)}&v=2`
+    : username
+      ? `${baseUrl}/api/og?mode=invite&username=${encodeURIComponent(username)}&displayName=${encodeURIComponent(username)}&bio=${encodeURIComponent(
+          `Join ${username} on MyLiveLinks`
+        )}`
+      : `${baseUrl}/mylivelinksmeta.png`;
 
   return {
     title,
@@ -30,7 +53,7 @@ export async function generateMetadata({ params }: { params: { username: string 
     openGraph: {
       title,
       description,
-      url: username ? `https://mylivelinks.com/invite/${encodeURIComponent(username)}` : 'https://mylivelinks.com/join',
+      url: username ? `${baseUrl}/invite/${encodeURIComponent(username)}` : `${baseUrl}/join`,
       siteName: 'MyLiveLinks',
       images: [{ url: ogImage, width: 1200, height: 630 }],
       type: 'website',

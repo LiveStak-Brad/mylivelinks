@@ -3,11 +3,23 @@ import { NextRequest } from 'next/server';
 
 export const runtime = 'edge';
 
+function toAbsoluteUrl(origin: string, raw: string) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (s.startsWith('http://') || s.startsWith('https://')) return s;
+  if (s.startsWith('data:')) return s;
+  if (s.startsWith('/')) return `${origin}${s}`;
+  return `${origin}/${s}`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const avatarUrl = searchParams.get('avatar') || '';
+    const origin = new URL(request.url).origin;
+    const mode = (searchParams.get('mode') || '').trim().toLowerCase();
+    const avatarUrl = toAbsoluteUrl(origin, searchParams.get('avatar') || '');
     const username = searchParams.get('username') || 'User';
+    const logoUrl = `${origin}/branding/mylivelinkstransparent.png`;
     
     if (!avatarUrl) {
       // No avatar, return simple branded card
@@ -26,7 +38,7 @@ export async function GET(request: NextRequest) {
               fontWeight: 'bold',
             }}
           >
-            {username} on MyLiveLinks 🔥
+            {mode === 'invite' ? `Join ${username} on MyLiveLinks` : `${username} on MyLiveLinks`}
           </div>
         ),
         { width: 1200, height: 630 }
@@ -64,17 +76,19 @@ export async function GET(request: NextRequest) {
               left: '20px',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(0, 0, 0, 0.7)',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              fontSize: '20px',
-              color: 'white',
-              fontWeight: 'bold',
+              background: 'rgba(0, 0, 0, 0.6)',
+              padding: '10px 14px',
+              borderRadius: '14px',
             }}
           >
-            <span style={{ fontSize: '24px' }}>⭐</span>
-            MyLiveLinks.com
+            <img
+              src={logoUrl}
+              alt="MyLiveLinks"
+              style={{
+                height: '54px',
+                width: 'auto',
+              }}
+            />
           </div>
         </div>
       ),

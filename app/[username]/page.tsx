@@ -1,17 +1,17 @@
 import { Metadata } from 'next';
-import { createClient } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import ModernProfilePage from './modern-page';
 
 // Generate dynamic metadata for SEO and social sharing
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
-  const supabase = createClient();
+  const admin = getSupabaseAdmin();
   
   try {
-    const { data: profile } = await supabase
+    const { data: profile } = await admin
       .from('profiles')
       .select('username, display_name, bio, avatar_url')
       .ilike('username', params.username)
-      .single();
+      .maybeSingle();
     
     if (!profile) {
       return {
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: { username: string 
     
     // Generate OG image with watermark
     const ogImageUrl = avatarUrl 
-      ? `https://www.mylivelinks.com/api/og/profile?avatar=${encodeURIComponent(avatarUrl)}&username=${encodeURIComponent(profile.username)}`
+      ? `https://www.mylivelinks.com/api/og/profile?avatar=${encodeURIComponent(avatarUrl)}&username=${encodeURIComponent(profile.username)}&v=2`
       : 'https://www.mylivelinks.com/mylivelinksmeta.png';
     
     return {
