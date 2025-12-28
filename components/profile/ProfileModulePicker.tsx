@@ -22,6 +22,7 @@ interface ModuleMetadata {
 }
 
 const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
+  // Streaming & Stats
   streaming_stats: {
     id: 'streaming_stats',
     label: 'Streaming Stats',
@@ -31,6 +32,11 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     id: 'profile_stats',
     label: 'Profile Stats',
     description: 'Account age, join date',
+  },
+  social_counts: {
+    id: 'social_counts',
+    label: 'Social Counts',
+    description: 'Follower/following counts',
   },
   top_supporters: {
     id: 'top_supporters',
@@ -42,11 +48,8 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     label: 'Top Streamers',
     description: 'Streamers you support',
   },
-  social_counts: {
-    id: 'social_counts',
-    label: 'Social Counts',
-    description: 'Follower/following counts',
-  },
+  
+  // Music & Entertainment
   music_showcase: {
     id: 'music_showcase',
     label: 'Music Tracks',
@@ -57,6 +60,8 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     label: 'Events / Shows',
     description: 'Your event schedule',
   },
+  
+  // Products & Business
   merchandise: {
     id: 'merchandise',
     label: 'Merchandise',
