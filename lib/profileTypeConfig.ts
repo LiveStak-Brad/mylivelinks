@@ -50,6 +50,7 @@ export type ProfileSection =
   | 'merchandise'
   | 'portfolio'
   | 'business_info'
+  | 'referral_network'
   | 'footer';
 
 export interface SectionConfig {
@@ -111,9 +112,10 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'streaming_stats', enabled: true, order: 5 },
       { id: 'social_media', enabled: true, order: 6 },
       { id: 'connections', enabled: true, order: 7 },
-      { id: 'links', enabled: true, order: 8 },
-      { id: 'profile_stats', enabled: true, order: 9 },
-      { id: 'footer', enabled: true, order: 10 },
+      { id: 'referral_network', enabled: true, order: 8 },
+      { id: 'links', enabled: true, order: 9 },
+      { id: 'profile_stats', enabled: true, order: 10 },
+      { id: 'footer', enabled: true, order: 11 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -143,8 +145,9 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'social_media', enabled: true, order: 5 },
       { id: 'merchandise', enabled: true, order: 6 },
       { id: 'connections', enabled: true, order: 7 },
-      { id: 'links', enabled: true, order: 8 },
-      { id: 'footer', enabled: true, order: 9 },
+      { id: 'referral_network', enabled: true, order: 8 },
+      { id: 'links', enabled: true, order: 9 },
+      { id: 'footer', enabled: true, order: 10 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -171,8 +174,9 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'social_media', enabled: true, order: 4 },
       { id: 'merchandise', enabled: true, order: 5 },
       { id: 'connections', enabled: true, order: 6 },
-      { id: 'links', enabled: true, order: 7 },
-      { id: 'footer', enabled: true, order: 8 },
+      { id: 'referral_network', enabled: true, order: 7 },
+      { id: 'links', enabled: true, order: 8 },
+      { id: 'footer', enabled: true, order: 9 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -199,7 +203,8 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'social_media', enabled: true, order: 5 },
       { id: 'links', enabled: true, order: 6 },
       { id: 'connections', enabled: true, order: 7 },
-      { id: 'footer', enabled: true, order: 8 },
+      { id: 'referral_network', enabled: true, order: 8 },
+      { id: 'footer', enabled: true, order: 9 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },
@@ -225,8 +230,11 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'social_media', enabled: true, order: 3 },
       { id: 'portfolio', enabled: true, order: 4 },
       { id: 'connections', enabled: true, order: 5 },
-      { id: 'links', enabled: true, order: 6 },
-      { id: 'profile_stats', enabled: true, order: 7 },
+      { id: 'referral_network', enabled: true, order: 6 },
+      { id: 'links', enabled: true, order: 7 },
+      { id: 'profile_stats', enabled: true, order: 8 },
+      { id: 'footer', enabled: true, order: 9 },
+    ],
       { id: 'footer', enabled: true, order: 8 },
     ],
     quickActions: [
@@ -319,7 +327,7 @@ export function isSectionEnabled(
   customEnabledModules?: ProfileSection[] | null
 ): boolean {
   // Core sections are ALWAYS enabled (not customizable)
-  const CORE_SECTIONS: ProfileSection[] = ['hero', 'footer', 'connections', 'social_media', 'links'];
+  const CORE_SECTIONS: ProfileSection[] = ['hero', 'footer', 'social_media', 'links'];
   if (CORE_SECTIONS.includes(section)) {
     return true;
   }

@@ -16,6 +16,18 @@ interface ModuleMetadata {
 }
 
 const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
+  // Network & Community (enabled by default)
+  connections: {
+    id: 'connections',
+    label: 'Connections',
+    description: 'Show your friends and followers',
+  },
+  referral_network: {
+    id: 'referral_network',
+    label: 'Referral Network',
+    description: 'Your referral stats and network tree',
+  },
+  
   // Music & Entertainment
   music_showcase: {
     id: 'music_showcase',

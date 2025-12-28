@@ -1,9 +1,10 @@
 -- ============================================================================
--- Profile Module Customization Migration (CORRECTED)
--- UI Agent #1 Deliverable - P0 FIX
+-- Profile Module Customization Migration (CORRECTED + UPDATED)
+-- UI Agent #1 Deliverable - P0 FIX + Connections & Referral Network
 -- ============================================================================
 -- Adds enabled_modules column (optional modules only, no core shell)
--- Core sections (hero, footer, connections, social_media, links) always render
+-- Core sections (hero, footer, social_media, links) always render
+-- Connections & Referral Network are optional but enabled by default
 -- ============================================================================
 
 BEGIN;
@@ -51,6 +52,13 @@ SET row_security = off
 AS $$
 DECLARE
   v_uid uuid;
+  v_core_modules text[] := ARRAY['hero', 'footer', 'social_media', 'links'];
+  v_optional_modules text[] := ARRAY[
+    'connections', 'referral_network',
+    'streaming_stats', 'profile_stats', 'social_counts', 'top_supporters', 'top_streamers',
+    'music_showcase', 'upcoming_events', 'merchandise', 'portfolio', 'business_info'
+  ];
+  v_invalid_modules text[];
 BEGIN
   v_uid := auth.uid();
   
@@ -58,7 +66,36 @@ BEGIN
     RAISE EXCEPTION 'unauthorized';
   END IF;
   
-  -- Update enabled_modules (can be NULL for profile_type defaults)
+  -- If p_modules is NULL, reset to profile_type defaults
+  IF p_modules IS NULL THEN
+    UPDATE public.profiles
+    SET enabled_modules = NULL,
+        updated_at = now()
+    WHERE id = v_uid;
+    RETURN;
+  END IF;
+  
+  -- Check for any core modules in the input, which are not allowed to be customized
+  SELECT ARRAY_AGG(s)
+  INTO v_invalid_modules
+  FROM unnest(p_modules) AS s
+  WHERE s = ANY(v_core_modules);
+
+  IF array_length(v_invalid_modules, 1) > 0 THEN
+    RAISE EXCEPTION 'Cannot customize core modules: %', array_to_string(v_invalid_modules, ', ');
+  END IF;
+
+  -- Ensure all provided modules are valid optional modules
+  SELECT ARRAY_AGG(s)
+  INTO v_invalid_modules
+  FROM unnest(p_modules) AS s
+  WHERE NOT (s = ANY(v_optional_modules));
+
+  IF array_length(v_invalid_modules, 1) > 0 THEN
+    RAISE EXCEPTION 'Invalid modules provided: %', array_to_string(v_invalid_modules, ', ');
+  END IF;
+  
+  -- Update enabled_modules
   UPDATE public.profiles
   SET enabled_modules = p_modules,
       updated_at = now()

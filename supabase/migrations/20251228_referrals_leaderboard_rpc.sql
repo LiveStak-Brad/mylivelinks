@@ -47,63 +47,108 @@ BEGIN
     c_profile_id := NULLIF(trim(coalesce(p_cursor->>'profile_id', '')), '')::uuid;
   END IF;
 
-  RETURN QUERY
-  WITH counts AS (
-    SELECT
-      r.referrer_profile_id AS profile_id,
-      COUNT(*) FILTER (WHERE v_start IS NULL OR r.claimed_at >= v_start)::bigint AS joined,
-      COUNT(*) FILTER (
-        WHERE r.activated_at IS NOT NULL
-          AND (v_start IS NULL OR r.activated_at >= v_start)
-      )::bigint AS active
-    FROM public.referrals r
-    GROUP BY r.referrer_profile_id
-  ),
-  base AS (
-    SELECT
-      c.profile_id,
-      p.username,
-      p.avatar_url,
-      c.joined,
-      c.active,
-      rr.last_activity_at
-    FROM counts c
-    LEFT JOIN public.referral_rollups rr ON rr.referrer_profile_id = c.profile_id
-    LEFT JOIN public.profiles p ON p.id = c.profile_id
-    WHERE (c.joined > 0 OR c.active > 0)
-  ),
-  filtered AS (
-    SELECT
-      b.*,
-      COALESCE(b.last_activity_at, '0001-01-01'::timestamptz) AS sort_last_activity_at
-    FROM base b
-    WHERE p_cursor IS NULL
-      OR (
-        b.active < c_active
-        OR (b.active = c_active AND b.joined < c_joined)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'referrals'
+  ) THEN
+    RETURN;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'referral_activity'
+  ) THEN
+    RETURN;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'referral_rollups'
+  ) THEN
+    RETURN;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'profiles'
+  ) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY EXECUTE $q$
+    WITH joined_counts AS (
+      SELECT
+        r.referrer_profile_id AS profile_id,
+        COUNT(*) FILTER (WHERE $1 IS NULL OR r.claimed_at >= $1)::bigint AS joined
+      FROM public.referrals r
+      GROUP BY r.referrer_profile_id
+    ),
+    active_counts AS (
+      SELECT
+        a.referrer_profile_id AS profile_id,
+        COUNT(*) FILTER (
+          WHERE a.event_type = 'activated'
+            AND ($1 IS NULL OR a.created_at >= $1)
+        )::bigint AS active
+      FROM public.referral_activity a
+      WHERE a.referrer_profile_id IS NOT NULL
+      GROUP BY a.referrer_profile_id
+    ),
+    counts AS (
+      SELECT
+        COALESCE(j.profile_id, a.profile_id) AS profile_id,
+        COALESCE(j.joined, 0)::bigint AS joined,
+        COALESCE(a.active, 0)::bigint AS active
+      FROM joined_counts j
+      FULL OUTER JOIN active_counts a USING (profile_id)
+    ),
+    base AS (
+      SELECT
+        c.profile_id,
+        p.username,
+        p.avatar_url,
+        c.joined,
+        c.active,
+        rr.last_activity_at
+      FROM counts c
+      LEFT JOIN public.referral_rollups rr ON rr.referrer_profile_id = c.profile_id
+      LEFT JOIN public.profiles p ON p.id = c.profile_id
+      WHERE (c.joined > 0 OR c.active > 0)
+    ),
+    filtered AS (
+      SELECT
+        b.*,
+        COALESCE(b.last_activity_at, '0001-01-01'::timestamptz) AS sort_last_activity_at
+      FROM base b
+      WHERE $6 IS NULL
         OR (
-          b.active = c_active
-          AND b.joined = c_joined
-          AND COALESCE(b.last_activity_at, '0001-01-01'::timestamptz) < COALESCE(c_last_activity_at, '0001-01-01'::timestamptz)
+          b.active < $2
+          OR (b.active = $2 AND b.joined < $3)
+          OR (
+            b.active = $2
+            AND b.joined = $3
+            AND COALESCE(b.last_activity_at, '0001-01-01'::timestamptz) < COALESCE($4, '0001-01-01'::timestamptz)
+          )
+          OR (
+            b.active = $2
+            AND b.joined = $3
+            AND COALESCE(b.last_activity_at, '0001-01-01'::timestamptz) = COALESCE($4, '0001-01-01'::timestamptz)
+            AND b.profile_id > $5
+          )
         )
-        OR (
-          b.active = c_active
-          AND b.joined = c_joined
-          AND COALESCE(b.last_activity_at, '0001-01-01'::timestamptz) = COALESCE(c_last_activity_at, '0001-01-01'::timestamptz)
-          AND b.profile_id > c_profile_id
-        )
-      )
-  )
-  SELECT
-    f.profile_id,
-    COALESCE(f.username, '') AS username,
-    f.avatar_url,
-    f.joined,
-    f.active,
-    f.last_activity_at
-  FROM filtered f
-  ORDER BY f.active DESC, f.joined DESC, f.sort_last_activity_at DESC, f.profile_id ASC
-  LIMIT LEAST(GREATEST(COALESCE(p_limit, 25), 1), 100);
+    )
+    SELECT
+      f.profile_id,
+      COALESCE(f.username, '') AS username,
+      f.avatar_url,
+      f.joined,
+      f.active,
+      f.last_activity_at
+    FROM filtered f
+    ORDER BY f.active DESC, f.joined DESC, f.sort_last_activity_at DESC, f.profile_id ASC
+    LIMIT LEAST(GREATEST(COALESCE($7, 25), 1), 100)
+  $q$
+  USING v_start, c_active, c_joined, c_last_activity_at, c_profile_id, p_cursor, p_limit;
 END;
 $$;
 
