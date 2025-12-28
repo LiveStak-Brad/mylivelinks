@@ -38,7 +38,27 @@ export default function ReferralProgressModule({
       const supabase = createClient();
       const { data: referralData, error: referralErr } = await supabase.rpc('get_or_create_referral_code');
       const code = (referralData as any)?.code as string | undefined;
-      const nextUrl = !referralErr && code ? `https://mylivelinks.com/join?ref=${code}` : 'https://mylivelinks.com/join';
+      let nextUrl = 'https://mylivelinks.com/join';
+
+      if (!referralErr && code) {
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id ?? null;
+        if (userId) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', userId)
+            .maybeSingle();
+          const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
+          if (uname) {
+            nextUrl = `https://mylivelinks.com/invite/${encodeURIComponent(uname)}`;
+          } else {
+            nextUrl = `https://mylivelinks.com/join?ref=${code}`;
+          }
+        } else {
+          nextUrl = `https://mylivelinks.com/join?ref=${code}`;
+        }
+      }
       setInviteUrl(nextUrl);
       return nextUrl;
     } catch (err) {
@@ -235,4 +255,5 @@ export default function ReferralProgressModule({
     </div>
   );
 }
+
 

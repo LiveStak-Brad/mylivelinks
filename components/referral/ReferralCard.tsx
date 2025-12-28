@@ -26,10 +26,28 @@ export default function ReferralCard({ className = '' }: ReferralCardProps) {
         const supabase = createClient();
         const { data: referralData, error: referralErr } = await supabase.rpc('get_or_create_referral_code');
         const code = (referralData as any)?.code as string | undefined;
+
         if (!referralErr && code) {
+          const { data: userData } = await supabase.auth.getUser();
+          const userId = userData?.user?.id ?? null;
+          if (userId) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', userId)
+              .maybeSingle();
+
+            const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
+            if (uname) {
+              if (mounted) setInviteUrl(`https://mylivelinks.com/invite/${encodeURIComponent(uname)}`);
+              return;
+            }
+          }
+
           if (mounted) setInviteUrl(`https://mylivelinks.com/join?ref=${code}`);
           return;
         }
+
         if (mounted) setInviteUrl('https://mylivelinks.com/join');
       } catch (err) {
         console.warn('[referrals] get_or_create_referral_code failed (non-blocking):', err);
@@ -191,4 +209,5 @@ export default function ReferralCard({ className = '' }: ReferralCardProps) {
     </div>
   );
 }
+
 

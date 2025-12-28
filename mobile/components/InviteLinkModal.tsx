@@ -35,6 +35,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
   const [loading, setLoading] = useState(true);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string>('https://mylivelinks.com/join');
 
   useEffect(() => {
     if (visible) {
@@ -47,6 +48,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
     try {
       if (!supabaseConfigured) {
         setReferralCode(null);
+        setInviteUrl('https://mylivelinks.com/join');
         setLoading(false);
         return;
       }
@@ -58,22 +60,35 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
         const { data: referralData, error: referralErr } = await supabase.rpc('get_or_create_referral_code');
         if (!referralErr && (referralData as any)?.code) {
           setReferralCode((referralData as any).code);
+
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
+          if (uname) {
+            setInviteUrl(`https://mylivelinks.com/invite/${encodeURIComponent(uname)}`);
+          } else {
+            setInviteUrl(`https://mylivelinks.com/join?ref=${(referralData as any).code}`);
+          }
           return;
         }
       } else {
         setReferralCode(null);
+        setInviteUrl('https://mylivelinks.com/join');
       }
     } catch (error) {
       console.error('Failed to load referral code:', error);
       setReferralCode(null);
+      setInviteUrl('https://mylivelinks.com/join');
     } finally {
       setLoading(false);
     }
   };
 
-  const inviteUrl = referralCode 
-    ? `https://mylivelinks.com/join?ref=${referralCode}`
-    : 'https://mylivelinks.com/join';
+  // inviteUrl is set during loadReferralCode; default is /join.
 
   const handleCopyLink = async () => {
     try {
@@ -446,4 +461,5 @@ function createStyles(theme: ThemeDefinition) {
     },
   });
 }
+
 

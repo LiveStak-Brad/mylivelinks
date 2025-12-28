@@ -13,6 +13,7 @@ export default function InviteLinkModal({ isOpen, onClose }: InviteLinkModalProp
   const [copied, setCopied] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [inviteUrl, setInviteUrl] = useState<string>('https://mylivelinks.com/join');
 
   useEffect(() => {
     if (isOpen) {
@@ -31,12 +32,26 @@ export default function InviteLinkModal({ isOpen, onClose }: InviteLinkModalProp
         const { data: referralData, error: referralErr } = await supabase.rpc('get_or_create_referral_code');
         if (!referralErr && referralData?.code) {
           setReferralCode(referralData.code);
+
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
+          if (uname) {
+            setInviteUrl(`https://mylivelinks.com/invite/${encodeURIComponent(uname)}`);
+          } else {
+            setInviteUrl(`https://mylivelinks.com/join?ref=${referralData.code}`);
+          }
           return;
         }
       }
     } catch (error) {
       console.error('Failed to load referral code:', error);
       setReferralCode(null);
+      setInviteUrl('https://mylivelinks.com/join');
     } finally {
       setLoading(false);
     }
@@ -44,9 +59,7 @@ export default function InviteLinkModal({ isOpen, onClose }: InviteLinkModalProp
 
   if (!isOpen) return null;
 
-  const inviteUrl = referralCode 
-    ? `https://mylivelinks.com/join?ref=${referralCode}`
-    : 'https://mylivelinks.com/join';
+  // inviteUrl is set during loadReferralCode; default is /join.
 
   const shareTitle = 'Join MyLiveLinks - Live Streaming Platform';
   const shareText = `Join me on MyLiveLinks! Live streaming, exclusive content, and real connections. Sign up with my link and get started! 🚀`;
@@ -200,4 +213,5 @@ export default function InviteLinkModal({ isOpen, onClose }: InviteLinkModalProp
     </div>
   );
 }
+
 
