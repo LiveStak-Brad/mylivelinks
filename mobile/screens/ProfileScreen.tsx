@@ -42,8 +42,8 @@ import {
   type ShowItem,
   MerchSection,
   type MerchItem,
-  ProductsOrServicesSection,
-  type ProductOrServiceItem,
+  PortfolioSection,
+  type PortfolioItem,
   AudioPlaylistPlayer,
   type ProfileMusicTrack,
   MusicVideosSection,
@@ -296,7 +296,7 @@ export function ProfileScreen({
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [featured, setFeatured] = useState<FeaturedItem[]>([]);
   const [merch, setMerch] = useState<MerchItem[]>([]);
-  const [products, setProducts] = useState<ProductOrServiceItem[]>([]);
+  const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [blocksLoading, setBlocksLoading] = useState(false);
   const [modulesReloadNonce, setModulesReloadNonce] = useState(0);
 
@@ -310,8 +310,8 @@ export function ProfileScreen({
   const [merchModalVisible, setMerchModalVisible] = useState(false);
   const [editingMerch, setEditingMerch] = useState<MerchItem | null>(null);
 
-  const [productModalVisible, setProductModalVisible] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<ProductOrServiceItem | null>(null);
+  const [portfolioModalVisible, setPortfolioModalVisible] = useState(false);
+  const [editingPortfolio, setEditingPortfolio] = useState<PortfolioItem | null>(null);
 
   const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
@@ -403,7 +403,7 @@ export function ProfileScreen({
   const loadMusicTracks = useCallback(async (profileId: string) => {
     setMusicTracksLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_music_tracks', { p_profile_id: profileId });
+      const { data, error } = await supabase.rpc('get_profile_music_tracks', { p_profile_id: profileId });
       if (error) {
         console.log('[Music] Failed to load tracks:', error.message);
         setMusicTracks([]);
@@ -418,6 +418,7 @@ export function ProfileScreen({
           audio_url: String((r as any)?.audio_url ?? ''),
           cover_art_url: (r as any)?.cover_art_url ?? null,
           rights_confirmed: (r as any)?.rights_confirmed ?? null,
+          sort_order: (r as any)?.sort_order ?? null,
         }))
       );
     } finally {
@@ -437,7 +438,7 @@ export function ProfileScreen({
         if (!res.ok || !json || json.error) {
           setShows([]);
           setMerch([]);
-          setProducts([]);
+          setPortfolioItems([]);
           setSchedule([]);
           setFeatured([]);
           setClips([]);
@@ -453,8 +454,6 @@ export function ProfileScreen({
         };
 
         const merchBlocks = getByType('merch');
-        const productBlocks = getByType('product');
-        const serviceBlocks = getByType('service');
         const scheduleBlocks = getByType('schedule_item');
         const featuredBlocks = getByType('featured_link');
         const clipBlocks = getByType('clip');
@@ -489,6 +488,34 @@ export function ProfileScreen({
           if (!cancelled) setShows([]);
         }
 
+        // Load portfolio from dedicated profile_portfolio table
+        try {
+          const { data: portfolioData, error: portfolioError } = await supabase.rpc('get_profile_portfolio', {
+            p_profile_id: profileId,
+          });
+          if (!cancelled) {
+            if (portfolioError) {
+              console.error('[Mobile] get_profile_portfolio failed:', portfolioError);
+              setPortfolioItems([]);
+            } else {
+              const rows = Array.isArray(portfolioData) ? portfolioData : [];
+              setPortfolioItems(
+                rows.map((r: any) => ({
+                  id: String(r.id),
+                  title: r.title ?? null,
+                  subtitle: r.subtitle ?? null,
+                  description: r.description ?? null,
+                  media_type: (r.media_type as any) ?? 'image',
+                  media_url: String(r.media_url ?? ''),
+                  thumbnail_url: r.thumbnail_url ?? null,
+                }))
+              );
+            }
+          }
+        } catch (e) {
+          if (!cancelled) setPortfolioItems([]);
+        }
+
         setMerch(
           merchBlocks.map((b) => ({
             id: String((b as any).id),
@@ -497,20 +524,6 @@ export function ProfileScreen({
             price: (b as any)?.metadata?.price ?? undefined,
             image_url: (b as any)?.metadata?.image_url ?? undefined,
             buy_url: (b as any).url ?? undefined,
-          }))
-        );
-
-        const mergedProducts = [...productBlocks, ...serviceBlocks];
-        setProducts(
-          mergedProducts.map((b) => ({
-            id: String((b as any).id),
-            name: String((b as any).title ?? ''),
-            description: (b as any)?.metadata?.description ?? undefined,
-            price: (b as any)?.metadata?.price ?? undefined,
-            image_url: (b as any)?.metadata?.image_url ?? undefined,
-            category: (b as any)?.metadata?.category ?? undefined,
-            link: (b as any).url ?? undefined,
-            availability: (b as any)?.metadata?.availability ?? 'available',
           }))
         );
 
@@ -576,18 +589,17 @@ export function ProfileScreen({
       audio_url: String(values.audio_url ?? ''),
       cover_art_url: String(values.cover_art_url ?? ''),
       rights_confirmed: values.rights_confirmed === true,
+      sort_order: editingTrack?.sort_order ?? musicTracks.length,
+      id: editingTrack?.id ?? null,
     };
-    const { error } = await supabase.rpc('upsert_music_track', {
-      p_id: editingTrack?.id ?? null,
-      p_payload: payload,
-    });
+    const { error } = await supabase.rpc('upsert_profile_music_track', { p_track: payload });
     if (error) throw error;
     setModulesReloadNonce((n) => n + 1);
-  }, [editingTrack?.id, requireOwner]);
+  }, [editingTrack?.id, editingTrack?.sort_order, requireOwner, musicTracks.length]);
 
   const deleteTrack = useCallback(async (id: string) => {
     if (!requireOwner()) return;
-    const { error } = await supabase.rpc('delete_music_track', { p_id: id });
+    const { error } = await supabase.rpc('delete_profile_music_track', { p_track_id: id });
     if (error) throw error;
     setModulesReloadNonce((n) => n + 1);
   }, [requireOwner]);
@@ -635,6 +647,55 @@ export function ProfileScreen({
     if (error) throw error;
     setModulesReloadNonce((n) => n + 1);
   }, [requireOwner]);
+
+  // Portfolio CRUD (new dedicated profile_portfolio table)
+  const savePortfolioItem = useCallback(
+    async (values: any) => {
+      if (!requireOwner()) return;
+      const title = String(values.title ?? '').trim();
+      const subtitle = String(values.subtitle ?? '').trim();
+      const description = String(values.description ?? '').trim();
+      const mediaTypeRaw = String(values.media_type ?? '').trim().toLowerCase();
+      const mediaUrl = String(values.media_url ?? '').trim();
+      const thumbnailUrl = String(values.thumbnail_url ?? '').trim();
+
+      if (!['image', 'video', 'link'].includes(mediaTypeRaw)) {
+        Alert.alert('Error', 'Media Type must be one of: image, video, link.');
+        return;
+      }
+      if (!mediaUrl) {
+        Alert.alert('Error', 'Media URL is required.');
+        return;
+      }
+
+      const payload: any = {
+        title: title || null,
+        subtitle: subtitle || null,
+        description: description || null,
+        media_type: mediaTypeRaw,
+        media_url: mediaUrl,
+        thumbnail_url: thumbnailUrl || null,
+        sort_order: editingPortfolio?.id ? portfolioItems.findIndex((x) => x.id === editingPortfolio.id) : portfolioItems.length,
+      };
+
+      if (editingPortfolio?.id) payload.id = editingPortfolio.id;
+
+      const { error } = await supabase.rpc('upsert_profile_portfolio_item', { p_item: payload });
+      if (error) throw error;
+      setModulesReloadNonce((n) => n + 1);
+    },
+    [editingPortfolio?.id, portfolioItems, requireOwner]
+  );
+
+  const deletePortfolioItem = useCallback(
+    async (id: string) => {
+      if (!requireOwner()) return;
+      const { error } = await supabase.rpc('delete_profile_portfolio_item', { p_item_id: id });
+      if (error) throw error;
+      setModulesReloadNonce((n) => n + 1);
+    },
+    [requireOwner]
+  );
 
   // Generic content block upsert
   const saveBlock = useCallback(
@@ -1708,18 +1769,18 @@ export function ProfileScreen({
 
             {/* PORTFOLIO / PRODUCTS (Business + Creator) */}
             {isSectionEnabled('portfolio', profileType) && (
-              <ProductsOrServicesSection
-                items={products}
+              <PortfolioSection
+                items={portfolioItems}
                 isOwner={isOwnProfile}
                 onAdd={() => {
                   if (!requireOwner()) return;
-                  setEditingProduct(null);
-                  setProductModalVisible(true);
+                  setEditingPortfolio(null);
+                  setPortfolioModalVisible(true);
                 }}
                 onEdit={(it) => {
                   if (!requireOwner()) return;
-                  setEditingProduct(it);
-                  setProductModalVisible(true);
+                  setEditingPortfolio(it);
+                  setPortfolioModalVisible(true);
                 }}
                 onDelete={(id) => {
                   if (!requireOwner()) return;
@@ -1729,13 +1790,15 @@ export function ProfileScreen({
                       text: 'Delete',
                       style: 'destructive',
                       onPress: () => {
-                        void deleteBlock(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
+                        void deletePortfolioItem(id).catch((e) => Alert.alert('Delete failed', String(e?.message || e)));
                       },
                     },
                   ]);
                 }}
-                onViewDetails={(it) => {
-                  if (it.link) void Linking.openURL(it.link);
+                onOpen={(it) => {
+                  const url = String(it.media_url ?? '').trim();
+                  if (!url) return;
+                  void Linking.openURL(url);
                 }}
                 cardOpacity={cardOpacity}
               />
@@ -2459,6 +2522,7 @@ export function ProfileScreen({
         {activeTab === 'music' && (
           <>
             <AudioPlaylistPlayer
+              profileId={profile.id}
               tracks={musicTracks}
               isOwner={isOwnProfile}
               onTracksChange={setMusicTracks}
