@@ -8,6 +8,7 @@ import { getPinnedPost, upsertPinnedPost, deletePinnedPost, PinnedPost } from '@
 import { uploadAvatar, uploadPinnedPostMedia, deleteAvatar, deletePinnedPostMedia } from '@/lib/storage';
 import Image from 'next/image';
 import ProfileCustomization from '@/components/profile/ProfileCustomization';
+import { ProfileTypePickerModal, ProfileType } from '@/components/ProfileTypePickerModal';
 
 interface UserLink {
   id?: number;
@@ -61,6 +62,10 @@ export default function ProfileSettingsPage() {
   
   // Display preferences
   const [hideStreamingStats, setHideStreamingStats] = useState(false);
+  
+  // Profile Type
+  const [profileType, setProfileType] = useState<ProfileType>('creator');
+  const [showProfileTypePicker, setShowProfileTypePicker] = useState(false);
   
   // Pinned post
   const [pinnedPost, setPinnedPost] = useState<PinnedPost | null>(null);
@@ -132,6 +137,10 @@ export default function ProfileSettingsPage() {
         
         // Load display preferences
         setHideStreamingStats(p.hide_streaming_stats || false);
+        
+        // TODO: Load profile type from backend when profiles.profile_type is ready
+        // setProfileType((p.profile_type || 'creator') as ProfileType);
+        setProfileType('creator'); // Default for now
         
         // Load customization fields
         setCustomization({
@@ -237,6 +246,8 @@ export default function ProfileSettingsPage() {
           social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
           // Display preferences
           hide_streaming_stats: hideStreamingStats,
+          // TODO: Save profile type to backend when profiles.profile_type is ready
+          // profile_type: profileType,
           // Customization fields
           profile_bg_url: customization.profile_bg_url || null,
           profile_bg_overlay: customization.profile_bg_overlay,
@@ -492,6 +503,35 @@ export default function ProfileSettingsPage() {
               <p className="text-xs text-gray-500 mt-1">{bio.length}/500</p>
             </div>
           </div>
+        </div>
+
+        {/* Profile Type */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Profile Type</h2>
+          <div 
+            onClick={() => setShowProfileTypePicker(true)}
+            className="flex items-center justify-between p-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition"
+          >
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Current Type
+              </div>
+              <div className="text-base font-semibold text-gray-900 dark:text-white capitalize">
+                {profileType === 'musician' ? 'Musician / Artist' : 
+                 profileType === 'business' ? 'Business / Brand' : 
+                 profileType}
+              </div>
+            </div>
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 flex items-start gap-2">
+            <span className="text-base">⚠️</span>
+            <span>Changing profile type may hide or show different sections on your profile. Nothing is deleted.</span>
+          </p>
         </div>
 
         {/* Save Button (Top) */}
@@ -827,6 +867,15 @@ export default function ProfileSettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* Profile Type Picker Modal */}
+      <ProfileTypePickerModal
+        visible={showProfileTypePicker}
+        onClose={() => setShowProfileTypePicker(false)}
+        currentType={profileType}
+        onSelect={(type) => setProfileType(type)}
+        allowSkip={false}
+      />
     </div>
   );
 }
