@@ -45,7 +45,6 @@ import {
   MusicShowcase,
   MusicVideos,
   ComedySpecials,
-  Vlogs,
   UpcomingEvents,
   Merchandise,
   BusinessInfo,
@@ -294,6 +293,20 @@ export default function ModernProfilePage() {
       setLoading(false);
     }
   };
+
+  // Tabs validation: Ensure active tab is valid for this profile type (must run before early returns).
+  useEffect(() => {
+    if (!profileData?.profile) return;
+    const profile = profileData.profile;
+    const enabledTabs = getEnabledTabs((profile.profile_type || 'creator') as ConfigProfileType);
+    if (!enabledTabs?.length) return;
+    const allowed = new Set(enabledTabs.map((t) => t.id));
+    if (!allowed.has(activeTab as any)) {
+      setActiveTab(enabledTabs[0].id);
+    }
+    // Only re-run when profile type changes or profileData loads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileData?.profile?.profile_type]);
 
   // Load profile-type module data (tracks + profile_content_blocks) after the main profile loads.
   useEffect(() => {
@@ -782,17 +795,8 @@ export default function ModernProfilePage() {
   
   const { profile } = profileData;
 
-  // Tabs are config-driven (parity with mobile). Ensure active tab is valid for this profile type.
+  // Tabs are config-driven (parity with mobile).
   const enabledTabs = getEnabledTabs((profile.profile_type || 'creator') as ConfigProfileType);
-  useEffect(() => {
-    if (!enabledTabs?.length) return;
-    const allowed = new Set(enabledTabs.map((t) => t.id));
-    if (!allowed.has(activeTab as any)) {
-      setActiveTab(enabledTabs[0].id);
-    }
-    // Only re-run when profile type changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.profile_type]);
 
   const tabIconMap: Record<ConfigProfileTab, any> = {
     info: Info,
@@ -1423,9 +1427,12 @@ export default function ModernProfilePage() {
             )}
 
             {(profile.profile_type === 'creator' || profile.profile_type === 'streamer') && (
-              <Vlogs
+              <VlogReelsClient
                 profileId={profile.id}
                 isOwner={isOwnProfile}
+                allowEdit={false}
+                title="Videos"
+                contentLabel="videos"
                 cardStyle={cardStyle}
                 borderRadiusClass={borderRadiusClass}
               />
