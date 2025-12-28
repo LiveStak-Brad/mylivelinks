@@ -136,7 +136,7 @@ export default function ModernProfilePage() {
   const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | undefined>(undefined);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'info' | 'feed' | 'photos'>('info');
+  const [activeTab, setActiveTab] = useState<string>('info');
   const [activeConnectionsTab, setActiveConnectionsTab] = useState<'following' | 'followers' | 'friends'>('following');
   const [connectionsExpanded, setConnectionsExpanded] = useState(true);
   

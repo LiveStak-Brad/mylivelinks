@@ -70,6 +70,11 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
 
+    // TEMP: Confirm which Supabase project this deployment is using (no secrets)
+    console.log('[TOKEN_API] supabase_project_ref', {
+      ref: SUPABASE_URL?.match(/^https:\/\/([a-z0-9-]+)\.supabase\.co/i)?.[1] ?? null,
+    });
+
     // TEMP: Prove server received an Authorization header (do not log token)
     console.log('[TOKEN_API] auth_header_presence', {
       hasAuthHeader: !!authHeader,
