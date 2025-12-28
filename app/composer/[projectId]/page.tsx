@@ -61,6 +61,20 @@ export default function ComposerEditorPage() {
   const [clipId, setClipId] = useState<string | null>(null);
   const [clipAssetUrl, setClipAssetUrl] = useState<string | null>(null);
   const [clipDurationSeconds, setClipDurationSeconds] = useState<number | null>(null);
+
+  const [overlayText, setOverlayText] = useState<
+    Array<{
+      id: string;
+      text: string;
+      x: number;
+      y: number;
+      scale: number;
+      color: string;
+      font: string;
+      startMs?: number | null;
+      endMs?: number | null;
+    }>
+  >([]);
   
   // Editor affordances (UI-only)
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '1:1' | '9:16'>('16:9');
@@ -85,6 +99,32 @@ export default function ComposerEditorPage() {
 
   const togglePanel = (panel: keyof typeof expandedPanels) => {
     setExpandedPanels(prev => ({ ...prev, [panel]: !prev[panel] }));
+  };
+
+  const addTextOverlay = (preset?: { color?: string; font?: string; scale?: number }) => {
+    const text = prompt('Text') || '';
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const id =
+      typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function'
+        ? (crypto as any).randomUUID()
+        : String(Date.now());
+
+    setOverlayText((prev) => [
+      ...prev,
+      {
+        id,
+        text: trimmed,
+        x: 0.5,
+        y: 0.5,
+        scale: preset?.scale ?? 1,
+        color: preset?.color ?? '#ffffff',
+        font: preset?.font ?? 'bold',
+        startMs: null,
+        endMs: null,
+      },
+    ]);
   };
 
   const getVideoDurationSeconds = async (file: File): Promise<number> => {
@@ -198,6 +238,8 @@ export default function ComposerEditorPage() {
       setClipId(null);
       setClipAssetUrl(null);
       setClipDurationSeconds(null);
+      setProjectTitle('');
+      setOverlayText([]);
       return;
     }
 
@@ -215,9 +257,32 @@ export default function ComposerEditorPage() {
           throw projectErr;
         }
 
+        const project = projectJson?.project;
         const clip = projectJson?.clip;
         const id = typeof clip?.id === 'string' ? clip.id : null;
         const durationSeconds = typeof clip?.duration_seconds === 'number' ? clip.duration_seconds : null;
+
+        const caption = typeof project?.caption === 'string' ? project.caption : '';
+
+        const overlay = project?.overlay_json;
+        const overlayTextRaw = overlay && typeof overlay === 'object' ? (overlay as any).text : null;
+        const loadedText = Array.isArray(overlayTextRaw)
+          ? overlayTextRaw
+              .map((item: any) => {
+                const itemId = typeof item?.id === 'string' ? item.id : null;
+                const itemText = typeof item?.text === 'string' ? item.text : null;
+                const x = typeof item?.x === 'number' ? item.x : null;
+                const y = typeof item?.y === 'number' ? item.y : null;
+                const scale = typeof item?.scale === 'number' ? item.scale : null;
+                const color = typeof item?.color === 'string' ? item.color : null;
+                const font = typeof item?.font === 'string' ? item.font : null;
+                const startMs = typeof item?.startMs === 'number' ? item.startMs : item?.startMs === null ? null : undefined;
+                const endMs = typeof item?.endMs === 'number' ? item.endMs : item?.endMs === null ? null : undefined;
+                if (!itemId || !itemText || x === null || y === null || scale === null || !color || !font) return null;
+                return { id: itemId, text: itemText, x, y, scale, color, font, startMs, endMs };
+              })
+              .filter(Boolean)
+          : [];
 
         if (!id) {
           throw new Error('Clip id missing');
@@ -225,6 +290,8 @@ export default function ComposerEditorPage() {
 
         if (cancelled) return;
 
+        setProjectTitle(caption);
+        setOverlayText(loadedText as any);
         setClipId(id);
         setClipDurationSeconds(durationSeconds);
 
@@ -285,8 +352,28 @@ export default function ComposerEditorPage() {
     setActors(actors.filter(a => a.id !== actorId));
   };
 
-  const handleSave = () => {
-    alert('Save functionality not wired yet');
+  const handleSave = async () => {
+    if (!projectId || isNewProject) {
+      showTemporaryToast('Create a project before saving');
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc('save_clip_project', {
+        p_project_id: projectId,
+        p_caption: projectTitle || null,
+        p_overlay_json: {
+          text: overlayText,
+        },
+      });
+
+      if (error) throw error;
+      showTemporaryToast('Saved');
+    } catch (err: any) {
+      console.error('Save project error:', err);
+      showTemporaryToast(err?.message || 'Save failed');
+    }
   };
 
   const handlePublish = async () => {
@@ -472,7 +559,7 @@ export default function ComposerEditorPage() {
               <ToolRailButton 
                 icon={Type} 
                 label="Text" 
-                onClick={() => showTemporaryToast('Text styles coming soon')}
+                onClick={() => addTextOverlay()}
               />
               <ToolRailButton icon={Music} label="Audio" disabled />
               <ToolRailButton icon={Sliders} label="Filters" disabled />
@@ -487,7 +574,7 @@ export default function ComposerEditorPage() {
                 <ToolBarButton 
                   icon={Type} 
                   label="Text" 
-                  onClick={() => showTemporaryToast('Text styles coming soon')}
+                  onClick={() => addTextOverlay()}
                 />
                 <ToolBarButton icon={Music} label="Audio" disabled />
                 <ToolBarButton icon={Sliders} label="Filters" disabled />
@@ -574,13 +661,36 @@ export default function ComposerEditorPage() {
                     `}
                   >
                     {clipAssetUrl ? (
-                      <video
-                        key={clipAssetUrl}
-                        src={clipAssetUrl}
-                        controls
-                        playsInline
-                        className="absolute inset-0 w-full h-full object-contain bg-black"
-                      />
+                      <>
+                        <video
+                          key={clipAssetUrl}
+                          src={clipAssetUrl}
+                          controls
+                          playsInline
+                          className="absolute inset-0 w-full h-full object-contain bg-black"
+                        />
+                        <div className="absolute inset-0 pointer-events-none">
+                          {overlayText.map((item) => (
+                            <div
+                              key={item.id}
+                              className="absolute"
+                              style={{
+                                left: `${Math.round(item.x * 100)}%`,
+                                top: `${Math.round(item.y * 100)}%`,
+                                transform: `translate(-50%, -50%) scale(${item.scale})`,
+                                color: item.color,
+                                fontWeight: item.font === 'bold' ? 800 : 600,
+                                textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+                                whiteSpace: 'pre-wrap',
+                                maxWidth: '90%',
+                                textAlign: 'center',
+                              }}
+                            >
+                              {item.text}
+                            </div>
+                          ))}
+                        </div>
+                      </>
                     ) : (
                       <div className="text-center space-y-4 md:space-y-5 px-4 md:px-6 py-6 md:py-8">
                         <div className="w-20 h-20 md:w-24 md:h-24 mx-auto rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center ring-4 ring-primary/10">
@@ -793,22 +903,22 @@ export default function ComposerEditorPage() {
                     <TextStyleChip 
                       label="Bold" 
                       style="font-bold" 
-                      onClick={() => showTemporaryToast('Text editing coming soon')}
+                      onClick={() => addTextOverlay({ font: 'bold', scale: 1 })}
                     />
                     <TextStyleChip 
                       label="Outline" 
                       style="font-bold" 
-                      onClick={() => showTemporaryToast('Text editing coming soon')}
+                      onClick={() => addTextOverlay({ font: 'bold', scale: 1 })}
                     />
                     <TextStyleChip 
                       label="Shadow" 
                       style="font-semibold" 
-                      onClick={() => showTemporaryToast('Text editing coming soon')}
+                      onClick={() => addTextOverlay({ font: 'semibold', scale: 1 })}
                     />
                     <TextStyleChip 
                       label="Neon" 
                       style="font-bold" 
-                      onClick={() => showTemporaryToast('Text editing coming soon')}
+                      onClick={() => addTextOverlay({ font: 'bold', scale: 1, color: '#a855f7' })}
                     />
                   </div>
                 </CardContent>
