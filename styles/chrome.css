@@ -536,6 +536,8 @@ button:active:not(:disabled),
 /* =============================================================================
    BOTTOM NAVIGATION (MOBILE)
    iOS/Android style bottom tab bar for mobile app parity
+   
+   CRITICAL: Fixed positioning that doesn't move when keyboard appears
 ============================================================================= */
 
 .bottom-nav {
@@ -549,6 +551,28 @@ button:active:not(:disabled),
   border-top: 1px solid hsl(var(--border) / 0.5);
   box-shadow: 0 -2px 8px hsl(var(--foreground) / 0.05);
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  /* Hardware acceleration for better performance */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Mobile-specific fixes to prevent keyboard from pushing nav */
+@media (max-width: 767px) {
+  .bottom-nav {
+    /* Ensure it stays fixed at bottom of viewport */
+    position: fixed !important;
+    /* Lock to viewport bottom */
+    bottom: 0 !important;
+  }
+  
+  /* iOS Safari specific: prevent visual viewport resize from affecting nav */
+  @supports (-webkit-touch-callout: none) {
+    .bottom-nav {
+      /* Use environmental variables for safe area on iOS */
+      padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
+    }
+  }
 }
 
 /* Hide on desktop (md and up) */

@@ -244,11 +244,22 @@
   html {
     font-family: var(--font-family-sans);
     scroll-behavior: smooth;
+    /* Prevent horizontal scroll - lock viewport width */
+    overflow-x: hidden;
+    max-width: 100vw;
   }
   
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    /* Prevent horizontal scroll on body */
+    overflow-x: hidden;
+    max-width: 100vw;
+    /* Prevent pull-to-refresh bounce on mobile */
+    overscroll-behavior-y: contain;
+    /* Lock body width - no sway */
+    position: relative;
+    width: 100%;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -429,6 +440,12 @@
 
 /* Prevent Horizontal Scroll */
 .mobile-no-scroll-x {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Ensure main content areas don't overflow */
+main, #main, [role="main"] {
   overflow-x: hidden;
   max-width: 100vw;
 }
