@@ -61,13 +61,6 @@ export function useLiveRoomParticipants(
   const { enabled = false } = options;
   if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked');
 
-  if (enabled && !process.env.EXPO_PUBLIC_API_URL) {
-    const message =
-      '[ROOM] Missing EXPO_PUBLIC_API_URL. Refusing to default LiveKit token endpoint to production. Set EXPO_PUBLIC_API_URL (e.g. in mobile/.env for local Expo dev, or in mobile/eas.json for EAS builds) and restart the dev server.';
-    console.error(message);
-    throw new Error(message);
-  }
-
   const { user, getAccessToken } = useAuthContext();
   const [allParticipants, setAllParticipants] = useState<RemoteParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
@@ -449,7 +442,15 @@ export function useLiveRoomParticipants(
       const message =
         '[ROOM] Missing EXPO_PUBLIC_API_URL. Refusing to default LiveKit token endpoint to production. Set EXPO_PUBLIC_API_URL (e.g. in mobile/.env for local Expo dev, or in mobile/eas.json for EAS builds) and restart the dev server.';
       console.error(message);
-      throw new Error(message);
+
+      setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: null, bodySnippet: null });
+      setLastTokenError({ status: null, bodySnippet: '', message });
+      setConnectionError(message);
+      setConnectDebug({ wsUrl: null, errorMessage: message, reachedConnected: false });
+      setLastConnectError(message);
+      isConnectingRef.current = false;
+      hasConnectedRef.current = false;
+      return;
     }
 
     isConnectingRef.current = true;
