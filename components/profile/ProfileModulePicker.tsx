@@ -22,28 +22,6 @@ interface ModuleMetadata {
 }
 
 const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
-  // Content Modules (Photos, Videos, etc.)
-  feed: {
-    id: 'feed',
-    label: 'Feed',
-    description: 'Photo/video feed grid',
-  },
-  reels: {
-    id: 'reels',
-    label: 'Vlog / Reels',
-    description: 'Short-form video content',
-  },
-  photos: {
-    id: 'photos',
-    label: 'Photos',
-    description: 'Photo gallery',
-  },
-  videos: {
-    id: 'videos',
-    label: 'Videos',
-    description: 'Video gallery',
-  },
-  
   // Music & Entertainment
   music_showcase: {
     id: 'music_showcase',
