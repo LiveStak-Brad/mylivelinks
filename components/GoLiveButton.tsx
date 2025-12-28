@@ -186,6 +186,10 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
 
   // Update preview when device selection changes
   useEffect(() => {
+    // IMPORTANT: When screen sharing, previewStream is a displayMedia stream and selectedVideoDevice is a sentinel.
+    // Never call getUserMedia with that sentinel, or browsers will throw OverconstrainedError.
+    if (videoSourceType !== 'camera') return;
+    if (selectedVideoDevice === 'screen-share') return;
     if (showDeviceModal && selectedVideoDevice && selectedAudioDevice && previewStream) {
       startPreview(undefined, selectedVideoDevice, selectedAudioDevice);
     }
@@ -302,20 +306,16 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     }
   };
 
-  const startPreview = async (existingStream?: MediaStream, videoId?: string, audioId?: string) => {
+  const startPreview = async (existingStream?: MediaStream, videoDeviceId?: string, audioDeviceId?: string) => {
     try {
-      // Stop existing preview
-      if (previewStream) {
-        previewStream.getTracks().forEach(track => track.stop());
+      // Guard: screen share uses getDisplayMedia (handled separately)
+      if (videoDeviceId === 'screen-share') {
+        return;
       }
 
       const constraints: MediaStreamConstraints = {
-        video: videoId || selectedVideoDevice 
-          ? { deviceId: { exact: videoId || selectedVideoDevice } }
-          : true,
-        audio: audioId || selectedAudioDevice
-          ? { deviceId: { exact: audioId || selectedAudioDevice } }
-          : true,
+        video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : true,
+        audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
       };
 
       const stream = existingStream || await navigator.mediaDevices.getUserMedia(constraints);
@@ -850,7 +850,11 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
                     setPreviewVideoRef(el);
                     if (el && previewStream) {
                       el.srcObject = previewStream;
-                      el.play().catch(err => console.error('Error playing preview:', err));
+                      el.play().catch((err: any) => {
+                        const name = err?.name;
+                        if (name === 'AbortError') return;
+                        console.error('Error playing preview:', err);
+                      });
                     }
                   }}
                   autoPlay
@@ -970,7 +974,9 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
                   value={selectedAudioDevice}
                   onChange={(e) => {
                     setSelectedAudioDevice(e.target.value);
-                    startPreview(undefined, selectedVideoDevice, e.target.value);
+                    if (videoSourceType === 'camera' && selectedVideoDevice !== 'screen-share') {
+                      startPreview(undefined, selectedVideoDevice, e.target.value);
+                    }
                   }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
