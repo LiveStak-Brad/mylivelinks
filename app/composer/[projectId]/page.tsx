@@ -23,7 +23,7 @@ import {
   ImageIcon,
   ChevronDown,
   ChevronUp,
-  Grid3x3,
+  Grid3X3,
   Maximize2,
   Undo2,
   Redo2,
@@ -126,45 +126,45 @@ export default function ComposerEditorPage() {
       <div className="max-w-[1920px] mx-auto px-4 sm:px-6 py-6">
         
         {/* Top Bar - Title + Actions */}
-        <header className="mb-6 animate-fade-in">
-          <div className="flex items-center gap-4 mb-4">
+        <header className="mb-4 md:mb-6 animate-fade-in">
+          <div className="flex items-center gap-2 md:gap-4 mb-3 md:mb-4">
             <Link
               href="/composer"
-              className="p-2 rounded-lg hover:bg-muted transition-colors"
+              className="p-2 rounded-lg hover:bg-muted transition-colors touch-manipulation"
               aria-label="Back to projects"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
-            <div className="flex-1 flex items-center gap-3">
+            <div className="flex-1 flex items-center gap-2 md:gap-3">
               <input
                 type="text"
                 value={projectTitle}
                 onChange={(e) => setProjectTitle(e.target.value)}
                 placeholder="Untitled Project"
                 className="
-                  text-2xl font-bold bg-transparent border-none outline-none
+                  text-lg md:text-2xl font-bold bg-transparent border-none outline-none
                   text-foreground placeholder:text-muted-foreground
                   flex-1 focus:ring-2 focus:ring-primary/20 rounded-lg px-2 py-1
                 "
               />
               {/* Draft Status Badge */}
-              <span className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-600 dark:text-amber-400">
+              <span className="hidden sm:inline-flex px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
                 Draft
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Undo/Redo */}
-              <div className="flex items-center gap-1 mr-2">
+            <div className="flex items-center gap-1 md:gap-2">
+              {/* Undo/Redo - Hidden on mobile */}
+              <div className="hidden md:flex items-center gap-1 mr-2">
                 <button
                   disabled
-                  className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed group relative"
+                  className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   title="Undo (coming soon)"
                 >
                   <Undo2 className="w-4 h-4" />
                 </button>
                 <button
                   disabled
-                  className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed group relative"
+                  className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   title="Redo (coming soon)"
                 >
                   <Redo2 className="w-4 h-4" />
@@ -173,11 +173,12 @@ export default function ComposerEditorPage() {
               <button
                 onClick={handleSave}
                 className="
-                  inline-flex items-center gap-2 px-4 py-2.5
+                  inline-flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 md:py-2.5
                   bg-muted text-foreground
                   text-sm font-semibold rounded-xl
                   hover:bg-muted/80 active:scale-[0.98]
                   transition-all duration-200
+                  touch-manipulation
                 "
               >
                 <Save className="w-4 h-4" />
@@ -186,23 +187,24 @@ export default function ComposerEditorPage() {
               <button
                 onClick={handlePublish}
                 className="
-                  inline-flex items-center gap-2 px-4 py-2.5
+                  inline-flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 md:py-2.5
                   bg-gradient-to-r from-primary to-accent text-white
                   text-sm font-semibold rounded-xl
                   hover:opacity-90 active:scale-[0.98]
                   transition-all duration-200
                   shadow-lg shadow-primary/30
+                  touch-manipulation
                 "
               >
                 <Upload className="w-4 h-4" />
-                Publish
+                <span className="hidden sm:inline">Publish</span>
               </button>
             </div>
           </div>
 
           {/* Producer + Actors - Compact Row */}
-          <div className="flex items-center gap-4 px-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-2 py-2 bg-card/50 rounded-lg border border-border">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Producer</span>
               {producer && (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
@@ -211,8 +213,8 @@ export default function ComposerEditorPage() {
                 </div>
               )}
             </div>
-            <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-2 flex-1">
+            <div className="hidden sm:block h-4 w-px bg-border" />
+            <div className="flex items-center gap-2 flex-wrap flex-1">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Actors</span>
               {actors.map((actor) => (
                 <div
@@ -223,7 +225,7 @@ export default function ComposerEditorPage() {
                   <span className="text-xs font-medium text-foreground">@{actor.username}</span>
                   <button
                     onClick={() => handleRemoveActor(actor.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
                   >
                     <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
                   </button>
@@ -231,7 +233,7 @@ export default function ComposerEditorPage() {
               ))}
               <button
                 onClick={handleAddActor}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border-2 border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border-2 border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all touch-manipulation"
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span className="text-xs font-medium">Add</span>
@@ -240,12 +242,13 @@ export default function ComposerEditorPage() {
           </div>
         </header>
 
-        {/* MAIN EDITOR LAYOUT */}
-        <div className="flex gap-4">
+        {/* MAIN EDITOR LAYOUT - Responsive Choreography */}
+        <div className="flex flex-col md:flex-row gap-4">
           
-          {/* 🎨 LEFT: TOOL RAIL (CapCut/Canva style) */}
-          <aside className="w-16 flex-shrink-0">
-            <div className="sticky top-20 space-y-2">
+          {/* 🎨 TOOL RAIL (Desktop) / TOOL BAR (Mobile) */}
+          <aside className="md:w-16 md:flex-shrink-0 order-2 md:order-1">
+            {/* Desktop: Vertical Rail */}
+            <div className="hidden md:block sticky top-20 space-y-2">
               <ToolRailButton icon={Scissors} label="Trim" disabled />
               <ToolRailButton 
                 icon={Type} 
@@ -257,23 +260,39 @@ export default function ComposerEditorPage() {
               <ToolRailButton icon={Sparkles} label="Effects" disabled />
               <ToolRailButton icon={ImageIcon} label="Stickers" disabled />
             </div>
+            
+            {/* Mobile: Horizontal Tool Bar */}
+            <div className="md:hidden">
+              <div className="flex gap-2 overflow-x-auto pb-2 px-1 -mx-1 scrollbar-thin">
+                <ToolBarButton icon={Scissors} label="Trim" disabled />
+                <ToolBarButton 
+                  icon={Type} 
+                  label="Text" 
+                  onClick={() => showTemporaryToast('Text styles coming soon')}
+                />
+                <ToolBarButton icon={Music} label="Audio" disabled />
+                <ToolBarButton icon={Sliders} label="Filters" disabled />
+                <ToolBarButton icon={Sparkles} label="Effects" disabled />
+                <ToolBarButton icon={ImageIcon} label="Stickers" disabled />
+              </div>
+            </div>
           </aside>
 
-          {/* 🌟 CENTER: CANVAS (THE STAR) */}
-          <div className="flex-1 space-y-4 min-w-0">
+          {/* 🌟 CANVAS (THE STAR) - First on Mobile, Center on Desktop */}
+          <div className="flex-1 space-y-4 min-w-0 order-1 md:order-2">
             
             {/* Canvas Controls Bar */}
-            <div className="flex items-center justify-between gap-4 px-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 px-2">
               {/* Aspect Ratio Presets */}
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">Aspect Ratio:</span>
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Aspect:</span>
                 <div className="flex items-center gap-1">
                   {(['9:16', '1:1', '16:9'] as const).map((ratio) => (
                     <button
                       key={ratio}
                       onClick={() => setAspectRatio(ratio)}
                       className={`
-                        px-3 py-1.5 rounded-lg text-xs font-semibold transition-all
+                        px-3 py-1.5 rounded-lg text-xs font-semibold transition-all touch-manipulation min-h-[44px]
                         ${aspectRatio === ratio
                           ? 'bg-primary text-white shadow-sm'
                           : 'bg-muted text-foreground hover:bg-muted/80'
@@ -291,7 +310,7 @@ export default function ComposerEditorPage() {
                 <button
                   onClick={() => setShowGrid(!showGrid)}
                   className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-manipulation min-h-[44px]
                     ${showGrid
                       ? 'bg-primary/10 text-primary border border-primary/20'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -299,13 +318,13 @@ export default function ComposerEditorPage() {
                   `}
                   title="Toggle alignment grid"
                 >
-                  <Grid3x3 className="w-3.5 h-3.5" />
-                  Grid
+                  <Grid3X3 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Grid</span>
                 </button>
                 <button
                   onClick={() => setShowSafeArea(!showSafeArea)}
                   className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-manipulation min-h-[44px]
                     ${showSafeArea
                       ? 'bg-primary/10 text-primary border border-primary/20'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -314,7 +333,7 @@ export default function ComposerEditorPage() {
                   title="Toggle safe area guides"
                 >
                   <Maximize2 className="w-3.5 h-3.5" />
-                  Safe Area
+                  <span className="hidden sm:inline">Safe Area</span>
                 </button>
               </div>
             </div>
@@ -336,24 +355,24 @@ export default function ComposerEditorPage() {
                     `}
                   >
                     {/* Empty State */}
-                    <div className="text-center space-y-5 px-6 py-8">
-                      <div className="w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center ring-4 ring-primary/10">
-                        <Film className="w-12 h-12 text-primary" />
+                    <div className="text-center space-y-4 md:space-y-5 px-4 md:px-6 py-6 md:py-8">
+                      <div className="w-20 h-20 md:w-24 md:h-24 mx-auto rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center ring-4 ring-primary/10">
+                        <Film className="w-10 h-10 md:w-12 md:h-12 text-primary" />
                       </div>
                       <div className="space-y-2">
-                        <h2 className="text-2xl font-bold text-foreground">
+                        <h2 className="text-xl md:text-2xl font-bold text-foreground">
                           Drop a clip here
                         </h2>
                         <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                           Upload a video or add from your live streams to start creating
                         </p>
                       </div>
-                      <div className="flex items-center justify-center gap-3">
-                        <button className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-primary/30">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 md:gap-3">
+                        <button className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-primary/30 touch-manipulation min-h-[48px]">
                           <Upload className="w-5 h-5" />
                           Upload Video
                         </button>
-                        <button className="inline-flex items-center gap-2 px-6 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors">
+                        <button className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors touch-manipulation min-h-[48px]">
                           <Film className="w-5 h-5" />
                           From Streams
                         </button>
@@ -402,24 +421,25 @@ export default function ComposerEditorPage() {
               </Card>
             </div>
 
-            {/* Timeline - Full Width, Anchored */}
+            {/* Timeline - Full Width, Mobile-Optimized */}
             <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-background to-accent/5 shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-                    <Scissors className="w-5 h-5 text-primary" />
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center gap-3 mb-3 md:mb-4">
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
+                    <Scissors className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold text-foreground text-lg">Timeline</h3>
-                    <p className="text-xs text-muted-foreground">Your edits will take shape here</p>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-foreground text-base md:text-lg">Timeline</h3>
+                    <p className="text-xs text-muted-foreground hidden sm:block">Your edits will take shape here</p>
                   </div>
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-medium">
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
                     Coming Soon
                   </span>
                 </div>
-                <div className="h-28 rounded-xl bg-muted/30 border-2 border-dashed border-border/50 flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground font-medium">
-                    Trim · Text Timing · Effects
+                <div className="h-20 md:h-28 rounded-xl bg-muted/30 border-2 border-dashed border-border/50 flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground font-medium text-center px-4">
+                    <span className="hidden sm:inline">Trim · Text Timing · Effects</span>
+                    <span className="sm:hidden">Editing unlocks here</span>
                   </p>
                 </div>
               </CardContent>
@@ -427,9 +447,9 @@ export default function ComposerEditorPage() {
 
           </div>
 
-          {/* 📋 RIGHT: INSPECTOR (Contextual) */}
-          <aside className="w-72 flex-shrink-0">
-            <div className="sticky top-20 space-y-3">
+          {/* 📋 INSPECTOR (Right on Desktop, Stack on Mobile) */}
+          <aside className="md:w-72 md:flex-shrink-0 order-3">
+            <div className="md:sticky md:top-20 space-y-3">
               
               <InspectorPanel
                 icon={Smartphone}
@@ -581,8 +601,8 @@ export default function ComposerEditorPage() {
 
         </div>
 
-        {/* Keyboard Shortcuts Hint Bar (Web Only) */}
-        <div className="mt-6 px-2">
+        {/* Keyboard Shortcuts Hint Bar (Web Only, Hidden on Mobile) */}
+        <div className="mt-6 px-2 hidden md:block">
           <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-muted/50 border border-border">
             <Keyboard className="w-4 h-4 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground">Shortcuts:</span>
@@ -673,6 +693,45 @@ function ToolRailButton({
         </div>
       </div>
     </div>
+  );
+}
+
+/* -----------------------------------------------------------------------------
+   Tool Bar Button (Horizontal, Mobile)
+----------------------------------------------------------------------------- */
+function ToolBarButton({
+  icon: Icon,
+  label,
+  disabled = false,
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      className="
+        flex-shrink-0 flex flex-col items-center justify-center gap-1
+        w-20 h-16 rounded-xl
+        bg-muted/50 border-2 border-border
+        hover:bg-muted hover:border-primary/50
+        transition-all duration-200
+        disabled:opacity-40 disabled:cursor-not-allowed
+        touch-manipulation
+      "
+    >
+      <Icon className="w-5 h-5 text-foreground" />
+      <span className="text-[10px] font-medium text-foreground">{label}</span>
+      {disabled && (
+        <span className="absolute top-1 right-1 text-[8px] px-1 py-0.5 rounded-md bg-card text-muted-foreground font-medium">
+          Soon
+        </span>
+      )}
+    </button>
   );
 }
 
