@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import * as ImagePicker from 'expo-image-picker';
 
 import { Button, Input, PageShell, PageHeader } from '../components/ui';
 import { useFeed, type FeedPost } from '../hooks/useFeed';
@@ -76,17 +77,12 @@ export function FeedScreen({ navigation }: Props) {
   const pickMedia = useCallback(
     async (kind: 'photo' | 'video') => {
       try {
-        let ImagePicker: any = null;
-        try {
-          // Use require() instead of dynamic import() because some TS configs disallow import().
-          // This also avoids compile-time module resolution errors when the dependency isn't installed yet.
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          ImagePicker = require('expo-image-picker');
-        } catch {
-          Alert.alert(
-            'Uploader not installed',
-            "Install expo-image-picker in the mobile app to enable photo/video uploads."
-          );
+        if (
+          typeof ImagePicker.requestMediaLibraryPermissionsAsync !== 'function' ||
+          typeof ImagePicker.launchImageLibraryAsync !== 'function'
+        ) {
+          console.log('[Feed] pickMedia error: expo-image-picker unavailable');
+          Alert.alert('Upload unavailable', 'Media picker is not available on this device.');
           return;
         }
 
@@ -105,7 +101,7 @@ export function FeedScreen({ navigation }: Props) {
           allowsEditing: false,
         });
 
-        if (result?.canceled) return;
+        if (!result || result.canceled) return;
         const asset = Array.isArray(result?.assets) ? result.assets[0] : null;
         const uri = typeof asset?.uri === 'string' ? asset.uri : null;
         if (!uri) return;
@@ -132,7 +128,7 @@ export function FeedScreen({ navigation }: Props) {
         }
       } catch (e: any) {
         const message = String(e?.message || e || 'Failed to open media picker');
-        console.error('[Feed] pickMedia error:', e);
+        console.log('[Feed] pickMedia error:', message);
         Alert.alert('Upload failed', message);
       }
     },
