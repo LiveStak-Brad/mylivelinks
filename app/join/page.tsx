@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function JoinPage() {
+function JoinRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -18,4 +18,12 @@ export default function JoinPage() {
   }, [router, searchParams]);
 
   return null;
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={null}>
+      <JoinRedirect />
+    </Suspense>
+  );
 }

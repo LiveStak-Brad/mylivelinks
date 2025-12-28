@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import SmartBrandLogo from '@/components/SmartBrandLogo';
 import { Button, Input, Card, CardContent } from '@/components/ui';
 import { AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
 
-export default function SignUpPage() {
+function SignUpPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
@@ -257,5 +257,13 @@ export default function SignUpPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpPageInner />
+    </Suspense>
   );
 }
