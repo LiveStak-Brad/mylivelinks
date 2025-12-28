@@ -1,7 +1,51 @@
 BEGIN;
 
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS profile_type varchar(20) DEFAULT 'default';
+-- Ensure canonical profile_type enum + column (handle legacy varchar profile_type safely)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'profile_type_enum'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE TYPE public.profile_type_enum AS ENUM (
+      'streamer',
+      'musician',
+      'comedian',
+      'business',
+      'creator'
+    );
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'profiles'
+      AND column_name = 'profile_type'
+      AND data_type IN ('character varying', 'text')
+  ) THEN
+    UPDATE public.profiles
+    SET profile_type = 'creator'
+    WHERE profile_type IS NULL
+       OR profile_type = 'default'
+       OR profile_type NOT IN ('streamer','musician','comedian','business','creator');
+
+    ALTER TABLE public.profiles
+      ALTER COLUMN profile_type TYPE public.profile_type_enum
+      USING profile_type::public.profile_type_enum;
+  ELSE
+    ALTER TABLE public.profiles
+      ADD COLUMN IF NOT EXISTS profile_type public.profile_type_enum;
+  END IF;
+
+  ALTER TABLE public.profiles
+    ALTER COLUMN profile_type SET DEFAULT 'creator',
+    ALTER COLUMN profile_type SET NOT NULL;
+END;
+$$;
 
 DROP FUNCTION IF EXISTS public.get_profile_bundle(text, uuid, text);
 
@@ -22,6 +66,8 @@ DECLARE
   v_blocks json;
   v_blocks_jsonb jsonb;
   v_profile_blocks_jsonb jsonb;
+  v_profile_content_blocks_jsonb jsonb;
+  v_profile_content_grouped_jsonb jsonb;
 BEGIN
   SELECT
     p.id,
@@ -31,7 +77,7 @@ BEGIN
     p.bio,
     p.created_at,
     p.is_live,
-    COALESCE(p.profile_type, 'default') AS profile_type,
+    COALESCE(p.profile_type::text, 'creator') AS profile_type,
 
     p.profile_bg_url,
     p.profile_bg_overlay,
@@ -88,6 +134,70 @@ BEGIN
     AND ul.is_active = TRUE
     AND COALESCE(ul.is_adult, FALSE) = FALSE;
 
+  -- Merge ordered profile_content_blocks when available.
+  v_profile_content_blocks_jsonb := '[]'::jsonb;
+  v_profile_content_grouped_jsonb := '{}'::jsonb;
+  BEGIN
+    PERFORM 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'profile_content_blocks';
+
+    IF FOUND THEN
+      SELECT COALESCE(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', pcb.id,
+            'block_type', pcb.block_type,
+            'title', pcb.title,
+            'url', pcb.url,
+            'metadata', pcb.metadata,
+            'sort_order', pcb.sort_order,
+            'created_at', pcb.created_at,
+            'updated_at', pcb.updated_at
+          )
+          ORDER BY pcb.sort_order, pcb.id
+        ),
+        '[]'::jsonb
+      )
+      INTO v_profile_content_blocks_jsonb
+      FROM public.profile_content_blocks pcb
+      WHERE pcb.profile_id = v_profile.id;
+
+      WITH rows AS (
+        SELECT
+          pcb.block_type,
+          jsonb_build_object(
+            'id', pcb.id,
+            'block_type', pcb.block_type,
+            'title', pcb.title,
+            'url', pcb.url,
+            'metadata', pcb.metadata,
+            'sort_order', pcb.sort_order,
+            'created_at', pcb.created_at,
+            'updated_at', pcb.updated_at
+          ) AS item,
+          pcb.sort_order,
+          pcb.id
+        FROM public.profile_content_blocks pcb
+        WHERE pcb.profile_id = v_profile.id
+      ),
+      grouped AS (
+        SELECT
+          block_type,
+          jsonb_agg(item ORDER BY sort_order NULLS LAST, id NULLS LAST) AS arr
+        FROM rows
+        GROUP BY block_type
+      )
+      SELECT COALESCE(jsonb_object_agg(block_type, arr), '{}'::jsonb)
+      INTO v_profile_content_grouped_jsonb
+      FROM grouped;
+    END IF;
+  EXCEPTION
+    WHEN undefined_table THEN
+      NULL;
+  END;
+
   v_blocks := json_build_object(
     'schedule_items', '[]'::json,
     'clips', '[]'::json,
@@ -99,10 +209,15 @@ BEGIN
     'products', '[]'::json,
     'booking_link', NULL,
     'featured_links', v_featured_links,
+    'content_blocks', v_profile_content_blocks_jsonb::json,
+    'blocks_by_type', v_profile_content_grouped_jsonb::json,
     'posts', '[]'::json
   );
 
   v_blocks_jsonb := to_jsonb(v_blocks);
+
+  -- Also expose grouped content blocks at top-level keys (by block_type) for easy parity.
+  v_blocks_jsonb := v_blocks_jsonb || COALESCE(v_profile_content_grouped_jsonb, '{}'::jsonb);
 
   -- If a future profile_blocks table exists, merge its grouped blocks into v_blocks.
   BEGIN
