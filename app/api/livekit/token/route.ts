@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
 
+    // TEMP: Prove server received an Authorization header (do not log token)
+    console.log('[TOKEN_API] auth_header_presence', {
+      hasAuthHeader: !!authHeader,
+      isBearer: !!bearerToken,
+    });
+
     // Get authenticated user (supports cookie auth for web and Bearer token auth for mobile)
     let user: any = null;
     let authError: any = null;
@@ -93,7 +99,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (authError || !user) {
-      console.error('Authentication failed:', authError);
+      console.error('[TOKEN_API] Authentication failed:', {
+        hasAuthHeader: !!authHeader,
+        usedBearer: !!bearerToken,
+        errorMessage: authError?.message,
+      });
       return NextResponse.json(
         { error: 'Unauthorized - Please log in' },
         { status: 401, headers: corsHeaders }

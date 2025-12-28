@@ -137,6 +137,30 @@ npx expo start
 - Scan QR code with Expo Go app on iOS device
 - **Limitation**: Can't use custom native modules (LiveKit requires dev build)
 
+### Clean Restart (Required After `.env` Changes)
+
+Expo reads `EXPO_PUBLIC_*` environment variables at **bundle time**. If you change `mobile/.env`, you must restart Metro with cache cleared so the new values are embedded.
+
+1. **Stop Metro**:
+   - In the terminal running Expo/Metro, press `Ctrl+C`
+
+2. **Start with a clean cache**:
+   ```bash
+   cd mobile
+   npx expo start -c
+   ```
+
+3. **If using a Dev Client (recommended for LiveKit)**:
+   - Quit the app on the device/simulator completely
+   - Relaunch the dev client and reconnect to the Metro server
+   - If it still shows old values, do a full rebuild:
+     - iOS (Mac): `npx expo run:ios` or rebuild from Xcode
+     - Android: `npx expo run:android`
+
+4. **Verify env loaded (temporary log)**:
+   - In Metro logs / device logs you should see:
+     - `[ENV_BOOT]` with `EXPO_PUBLIC_API_URL: "https://mylivelinks.com"`
+
 ### Option 2: iOS Simulator (Mac Only)
 ```bash
 cd mobile

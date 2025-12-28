@@ -137,6 +137,23 @@ export function useAuth(): UseAuthReturn {
       return session.access_token;
     }
 
+    // If token is missing at time of request, attempt a single refresh to recover.
+    // This is intentionally minimal and does not log any secrets.
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.warn('[AUTH] refreshSession failed');
+        return null;
+      }
+      if (data?.session) {
+        setSession(data.session);
+      }
+      return data?.session?.access_token ?? null;
+    } catch {
+      console.warn('[AUTH] refreshSession threw');
+      return null;
+    }
+
     // No fallback outside React state; caller must handle missing token
     return null;
   }, [session, supabaseConfigured]);

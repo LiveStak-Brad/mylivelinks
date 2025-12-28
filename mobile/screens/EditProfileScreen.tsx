@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { Button, Input, PageShell } from '../components/ui';
+import { ProfileTypePickerModal, type ProfileType } from '../components/ProfileTypePickerModal';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
@@ -27,6 +28,8 @@ export function EditProfileScreen({ navigation }: Props) {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
+  const [profileType, setProfileType] = useState<ProfileType>('creator');
+  const [showTypePickerModal, setShowTypePickerModal] = useState(false);
 
   const canSave = useMemo(() => !!userId && !saving && !loading, [loading, saving, userId]);
 
@@ -59,6 +62,8 @@ export function EditProfileScreen({ navigation }: Props) {
       setProfile(row);
       setDisplayName(String(row.display_name ?? ''));
       setBio(String(row.bio ?? ''));
+      // TODO: Load actual profile type from backend when field exists
+      setProfileType('creator');
     } catch (e: any) {
       setError(e?.message || 'Failed to load profile');
       setProfile(null);
@@ -85,6 +90,7 @@ export function EditProfileScreen({ navigation }: Props) {
     setError(null);
 
     try {
+      // TODO: Save profileType to backend when field is added
       const { error: e } = await supabase
         .from('profiles')
         .update({
@@ -153,11 +159,52 @@ export function EditProfileScreen({ navigation }: Props) {
             />
           </View>
 
+          {/* Profile Type Row */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Profile Type</Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.profileTypeRow,
+                pressed && styles.profileTypeRowPressed,
+              ]}
+              onPress={() => setShowTypePickerModal(true)}
+            >
+              <Text style={styles.profileTypeValue}>{formatProfileType(profileType)}</Text>
+              <Text style={styles.profileTypeChevron}>›</Text>
+            </Pressable>
+            <Text style={styles.warningText}>
+              Changing type may hide/show sections. Nothing is deleted.
+            </Text>
+          </View>
+
           <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} loading={saving} />
         </View>
       )}
+
+      {/* Profile Type Picker Modal */}
+      <ProfileTypePickerModal
+        visible={showTypePickerModal}
+        onClose={() => setShowTypePickerModal(false)}
+        currentType={profileType}
+        onSelect={(type) => {
+          setProfileType(type);
+          // TODO: Save to backend when field is added
+        }}
+      />
     </PageShell>
   );
+}
+
+// Helper function to format profile type for display
+function formatProfileType(type: ProfileType): string {
+  const labels: Record<ProfileType, string> = {
+    streamer: 'Streamer',
+    musician: 'Musician / Artist',
+    comedian: 'Comedian',
+    business: 'Business / Brand',
+    creator: 'Creator',
+  };
+  return labels[type];
 }
 
 const styles = StyleSheet.create({
@@ -212,5 +259,36 @@ const styles = StyleSheet.create({
     height: 110,
     textAlignVertical: 'top',
     paddingTop: 12,
+  },
+  profileTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  profileTypeRowPressed: {
+    opacity: 0.7,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  profileTypeValue: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  profileTypeChevron: {
+    color: '#9aa0a6',
+    fontSize: 24,
+    fontWeight: '300',
+  },
+  warningText: {
+    color: '#f59e0b',
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

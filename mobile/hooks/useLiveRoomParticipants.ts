@@ -252,8 +252,8 @@ export function useLiveRoomParticipants(
         });
       }
 
-      // 3) Guarantee Authorization header is sent (TEMP log; do not log token)
-      console.log('[TOKEN] Authorization header present:', true);
+      // TEMP: Prove whether we actually have a token at the moment we send the request (do not log token)
+      console.log('[TOKEN] hasAccessToken:', !!accessToken);
 
       const response = await fetch(TOKEN_ENDPOINT, {
         method: 'POST',

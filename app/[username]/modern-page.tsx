@@ -16,6 +16,11 @@ import FollowersModal from '@/components/profile/FollowersModal';
 import SocialMediaBar from '@/components/profile/SocialMediaBar';
 import ProfileLivePlayer from '@/components/ProfileLivePlayer';
 import UserConnectionsList from '@/components/UserConnectionsList';
+import ProfileTypeBadge, { ProfileType } from '@/components/profile/ProfileTypeBadge';
+import ProfileQuickActionsRow from '@/components/profile/ProfileQuickActionsRow';
+import ProfileSectionTabs from '@/components/profile/ProfileSectionTabs';
+import { getEnabledSections, isSectionEnabled, type ProfileType as ConfigProfileType } from '@/lib/profileTypeConfig';
+import { MusicShowcase, UpcomingEvents, Merchandise, BusinessInfo, Portfolio, TabEmptyState } from '@/components/profile/sections';
 
 interface ProfileData {
   profile: {
@@ -31,6 +36,7 @@ interface ProfileData {
     total_gifts_sent: number;
     gifter_level: number;
     created_at: string;
+    profile_type?: ProfileType;
     // Customization
     profile_bg_url?: string;
     profile_bg_overlay?: string;
@@ -132,6 +138,7 @@ export default function ModernProfilePage() {
   const [liveStreamId, setLiveStreamId] = useState<number | undefined>(undefined);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'feed' | 'photos'>('info');
+  const [activeSectionTab, setActiveSectionTab] = useState<string>('info');
   const [activeConnectionsTab, setActiveConnectionsTab] = useState<'following' | 'followers' | 'friends'>('following');
   const [connectionsExpanded, setConnectionsExpanded] = useState(true);
   
@@ -551,9 +558,13 @@ export default function ModernProfilePage() {
                 <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words">
                   {profile.display_name || profile.username}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg mb-3">
-                  @{profile.username}
-                </p>
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-3">
+                  <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg">
+                    @{profile.username}
+                  </p>
+                  {/* Profile Type Badge */}
+                  <ProfileTypeBadge profileType={profile.profile_type || 'creator'} />
+                </div>
                 
                 {profile.bio && (
                   <p className="text-gray-700 dark:text-gray-300 mb-4 max-w-2xl text-sm sm:text-base break-words">
@@ -616,7 +627,26 @@ export default function ModernProfilePage() {
           </div>
         </div>
         
-        {/* Profile Tabs (Info | Feed | Photos) */}
+        {/* Profile Type Quick Actions Row */}
+        {(profile.profile_type && profile.profile_type !== 'default') && (
+          <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
+            <ProfileQuickActionsRow 
+              profileType={profile.profile_type}
+            />
+          </div>
+        )}
+        
+        {/* Profile Section Tabs (Type-specific) */}
+        <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
+          <ProfileSectionTabs
+            profileType={profile.profile_type || 'creator'}
+            activeTab={activeSectionTab}
+            onTabChange={setActiveSectionTab}
+            accentColor={accentColor}
+          />
+        </div>
+        
+        {/* Profile Tabs (Info | Feed | Photos) - Legacy tabs for backward compatibility */}
         <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
           <div className="flex border-b border-gray-200 dark:border-gray-700">
             <button
@@ -664,9 +694,49 @@ export default function ModernProfilePage() {
           </div>
         </div>
         
-        {/* Tab Content */}
-        {activeTab === 'info' && (
+        {/* Tab Content - Render based on activeSectionTab (CONFIG-DRIVEN) */}
+        {activeSectionTab === 'info' && (
           <>
+        {/* Config-driven section rendering for musician showcase */}
+        {isSectionEnabled('music_showcase', profile.profile_type as ConfigProfileType) && (
+          <MusicShowcase 
+            profileType={profile.profile_type as ConfigProfileType}
+            isOwner={isOwnProfile}
+          />
+        )}
+        
+        {/* Config-driven section rendering for upcoming events */}
+        {isSectionEnabled('upcoming_events', profile.profile_type as ConfigProfileType) && (
+          <UpcomingEvents 
+            profileType={profile.profile_type as ConfigProfileType}
+            isOwner={isOwnProfile}
+          />
+        )}
+        
+        {/* Config-driven section rendering for merchandise */}
+        {isSectionEnabled('merchandise', profile.profile_type as ConfigProfileType) && (
+          <Merchandise 
+            profileType={profile.profile_type as ConfigProfileType}
+            isOwner={isOwnProfile}
+          />
+        )}
+        
+        {/* Config-driven section rendering for business info */}
+        {isSectionEnabled('business_info', profile.profile_type as ConfigProfileType) && (
+          <BusinessInfo 
+            profileType={profile.profile_type as ConfigProfileType}
+            isOwner={isOwnProfile}
+          />
+        )}
+        
+        {/* Config-driven section rendering for portfolio */}
+        {isSectionEnabled('portfolio', profile.profile_type as ConfigProfileType) && (
+          <Portfolio 
+            profileType={profile.profile_type as ConfigProfileType}
+            isOwner={isOwnProfile}
+          />
+        )}
+        
         {/* Stats & Social Grid - Hide if hideStreamingStats is true */}
         {!profile.hide_streaming_stats && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
@@ -865,30 +935,45 @@ export default function ModernProfilePage() {
         )}
         
         {/* Feed Tab */}
-        {activeTab === 'feed' && (
-          <div className={`${borderRadiusClass} overflow-hidden shadow-lg p-6 sm:p-8 text-center`} style={cardStyle}>
-            <svg className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <h3 className="text-xl font-bold mb-2">No Posts Yet</h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Posts and updates will appear here
-            </p>
-          </div>
+        {activeSectionTab === 'feed' && (
+          <TabEmptyState type="feed" isOwner={isOwnProfile} />
         )}
         
         {/* Photos Tab */}
-        {activeTab === 'photos' && (
-          <div className={`${borderRadiusClass} overflow-hidden shadow-lg p-6 sm:p-8 text-center`} style={cardStyle}>
-            <svg className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <h3 className="text-xl font-bold mb-2">No Photos Yet</h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Photos and media will appear here
-            </p>
-          </div>
+        {activeSectionTab === 'photos' && (
+          <TabEmptyState type="photos" isOwner={isOwnProfile} />
         )}
+        
+        {/* Videos Tab */}
+        {activeSectionTab === 'videos' && (
+          <TabEmptyState type="videos" isOwner={isOwnProfile} />
+        )}
+        
+        {/* Music Tab - Musician-specific (shows MusicShowcase) */}
+        {activeSectionTab === 'music' && (
+          <MusicShowcase 
+            profileType={profile.profile_type as ConfigProfileType}
+            isOwner={isOwnProfile}
+          />
+        )}
+        
+        {/* Events Tab - Musician/Comedian-specific (shows UpcomingEvents) */}
+        {activeSectionTab === 'events' && (
+          <UpcomingEvents 
+            profileType={profile.profile_type as ConfigProfileType}
+            isOwner={isOwnProfile}
+          />
+        )}
+        
+        {/* Products Tab - Business-specific (shows Portfolio for now) */}
+        {activeSectionTab === 'products' && (
+          <Portfolio 
+            profileType={profile.profile_type as ConfigProfileType}
+            isOwner={isOwnProfile}
+          />
+        )}
+        
+        {/* Type-specific tab placeholders (kept for backward compatibility) */}
       </div>
       
       {/* Modals */}

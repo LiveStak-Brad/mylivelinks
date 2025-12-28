@@ -20,6 +20,21 @@ import { useThemeMode } from '../contexts/ThemeContext';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useAutoHideBars } from '../hooks/useAutoHideBars';
 import { getAvatarSource } from '../lib/defaultAvatar';
+import { 
+  getEnabledTabs, 
+  getEnabledSections, 
+  isSectionEnabled,
+  type ProfileType 
+} from '../config/profileTypeConfig';
+import { 
+  getMockMusicShowcase,
+  getMockUpcomingEvents,
+  getMockMerchandise,
+  getMockBusinessInfo,
+  getMockPortfolio,
+  hasMockData,
+  getEmptyStateText,
+} from '../config/mockDataProviders';
 
 /* =============================================================================
    PROFILE SCREEN v2 - FULL VISUAL PARITY WITH WEB
@@ -64,6 +79,7 @@ interface ProfileData {
     coin_balance?: number;
     earnings_balance?: number;
     hide_streaming_stats?: boolean;
+    profile_type?: ProfileType; // PROFILE TYPE for conditional rendering
     // Customization (MATCH WEB)
     profile_bg_url?: string;
     profile_bg_overlay?: string;
@@ -136,7 +152,7 @@ interface ProfileData {
 }
 
 type ConnectionsTab = 'following' | 'followers' | 'friends';
-type ProfileTab = 'info' | 'feed' | 'photos';
+type ProfileTab = 'info' | 'feed' | 'photos' | 'videos' | 'music' | 'events' | 'products';
 
 type ProfileScreenProps = {
   /** The username to display */
@@ -435,6 +451,10 @@ export function ProfileScreen({
   }
 
   const { profile } = profileData;
+  const profileType = profile.profile_type || 'default'; // Get profile type, default to 'default'
+  const enabledTabs = useMemo(() => getEnabledTabs(profileType), [profileType]);
+  const enabledSections = useMemo(() => getEnabledSections(profileType), [profileType]);
+  
   const gifterStatus = profileData.gifter_statuses?.[profile.id];
   const gifterLevelDisplay =
     gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0
@@ -580,72 +600,33 @@ export function ProfileScreen({
           </View>
         </View>
 
-        {/* PROFILE TABS (Info | Feed | Photos) */}
+        {/* PROFILE TABS - Dynamically rendered based on profile type */}
         <View style={[styles.card, customCardStyle, { marginTop: 0, paddingVertical: 0 }]}>
           <View style={styles.profileTabs}>
-            <Pressable
-              style={[
-                styles.profileTab,
-                activeTab === 'info' && { borderBottomColor: accentColor, borderBottomWidth: 3 },
-              ]}
-              onPress={() => setActiveTab('info')}
-            >
-              <Ionicons 
-                name="information-circle" 
-                size={20} 
-                color={activeTab === 'info' ? accentColor : theme.colors.textMuted} 
-              />
-              <Text
+            {enabledTabs.map((tab) => (
+              <Pressable
+                key={tab.id}
                 style={[
-                  styles.profileTabText,
-                  activeTab === 'info' && { color: accentColor, fontWeight: '700' },
+                  styles.profileTab,
+                  activeTab === tab.id && { borderBottomColor: accentColor, borderBottomWidth: 3 },
                 ]}
+                onPress={() => setActiveTab(tab.id)}
               >
-                Info
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.profileTab,
-                activeTab === 'feed' && { borderBottomColor: accentColor, borderBottomWidth: 3 },
-              ]}
-              onPress={() => setActiveTab('feed')}
-            >
-              <Ionicons 
-                name="albums" 
-                size={20} 
-                color={activeTab === 'feed' ? accentColor : theme.colors.textMuted} 
-              />
-              <Text
-                style={[
-                  styles.profileTabText,
-                  activeTab === 'feed' && { color: accentColor, fontWeight: '700' },
-                ]}
-              >
-                Feed
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.profileTab,
-                activeTab === 'photos' && { borderBottomColor: accentColor, borderBottomWidth: 3 },
-              ]}
-              onPress={() => setActiveTab('photos')}
-            >
-              <Ionicons 
-                name="images" 
-                size={20} 
-                color={activeTab === 'photos' ? accentColor : theme.colors.textMuted} 
-              />
-              <Text
-                style={[
-                  styles.profileTabText,
-                  activeTab === 'photos' && { color: accentColor, fontWeight: '700' },
-                ]}
-              >
-                Photos
-              </Text>
-            </Pressable>
+                <Ionicons 
+                  name={tab.icon as any}
+                  size={20} 
+                  color={activeTab === tab.id ? accentColor : theme.colors.textMuted} 
+                />
+                <Text
+                  style={[
+                    styles.profileTabText,
+                    activeTab === tab.id && { color: accentColor, fontWeight: '700' },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -653,7 +634,7 @@ export function ProfileScreen({
         {activeTab === 'info' && (
           <>
             {/* STATS CARDS SECTION (Social Counts, Top Supporters, Top Streamers) */}
-        {!profile.hide_streaming_stats && (
+        {!profile.hide_streaming_stats && isSectionEnabled('social_counts', profileType) && (
           <View style={styles.statsCardsContainer}>
             {/* Social Counts Card */}
             <View style={[styles.card, customCardStyle]}>
@@ -683,7 +664,7 @@ export function ProfileScreen({
             </View>
 
             {/* Top Supporters Card */}
-            {profileData.top_supporters.length > 0 && (
+            {isSectionEnabled('top_supporters', profileType) && profileData.top_supporters.length > 0 && (
               <View style={[styles.card, customCardStyle]}>
                 <Text style={styles.cardTitle}>🎁 Top Supporters</Text>
                 {profileData.top_supporters.slice(0, 3).map((supporter, idx) => (
@@ -715,7 +696,7 @@ export function ProfileScreen({
             )}
 
             {/* Top Streamers Card */}
-            {profileData.top_streamers.length > 0 && (
+            {isSectionEnabled('top_streamers', profileType) && profileData.top_streamers.length > 0 && (
               <View style={[styles.card, customCardStyle]}>
                 <Text style={styles.cardTitle}>🌟 Top Streamers</Text>
                 {profileData.top_streamers.slice(0, 3).map((streamer, idx) => (
@@ -750,7 +731,7 @@ export function ProfileScreen({
         )}
 
         {/* SOCIAL MEDIA CARD */}
-        {(profile.social_instagram ||
+        {isSectionEnabled('social_media', profileType) && (profile.social_instagram ||
           profile.social_twitter ||
           profile.social_youtube ||
           profile.social_tiktok ||
@@ -820,6 +801,7 @@ export function ProfileScreen({
         )}
 
         {/* CONNECTIONS CARD */}
+        {isSectionEnabled('connections', profileType) && (
         <View style={[styles.card, customCardStyle]}>
           <Pressable
             onPress={() => setConnectionsExpanded(!connectionsExpanded)}
@@ -931,9 +913,10 @@ export function ProfileScreen({
             </>
           )}
         </View>
+        )}
 
         {/* LINKS CARD */}
-        {profileData.links.length > 0 && (
+        {isSectionEnabled('links', profileType) && profileData.links.length > 0 && (
           <View style={[styles.card, customCardStyle]}>
             <Text style={styles.cardTitle}>My Links</Text>
             {profileData.links.map((link) => (
@@ -958,7 +941,7 @@ export function ProfileScreen({
         )}
 
         {/* PROFILE STATS CARD */}
-        {!profile.hide_streaming_stats && (
+        {isSectionEnabled('profile_stats', profileType) && !profile.hide_streaming_stats && (
           <View style={[styles.card, customCardStyle]}>
             <Text style={styles.cardTitle}>📊 Profile Stats</Text>
             <View style={styles.statsDetailRow}>
@@ -999,6 +982,7 @@ export function ProfileScreen({
         )}
 
         {/* FOOTER CARD */}
+        {isSectionEnabled('footer', profileType) && (
         <View style={[styles.card, customCardStyle]}>
           <View style={styles.footerContent}>
             <Text style={[styles.footerBrand, { color: accentColor }]}>MyLiveLinks</Text>
@@ -1018,6 +1002,7 @@ export function ProfileScreen({
             </Text>
           </View>
         </View>
+        )}
           </>
         )}
 
