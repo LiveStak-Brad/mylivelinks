@@ -26,6 +26,7 @@ import {
 import { getEmptyStateText } from '@/lib/mockDataProviders';
 import type { ProfileType } from '@/lib/profileTypeConfig';
 import { createClient } from '@/lib/supabase';
+import { uploadProfileMedia } from '@/lib/storage';
 
 export type MusicTrackRow = {
   id: string;
@@ -77,6 +78,8 @@ export default function MusicShowcase({
   const [newTitle, setNewTitle] = useState('');
   const [newArtist, setNewArtist] = useState('');
   const [newAudioUrl, setNewAudioUrl] = useState('');
+  const [newAudioSource, setNewAudioSource] = useState<'url' | 'upload'>('url');
+  const [newAudioFile, setNewAudioFile] = useState<File | null>(null);
   const [newCoverUrl, setNewCoverUrl] = useState('');
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -305,6 +308,8 @@ export default function MusicShowcase({
     setNewTitle('');
     setNewArtist('');
     setNewAudioUrl('');
+    setNewAudioSource('url');
+    setNewAudioFile(null);
     setNewCoverUrl('');
     setRightsConfirmed(false);
     setShowAddModal(true);
@@ -313,13 +318,35 @@ export default function MusicShowcase({
   const submitAdd = async () => {
     setFormError(null);
     const title = newTitle.trim();
-    const audioUrl = newAudioUrl.trim();
+    let audioUrl = newAudioUrl.trim();
     const artist = newArtist.trim();
     const cover = newCoverUrl.trim();
 
     if (!title) return setFormError('Track title is required.');
-    if (!audioUrl) return setFormError('Audio URL is required.');
     if (!rightsConfirmed) return setFormError('You must confirm you own the rights or have permission.');
+
+    if (newAudioSource === 'upload') {
+      if (!newAudioFile) return setFormError('Please select an MP3 or WAV file to upload.');
+      const name = String(newAudioFile.name || '').toLowerCase();
+      const type = String(newAudioFile.type || '').toLowerCase();
+      const isMp3 = type === 'audio/mpeg' || name.endsWith('.mp3');
+      const isWav = type === 'audio/wav' || type === 'audio/x-wav' || name.endsWith('.wav');
+      if (!isMp3 && !isWav) return setFormError('Only MP3 or WAV files are supported.');
+      if (newAudioFile.size > 50 * 1024 * 1024) return setFormError('Audio file too large (max 50MB).');
+    }
+
+    if (newAudioSource === 'upload' && profileId) {
+      try {
+        const storageId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : safeUuid();
+        audioUrl = await uploadProfileMedia(profileId, `music/tracks/${storageId}/audio`, newAudioFile as File, { upsert: false });
+      } catch (e: any) {
+        const msg = typeof e?.message === 'string' ? e.message : 'Failed to upload audio.';
+        console.error('[MusicShowcase] audio upload failed', e);
+        return setFormError(msg);
+      }
+    }
+
+    if (!audioUrl) return setFormError('Audio URL is required.');
 
     if (!profileId) {
       // Fallback: keep UI working even if we couldn't resolve profileId (should be rare).
@@ -411,6 +438,10 @@ export default function MusicShowcase({
             setNewArtist={setNewArtist}
             newAudioUrl={newAudioUrl}
             setNewAudioUrl={setNewAudioUrl}
+            newAudioSource={newAudioSource}
+            setNewAudioSource={setNewAudioSource}
+            newAudioFile={newAudioFile}
+            setNewAudioFile={setNewAudioFile}
             newCoverUrl={newCoverUrl}
             setNewCoverUrl={setNewCoverUrl}
             rightsConfirmed={rightsConfirmed}
@@ -604,6 +635,10 @@ export default function MusicShowcase({
           setNewArtist={setNewArtist}
           newAudioUrl={newAudioUrl}
           setNewAudioUrl={setNewAudioUrl}
+          newAudioSource={newAudioSource}
+          setNewAudioSource={setNewAudioSource}
+          newAudioFile={newAudioFile}
+          setNewAudioFile={setNewAudioFile}
           newCoverUrl={newCoverUrl}
           setNewCoverUrl={setNewCoverUrl}
           rightsConfirmed={rightsConfirmed}
@@ -624,13 +659,17 @@ function AddTrackModal(props: {
   setNewArtist: (v: string) => void;
   newAudioUrl: string;
   setNewAudioUrl: (v: string) => void;
+  newAudioSource: 'url' | 'upload';
+  setNewAudioSource: (v: 'url' | 'upload') => void;
+  newAudioFile: File | null;
+  setNewAudioFile: (v: File | null) => void;
   newCoverUrl: string;
   setNewCoverUrl: (v: string) => void;
   rightsConfirmed: boolean;
   setRightsConfirmed: (v: boolean) => void;
   formError: string | null;
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: () => void | Promise<void>;
 }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -673,13 +712,52 @@ function AddTrackModal(props: {
             />
           </div>
           <div>
-            <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Audio URL *</label>
-            <input
-              value={props.newAudioUrl}
-              onChange={(e) => props.setNewAudioUrl(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-white"
-              placeholder="https://.../track.mp3"
-            />
+            <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Audio Source *</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => props.setNewAudioSource('url')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold border ${
+                  props.newAudioSource === 'url' ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700'
+                }`}
+              >
+                Audio URL
+              </button>
+              <button
+                type="button"
+                onClick={() => props.setNewAudioSource('upload')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold border ${
+                  props.newAudioSource === 'upload' ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700'
+                }`}
+              >
+                Upload MP3/WAV
+              </button>
+            </div>
+
+            {props.newAudioSource === 'url' ? (
+              <div className="mt-2">
+                <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Audio URL *</label>
+                <input
+                  value={props.newAudioUrl}
+                  onChange={(e) => props.setNewAudioUrl(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-white"
+                  placeholder="https://.../track.mp3"
+                />
+              </div>
+            ) : (
+              <div className="mt-2">
+                <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Audio File *</label>
+                <input
+                  type="file"
+                  accept="audio/mpeg,audio/wav,.mp3,.wav"
+                  onChange={(e) => props.setNewAudioFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm"
+                />
+                {!!props.newAudioFile && (
+                  <div className="mt-1 text-xs font-semibold text-gray-600 dark:text-gray-400">Selected: {props.newAudioFile.name}</div>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Cover Art URL</label>
