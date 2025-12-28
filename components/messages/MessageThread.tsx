@@ -5,6 +5,8 @@ import { Send, Gift, Smile, ArrowLeft, Loader2, ExternalLink, ImagePlus } from '
 import { useMessages, Message, Conversation } from './MessagesContext';
 import GiftPickerMini from './GiftPickerMini';
 import { useIM } from '@/components/im';
+import SafeRichText from '@/components/SafeRichText';
+import SafeOutboundLink from '@/components/SafeOutboundLink';
 
 interface MessageThreadProps {
   conversation: Conversation;
@@ -474,9 +476,9 @@ function MessageBubble({
           }`}
         >
           {url ? (
-            <a href={url} target="_blank" rel="noreferrer">
+            <SafeOutboundLink href={url}>
               <img src={url} alt="Photo" className="block max-h-[260px] w-auto object-contain" />
-            </a>
+            </SafeOutboundLink>
           ) : (
             <div className="px-4 py-3 text-sm text-muted-foreground">Photo</div>
           )}
@@ -507,7 +509,13 @@ function MessageBubble({
             : 'bg-muted text-foreground rounded-bl-md'
         }`}
       >
-        <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
+        <p className="text-sm break-words whitespace-pre-wrap">
+          <SafeRichText
+            text={message.content}
+            className="whitespace-pre-wrap"
+            linkClassName={isOwn ? 'text-white underline underline-offset-2' : 'text-primary underline underline-offset-2'}
+          />
+        </p>
         <p className={`text-[10px] mt-1 ${isOwn ? 'text-white/70' : 'text-muted-foreground'}`}>
           {time}
           {isOwn && (

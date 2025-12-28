@@ -5,6 +5,7 @@ import { Heart, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import ClipActions from '@/components/ClipActions';
+import SafeRichText from '@/components/SafeRichText';
 
 /* =============================================================================
    FEED POST CARD COMPONENT
@@ -159,7 +160,9 @@ const FeedPostCard = memo(function FeedPostCard({
       {/* Content */}
       {content && (
         <div className="px-4 pb-3">
-          <p className="text-foreground leading-relaxed whitespace-pre-wrap">{content}</p>
+          <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+            <SafeRichText text={content} className="whitespace-pre-wrap" showLinkPreview={true} />
+          </p>
         </div>
       )}
       

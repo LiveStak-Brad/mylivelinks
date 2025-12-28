@@ -7,6 +7,7 @@ import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import MiniProfile from './MiniProfile';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import SafeRichText from '@/components/SafeRichText';
 
 interface ChatMessage {
   id: number | string;
@@ -554,7 +555,7 @@ export default function Chat() {
                       </span>
                     </div>
                     <div className="text-sm text-gray-700 dark:text-gray-300 break-words">
-                      {msg.content}
+                      <SafeRichText text={msg.content} />
                     </div>
                   </>
                 )}

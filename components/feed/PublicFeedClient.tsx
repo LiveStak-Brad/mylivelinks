@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { MessageCircle, Gift, RefreshCw, Upload, X } from 'lucide-react';
 import { Button, Card, Modal, Textarea } from '@/components/ui';
 import PostMedia from './PostMedia';
+import SafeRichText from '@/components/SafeRichText';
 import { createClient } from '@/lib/supabase';
 import { uploadPostMedia } from '@/lib/storage';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
@@ -552,7 +553,9 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                     </Button>
                   </div>
 
-                  <div className="text-foreground whitespace-pre-wrap">{post.text_content}</div>
+                  <div className="text-foreground whitespace-pre-wrap">
+                    <SafeRichText text={post.text_content} className="whitespace-pre-wrap" showLinkPreview={true} />
+                  </div>
 
                   {post.media_url && (
                     <div className="rounded-xl overflow-hidden border border-border bg-muted/20">
@@ -587,7 +590,9 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                                 </Link>
                               </div>
                               <div className="text-xs text-muted-foreground">{formatDateTime(c.created_at)}</div>
-                              <div className="text-sm text-foreground whitespace-pre-wrap mt-1">{c.text_content}</div>
+                              <div className="text-sm text-foreground whitespace-pre-wrap mt-1">
+                                <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
+                              </div>
                             </div>
                             <Button
                               variant="outline"

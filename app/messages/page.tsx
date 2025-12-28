@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { MessageCircle, Search } from 'lucide-react';
 import { Input, EmptyState } from '@/components/ui';
 import { useMessages } from '@/components/messages';
+import SafeRichText from '@/components/SafeRichText';
 
 /**
  * MESSAGES PAGE
@@ -184,7 +185,19 @@ function MessagesPageContent() {
                             : 'bg-primary text-primary-foreground'
                         }`}
                       >
-                        {msg.type === 'text' && <p>{msg.content}</p>}
+                        {msg.type === 'text' && (
+                          <p className="whitespace-pre-wrap">
+                            <SafeRichText
+                              text={msg.content}
+                              className="whitespace-pre-wrap"
+                              linkClassName={
+                                msg.senderId === activeConversation.recipientId
+                                  ? 'text-primary underline underline-offset-2'
+                                  : 'text-white underline underline-offset-2'
+                              }
+                            />
+                          </p>
+                        )}
                         {msg.type === 'gift' && (
                           <p>
                             🎁 {msg.giftName} (+{msg.giftCoins} coins)
