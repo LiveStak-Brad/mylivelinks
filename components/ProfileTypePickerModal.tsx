@@ -8,7 +8,8 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createClient } from '@/lib/supabase';
 
 export type ProfileType = 'streamer' | 'musician' | 'comedian' | 'business' | 'creator';
 
@@ -69,29 +70,63 @@ export function ProfileTypePickerModal({
   allowSkip = false,
   cardOpacity = 0.95, // Default opacity to match profile cards
 }: ProfileTypePickerModalProps) {
+  const supabase = useMemo(() => createClient(), []);
   const [selectedType, setSelectedType] = useState<ProfileType>(currentType);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!visible) return null;
+  useEffect(() => {
+    if (!visible) return;
+    setSelectedType(currentType);
+    setSaving(false);
+    setError(null);
+  }, [currentType, visible]);
 
-  const handleContinue = () => {
-    // TODO: In future, this will call backend to save to profiles.profile_type
-    if (onSelect) {
-      onSelect(selectedType);
-    }
-    onClose();
+  const persistProfileType = async (nextType: ProfileType) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('You must be logged in to update your profile type.');
+    const { error } = await supabase
+      .from('profiles')
+      .update({ profile_type: nextType })
+      .eq('id', user.id);
+    if (error) throw error;
   };
 
-  const handleSkip = () => {
-    // Set to creator (default) and close
-    if (onSelect) {
-      onSelect('creator');
+  const handleContinue = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await persistProfileType(selectedType);
+      onSelect?.(selectedType);
+      onClose();
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : 'Failed to save profile type.');
+    } finally {
+      setSaving(false);
     }
-    onClose();
+  };
+
+  const handleSkip = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await persistProfileType('creator');
+      onSelect?.('creator');
+      onClose();
+    } catch (e: any) {
+      setError(e?.message ? String(e.message) : 'Failed to save profile type.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCardPress = (type: ProfileType) => {
     setSelectedType(type);
   };
+
+  if (!visible) return null;
 
   return (
     <div
@@ -130,17 +165,24 @@ export function ProfileTypePickerModal({
 
         {/* Actions */}
         <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 space-y-2.5">
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-900/20 px-4 py-3">
+              <p className="text-sm font-semibold text-red-700 dark:text-red-200">{error}</p>
+            </div>
+          )}
           <button
             onClick={handleContinue}
-            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all active:scale-[0.99] shadow-lg"
+            disabled={saving}
+            className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all active:scale-[0.99] shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Continue
+            {saving ? 'Saving…' : 'Continue'}
           </button>
 
           {allowSkip && (
             <button
               onClick={handleSkip}
-              className="w-full h-11 text-gray-500 dark:text-gray-400 font-semibold rounded-xl hover:text-gray-700 dark:hover:text-gray-300 transition-opacity active:opacity-60"
+              disabled={saving}
+              className="w-full h-11 text-gray-500 dark:text-gray-400 font-semibold rounded-xl hover:text-gray-700 dark:hover:text-gray-300 transition-opacity active:opacity-60 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Skip for now
             </button>

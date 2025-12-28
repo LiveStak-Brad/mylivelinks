@@ -20,7 +20,7 @@ export type ProfileType =
 // TABS DEFINITION
 // ============================================================================
 
-export type ProfileTab = 'info' | 'feed' | 'photos' | 'videos' | 'music' | 'events' | 'products';
+export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products';
 
 export interface TabConfig {
   id: ProfileTab;
@@ -97,6 +97,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'information-circle', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'albums', enabled: true },
+      { id: 'reels', label: 'Reels', icon: 'film', enabled: true },
       { id: 'photos', label: 'Photos', icon: 'images', enabled: true },
       { id: 'videos', label: 'Videos', icon: 'videocam', enabled: true },
     ],
@@ -212,6 +213,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'information-circle', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'albums', enabled: true },
+      { id: 'reels', label: 'Reels', icon: 'film', enabled: true },
       { id: 'photos', label: 'Photos', icon: 'images', enabled: true },
       { id: 'videos', label: 'Videos', icon: 'videocam', enabled: true },
     ],
@@ -219,10 +221,12 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'hero', enabled: true, order: 1 },
       { id: 'social_counts', enabled: true, order: 2 },
       { id: 'social_media', enabled: true, order: 3 },
-      { id: 'connections', enabled: true, order: 4 },
-      { id: 'links', enabled: true, order: 5 },
-      { id: 'profile_stats', enabled: true, order: 6 },
-      { id: 'footer', enabled: true, order: 7 },
+      // Creator: allow editable portfolio/products (real blocks-backed section)
+      { id: 'portfolio', enabled: true, order: 4 },
+      { id: 'connections', enabled: true, order: 5 },
+      { id: 'links', enabled: true, order: 6 },
+      { id: 'profile_stats', enabled: true, order: 7 },
+      { id: 'footer', enabled: true, order: 8 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'person-add', enabled: true, primary: true },
@@ -314,4 +318,6 @@ export function isTabEnabled(tab: ProfileTab, profileType?: ProfileType): boolea
   const tabConfig = config.tabs.find(t => t.id === tab);
   return tabConfig?.enabled ?? false;
 }
+
+
 

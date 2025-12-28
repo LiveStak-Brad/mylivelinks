@@ -5,7 +5,7 @@
  * UI-only component with placeholder save handler
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal as RNModal,
   View,
@@ -13,8 +13,11 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 
 export type ProfileType = 'streamer' | 'musician' | 'comedian' | 'business' | 'creator';
 
@@ -78,21 +81,59 @@ export function ProfileTypePickerModal({
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme, cardOpacity), [theme, cardOpacity]);
   const [selectedType, setSelectedType] = useState<ProfileType>(currentType);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleContinue = () => {
-    // Placeholder: In future, this will call the save handler
-    if (onSelect) {
-      onSelect(selectedType);
-    }
-    onClose();
+  useEffect(() => {
+    if (!visible) return;
+    setSelectedType(currentType);
+    setSaving(false);
+    setError(null);
+  }, [currentType, visible]);
+
+  const persistProfileType = async (nextType: ProfileType) => {
+    if (!supabaseConfigured) throw new Error('Supabase client not initialized.');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('You must be logged in to update your profile type.');
+    const { error } = await supabase
+      .from('profiles')
+      .update({ profile_type: nextType })
+      .eq('id', user.id);
+    if (error) throw error;
   };
 
-  const handleSkip = () => {
-    // Set to creator (default) and close
-    if (onSelect) {
-      onSelect('creator');
+  const handleContinue = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await persistProfileType(selectedType);
+      onSelect?.(selectedType);
+      onClose();
+    } catch (e: any) {
+      const msg = e?.message ? String(e.message) : 'Failed to save profile type.';
+      setError(msg);
+      Alert.alert('Save failed', msg);
+    } finally {
+      setSaving(false);
     }
-    onClose();
+  };
+
+  const handleSkip = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await persistProfileType('creator');
+      onSelect?.('creator');
+      onClose();
+    } catch (e: any) {
+      const msg = e?.message ? String(e.message) : 'Failed to save profile type.';
+      setError(msg);
+      Alert.alert('Save failed', msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCardPress = (type: ProfileType) => {
@@ -141,8 +182,16 @@ export function ProfileTypePickerModal({
                 pressed && styles.continueButtonPressed,
               ]}
               onPress={handleContinue}
+              disabled={saving}
             >
-              <Text style={styles.continueButtonText}>Continue</Text>
+              {saving ? (
+                <View style={styles.savingRow}>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.continueButtonText}>Saving…</Text>
+                </View>
+              ) : (
+                <Text style={styles.continueButtonText}>Continue</Text>
+              )}
             </Pressable>
 
             {allowSkip && (
@@ -152,6 +201,7 @@ export function ProfileTypePickerModal({
                   pressed && styles.skipButtonPressed,
                 ]}
                 onPress={handleSkip}
+                disabled={saving}
               >
                 <Text style={styles.skipButtonText}>Skip for now</Text>
               </Pressable>
@@ -323,6 +373,12 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       gap: 10,
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
+    },
+    savingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
     },
     continueButton: {
       height: 48,

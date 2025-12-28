@@ -226,12 +226,13 @@ export default function ProfileSettingsPage() {
 
       let profileTypeSavedViaRpc = false;
       try {
-        const { error: typeErr } = await supabase.rpc('set_profile_type', {
-          p_profile_type: profileType,
+        const resp = await fetch('/api/profile/type', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ type: profileType }),
         });
-        if (!typeErr) {
-          profileTypeSavedViaRpc = true;
-        }
+        if (resp.ok) profileTypeSavedViaRpc = true;
       } catch {
         profileTypeSavedViaRpc = false;
       }

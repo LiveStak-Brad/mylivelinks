@@ -50,6 +50,8 @@ import {
   type MusicVideoItem,
   ComedySpecialsSection,
   type ComedySpecialItem,
+  VlogReelsSection,
+  type VlogItem,
 } from '../components/profile';
 import { SectionEditModal } from '../components/profile/SectionEditModal';
 
@@ -327,6 +329,10 @@ export function ProfileScreen({
   const [comedySpecials, setComedySpecials] = useState<ComedySpecialItem[]>([]);
   const [comedySpecialsLoading, setComedySpecialsLoading] = useState(false);
 
+  // Creator/Streamer: VLOG / Reels (real data via profile type modules)
+  const [vlogs, setVlogs] = useState<VlogItem[]>([]);
+  const [vlogsLoading, setVlogsLoading] = useState(false);
+
   // Business profile module (real data, no mock)
   const [business, setBusiness] = useState<BusinessRow | null>(null);
   const [businessLoading, setBusinessLoading] = useState(false);
@@ -481,7 +487,7 @@ export function ProfileScreen({
   );
 
   const loadBlocksBundle = useCallback(
-    async (uname: string) => {
+    async (uname: string, pid: string) => {
       setBlocksLoading(true);
       try {
         const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -513,59 +519,55 @@ export function ProfileScreen({
         // Load shows/events from dedicated profile_events table
         try {
           const { data: eventsData, error: eventsError } = await supabase.rpc('get_profile_events', {
-            p_profile_id: profileId,
+            p_profile_id: pid,
           });
-          if (!cancelled) {
-            if (eventsError) {
-              console.error('[Mobile] get_profile_events failed:', eventsError);
-              setShows([]);
-            } else {
-              const rows = Array.isArray(eventsData) ? eventsData : [];
-              setShows(
-                rows.map((r: any) => ({
-                  id: String(r.id),
-                  title: String(r.title ?? ''),
-                  venue: undefined, // not in new schema
-                  location: r.location ?? undefined,
-                  date: r.start_at ? new Date(r.start_at).toLocaleDateString() : undefined,
-                  time: r.start_at ? new Date(r.start_at).toLocaleTimeString() : undefined,
-                  poster_url: undefined, // not in new schema
-                  ticket_link: r.url ?? undefined,
-                  status: 'upcoming',
-                }))
-              );
-            }
+          if (eventsError) {
+            console.error('[Mobile] get_profile_events failed:', eventsError);
+            setShows([]);
+          } else {
+            const rows = Array.isArray(eventsData) ? eventsData : [];
+            setShows(
+              rows.map((r: any) => ({
+                id: String(r.id),
+                title: String(r.title ?? ''),
+                venue: undefined, // not in new schema
+                location: r.location ?? undefined,
+                date: r.start_at ? new Date(r.start_at).toLocaleDateString() : undefined,
+                time: r.start_at ? new Date(r.start_at).toLocaleTimeString() : undefined,
+                poster_url: undefined, // not in new schema
+                ticket_link: r.url ?? undefined,
+                status: 'upcoming',
+              }))
+            );
           }
         } catch (e) {
-          if (!cancelled) setShows([]);
+          setShows([]);
         }
 
         // Load portfolio from dedicated profile_portfolio table
         try {
           const { data: portfolioData, error: portfolioError } = await supabase.rpc('get_profile_portfolio', {
-            p_profile_id: profileId,
+            p_profile_id: pid,
           });
-          if (!cancelled) {
-            if (portfolioError) {
-              console.error('[Mobile] get_profile_portfolio failed:', portfolioError);
-              setPortfolioItems([]);
-            } else {
-              const rows = Array.isArray(portfolioData) ? portfolioData : [];
-              setPortfolioItems(
-                rows.map((r: any) => ({
-                  id: String(r.id),
-                  title: r.title ?? null,
-                  subtitle: r.subtitle ?? null,
-                  description: r.description ?? null,
-                  media_type: (r.media_type as any) ?? 'image',
-                  media_url: String(r.media_url ?? ''),
-                  thumbnail_url: r.thumbnail_url ?? null,
-                }))
-              );
-            }
+          if (portfolioError) {
+            console.error('[Mobile] get_profile_portfolio failed:', portfolioError);
+            setPortfolioItems([]);
+          } else {
+            const rows = Array.isArray(portfolioData) ? portfolioData : [];
+            setPortfolioItems(
+              rows.map((r: any) => ({
+                id: String(r.id),
+                title: r.title ?? null,
+                subtitle: r.subtitle ?? null,
+                description: r.description ?? null,
+                media_type: (r.media_type as any) ?? 'image',
+                media_url: String(r.media_url ?? ''),
+                thumbnail_url: r.thumbnail_url ?? null,
+              }))
+            );
           }
         } catch (e) {
-          if (!cancelled) setPortfolioItems([]);
+          setPortfolioItems([]);
         }
 
         setSchedule(
@@ -624,19 +626,20 @@ export function ProfileScreen({
   // Track CRUD
   const saveTrack = useCallback(async (values: any) => {
     if (!requireOwner()) return;
+    const sortOrder = (editingTrack as any)?.sort_order ?? musicTracks.length;
     const payload = {
       title: String(values.title ?? ''),
       artist_name: String(values.artist_name ?? ''),
       audio_url: String(values.audio_url ?? ''),
       cover_art_url: String(values.cover_art_url ?? ''),
       rights_confirmed: values.rights_confirmed === true,
-      sort_order: editingTrack?.sort_order ?? musicTracks.length,
+      sort_order: sortOrder,
       id: editingTrack?.id ?? null,
     };
     const { error } = await supabase.rpc('upsert_profile_music_track', { p_track: payload });
     if (error) throw error;
     setModulesReloadNonce((n) => n + 1);
-  }, [editingTrack?.id, editingTrack?.sort_order, requireOwner, musicTracks.length]);
+  }, [editingTrack?.id, requireOwner, musicTracks.length]);
 
   const deleteTrack = useCallback(async (id: string) => {
     if (!requireOwner()) return;
@@ -941,13 +944,36 @@ export function ProfileScreen({
         } else {
           setComedySpecials([]);
         }
+
+        if (pid && (ptype === 'creator' || ptype === 'streamer')) {
+          setVlogsLoading(true);
+          const { data: list, error: listErr } = await supabase.rpc('get_vlogs', { p_profile_id: pid });
+          if (listErr) {
+            console.log('[Vlogs] load failed:', listErr.message);
+            setVlogs([]);
+          } else {
+            const next = (Array.isArray(list) ? list : []).map((r: any) => ({
+              id: String(r.id),
+              video_url: String(r.video_url || ''),
+              caption: r.caption ?? null,
+              thumbnail_url: r.thumbnail_url ?? null,
+              duration_seconds: Number(r.duration_seconds || 0),
+              created_at: String(r.created_at || ''),
+            })) as VlogItem[];
+            setVlogs(next);
+          }
+        } else {
+          setVlogs([]);
+        }
       } catch (e) {
         console.log('[MusicVideos] load exception');
         setMusicVideos([]);
         setComedySpecials([]);
+        setVlogs([]);
       } finally {
         setMusicVideosLoading(false);
         setComedySpecialsLoading(false);
+        setVlogsLoading(false);
       }
     } catch (err: any) {
       console.error('Profile load error:', err);
@@ -1344,9 +1370,11 @@ export function ProfileScreen({
   // Load content blocks bundle (schedule/featured/clips; events/portfolio are dedicated)
   useEffect(() => {
     const uname = profileData?.profile?.username;
+    const pid = profileData?.profile?.id;
     if (!uname) return;
-    loadBlocksBundle(uname);
-  }, [profileData?.profile?.username, loadBlocksBundle, modulesReloadNonce]);
+    if (!pid) return;
+    loadBlocksBundle(uname, pid);
+  }, [profileData?.profile?.id, profileData?.profile?.username, loadBlocksBundle, modulesReloadNonce]);
 
   // Load merchandise (dedicated profile_merch RPC)
   useEffect(() => {
@@ -2704,6 +2732,25 @@ export function ProfileScreen({
                   accentColor={accentColor}
                 />
               )
+            ) : profileType === 'creator' || profileType === 'streamer' ? (
+              vlogsLoading ? (
+                <View style={[styles.card, customCardStyle]}>
+                  <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={accentColor} />
+                  </View>
+                </View>
+              ) : (
+                <VlogReelsSection
+                  profileId={profile.id}
+                  isOwner={false}
+                  items={vlogs}
+                  onItemsChange={setVlogs}
+                  cardOpacity={cardOpacity}
+                  accentColor={accentColor}
+                  title="🎬 Videos"
+                  contentLabel="videos"
+                />
+              )
             ) : (
               <View style={[styles.card, customCardStyle]}>
                 <View style={styles.emptyStateContainer}>
@@ -2712,6 +2759,30 @@ export function ProfileScreen({
                   <Text style={styles.emptyStateText}>Video content will appear here</Text>
                 </View>
               </View>
+            )}
+          </>
+        )}
+
+        {/* REELS TAB (Creator/Streamer) - VLOG / Reels */}
+        {activeTab === 'reels' && (
+          <>
+            {vlogsLoading ? (
+              <View style={[styles.card, customCardStyle]}>
+                <View style={styles.centerContainer}>
+                  <ActivityIndicator size="large" color={accentColor} />
+                </View>
+              </View>
+            ) : (
+              <VlogReelsSection
+                profileId={profile.id}
+                isOwner={isOwnProfile}
+                items={vlogs}
+                onItemsChange={setVlogs}
+                cardOpacity={cardOpacity}
+                accentColor={accentColor}
+                title="🎞️ Reels"
+                contentLabel="reels"
+              />
             )}
           </>
         )}

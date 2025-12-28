@@ -22,7 +22,7 @@ export type ProfileType =
 // TABS DEFINITION
 // ============================================================================
 
-export type ProfileTab = 'info' | 'feed' | 'photos' | 'videos' | 'music' | 'events' | 'products';
+export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products';
 
 export interface TabConfig {
   id: ProfileTab;
@@ -99,6 +99,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
+      { id: 'reels', label: 'Reels', icon: 'Clapperboard', enabled: true },
       { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
       { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
     ],
@@ -214,6 +215,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
+      { id: 'reels', label: 'Reels', icon: 'Clapperboard', enabled: true },
       { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
       { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
     ],
@@ -221,10 +223,11 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'hero', enabled: true, order: 1 },
       { id: 'social_counts', enabled: true, order: 2 },
       { id: 'social_media', enabled: true, order: 3 },
-      { id: 'connections', enabled: true, order: 4 },
-      { id: 'links', enabled: true, order: 5 },
-      { id: 'profile_stats', enabled: true, order: 6 },
-      { id: 'footer', enabled: true, order: 7 },
+      { id: 'portfolio', enabled: true, order: 4 },
+      { id: 'connections', enabled: true, order: 5 },
+      { id: 'links', enabled: true, order: 6 },
+      { id: 'profile_stats', enabled: true, order: 7 },
+      { id: 'footer', enabled: true, order: 8 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'UserPlus', enabled: true, primary: true },

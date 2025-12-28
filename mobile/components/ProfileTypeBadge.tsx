@@ -122,3 +122,5 @@ function createStyles(theme: ThemeDefinition) {
 
 export default ProfileTypeBadge;
 
+
+
