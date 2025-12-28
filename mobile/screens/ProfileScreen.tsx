@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   Pressable,
   ScrollView,
@@ -13,13 +14,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Button, PageShell, BottomNav } from '../components/ui';
+import { Button, Input, PageShell, BottomNav } from '../components/ui';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useAutoHideBars } from '../hooks/useAutoHideBars';
 import { getAvatarSource } from '../lib/defaultAvatar';
+import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { 
   getEnabledTabs, 
   getEnabledSections, 
@@ -183,6 +185,24 @@ interface ConnectionUser {
   is_live?: boolean;
 }
 
+type FeedAuthor = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+};
+
+type FeedPost = {
+  id: string;
+  text_content: string;
+  media_url: string | null;
+  created_at: string;
+  author: FeedAuthor;
+  comment_count: number;
+  gift_total_coins: number;
+};
+
+type FeedCursor = { before_created_at: string; before_id: string };
+
 export function ProfileScreen({
   username,
   isOwnProfile = false,
@@ -198,6 +218,7 @@ export function ProfileScreen({
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const currentUserId = session?.user?.id ?? null;
+  const { fetchAuthed } = useFetchAuthed();
   
   // Auto-hide bars on scroll
   const { barsVisible, scrollHandlers } = useAutoHideBars({
@@ -214,6 +235,24 @@ export function ProfileScreen({
   const [connectionsExpanded, setConnectionsExpanded] = useState(false);
   const [connections, setConnections] = useState<any[]>([]);
   const [connectionsLoading, setConnectionsLoading] = useState(false);
+
+  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
+  const [feedNextCursor, setFeedNextCursor] = useState<FeedCursor | null>(null);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedError, setFeedError] = useState<string | null>(null);
+
+  const feedInFlightRef = React.useRef(false);
+  const lastCursorKeyRef = React.useRef<string>('');
+
+  const [composerText, setComposerText] = useState('');
+  const [composerLoading, setComposerLoading] = useState(false);
+  const composerInFlightRef = React.useRef(false);
+  const [mediaLocalUri, setMediaLocalUri] = useState<string | null>(null);
+  const [mediaMimeType, setMediaMimeType] = useState<string | null>(null);
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+
+  const canPost = (composerText.trim().length > 0 || !!mediaUrl) && !composerLoading && !mediaUploading;
 
   const loadProfile = useCallback(async () => {
     try {
@@ -250,6 +289,160 @@ export function ProfileScreen({
       setLoading(false);
     }
   }, [apiBaseUrl, authToken, username]);
+
+  const loadFeed = useCallback(
+    async (mode: 'replace' | 'append') => {
+      if (feedInFlightRef.current) return;
+      feedInFlightRef.current = true;
+      setFeedLoading(true);
+      setFeedError(null);
+
+      try {
+        const cursor = mode === 'append' ? feedNextCursor : null;
+        const cursorKey = cursor ? `${cursor.before_created_at}|${cursor.before_id}` : '';
+        if (mode === 'append' && cursorKey && cursorKey === lastCursorKeyRef.current) {
+          setFeedNextCursor(null);
+          return;
+        }
+        lastCursorKeyRef.current = cursorKey;
+
+        const params = new URLSearchParams();
+        params.set('limit', '20');
+        params.set('username', username);
+        if (cursor?.before_created_at) params.set('before_created_at', cursor.before_created_at);
+        if (cursor?.before_id) params.set('before_id', cursor.before_id);
+
+        const base = apiBaseUrl.replace(/\/+$/, '');
+        const res = await fetch(`${base}/api/feed?${params.toString()}`);
+        const json = (await res.json()) as any;
+
+        if (!res.ok) {
+          setFeedError(String(json?.error || 'Failed to load feed'));
+          if (mode === 'append') setFeedNextCursor(null);
+          return;
+        }
+
+        const nextPosts = Array.isArray(json?.posts) ? (json.posts as FeedPost[]) : [];
+        const nextCursor = (json?.nextCursor ?? null) as FeedCursor | null;
+
+        if (mode === 'append' && nextPosts.length === 0) {
+          setFeedNextCursor(null);
+          return;
+        }
+
+        setFeedPosts((prev) => (mode === 'append' ? [...prev, ...nextPosts] : nextPosts));
+        setFeedNextCursor(nextCursor);
+      } catch (err) {
+        setFeedError(err instanceof Error ? err.message : 'Failed to load feed');
+        if (mode === 'append') setFeedNextCursor(null);
+      } finally {
+        feedInFlightRef.current = false;
+        setFeedLoading(false);
+      }
+    },
+    [apiBaseUrl, feedNextCursor, username]
+  );
+
+  const refreshFeed = useCallback(async () => {
+    await loadFeed('replace');
+  }, [loadFeed]);
+
+  const loadMoreFeed = useCallback(async () => {
+    if (!feedNextCursor) return;
+    await loadFeed('append');
+  }, [feedNextCursor, loadFeed]);
+
+  useEffect(() => {
+    void loadFeed('replace');
+  }, [loadFeed]);
+
+  const uploadPostMedia = useCallback(
+    async (uri: string, mime: string | null): Promise<string> => {
+      const profileId = session?.user?.id;
+      if (!profileId) {
+        throw new Error('Not signed in');
+      }
+
+      const extFromMime = mime?.includes('/') ? mime.split('/')[1] : null;
+      const ext = String(extFromMime || 'jpg')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 8);
+      const filePath = `${profileId}/feed/${Date.now()}.${ext || 'jpg'}`;
+
+      const blob = await fetch(uri).then((r) => r.blob());
+      const { error: uploadError } = await supabase.storage.from('post-media').upload(filePath, blob, {
+        contentType: mime || undefined,
+        upsert: false,
+      });
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage.from('post-media').getPublicUrl(filePath);
+      const publicUrl = urlData?.publicUrl;
+      if (!publicUrl) {
+        throw new Error('Failed to get media URL');
+      }
+      return publicUrl;
+    },
+    [session?.user?.id]
+  );
+
+  const pickMedia = useCallback(
+    async (kind: 'photo' | 'video') => {
+      try {
+        let ImagePicker: any = null;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-var-requires
+          ImagePicker = require('expo-image-picker');
+        } catch {
+          Alert.alert(
+            'Uploader not installed',
+            "Install expo-image-picker in the mobile app to enable photo/video uploads."
+          );
+          return;
+        }
+
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm?.granted) {
+          Alert.alert('Permission required', 'Please allow photo library access.');
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes:
+            kind === 'photo'
+              ? ImagePicker.MediaTypeOptions.Images
+              : ImagePicker.MediaTypeOptions.Videos,
+          quality: 0.9,
+          allowsEditing: false,
+        });
+
+        if (result?.canceled) return;
+        const asset = Array.isArray(result?.assets) ? result.assets[0] : null;
+        const uri = typeof asset?.uri === 'string' ? asset.uri : null;
+        if (!uri) return;
+
+        setMediaLocalUri(uri);
+        const mime = typeof asset?.mimeType === 'string' ? asset.mimeType : null;
+        setMediaMimeType(mime);
+
+        setMediaUploading(true);
+        try {
+          const uploadedUrl = await uploadPostMedia(uri, mime);
+          setMediaUrl(uploadedUrl);
+        } finally {
+          setMediaUploading(false);
+        }
+      } catch (e: any) {
+        const message = String(e?.message || e || 'Failed to open media picker');
+        console.error('[Profile] pickMedia error:', e);
+        Alert.alert('Upload failed', message);
+      }
+    },
+    [uploadPostMedia]
+  );
 
   useEffect(() => {
     loadProfile();
@@ -486,6 +679,53 @@ export function ProfileScreen({
     opacity: cardOpacity,
     borderRadius: cardBorderRadius,
   };
+
+  const formatDateTime = (value: string) => {
+    try {
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value;
+      return d.toLocaleString();
+    } catch {
+      return value;
+    }
+  };
+
+  const renderPostCard = (post: FeedPost) => {
+    const avatarUri = resolveMediaUrl(post.author?.avatar_url ?? null);
+    const mediaUri = resolveMediaUrl(post.media_url ?? null);
+    return (
+      <View key={post.id} style={[styles.postCard, customCardStyle]}>
+        <View style={styles.postHeaderRow}>
+          <Image source={getAvatarSource(avatarUri)} style={styles.postAvatarImage} />
+          <View style={styles.postMetaCol}>
+            <Text style={styles.postAuthor} numberOfLines={1}>
+              {post.author?.username || 'Unknown'}
+            </Text>
+            <Text style={styles.postTimestamp} numberOfLines={1}>
+              {formatDateTime(post.created_at)}
+            </Text>
+          </View>
+          <View style={styles.postMetrics}>
+            <Text style={styles.postMetricText}>💬 {post.comment_count ?? 0}</Text>
+            <Text style={styles.postMetricText}>🎁 {post.gift_total_coins ?? 0}</Text>
+          </View>
+        </View>
+
+        {!!post.text_content && (
+          <Text style={styles.postContentText}>{String(post.text_content)}</Text>
+        )}
+
+        {!!mediaUri && (
+          <View style={styles.postMediaWrap}>
+            <Image source={{ uri: mediaUri }} style={styles.postMediaImage} resizeMode="cover" />
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const tileSize = (Dimensions.get('window').width - 16 * 2 - 2 * 2) / 3;
+  const photoPosts = feedPosts.filter((p) => typeof p?.media_url === 'string' && !!p.media_url);
 
   return (
     <PageShell
@@ -1016,28 +1256,240 @@ export function ProfileScreen({
 
         {/* FEED TAB */}
         {activeTab === 'feed' && (
-          <View style={[styles.card, customCardStyle]}>
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="albums-outline" size={64} color={theme.colors.textMuted} />
-              <Text style={styles.emptyStateTitle}>No Posts Yet</Text>
-              <Text style={styles.emptyStateText}>
-                Posts and updates will appear here
-              </Text>
+          <>
+            {isOwnProfile && (
+              <View style={[styles.card, customCardStyle]}>
+                <Input
+                  placeholder="What's happening?"
+                  value={composerText}
+                  onChangeText={setComposerText}
+                  multiline
+                  style={styles.composerInput}
+                />
+
+                <View style={styles.mediaActionsRow}>
+                  <Pressable
+                    onPress={() => void pickMedia('photo')}
+                    disabled={composerLoading || mediaUploading}
+                    style={({ pressed }) => [
+                      styles.mediaActionButton,
+                      pressed && !(composerLoading || mediaUploading) ? styles.mediaActionButtonPressed : null,
+                    ]}
+                  >
+                    <Text style={styles.mediaActionIcon}>📷</Text>
+                    <Text style={styles.mediaActionText}>Photo</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => void pickMedia('video')}
+                    disabled={composerLoading || mediaUploading}
+                    style={({ pressed }) => [
+                      styles.mediaActionButton,
+                      pressed && !(composerLoading || mediaUploading) ? styles.mediaActionButtonPressed : null,
+                    ]}
+                  >
+                    <Text style={styles.mediaActionIcon}>🎥</Text>
+                    <Text style={styles.mediaActionText}>Video</Text>
+                  </Pressable>
+
+                  {(mediaUploading || mediaUrl) && (
+                    <View style={styles.mediaStatusPill}>
+                      <Text style={styles.mediaStatusText}>{mediaUploading ? 'Uploading…' : 'Attached'}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {!!mediaLocalUri && !mediaMimeType?.startsWith('video/') && (
+                  <View style={styles.composerPreviewWrap}>
+                    <Image source={{ uri: mediaLocalUri }} style={styles.composerPreviewImage} resizeMode="cover" />
+                    <Pressable
+                      onPress={() => {
+                        setMediaLocalUri(null);
+                        setMediaMimeType(null);
+                        setMediaUrl(null);
+                      }}
+                      style={({ pressed }) => [styles.removeMediaButton, pressed ? styles.removeMediaButtonPressed : null]}
+                    >
+                      <Text style={styles.removeMediaText}>Remove</Text>
+                    </Pressable>
+                  </View>
+                )}
+
+                <View style={styles.composerActionsRow}>
+                  <Button
+                    title={composerLoading ? 'Posting…' : 'Post'}
+                    onPress={() => {
+                      void (async () => {
+                        const text = composerText.trim();
+                        if ((!text && !mediaUrl) || composerLoading || mediaUploading) return;
+                        if (composerInFlightRef.current) return;
+                        composerInFlightRef.current = true;
+                        setComposerLoading(true);
+                        try {
+                          const safeTextContent = text.length ? text : ' ';
+                          const res = await fetchAuthed('/api/posts', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text_content: safeTextContent, media_url: mediaUrl }),
+                          });
+                          if (!res.ok) {
+                            console.error('[Profile] create post failed:', res.message);
+                            return;
+                          }
+                          setComposerText('');
+                          setMediaLocalUri(null);
+                          setMediaMimeType(null);
+                          setMediaUrl(null);
+                          await refreshFeed();
+                        } finally {
+                          setComposerLoading(false);
+                          composerInFlightRef.current = false;
+                        }
+                      })();
+                    }}
+                    disabled={!canPost}
+                    loading={composerLoading}
+                    style={styles.postButton}
+                  />
+                </View>
+              </View>
+            )}
+
+            {feedError && (
+              <View style={[styles.card, customCardStyle]}>
+                <View style={styles.emptyStateContainer}>
+                  <Text style={styles.emptyStateTitle}>Something went wrong</Text>
+                  <Text style={styles.emptyStateText}>{feedError}</Text>
+                  <Button title="Retry" onPress={() => void refreshFeed()} style={styles.stateButton} />
+                </View>
+              </View>
+            )}
+
+            {!feedError && feedPosts.length === 0 && !feedLoading && (
+              <View style={[styles.card, customCardStyle]}>
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="albums-outline" size={64} color={theme.colors.textMuted} />
+                  <Text style={styles.emptyStateTitle}>No Posts Yet</Text>
+                  <Text style={styles.emptyStateText}>Posts and updates will appear here</Text>
+                </View>
+              </View>
+            )}
+
+            {feedPosts.map(renderPostCard)}
+
+            <View style={styles.feedActionsRow}>
+              <Button title="Refresh" onPress={() => void refreshFeed()} variant="secondary" style={styles.stateButton} />
+              {feedNextCursor && (
+                <Button title="Load more" onPress={() => void loadMoreFeed()} variant="secondary" style={styles.stateButton} />
+              )}
             </View>
-          </View>
+          </>
         )}
 
         {/* PHOTOS TAB */}
         {activeTab === 'photos' && (
-          <View style={[styles.card, customCardStyle]}>
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="images-outline" size={64} color={theme.colors.textMuted} />
-              <Text style={styles.emptyStateTitle}>No Photos Yet</Text>
-              <Text style={styles.emptyStateText}>
-                Photos and media will appear here
-              </Text>
-            </View>
-          </View>
+          <>
+            {isOwnProfile && (
+              <View style={[styles.card, customCardStyle]}>
+                <View style={styles.mediaActionsRow}>
+                  <Pressable
+                    onPress={() => void pickMedia('photo')}
+                    disabled={composerLoading || mediaUploading}
+                    style={({ pressed }) => [
+                      styles.mediaActionButton,
+                      pressed && !(composerLoading || mediaUploading) ? styles.mediaActionButtonPressed : null,
+                    ]}
+                  >
+                    <Text style={styles.mediaActionIcon}>📷</Text>
+                    <Text style={styles.mediaActionText}>Upload</Text>
+                  </Pressable>
+
+                  {(mediaUploading || mediaUrl) && (
+                    <View style={styles.mediaStatusPill}>
+                      <Text style={styles.mediaStatusText}>{mediaUploading ? 'Uploading…' : 'Ready to post'}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.composerActionsRow}>
+                  <Button
+                    title={composerLoading ? 'Posting…' : 'Post'}
+                    onPress={() => {
+                      void (async () => {
+                        const text = composerText.trim();
+                        if ((!text && !mediaUrl) || composerLoading || mediaUploading) return;
+                        if (composerInFlightRef.current) return;
+                        composerInFlightRef.current = true;
+                        setComposerLoading(true);
+                        try {
+                          const safeTextContent = text.length ? text : ' ';
+                          const res = await fetchAuthed('/api/posts', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text_content: safeTextContent, media_url: mediaUrl }),
+                          });
+                          if (!res.ok) {
+                            console.error('[Profile] create post failed:', res.message);
+                            return;
+                          }
+                          setComposerText('');
+                          setMediaLocalUri(null);
+                          setMediaMimeType(null);
+                          setMediaUrl(null);
+                          await refreshFeed();
+                        } finally {
+                          setComposerLoading(false);
+                          composerInFlightRef.current = false;
+                        }
+                      })();
+                    }}
+                    disabled={!canPost}
+                    loading={composerLoading}
+                    style={styles.postButton}
+                  />
+                </View>
+              </View>
+            )}
+
+            {photoPosts.length === 0 && !feedLoading ? (
+              <View style={[styles.card, customCardStyle]}>
+                <View style={styles.emptyStateContainer}>
+                  <Ionicons name="images-outline" size={64} color={theme.colors.textMuted} />
+                  <Text style={styles.emptyStateTitle}>No Photos Yet</Text>
+                  <Text style={styles.emptyStateText}>Photos and media will appear here</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={[styles.card, customCardStyle, { padding: 8 }]}>
+                <View style={styles.photoGridWrap}>
+                  {photoPosts.map((p) => {
+                    const uri = resolveMediaUrl(p.media_url ?? null);
+                    return (
+                      <View
+                        key={p.id}
+                        style={{
+                          width: tileSize,
+                          height: tileSize,
+                          margin: 2,
+                          borderRadius: 8,
+                          overflow: 'hidden',
+                          backgroundColor: theme.mode === 'light' ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.06)',
+                        }}
+                      >
+                        {uri ? (
+                          <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                        ) : (
+                          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text style={{ color: theme.colors.textMuted }}>—</Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </PageShell>
@@ -1120,6 +1572,172 @@ function createStyles(theme: any) {
       fontSize: 16,
       textAlign: 'center',
     },
+
+    postCard: {
+      backgroundColor: theme.colors.surfaceCard,
+      borderRadius: 18,
+      padding: 16,
+      marginHorizontal: 16,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: theme.elevations.card.color,
+      shadowOffset: theme.elevations.card.offset,
+      shadowOpacity: theme.elevations.card.opacity,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+    postHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    postAvatarImage: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+    },
+    postMetaCol: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    postAuthor: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    postTimestamp: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      marginTop: 2,
+    },
+    postMetrics: {
+      alignItems: 'flex-end',
+      gap: 2,
+    },
+    postMetricText: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    postContentText: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 10,
+    },
+    postMediaWrap: {
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: theme.mode === 'light' ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.06)',
+    },
+    postMediaImage: {
+      width: '100%',
+      height: 220,
+    },
+
+    composerInput: {
+      minHeight: 72,
+      textAlignVertical: 'top',
+      paddingTop: 12,
+    },
+    mediaActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 12,
+      flexWrap: 'wrap',
+    },
+    mediaActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: theme.mode === 'light' ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.08)',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    mediaActionButtonPressed: {
+      opacity: 0.85,
+    },
+    mediaActionIcon: {
+      fontSize: 16,
+    },
+    mediaActionText: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    mediaStatusPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: theme.mode === 'light' ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.18)',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    mediaStatusText: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    composerPreviewWrap: {
+      marginTop: 12,
+      borderRadius: 14,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    composerPreviewImage: {
+      width: '100%',
+      height: 180,
+    },
+    removeMediaButton: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: theme.mode === 'light' ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.6)',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    removeMediaButtonPressed: {
+      opacity: 0.85,
+    },
+    removeMediaText: {
+      color: theme.mode === 'light' ? theme.colors.textPrimary : '#fff',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    composerActionsRow: {
+      marginTop: 12,
+      alignItems: 'flex-end',
+    },
+    postButton: {
+      minWidth: 120,
+      height: 40,
+    },
+
+    feedActionsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginHorizontal: 16,
+      marginBottom: 20,
+    },
+    stateButton: {
+      flex: 1,
+      minHeight: 44,
+    },
+    photoGridWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+    },
     
     // Header buttons
     shareButton: {
@@ -1135,7 +1753,7 @@ function createStyles(theme: any) {
       backgroundColor: theme.colors.surfaceCard,
       borderRadius: 18,
       marginHorizontal: 16,
-      marginBottom: 14,
+      marginBottom: 24, // Match web spacing
       padding: 24,
       alignItems: 'center',
       position: 'relative',
@@ -1341,7 +1959,7 @@ function createStyles(theme: any) {
       borderRadius: 18,
       padding: 16,
       marginHorizontal: 16,
-      marginBottom: 14,
+      marginBottom: 24, // Match web mb-6 (24px)
       borderWidth: 1,
       borderColor: theme.colors.border,
       // Shadow
@@ -1360,7 +1978,7 @@ function createStyles(theme: any) {
 
     // Stats Cards Container
     statsCardsContainer: {
-      gap: 14,
+      gap: 24, // Match web spacing
     },
     
     // Social Counts (in card)

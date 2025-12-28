@@ -111,14 +111,13 @@ export default function AdultLinksSection({
   return (
     <>
       <div 
-        className={`${borderRadiusClass} shadow-lg overflow-hidden border-2 border-amber-500 dark:border-red-700`}
+        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border-2 border-amber-500 dark:border-red-700 shadow-lg mb-6`}
         style={{
           ...cardStyle,
           backgroundColor: '#2D2416', // Dark brown/amber background
           opacity: 0.95
         }}
       >
-        <div className="p-6">
           {/* Section Header with Warning */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -167,10 +166,9 @@ export default function AdultLinksSection({
             ))}
           </div>
           
-          {/* Footer Notice */}
-          <div className="mt-4 text-center text-xs text-amber-400/70">
-            MyLiveLinks does not host or control this external content
-          </div>
+        {/* Footer Notice */}
+        <div className="mt-4 text-center text-xs text-amber-400/70">
+          MyLiveLinks does not host or control this external content
         </div>
       </div>
       

@@ -36,7 +36,7 @@ export default function BusinessInfo({
   if (!info) {
     return (
       <div 
-        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg`}
+        className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
         style={cardStyle}
       >
         <div className="flex items-center justify-between mb-4">
@@ -69,7 +69,7 @@ export default function BusinessInfo({
 
   return (
     <div 
-      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg`}
+      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
       style={cardStyle}
     >
       <div className="flex items-center justify-between mb-4">

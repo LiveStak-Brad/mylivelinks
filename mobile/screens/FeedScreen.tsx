@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
 import { Button, Input, PageShell, PageHeader } from '../components/ui';
@@ -11,6 +11,9 @@ import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getAvatarSource } from '../lib/defaultAvatar';
+import { Modal } from '../components/ui/Modal';
+import { PHOTO_FILTER_PRESETS, type PhotoFilterId } from '../lib/photoFilters';
+import { Cool, Grayscale, Sepia, Warm, Contrast as ContrastFilter, cleanExtractedImagesCache } from 'react-native-image-filter-kit';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Feed'>;
 
@@ -20,11 +23,17 @@ export function FeedScreen({ navigation }: Props) {
   const { user } = useAuthContext();
   const [composerText, setComposerText] = useState('');
   const [composerLoading, setComposerLoading] = useState(false);
-  const composerInFlightRef = React.useRef(false);
   const [mediaLocalUri, setMediaLocalUri] = useState<string | null>(null);
   const [mediaMimeType, setMediaMimeType] = useState<string | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [pendingPhotoUri, setPendingPhotoUri] = useState<string | null>(null);
+  const [pendingPhotoMime, setPendingPhotoMime] = useState<string | null>(null);
+  const [selectedFilterId, setSelectedFilterId] = useState<PhotoFilterId>('original');
+  const [extractEnabled, setExtractEnabled] = useState(false);
+  const pendingResolveRef = useRef<((uri: string) => void) | null>(null);
+  const pendingRejectRef = useRef<((err: Error) => void) | null>(null);
 
   const canPost = (composerText.trim().length > 0 || !!mediaUrl) && !composerLoading && !mediaUploading;
   const { theme } = useThemeMode();
@@ -100,8 +109,17 @@ export function FeedScreen({ navigation }: Props) {
         const uri = typeof asset?.uri === 'string' ? asset.uri : null;
         if (!uri) return;
 
-        setMediaLocalUri(uri);
         const mime = typeof asset?.mimeType === 'string' ? asset.mimeType : null;
+
+        if (kind === 'photo') {
+          setPendingPhotoUri(uri);
+          setPendingPhotoMime(mime);
+          setSelectedFilterId('original');
+          setFilterModalVisible(true);
+          return;
+        }
+
+        setMediaLocalUri(uri);
         setMediaMimeType(mime);
 
         setMediaUploading(true);
@@ -119,6 +137,79 @@ export function FeedScreen({ navigation }: Props) {
     },
     [uploadPostMedia]
   );
+
+  const exportFilteredPhotoUri = useCallback(
+    async (uri: string, filterId: PhotoFilterId): Promise<string> => {
+      if (filterId === 'original') return uri;
+
+      return new Promise<string>((resolve, reject) => {
+        pendingResolveRef.current = resolve;
+        pendingRejectRef.current = reject;
+        setExtractEnabled(true);
+      });
+    },
+    []
+  );
+
+  const onExtracted = useCallback(
+    (nextUri: string) => {
+      try {
+        setExtractEnabled(false);
+        const resolve = pendingResolveRef.current;
+        pendingResolveRef.current = null;
+        pendingRejectRef.current = null;
+        if (resolve) resolve(nextUri);
+      } catch (e) {
+        console.error('[Feed] onExtracted error:', e);
+      }
+    },
+    []
+  );
+
+  const onExtractError = useCallback((message: string) => {
+    setExtractEnabled(false);
+    const reject = pendingRejectRef.current;
+    pendingResolveRef.current = null;
+    pendingRejectRef.current = null;
+    if (reject) reject(new Error(message));
+  }, []);
+
+  const attachFilteredPhoto = useCallback(async () => {
+    const uri = pendingPhotoUri;
+    if (!uri) {
+      setFilterModalVisible(false);
+      return;
+    }
+    const mime = pendingPhotoMime;
+
+    setMediaUploading(true);
+    try {
+      let uriToUpload = uri;
+      try {
+        uriToUpload = await exportFilteredPhotoUri(uri, selectedFilterId);
+      } catch (e: any) {
+        throw new Error(String(e?.message || e || 'Failed to export filtered photo'));
+      }
+
+      setMediaLocalUri(uriToUpload);
+      setMediaMimeType(mime || 'image/jpeg');
+
+      const uploadedUrl = await uploadPostMedia(uriToUpload, mime || 'image/jpeg');
+      setMediaUrl(uploadedUrl);
+      setFilterModalVisible(false);
+
+      try {
+        cleanExtractedImagesCache();
+      } catch {
+        // ignore
+      }
+    } finally {
+      setMediaUploading(false);
+      setPendingPhotoUri(null);
+      setPendingPhotoMime(null);
+      setExtractEnabled(false);
+    }
+  }, [exportFilteredPhotoUri, pendingPhotoMime, pendingPhotoUri, selectedFilterId, uploadPostMedia]);
 
   const formatDateTime = useCallback((value: string) => {
     try {
@@ -233,8 +324,6 @@ export function FeedScreen({ navigation }: Props) {
               void (async () => {
                 const text = composerText.trim();
                 if ((!text && !mediaUrl) || composerLoading || mediaUploading) return;
-                if (composerInFlightRef.current) return;
-                composerInFlightRef.current = true;
                 setComposerLoading(true);
                 try {
                   const res = await fetchAuthed('/api/posts', {
@@ -253,7 +342,6 @@ export function FeedScreen({ navigation }: Props) {
                   await refresh();
                 } finally {
                   setComposerLoading(false);
-                  composerInFlightRef.current = false;
                 }
               })();
             }}
@@ -262,9 +350,114 @@ export function FeedScreen({ navigation }: Props) {
             style={styles.postButton}
           />
         </View>
+
+        <Modal
+          visible={filterModalVisible}
+          onRequestClose={() => {
+            if (mediaUploading) return;
+            setFilterModalVisible(false);
+            setPendingPhotoUri(null);
+            setPendingPhotoMime(null);
+            setSelectedFilterId('original');
+            setExtractEnabled(false);
+          }}
+        >
+          <View style={styles.filterModalContent}>
+            <Text style={styles.filterTitle}>Filters</Text>
+
+            {!!pendingPhotoUri && (
+              <View style={styles.filterPreviewWrap}>
+                {selectedFilterId === 'original' ? (
+                  <Image source={{ uri: pendingPhotoUri }} style={styles.filterPreviewImage} resizeMode="cover" />
+                ) : selectedFilterId === 'bw' ? (
+                  <Grayscale
+                    image={<Image source={{ uri: pendingPhotoUri }} style={styles.filterPreviewImage} resizeMode="cover" />}
+                    extractImageEnabled={extractEnabled}
+                    onExtractImage={(ev: { nativeEvent: { uri: string } }) => onExtracted(ev.nativeEvent.uri)}
+                    onFilteringError={(ev: { nativeEvent: { message: string } }) => onExtractError(ev.nativeEvent.message)}
+                  />
+                ) : selectedFilterId === 'sepia' ? (
+                  <Sepia
+                    image={<Image source={{ uri: pendingPhotoUri }} style={styles.filterPreviewImage} resizeMode="cover" />}
+                    extractImageEnabled={extractEnabled}
+                    onExtractImage={(ev: { nativeEvent: { uri: string } }) => onExtracted(ev.nativeEvent.uri)}
+                    onFilteringError={(ev: { nativeEvent: { message: string } }) => onExtractError(ev.nativeEvent.message)}
+                  />
+                ) : selectedFilterId === 'cool' ? (
+                  <Cool
+                    image={<Image source={{ uri: pendingPhotoUri }} style={styles.filterPreviewImage} resizeMode="cover" />}
+                    extractImageEnabled={extractEnabled}
+                    onExtractImage={(ev: { nativeEvent: { uri: string } }) => onExtracted(ev.nativeEvent.uri)}
+                    onFilteringError={(ev: { nativeEvent: { message: string } }) => onExtractError(ev.nativeEvent.message)}
+                  />
+                ) : selectedFilterId === 'warm' ? (
+                  <Warm
+                    image={<Image source={{ uri: pendingPhotoUri }} style={styles.filterPreviewImage} resizeMode="cover" />}
+                    extractImageEnabled={extractEnabled}
+                    onExtractImage={(ev: { nativeEvent: { uri: string } }) => onExtracted(ev.nativeEvent.uri)}
+                    onFilteringError={(ev: { nativeEvent: { message: string } }) => onExtractError(ev.nativeEvent.message)}
+                  />
+                ) : (
+                  <ContrastFilter
+                    amount={1.2}
+                    image={<Image source={{ uri: pendingPhotoUri }} style={styles.filterPreviewImage} resizeMode="cover" />}
+                    extractImageEnabled={extractEnabled}
+                    onExtractImage={(ev: { nativeEvent: { uri: string } }) => onExtracted(ev.nativeEvent.uri)}
+                    onFilteringError={(ev: { nativeEvent: { message: string } }) => onExtractError(ev.nativeEvent.message)}
+                  />
+                )}
+              </View>
+            )}
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+              {PHOTO_FILTER_PRESETS.map((preset) => {
+                const selected = preset.id === selectedFilterId;
+                return (
+                  <Pressable
+                    key={preset.id}
+                    onPress={() => {
+                      if (mediaUploading) return;
+                      setSelectedFilterId(preset.id);
+                    }}
+                    style={[styles.filterPill, selected ? styles.filterPillSelected : null]}
+                  >
+                    <Text style={[styles.filterPillText, selected ? styles.filterPillTextSelected : null]}>
+                      {preset.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <View style={styles.filterActions}>
+              <Pressable
+                onPress={() => {
+                  if (mediaUploading) return;
+                  setFilterModalVisible(false);
+                  setPendingPhotoUri(null);
+                  setPendingPhotoMime(null);
+                  setSelectedFilterId('original');
+                  setExtractEnabled(false);
+                }}
+                style={({ pressed }) => [styles.filterActionButton, pressed ? styles.filterActionButtonPressed : null]}
+              >
+                <Text style={styles.filterActionText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (mediaUploading) return;
+                  void attachFilteredPhoto();
+                }}
+                style={({ pressed }) => [styles.filterActionPrimary, pressed ? styles.filterActionButtonPressed : null]}
+              >
+                <Text style={styles.filterActionPrimaryText}>{mediaUploading ? 'Attaching…' : 'Attach'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       </View>
     );
-  }, [canPost, composerLoading, composerText, fetchAuthed, mediaLocalUri, mediaMimeType, mediaUploading, mediaUrl, pickMedia, refresh]);
+  }, [attachFilteredPhoto, canPost, composerLoading, composerText, extractEnabled, fetchAuthed, filterModalVisible, mediaLocalUri, mediaMimeType, mediaUploading, mediaUrl, onExtractError, onExtracted, pendingPhotoUri, pickMedia, refresh, selectedFilterId, styles]);
 
   const keyExtractor = useCallback((item: FeedPost) => item.id, []);
 
@@ -454,6 +647,87 @@ function createStyles(theme: ThemeDefinition) {
     },
     postButton: {
       paddingHorizontal: 24,
+    },
+
+    filterModalContent: {
+      gap: 12,
+    },
+    filterTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '900',
+    },
+    filterPreviewWrap: {
+      width: '100%',
+      height: 240,
+      borderRadius: 14,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardAlt,
+    },
+    filterPreviewImage: {
+      width: '100%',
+      height: '100%',
+    },
+    filterRow: {
+      paddingVertical: 6,
+      gap: 8,
+    },
+    filterPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardAlt,
+    },
+    filterPillSelected: {
+      backgroundColor: 'rgba(94,155,255,0.22)',
+      borderColor: 'rgba(94,155,255,0.55)',
+    },
+    filterPillText: {
+      color: theme.colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    filterPillTextSelected: {
+      color: theme.colors.textPrimary,
+    },
+    filterActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 10,
+      marginTop: 2,
+    },
+    filterActionButton: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: theme.colors.cardAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    filterActionPrimary: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: 'rgba(94,155,255,0.28)',
+      borderWidth: 1,
+      borderColor: 'rgba(94,155,255,0.55)',
+    },
+    filterActionButtonPressed: {
+      opacity: 0.85,
+    },
+    filterActionText: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '900',
+    },
+    filterActionPrimaryText: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '900',
     },
 
     postCard: {

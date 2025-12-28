@@ -6,6 +6,7 @@ import { MessageCircle, Gift, RefreshCw, Upload, X } from 'lucide-react';
 import { Button, Card, Modal, Textarea } from '@/components/ui';
 import { createClient } from '@/lib/supabase';
 import { uploadPostMedia } from '@/lib/storage';
+import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
 
 type FeedAuthor = {
   id: string;
@@ -59,10 +60,10 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
 
   const [composerText, setComposerText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
-  const composerInFlightRef = useRef(false);
   const [composerMediaFile, setComposerMediaFile] = useState<File | null>(null);
   const [composerMediaPreviewUrl, setComposerMediaPreviewUrl] = useState<string | null>(null);
   const [composerMediaKind, setComposerMediaKind] = useState<'image' | 'video' | null>(null);
+  const [composerPhotoFilterId, setComposerPhotoFilterId] = useState<PhotoFilterId>('original');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -153,6 +154,46 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
     void loadFeed('replace');
   }, [loadFeed]);
 
+  const exportFilteredImage = useCallback(
+    async (file: File, cssFilter: string, filterId: PhotoFilterId): Promise<File> => {
+      if (cssFilter === 'none') return file;
+
+      const localUrl = URL.createObjectURL(file);
+      try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error('Failed to load image'));
+          el.src = localUrl;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas not supported');
+
+        ctx.filter = cssFilter;
+        ctx.drawImage(img, 0, 0);
+
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob(
+            (b) => (b ? resolve(b) : reject(new Error('Failed to export image'))),
+            'image/jpeg',
+            0.92
+          );
+        });
+
+        const baseName = file.name.replace(/\.[^.]+$/, '');
+        const nextName = `${baseName}-${filterId}.jpg`;
+        return new File([blob], nextName, { type: blob.type || 'image/jpeg' });
+      } finally {
+        URL.revokeObjectURL(localUrl);
+      }
+    },
+    []
+  );
+
   const createPost = useCallback(async () => {
     if (!currentUserId) {
       setLoadError('Please log in to post.');
@@ -161,9 +202,6 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
 
     const text = composerText.trim();
     if (!text && !composerMediaFile) return;
-
-    if (composerInFlightRef.current) return;
-    composerInFlightRef.current = true;
 
     if (composerMediaFile && !currentUserId) {
       setLoadError('Please log in to upload media.');
@@ -174,13 +212,23 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
     try {
       let mediaUrl: string | null = null;
       if (composerMediaFile && currentUserId) {
-        mediaUrl = await uploadPostMedia(currentUserId, composerMediaFile);
+        const fileToUpload =
+          composerMediaKind === 'image'
+            ? await exportFilteredImage(
+                composerMediaFile,
+                getPhotoFilterPreset(composerPhotoFilterId).cssFilter,
+                composerPhotoFilterId
+              )
+            : composerMediaFile;
+        mediaUrl = await uploadPostMedia(currentUserId, fileToUpload);
       }
+
+      const safeTextContent = text.length ? text : ' ';
 
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text_content: text, media_url: mediaUrl }),
+        body: JSON.stringify({ text_content: safeTextContent, media_url: mediaUrl }),
       });
 
       const json = (await res.json()) as any;
@@ -195,14 +243,14 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
       setComposerMediaFile(null);
       setComposerMediaPreviewUrl(null);
       setComposerMediaKind(null);
+      setComposerPhotoFilterId('original');
       await loadFeed('replace');
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to create post');
     } finally {
       setIsPosting(false);
-      composerInFlightRef.current = false;
     }
-  }, [composerMediaFile, composerMediaPreviewUrl, composerText, currentUserId, loadFeed]);
+  }, [composerMediaFile, composerMediaKind, composerMediaPreviewUrl, composerPhotoFilterId, composerText, currentUserId, exportFilteredImage, loadFeed]);
 
   const onComposerFileChange = useCallback((file: File | null) => {
     if (!file) return;
@@ -223,6 +271,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
     if (composerMediaPreviewUrl) URL.revokeObjectURL(composerMediaPreviewUrl);
     setComposerMediaFile(file);
     setComposerMediaKind(isVideo ? 'video' : 'image');
+    setComposerPhotoFilterId('original');
     setComposerMediaPreviewUrl(URL.createObjectURL(file));
   }, [composerMediaPreviewUrl]);
 
@@ -231,6 +280,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
     setComposerMediaFile(null);
     setComposerMediaPreviewUrl(null);
     setComposerMediaKind(null);
+    setComposerPhotoFilterId('original');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [composerMediaPreviewUrl]);
 
@@ -390,7 +440,12 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
                   {composerMediaKind === 'video' ? (
                     <video src={composerMediaPreviewUrl} controls className="w-full max-h-[420px] object-contain" />
                   ) : (
-                    <img src={composerMediaPreviewUrl} alt="Selected media" className="w-full max-h-[420px] object-contain" />
+                    <img
+                      src={composerMediaPreviewUrl}
+                      alt="Selected media"
+                      className="w-full max-h-[420px] object-contain"
+                      style={{ filter: getPhotoFilterPreset(composerPhotoFilterId).cssFilter }}
+                    />
                   )}
                   <button
                     type="button"
@@ -401,6 +456,29 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
                     <X className="w-4 h-4" />
                     Remove
                   </button>
+                </div>
+              )}
+
+              {composerMediaPreviewUrl && composerMediaKind === 'image' && (
+                <div className="flex items-center gap-2 overflow-x-auto pt-1">
+                  {PHOTO_FILTER_PRESETS.map((preset) => {
+                    const selected = preset.id === composerPhotoFilterId;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setComposerPhotoFilterId(preset.id)}
+                        disabled={isPosting}
+                        className={`shrink-0 px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors ${
+                          selected
+                            ? 'bg-foreground text-background border-foreground'
+                            : 'bg-background/60 text-foreground border-border hover:bg-muted'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
