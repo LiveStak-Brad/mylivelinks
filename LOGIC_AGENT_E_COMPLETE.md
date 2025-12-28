@@ -31,6 +31,7 @@ Within bucket `clips`, object keys are standardized to:
 Because Postgres RPCs cannot generate Supabase Storage signed URLs directly (no `create_signed_url` SQL function in this repo), playback URL retrieval is implemented as an API route.
 
 - **Endpoint:** `GET /api/clips/{clip_id}/playback`
+- **Alias endpoint (RPC-shaped):** `GET /api/get_clip_playback?p_clip_id={clip_id}`
 - **Auth:** optional (RLS-enforced)
   - Public + ready clips are readable due to existing RLS on `public.clips`.
   - Private/unlisted clips are only readable by the producer due to existing RLS.
@@ -50,6 +51,7 @@ Behavior:
 
 - `supabase/migrations/20251228_clips_storage_contract_phase1.sql`
 - `app/api/clips/[clipId]/playback/route.ts`
+- `app/api/get_clip_playback/route.ts`
 - `LOGIC_AGENT_E_COMPLETE.md`
 
 ## Status
