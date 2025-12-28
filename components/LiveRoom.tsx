@@ -1344,12 +1344,19 @@ export default function LiveRoom() {
         }
 
         // Always include the current user's own stream if they're live
-        const { data: ownLiveStream } = await supabase
+        const { data: ownLiveStream, error: ownLiveStreamError } = await supabase
           .from('live_streams')
           .select('id, profile_id, live_available')
           .eq('profile_id', user.id)
           .eq('live_available', true)
-          .single();
+          .maybeSingle();
+
+        if (ownLiveStreamError) {
+          const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+          if (DEBUG_LIVEKIT) {
+            console.warn('[DEBUG] ownLiveStream query error (non-fatal):', ownLiveStreamError);
+          }
+        }
 
         if (ownLiveStream) {
           const ownStreamExists = streamersWithBadges.find(s => s.profile_id === user.id);
@@ -1522,12 +1529,19 @@ export default function LiveRoom() {
       const availableStreamers = streamers || liveStreamers;
 
       // Check if user is live - if so, ensure they're in slot 1
-      const { data: userLiveStream } = await supabase
+      const { data: userLiveStream, error: userLiveStreamError } = await supabase
         .from('live_streams')
         .select('id, live_available')
         .eq('profile_id', user.id)
         .eq('live_available', true)
-        .single();
+        .maybeSingle();
+
+      if (userLiveStreamError) {
+        const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
+        if (DEBUG_LIVEKIT) {
+          console.warn('[DEBUG] userLiveStream query error (non-fatal):', userLiveStreamError);
+        }
+      }
 
       const { data, error } = await supabase
         .from('user_grid_slots')
