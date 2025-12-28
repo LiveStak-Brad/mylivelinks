@@ -168,15 +168,18 @@ Whitespace:  Pre-wrap (preserves formatting)
 Padding:     12px 0
 ```
 
-**3. Media Display**
+**3. Media Display (Feed Mode - Auto-Size, NO BARS)**
 ```
-Photos:      Full-width, max-height 600px, object-fit cover
-Videos:      Full-width, max-height 600px, native controls
-Aspect:      Preserve original (not forced square)
+Photos:      Full-width, auto-height, preserve aspect ratio
+Videos:      Full-width, auto-height, preserve aspect ratio, native controls
+Aspect:      Container auto-sizes to content (NO black bars)
+Object-fit:  None (image/video determines container size)
 Border:      Subtle 1px border
 Radius:      8px (slightly rounded)
-Background:  Black for letterboxing
+Background:  None (no letterboxing)
 ```
+
+**⚠️ CRITICAL RULE:** Feed posts MUST NOT use fixed-height containers or `object-fit: contain`. The container expands to match the media's aspect ratio exactly. See `MEDIA_SIZING_RULES.md` for details.
 
 **4. Engagement Bar (Below Media)**
 ```

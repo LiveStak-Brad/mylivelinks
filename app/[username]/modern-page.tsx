@@ -936,12 +936,20 @@ export default function ModernProfilePage() {
         
         {/* Feed Tab */}
         {activeTab === 'feed' && (
-          <PublicFeedClient username={profile.username} />
+          <PublicFeedClient 
+            username={profile.username} 
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
         )}
         
         {/* Photos Tab */}
         {activeTab === 'photos' && (
-          <ProfilePhotosClient username={profile.username} />
+          <ProfilePhotosClient 
+            username={profile.username}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
         )}
         
         {/* Videos Tab */}

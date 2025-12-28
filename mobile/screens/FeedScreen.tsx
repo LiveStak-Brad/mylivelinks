@@ -23,6 +23,7 @@ export function FeedScreen({ navigation }: Props) {
   const { user } = useAuthContext();
   const [composerText, setComposerText] = useState('');
   const [composerLoading, setComposerLoading] = useState(false);
+  const composerInFlightRef = useRef(false);
   const [mediaLocalUri, setMediaLocalUri] = useState<string | null>(null);
   const [mediaMimeType, setMediaMimeType] = useState<string | null>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
@@ -324,6 +325,8 @@ export function FeedScreen({ navigation }: Props) {
               void (async () => {
                 const text = composerText.trim();
                 if ((!text && !mediaUrl) || composerLoading || mediaUploading) return;
+                if (composerInFlightRef.current) return;
+                composerInFlightRef.current = true;
                 setComposerLoading(true);
                 try {
                   const res = await fetchAuthed('/api/posts', {
@@ -342,6 +345,7 @@ export function FeedScreen({ navigation }: Props) {
                   await refresh();
                 } finally {
                   setComposerLoading(false);
+                  composerInFlightRef.current = false;
                 }
               })();
             }}

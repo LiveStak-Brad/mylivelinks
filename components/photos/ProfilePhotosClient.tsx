@@ -22,7 +22,15 @@ function isVideoUrl(url: string) {
   return /(\.mp4|\.mov|\.webm|\.mkv|\.avi)(\?|$)/i.test(url);
 }
 
-export default function ProfilePhotosClient({ username }: { username: string }) {
+export default function ProfilePhotosClient({ 
+  username, 
+  cardStyle, 
+  borderRadiusClass = 'rounded-xl' 
+}: { 
+  username: string;
+  cardStyle?: React.CSSProperties;
+  borderRadiusClass?: string;
+}) {
   const [activeTab, setActiveTab] = useState<'all' | 'photos' | 'videos' | 'tagged'>('all');
 
   const [items, setItems] = useState<MediaItem[]>([]);
@@ -236,7 +244,7 @@ export default function ProfilePhotosClient({ username }: { username: string }) 
   return (
     <div className="space-y-4">
       {loadError && (
-        <Card className="p-4 border border-destructive/30 bg-destructive/5">
+        <Card className={`p-4 border border-destructive/30 bg-destructive/5 backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm text-destructive">{loadError}</div>
             <Button variant="outline" size="sm" onClick={loadMedia}>
@@ -247,7 +255,7 @@ export default function ProfilePhotosClient({ username }: { username: string }) 
       )}
 
       {isOwner && (
-        <Card className="overflow-hidden">
+        <Card className={`overflow-hidden backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>
           <div className="p-4 sm:p-5 space-y-3">
             <div className="text-sm font-medium text-foreground">Post a photo or video</div>
 

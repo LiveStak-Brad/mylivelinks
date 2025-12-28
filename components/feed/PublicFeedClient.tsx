@@ -40,6 +40,8 @@ type FeedResponse = {
 
 type PublicFeedClientProps = {
   username?: string;
+  cardStyle?: React.CSSProperties;
+  borderRadiusClass?: string;
 };
 
 function formatDateTime(value: string) {
@@ -52,7 +54,7 @@ function formatDateTime(value: string) {
   }
 }
 
-export default function PublicFeedClient({ username }: PublicFeedClientProps) {
+export default function PublicFeedClient({ username, cardStyle, borderRadiusClass = 'rounded-xl' }: PublicFeedClientProps) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [nextCursor, setNextCursor] = useState<FeedResponse['nextCursor']>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -60,6 +62,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
 
   const [composerText, setComposerText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const composerInFlightRef = useRef(false);
   const [composerMediaFile, setComposerMediaFile] = useState<File | null>(null);
   const [composerMediaPreviewUrl, setComposerMediaPreviewUrl] = useState<string | null>(null);
   const [composerMediaKind, setComposerMediaKind] = useState<'image' | 'video' | null>(null);
@@ -203,8 +206,12 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
     const text = composerText.trim();
     if (!text && !composerMediaFile) return;
 
+    if (composerInFlightRef.current) return;
+    composerInFlightRef.current = true;
+
     if (composerMediaFile && !currentUserId) {
       setLoadError('Please log in to upload media.');
+      composerInFlightRef.current = false;
       return;
     }
 
@@ -249,6 +256,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
       setLoadError(err instanceof Error ? err.message : 'Failed to create post');
     } finally {
       setIsPosting(false);
+      composerInFlightRef.current = false;
     }
   }, [composerMediaFile, composerMediaKind, composerMediaPreviewUrl, composerPhotoFilterId, composerText, currentUserId, exportFilteredImage, loadFeed]);
 
@@ -422,7 +430,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
         </Card>
       )}
 
-      <Card className="overflow-hidden">
+      <Card className={`overflow-hidden backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>
         <div className="p-4 sm:p-5 space-y-3">
           <div className="text-sm font-medium text-foreground">Create a post</div>
           {shouldShowComposer ? (
@@ -515,7 +523,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
       </Card>
 
       {posts.length === 0 && !isLoading ? (
-        <Card className="p-6">
+        <Card className={`p-6 backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>
           <div className="text-sm text-muted-foreground">No posts yet.</div>
         </Card>
       ) : (
@@ -526,7 +534,7 @@ export default function PublicFeedClient({ username }: PublicFeedClientProps) {
             const isCommentsLoading = !!commentsLoading[post.id];
 
             return (
-              <Card key={post.id} className="overflow-hidden">
+              <Card key={post.id} className={`overflow-hidden backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
