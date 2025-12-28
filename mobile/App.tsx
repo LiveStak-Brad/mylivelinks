@@ -47,6 +47,8 @@ import { OwnerPanelScreen } from './screens/OwnerPanelScreen';
 import { ModerationPanelScreen } from './screens/ModerationPanelScreen';
 import { AdminApplicationsScreen } from './screens/AdminApplicationsScreen';
 import { AdminGiftsScreen } from './screens/AdminGiftsScreen';
+import { ComposerListScreen } from './screens/ComposerListScreen';
+import { ComposerEditorScreen } from './screens/ComposerEditorScreen';
 import { setPendingReferralCode } from './lib/referrals';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -117,6 +119,8 @@ function AppNavigation() {
             <Stack.Screen name="ModerationPanel" component={ModerationPanelScreen} />
             <Stack.Screen name="AdminApplications" component={AdminApplicationsScreen} />
             <Stack.Screen name="AdminGifts" component={AdminGiftsScreen} />
+            <Stack.Screen name="ComposerList" component={ComposerListScreen} />
+            <Stack.Screen name="ComposerEditor" component={ComposerEditorScreen} />
             <Stack.Screen name="ProfileRoute" component={ProfileRouteScreen} options={{ presentation: 'card', animation: 'none' }} />
           </Stack.Navigator>
         </NavigationContainer>

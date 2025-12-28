@@ -12,7 +12,8 @@ import {
   Settings, 
   LogOut, 
   ChevronDown,
-  ExternalLink 
+  ExternalLink,
+  Film 
 } from 'lucide-react';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import ThemeToggle from './ThemeToggle';
@@ -296,6 +297,14 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
               icon={BarChart3}
               iconColor="text-purple-500"
               label="Analytics"
+            />
+            
+            <MenuItem
+              href="/composer"
+              onClick={closeMenu}
+              icon={Film}
+              iconColor="text-pink-500"
+              label="Composer"
             />
             
             <MenuDivider />

@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { Heart, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import ClipActions from '@/components/ClipActions';
 
 /* =============================================================================
    FEED POST CARD COMPONENT
@@ -37,6 +38,10 @@ export interface FeedPostCardProps {
   timestamp?: string;
   /** Media attachment element (image/video) */
   media?: React.ReactNode;
+  /** If true, show clip completion actions instead of standard actions */
+  isClipCompletion?: boolean;
+  /** Clip ID (if isClipCompletion is true) */
+  clipId?: string;
   /** Callback when like button clicked */
   onLike?: () => void;
   /** Callback when comment button clicked */
@@ -45,6 +50,8 @@ export interface FeedPostCardProps {
   onShare?: () => void;
   /** Callback when more options clicked */
   onMore?: () => void;
+  /** Callback when clip action is triggered */
+  onClipAction?: (action: 'post' | 'save' | 'post-save' | 'composer') => void;
   /** Additional className */
   className?: string;
 }
@@ -110,10 +117,13 @@ const FeedPostCard = memo(function FeedPostCard({
   content,
   timestamp = 'Just now',
   media,
+  isClipCompletion = false,
+  clipId,
   onLike,
   onComment,
   onShare,
   onMore,
+  onClipAction,
   className = '',
 }: FeedPostCardProps) {
   return (
@@ -161,23 +171,36 @@ const FeedPostCard = memo(function FeedPostCard({
       )}
       
       {/* Actions */}
-      <div className="flex items-center border-t border-border mx-4 py-1">
-        <ActionButton
-          icon={Heart}
-          label="Like"
-          onClick={onLike}
-        />
-        <ActionButton
-          icon={MessageCircle}
-          label="Comment"
-          onClick={onComment}
-        />
-        <ActionButton
-          icon={Share2}
-          label="Share"
-          onClick={onShare}
-        />
-      </div>
+      {isClipCompletion ? (
+        // Clip Completion Actions
+        <div className="px-4 py-4 border-t border-border">
+          <ClipActions
+            clipId={clipId}
+            onAction={onClipAction}
+            variant="horizontal"
+            compact={false}
+          />
+        </div>
+      ) : (
+        // Standard Post Actions
+        <div className="flex items-center border-t border-border mx-4 py-1">
+          <ActionButton
+            icon={Heart}
+            label="Like"
+            onClick={onLike}
+          />
+          <ActionButton
+            icon={MessageCircle}
+            label="Comment"
+            onClick={onComment}
+          />
+          <ActionButton
+            icon={Share2}
+            label="Share"
+            onClick={onShare}
+          />
+        </div>
+      )}
     </Card>
   );
 });

@@ -302,6 +302,17 @@ export function UserMenu({
                 styles={styles}
               />
 
+              <MenuItem
+                icon="film-outline"
+                iconColor="#f59e0b"
+                label="Composer"
+                onPress={() => {
+                  closeMenu();
+                  navigateRoot('ComposerList');
+                }}
+                styles={styles}
+              />
+
               <MenuDivider styles={styles} />
 
               {/* Room / Live */}
