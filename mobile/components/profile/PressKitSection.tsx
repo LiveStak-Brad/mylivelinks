@@ -19,6 +19,7 @@ interface PressKitSectionProps {
   onEdit?: (item: PressKitItem) => void;
   onDelete?: (itemId: string) => void;
   onDownload?: (item: PressKitItem) => void;
+  cardOpacity?: number; // User-selected opacity (from profile settings)
 }
 
 /**
@@ -38,9 +39,10 @@ export function PressKitSection({
   onEdit,
   onDelete,
   onDownload,
+  cardOpacity = 0.95, // Default opacity to match profile cards
 }: PressKitSectionProps) {
   const { theme } = useThemeMode();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, cardOpacity), [theme, cardOpacity]);
 
   const getIconForType = (type: PressKitItem['type']): string => {
     switch (type) {
@@ -186,7 +188,7 @@ export function PressKitSection({
   );
 }
 
-function createStyles(theme: ThemeDefinition) {
+function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
   const cardShadow = theme.elevations.card;
 
   return StyleSheet.create({
@@ -221,6 +223,7 @@ function createStyles(theme: ThemeDefinition) {
     },
     pressKitItem: {
       backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity, // Apply user-selected opacity
       borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -331,6 +334,7 @@ function createStyles(theme: ThemeDefinition) {
       paddingVertical: 40,
       marginHorizontal: 16,
       backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity, // Apply user-selected opacity
       borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.colors.border,

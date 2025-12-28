@@ -141,7 +141,7 @@ export function FeaturedSection({
   );
 }
 
-function createStyles(theme: ThemeDefinition) {
+function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
   const cardShadow = theme.elevations.card;
 
   return StyleSheet.create({
@@ -178,6 +178,7 @@ function createStyles(theme: ThemeDefinition) {
     itemCard: {
       width: 240,
       backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity, // Apply user-selected opacity
       borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -270,6 +271,7 @@ function createStyles(theme: ThemeDefinition) {
       paddingVertical: 40,
       marginHorizontal: 16,
       backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity, // Apply user-selected opacity
       borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.colors.border,
