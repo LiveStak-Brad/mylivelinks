@@ -26,6 +26,32 @@ const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com').replace(/\/+$/, '');
 const TOKEN_ENDPOINT = `${API_BASE_URL}${TOKEN_ENDPOINT_PATH}`;
 
+const nowMs = (): number => {
+  try {
+    const p: any = (globalThis as any)?.performance;
+    if (p && typeof p.now === 'function') return p.now();
+  } catch {
+    // ignore
+  }
+  return Date.now();
+};
+
+const getErrorDetails = (error: any): { name: string | null; message: string | null; cause: string | null } => {
+  const name = error?.name ? String(error.name) : null;
+  const message = error?.message ? String(error.message) : null;
+  let cause: string | null = null;
+  try {
+    if (error?.cause) {
+      if (typeof error.cause === 'string') cause = error.cause;
+      else if (error.cause?.message) cause = String(error.cause.message);
+      else cause = String(error.cause);
+    }
+  } catch {
+    // ignore
+  }
+  return { name, message, cause };
+};
+
 const redactTokenFromText = (text: string): string => {
   if (!text) return text;
   // Best-effort redact any token fields in JSON.
@@ -285,8 +311,46 @@ export function useLiveRoomParticipants(
         headerKeys: ['Content-Type', 'Authorization'],
       });
 
+      // Preflight reachability check (diagnostic) before token POST
+      try {
+        const reachabilityUrl = API_BASE_URL;
+        const t0 = nowMs();
+        const preflightController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const preflightTimeoutId = setTimeout(() => {
+          try {
+            preflightController?.abort();
+          } catch {
+            // ignore
+          }
+        }, 8_000);
+
+        const preflightResponse = await fetch(reachabilityUrl, {
+          method: 'HEAD',
+          ...(preflightController ? { signal: preflightController.signal } : {}),
+        }).finally(() => clearTimeout(preflightTimeoutId));
+
+        const dt = Math.round(nowMs() - t0);
+        console.log('[NET] reachability', {
+          url: reachabilityUrl,
+          method: 'HEAD',
+          status: preflightResponse.status,
+          ok: preflightResponse.ok,
+          ms: dt,
+        });
+      } catch (preflightErr: any) {
+        const { name, message, cause } = getErrorDetails(preflightErr);
+        console.log('[NET] reachability_error', {
+          url: API_BASE_URL,
+          method: 'HEAD',
+          name,
+          message,
+          cause,
+        });
+      }
+
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timeoutMs = 15_000;
+      const timeoutMs = typeof __DEV__ !== 'undefined' && __DEV__ ? 45_000 : 15_000;
+      const tokenFetchStart = nowMs();
       const timeoutId = setTimeout(() => {
         try {
           controller?.abort();
@@ -305,6 +369,8 @@ export function useLiveRoomParticipants(
         ...(controller ? { signal: controller.signal } : {}),
       }).finally(() => clearTimeout(timeoutId));
 
+      const tokenFetchMs = Math.round(nowMs() - tokenFetchStart);
+
       lastTokenStatusRef.current = response.status;
       setTokenDebug(prev => ({ ...prev, status: response.status }));
 
@@ -314,6 +380,7 @@ export function useLiveRoomParticipants(
       console.log('[TOKEN][HTTP] response', {
         status: response.status,
         ok: response.ok,
+        ms: tokenFetchMs,
         textSnippet: snippet500,
       });
 
@@ -382,14 +449,21 @@ export function useLiveRoomParticipants(
 
       return data;
     } catch (error: any) {
-      const msg = error?.message || 'Token fetch error';
+      const { name, message, cause } = getErrorDetails(error);
+      const msg = message || 'Token fetch error';
       const stack = error?.stack ? String(error.stack).slice(0, 1200) : null;
-      console.error('[TOKEN] Fetch error:', { msg, stack });
+      console.error('[TOKEN] Fetch error:', { name, msg, cause, stack });
+
+      const isAbort = name === 'AbortError' || msg === 'Aborted' || /aborted/i.test(msg);
 
       // 0 = no HTTP response (network/SSL/DNS failure)
       setTokenDebug(prev => ({ ...prev, status: prev.status ?? 0 }));
       if (lastTokenStatusRef.current == null) lastTokenStatusRef.current = 0;
-      setConnectionError(prev => prev || 'Network/SSL error calling TOKEN_ENDPOINT');
+      if (isAbort) {
+        setConnectionError(prev => prev || 'Token fetch aborted (timeout)');
+      } else {
+        setConnectionError(prev => prev || 'Network/SSL error calling TOKEN_ENDPOINT');
+      }
       setLastTokenError({
         status: lastTokenStatusRef.current ?? 0,
         bodySnippet: stack ? toSnippet(stack, 500) : '',
@@ -549,15 +623,30 @@ export function useLiveRoomParticipants(
         setMyIdentity(participantName);
 
         // Fetch token (viewer)
-        const { token, url } = await fetchToken({
-          participantName,
-          canPublish: true,
-          canSubscribe: true,
-          role: 'viewer',
-          participantMetadata: authContext.isAuthed
-            ? { profile_id: authContext.profileId, platform: 'mobile' }
-            : { platform: 'mobile' },
-        });
+        let token: string;
+        let url: string;
+        try {
+          const tokenResult = await fetchToken({
+            participantName,
+            canPublish: true,
+            canSubscribe: true,
+            role: 'viewer',
+            participantMetadata: authContext.isAuthed
+              ? { profile_id: authContext.profileId, platform: 'mobile' }
+              : { platform: 'mobile' },
+          });
+          token = tokenResult.token;
+          url = tokenResult.url;
+        } catch (tokenErr: any) {
+          const { name, message, cause } = getErrorDetails(tokenErr);
+          const details = [name, message, cause].filter(Boolean).join(' | ').slice(0, 500);
+          console.error('[ROOM] Token fetch failed', { name, message, cause });
+          setConnectDebug({ wsUrl: null, errorMessage: `TOKEN_FETCH_FAILED: ${details || 'Token fetch failed'}`, reachedConnected: false });
+          setLastConnectError(`TOKEN_FETCH_FAILED: ${details || 'Token fetch failed'}`);
+          isConnectingRef.current = false;
+          hasConnectedRef.current = false;
+          return;
+        }
 
         if (DEBUG) console.log('[ROOM] Creating LiveKit Room instance');
         
@@ -676,7 +765,8 @@ export function useLiveRoomParticipants(
         if (DEBUG) console.log('[ROOM] Connected successfully');
 
       } catch (error: any) {
-        console.error('[ROOM] Connection error', error);
+        const { name, message, cause } = getErrorDetails(error);
+        console.error('[ROOM] Room connect error', { name, message, cause });
         isConnectingRef.current = false;
         hasConnectedRef.current = false;
         if (!lastConnectError) {

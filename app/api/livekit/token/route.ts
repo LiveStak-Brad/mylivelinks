@@ -27,6 +27,25 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const reqId = Math.random().toString(16).slice(2, 10);
+  const t0 = Date.now();
+  const mark = (phase: string, extra?: Record<string, any>) => {
+    try {
+      console.log('[TOKEN_API_TIMING]', {
+        reqId,
+        phase,
+        ms: Date.now() - t0,
+        ...(extra || {}),
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  mark('request_start', {
+    method: request.method,
+    host: request.headers.get('host'),
+  });
   try {
     // Validate environment variables with detailed error messages
     if (!LIVEKIT_URL) {
@@ -70,6 +89,8 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
 
+    mark('auth_verify_start', { usedBearer: !!bearerToken, hasAuthHeader: !!authHeader });
+
     // TEMP: Confirm which Supabase project this deployment is using (no secrets)
     console.log('[TOKEN_API] supabase_project_ref', {
       ref: SUPABASE_URL?.match(/^https:\/\/([a-z0-9-]+)\.supabase\.co/i)?.[1] ?? null,
@@ -97,6 +118,8 @@ export async function POST(request: NextRequest) {
       authError = result.error || null;
     }
 
+    mark('auth_verify_done', { hasUser: !!user, hasAuthError: !!authError });
+
     console.log('Auth result:', {
       hasUser: !!user,
       userId: user?.id?.substring(0, 8) + '...',
@@ -123,7 +146,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get request body
+    mark('read_body_start');
     const body = await request.json();
+    mark('read_body_done');
     const { 
       roomName, 
       participantName, 
@@ -209,6 +234,8 @@ export async function POST(request: NextRequest) {
       role: effectiveRole,
     });
 
+    mark('livekit_token_create_start');
+
     // Validate API key/secret format (they should be strings)
     // Check for common issues: whitespace, newlines, quotes
     const apiKeyClean = LIVEKIT_API_KEY?.replace(/[\r\n\t\s"']/g, '');
@@ -269,6 +296,7 @@ export async function POST(request: NextRequest) {
         apiKeyPrefix: finalApiKey.substring(0, 15) + '...',
         apiKeyLength: finalApiKey.length,
       });
+      mark('livekit_token_create_error');
       return NextResponse.json(
         { error: `Failed to create LiveKit token: ${tokenErr.message || 'Invalid API credentials'}` },
         { status: 500 }
@@ -302,14 +330,19 @@ export async function POST(request: NextRequest) {
     // Generate token - toJwt() returns a Promise<string> in this SDK version
     let token: string;
     try {
+      mark('livekit_toJwt_start');
       token = await at.toJwt();
+      mark('livekit_toJwt_done');
     } catch (jwtErr: any) {
       console.error('Error generating JWT:', jwtErr);
+      mark('livekit_toJwt_error');
       return NextResponse.json(
         { error: `Failed to generate token: ${jwtErr.message || 'Unknown error'}` },
         { status: 500 }
       );
     }
+
+    mark('livekit_token_ready');
     
     // Validate token was generated
     if (!token || typeof token !== 'string' || token.length < 50) {
@@ -403,12 +436,14 @@ export async function POST(request: NextRequest) {
       livekitUrlEnv: LIVEKIT_URL,
     });
 
+    mark('response_send');
     return NextResponse.json({
       token,
       url: wsUrl,
     }, { headers: corsHeaders });
   } catch (error: any) {
     console.error('Error generating LiveKit token:', error);
+    mark('handler_error');
     return NextResponse.json(
       { error: error.message || 'Failed to generate token' },
       { status: 500, headers: corsHeaders }
