@@ -6,10 +6,12 @@ export const runtime = 'edge';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    
+    const mode = (searchParams.get('mode') || '').trim().toLowerCase();
+
     const username = searchParams.get('username') || 'User';
     const displayName = searchParams.get('displayName') || username;
-    const bio = searchParams.get('bio') || 'Follow me on MyLiveLinks';
+    const defaultBio = mode === 'invite' ? 'Join me on MyLiveLinks' : 'Follow me on MyLiveLinks';
+    const bio = searchParams.get('bio') || defaultBio;
     
     // Get first letter for avatar
     const firstLetter = displayName.charAt(0).toUpperCase();
@@ -106,7 +108,7 @@ export async function GET(request: NextRequest) {
                 fontWeight: 'bold',
               }}
             >
-              🔥 Follow me on MyLiveLinks
+              {mode === 'invite' ? '✨ Join me on MyLiveLinks' : '🔥 Follow me on MyLiveLinks'}
             </div>
           </div>
         </div>
