@@ -1431,7 +1431,6 @@ export default function ModernProfilePage() {
               <VlogReelsClient
                 profileId={profile.id}
                 isOwner={isOwnProfile}
-                allowEdit={false}
                 title="Videos"
                 contentLabel="videos"
                 cardStyle={cardStyle}

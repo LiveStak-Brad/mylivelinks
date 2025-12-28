@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Clapperboard, Plus, Trash2, X } from 'lucide-react';
+import { Clapperboard, Plus, Trash2, Upload, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
+import { uploadProfileMedia } from '@/lib/storage';
 
 type VlogRow = {
   id: string;
@@ -52,19 +53,8 @@ async function getVideoDurationSeconds(file: File): Promise<number> {
 }
 
 async function uploadVlogVideo(profileId: string, vlogId: string, file: File): Promise<string> {
-  const supabase = createClient();
-  const filePath = `${profileId}/vlogs/${vlogId}/video`;
-
-  const { error } = await supabase.storage.from('profile-media').upload(filePath, file, {
-    contentType: file.type || undefined,
-    upsert: false,
-  });
-  if (error) throw error;
-
-  const { data: urlData } = supabase.storage.from('profile-media').getPublicUrl(filePath);
-  const publicUrl = urlData?.publicUrl;
-  if (!publicUrl) throw new Error('Failed to get public URL');
-  return publicUrl;
+  const relPath = `vlogs/${vlogId}/video`;
+  return uploadProfileMedia(profileId, relPath, file, { upsert: false });
 }
 export default function VlogReelsClient({
   profileId,
@@ -83,9 +73,9 @@ export default function VlogReelsClient({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
 
-  const [uploaderOpen, setUploaderOpen] = useState(false);
   const [caption, setCaption] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -109,12 +99,17 @@ export default function VlogReelsClient({
 
   const canEdit = allowEdit ?? isOwner;
 
-  const openUploader = () => {
-    setCaption('');
-    setFile(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setUploaderOpen(true);
-  };
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
 
   const onPickFile = (next: File | null) => {
     if (!next) return;
@@ -130,6 +125,12 @@ export default function VlogReelsClient({
     }
 
     setFile(next);
+  };
+
+  const clearUploader = () => {
+    setCaption('');
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const saveVlog = async () => {
@@ -162,7 +163,7 @@ export default function VlogReelsClient({
       const { error } = await supabase.rpc('create_vlog', { p_payload: payload });
       if (error) throw error;
 
-      setUploaderOpen(false);
+      clearUploader();
       await load();
     } catch (e) {
       console.error('[VlogReels] save failed', e);
@@ -204,14 +205,78 @@ export default function VlogReelsClient({
         </div>
         {canEdit && (
           <button
-            onClick={openUploader}
+            onClick={() => fileInputRef.current?.click()}
             className="inline-flex items-center gap-2 text-sm font-semibold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
           >
             <Plus className="w-4 h-4" />
-            Add VLOG
+            Add
           </button>
         )}
       </div>
+
+      {canEdit && (
+        <div className="p-4 sm:p-6 border-b border-gray-200/60 dark:border-gray-700/60">
+          <div className="space-y-3">
+            <div className="text-sm font-semibold text-gray-900 dark:text-white">Upload a video</div>
+
+            <textarea
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm"
+              placeholder="Add a caption (optional)…"
+              rows={3}
+              disabled={saving}
+            />
+
+            {previewUrl && (
+              <div className="relative rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-black/5 dark:bg-black/30">
+                <video src={previewUrl} controls className="w-full h-auto block" />
+                <button
+                  type="button"
+                  onClick={clearUploader}
+                  className="absolute top-2 right-2 inline-flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-white/80 dark:bg-black/50 backdrop-blur border border-gray-200 dark:border-gray-700 text-xs"
+                  disabled={saving}
+                >
+                  <X className="w-4 h-4" />
+                  Remove
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+                  disabled={saving}
+                />
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold border border-gray-200 dark:border-gray-700"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={saving}
+                >
+                  <Upload className="w-4 h-4" />
+                  Choose video
+                </button>
+                <div className="text-xs text-gray-500 dark:text-gray-400">≤ 60s • Max 250MB</div>
+              </div>
+
+              <button
+                type="button"
+                className="px-4 py-2 rounded-lg text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-60"
+                disabled={saving || !file}
+                onClick={() => void saveVlog()}
+              >
+                {saving ? 'Uploading…' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="p-6 text-center text-gray-600 dark:text-gray-400">Loading {String(contentLabel || 'vlog')}…</div>
@@ -220,7 +285,7 @@ export default function VlogReelsClient({
           <div className="text-gray-600 dark:text-gray-400">No {String(contentLabel || 'vlog')} yet.</div>
           {canEdit && (
             <button
-              onClick={openUploader}
+              onClick={() => fileInputRef.current?.click()}
               className="mt-4 px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors"
             >
               + Add VLOG
@@ -322,64 +387,6 @@ export default function VlogReelsClient({
                 )}
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {uploaderOpen && (
-        <div className="fixed inset-0 z-[1400] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => (!saving ? setUploaderOpen(false) : null)} />
-          <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-2xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-lg font-extrabold text-gray-900 dark:text-white">Add VLOG</div>
-              <button
-                className="text-sm font-bold text-gray-600 dark:text-gray-300 hover:opacity-80"
-                onClick={() => (!saving ? setUploaderOpen(false) : null)}
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Caption (optional)</label>
-                <input
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm"
-                  placeholder="Say something…"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Video (≤ 60s)</label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-                  className="w-full text-sm"
-                />
-                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">Vertical videos work best. Max 250MB.</div>
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2">
-                <button
-                  className="px-4 py-2 rounded-lg text-sm font-bold border border-gray-200 dark:border-gray-700"
-                  disabled={saving}
-                  onClick={() => setUploaderOpen(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="px-4 py-2 rounded-lg text-sm font-bold bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-60"
-                  disabled={saving}
-                  onClick={() => void saveVlog()}
-                >
-                  {saving ? 'Uploading…' : 'Upload'}
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
