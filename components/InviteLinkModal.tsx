@@ -25,33 +25,62 @@ export default function InviteLinkModal({ isOpen, onClose }: InviteLinkModalProp
     setLoading(true);
     try {
       const supabase = createClient();
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mylivelinks.com';
+
+      try {
+        const res = await fetch('/api/referrals/me/code', { cache: 'no-store' });
+        const json = await res.json().catch(() => null);
+        const url = typeof json?.url === 'string' ? String(json.url) : '';
+        const code = typeof json?.code === 'string' ? String(json.code).trim() : '';
+        if (res.ok && url) {
+          if (code) setReferralCode(code);
+          setInviteUrl(url);
+          return;
+        }
+      } catch {
+        // best-effort
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
+        const metaUsername =
+          typeof (user as any)?.user_metadata?.username === 'string' ? String((user as any).user_metadata.username).trim() : '';
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const unameRaw = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
+        const uname = unameRaw || metaUsername;
+        if (uname) {
+          setInviteUrl(`${origin}/invite/${encodeURIComponent(uname)}`);
+        }
+
         // Prefer DB-backed referral codes (stable + unique)
         const { data: referralData, error: referralErr } = await supabase.rpc('get_or_create_referral_code');
-        if (!referralErr && referralData?.code) {
-          setReferralCode(referralData.code);
-
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
-          if (uname) {
-            setInviteUrl(`https://mylivelinks.com/invite/${encodeURIComponent(uname)}`);
-          } else {
-            setInviteUrl(`https://mylivelinks.com/join?ref=${referralData.code}`);
+        const row = Array.isArray(referralData) ? referralData[0] : referralData;
+        const code = typeof (row as any)?.code === 'string' ? String((row as any).code).trim() : '';
+        if (!referralErr && code) {
+          setReferralCode(code);
+          if (!uname) {
+            setInviteUrl(`${origin}/join?ref=${encodeURIComponent(code)}`);
           }
           return;
         }
+
+        if (!uname) {
+          setInviteUrl(`${origin}/join`);
+          setReferralCode(null);
+        }
+        return;
       }
     } catch (error) {
       console.error('Failed to load referral code:', error);
       setReferralCode(null);
-      setInviteUrl('https://mylivelinks.com/join');
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mylivelinks.com';
+      setInviteUrl(`${origin}/join`);
     } finally {
       setLoading(false);
     }

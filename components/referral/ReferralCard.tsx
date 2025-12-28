@@ -24,34 +24,56 @@ export default function ReferralCard({ className = '' }: ReferralCardProps) {
       setLoading(true);
       try {
         const supabase = createClient();
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mylivelinks.com';
+
+        try {
+          const res = await fetch('/api/referrals/me/code', { cache: 'no-store' });
+          const json = await res.json().catch(() => null);
+          const url = typeof json?.url === 'string' ? String(json.url) : '';
+          if (res.ok && url) {
+            if (mounted) setInviteUrl(url);
+            return;
+          }
+        } catch {
+          // best-effort
+        }
+
+        const { data: userData } = await supabase.auth.getUser();
+        const metaUsername =
+          typeof (userData?.user as any)?.user_metadata?.username === 'string'
+            ? String((userData?.user as any).user_metadata.username).trim()
+            : '';
+        const userId = userData?.user?.id ?? null;
+
+        if (userId) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', userId)
+            .maybeSingle();
+
+          const unameRaw = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
+          const uname = unameRaw || metaUsername;
+          if (uname) {
+            if (mounted) setInviteUrl(`${origin}/invite/${encodeURIComponent(uname)}`);
+            return;
+          }
+        }
+
         const { data: referralData, error: referralErr } = await supabase.rpc('get_or_create_referral_code');
-        const code = (referralData as any)?.code as string | undefined;
+        const row = Array.isArray(referralData) ? referralData[0] : referralData;
+        const code = typeof (row as any)?.code === 'string' ? String((row as any).code).trim() : '';
 
         if (!referralErr && code) {
-          const { data: userData } = await supabase.auth.getUser();
-          const userId = userData?.user?.id ?? null;
-          if (userId) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('username')
-              .eq('id', userId)
-              .maybeSingle();
-
-            const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
-            if (uname) {
-              if (mounted) setInviteUrl(`https://mylivelinks.com/invite/${encodeURIComponent(uname)}`);
-              return;
-            }
-          }
-
-          if (mounted) setInviteUrl(`https://mylivelinks.com/join?ref=${code}`);
+          if (mounted) setInviteUrl(`${origin}/join?ref=${encodeURIComponent(code)}`);
           return;
         }
 
-        if (mounted) setInviteUrl('https://mylivelinks.com/join');
+        if (mounted) setInviteUrl(`${origin}/join`);
       } catch (err) {
         console.warn('[referrals] get_or_create_referral_code failed (non-blocking):', err);
-        if (mounted) setInviteUrl('https://mylivelinks.com/join');
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://mylivelinks.com';
+        if (mounted) setInviteUrl(`${origin}/join`);
       } finally {
         if (mounted) setLoading(false);
       }

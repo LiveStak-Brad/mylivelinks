@@ -126,18 +126,24 @@ export default async function InviteUsernamePage({ params }: { params: { usernam
     const userAgent = h.get('user-agent') || null;
 
     if (code) {
+      let clickId: string | null = null;
       try {
-        await admin.from('referral_clicks').insert({
-          referral_code: normalizeReferralCode(code),
-          ip_hash: ipHash,
-          user_agent: userAgent,
-          landing_path: `/invite/${username}`,
-        });
+        const { data: clickRow } = await admin
+          .from('referral_clicks')
+          .insert({
+            referral_code: normalizeReferralCode(code),
+            ip_hash: ipHash,
+            user_agent: userAgent,
+            landing_path: `/invite/${username}`,
+          })
+          .select('id')
+          .single();
+        clickId = clickRow?.id ? String(clickRow.id) : null;
       } catch {
         // best-effort
       }
 
-      targetUrl = `/signup?ref=${encodeURIComponent(code)}`;
+      targetUrl = `/signup?ref=${encodeURIComponent(code)}${clickId ? `&click_id=${encodeURIComponent(clickId)}` : ''}`;
     }
   }
 

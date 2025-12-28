@@ -56,25 +56,34 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
+        if (uname) {
+          setInviteUrl(`https://mylivelinks.com/invite/${encodeURIComponent(uname)}`);
+        }
+
         // Prefer DB-backed referral codes (stable + unique)
         const { data: referralData, error: referralErr } = await supabase.rpc('get_or_create_referral_code');
-        if (!referralErr && (referralData as any)?.code) {
-          setReferralCode((referralData as any).code);
-
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
-          if (uname) {
-            setInviteUrl(`https://mylivelinks.com/invite/${encodeURIComponent(uname)}`);
-          } else {
-            setInviteUrl(`https://mylivelinks.com/join?ref=${(referralData as any).code}`);
+        const row = Array.isArray(referralData) ? referralData[0] : referralData;
+        const code = typeof (row as any)?.code === 'string' ? String((row as any).code).trim() : '';
+        if (!referralErr && code) {
+          setReferralCode(code);
+          if (!uname) {
+            setInviteUrl(`https://mylivelinks.com/join?ref=${encodeURIComponent(code)}`);
           }
           return;
         }
+
+        if (!uname) {
+          setReferralCode(null);
+          setInviteUrl('https://mylivelinks.com/join');
+        }
+        return;
       } else {
         setReferralCode(null);
         setInviteUrl('https://mylivelinks.com/join');

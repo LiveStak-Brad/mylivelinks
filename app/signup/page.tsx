@@ -20,6 +20,7 @@ function SignUpPageInner() {
   const supabase = createClient();
 
   const referralCode = (searchParams?.get('ref') || '').trim();
+  const referralClickId = (searchParams?.get('click_id') || '').trim();
 
   useEffect(() => {
     // Check if already logged in
@@ -114,7 +115,7 @@ function SignUpPageInner() {
           try {
             await supabase.rpc('claim_referral', {
               p_code: referralCode,
-              p_click_id: null,
+              p_click_id: referralClickId || null,
               p_device_id: null,
             });
           } catch (claimErr) {

@@ -20,6 +20,7 @@ function LoginPageInner() {
   const supabase = createClient();
 
   const referralCode = (searchParams?.get('ref') || '').trim();
+  const referralClickId = (searchParams?.get('click_id') || '').trim();
 
   const withTimeout = async <T = any,>(p: PromiseLike<T>, ms: number, label: string): Promise<T> => {
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
@@ -156,7 +157,7 @@ function LoginPageInner() {
             try {
               await supabase.rpc('claim_referral', {
                 p_code: referralCode,
-                p_click_id: null,
+                p_click_id: referralClickId || null,
                 p_device_id: null,
               });
             } catch (claimErr) {
@@ -218,7 +219,7 @@ function LoginPageInner() {
             try {
               await supabase.rpc('claim_referral', {
                 p_code: referralCode,
-                p_click_id: null,
+                p_click_id: referralClickId || null,
                 p_device_id: null,
               });
             } catch (claimErr) {
