@@ -190,7 +190,7 @@ export default function VlogReelsClient({
   if (!isOwner && !hasAny && !loading) {
     return (
       <div className={`${borderRadiusClass} overflow-hidden shadow-lg`} style={cardStyle}>
-        <div className="p-6 text-center text-gray-600 dark:text-gray-400">No {String(contentLabel || 'reels')} yet.</div>
+        <div className="p-6 text-center text-gray-600 dark:text-gray-400">No {String(contentLabel || 'vlog')} yet.</div>
       </div>
     );
   }
@@ -200,7 +200,7 @@ export default function VlogReelsClient({
       <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Clapperboard className="w-5 h-5 text-purple-500" />
-          <div className="font-extrabold text-gray-900 dark:text-white">{String(title || 'Reels')}</div>
+          <div className="font-extrabold text-gray-900 dark:text-white">{String(title || 'Vlog')}</div>
         </div>
         {canEdit && (
           <button
@@ -214,10 +214,10 @@ export default function VlogReelsClient({
       </div>
 
       {loading ? (
-        <div className="p-6 text-center text-gray-600 dark:text-gray-400">Loading {String(contentLabel || 'reels')}…</div>
+        <div className="p-6 text-center text-gray-600 dark:text-gray-400">Loading {String(contentLabel || 'vlog')}…</div>
       ) : rows.length === 0 ? (
         <div className="p-10 text-center">
-          <div className="text-gray-600 dark:text-gray-400">No {String(contentLabel || 'reels')} yet.</div>
+          <div className="text-gray-600 dark:text-gray-400">No {String(contentLabel || 'vlog')} yet.</div>
           {canEdit && (
             <button
               onClick={openUploader}

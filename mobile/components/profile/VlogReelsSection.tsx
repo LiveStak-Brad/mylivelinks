@@ -221,8 +221,8 @@ export function VlogReelsSection({
   const windowW = Dimensions.get('window').width;
   const windowH = Dimensions.get('window').height;
   const tileSize = (windowW - 16 * 2 - 2 * 2) / 3;
-  const label = String(contentLabel || 'reels');
-  const titleText = String(title || '🎞️ Reels');
+  const label = String(contentLabel || 'vlog');
+  const titleText = String(title || 'Vlog');
 
   return (
     <View style={styles.container}>

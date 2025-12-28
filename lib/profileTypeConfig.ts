@@ -99,7 +99,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
-      { id: 'reels', label: 'Reels', icon: 'Clapperboard', enabled: true },
+      { id: 'reels', label: 'Vlog', icon: 'Clapperboard', enabled: true },
       { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
       { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
     ],
@@ -215,7 +215,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
-      { id: 'reels', label: 'Reels', icon: 'Clapperboard', enabled: true },
+      { id: 'reels', label: 'Vlog', icon: 'Clapperboard', enabled: true },
       { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
       { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
     ],

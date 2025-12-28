@@ -329,7 +329,7 @@ export function ProfileScreen({
   const [comedySpecials, setComedySpecials] = useState<ComedySpecialItem[]>([]);
   const [comedySpecialsLoading, setComedySpecialsLoading] = useState(false);
 
-  // Creator/Streamer: VLOG / Reels (real data via profile type modules)
+  // Creator/Streamer: VLOG / Vlog (real data via profile type modules)
   const [vlogs, setVlogs] = useState<VlogItem[]>([]);
   const [vlogsLoading, setVlogsLoading] = useState(false);
 
@@ -2763,7 +2763,7 @@ export function ProfileScreen({
           </>
         )}
 
-        {/* REELS TAB (Creator/Streamer) - VLOG / Reels */}
+        {/* VLOG TAB (Creator/Streamer) - VLOG / Vlog */}
         {activeTab === 'reels' && (
           <>
             {vlogsLoading ? (
@@ -2780,8 +2780,8 @@ export function ProfileScreen({
                 onItemsChange={setVlogs}
                 cardOpacity={cardOpacity}
                 accentColor={accentColor}
-                title="🎞️ Reels"
-                contentLabel="reels"
+                title="Vlog"
+                contentLabel="vlog"
               />
             )}
           </>

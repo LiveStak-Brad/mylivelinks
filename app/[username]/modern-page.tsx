@@ -1386,11 +1386,12 @@ export default function ModernProfilePage() {
           />
         )}
 
-        {/* Reels Tab (Creator + Streamer: VLOG / Reels <= 60s) */}
+        {/* Vlog Tab (Creator + Streamer: VLOG / Vlog <= 60s) */}
         {activeTab === 'reels' && (
           <VlogReelsClient
             profileId={profile.id}
             isOwner={isOwnProfile}
+            title="Vlog"
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
