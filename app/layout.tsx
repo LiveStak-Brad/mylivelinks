@@ -47,7 +47,6 @@ export default function RootLayout({
         <meta name="twitter:description" content="Share your links, make posts, go live, and get paid! Join the MyLiveLinks community." />
         <meta name="twitter:image" content="/mylivelinksmeta.png" />
         
-        <link rel="icon" href="/branding/favicon/favicon.ico" />
         <link rel="icon" type="image/png" sizes="32x32" href="/branding/favicon/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/branding/favicon/favicon-16x16.png" />
         <link rel="apple-touch-icon" href="/branding/favicon/apple-touch-icon.png" />

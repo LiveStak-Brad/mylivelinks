@@ -9,7 +9,9 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 
-const SOURCE_IMAGE = path.join(__dirname, '../public/branding/mylivelinkstransparent.png');
+// Use the dedicated icon artwork (square) as the source so small sizes (16/32) stay bold in tabs.
+// This should be a simple mark with minimal padding.
+const SOURCE_IMAGE = path.join(__dirname, '../icon512.png');
 const OUTPUT_DIR = path.join(__dirname, '../public/branding/favicon');
 
 // Icon sizes needed for PWA and favicon
@@ -42,10 +44,13 @@ async function generateIcons() {
     const outputPath = path.join(OUTPUT_DIR, name);
     
     try {
+      // Trim transparent/near-transparent edges then fill the canvas (no extra padding).
       await sharp(SOURCE_IMAGE)
+        .trim({ threshold: 8 })
         .resize(size, size, {
-          fit: 'contain',
-          background: { r: 0, g: 0, b: 0, alpha: 0 }
+          fit: 'cover',
+          position: 'centre',
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
         })
         .png()
         .toFile(outputPath);
