@@ -495,7 +495,7 @@ export default function ProfileSettingsPage() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">Username</label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={username}
@@ -505,7 +505,7 @@ export default function ProfileSettingsPage() {
                 />
                 <Link
                   href="/settings/username"
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition whitespace-nowrap"
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition whitespace-nowrap text-center"
                 >
                   Change Username
                 </Link>
