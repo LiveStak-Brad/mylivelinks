@@ -87,7 +87,6 @@ interface StripeEvent {
 }
 
 export default function AnalyticsPage() {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [dateRange, setDateRange] = useState<DateRange>(getDateRangeFromPreset('30d'));
   const [loading, setLoading] = useState(true);
