@@ -53,7 +53,6 @@ interface CoinPack {
   name: string;
   price_usd: number;
   coins: number;
-  coins_awarded: number;
   is_active: boolean;
   platform: 'web' | 'mobile';
 }

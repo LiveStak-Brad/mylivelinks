@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Settings as SettingsIcon,
   Globe,
@@ -37,8 +37,36 @@ interface Setting {
   disabled?: boolean;
 }
 
+type SettingsApiRow = {
+  key: string;
+  value: any;
+  updated_at: string;
+};
+
+function safeNumber(v: unknown) {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function coerceBool(v: unknown) {
+  if (v === true) return true;
+  if (v === false) return false;
+  const s = String(v ?? '').toLowerCase();
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  return false;
+}
+
+function deepCloneSections(sections: SettingSection[]): SettingSection[] {
+  return sections.map((sec) => ({
+    ...sec,
+    settings: sec.settings.map((s) => ({ ...s })),
+  }));
+}
+
 export default function SettingsPage() {
   const [hasChanges, setHasChanges] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // UI-only settings structure (wire-ready)
   const settingSections: SettingSection[] = [
@@ -204,6 +232,75 @@ export default function SettingsPage() {
     },
   ];
 
+  const [sections, setSections] = useState<SettingSection[]>(() => deepCloneSections(settingSections));
+
+  const loadSettings = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/settings', { method: 'GET', credentials: 'include', cache: 'no-store' });
+      if (!res.ok) throw new Error(`Failed to load settings (${res.status})`);
+      const json = (await res.json()) as { settings: SettingsApiRow[]; source: string };
+
+      const kv = new Map<string, any>();
+      for (const row of json.settings ?? []) {
+        if (row && typeof row.key === 'string') kv.set(row.key, row.value);
+      }
+
+      setSections((prev) => {
+        const next = deepCloneSections(prev);
+        for (const sec of next) {
+          for (const s of sec.settings) {
+            if (!kv.has(s.id)) continue;
+            const v = kv.get(s.id);
+            if (s.type === 'toggle') s.value = coerceBool(v);
+            else if (s.type === 'number') s.value = safeNumber(v);
+            else s.value = v;
+          }
+        }
+        return next;
+      });
+      setHasChanges(false);
+    } catch (e) {
+      console.error('[Owner Settings] load failed:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadSettings();
+  }, []);
+
+  const saveSettings = async () => {
+    setLoading(true);
+    try {
+      const updates: Array<{ key: string; value: any }> = [];
+      for (const sec of sections) {
+        for (const s of sec.settings) {
+          updates.push({ key: s.id, value: s.value });
+        }
+      }
+
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to save settings (${res.status})`);
+      }
+
+      setHasChanges(false);
+      await loadSettings();
+    } catch (e) {
+      console.error('[Owner Settings] save failed:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderSetting = (setting: Setting) => {
     switch (setting.type) {
       case 'toggle':
@@ -220,7 +317,18 @@ export default function SettingsPage() {
               type="checkbox"
               checked={setting.value}
               disabled={setting.disabled}
-              onChange={() => setHasChanges(true)}
+              onChange={(e) => {
+                const nextVal = e.target.checked;
+                setSections((prev) =>
+                  prev.map((sec) => ({
+                    ...sec,
+                    settings: sec.settings.map((s) =>
+                      s.id === setting.id ? { ...s, value: nextVal } : s
+                    ),
+                  }))
+                );
+                setHasChanges(true);
+              }}
               className="w-5 h-5 rounded border-border bg-background text-primary focus:ring-2 focus:ring-primary disabled:opacity-50"
             />
           </label>
@@ -237,7 +345,18 @@ export default function SettingsPage() {
               type="text"
               value={setting.value}
               disabled={setting.disabled}
-              onChange={() => setHasChanges(true)}
+              onChange={(e) => {
+                const nextVal = e.target.value;
+                setSections((prev) =>
+                  prev.map((sec) => ({
+                    ...sec,
+                    settings: sec.settings.map((s) =>
+                      s.id === setting.id ? { ...s, value: nextVal } : s
+                    ),
+                  }))
+                );
+                setHasChanges(true);
+              }}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
             />
           </div>
@@ -254,7 +373,18 @@ export default function SettingsPage() {
               type="number"
               value={setting.value}
               disabled={setting.disabled}
-              onChange={() => setHasChanges(true)}
+              onChange={(e) => {
+                const nextVal = Number(e.target.value);
+                setSections((prev) =>
+                  prev.map((sec) => ({
+                    ...sec,
+                    settings: sec.settings.map((s) =>
+                      s.id === setting.id ? { ...s, value: nextVal } : s
+                    ),
+                  }))
+                );
+                setHasChanges(true);
+              }}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
             />
           </div>
@@ -270,7 +400,18 @@ export default function SettingsPage() {
             <select
               value={setting.value}
               disabled={setting.disabled}
-              onChange={() => setHasChanges(true)}
+              onChange={(e) => {
+                const nextVal = e.target.value;
+                setSections((prev) =>
+                  prev.map((sec) => ({
+                    ...sec,
+                    settings: sec.settings.map((s) =>
+                      s.id === setting.id ? { ...s, value: nextVal } : s
+                    ),
+                  }))
+                );
+                setHasChanges(true);
+              }}
               className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
             >
               {setting.options?.map((option) => (
@@ -302,12 +443,18 @@ export default function SettingsPage() {
         </div>
         <div className="flex items-center gap-3">
           {hasChanges && (
-            <Button variant="outline" onClick={() => setHasChanges(false)} disabled>
+            <Button
+              variant="outline"
+              onClick={() => {
+                void loadSettings();
+              }}
+              disabled={loading}
+            >
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset
             </Button>
           )}
-          <Button variant="primary" disabled={!hasChanges}>
+          <Button variant="primary" disabled={!hasChanges || loading} onClick={() => void saveSettings()}>
             <Save className="w-4 h-4 mr-2" />
             Save Changes
           </Button>
@@ -315,7 +462,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Settings Sections */}
-      {settingSections.map((section) => {
+      {sections.map((section) => {
         const Icon = section.icon;
         
         return (

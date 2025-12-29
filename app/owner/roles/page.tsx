@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   UserCog,
   Shield,
@@ -41,6 +41,35 @@ interface Permission {
   category: string;
 }
 
+type RolesApiProfile = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+} | null;
+
+type RolesApiAssignment = {
+  profile_id: string;
+  role: string;
+  created_at: string;
+  created_by: string | null;
+  profile: RolesApiProfile;
+  created_by_profile: RolesApiProfile;
+};
+
+type RolesApiRoom = {
+  id: string;
+  name: string;
+  admins: RolesApiAssignment[];
+  moderators: RolesApiAssignment[];
+};
+
+type RolesApiResponse = {
+  owners?: RolesApiAssignment[];
+  app_admins?: RolesApiAssignment[];
+  rooms?: RolesApiRoom[];
+};
+
 const PERMISSION_CATEGORIES = [
   { id: 'users', name: 'User Management' },
   { id: 'content', name: 'Content Moderation' },
@@ -64,13 +93,80 @@ const ALL_PERMISSIONS: Permission[] = [
 ];
 
 export default function RolesPage() {
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
-  // UI-only placeholders - ready for wiring
-  const totalRoles = 0;
-  const totalUsers = 0;
-  const roles: Role[] = [];
+  const [apiData, setApiData] = useState<RolesApiResponse | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/admin/roles', { method: 'GET', credentials: 'include', cache: 'no-store' });
+        if (!res.ok) throw new Error(`Failed to load roles (${res.status})`);
+        const json = (await res.json()) as RolesApiResponse;
+        setApiData(json);
+      } catch (e) {
+        console.error('[Owner Roles] load failed:', e);
+        setApiData(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const roles: Role[] = useMemo(() => {
+    const owners = apiData?.owners ?? [];
+    const appAdmins = apiData?.app_admins ?? [];
+    const rooms = apiData?.rooms ?? [];
+
+    const roomAdminsCount = rooms.reduce((sum, r) => sum + (r.admins?.length ?? 0), 0);
+    const roomModsCount = rooms.reduce((sum, r) => sum + (r.moderators?.length ?? 0), 0);
+
+    const now = new Date().toISOString();
+
+    return [
+      {
+        id: 'owner',
+        name: 'Owner',
+        description: 'Full platform access (singleton)',
+        userCount: owners.length,
+        permissions: ALL_PERMISSIONS.map((p) => p.id),
+        isSystem: true,
+        createdAt: now,
+      },
+      {
+        id: 'app_admin',
+        name: 'App Admin',
+        description: 'Platform-wide admin access',
+        userCount: appAdmins.length,
+        permissions: ALL_PERMISSIONS.map((p) => p.id),
+        isSystem: true,
+        createdAt: now,
+      },
+      {
+        id: 'room_admin',
+        name: 'Room Admin',
+        description: 'Manage a specific room',
+        userCount: roomAdminsCount,
+        permissions: ['live.view', 'live.moderate', 'content.view', 'content.moderate'],
+        isSystem: true,
+        createdAt: now,
+      },
+      {
+        id: 'room_moderator',
+        name: 'Room Moderator',
+        description: 'Moderate a specific room',
+        userCount: roomModsCount,
+        permissions: ['live.view', 'live.moderate', 'content.view', 'content.moderate'],
+        isSystem: true,
+        createdAt: now,
+      },
+    ];
+  }, [apiData]);
+
+  const totalRoles = roles.length;
+  const totalUsers = roles.reduce((sum, r) => sum + r.userCount, 0);
 
   const columns = [
     { key: 'name', label: 'Role Name', width: 'flex-1' },

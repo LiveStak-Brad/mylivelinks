@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { 
   Users,
   Search,
@@ -47,18 +47,101 @@ interface User {
   followingCount: number;
 }
 
+type AdminUsersApi = {
+  users: any[];
+  limit: number;
+  offset: number;
+};
+
+function safeNumber(v: unknown) {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function isTruthy(v: unknown) {
+  return v === true || String(v).toLowerCase() === 'true';
+}
+
 export default function UsersPage() {
-  const [loading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'banned' | 'verified'>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  // UI-only placeholders - ready for wiring
-  const totalUsers = 0;
-  const activeUsers = 0;
-  const bannedUsers = 0;
-  const verifiedUsers = 0;
-  const users: User[] = [];
+  const [users, setUsers] = useState<User[]>([]);
+
+  const loadUsers = async (q: string) => {
+    setLoading(true);
+    try {
+      const qs = q.trim() ? `?q=${encodeURIComponent(q.trim())}&limit=100&offset=0` : `?limit=100&offset=0`;
+      const res = await fetch(`/api/admin/users${qs}`, { method: 'GET', credentials: 'include', cache: 'no-store' });
+      if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
+      const json = (await res.json()) as AdminUsersApi;
+
+      const mapped: User[] = (json.users ?? []).map((p: any) => {
+        const username = String(p?.username ?? 'unknown');
+
+        const coinBalance = safeNumber(p?.coin_balance ?? p?.coinBalance);
+        const earningsBalance = safeNumber(p?.earnings_balance ?? p?.earningsBalance);
+
+        const bannedUntil = p?.banned_until ?? p?.user_sanctions?.banned_until ?? null;
+        const isBanned = Boolean(bannedUntil);
+
+        const isVerified = isTruthy(p?.is_verified ?? p?.verified ?? p?.adult_verified ?? p?.is_adult_verified);
+
+        return {
+          id: String(p?.id ?? ''),
+          username,
+          displayName: p?.display_name ?? null,
+          email: String(p?.email ?? ''),
+          avatarUrl: p?.avatar_url ?? null,
+          isBanned,
+          isVerified,
+          coinBalance,
+          diamondBalance: earningsBalance,
+          createdAt: String(p?.created_at ?? new Date().toISOString()),
+          lastActiveAt: String(p?.last_seen_at ?? p?.updated_at ?? p?.created_at ?? new Date().toISOString()),
+          followerCount: safeNumber(p?.follower_count),
+          followingCount: safeNumber(p?.following_count),
+        };
+      });
+
+      setUsers(mapped);
+    } catch (e) {
+      console.error('[Owner Users] load failed:', e);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadUsers('');
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    return users
+      .filter((u) => {
+        if (filterStatus === 'banned') return u.isBanned;
+        if (filterStatus === 'verified') return u.isVerified;
+        if (filterStatus === 'active') return !u.isBanned;
+        return true;
+      })
+      .filter((u) => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+          u.username.toLowerCase().includes(q) ||
+          (u.displayName || '').toLowerCase().includes(q) ||
+          (u.email || '').toLowerCase().includes(q)
+        );
+      });
+  }, [users, filterStatus, searchQuery]);
+
+  const totalUsers = users.length;
+  const activeUsers = users.filter((u) => !u.isBanned).length;
+  const bannedUsers = users.filter((u) => u.isBanned).length;
+  const verifiedUsers = users.filter((u) => u.isVerified).length;
 
   const columns = [
     { key: 'user', label: 'User', width: 'flex-1' },
@@ -166,7 +249,7 @@ export default function UsersPage() {
       {/* Table */}
       <Table
         columns={columns}
-        data={users}
+        data={filteredUsers}
         renderRow={renderRow}
         loading={loading}
         emptyState={{
@@ -178,7 +261,10 @@ export default function UsersPage() {
           <TableToolbar
             searchPlaceholder="Search users by name, email, or username..."
             searchValue={searchQuery}
-            onSearchChange={setSearchQuery}
+            onSearchChange={(v) => {
+              setSearchQuery(v);
+              void loadUsers(v);
+            }}
             filters={[
               {
                 label: 'All Users',

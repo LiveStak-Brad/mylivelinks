@@ -81,9 +81,11 @@ export default function OwnerDashboard() {
   // SUCCESS STATE (Data loaded)
   // ============================================================================
 
-  // Calculate today's delta for users (mock for now)
-  const todayDelta = 12;
-  const todayDeltaPercent = 12.5;
+  // Real metrics from API
+  const usersNew24h = data.stats?.usersNew24h || 0;
+  const dailyActiveUsers = data.stats?.dailyActiveUsers || 0;
+  const revenueTodayUsdCents = data.stats?.revenueTodayUsdCents || 0;
+  const revenueTodayUsd = (revenueTodayUsdCents / 100).toFixed(2);
 
   // Mock gifts today count - UI-only, ready for wiring
   const giftsToday = 0;
@@ -125,22 +127,22 @@ export default function OwnerDashboard() {
 
       {/* Top KPI Row - 6 StatCards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-        {/* Total Users with today delta */}
+        {/* Total Users with new users today */}
         <StatCard
           title="Total Users"
           value={(data.stats?.totalUsers || 0).toLocaleString()}
           icon={Users}
           trend={{
-            value: todayDeltaPercent,
-            direction: todayDelta >= 0 ? 'up' : 'down',
-            label: `+${todayDelta} today`,
+            value: usersNew24h > 0 ? ((usersNew24h / (data.stats?.totalUsers || 1)) * 100) : 0,
+            direction: usersNew24h >= 0 ? 'up' : 'down',
+            label: `+${usersNew24h} today`,
           }}
         />
 
-        {/* DAU - wire-ready placeholder */}
+        {/* DAU - now wired */}
         <StatCard
           title="DAU"
-          value={0}
+          value={dailyActiveUsers.toLocaleString()}
           icon={Eye}
           subtitle="Daily active users"
         />
@@ -161,10 +163,10 @@ export default function OwnerDashboard() {
           subtitle={`${giftCoinsToday.toLocaleString()} coins`}
         />
 
-        {/* Revenue Today - wire-ready placeholder */}
+        {/* Revenue Today - now wired */}
         <StatCard
           title="Revenue Today"
-          value="$0"
+          value={`$${revenueTodayUsd}`}
           icon={DollarSign}
           subtitle="Gross coin sales"
         />

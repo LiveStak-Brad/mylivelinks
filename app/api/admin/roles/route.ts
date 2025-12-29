@@ -62,6 +62,17 @@ export async function GET(request: NextRequest) {
         created_by_profile: r.created_by ? creatorById.get(r.created_by) || null : null,
       }));
 
+    const owners = (appRoles || [])
+      .filter((r: any) => r.role === 'owner')
+      .map((r: any) => ({
+        profile_id: r.profile_id,
+        role: r.role,
+        created_at: r.created_at,
+        created_by: r.created_by,
+        profile: profileById.get(r.profile_id) || null,
+        created_by_profile: r.created_by ? creatorById.get(r.created_by) || null : null,
+      }));
+
     const roomsById = new Map<string, any>((rooms || []).map((r: any) => [r.id, { ...r, admins: [], moderators: [] }]));
 
     for (const rr of (roomRoles || []) as any[]) {
@@ -84,6 +95,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
+        owners,
         app_admins,
         rooms: Array.from(roomsById.values()),
       },

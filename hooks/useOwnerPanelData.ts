@@ -13,6 +13,10 @@ export interface DashboardStats {
   totalCreators: number;
   activeStreams: number;
   totalRevenue: number;
+  usersNew24h: number;
+  dailyActiveUsers: number;
+  revenueTodayUsdCents: number;
+  revenue30dUsdCents: number;
   trends: {
     users: { value: number; direction: 'up' | 'down' };
     creators: { value: number; direction: 'up' | 'down' };
@@ -368,6 +372,10 @@ function mapSummaryToOwnerPanelData(res: OwnerSummaryResponse): OwnerPanelData {
     totalCreators: Number(stats.profiles_total ?? 0),
     activeStreams: Number(stats.streams_live ?? 0),
     totalRevenue: Number(stats.revenue_30d_usd_cents ?? 0),
+    usersNew24h: Number(stats.users_new_24h ?? 0),
+    dailyActiveUsers: Number(stats.users_active_24h ?? 0),
+    revenueTodayUsdCents: Number(stats.revenue_today_usd_cents ?? 0),
+    revenue30dUsdCents: Number(stats.revenue_30d_usd_cents ?? 0),
     trends: {
       users: { value: 0, direction: 'up' },
       creators: { value: 0, direction: 'up' },
