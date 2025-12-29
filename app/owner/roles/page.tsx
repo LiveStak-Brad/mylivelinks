@@ -83,7 +83,7 @@ export default function RolesPage() {
 
   const renderRow = (role: Role) => (
     <>
-      <TableCell width="flex-1">
+      <TableCell className="flex-1">
         <div>
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground">{role.name}</span>
@@ -94,7 +94,7 @@ export default function RolesPage() {
           <span className="text-sm text-muted-foreground">{role.description}</span>
         </div>
       </TableCell>
-      <TableCell width="w-24">
+      <TableCell className="w-24">
         <span className="text-sm font-mono">{role.userCount}</span>
       </TableCell>
       <TableCell width="w-32">
