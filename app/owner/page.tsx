@@ -217,12 +217,7 @@ export default function OwnerDashboard() {
         {/* Top Creators Today */}
         <Card>
           <CardHeader
-            title={
-              <div className="flex items-center gap-2">
-                <Crown className="w-5 h-5 text-primary" />
-                <span>Top Creators Today</span>
-              </div>
-            }
+            title="Top Creators Today"
             subtitle="By gifts received"
           />
           <CardBody>
@@ -258,12 +253,7 @@ export default function OwnerDashboard() {
         {/* Referrals Snapshot */}
         <Card>
           <CardHeader
-            title={
-              <div className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-primary" />
-                <span>Referrals Today</span>
-              </div>
-            }
+            title="Referrals Today"
             subtitle="Growth from referrals"
           />
           <CardBody>
