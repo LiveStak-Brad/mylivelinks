@@ -111,13 +111,44 @@ interface RoomBannerProps {
 }
 ```
 
+**Design Requirements**:
+- **Height**: `py-1.5` (24px total) - MUST be compact
+- **Logo**: 20px × 20px max
+- **Font**: `text-xs` (12px)
+- **Layout**: Horizontal flex with space-between
+- **Responsive**: Hide "Presented by" on mobile (<640px)
+
+**Example Implementation**:
+```tsx
+<div className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white flex items-center justify-between py-1.5 px-4 text-xs z-50 flex-shrink-0">
+  {/* Left: Logo + Title */}
+  <div className="flex items-center gap-2">
+    {roomLogoUrl && (
+      <img 
+        src={roomLogoUrl} 
+        alt={`${roomName} logo`}
+        className="w-5 h-5 object-contain"
+      />
+    )}
+    <span className="font-semibold">{roomName || 'Live Central'}</span>
+  </div>
+  
+  {/* Right: Presented By (hidden on mobile) */}
+  {presentedBy && (
+    <span className="hidden sm:block opacity-90">
+      {presentedBy}
+    </span>
+  )}
+</div>
+```
+
 **Example Usage**:
 ```tsx
 <RoomBanner
   roomKey="live-central"
   roomName="Live Central"
   roomLogoUrl="https://.../room-logos/live-central-logo.png"
-  presentedBy="Presented by MyLiveLinks Official"
+  presentedBy="MyLiveLinks Official"
   bannerStyle="default"
 />
 ```
@@ -213,34 +244,63 @@ banner_style: string;
   roomLogoUrl={currentRoomLogoUrl}
   presentedBy={currentPresentedBy}
   bannerStyle={currentBannerStyle}
-  className="z-50 flex-shrink-0"
 />
 ```
+
+**Also Update Header** (line 2708):
+
+**From**:
+```tsx
+<header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-50 relative pb-2 lg:pb-8">
+```
+
+**To**:
+```tsx
+<header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-50 relative pb-1 lg:pb-4">
+```
+
+**Changes**:
+- Reduced `pb-2` → `pb-1` (saves 4px on mobile)
+- Reduced `lg:pb-8` → `lg:pb-4` (saves 16px on desktop)
+- This accommodates the new compact room banner
 
 ---
 
 ## Banner Styles
 
-### Default
-- Room logo on left
-- Room title in center
-- "Presented by..." on right
-- Gradient background
+**⚠️ IMPORTANT: All banner styles MUST remain compact to preserve screen space for the live grid.**
+
+### Default (Recommended)
+- **Height**: `py-1.5` (24px total)
+- **Layout**: Horizontal flex - Logo (left) | Room Title (center) | Presented By (right)
+- **Logo Size**: 20px × 20px
+- **Font**: text-xs (12px)
+- **Background**: Gradient or solid color
+- **Padding**: px-4
 
 ### Minimal
-- Room title + logo only
-- White/dark mode background
-- Compact height
+- **Height**: `py-1` (20px total)
+- **Layout**: Room title + small logo only
+- **Logo Size**: 16px × 16px
+- **Font**: text-xs (12px)
+- **Background**: White/dark mode background
+- **Use case**: Maximum screen space
 
 ### Card
-- Elevated card design
-- Shadow/border
-- More prominent logo
+- **Height**: `py-2` (32px total)
+- **Layout**: Slightly elevated with subtle shadow
+- **Logo Size**: 24px × 24px
+- **Font**: text-sm (14px)
+- **Background**: Card color with border
+- **Use case**: Branded rooms
 
 ### Gradient
-- Full-width gradient (customizable)
-- Logo + title overlay
-- Modern, eye-catching
+- **Height**: `py-2` (32px total)
+- **Layout**: Full-width gradient background
+- **Logo Size**: 20px × 20px
+- **Font**: text-xs (12px)
+- **Background**: Custom gradient
+- **Use case**: Eye-catching branding
 
 ---
 
@@ -324,20 +384,44 @@ If room data is not available:
 
 ### Room Logo Specs
 
-- **Format**: PNG with transparent background (preferred) or JPG
-- **Size**: 200x200px minimum, 500x500px recommended
-- **Aspect Ratio**: Square (1:1) preferred
-- **File Size**: Max 5MB
-- **Style**: Simple, recognizable at small sizes
+- **Format**: PNG with transparent background (preferred) or SVG
+- **Source Size**: 200x200px minimum, 500x500px recommended
+- **Display Size**: 16-24px (displayed very small in banner)
+- **Aspect Ratio**: Square (1:1) REQUIRED
+- **File Size**: Max 2MB (smaller is better)
+- **Style**: Simple, bold, high contrast - must be recognizable at 20px size
+- **Avoid**: Fine details, thin lines, complex text
+
+**Design Tips**:
+- Think "app icon" not "poster"
+- Test at 20px × 20px before uploading
+- Use solid colors or simple gradients
+- Avoid photographic images
 
 ### Presenter Text
 
-- **Format**: "Presented by [Name/Brand]"
+- **Format**: "Presented by [Name/Brand]" or "[Name/Brand]"
 - **Examples**:
   - "Presented by MyLiveLinks Official"
-  - "Presented by DJ Mixer"
-  - "Presented by Gaming Central Team"
-- **Max Length**: 50 characters
+  - "MyLiveLinks Official"
+  - "DJ Mixer"
+  - "Gaming Central"
+- **Max Length**: 40 characters (shorter is better)
+- **Display**: text-xs (12px), may be hidden on very small screens
+
+### Banner Height Specs
+
+**Current Layout**:
+- Testing Mode Banner (if shown): `py-2` (32px)
+- **Room Banner**: `py-1.5` to `py-2` (24-32px) ← **MUST STAY COMPACT**
+- Header: `min-h-[56px] md:min-h-[70px] lg:min-h-[100px] xl:min-h-[120px]`
+
+**Header Adjustment** (to accommodate banner):
+- Reduce header bottom padding from `pb-2 lg:pb-8` to `pb-1 lg:pb-4`
+- This saves 4-16px of vertical space
+- Logo/controls remain same size
+
+**Total Space Saved**: Approximately 8-20px depending on breakpoint
 
 ---
 
