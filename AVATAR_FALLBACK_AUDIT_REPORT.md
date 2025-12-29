@@ -278,3 +278,4 @@ export function getAvatarSource(avatarUrl: string | null | undefined) {
 
 **Result:** MyLiveLinks now displays the canonical "no-profile-pic.png" placeholder consistently across all web and mobile surfaces when users have no avatar or when image loading fails.
 
+

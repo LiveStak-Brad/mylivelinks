@@ -5,6 +5,10 @@ import type {
   DashboardStats,
   FeatureFlag,
   LiveStreamRow,
+  OwnerHealthResponse,
+  OwnerLiveResponse,
+  OwnerPanelDataSource,
+  OwnerReportsResponse,
   OwnerSummaryResponse,
   ReportRow,
   RevenueSummary,
@@ -167,8 +171,10 @@ const OwnerPanelErrorSchema = z.object({
   code: z.string().min(1),
   message: z.string().min(1),
   http_status: z.number().int().nonnegative().nullable(),
-  details: z.unknown().nullable(),
+  details: z.unknown().nullable().optional(),
 });
+
+const OwnerPanelDataSourceSchema = z.enum(["supabase", "empty_not_wired"]) satisfies z.ZodType<OwnerPanelDataSource>;
 
 const OwnerSummaryDataSchema = z.object({
   generated_at: DateTimeSchema,
@@ -182,6 +188,36 @@ const OwnerSummaryDataSchema = z.object({
 });
 
 export const OwnerSummaryResponseSchema = (z.union([
-  z.object({ ok: z.literal(true), data: OwnerSummaryDataSchema }),
+  z.object({ ok: z.literal(true), data: OwnerSummaryDataSchema, dataSource: OwnerPanelDataSourceSchema }),
   z.object({ ok: z.literal(false), error: OwnerPanelErrorSchema }),
 ]) as unknown) as z.ZodType<OwnerSummaryResponse>;
+
+const OwnerLiveDataSchema = z.object({
+  generated_at: DateTimeSchema,
+  live_streams: PaginatedListSchema(LiveStreamRowSchema),
+});
+
+export const OwnerLiveResponseSchema = (z.union([
+  z.object({ ok: z.literal(true), data: OwnerLiveDataSchema, dataSource: OwnerPanelDataSourceSchema }),
+  z.object({ ok: z.literal(false), error: OwnerPanelErrorSchema }),
+]) as unknown) as z.ZodType<OwnerLiveResponse>;
+
+const OwnerReportsDataSchema = z.object({
+  generated_at: DateTimeSchema,
+  reports: PaginatedListSchema(ReportRowSchema),
+});
+
+export const OwnerReportsResponseSchema = (z.union([
+  z.object({ ok: z.literal(true), data: OwnerReportsDataSchema, dataSource: OwnerPanelDataSourceSchema }),
+  z.object({ ok: z.literal(false), error: OwnerPanelErrorSchema }),
+]) as unknown) as z.ZodType<OwnerReportsResponse>;
+
+const OwnerHealthDataSchema = z.object({
+  generated_at: DateTimeSchema,
+  system_health: SystemHealthSchema,
+});
+
+export const OwnerHealthResponseSchema = (z.union([
+  z.object({ ok: z.literal(true), data: OwnerHealthDataSchema, dataSource: OwnerPanelDataSourceSchema }),
+  z.object({ ok: z.literal(false), error: OwnerPanelErrorSchema }),
+]) as unknown) as z.ZodType<OwnerHealthResponse>;

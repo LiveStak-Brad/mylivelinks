@@ -12,6 +12,8 @@ export type DashboardStats = {
   revenue_30d_usd_cents: number;
 };
 
+export type OwnerPanelDataSource = "supabase" | "empty_not_wired";
+
 export type LiveStreamRow = {
   stream_id: string;
   room_id: string;
@@ -70,7 +72,7 @@ export type FeatureFlag = {
   description: string | null;
   scope: "global" | "web" | "mobile" | "server";
   enabled: boolean;
-  value_json: unknown | null;
+  value_json?: unknown | null;
   updated_at: string;
 };
 
@@ -135,7 +137,7 @@ type OwnerPanelError = {
   code: string;
   message: string;
   http_status: number | null;
-  details: unknown | null;
+  details?: unknown | null;
 };
 
 type OwnerSummaryData = {
@@ -150,5 +152,32 @@ type OwnerSummaryData = {
 };
 
 export type OwnerSummaryResponse =
-  | { ok: true; data: OwnerSummaryData }
+  | { ok: true; data: OwnerSummaryData; dataSource: OwnerPanelDataSource }
+  | { ok: false; error: OwnerPanelError };
+
+type OwnerLiveData = {
+  generated_at: string;
+  live_streams: PaginatedList<LiveStreamRow>;
+};
+
+export type OwnerLiveResponse =
+  | { ok: true; data: OwnerLiveData; dataSource: OwnerPanelDataSource }
+  | { ok: false; error: OwnerPanelError };
+
+type OwnerReportsData = {
+  generated_at: string;
+  reports: PaginatedList<ReportRow>;
+};
+
+export type OwnerReportsResponse =
+  | { ok: true; data: OwnerReportsData; dataSource: OwnerPanelDataSource }
+  | { ok: false; error: OwnerPanelError };
+
+type OwnerHealthData = {
+  generated_at: string;
+  system_health: SystemHealth;
+};
+
+export type OwnerHealthResponse =
+  | { ok: true; data: OwnerHealthData; dataSource: OwnerPanelDataSource }
   | { ok: false; error: OwnerPanelError };

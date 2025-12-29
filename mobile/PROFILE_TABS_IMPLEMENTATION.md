@@ -380,3 +380,4 @@ style={activeTab === 'info' ? { borderColor: accentColor, color: accentColor } :
 
 
 
+

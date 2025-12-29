@@ -35,6 +35,8 @@ import SocialMediaBar from '@/components/profile/SocialMediaBar';
 import ProfileLivePlayer from '@/components/ProfileLivePlayer';
 import UserConnectionsList from '@/components/UserConnectionsList';
 import ProfileTypeBadge, { ProfileType } from '@/components/profile/ProfileTypeBadge';
+import TopFriendsDisplay from '@/components/profile/TopFriendsDisplay';
+import TopFriendsManager from '@/components/profile/TopFriendsManager';
 import {
   getEnabledTabs,
   isSectionEnabled,
@@ -181,6 +183,8 @@ export default function ModernProfilePage() {
   const [activeTab, setActiveTab] = useState<string>('info');
   const [activeConnectionsTab, setActiveConnectionsTab] = useState<'following' | 'followers' | 'friends'>('following');
   const [connectionsExpanded, setConnectionsExpanded] = useState(true);
+  const [topFriendsManagerOpen, setTopFriendsManagerOpen] = useState(false);
+  const [topFriendsReloadKey, setTopFriendsReloadKey] = useState(0);
 
   // Profile-type modules (real data; no mocks for visitors)
   const [musicTracks, setMusicTracks] = useState<MusicTrackRow[]>([]);
@@ -1107,6 +1111,17 @@ export default function ModernProfilePage() {
               </div>
             )}
 
+            {/* Top Friends Section - MySpace Style */}
+            <TopFriendsDisplay
+              key={topFriendsReloadKey}
+              profileId={profile.id}
+              isOwner={isOwnProfile}
+              onManage={() => setTopFriendsManagerOpen(true)}
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+              accentColor={accentColor}
+            />
+
             {/* Streamer schedule (real data, owner-only empty state) */}
             {profile.profile_type === 'streamer' && (
               <Schedule
@@ -1517,6 +1532,18 @@ export default function ModernProfilePage() {
       {/* Universal Edit Section Modals */}
       {isOwnProfile && (
         <>
+          {/* Top Friends Manager Modal */}
+          <TopFriendsManager
+            profileId={profile.id}
+            isOpen={topFriendsManagerOpen}
+            onClose={() => setTopFriendsManagerOpen(false)}
+            onSave={() => {
+              setTopFriendsReloadKey((k) => k + 1);
+              setTopFriendsManagerOpen(false);
+            }}
+            accentColor={accentColor}
+          />
+
           <SectionEditModal
             isOpen={trackModalOpen}
             onClose={() => {

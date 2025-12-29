@@ -50,3 +50,4 @@ INSERT INTO gift_types (name, emoji, coin_cost, tier, display_order, is_active) 
 
 
 
+

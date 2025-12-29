@@ -1,11 +1,40 @@
-import { NextRequest } from 'next/server';
+import { randomUUID } from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
 import type { User } from '@supabase/supabase-js';
 import { createRouteHandlerClient, createServerSupabaseClient } from '@/lib/supabase-server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+export function generateReqId() {
+  try {
+    return randomUUID();
+  } catch {
+    return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+export function adminJson(reqId: string, data: unknown, status = 200) {
+  return NextResponse.json({ ok: true, reqId, data }, { status });
+}
+
+export function adminError(reqId: string, message: string, status = 500, details?: unknown) {
+  return NextResponse.json(
+    {
+      ok: false,
+      reqId,
+      error: {
+        message,
+        status,
+        details: details ?? null,
+      },
+    },
+    { status }
+  );
+}
+
 export type AdminAuthResult = {
   user: User;
+  profileId: string;
 };
 
 export function createAuthedRouteHandlerClient(request: NextRequest) {
@@ -46,7 +75,7 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
   });
 
   if (!isAdminError && isAdmin) {
-    return { user };
+    return { user, profileId: user.id };
   }
 
   try {
@@ -59,7 +88,7 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
 
     const legacyAllowed = !!profile?.is_admin || !!profile?.is_owner;
     if (!legacyAllowed) throw new Error('FORBIDDEN');
-    return { user };
+    return { user, profileId: user.id };
   } catch {
     throw new Error('FORBIDDEN');
   }
