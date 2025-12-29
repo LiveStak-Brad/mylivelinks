@@ -1,0 +1,122 @@
+-- FIXED VERSION - Pass profile_id explicitly instead of relying on auth.uid()
+
+-- Add or update a top friend
+CREATE OR REPLACE FUNCTION upsert_top_friend(
+  p_profile_id UUID,
+  p_friend_id UUID,
+  p_position INTEGER
+)
+RETURNS JSON
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_existing_position INTEGER;
+BEGIN
+  IF p_profile_id IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Profile ID required');
+  END IF;
+  
+  IF p_position < 1 OR p_position > 8 THEN
+    RETURN json_build_object('success', false, 'error', 'Position must be between 1 and 8');
+  END IF;
+  
+  IF p_profile_id = p_friend_id THEN
+    RETURN json_build_object('success', false, 'error', 'Cannot add yourself');
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_friend_id) THEN
+    RETURN json_build_object('success', false, 'error', 'Friend not found');
+  END IF;
+  
+  SELECT friend_position INTO v_existing_position
+  FROM top_friends
+  WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
+  
+  IF v_existing_position IS NOT NULL AND v_existing_position != p_position THEN
+    DELETE FROM top_friends WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
+  END IF;
+  
+  DELETE FROM top_friends WHERE profile_id = p_profile_id AND friend_position = p_position AND friend_id != p_friend_id;
+  
+  INSERT INTO top_friends (profile_id, friend_id, friend_position)
+  VALUES (p_profile_id, p_friend_id, p_position)
+  ON CONFLICT (profile_id, friend_position) 
+  DO UPDATE SET friend_id = p_friend_id, updated_at = now();
+  
+  RETURN json_build_object('success', true);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Remove a top friend
+CREATE OR REPLACE FUNCTION remove_top_friend(
+  p_profile_id UUID,
+  p_friend_id UUID
+)
+RETURNS JSON
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_profile_id IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Profile ID required');
+  END IF;
+  
+  DELETE FROM top_friends
+  WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
+  
+  RETURN json_build_object('success', true);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Reorder top friends
+CREATE OR REPLACE FUNCTION reorder_top_friends(
+  p_profile_id UUID,
+  p_friend_id UUID,
+  p_new_position INTEGER
+)
+RETURNS JSON
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_old_position INTEGER;
+  v_friend_at_new_position UUID;
+BEGIN
+  IF p_profile_id IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Profile ID required');
+  END IF;
+  
+  IF p_new_position < 1 OR p_new_position > 8 THEN
+    RETURN json_build_object('success', false, 'error', 'Position must be between 1 and 8');
+  END IF;
+  
+  SELECT friend_position INTO v_old_position
+  FROM top_friends
+  WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
+  
+  IF v_old_position IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Friend not in list');
+  END IF;
+  
+  SELECT friend_id INTO v_friend_at_new_position
+  FROM top_friends
+  WHERE profile_id = p_profile_id AND friend_position = p_new_position;
+  
+  IF v_friend_at_new_position IS NOT NULL THEN
+    UPDATE top_friends SET friend_position = v_old_position
+    WHERE profile_id = p_profile_id AND friend_id = v_friend_at_new_position;
+  END IF;
+  
+  UPDATE top_friends SET friend_position = p_new_position
+  WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
+  
+  RETURN json_build_object('success', true);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Update grants
+GRANT EXECUTE ON FUNCTION upsert_top_friend(UUID, UUID, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION remove_top_friend(UUID, UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION reorder_top_friends(UUID, UUID, INTEGER) TO authenticated;
+

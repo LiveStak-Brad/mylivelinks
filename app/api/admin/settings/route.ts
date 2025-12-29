@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@/lib/supabase-server';
-import { requireAdmin } from '@/lib/admin';
+import { createAuthedRouteHandlerClient, requireAdmin } from '@/lib/admin';
 
 function authErrorToResponse(err: unknown) {
   const msg = err instanceof Error ? err.message : '';
@@ -13,7 +12,7 @@ export async function GET(request: NextRequest) {
   try {
     await requireAdmin(request);
 
-    const supabase = createRouteHandlerClient(request);
+    const supabase = createAuthedRouteHandlerClient(request);
 
     const { data, error } = await supabase
       .from('platform_settings_kv')

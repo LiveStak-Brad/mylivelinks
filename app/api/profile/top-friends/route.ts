@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
 
     // Call RPC function to upsert top friend
     const { data, error } = await supabase.rpc('upsert_top_friend', {
+      p_profile_id: user.id,
       p_friend_id: friendId,
       p_position: position,
     });
@@ -139,6 +140,7 @@ export async function DELETE(request: NextRequest) {
 
     // Call RPC function to remove top friend
     const { data, error } = await supabase.rpc('remove_top_friend', {
+      p_profile_id: user.id,
       p_friend_id: friendId,
     });
 
@@ -206,6 +208,7 @@ export async function PATCH(request: NextRequest) {
 
     // Call RPC function to reorder top friends
     const { data, error } = await supabase.rpc('reorder_top_friends', {
+      p_profile_id: user.id,
       p_friend_id: friendId,
       p_new_position: newPosition,
     });
