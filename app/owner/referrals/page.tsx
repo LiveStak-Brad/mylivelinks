@@ -159,12 +159,7 @@ export default function ReferralsPage() {
         {/* Leaderboard */}
         <Card>
           <CardHeader
-            title={
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                <span>Top Referrers</span>
-              </div>
-            }
+            title="Top Referrers"
             subtitle="Ranked by activations, then signups"
           />
           <CardBody>
@@ -258,12 +253,7 @@ export default function ReferralsPage() {
         {/* Recent Activity */}
         <Card>
           <CardHeader
-            title={
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" />
-                <span>Recent Activity</span>
-              </div>
-            }
+            title="Recent Activity"
             subtitle="Latest referral events"
           />
           <CardBody>
