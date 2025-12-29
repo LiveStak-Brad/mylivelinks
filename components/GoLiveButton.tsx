@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLiveKitPublisher } from '@/hooks/useLiveKitPublisher';
 import { createClient } from '@/lib/supabase';
 import { LocalVideoTrack, LocalAudioTrack, Room } from 'livekit-client';
+import { Video, VideoOff } from 'lucide-react';
 
 interface GoLiveButtonProps {
   sharedRoom?: Room | null; // Shared LiveKit room connection
@@ -807,27 +808,28 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       <button
         onClick={handleGoLive}
         disabled={loading}
-        className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-1.5 xl:px-4 xl:py-2 rounded md:rounded-md lg:rounded-lg transition font-semibold whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm shadow-sm md:shadow-md ${
+        className={`group relative p-2 md:p-2.5 lg:p-3 xl:p-3.5 rounded-lg transition-all duration-200 font-semibold shadow-md hover:shadow-lg ${
           isLive
             ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white hover:from-red-600 hover:to-pink-700'
             : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
         } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        title={loading ? 'Loading...' : isLive && (isPublishing || isPublishingState) && isScreenSharing ? 'Screen Live' : isLive && (isPublishing || isPublishingState) ? 'Live' : isLive ? 'Stop Live' : 'Go Live'}
       >
         {loading ? (
-          <><span className="hidden lg:inline">Loading...</span><span className="lg:hidden">⏳</span></>
-        ) : isLive && (isPublishing || isPublishingState) && isScreenSharing ? (
-          // Show screen share indicator when live with screen share
-          <><span className="hidden lg:inline">🖥️ SCREEN LIVE</span><span className="lg:hidden">🖥️</span></>
+          <div className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 animate-spin rounded-full border-2 border-white border-t-transparent" />
         ) : isLive && (isPublishing || isPublishingState) ? (
-          // Only show "LIVE" when both isLive AND isPublishing are true
-          <><span className="hidden lg:inline">🔴 LIVE</span><span className="lg:hidden">🔴</span></>
+          <Video className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-white" />
         ) : isLive ? (
-          // Show "Stop Live" when isLive is true but not publishing yet
-          <><span className="hidden lg:inline">⏸️ Stop Live</span><span className="lg:hidden">⏸️</span></>
+          <VideoOff className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-white" />
         ) : (
-          <><span className="hidden lg:inline">▶️ Go Live</span><span className="lg:hidden">▶️</span></>
+          <Video className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-white" />
         )}
-        {error && <span className="ml-1 lg:ml-2 text-[6px] lg:text-xs">⚠️</span>}
+        {error && <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span></span>}
+        
+        {/* Hover tooltip for desktop */}
+        <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+          {loading ? 'Loading...' : isLive && (isPublishing || isPublishingState) && isScreenSharing ? '🖥️ Screen Live' : isLive && (isPublishing || isPublishingState) ? '🔴 Live' : isLive ? '⏸️ Stop Live' : '▶️ Go Live'}
+        </span>
       </button>
 
       {/* Device Selection Modal */}

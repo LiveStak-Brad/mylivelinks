@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
+import { Volume2, Focus, Shuffle, Eye, Gift as GiftIcon, Sparkles } from 'lucide-react';
 import SmartBrandLogo from './SmartBrandLogo';
 import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT } from '@/lib/livekit-constants';
 import Tile from './Tile';
@@ -2718,53 +2719,65 @@ export default function LiveRoom() {
           </div>
 
           {/* Sort Buttons Group - Positioned halfway between Apply and Logo */}
-          <div className="flex items-center gap-0.5 md:gap-1 lg:gap-2 xl:gap-3 flex-shrink-0 z-10 absolute left-[22%] md:left-[25%] transform -translate-x-1/2">
+          <div className="flex items-center gap-1 md:gap-1.5 lg:gap-2 flex-shrink-0 z-10 absolute left-[22%] md:left-[25%] transform -translate-x-1/2">
             <button
               onClick={handleRandomize}
-              className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-3 lg:py-2 xl:px-5 xl:py-2.5 rounded md:rounded-md lg:rounded-lg transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0 ${
+              className={`group relative p-2 md:p-2.5 lg:p-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
                 sortMode === 'random'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 opacity-70 hover:opacity-100'
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white opacity-70 hover:opacity-100'
               }`}
+              title="Randomize"
             >
-              <span className="hidden xl:inline">Randomize</span>
-              <span className="xl:hidden">🎲</span>
+              <Shuffle className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                🎲 Randomize
+              </span>
             </button>
             
             <button
               onClick={() => handleSortModeChange('most_viewed')}
-              className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-2 xl:px-4 xl:py-2.5 rounded md:rounded-md lg:rounded-lg transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0 ${
+              className={`group relative p-2 md:p-2.5 lg:p-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
                 sortMode === 'most_viewed'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 opacity-70 hover:opacity-100'
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white opacity-70 hover:opacity-100'
               }`}
+              title="Most Viewed"
             >
-              <span className="hidden xl:inline">Most Viewed</span>
-              <span className="xl:hidden">👁️</span>
+              <Eye className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                👁️ Most Viewed
+              </span>
             </button>
             
             <button
               onClick={() => handleSortModeChange('most_gifted')}
-              className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-2 xl:px-4 xl:py-2.5 rounded md:rounded-md lg:rounded-lg transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0 ${
+              className={`group relative p-2 md:p-2.5 lg:p-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
                 sortMode === 'most_gifted'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 opacity-70 hover:opacity-100'
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white opacity-70 hover:opacity-100'
               }`}
+              title="Most Gifted"
             >
-              <span className="hidden xl:inline">Most Gifted</span>
-              <span className="xl:hidden">🎁</span>
+              <GiftIcon className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                🎁 Most Gifted
+              </span>
             </button>
             
             <button
               onClick={() => handleSortModeChange('newest')}
-              className={`px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-2 xl:px-4 xl:py-2.5 rounded md:rounded-md lg:rounded-lg transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0 ${
+              className={`group relative p-2 md:p-2.5 lg:p-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
                 sortMode === 'newest'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 opacity-70 hover:opacity-100'
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white opacity-70 hover:opacity-100'
               }`}
+              title="Newest"
             >
-              <span className="hidden xl:inline">Newest</span>
-              <span className="xl:hidden">🆕</span>
+              <Sparkles className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                🆕 Newest
+              </span>
             </button>
           </div>
 
@@ -2783,7 +2796,7 @@ export default function LiveRoom() {
           </div>
 
           {/* Right Section - Go Live, Unmute All, Focus Mode, Options and Login grouped together */}
-          <div className="flex items-center gap-0.5 md:gap-1 lg:gap-2 xl:gap-3 flex-shrink-0 z-10">
+          <div className="flex items-center gap-1 md:gap-1.5 lg:gap-2 flex-shrink-0 z-10">
             <GoLiveButton 
               sharedRoom={sharedRoom} 
               isRoomConnected={isRoomConnected} 
@@ -2793,18 +2806,23 @@ export default function LiveRoom() {
             />
             <button
               onClick={handleUnmuteAll}
-              className="px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-2 xl:px-4 xl:py-2.5 bg-green-500 text-white rounded md:rounded-md lg:rounded-lg hover:bg-green-600 transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-semibold shadow-sm md:shadow-md flex-shrink-0"
+              className="group relative p-2 md:p-2.5 lg:p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-200 shadow-md hover:shadow-lg"
               title="Unmute all tiles to enable sound"
             >
-              <span className="hidden lg:inline">🔊 Unmute All</span>
-              <span className="lg:hidden">🔊</span>
+              <Volume2 className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7" />
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                🔊 Unmute All
+              </span>
             </button>
             <button
               onClick={toggleFocusMode}
-              className="px-1 py-0.5 md:px-1.5 md:py-1 lg:px-2.5 lg:py-1.5 xl:px-4 xl:py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded md:rounded-md lg:rounded-lg hover:from-blue-600 hover:to-purple-700 transition whitespace-nowrap text-[7px] md:text-[9px] lg:text-xs xl:text-sm font-medium shadow-sm md:shadow-md"
+              className="group relative p-2 md:p-2.5 lg:p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
+              title={uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}
             >
-              <span className="hidden lg:inline">{uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}</span>
-              <span className="lg:hidden">{uiPanels.focusMode ? '📺' : '🎯'}</span>
+              <Focus className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7" />
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                {uiPanels.focusMode ? '📺 Show UI' : '🎯 Focus Mode'}
+              </span>
             </button>
             <OptionsMenu />
             <UserMenu />
