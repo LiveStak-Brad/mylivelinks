@@ -830,10 +830,17 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         </span>
       </button>
 
-      {/* Device Selection Modal */}
+      {/* Device Selection Modal - Portal to ensure it renders above everything */}
       {showDeviceModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 overflow-y-auto" onClick={() => setShowDeviceModal(false)}>
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-md p-6 my-auto" onClick={(e) => e.stopPropagation()}>
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          style={{ zIndex: 99999 }}
+          onClick={() => setShowDeviceModal(false)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-md p-6 my-auto max-h-[90vh] overflow-y-auto" 
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-xl font-semibold mb-4">Select Camera & Microphone</h2>
             
             {permissionError && (
