@@ -94,7 +94,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
   const [activeReplyTo, setActiveReplyTo] = useState<string | null>(null); // commentId being replied to
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [replySubmitting, setReplySubmitting] = useState<Record<string, boolean>>({});
-  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>>({}); // Show/hide replies
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({}); // Show/hide replies
 
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftTargetPost, setGiftTargetPost] = useState<FeedPost | null>(null);
