@@ -857,18 +857,19 @@ export default function ModernProfilePage() {
   
   // Custom colors with fallbacks
   const buttonColor = profile.button_color || profile.accent_color || '#3B82F6';
-  const contentTextColor = profile.content_text_color || null; // Allow null to use card default
-  const uiTextColor = profile.ui_text_color || null; // Allow null to use card default
+  const contentTextColor = profile.content_text_color || '#1F2937';
+  const uiTextColor = profile.ui_text_color || '#374151';
   const linkColor = profile.link_color || profile.accent_color || '#3B82F6';
   const accentColor = profile.accent_color || '#3B82F6';
   
-  // Debug: Log what we received
-  console.log('[PROFILE COLORS]', {
+  // Debug: Log what we received (including enabled_modules)
+  console.log('[PROFILE DATA]', {
+    username: profile.username,
+    profile_type: profile.profile_type,
+    enabled_modules: profile.enabled_modules,
+    enabled_modules_type: typeof profile.enabled_modules,
     button_color: profile.button_color,
     content_text_color: profile.content_text_color,
-    ui_text_color: profile.ui_text_color,
-    link_color: profile.link_color,
-    accent_color: profile.accent_color,
   });
   
   // Follow button config
@@ -1042,7 +1043,7 @@ export default function ModernProfilePage() {
                 {profile.bio && (
                   <p 
                     className="mb-4 max-w-2xl text-sm sm:text-base break-words"
-                    style={contentTextColor ? { color: contentTextColor } : {}}
+                    style={{ color: contentTextColor }}
                   >
                     {profile.bio}
                   </p>

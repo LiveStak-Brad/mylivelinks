@@ -353,23 +353,21 @@ export default function ProfileSettingsPage() {
           top_friends_title: topFriendsTitle,
           top_friends_avatar_style: topFriendsAvatarStyle,
           top_friends_max_count: topFriendsMaxCount,
-        // Customization fields
-        profile_bg_url: customization.profile_bg_url || null,
-        profile_bg_overlay: customization.profile_bg_overlay,
-        card_color: customization.card_color,
-        card_opacity: customization.card_opacity,
-        card_border_radius: customization.card_border_radius,
-        font_preset: customization.font_preset,
-        accent_color: customization.accent_color,
-        links_section_title: customization.links_section_title,
-        // Note: New color fields (button_color, etc.) commented out until migration is applied
-        // Uncomment after running: 20251229_add_granular_color_customization.sql
-        // button_color: customization.button_color || null,
-        // content_text_color: customization.content_text_color || null,
-        // ui_text_color: customization.ui_text_color || null,
-        // link_color: customization.link_color || null,
-        updated_at: new Date().toISOString(),
-      };
+          // Customization fields
+          profile_bg_url: customization.profile_bg_url || null,
+          profile_bg_overlay: customization.profile_bg_overlay,
+          card_color: customization.card_color,
+          card_opacity: customization.card_opacity,
+          card_border_radius: customization.card_border_radius,
+          font_preset: customization.font_preset,
+          accent_color: customization.accent_color,
+          button_color: customization.button_color || null,
+          content_text_color: customization.content_text_color || null,
+          ui_text_color: customization.ui_text_color || null,
+          link_color: customization.link_color || null,
+          links_section_title: customization.links_section_title,
+          updated_at: new Date().toISOString(),
+        };
 
         // Run async operations in parallel where possible
         const [avatarResult, profileTypeResult] = await Promise.allSettled([
