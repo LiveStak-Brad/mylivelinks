@@ -64,6 +64,10 @@ export default function ProfileSettingsPage() {
     card_border_radius: 'medium',
     font_preset: 'modern',
     accent_color: '#3B82F6',
+    button_color: '',
+    content_text_color: '',
+    ui_text_color: '',
+    link_color: '',
     links_section_title: 'My Links'
   });
   
