@@ -2,6 +2,7 @@
 // This is a placeholder hook that will be wired to backend by other agents
 
 import { useState, useEffect } from 'react';
+import type { OwnerLiveResponse } from '@/lib/ownerPanel';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -83,21 +84,45 @@ export function useOwnerLiveOpsData(): UseOwnerLiveOpsDataReturn {
     setError(null);
 
     try {
-      // TODO: Wire to backend data source
-      // This is a stub - backend integration agents will implement actual data fetching
-      
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch('/api/owner/live?limit=100&offset=0', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
 
-      // Return mock data in development only
+      if (!response.ok) {
+        throw new Error(`Failed to load live streams (${response.status})`);
+      }
+
+      const json = (await response.json()) as OwnerLiveResponse;
+      if (!json.ok) {
+        throw new Error(json.error?.message || 'Failed to load live streams');
+      }
+
+      const items = json.data.live_streams?.items ?? [];
+      const mapped: LiveOpsStreamData[] = items.map((s) => ({
+        id: String(s.stream_id ?? ''),
+        streamer: String(s.host_username ?? 'unknown'),
+        streamerId: String(s.host_profile_id ?? ''),
+        avatarUrl: s.host_avatar_url ?? null,
+        room: String(s.title ?? s.room_slug ?? 'Unknown room'),
+        roomId: String(s.room_id ?? ''),
+        region: 'all',
+        status: s.status === 'live' ? 'live' : s.status === 'starting' ? 'starting' : 'ending',
+        startedAt: s.started_at,
+        viewers: Number(s.viewer_count ?? 0),
+        giftsPerMin: 0,
+        chatPerMin: 0,
+      }));
+
+      setStreams(mapped);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch live operations data');
       if (IS_DEV) {
         setStreams(generateMockStreams());
       } else {
         setStreams([]);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch live operations data');
-      setStreams([]);
     } finally {
       setLoading(false);
     }

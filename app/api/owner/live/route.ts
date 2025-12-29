@@ -77,6 +77,48 @@ async function detectSupabaseWired(): Promise<OwnerPanelDataSource> {
   return 'supabase';
 }
 
+async function fetchLiveStreams(limit: number, offset: number): Promise<{ items: LiveStreamRow[]; dataSource: OwnerPanelDataSource }> {
+  const admin = getSupabaseAdmin();
+
+  const { data, error } = await admin
+    .from('live_streams')
+    .select(
+      'id, room_id, title, status, started_at, ended_at, viewer_count, peak_viewer_count, is_recording, host:profiles!live_streams_host_id_fkey(id, username, display_name, avatar_url), rooms!live_streams_room_id_fkey(slug)'
+    )
+    .eq('status', 'live')
+    .order('started_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (!error) {
+    const rows = Array.isArray(data) ? data : [];
+    return {
+      dataSource: 'supabase',
+      items: rows.map((r: any) => ({
+        stream_id: String(r?.id ?? ''),
+        room_id: String(r?.room_id ?? ''),
+        room_slug: r?.rooms?.slug ?? null,
+        title: r?.title ?? null,
+        status: (['live', 'ended', 'starting', 'scheduled'].includes(String(r?.status)) ? String(r.status) : 'live') as LiveStreamRow['status'],
+        started_at: r?.started_at ?? nowIso(),
+        ended_at: r?.ended_at ?? null,
+        host_profile_id: String(r?.host?.id ?? ''),
+        host_username: String(r?.host?.username ?? 'unknown'),
+        host_display_name: r?.host?.display_name ?? null,
+        host_avatar_url: r?.host?.avatar_url ?? null,
+        viewer_count: Number(r?.viewer_count ?? 0),
+        peak_viewer_count: r?.peak_viewer_count ?? null,
+        is_recording: r?.is_recording === true,
+      })),
+    };
+  }
+
+  if (isNotWiredError(error)) {
+    return { items: [], dataSource: 'empty_not_wired' };
+  }
+
+  throw error;
+}
+
 export async function GET(request: NextRequest) {
   const reqId = request.headers.get('x-request-id') || randomUUID();
   const startedAt = Date.now();
@@ -97,12 +139,18 @@ export async function GET(request: NextRequest) {
 
     const dataSource = await detectSupabaseWired().catch(() => 'empty_not_wired' as const);
 
+    const live = await fetchLiveStreams(limit, offset).catch((err) => {
+      if (isNotWiredError(err)) return { items: [] as LiveStreamRow[], dataSource: 'empty_not_wired' as const };
+      logJson('warn', { reqId, endpoint: ENDPOINT, event: 'fetch_failed', error: err instanceof Error ? err.message : String(err) });
+      return { items: [] as LiveStreamRow[], dataSource: 'empty_not_wired' as const };
+    });
+
     const payload: OwnerLiveResponse = {
       ok: true,
-      dataSource,
+      dataSource: live.dataSource === 'supabase' ? 'supabase' : dataSource,
       data: {
         generated_at: generatedAt,
-        live_streams: paginated([] as LiveStreamRow[], limit, offset),
+        live_streams: paginated(live.items, limit, offset),
       },
     };
 

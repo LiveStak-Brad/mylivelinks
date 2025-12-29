@@ -1,51 +1,8 @@
-BEGIN;
-
--- Ensure canonical profile_type enum + column (handle legacy varchar profile_type safely)
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'profile_type_enum'
-      AND n.nspname = 'public'
-  ) THEN
-    CREATE TYPE public.profile_type_enum AS ENUM (
-      'streamer',
-      'musician',
-      'comedian',
-      'business',
-      'creator'
-    );
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'profiles'
-      AND column_name = 'profile_type'
-      AND data_type IN ('character varying', 'text')
-  ) THEN
-    UPDATE public.profiles
-    SET profile_type = 'creator'
-    WHERE profile_type IS NULL
-       OR profile_type = 'default'
-       OR profile_type NOT IN ('streamer','musician','comedian','business','creator');
-
-    ALTER TABLE public.profiles
-      ALTER COLUMN profile_type TYPE public.profile_type_enum
-      USING profile_type::public.profile_type_enum;
-  ELSE
-    ALTER TABLE public.profiles
-      ADD COLUMN IF NOT EXISTS profile_type public.profile_type_enum;
-  END IF;
-
-  ALTER TABLE public.profiles
-    ALTER COLUMN profile_type SET DEFAULT 'creator',
-    ALTER COLUMN profile_type SET NOT NULL;
-END;
-$$;
+-- ============================================================================
+-- Update get_profile_bundle RPC to include Top Friends customization fields
+-- ============================================================================
+-- This migration updates the profile bundle RPC function to return the new
+-- Top Friends customization fields so they appear on user profiles
 
 DROP FUNCTION IF EXISTS public.get_profile_bundle(text, uuid, text);
 
@@ -90,10 +47,11 @@ BEGIN
 
     p.hide_streaming_stats,
 
-    p.show_top_friends,
-    p.top_friends_title,
-    p.top_friends_avatar_style,
-    p.top_friends_max_count,
+    -- Top Friends customization fields
+    COALESCE(p.show_top_friends, true) AS show_top_friends,
+    COALESCE(p.top_friends_title, 'Top Friends') AS top_friends_title,
+    COALESCE(p.top_friends_avatar_style, 'square') AS top_friends_avatar_style,
+    COALESCE(p.top_friends_max_count, 8) AS top_friends_max_count,
 
     p.social_instagram,
     p.social_twitter,
@@ -278,4 +236,9 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_profile_bundle(text, uuid, text) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_profile_bundle(text, uuid, text) TO authenticated;
 
-COMMIT;
+-- Migration complete
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Updated get_profile_bundle RPC to include Top Friends customization fields';
+END $$;
+

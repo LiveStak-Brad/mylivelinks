@@ -2,6 +2,7 @@
 // This is a placeholder hook that will be wired to Supabase by other agents
 
 import { useState, useEffect } from 'react';
+import type { OwnerSummaryResponse } from '@/lib/ownerPanel';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -259,7 +260,7 @@ export interface UseOwnerPanelDataReturn {
 // ============================================================================
 
 export interface LiveStreamInfo {
-  id: number;
+  id: string;
   streamer_username: string;
   streamer_avatar: string | null;
   viewer_count: number;
@@ -315,6 +316,75 @@ const MOCK_DATA: OwnerPanelData = {
   recentReports: [],
 };
 
+function coerceServiceStatus(v: unknown): 'ok' | 'degraded' | 'down' {
+  const s = String(v ?? '').toLowerCase();
+  if (s === 'ok') return 'ok';
+  if (s === 'down') return 'down';
+  return 'degraded';
+}
+
+function mapSummaryToOwnerPanelData(res: OwnerSummaryResponse): OwnerPanelData {
+  if (!res.ok) return MOCK_DATA;
+
+  const stats = res.data.stats;
+  const systemHealth = res.data.system_health;
+
+  const apiStatus: PlatformHealth['api'] = 'ok';
+  const supabaseStatus: PlatformHealth['supabase'] = coerceServiceStatus(systemHealth?.services?.database?.status);
+  const livekitStatus: PlatformHealth['livekit'] = coerceServiceStatus(systemHealth?.services?.livekit?.status);
+
+  const platformHealth: PlatformHealth = {
+    api: apiStatus,
+    supabase: supabaseStatus,
+    livekit: livekitStatus,
+    tokenSuccessRate: 0,
+    avgJoinTime: 0,
+  };
+
+  const liveStreamInfo: LiveStreamInfo[] = (res.data.live_streams?.items ?? []).map((s) => ({
+    id: String(s.stream_id ?? ''),
+    streamer_username: String(s.host_username ?? 'unknown'),
+    streamer_avatar: s.host_avatar_url ?? null,
+    viewer_count: Number(s.viewer_count ?? 0),
+    gifts_per_min: 0,
+    chat_per_min: 0,
+    region: 'all',
+    started_at: s.started_at,
+    room_name: String(s.title ?? s.room_slug ?? 'Unknown room'),
+  }));
+
+  const recentReports: ReportInfo[] = (res.data.reports?.items ?? []).map((r) => ({
+    id: String(r.id ?? ''),
+    reported_user_username: r.reported_user?.username ?? null,
+    reported_stream_id: null,
+    report_type: String(r.report_type ?? 'unknown'),
+    severity: 'medium',
+    created_at: r.created_at,
+    status: String(r.status ?? 'pending'),
+  }));
+
+  const mappedStats: DashboardStats = {
+    totalUsers: Number(stats.users_total ?? 0),
+    totalCreators: Number(stats.profiles_total ?? 0),
+    activeStreams: Number(stats.streams_live ?? 0),
+    totalRevenue: Number(stats.revenue_30d_usd_cents ?? 0),
+    trends: {
+      users: { value: 0, direction: 'up' },
+      creators: { value: 0, direction: 'up' },
+      streams: { value: 0, direction: 'up' },
+      revenue: { value: 0, direction: 'up' },
+    },
+  };
+
+  return {
+    ...MOCK_DATA,
+    stats: mappedStats,
+    platformHealth,
+    liveStreamInfo,
+    recentReports,
+  };
+}
+
 // ============================================================================
 // HOOK IMPLEMENTATION
 // ============================================================================
@@ -337,16 +407,26 @@ export function useOwnerPanelData(): UseOwnerPanelDataReturn {
     setError(null);
 
     try {
-      // TODO: Wire to Supabase
-      // This is a stub - other agents will implement actual data fetching
-      
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch('/api/owner/summary', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
 
-      // Return empty data structure
-      setData(MOCK_DATA);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch owner summary (${response.status})`);
+      }
+
+      const json = (await response.json()) as OwnerSummaryResponse;
+
+      if (!json.ok) {
+        throw new Error(json.error?.message || 'Failed to fetch owner summary');
+      }
+
+      setData(mapSummaryToOwnerPanelData(json));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      setData(MOCK_DATA);
     } finally {
       setLoading(false);
     }

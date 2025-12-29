@@ -11,9 +11,9 @@ import type { LiveStreamInfo } from '@/hooks';
 export interface LiveNowTableProps {
   streams: LiveStreamInfo[];
   loading?: boolean;
-  onJoinInvisibly?: (streamId: number) => void;
-  onEndStream?: (streamId: number) => void;
-  onShadowMute?: (streamId: number) => void;
+  onJoinInvisibly?: (streamId: string) => void;
+  onEndStream?: (streamId: string) => void;
+  onShadowMute?: (streamId: string) => void;
 }
 
 export function LiveNowTable({
