@@ -3256,10 +3256,7 @@ export default function LiveRoom() {
                 {/* Leaderboards - Left */}
                 {uiPanels.leaderboardsOpen && (
                   <div className="hidden lg:flex lg:w-80 xl:w-96 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
-                    <div className="p-4">
-                      <h3 className="text-lg font-semibold mb-3">Leaderboards</h3>
-                      <Leaderboard />
-                    </div>
+                    <Leaderboard />
                   </div>
                 )}
 
