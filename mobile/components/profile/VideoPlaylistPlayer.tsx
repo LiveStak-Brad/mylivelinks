@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ResizeMode, Video } from 'expo-av';
 
@@ -56,6 +56,72 @@ function youtubeEmbedUrl(youtubeId: string) {
   return `https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1&playsinline=1`;
 }
 
+function youtubePlayerHtml(youtubeId: string) {
+  const safeId = String(youtubeId || '').replace(/[^A-Za-z0-9_-]/g, '');
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <style>
+      html, body { margin: 0; padding: 0; background: #000; height: 100%; width: 100%; overflow: hidden; }
+      #player { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="player"></div>
+    <script>
+      (function() {
+        var tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        var player = null;
+        function post(msg) {
+          try {
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(String(msg));
+            }
+          } catch (e) {}
+        }
+
+        window.onYouTubeIframeAPIReady = function() {
+          try {
+            player = new YT.Player('player', {
+              videoId: '${safeId}',
+              playerVars: {
+                rel: 0,
+                modestbranding: 1,
+                playsinline: 1,
+                controls: 1
+              },
+              events: {
+                onReady: function() { post('ready'); },
+                onStateChange: function(evt) {
+                  if (!evt) return;
+                  if (evt.data === 0) post('ended');
+                  if (evt.data === 1) post('playing');
+                  if (evt.data === 2) post('paused');
+                }
+              }
+            });
+          } catch (e) {
+            post('error');
+          }
+        };
+
+        window.playVideo = function() {
+          try { player && player.playVideo && player.playVideo(); } catch (e) {}
+        };
+        window.pauseVideo = function() {
+          try { player && player.pauseVideo && player.pauseVideo(); } catch (e) {}
+        };
+      })();
+    </script>
+  </body>
+</html>`;
+}
+
 export function VideoPlaylistPlayer({
   title,
   items,
@@ -70,7 +136,11 @@ export function VideoPlaylistPlayer({
   emptyOwnerCTA,
 }: Props) {
   const { theme } = useThemeMode();
-  const styles = useMemo(() => createStyles(theme, accentColor, cardOpacity), [theme, accentColor, cardOpacity]);
+  const { width: windowWidth } = useWindowDimensions();
+  const styles = useMemo(
+    () => createStyles(theme, accentColor, cardOpacity, windowWidth),
+    [theme, accentColor, cardOpacity, windowWidth]
+  );
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -224,10 +294,11 @@ export function VideoPlaylistPlayer({
             canRenderYoutubeInline ? (
               <WebView
                 ref={ytRef}
-                source={{ uri: youtubeEmbedUrl(youtubeId as string) }}
+                source={{ html: youtubePlayerHtml(youtubeId as string), baseUrl: 'https://www.youtube.com' }}
                 style={styles.webview}
                 allowsInlineMediaPlayback
-                mediaPlaybackRequiresUserAction={!isPlaying}
+                mediaPlaybackRequiresUserAction={false}
+                allowsFullscreenVideo
                 onMessage={(evt: any) => {
                   const msg = String((evt as any)?.nativeEvent?.data || '').toLowerCase();
                   if (msg === 'ended') {
@@ -244,7 +315,7 @@ export function VideoPlaylistPlayer({
             ) : (
               <View style={styles.videoFallback}>
                 <Text style={styles.videoFallbackText}>
-                  {youtubeId ? 'YouTube playback needs react-native-webview' : 'Invalid YouTube URL'}
+                  {youtubeId ? 'YouTube playback needs react-native-webview installed' : 'Invalid YouTube URL'}
                 </Text>
                 {!!youtubeId && (
                   <Pressable style={styles.youtubeOpenButton} onPress={() => void openYoutubeExternal()}>
@@ -254,23 +325,32 @@ export function VideoPlaylistPlayer({
               </View>
             )
           ) : (
-            <Video
-              source={{ uri: current?.video_url || '' }}
-              style={styles.video}
-              useNativeControls={false}
-              resizeMode={ResizeMode.CONTAIN}
-              shouldPlay={isPlaying}
-              onPlaybackStatusUpdate={(st: any) => {
-                if (!st?.isLoaded) return;
-                if (st.didJustFinish) {
-                  if (items.length <= 1) {
-                    setIsPlaying(false);
-                    return;
+            current?.video_url ? (
+              <Video
+                source={{ uri: current.video_url }}
+                style={styles.video}
+                useNativeControls={false}
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay={isPlaying}
+                onError={() => {
+                  setIsPlaying(false);
+                }}
+                onPlaybackStatusUpdate={(st: any) => {
+                  if (!st?.isLoaded) return;
+                  if (st.didJustFinish) {
+                    if (items.length <= 1) {
+                      setIsPlaying(false);
+                      return;
+                    }
+                    goNext();
                   }
-                  goNext();
-                }
-              }}
-            />
+                }}
+              />
+            ) : (
+              <View style={styles.videoFallback}>
+                <Text style={styles.videoFallbackText}>Video URL missing</Text>
+              </View>
+            )
           )}
         </View>
 
@@ -364,12 +444,13 @@ export function VideoPlaylistPlayer({
   );
 }
 
-function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: number) {
+function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: number, windowWidth: number) {
   const cardShadow = theme.elevations.card;
+  const videoHeight = Math.max(220, Math.min(360, Math.round((Math.max(320, windowWidth) - 24) * (9 / 16))));
   return StyleSheet.create({
     container: {
-      paddingVertical: 20,
-      paddingHorizontal: 16,
+      paddingVertical: 16,
+      paddingHorizontal: 12,
     },
     sectionCard: {
       backgroundColor: theme.colors.surfaceCard,
@@ -461,7 +542,7 @@ function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: 
       backgroundColor: theme.mode === 'light' ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.06)',
       padding: 12,
       gap: 12,
-      marginHorizontal: 16,
+      marginHorizontal: 12,
       marginBottom: 16,
     },
     nowRow: {
@@ -505,7 +586,7 @@ function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: 
     },
     videoBox: {
       width: '100%',
-      aspectRatio: 16 / 9,
+      height: videoHeight,
       borderRadius: 14,
       overflow: 'hidden',
       backgroundColor: '#000',
