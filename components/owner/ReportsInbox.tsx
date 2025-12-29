@@ -160,7 +160,8 @@ export default function ReportsInbox({
       <Card>
         <CardContent className="p-6">
           <ErrorState
-            message={error}
+            title="Failed to load reports"
+            description={error}
             onRetry={() => window.location.reload()}
           />
         </CardContent>
@@ -278,7 +279,7 @@ export default function ReportsInbox({
         {!loading && reports.length === 0 && (
           <div className="p-12">
             <EmptyState
-              icon={AlertCircle}
+              icon={<AlertCircle className="w-12 h-12" />}
               title="No reports found"
               description="No reports match your current filters."
             />
