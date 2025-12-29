@@ -106,6 +106,9 @@ export default function TopFriendsManager({
   };
 
   const addFriend = async (user: UserProfile) => {
+    console.log('[TOP_FRIENDS_MANAGER] Current friends:', topFriends.length);
+    console.log('[TOP_FRIENDS_MANAGER] Positions:', topFriends.map(f => f.position));
+    
     if (topFriends.length >= 8) {
       alert('You can only have up to 8 top friends!');
       return;
@@ -118,6 +121,8 @@ export default function TopFriendsManager({
         ? Math.max(...topFriends.map(f => f.position))
         : 0;
       const nextPosition = maxPosition + 1;
+      
+      console.log('[TOP_FRIENDS_MANAGER] Adding friend to position:', nextPosition);
 
       const response = await fetch('/api/profile/top-friends', {
         method: 'POST',
@@ -129,6 +134,8 @@ export default function TopFriendsManager({
       });
 
       const data = await response.json();
+      
+      console.log('[TOP_FRIENDS_MANAGER] Add response:', response.status, data);
 
       if (response.ok && data.success) {
         // Reload top friends
