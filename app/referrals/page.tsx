@@ -194,7 +194,7 @@ export default function ReferralsPage() {
                   <div className="flex gap-2">
                     <Button
                       onClick={handleCopyLink}
-                      variant={copied ? 'success' : 'secondary'}
+                      variant={copied ? 'primary' : 'secondary'}
                       className="flex-1"
                       leftIcon={copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     >

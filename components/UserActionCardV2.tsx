@@ -14,7 +14,7 @@ import {
   User,
   UserPlus,
   UserCheck,
-  Grid3x3,
+  LayoutGrid,
   Volume2,
   UserX,
   Shield,
@@ -180,78 +180,161 @@ export default function UserActionCardV2({
   const isOwnProfile = currentUserId === profileId;
 
   // Role-based visibility helpers
-  const canModerate = currentUserRole === 'moderator' || currentUserRole === 'admin' || currentUserRole === 'owner';
-  const canPromote = currentUserRole === 'admin' || currentUserRole === 'owner';
+  const canModerate = detectedRole === 'moderator' || detectedRole === 'admin' || detectedRole === 'owner';
+  const canPromote = detectedRole === 'admin' || detectedRole === 'owner';
 
-  // ========== UI-ONLY PLACEHOLDER HANDLERS ==========
-  // These will be wired with real logic in Prompt 2
+  // ========== REAL ACTION HANDLERS ==========
 
-  const handleFollow = () => {
-    console.log('[UI STUB] Follow action triggered for:', username);
-    setIsFollowing(!isFollowing);
-    // TODO: Wire real follow/unfollow logic
+  const handleFollow = async () => {
+    if (!currentUserId || currentUserId === profileId) return;
+
+    setIsFollowLoading(true);
+    try {
+      if (isFollowing) {
+        // Unfollow
+        const { error } = await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', currentUserId)
+          .eq('followee_id', profileId);
+
+        if (error) throw error;
+        setIsFollowing(false);
+      } else {
+        // Follow
+        const { error } = await supabase
+          .from('follows')
+          .insert({
+            follower_id: currentUserId,
+            followee_id: profileId,
+          });
+
+        if (error) throw error;
+        setIsFollowing(true);
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      alert('Failed to update follow status');
+    } finally {
+      setIsFollowLoading(false);
+    }
   };
 
   const handleIM = () => {
-    console.log('[UI STUB] IM action triggered for:', username);
     openChat(profileId, username, avatarUrl || undefined);
     onClose();
   };
 
   const handleVisitProfile = () => {
-    console.log('[UI STUB] Visit Profile triggered for:', username);
     router.push(`/${username}`);
     onClose();
   };
 
-  const handleMoveToGrid = () => {
-    console.log('[UI STUB] Move to Grid triggered for:', username);
-    alert(`Move ${username} to Grid (TODO: implement)`);
-    // TODO: Wire grid management logic
-  };
+  const handleMoveToGrid = async () => {
+    if (!inLiveRoom || !liveStreamId) {
+      console.log('[TODO] Move to grid: No live stream context available');
+      alert('Move to Grid feature is not yet fully implemented');
+      return;
+    }
 
-  const handleMute = () => {
-    console.log('[UI STUB] Mute triggered for:', username);
-    alert(`Mute ${username} (TODO: implement)`);
-    // TODO: Wire mute logic
-  };
-
-  const handleRemove = () => {
-    console.log('[UI STUB] Remove from Stream triggered for:', username);
-    const confirmed = confirm(`Remove ${username} from stream?`);
-    if (confirmed) {
-      console.log('[UI STUB] User confirmed removal');
-      // TODO: Wire removal logic
+    try {
+      // TODO: Implement actual grid management API
+      console.log('[TODO] Move to grid:', { profileId, username, liveStreamId });
+      alert(`Move to Grid feature coming soon. Would move ${username} to grid.`);
+    } catch (error) {
+      console.error('Error moving to grid:', error);
+      alert('Failed to move user to grid');
     }
   };
 
-  const handlePromoteToMod = () => {
-    console.log('[UI STUB] Promote to Mod triggered for:', username);
+  const handleMute = async () => {
+    if (!inLiveRoom) {
+      console.log('[TODO] Mute: No live room context available');
+      return;
+    }
+
+    try {
+      // TODO: Implement actual mute API via LiveKit or room management
+      console.log('[TODO] Mute user:', { profileId, username });
+      alert(`Mute feature coming soon. Would mute ${username}'s audio.`);
+    } catch (error) {
+      console.error('Error muting user:', error);
+      alert('Failed to mute user');
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!inLiveRoom) {
+      console.log('[TODO] Remove: No live room context available');
+      return;
+    }
+
+    const confirmed = confirm(`Remove ${username} from the live room?`);
+    if (!confirmed) return;
+
+    try {
+      // TODO: Implement actual remove API
+      // This should disconnect the user from LiveKit room and clear their room presence
+      console.log('[TODO] Remove user:', { profileId, username });
+      alert(`Remove feature coming soon. Would remove ${username} from room.`);
+    } catch (error) {
+      console.error('Error removing user:', error);
+      alert('Failed to remove user');
+    }
+  };
+
+  const handlePromoteToMod = async () => {
+    if (!inLiveRoom || !roomId) {
+      console.log('[TODO] Promote to mod: No live room context available');
+      return;
+    }
+
     const confirmed = confirm(`Promote ${username} to moderator?`);
-    if (confirmed) {
-      console.log('[UI STUB] User confirmed promotion');
-      // TODO: Wire mod promotion logic
+    if (!confirmed) return;
+
+    try {
+      // TODO: Implement room_moderators table and API
+      // For now, this is a stub
+      console.log('[TODO] Promote to moderator:', { profileId, username, roomId });
+      alert(`Promote to Moderator feature coming soon. Would promote ${username}.`);
+    } catch (error) {
+      console.error('Error promoting to moderator:', error);
+      alert('Failed to promote user');
     }
   };
 
   const handleBattle = () => {
-    console.log('[UI STUB] Battle clicked (Coming Soon)');
-    // Intentionally does nothing - Coming Soon feature
+    // Battle feature is explicitly marked as coming soon - intentionally does nothing
+    console.log('[Battle] Coming Soon feature clicked');
   };
 
   const handleReport = () => {
-    console.log('[UI STUB] Report triggered for:', username);
-    alert(`Report ${username} (TODO: implement report flow)`);
-    // TODO: Wire report modal/flow
+    setShowReportModal(true);
   };
 
-  const handleBlock = () => {
-    console.log('[UI STUB] Block triggered for:', username);
+  const handleBlock = async () => {
+    if (!currentUserId || currentUserId === profileId) return;
+
     const confirmed = confirm(`Block ${username}? They won't be able to see your content.`);
-    if (confirmed) {
-      console.log('[UI STUB] User confirmed block');
+    if (!confirmed) return;
+
+    setIsBlocking(true);
+    try {
+      const { error } = await supabase.rpc('block_user', {
+        p_blocker_id: currentUserId,
+        p_blocked_id: profileId,
+      });
+
+      if (error) throw error;
+
       setIsBlocked(true);
-      // TODO: Wire real block logic
+      // Refresh the page to update filtered lists
+      window.location.reload();
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      alert('Failed to block user');
+    } finally {
+      setIsBlocking(false);
     }
   };
 
@@ -332,13 +415,16 @@ export default function UserActionCardV2({
               {/* Follow/Following */}
               <button
                 onClick={handleFollow}
-                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition ${
+                disabled={isFollowLoading}
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
                   isFollowing
                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                     : 'bg-blue-500 text-white hover:bg-blue-600'
                 }`}
               >
-                {isFollowing ? (
+                {isFollowLoading ? (
+                  'Loading...'
+                ) : isFollowing ? (
                   <>
                     <UserCheck className="w-4 h-4" />
                     Following
@@ -387,7 +473,7 @@ export default function UserActionCardV2({
                     onClick={handleMoveToGrid}
                     className="w-full flex items-center gap-3 px-4 py-3 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-900/30 transition font-medium text-sm"
                   >
-                    <Grid3x3 className="w-4 h-4" />
+                    <LayoutGrid className="w-4 h-4" />
                     Move into Grid
                   </button>
 
@@ -455,15 +541,28 @@ export default function UserActionCardV2({
 
               <button
                 onClick={handleBlock}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition font-semibold text-sm"
+                disabled={isBlocking}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Ban className="w-4 h-4" />
-                {isBlocked ? 'Blocked' : 'Block'}
+                {isBlocking ? 'Blocking...' : isBlocked ? 'Blocked' : 'Block'}
               </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          reportType="user"
+          reportedUserId={profileId}
+          reportedUsername={username}
+          contextDetails={inLiveRoom ? `live_room:${roomId}` : undefined}
+        />
+      )}
     </div>
   );
 }

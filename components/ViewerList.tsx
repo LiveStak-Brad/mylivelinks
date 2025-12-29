@@ -385,7 +385,8 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
           isLive={selectedProfile.isLive}
           onClose={() => setSelectedProfile(null)}
           inLiveRoom={true}
-          currentUserRole="viewer"
+          roomId="live_central"
+          liveStreamId={viewers.find(v => v.profile_id === selectedProfile.profileId)?.live_stream_id}
         />
       )}
     </div>
