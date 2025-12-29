@@ -135,7 +135,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
   } = useLiveRoomParticipants({ enabled });
   const { theme } = useThemeMode();
 
-  const error = connectionError || lastConnectError || lastTokenError?.message || null;
+  const liveError = connectionError || lastConnectError || lastTokenError?.message || null;
 
   const setRemoteAudioMuted = useCallback((muted: boolean, focusedIdentity?: string) => {
     if (!room) return;
@@ -508,11 +508,11 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
             </View>
           </GestureDetector>
 
-          {!isConnected && !!error && (
+          {!isConnected && !!liveError && (
             <View style={styles.connectionErrorBanner} pointerEvents="none">
               <Text style={styles.connectionErrorTitle}>Live connection failed</Text>
               <Text style={styles.connectionErrorText} numberOfLines={4}>
-                {String(error)}
+                {String(liveError)}
               </Text>
             </View>
           )}
