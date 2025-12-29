@@ -173,7 +173,15 @@ export async function POST(request: NextRequest) {
 
       try {
         const allowed = await runStage('can_access_live', 2_000, async () => {
-          return canAccessLive({ id: user.id, email: user.email });
+          const baseAllowed = canAccessLive({ id: user.id, email: user.email });
+          if (baseAllowed) return true;
+
+          try {
+            const { data } = await (auth.supabase as any).rpc('is_live_tester', { p_profile_id: user.id });
+            return data === true;
+          } catch {
+            return false;
+          }
         });
 
         if (!allowed) {

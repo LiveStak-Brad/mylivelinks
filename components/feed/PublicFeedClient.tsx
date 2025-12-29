@@ -342,13 +342,14 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
       if (created) {
         setCommentsByPost((prev) => {
           const existing = prev[postId] ?? [];
-          const next = [...existing, {
+          const newComment: FeedComment = {
             id: String(created.id),
             post_id: String(created.post_id),
             text_content: String(created.text_content ?? ''),
             created_at: String(created.created_at),
             author: { id: '', username: 'You', avatar_url: null },
-          }];
+          };
+          const next: FeedComment[] = [...existing, newComment];
           return { ...prev, [postId]: next };
         });
       }

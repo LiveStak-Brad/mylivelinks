@@ -28,6 +28,9 @@ export default function ProfileSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [referralId, setReferralId] = useState<string | null>(null);
+  const [invitedByUsername, setInvitedByUsername] = useState('');
+  const [claimingReferral, setClaimingReferral] = useState(false);
   
   // Profile fields
   const [avatarUrl, setAvatarUrl] = useState<string>('');
@@ -94,6 +97,73 @@ export default function ProfileSettingsPage() {
   useEffect(() => {
     checkAuth();
   }, []);
+
+  const loadReferralStatus = async (userId: string) => {
+    try {
+      const { data, error } = await (supabase.from('referrals') as any)
+        .select('id')
+        .eq('referred_profile_id', userId)
+        .maybeSingle();
+      if (error) return;
+      const id = typeof (data as any)?.id === 'string' ? (data as any).id : null;
+      setReferralId(id);
+    } catch {
+      // Ignore
+    }
+  };
+
+  const handleClaimReferralByUsername = async () => {
+    if (!currentUserId) {
+      alert('Error: No user ID. Please log in again.');
+      return;
+    }
+
+    if (referralId) {
+      alert('Referral already claimed.');
+      return;
+    }
+
+    const raw = invitedByUsername.trim();
+    const normalized = raw.replace(/^@/, '').trim();
+    if (!normalized) {
+      alert('Please enter the username of who invited you.');
+      return;
+    }
+
+    setClaimingReferral(true);
+    try {
+      const { data, error } = await (supabase as any).rpc('claim_referral_by_inviter_username', {
+        p_inviter_username: normalized,
+      });
+
+      if (error) {
+        const msg = String(error.message || '').toLowerCase();
+        if (msg.includes('inviter_not_found')) {
+          alert('That username was not found.');
+          return;
+        }
+        if (msg.includes('self_referral_not_allowed')) {
+          alert("You can't refer yourself.");
+          return;
+        }
+        if (msg.includes('invalid_username')) {
+          alert('Please enter a valid username.');
+          return;
+        }
+        alert(error.message || 'Failed to claim referral.');
+        return;
+      }
+
+      const id = typeof data === 'string' ? data : data ? String(data) : null;
+      setReferralId(id);
+      setInvitedByUsername('');
+      alert('Referral saved!');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to claim referral.');
+    } finally {
+      setClaimingReferral(false);
+    }
+  };
 
   const checkAuth = async () => {
     // Clear mock data
@@ -198,6 +268,8 @@ export default function ProfileSettingsPage() {
         setPinnedPostMediaPreview(post.media_url);
         setPinnedPostMediaType(post.media_type);
       }
+
+      await loadReferralStatus(userId);
     } catch (error) {
       console.error('Error loading profile:', error);
     } finally {
@@ -553,6 +625,38 @@ export default function ProfileSettingsPage() {
                 maxLength={500}
               />
               <p className="text-xs text-gray-500 mt-1">{bio.length}/500</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Referral */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Referral</h2>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-2">Who invited you? (username)</label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={invitedByUsername}
+                  onChange={(e) => setInvitedByUsername(e.target.value)}
+                  disabled={!!referralId || claimingReferral}
+                  className={`flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white ${
+                    referralId ? 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400' : ''
+                  }`}
+                  placeholder="username (no @)"
+                />
+                <button
+                  onClick={handleClaimReferralByUsername}
+                  disabled={!!referralId || claimingReferral}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {claimingReferral ? 'Saving...' : referralId ? 'Saved' : 'Save'}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                You can only set this once. If you already claimed a referral, this will be locked.
+              </p>
             </div>
           </div>
         </div>
