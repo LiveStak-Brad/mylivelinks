@@ -2703,7 +2703,7 @@ export default function LiveRoom() {
       {/* Room Banner */}
       <RoomBanner
         roomKey="live-central"
-        roomName="Live Central"
+        roomName="Live Central Room"
         roomLogoUrl="/livecentral.png"
         presentedBy="MyLiveLinks Official"
         bannerStyle="default"
