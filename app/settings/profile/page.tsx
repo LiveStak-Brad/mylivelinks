@@ -325,8 +325,8 @@ export default function ProfileSettingsPage() {
     // Set saving state immediately for instant UI feedback
     setSaving(true);
 
-    // Defer the actual save to next tick for instant button response
-    requestAnimationFrame(async () => {
+    // Use setTimeout instead of requestAnimationFrame for async work
+    setTimeout(async () => {
       try {
         // Prepare update payload first (synchronous work)
         const updatePayload: any = {
