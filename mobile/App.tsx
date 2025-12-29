@@ -14,6 +14,8 @@
  * with the same 5-tab layout, icons, labels, and routing behavior.
  */
 
+// Mobile Owner Panel Parity: Revenue + Feature Flags
+
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';

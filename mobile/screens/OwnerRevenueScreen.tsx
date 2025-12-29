@@ -1,3 +1,4 @@
+// Mobile Owner Panel Parity: Revenue + Feature Flags
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,7 +16,7 @@ import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'OwnerRevenue'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'OwnerRevenue' | 'OwnerCoinsRevenue'>;
 
 // ============================================================================
 // Types

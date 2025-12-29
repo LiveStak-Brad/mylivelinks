@@ -1,3 +1,4 @@
+// Mobile Owner Panel Parity: Revenue + Feature Flags
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,

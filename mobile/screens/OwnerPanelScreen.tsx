@@ -1,3 +1,4 @@
+// Mobile Owner Panel Parity: Revenue + Feature Flags
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';

@@ -20,6 +20,7 @@ export type RootStackParamList = {
   ReferralsLeaderboard: undefined;
   OwnerPanel: undefined;
   OwnerReferrals: undefined;
+  OwnerRevenue: undefined;
   OwnerCoinsRevenue: undefined;
   OwnerFeatureFlags: undefined;
   OwnerReports: undefined;
