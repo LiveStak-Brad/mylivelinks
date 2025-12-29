@@ -167,7 +167,7 @@ export function OptionsMenu({
         visible={showMenu}
         animationType="fade"
         transparent
-        supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
+        supportedOrientations={['portrait']}
         onRequestClose={closeMenu}
       >
         <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) }]}>
@@ -182,7 +182,7 @@ export function OptionsMenu({
                 onPress={closeMenu}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={28} color={textMuted} />
+                <Ionicons name="close" size={28} color={theme.colors.textMuted} />
               </Pressable>
             </View>
 
