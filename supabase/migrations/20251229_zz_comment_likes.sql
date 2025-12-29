@@ -29,8 +29,8 @@ $$;
 
 -- 2. Create comment_likes table
 CREATE TABLE IF NOT EXISTS public.comment_likes (
-  id bigserial PRIMARY KEY,
-  comment_id bigint NOT NULL REFERENCES public.post_comments(id) ON DELETE CASCADE,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  comment_id uuid NOT NULL REFERENCES public.post_comments(id) ON DELETE CASCADE,
   profile_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(comment_id, profile_id)
