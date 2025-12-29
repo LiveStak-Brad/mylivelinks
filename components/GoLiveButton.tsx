@@ -316,8 +316,27 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       }
 
       const constraints: MediaStreamConstraints = {
-        video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : true,
-        audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
+        video: videoDeviceId ? {
+          deviceId: { exact: videoDeviceId },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          frameRate: { ideal: 30 },
+        } : {
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          frameRate: { ideal: 30 },
+          facingMode: 'user',
+        },
+        audio: audioDeviceId ? {
+          deviceId: { exact: audioDeviceId },
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } : {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       };
 
       const stream = existingStream || await navigator.mediaDevices.getUserMedia(constraints);
