@@ -53,6 +53,7 @@ interface CoinPack {
   name: string;
   price_usd: number;
   coins: number;
+  coins_awarded: number;
   is_active: boolean;
   platform: 'web' | 'mobile';
 }
@@ -637,15 +638,15 @@ export default function RevenueOwnerPage() {
                       <Coins className="w-5 h-5 text-primary" />
                       <div>
                         <p className="text-sm font-semibold text-foreground">
-                          {formatCurrency(pack.price_usd)} = {formatNumber(pack.coins_awarded)} coins
+                          {formatCurrency(pack.price_usd)} = {formatNumber(pack.coins)} coins
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {(pack.coins_awarded / pack.price_usd).toFixed(0)} coins per dollar
+                          {(pack.coins / pack.price_usd).toFixed(0)} coins per dollar
                         </p>
                       </div>
                     </div>
                     <button
-                      onClick={() => handleCoinPackToggle(pack.id)}
+                      onClick={() => handleCoinPackToggle(String(pack.id))}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         pack.is_active ? 'bg-success' : 'bg-muted'
                       }`}
