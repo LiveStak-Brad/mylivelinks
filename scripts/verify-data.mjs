@@ -61,24 +61,27 @@ async function main() {
   }
   console.log('\n' + '=' .repeat(80) + '\n');
   
-  // 2. CHECK REFERRAL CONVERSIONS
-  console.log('📊 QUERY 2: Referral Conversions (attributed to Brad)\n');
+  // 2. CHECK REFERRALS (new schema)
+  console.log('📊 QUERY 2: Referrals (attributed to Brad)\n');
   const { data: referrals, error: referralsError, count: referralCount } = await supabase
-    .from('referral_conversions')
-    .select('*, profiles!referee_id(username, email)', { count: 'exact' })
-    .eq('referrer_id', BRAD_USER_ID)
-    .order('created_at', { ascending: false });
+    .from('referrals')
+    .select('*, profiles!referred_profile_id(username, email)', { count: 'exact' })
+    .eq('referrer_profile_id', BRAD_USER_ID)
+    .order('claimed_at', { ascending: false });
   
   if (referralsError) {
     console.error('❌ Error fetching referrals:', referralsError);
-    console.log('Note: referral_conversions table may not exist yet');
   } else {
     console.log(`✅ Total Referrals: ${referralCount || 0}`);
+    const activatedCount = referrals?.filter(r => r.activated_at).length || 0;
+    console.log(`   Activated: ${activatedCount}`);
     if (referrals && referrals.length > 0) {
-      console.log('Referrals:');
-      console.log(JSON.stringify(referrals, null, 2));
+      console.log('Recent Referrals:');
+      referrals.slice(0, 5).forEach(r => {
+        console.log(`  - ${r.profiles?.username || 'unknown'} (${r.activated_at ? '✅ activated' : '⏳ pending'})`);
+      });
     } else {
-      console.log('⚠️  No referral conversions found');
+      console.log('⚠️  No referrals found');
     }
   }
   console.log('\n' + '=' .repeat(80) + '\n');
@@ -87,7 +90,7 @@ async function main() {
   console.log('📊 QUERY 3: Posts by Brad\n');
   const { data: posts, error: postsError, count: postCount } = await supabase
     .from('posts')
-    .select('id, caption, media_url, media_type, created_at, like_count, comment_count', { count: 'exact' })
+    .select('id, text_content, media_url, visibility, created_at', { count: 'exact' })
     .eq('author_id', BRAD_USER_ID)
     .order('created_at', { ascending: false })
     .limit(20);
@@ -99,7 +102,10 @@ async function main() {
     console.log(`✅ Total Posts: ${postCount || 0}`);
     if (posts && posts.length > 0) {
       console.log('Recent Posts:');
-      console.log(JSON.stringify(posts, null, 2));
+      posts.forEach(p => {
+        const preview = p.text_content?.substring(0, 50) || '[media only]';
+        console.log(`  - ${p.created_at}: ${preview}`);
+      });
     } else {
       console.log('⚠️  No posts found');
     }
@@ -154,8 +160,8 @@ async function main() {
   }
   console.log('\n' + '=' .repeat(80) + '\n');
   
-  // 6. CHECK FOLLOWERS
-  console.log('📊 QUERY 6: Followers\n');
+  // 6. CHECK FOLLOWERS (CRITICAL DATA-TRUTH CHECK)
+  console.log('📊 QUERY 6: Followers - Cache vs Actual\n');
   const { count: followerCount, error: followersError } = await supabase
     .from('follows')
     .select('*', { count: 'exact', head: true })
@@ -164,7 +170,15 @@ async function main() {
   if (followersError) {
     console.error('❌ Error counting followers:', followersError);
   } else {
-    console.log(`✅ Total Followers: ${followerCount || 0}`);
+    const cachedCount = profile?.follower_count || 0;
+    const actualCount = followerCount || 0;
+    console.log(`Cached (profiles.follower_count): ${cachedCount}`);
+    console.log(`Actual (COUNT from follows):       ${actualCount}`);
+    if (cachedCount === actualCount) {
+      console.log('✅ CACHE IN SYNC');
+    } else {
+      console.log(`❌ CACHE MISMATCH! Difference: ${actualCount - cachedCount}`);
+    }
   }
   console.log('\n' + '=' .repeat(80) + '\n');
   
