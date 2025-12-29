@@ -34,7 +34,7 @@ function NotificationBadge({ count }: { count: number }) {
   );
 }
 
-// Premium nav link component with consistent styling
+// Premium nav link component with consistent styling (vector icons only)
 function NavLink({ 
   item,
   isActive, 
@@ -46,29 +46,46 @@ function NavLink({
   disabled?: boolean;
   onClick?: () => void;
 }) {
+  const Icon = item.icon;
+  
   if (disabled) {
-    return (
-      <span
-        className="nav-link nav-link-disabled"
-        title="Coming soon"
-        aria-disabled="true"
-      >
-        {item.label}
-      </span>
-    );
+    return null; // Don't show disabled items (Live Streams when not owner)
   }
 
   return (
     <Link
       href={item.href}
       onClick={onClick}
-      className={`nav-link ${isActive ? 'nav-link-active' : 'nav-link-inactive'}`}
+      className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110 ${
+        isActive ? 'scale-110' : 'opacity-70 hover:opacity-100'
+      }`}
       aria-current={isActive ? 'page' : undefined}
+      title={item.label}
     >
-      {item.label}
-      {isActive && <span className="nav-link-indicator" />}
+      {Icon && <Icon className={`w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 ${getIconColor(item.label)}`} strokeWidth={2} />}
+      
+      {/* Hover tooltip for desktop */}
+      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+        {item.label}
+      </span>
     </Link>
   );
+}
+
+// Icon color helper
+function getIconColor(label: string) {
+  switch (label) {
+    case 'Home':
+      return 'text-blue-500 dark:text-blue-400';
+    case 'Feed':
+      return 'text-green-500 dark:text-green-400';
+    case 'Rooms':
+      return 'text-purple-500 dark:text-purple-400';
+    case 'Live Streams':
+      return 'text-red-500 dark:text-red-400';
+    default:
+      return 'text-gray-700 dark:text-white';
+  }
 }
 
 // Header icons component that uses the contexts
