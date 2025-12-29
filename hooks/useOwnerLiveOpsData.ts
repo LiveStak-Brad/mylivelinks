@@ -33,8 +33,10 @@ export interface UseOwnerLiveOpsDataReturn {
 // MOCK DATA (Only used in __DEV__, removed in production)
 // ============================================================================
 
+const IS_DEV = process.env.NODE_ENV !== 'production';
+
 function generateMockStreams(): LiveOpsStreamData[] {
-  if (typeof __DEV__ === 'undefined' || !__DEV__) {
+  if (!IS_DEV) {
     return [];
   }
 
@@ -88,7 +90,7 @@ export function useOwnerLiveOpsData(): UseOwnerLiveOpsDataReturn {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Return mock data in development only
-      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      if (IS_DEV) {
         setStreams(generateMockStreams());
       } else {
         setStreams([]);

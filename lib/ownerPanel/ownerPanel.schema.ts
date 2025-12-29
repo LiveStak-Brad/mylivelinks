@@ -103,15 +103,19 @@ export const RevenueSummarySchema = z
     diamond_conversions_count: z.number().int().nonnegative(),
   }) satisfies z.ZodType<RevenueSummary>;
 
-export const FeatureFlagSchema = z
+export const FeatureFlagSchema = (z
   .object({
     key: z.string().min(1),
     description: z.string().nullable(),
     scope: z.enum(["global", "web", "mobile", "server"]),
     enabled: z.boolean(),
-    value_json: z.unknown().nullable(),
+    value_json: z.unknown().nullable().optional(),
     updated_at: DateTimeSchema,
-  }) satisfies z.ZodType<FeatureFlag>;
+  })
+  .transform((v) => ({
+    ...v,
+    value_json: v.value_json ?? null,
+  })) as unknown) as z.ZodType<FeatureFlag>;
 
 export const SystemHealthSchema = z
   .object({
@@ -177,8 +181,7 @@ const OwnerSummaryDataSchema = z.object({
   audit_logs: PaginatedListSchema(AuditLogRowSchema),
 });
 
-export const OwnerSummaryResponseSchema = z
-  .union([
-    z.object({ ok: z.literal(true), data: OwnerSummaryDataSchema }),
-    z.object({ ok: z.literal(false), error: OwnerPanelErrorSchema }),
-  ]) satisfies z.ZodType<OwnerSummaryResponse>;
+export const OwnerSummaryResponseSchema = (z.union([
+  z.object({ ok: z.literal(true), data: OwnerSummaryDataSchema }),
+  z.object({ ok: z.literal(false), error: OwnerPanelErrorSchema }),
+]) as unknown) as z.ZodType<OwnerSummaryResponse>;
