@@ -47,6 +47,7 @@ import { OwnerPanelScreen } from './screens/OwnerPanelScreen';
 import { OwnerReferralsScreen } from './screens/OwnerReferralsScreen';
 import { OwnerRevenueScreen } from './screens/OwnerRevenueScreen';
 import { OwnerFeatureFlagsScreen } from './screens/OwnerFeatureFlagsScreen';
+import { OwnerReportsScreen } from './screens/OwnerReportsScreen';
 import { LiveOpsScreen } from './screens/LiveOpsScreen';
 import { ModerationPanelScreen } from './screens/ModerationPanelScreen';
 import { AdminApplicationsScreen } from './screens/AdminApplicationsScreen';
@@ -125,6 +126,7 @@ function AppNavigation() {
             <Stack.Screen name="OwnerRevenue" component={OwnerRevenueScreen} />
             <Stack.Screen name="OwnerCoinsRevenue" component={OwnerRevenueScreen} />
             <Stack.Screen name="OwnerFeatureFlags" component={OwnerFeatureFlagsScreen} />
+            <Stack.Screen name="OwnerReports" component={OwnerReportsScreen} />
             <Stack.Screen name="LiveOps" component={LiveOpsScreen} />
             <Stack.Screen name="ModerationPanel" component={ModerationPanelScreen} />
             <Stack.Screen name="AdminApplications" component={AdminApplicationsScreen} />

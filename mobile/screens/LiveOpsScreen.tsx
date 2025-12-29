@@ -3,42 +3,24 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, T
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 
-import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, PageShell, Modal } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import { StreamCard } from '../components/owner/StreamCard';
 import { StreamDetailSheet } from '../components/owner/StreamDetailSheet';
+import { useOwnerLiveOpsData, type LiveOpsStreamData } from '../hooks/useOwnerLiveOpsData';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveOps'>;
 
 type RegionFilter = 'all' | 'us-east' | 'us-west' | 'eu-west' | 'ap-south';
 type StatusFilter = 'all' | 'live' | 'starting' | 'ending';
 
-export interface LiveStreamData {
-  id: string;
-  streamer: string;
-  streamerId: string;
-  avatarUrl: string | null;
-  room: string;
-  roomId?: string;
-  region: RegionFilter;
-  status: 'live' | 'starting' | 'ending';
-  startedAt: string;
-  viewers: number;
-  giftsPerMin: number;
-  chatPerMin: number;
-}
-
 export function LiveOpsScreen({ navigation }: Props) {
-  const { fetchAuthed } = useFetchAuthed();
+  const { streams, loading, error, refetch } = useOwnerLiveOpsData();
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [streams, setStreams] = useState<LiveStreamData[]>([]);
-  const [filteredStreams, setFilteredStreams] = useState<LiveStreamData[]>([]);
+  const [filteredStreams, setFilteredStreams] = useState<LiveOpsStreamData[]>([]);
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');

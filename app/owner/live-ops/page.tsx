@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Radio, 
@@ -16,47 +16,24 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { SkeletonCard, EmptyState } from '@/components/ui';
 import { PageShell, PageHeader, PageSection } from '@/components/layout';
-import StreamRow, { LiveStreamData } from '@/components/owner/StreamRow';
+import StreamRow from '@/components/owner/StreamRow';
 import StreamDetailDrawer from '@/components/owner/StreamDetailDrawer';
+import { useOwnerLiveOpsData, type LiveOpsStreamData } from '@/hooks';
 
 type RegionFilter = 'all' | 'us-east' | 'us-west' | 'eu-west' | 'ap-south';
 type StatusFilter = 'all' | 'live' | 'starting' | 'ending';
 
 export default function LiveOpsPage() {
   const router = useRouter();
-  const [streams, setStreams] = useState<LiveStreamData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { streams, loading, error, refetch } = useOwnerLiveOpsData();
   const [searchQuery, setSearchQuery] = useState('');
   const [regionFilter, setRegionFilter] = useState<RegionFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedStream, setSelectedStream] = useState<LiveStreamData | null>(null);
+  const [selectedStream, setSelectedStream] = useState<LiveOpsStreamData | null>(null);
   const itemsPerPage = 10;
 
-  const fetchStreams = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // UI only - mock data for now
-      const res = await fetch('/api/admin/streams/live');
-      if (!res.ok) throw new Error('Failed to fetch streams');
-      const data = await res.json();
-      setStreams(data.streams || []);
-    } catch (err) {
-      console.error('Error fetching streams:', err);
-      // For now, use mock data
-      setStreams(generateMockStreams());
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchStreams();
-  }, [fetchStreams]);
-
-  const handleStreamClick = (stream: LiveStreamData) => {
+  const handleStreamClick = (stream: LiveOpsStreamData) => {
     setSelectedStream(stream);
   };
 
@@ -116,7 +93,7 @@ export default function LiveOpsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchStreams}
+              onClick={refetch}
               disabled={loading}
               className="gap-2"
             >
@@ -195,7 +172,7 @@ export default function LiveOpsPage() {
               <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
               <h3 className="text-lg font-semibold text-foreground mb-2">Error Loading Streams</h3>
               <p className="text-muted-foreground mb-6">{error}</p>
-              <Button onClick={fetchStreams} variant="outline">
+              <Button onClick={refetch} variant="outline">
                 Try Again
               </Button>
             </div>
@@ -264,28 +241,5 @@ export default function LiveOpsPage() {
       )}
     </>
   );
-}
-
-// Mock data generator for UI development
-function generateMockStreams(): LiveStreamData[] {
-  const streamers = ['DJ_Emma', 'GamerMike', 'ArtistSarah', 'ComedyJoe', 'MusicLive', 'FitnessQueen', 'TechTalk', 'ChefMaster'];
-  const rooms = ['Main Stage', 'Gaming Arena', 'Art Studio', 'Comedy Club', 'Music Hall', 'Fitness Zone', 'Tech Corner', 'Kitchen Live'];
-  const regions: RegionFilter[] = ['us-east', 'us-west', 'eu-west', 'ap-south'];
-  const statuses: Array<'live' | 'starting' | 'ending'> = ['live', 'starting', 'ending'];
-
-  return Array.from({ length: 25 }, (_, i) => ({
-    id: `stream-${i + 1}`,
-    streamer: streamers[i % streamers.length],
-    streamerId: `user-${i + 1}`,
-    avatarUrl: null,
-    room: rooms[i % rooms.length],
-    roomId: `room-${i + 1}`,
-    region: regions[i % regions.length],
-    status: i < 20 ? 'live' : statuses[i % statuses.length] as 'live' | 'starting' | 'ending',
-    startedAt: new Date(Date.now() - Math.random() * 7200000).toISOString(),
-    viewers: Math.floor(Math.random() * 500) + 10,
-    giftsPerMin: Math.floor(Math.random() * 50),
-    chatPerMin: Math.floor(Math.random() * 200) + 10,
-  }));
 }
 

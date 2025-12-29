@@ -18,10 +18,10 @@ import {
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { LiveStreamData } from './StreamRow';
+import type { LiveOpsStreamData } from '@/hooks';
 
 interface StreamDetailDrawerProps {
-  stream: LiveStreamData;
+  stream: LiveOpsStreamData;
   isOpen: boolean;
   onClose: () => void;
 }

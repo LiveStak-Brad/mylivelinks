@@ -17,7 +17,6 @@ export { default as ReportDetailPanel } from './ReportDetailPanel';
 export { OwnerPanelShell } from './OwnerPanelShell';
 export type { OwnerPanelShellProps } from './OwnerPanelShell';
 export { default as StreamRow } from './StreamRow';
-export type { LiveStreamData } from './StreamRow';
 export { default as StreamDetailDrawer } from './StreamDetailDrawer';
 
 // Owner Panel Dashboard Components

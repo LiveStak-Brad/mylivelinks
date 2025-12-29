@@ -439,6 +439,7 @@ $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='profiles') THEN
+    EXECUTE 'ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY';
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname='public' AND tablename='profiles' AND policyname='Admins can select all profiles'
@@ -455,6 +456,7 @@ BEGIN
   END IF;
 
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='room_applications') THEN
+    EXECUTE 'ALTER TABLE public.room_applications ENABLE ROW LEVEL SECURITY';
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname='public' AND tablename='room_applications' AND policyname='Admins can view all applications'
@@ -471,6 +473,7 @@ BEGIN
   END IF;
 
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='gift_types') THEN
+    EXECUTE 'ALTER TABLE public.gift_types ENABLE ROW LEVEL SECURITY';
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname='public' AND tablename='gift_types' AND policyname='Admins can manage gift types'
@@ -480,6 +483,7 @@ BEGIN
   END IF;
 
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='coin_packs') THEN
+    EXECUTE 'ALTER TABLE public.coin_packs ENABLE ROW LEVEL SECURITY';
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname='public' AND tablename='coin_packs' AND policyname='Admins can manage coin packs'
@@ -488,5 +492,186 @@ BEGIN
     END IF;
   END IF;
 END $$;
+
+-- admin_overview is used by /api/admin/overview (preferred path, with JS fallback)
+CREATE OR REPLACE FUNCTION public.admin_overview()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_users bigint;
+  v_live_streams_active bigint;
+  v_gifts_sent_24h bigint;
+  v_pending_reports bigint;
+  v_live_now jsonb;
+  v_recent_reports jsonb;
+  v_reports_table text;
+BEGIN
+  IF NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'forbidden';
+  END IF;
+
+  SELECT COUNT(*) INTO v_users FROM public.profiles;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'live_streams') THEN
+    EXECUTE 'SELECT COUNT(*) FROM public.live_streams WHERE live_available = true' INTO v_live_streams_active;
+  ELSE
+    v_live_streams_active := 0;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'gifts') THEN
+    EXECUTE 'SELECT COUNT(*) FROM public.gifts WHERE sent_at >= (now() - interval ''24 hours'')' INTO v_gifts_sent_24h;
+  ELSE
+    v_gifts_sent_24h := 0;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'content_reports') THEN
+    v_reports_table := 'content_reports';
+  ELSIF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'reports') THEN
+    v_reports_table := 'reports';
+  ELSE
+    v_reports_table := NULL;
+  END IF;
+
+  IF v_reports_table IS NULL THEN
+    v_pending_reports := 0;
+  ELSE
+    EXECUTE format('SELECT COUNT(*) FROM public.%I WHERE status = $1', v_reports_table)
+      INTO v_pending_reports
+      USING 'pending';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'live_streams')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='live_streams' AND column_name='live_available') THEN
+    v_live_now := (
+      SELECT COALESCE(jsonb_agg(row_to_json(t)::jsonb), '[]'::jsonb)
+      FROM (
+        SELECT
+          ls.id::text AS stream_id,
+          ls.profile_id::text AS host_user_id,
+          p.username AS host_name,
+          NULL::text AS title,
+          0::int AS viewer_count,
+          ls.started_at
+        FROM public.live_streams ls
+        LEFT JOIN public.profiles p ON p.id = ls.profile_id
+        WHERE ls.live_available = true
+        ORDER BY ls.started_at DESC NULLS LAST
+        LIMIT 20
+      ) t
+    );
+  ELSE
+    v_live_now := '[]'::jsonb;
+  END IF;
+
+  IF v_reports_table = 'content_reports' THEN
+    v_recent_reports := (
+      SELECT COALESCE(jsonb_agg(row_to_json(r)::jsonb), '[]'::jsonb)
+      FROM (
+        SELECT
+          cr.id::text AS report_id,
+          cr.created_at,
+          reporter.username AS reporter_name,
+          target.username AS target_name,
+          cr.report_reason AS reason,
+          cr.status
+        FROM public.content_reports cr
+        LEFT JOIN public.profiles reporter ON reporter.id = cr.reporter_id
+        LEFT JOIN public.profiles target ON target.id = cr.reported_user_id
+        ORDER BY cr.created_at DESC
+        LIMIT 20
+      ) r
+    );
+  ELSIF v_reports_table = 'reports' THEN
+    -- The repo has multiple historical report schemas. The canonical uuid-based public.reports
+    -- (20251228_reports_phase1) targets clips/posts (target_type/target_id), not users.
+    -- To avoid brittle joins, return an empty list here and let /api/admin/overview fall back
+    -- to its JS query path for the per-row usernames.
+    v_recent_reports := '[]'::jsonb;
+  ELSE
+    v_recent_reports := '[]'::jsonb;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'totals', jsonb_build_object(
+      'users', v_users,
+      'live_streams_active', v_live_streams_active,
+      'gifts_sent_24h', v_gifts_sent_24h,
+      'pending_reports', v_pending_reports
+    ),
+    'live_now', v_live_now,
+    'recent_reports', v_recent_reports
+  );
+END;
+$$;
+
+-- Stream admin actions are used by /api/admin/live-streams/end and end-all
+CREATE OR REPLACE FUNCTION public.admin_end_stream(p_stream_id bigint)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'forbidden';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='live_streams') THEN
+    RAISE EXCEPTION 'live_streams table not found';
+  END IF;
+
+  UPDATE public.live_streams
+  SET
+    live_available = false,
+    is_published = false,
+    ended_at = now(),
+    unpublished_at = now(),
+    updated_at = now()
+  WHERE id = p_stream_id;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='active_viewers') THEN
+    DELETE FROM public.active_viewers WHERE live_stream_id = p_stream_id;
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_end_all_streams()
+RETURNS int
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_ended int;
+BEGIN
+  IF NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'forbidden';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='live_streams') THEN
+    RETURN 0;
+  END IF;
+
+  UPDATE public.live_streams
+  SET
+    live_available = false,
+    is_published = false,
+    ended_at = now(),
+    unpublished_at = now(),
+    updated_at = now()
+  WHERE live_available = true;
+
+  GET DIAGNOSTICS v_ended = ROW_COUNT;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='active_viewers') THEN
+    DELETE FROM public.active_viewers;
+  END IF;
+
+  RETURN v_ended;
+END;
+$$;
 
 COMMIT;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { requireOwner } from '@/lib/rbac';
 
 // DELETE /api/admin/roles/app-admin/[adminId] - Remove an app admin
 export async function DELETE(
@@ -7,20 +8,20 @@ export async function DELETE(
   { params }: { params: { adminId: string } }
 ) {
   try {
+    await requireOwner(request);
     const supabase = createRouteHandlerClient(request);
-
-    // Check auth
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const { adminId } = params;
 
-    // TODO: Implement actual role removal in database
-    console.log(`[Roles] Removing app admin: ${adminId}`);
+    const { error } = await supabase.rpc('revoke_app_admin', {
+      p_target_profile_id: adminId,
+    });
 
-    return NextResponse.json({ success: true, message: 'App admin removed (stub)' });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (err) {
     console.error('[API /admin/roles/app-admin/[adminId]] Exception:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

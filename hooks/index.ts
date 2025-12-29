@@ -10,6 +10,7 @@ export { useViewerHeartbeat } from './useViewerHeartbeat';
 export { useIsMobileWeb } from './useIsMobileWeb';
 export { useOrientation } from './useOrientation';
 export { useOwnerPanelData } from './useOwnerPanelData';
+export { useOwnerLiveOpsData } from './useOwnerLiveOpsData';
 export type {
   OwnerPanelData,
   OwnerPanelStats,
@@ -17,4 +18,8 @@ export type {
   LiveStreamInfo,
   ReportInfo,
 } from './useOwnerPanelData';
+export type {
+  LiveOpsStreamData,
+  UseOwnerLiveOpsDataReturn,
+} from './useOwnerLiveOpsData';
 

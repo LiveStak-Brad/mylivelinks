@@ -74,6 +74,21 @@ export function OwnerPanelScreen({ navigation }: Props) {
           <StatCard theme={theme} label="Gifts Sent (24h)" value={Number(totals.gifts_sent_24h ?? 0)} iconName="gift" iconColor="#ec4899" />
           <StatCard theme={theme} label="Pending Reports" value={Number(totals.pending_reports ?? 0)} iconName="alert-circle" iconColor="#ef4444" />
           
+          {/* Reports Section */}
+          <View style={styles.actionCard}>
+            <Feather name="alert-triangle" size={24} color="#ef4444" />
+            <View style={styles.actionCardContent}>
+              <Text style={styles.actionCardTitle}>Reports & Moderation</Text>
+              <Text style={styles.actionCardText}>Review and manage user reports</Text>
+            </View>
+            <Button 
+              title="View" 
+              variant="primary" 
+              onPress={() => navigation.navigate('OwnerReports')} 
+              style={styles.actionButton}
+            />
+          </View>
+          
           {/* Live Ops Section */}
           <View style={styles.actionCard}>
             <Feather name="activity" size={24} color="#ef4444" />

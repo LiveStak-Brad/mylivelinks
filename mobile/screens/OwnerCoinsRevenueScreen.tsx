@@ -9,7 +9,6 @@ import {
   Switch,
   TextInput,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
@@ -52,6 +51,19 @@ type RevenueData = {
   }>;
 };
 
+// Dev-only mock data (null in production)
+const DEV_MOCK_REVENUE: RevenueData | null = __DEV__ ? {
+  grossRevenue: 12345,
+  netRevenue: 8641,
+  totalGiftsSent: 567,
+  activeCreators: 45,
+  topCreators: [
+    { username: 'creator1', avatar_url: null, revenue: 1200 },
+    { username: 'creator2', avatar_url: null, revenue: 950 },
+    { username: 'creator3', avatar_url: null, revenue: 780 },
+  ],
+} : null;
+
 export function OwnerCoinsRevenueScreen({ navigation }: Props) {
   const { fetchAuthed } = useFetchAuthed();
   const { theme } = useThemeMode();
@@ -89,18 +101,11 @@ export function OwnerCoinsRevenueScreen({ navigation }: Props) {
 
     try {
       // TODO: Replace with actual API call
-      // For now, mock data
-      setRevenueData({
-        grossRevenue: 12345,
-        netRevenue: 8641,
-        totalGiftsSent: 567,
-        activeCreators: 45,
-        topCreators: [
-          { username: 'creator1', avatar_url: null, revenue: 1200 },
-          { username: 'creator2', avatar_url: null, revenue: 950 },
-          { username: 'creator3', avatar_url: null, revenue: 780 },
-        ],
-      });
+      // const response = await fetchAuthed(`/api/admin/analytics?range=${dateRange}`);
+      // setRevenueData(response.data);
+      
+      // Use dev mock if available, otherwise null
+      setRevenueData(DEV_MOCK_REVENUE);
     } catch (e: any) {
       console.error('Failed to load coins & revenue data:', e);
     } finally {
@@ -119,11 +124,7 @@ export function OwnerCoinsRevenueScreen({ navigation }: Props) {
   }, [load]);
 
   const handleSaveEconomy = () => {
-    Alert.alert(
-      'Not Implemented',
-      'Economy control wiring coming soon. This is a UI-only placeholder for now.',
-      [{ text: 'OK' }]
-    );
+    // No-op: Button is disabled, helper text explains why
   };
 
   const toggleCoinPack = (id: string) => {
@@ -204,22 +205,30 @@ export function OwnerCoinsRevenueScreen({ navigation }: Props) {
           <View style={styles.kpiCard}>
             <Feather name="dollar-sign" size={20} color="#10b981" />
             <Text style={styles.kpiLabel}>Gross Revenue</Text>
-            <Text style={styles.kpiValue}>${data.grossRevenue.toLocaleString()}</Text>
+            <Text style={styles.kpiValue}>
+              {data.grossRevenue > 0 ? `$${data.grossRevenue.toLocaleString()}` : '—'}
+            </Text>
           </View>
           <View style={styles.kpiCard}>
             <Feather name="trending-up" size={20} color="#8b5cf6" />
             <Text style={styles.kpiLabel}>Net Revenue</Text>
-            <Text style={styles.kpiValue}>${data.netRevenue.toLocaleString()}</Text>
+            <Text style={styles.kpiValue}>
+              {data.netRevenue > 0 ? `$${data.netRevenue.toLocaleString()}` : '—'}
+            </Text>
           </View>
           <View style={styles.kpiCard}>
             <Feather name="gift" size={20} color="#ec4899" />
             <Text style={styles.kpiLabel}>Total Gifts</Text>
-            <Text style={styles.kpiValue}>{data.totalGiftsSent.toLocaleString()}</Text>
+            <Text style={styles.kpiValue}>
+              {data.totalGiftsSent > 0 ? data.totalGiftsSent.toLocaleString() : '—'}
+            </Text>
           </View>
           <View style={styles.kpiCard}>
             <Feather name="users" size={20} color="#3b82f6" />
             <Text style={styles.kpiLabel}>Active Creators</Text>
-            <Text style={styles.kpiValue}>{data.activeCreators}</Text>
+            <Text style={styles.kpiValue}>
+              {data.activeCreators > 0 ? data.activeCreators : '—'}
+            </Text>
           </View>
         </View>
 
@@ -332,13 +341,19 @@ export function OwnerCoinsRevenueScreen({ navigation }: Props) {
         </View>
 
         {/* Save Button (disabled) */}
-        <TouchableOpacity
-          style={[styles.saveButton, styles.saveButtonDisabled]}
-          onPress={handleSaveEconomy}
-        >
-          <Feather name="alert-circle" size={16} color={theme.colors.textMuted} />
-          <Text style={styles.saveButtonTextDisabled}>Save (Wiring Coming Soon)</Text>
-        </TouchableOpacity>
+        <View style={styles.saveContainer}>
+          <TouchableOpacity
+            style={[styles.saveButton, styles.saveButtonDisabled]}
+            disabled
+          >
+            <Feather name="save" size={16} color={theme.colors.textMuted} />
+            <Text style={styles.saveButtonTextDisabled}>Save Changes</Text>
+          </TouchableOpacity>
+          <View style={styles.saveHelper}>
+            <Feather name="info" size={14} color={theme.colors.textMuted} />
+            <Text style={styles.saveHelperText}>Backend wiring coming soon. Changes are not persisted.</Text>
+          </View>
+        </View>
       </ScrollView>
     );
   };
@@ -584,6 +599,10 @@ function createStyles(theme: ThemeDefinition) {
       fontSize: 12,
       fontWeight: '600',
     },
+    saveContainer: {
+      gap: 12,
+      marginTop: 8,
+    },
     saveButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -592,7 +611,6 @@ function createStyles(theme: ThemeDefinition) {
       padding: 16,
       borderRadius: 12,
       backgroundColor: theme.colors.accent,
-      marginTop: 8,
     },
     saveButtonDisabled: {
       backgroundColor: theme.colors.cardAlt,
@@ -602,6 +620,19 @@ function createStyles(theme: ThemeDefinition) {
       color: theme.colors.textMuted,
       fontSize: 15,
       fontWeight: '800',
+    },
+    saveHelper: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      paddingHorizontal: 4,
+    },
+    saveHelperText: {
+      flex: 1,
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      fontWeight: '600',
+      lineHeight: 18,
     },
   });
 }

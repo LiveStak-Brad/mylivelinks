@@ -10,25 +10,11 @@ import {
   Radio
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-
-export interface LiveStreamData {
-  id: string;
-  streamer: string;
-  streamerId: string;
-  avatarUrl: string | null;
-  room: string;
-  roomId?: string;
-  region: 'us-east' | 'us-west' | 'eu-west' | 'ap-south' | 'all';
-  status: 'live' | 'starting' | 'ending';
-  startedAt: string;
-  viewers: number;
-  giftsPerMin: number;
-  chatPerMin: number;
-}
+import type { LiveOpsStreamData } from '@/hooks';
 
 interface StreamRowProps {
-  stream: LiveStreamData;
-  onClick: (stream: LiveStreamData) => void;
+  stream: LiveOpsStreamData;
+  onClick: (stream: LiveOpsStreamData) => void;
 }
 
 const regionLabels: Record<string, string> = {
