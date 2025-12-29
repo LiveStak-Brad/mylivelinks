@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   BarChart3,
   DollarSign,
@@ -9,7 +8,6 @@ import {
   Gem,
   TrendingUp,
   CreditCard,
-  ArrowLeft,
   RefreshCw,
   AlertTriangle,
   Wallet,
@@ -156,80 +154,65 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-gray-800 border-b border-gray-700">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => router.push('/owner')}
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                  <BarChart3 className="w-6 h-6 text-purple-400" />
-                  Monetization Analytics
-                </h1>
-                <p className="text-sm text-gray-400">
-                  Coins, Diamonds, Revenue & Payouts
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              {/* Test data toggle */}
-              <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeTestData}
-                  onChange={(e) => setIncludeTestData(e.target.checked)}
-                  className="rounded bg-gray-700 border-gray-600 text-purple-500 focus:ring-purple-500"
-                />
-                Include test data
-              </label>
-              
-              <DateRangePicker value={dateRange} onChange={setDateRange} />
-              
-              <button
-                onClick={loadData}
-                disabled={refreshing}
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-            </div>
-          </div>
-          
-          {/* Tabs */}
-          <div className="flex gap-1 mt-4 -mb-4">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg transition ${
-                    isActive
-                      ? 'bg-gray-900 text-white border-t border-l border-r border-gray-700'
-                      : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+    <div className="p-6 space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-3">
+            <BarChart3 className="w-8 h-8 text-primary" />
+            Monetization Analytics
+          </h1>
+          <p className="text-muted-foreground">
+            Coins, Diamonds, Revenue & Payouts
+          </p>
         </div>
-      </header>
-
-      {/* Content */}
-      <main className="p-6">
+        
+        <div className="flex items-center gap-3">
+          {/* Test data toggle */}
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeTestData}
+              onChange={(e) => setIncludeTestData(e.target.checked)}
+              className="rounded border-border bg-background text-primary focus:ring-2 focus:ring-primary"
+            />
+            Include test data
+          </label>
+          
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          
+          <button
+            onClick={loadData}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
+      </div>
+      
+      {/* Tabs */}
+      <div className="flex gap-2 border-b border-border">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition border-b-2 -mb-px ${
+                isActive
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
@@ -645,9 +628,6 @@ export default function AnalyticsPage() {
             </div>
           </div>
         )}
-      </main>
     </div>
   );
 }
-
-
