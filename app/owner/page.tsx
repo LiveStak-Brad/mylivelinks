@@ -27,14 +27,15 @@ export default function OwnerDashboard() {
     return (
       <div className="max-w-7xl mx-auto">
         <EmptyState
-          icon={<AlertCircle className="w-12 h-12" />}
+          icon={AlertCircle}
           title="Failed to Load Data"
           description={error}
-          action={{
-            label: 'Try Again',
-            onClick: refetch,
-            variant: 'primary',
-          }}
+          variant="error"
+          action={
+            <Button variant="primary" onClick={refetch}>
+              Try Again
+            </Button>
+          }
         />
       </div>
     );

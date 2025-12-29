@@ -4,7 +4,8 @@
  */
 
 import { Eye, Ban, Radio } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Tooltip, EmptyState } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Tooltip } from '@/components/ui';
+import { EmptyState } from '@/components/owner/ui-kit';
 import type { LiveStreamInfo } from '@/hooks';
 
 export interface LiveNowTableProps {
@@ -62,7 +63,7 @@ export function LiveNowTable({
       <CardContent>
         {streams.length === 0 ? (
           <EmptyState
-            icon={<Radio className="w-12 h-12" />}
+            icon={Radio}
             title="No live streams"
             description="No streamers are currently live."
           />

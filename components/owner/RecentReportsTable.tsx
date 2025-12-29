@@ -4,7 +4,8 @@
  */
 
 import { AlertTriangle, Eye } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge, EmptyState } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from '@/components/ui';
+import { EmptyState } from '@/components/owner/ui-kit';
 import type { ReportInfo } from '@/hooks';
 
 export interface RecentReportsTableProps {
@@ -91,7 +92,7 @@ export function RecentReportsTable({
       <CardContent>
         {reports.length === 0 ? (
           <EmptyState
-            icon={<AlertTriangle className="w-12 h-12" />}
+            icon={AlertTriangle}
             title="No reports"
             description="No moderation reports to review."
           />
