@@ -4,6 +4,8 @@
  * Helpers for consistent active-route detection and navigation state management.
  */
 
+import { Home, Radio, Tv, Video } from 'lucide-react';
+
 /**
  * Check if a route is active based on the current pathname.
  * 
@@ -83,8 +85,8 @@ export interface NavItem {
   href: string;
   /** Display label */
   label: string;
-  /** Icon component name (optional) */
-  icon?: string;
+  /** Icon component (Lucide React) */
+  icon?: any;
   /** Whether this route requires authentication */
   requiresAuth?: boolean;
   /** Whether this route requires live streaming to be enabled */
@@ -103,24 +105,28 @@ export interface NavItem {
 export const MAIN_NAV_ITEMS: NavItem[] = [
   { 
     href: '/', 
-    label: 'Home', 
+    label: 'Home',
+    icon: Home,
     matchType: 'exact',
   },
   { 
     href: '/feed', 
-    label: 'Feed', 
+    label: 'Feed',
+    icon: Radio,
     matchType: 'exact',
   },
   { 
     href: '/rooms', 
-    label: 'Rooms', 
+    label: 'Rooms',
+    icon: Tv,
     matchType: 'prefix',
   },
   { 
     href: '/live', 
-    label: 'Live Streams', 
+    label: 'Live Streams',
+    icon: Video,
     matchType: 'prefix',
-    requiresLive: true,
+    requiresLive: true, // Owner only
   },
 ];
 
