@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Room, RemoteParticipant } from 'livekit-client';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 import type { Participant } from '../types/live';
 import { getMobileIdentity } from '../lib/mobileIdentity';
 import { getDeviceId, generateSessionId } from '../lib/deviceId';
@@ -351,10 +352,24 @@ export function useLiveRoomParticipants(
       }
 
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timeoutMs = typeof __DEV__ !== 'undefined' && __DEV__ ? 45_000 : 15_000;
       const tokenFetchStart = nowMs();
+      const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+      const isDevClient = isDev && Constants.appOwnership === 'standalone';
+      const timeoutMs = isDevClient ? 45_000 : 15_000;
+
+      console.log('[TOKEN] start', {
+        endpoint: TOKEN_ENDPOINT,
+        timeoutMs,
+        elapsedMs: 0,
+      });
       const timeoutId = setTimeout(() => {
         try {
+          const elapsedMs = Math.round(nowMs() - tokenFetchStart);
+          console.log('[TOKEN] abort', {
+            endpoint: TOKEN_ENDPOINT,
+            timeoutMs,
+            elapsedMs,
+          });
           controller?.abort();
         } catch {
           // ignore
@@ -373,6 +388,13 @@ export function useLiveRoomParticipants(
 
       const tokenFetchMs = Math.round(nowMs() - tokenFetchStart);
 
+      console.log('[TOKEN] response_arrived', {
+        status: response.status,
+        ok: response.ok,
+        timeoutMs,
+        elapsedMs: tokenFetchMs,
+      });
+
       lastTokenStatusRef.current = response.status;
       setTokenDebug(prev => ({ ...prev, status: response.status }));
 
@@ -382,7 +404,8 @@ export function useLiveRoomParticipants(
       console.log('[TOKEN][HTTP] response', {
         status: response.status,
         ok: response.ok,
-        ms: tokenFetchMs,
+        timeoutMs,
+        elapsedMs: tokenFetchMs,
         textSnippet: snippet500,
       });
 
