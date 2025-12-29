@@ -457,7 +457,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         <View style={[styles.leftColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingLeft: insets.left || 12 }]}>
           {/* Back Button - Position 1 */}
           <TouchableOpacity onPress={handleExitLive} style={styles.vectorButton} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={28} color="#ffffff" />
+            <Ionicons name="arrow-back" size={28} color="#10b981" />
           </TouchableOpacity>
           
           {/* Empty space - Position 2 (aligns with Gift) */}
@@ -472,7 +472,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
             onPress={handleFilterPress}
             activeOpacity={0.7}
           >
-            <Ionicons name="color-wand" size={26} color="#ffffff" />
+            <Ionicons name="color-wand" size={26} color="#ec4899" />
           </TouchableOpacity>
 
           {/* GO LIVE CAMERA ICON - Position 5 (aligns with Share) */}
@@ -484,7 +484,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
             <Ionicons 
               name="videocam" 
               size={28} 
-              color={(isLive && isPublishing) ? "#ef4444" : "#ffffff"} 
+              color={(isLive && isPublishing) ? "#ef4444" : "#ec4899"} 
             />
           </TouchableOpacity>
         </View>
@@ -522,27 +522,27 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         <View style={[styles.rightColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingRight: insets.right || 12 }]}>
           {/* Options */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleOptionsPress} activeOpacity={0.7}>
-            <Ionicons name="settings-sharp" size={26} color="#ffffff" />
+            <Ionicons name="settings-sharp" size={26} color="#6366f1" />
           </TouchableOpacity>
 
           {/* Gift */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleGiftPress} activeOpacity={0.7}>
-            <Ionicons name="gift" size={26} color="#ffffff" />
+            <Ionicons name="gift" size={26} color="#f59e0b" />
           </TouchableOpacity>
 
           {/* PiP */}
           <TouchableOpacity style={styles.vectorButton} onPress={handlePiPPress} activeOpacity={0.7}>
-            <Ionicons name="contract" size={26} color={state.focusedIdentity ? "#a855f7" : "#ffffff"} />
+            <Ionicons name="contract" size={26} color={state.focusedIdentity ? "#a855f7" : "#a855f7"} />
           </TouchableOpacity>
 
           {/* Mixer */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleMixerPress} activeOpacity={0.7}>
-            <Ionicons name="options" size={26} color="#ffffff" />
+            <Ionicons name="options" size={26} color="#06b6d4" />
           </TouchableOpacity>
 
           {/* Share */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleSharePress} activeOpacity={0.7}>
-            <Ionicons name="share-outline" size={26} color="#ffffff" />
+            <Ionicons name="share-outline" size={26} color="#10b981" />
           </TouchableOpacity>
         </View>
       </View>
