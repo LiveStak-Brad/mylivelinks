@@ -16,7 +16,7 @@ export type OwnerPanelDataSource = "supabase" | "empty_not_wired";
 
 export type LiveStreamRow = {
   stream_id: string;
-  room_id: string;
+  room_id: string | null;
   room_slug: string | null;
   title: string | null;
   status: "live" | "ended" | "starting" | "scheduled";

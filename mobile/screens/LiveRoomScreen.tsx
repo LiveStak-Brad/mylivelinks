@@ -12,10 +12,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, useWindowDimensions, Share, Alert } from 'react-native';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useFocusEffect } from '@react-navigation/native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import { Ionicons } from '@expo/vector-icons';
 import { Grid12 } from '../components/live/Grid12';
 import { ChatOverlay } from '../overlays/ChatOverlay';
@@ -58,24 +56,10 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
   
   // Modal states for Mixer (Options uses overlay system for parity with swipe-right menu)
   const [showMixerModal, setShowMixerModal] = useState(false);
-  
-  // 🔒 LOCK ORIENTATION TO LANDSCAPE on mount/focus
-  useFocusEffect(
-    useCallback(() => {
-      if (DEBUG) console.log('[ORIENTATION] Locking to landscape...');
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(err => {
-        console.error('[ORIENTATION] Failed to lock:', err);
-      });
 
-      // Unlock on unmount/blur
-      return () => {
-        if (DEBUG) console.log('[ORIENTATION] Unlocking orientation...');
-        ScreenOrientation.unlockAsync().catch(err => {
-          console.error('[ORIENTATION] Failed to unlock:', err);
-        });
-      };
-    }, [])
-  );
+  useEffect(() => {
+    console.log('[LIVE_CRASH_FIX] live_room_screen_render', { enabled });
+  }, [enabled]);
   
   // Load current user
   useEffect(() => {
@@ -417,8 +401,6 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
 
   // Handle exit with orientation unlock
   const handleExitLive = useCallback(async () => {
-    if (DEBUG) console.log('[EXIT] Unlocking orientation before exit...');
-
     // Clean stop if we were live
     try {
       if (isLive) {
@@ -433,18 +415,10 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
     } catch {
       // ignore
     }
-
-    await ScreenOrientation.unlockAsync().catch(err => {
-      console.error('[EXIT] Failed to unlock:', err);
-    });
     onExitLive?.();
   }, [isLive, onExitLive, room, stopLive]);
 
   const handleNavigateToRooms = useCallback(async () => {
-    if (DEBUG) console.log('[EXIT] Unlocking orientation before rooms nav...');
-    await ScreenOrientation.unlockAsync().catch(err => {
-      console.error('[EXIT] Failed to unlock:', err);
-    });
     onNavigateToRooms?.();
   }, [onNavigateToRooms]);
 

@@ -49,8 +49,8 @@ export const DashboardStatsSchema = z
 
 export const LiveStreamRowSchema = z
   .object({
-    stream_id: UuidSchema,
-    room_id: UuidSchema,
+    stream_id: z.string().min(1),
+    room_id: z.string().min(1).nullable(),
     room_slug: z.string().min(1).nullable(),
     title: z.string().min(1).nullable(),
     status: z.enum(["live", "ended", "starting", "scheduled"]),
@@ -59,7 +59,7 @@ export const LiveStreamRowSchema = z
     host_profile_id: UuidSchema,
     host_username: z.string().min(1),
     host_display_name: z.string().min(1).nullable(),
-    host_avatar_url: z.string().url().nullable(),
+    host_avatar_url: z.string().nullable(),
     viewer_count: z.number().int().nonnegative(),
     peak_viewer_count: z.number().int().nonnegative().nullable(),
     is_recording: z.boolean(),

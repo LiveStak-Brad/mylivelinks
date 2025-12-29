@@ -381,30 +381,67 @@ async function buildLiveStreams(reqId: string, limit: number, offset: number): P
 
   const { data, error } = await admin
     .from('live_streams')
-    .select('id, room_id, title, status, started_at, ended_at, viewer_count, peak_viewer_count, is_recording, host:profiles!live_streams_host_id_fkey(id, username, display_name, avatar_url), rooms!live_streams_room_id_fkey(slug)')
+    .select(
+      `
+        id,
+        profile_id,
+        room_name,
+        started_at,
+        ended_at,
+        status,
+        live_available,
+        profile:profiles!live_streams_profile_id_fkey(id, username, display_name, avatar_url)
+      `
+    )
     .eq('status', 'live')
+    .eq('live_available', true)
     .order('started_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (!error) {
     const rows = Array.isArray(data) ? data : [];
+    const streamIds = rows.map((r: any) => Number(r?.id)).filter((v: any) => Number.isFinite(v));
+
+    const viewerCounts = new Map<number, number>();
+    if (streamIds.length > 0) {
+      const { data: viewers, error: viewersError } = await admin
+        .from('active_viewers')
+        .select('live_stream_id')
+        .in('live_stream_id', streamIds);
+
+      if (!viewersError && Array.isArray(viewers)) {
+        for (const row of viewers as any[]) {
+          const key = Number((row as any)?.live_stream_id);
+          if (!Number.isFinite(key)) continue;
+          viewerCounts.set(key, (viewerCounts.get(key) || 0) + 1);
+        }
+      }
+    }
+
     return {
-      items: rows.map((r: any) => ({
-        stream_id: String(r?.id ?? ''),
-        room_id: String(r?.room_id ?? ''),
-        room_slug: r?.rooms?.slug ?? null,
-        title: r?.title ?? null,
-        status: (['live', 'ended', 'starting', 'scheduled'].includes(String(r?.status)) ? String(r.status) : 'live') as LiveStreamRow['status'],
-        started_at: r?.started_at ?? nowIso(),
-        ended_at: r?.ended_at ?? null,
-        host_profile_id: String(r?.host?.id ?? ''),
-        host_username: String(r?.host?.username ?? 'unknown'),
-        host_display_name: r?.host?.display_name ?? null,
-        host_avatar_url: r?.host?.avatar_url ?? null,
-        viewer_count: Number(r?.viewer_count ?? 0),
-        peak_viewer_count: r?.peak_viewer_count ?? null,
-        is_recording: r?.is_recording === true,
-      })),
+      items: rows.map((r: any) => {
+        const streamIdNum = Number(r?.id);
+        const host = r?.profile;
+        const rawStatus = String(r?.status ?? '').toLowerCase();
+        const mappedStatus: LiveStreamRow['status'] = rawStatus === 'live' ? 'live' : rawStatus === 'starting' ? 'starting' : rawStatus === 'scheduled' ? 'scheduled' : 'ended';
+
+        return {
+          stream_id: String(r?.id ?? ''),
+          room_id: null,
+          room_slug: null,
+          title: r?.room_name ?? null,
+          status: mappedStatus,
+          started_at: r?.started_at ?? nowIso(),
+          ended_at: r?.ended_at ?? null,
+          host_profile_id: String(host?.id ?? r?.profile_id ?? ''),
+          host_username: String(host?.username ?? 'unknown'),
+          host_display_name: host?.display_name ?? null,
+          host_avatar_url: host?.avatar_url ?? null,
+          viewer_count: Number.isFinite(streamIdNum) ? viewerCounts.get(streamIdNum) || 0 : 0,
+          peak_viewer_count: null,
+          is_recording: false,
+        };
+      }),
       dataSource: 'supabase',
     };
   }
