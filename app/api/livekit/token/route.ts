@@ -70,14 +70,40 @@ export async function POST(request: NextRequest) {
   const withStageTimeout = async <T,>(stage: string, fn: () => Promise<T>, timeoutMs = STAGE_TIMEOUT_MS): Promise<T> => {
     log('stage_start', { stage, timeoutMs });
     let timeoutHandle: any;
-    const timeoutPromise = new Promise<T>((_resolve, reject) => {
-      timeoutHandle = setTimeout(() => reject(new StageTimeoutError(stage, timeoutMs)), timeoutMs);
+    let completed = false;
+    
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeoutHandle = setTimeout(() => {
+        if (!completed) {
+          completed = true;
+          reject(new StageTimeoutError(stage, timeoutMs));
+        }
+      }, timeoutMs);
     });
+    
     try {
-      const result = await Promise.race([fn(), timeoutPromise]);
+      const workPromise = fn().then(
+        (result) => {
+          if (!completed) {
+            completed = true;
+            return result;
+          }
+          throw new Error('Stage already timed out');
+        },
+        (err) => {
+          if (!completed) {
+            completed = true;
+            throw err;
+          }
+          throw new Error('Stage already timed out');
+        }
+      );
+      
+      const result = await Promise.race([workPromise, timeoutPromise]);
       log('stage_done', { stage });
-      return result as T;
+      return result;
     } finally {
+      completed = true;
       try {
         clearTimeout(timeoutHandle);
       } catch {
@@ -92,10 +118,19 @@ export async function POST(request: NextRequest) {
   });
 
   let timeoutId: any;
+  let hardTimeoutFired = false;
   const timeoutResponse = new Promise<NextResponse>((resolve) => {
     timeoutId = setTimeout(() => {
-      log('hard_timeout');
-      resolve(respond(504, { error: 'Request timed out', stage: 'hard_timeout', reqId }));
+      if (!responded) {
+        hardTimeoutFired = true;
+        log('hard_timeout', { timeoutMs: HARD_TIMEOUT_MS });
+        resolve(respond(504, { 
+          error: 'Request exceeded hard timeout', 
+          stage: 'hard_timeout', 
+          timeoutMs: HARD_TIMEOUT_MS,
+          reqId 
+        }));
+      }
     }, HARD_TIMEOUT_MS);
   });
 
@@ -108,18 +143,24 @@ export async function POST(request: NextRequest) {
         log('env_validate_fail', { missing: 'LIVEKIT_URL' });
         return respond(500, {
           error: 'LiveKit URL not configured. Please set LIVEKIT_URL in Vercel environment variables.',
+          stage: 'env_validate',
+          reqId,
         });
       }
       if (!LIVEKIT_API_KEY) {
         log('env_validate_fail', { missing: 'LIVEKIT_API_KEY' });
         return respond(500, {
           error: 'LiveKit API Key not configured. Please set LIVEKIT_API_KEY in Vercel environment variables.',
+          stage: 'env_validate',
+          reqId,
         });
       }
       if (!LIVEKIT_API_SECRET) {
         log('env_validate_fail', { missing: 'LIVEKIT_API_SECRET' });
         return respond(500, {
           error: 'LiveKit API Secret not configured. Please set LIVEKIT_API_SECRET in Vercel environment variables.',
+          stage: 'env_validate',
+          reqId,
         });
       }
       log('env_validate_done', {
@@ -182,17 +223,24 @@ export async function POST(request: NextRequest) {
         return respond(401, { error: 'Unauthorized - Please log in', stage: 'supabase_getUser', reqId });
       }
 
-      // Get request body
+      // Get request body with aggressive timeout (body parse can hang on mobile)
       let body: any;
       try {
-        body = await withStageTimeout('body_parse', async () => request.json());
+        body = await withStageTimeout('body_parse', async () => {
+          // Wrap in try-catch to handle JSON parse errors gracefully
+          try {
+            return await request.json();
+          } catch (jsonErr: any) {
+            throw new Error(`JSON parse failed: ${jsonErr?.message || 'invalid_json'}`);
+          }
+        }, 2000); // Reduce timeout to 2s for body parse
       } catch (err: any) {
         if (err instanceof StageTimeoutError) {
           log('stage_timeout', { stage: err.stage, timeoutMs: err.timeoutMs });
           return respond(504, { error: 'Stage timed out', stage: err.stage, timeoutMs: err.timeoutMs, reqId });
         }
         log('body_parse_error', { message: err?.message || 'invalid_json' });
-        return respond(400, { error: 'Invalid JSON body', stage: 'body_parse', reqId });
+        return respond(400, { error: 'Invalid JSON body', stage: 'body_parse', message: err?.message, reqId });
       }
 
       log('body_parse_done', {
@@ -216,7 +264,7 @@ export async function POST(request: NextRequest) {
       try {
         const allowed = await withStageTimeout('canAccessLive', async () => {
           return canAccessLive({ id: user.id, email: user.email });
-        });
+        }, 2000); // Reduce timeout to 2s for access check
         if (!allowed) {
           log('access_denied');
           return respond(403, { error: 'Live is not available yet', stage: 'canAccessLive', reqId });
@@ -226,7 +274,9 @@ export async function POST(request: NextRequest) {
           log('stage_timeout', { stage: err.stage, timeoutMs: err.timeoutMs });
           return respond(504, { error: 'Stage timed out', stage: err.stage, timeoutMs: err.timeoutMs, reqId });
         }
-        throw err;
+        log('canAccessLive_error', { message: err?.message || 'unknown' });
+        // On error, fail closed (deny access)
+        return respond(403, { error: 'Access check failed', stage: 'canAccessLive', message: err?.message, reqId });
       }
 
       log('body_validate_start');
@@ -248,13 +298,24 @@ export async function POST(request: NextRequest) {
 
       // Get user's profile for metadata
       log('profile_fetch_start');
-      const { data: profile } = await withStageTimeout('profile_fetch', async () => {
-        return supabase
-          .from('profiles')
-          .select('username, display_name, avatar_url')
-          .eq('id', user.id)
-          .single();
-      });
+      let profile: any = null;
+      try {
+        const result = await withStageTimeout('profile_fetch', async () => {
+          return supabase
+            .from('profiles')
+            .select('username, display_name, avatar_url')
+            .eq('id', user.id)
+            .single();
+        }, 2000); // 2s timeout for profile fetch
+        profile = result?.data || null;
+      } catch (err: any) {
+        // Profile fetch is optional - continue without it
+        log('profile_fetch_error', { 
+          message: err?.message || 'unknown',
+          isTimeout: err instanceof StageTimeoutError
+        });
+        profile = null;
+      }
       log('profile_fetch_done', { hasProfile: !!profile });
 
       // Create LiveKit access token with device-scoped identity
@@ -287,12 +348,16 @@ export async function POST(request: NextRequest) {
         log('env_validate_fail', { invalid: 'LIVEKIT_API_KEY' });
         return respond(500, {
           error: 'Invalid LiveKit API Key format. Please check your Vercel environment variables.',
+          stage: 'env_validate',
+          reqId,
         });
       }
       if (typeof LIVEKIT_API_SECRET !== 'string' || LIVEKIT_API_SECRET.length < 10) {
         log('env_validate_fail', { invalid: 'LIVEKIT_API_SECRET' });
         return respond(500, {
           error: 'Invalid LiveKit API Secret format. Please check your Vercel environment variables.',
+          stage: 'env_validate',
+          reqId,
         });
       }
 
@@ -312,6 +377,8 @@ export async function POST(request: NextRequest) {
         log('token_create_error', { message: tokenErr?.message || 'create_failed' });
         return respond(500, {
           error: `Failed to create LiveKit token: ${tokenErr.message || 'Invalid API credentials'}`,
+          stage: 'livekit_token_sign',
+          reqId,
         });
       }
 
@@ -357,13 +424,13 @@ export async function POST(request: NextRequest) {
       // Validate token was generated
       if (!token || typeof token !== 'string' || token.length < 50) {
         log('token_invalid', { tokenType: typeof token, tokenLength: typeof token === 'string' ? token.length : null });
-        return respond(500, { error: 'Failed to generate valid token' });
+        return respond(500, { error: 'Failed to generate valid token', stage: 'livekit_token_sign', reqId });
       }
 
       // Validate URL format
       if (!LIVEKIT_URL || (!LIVEKIT_URL.startsWith('wss://') && !LIVEKIT_URL.startsWith('ws://') && !LIVEKIT_URL.startsWith('https://'))) {
         log('env_validate_fail', { invalid: 'LIVEKIT_URL' });
-        return respond(500, { error: 'Invalid LiveKit URL format. Must start with wss://, ws://, or https://' });
+        return respond(500, { error: 'Invalid LiveKit URL format. Must start with wss://, ws://, or https://', stage: 'env_validate', reqId });
       }
 
       // Ensure URL is WebSocket format for client connection
