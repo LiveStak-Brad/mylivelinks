@@ -67,10 +67,10 @@ export default function AnalyticsChart({
 
   if (loading) {
     return (
-      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+      <div className="bg-card rounded-lg p-6 border border-border">
         <div className="animate-pulse">
-          <div className="h-5 w-32 bg-gray-700 rounded mb-4" />
-          <div className="h-[200px] bg-gray-700/50 rounded" />
+          <div className="h-5 w-32 bg-muted rounded mb-4" />
+          <div className="h-[200px] bg-muted/50 rounded" />
         </div>
       </div>
     );
@@ -78,9 +78,9 @@ export default function AnalyticsChart({
 
   if (!data.length) {
     return (
-      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-        <h3 className="text-sm font-medium text-gray-400 mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-[200px] text-gray-500">
+      <div className="bg-card rounded-lg p-6 border border-border">
+        <h3 className="text-sm font-medium text-muted-foreground mb-4">{title}</h3>
+        <div className="flex items-center justify-center h-[200px] text-muted-foreground">
           No data available
         </div>
       </div>
@@ -90,19 +90,19 @@ export default function AnalyticsChart({
   const chartHeight = height - 40;
 
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+    <div className="bg-card rounded-lg p-6 border border-border">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-400">{title}</h3>
+        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
         {legend && (
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.primary }} />
-              <span className="text-gray-400">{legend.primary}</span>
+              <span className="text-muted-foreground">{legend.primary}</span>
             </div>
             {legend.secondary && colors.secondary && (
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.secondary }} />
-                <span className="text-gray-400">{legend.secondary}</span>
+                <span className="text-muted-foreground">{legend.secondary}</span>
               </div>
             )}
           </div>
@@ -111,7 +111,7 @@ export default function AnalyticsChart({
       
       <div className="relative" style={{ height }}>
         {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 bottom-10 w-12 flex flex-col justify-between text-[10px] text-gray-500">
+        <div className="absolute left-0 top-0 bottom-10 w-12 flex flex-col justify-between text-[10px] text-muted-foreground">
           <span>{formatValue(maxValue)}</span>
           <span>{formatValue(maxValue / 2)}</span>
           <span>{formatValue(0)}</span>
@@ -179,7 +179,7 @@ export default function AnalyticsChart({
           </svg>
           
           {/* X-axis labels */}
-          <div className="flex justify-between text-[10px] text-gray-500 mt-2 px-2">
+          <div className="flex justify-between text-[10px] text-muted-foreground mt-2 px-2">
             {data.length <= 7 ? (
               data.map((d, i) => (
                 <span key={i}>{d.label}</span>
