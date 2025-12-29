@@ -68,14 +68,14 @@ export async function POST(request: NextRequest) {
   }
 
   const withStageTimeout = async <T,>(stage: string, fn: () => Promise<T>, timeoutMs = STAGE_TIMEOUT_MS): Promise<T> => {
-    log(`${stage}_start`, { timeoutMs });
+    log('stage_start', { stage, timeoutMs });
     let timeoutHandle: any;
     const timeoutPromise = new Promise<T>((_resolve, reject) => {
       timeoutHandle = setTimeout(() => reject(new StageTimeoutError(stage, timeoutMs)), timeoutMs);
     });
     try {
       const result = await Promise.race([fn(), timeoutPromise]);
-      log(`${stage}_done`);
+      log('stage_done', { stage });
       return result as T;
     } finally {
       try {
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
   const timeoutResponse = new Promise<NextResponse>((resolve) => {
     timeoutId = setTimeout(() => {
       log('hard_timeout');
-      resolve(respond(504, { error: 'Request timed out' }));
+      resolve(respond(504, { error: 'Request timed out', stage: 'hard_timeout', reqId }));
     }, HARD_TIMEOUT_MS);
   });
 
@@ -131,14 +131,19 @@ export async function POST(request: NextRequest) {
       // Create Supabase client with proper route handler support
       let supabase = createRouteHandlerClient(request);
 
-      log('auth_parse_start');
-      const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
-      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
-      log('auth_parse_done', { usedBearer: !!bearerToken, hasAuthHeader: !!authHeader });
+      const authHeaderParse = await withStageTimeout('auth_header_parse', async () => {
+        const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
+        const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
+        return { authHeader, bearerToken };
+      });
+
+      const authHeader = authHeaderParse.authHeader;
+      const bearerToken = authHeaderParse.bearerToken;
+      log('auth_header_parse_done', { usedBearer: !!bearerToken, hasAuthHeader: !!authHeader });
 
       // Get authenticated user (supports cookie auth for web and Bearer token auth for mobile)
       log('before_auth_verify');
-      const auth = await withStageTimeout('auth_verify', async () => {
+      const auth = await withStageTimeout('supabase_getUser', async () => {
         let user: any = null;
         let authError: any = null;
         let effectiveSupabase: any = supabase;
@@ -174,7 +179,7 @@ export async function POST(request: NextRequest) {
           errorMessage: authError?.message || null,
           supabaseProjectRef: SUPABASE_URL?.match(/^https:\/\/([a-z0-9-]+)\.supabase\.co/i)?.[1] ?? null,
         });
-        return respond(401, { error: 'Unauthorized - Please log in' });
+        return respond(401, { error: 'Unauthorized - Please log in', stage: 'supabase_getUser', reqId });
       }
 
       // Get request body
@@ -184,10 +189,10 @@ export async function POST(request: NextRequest) {
       } catch (err: any) {
         if (err instanceof StageTimeoutError) {
           log('stage_timeout', { stage: err.stage, timeoutMs: err.timeoutMs });
-          return respond(504, { error: 'Stage timed out', stage: err.stage, timeoutMs: err.timeoutMs });
+          return respond(504, { error: 'Stage timed out', stage: err.stage, timeoutMs: err.timeoutMs, reqId });
         }
         log('body_parse_error', { message: err?.message || 'invalid_json' });
-        return respond(400, { error: 'Invalid JSON body' });
+        return respond(400, { error: 'Invalid JSON body', stage: 'body_parse', reqId });
       }
 
       log('body_parse_done', {
@@ -209,17 +214,17 @@ export async function POST(request: NextRequest) {
       } = body;
 
       try {
-        const allowed = await withStageTimeout('access_check', async () => {
+        const allowed = await withStageTimeout('canAccessLive', async () => {
           return canAccessLive({ id: user.id, email: user.email });
         });
         if (!allowed) {
           log('access_denied');
-          return respond(403, { error: 'Live is not available yet' });
+          return respond(403, { error: 'Live is not available yet', stage: 'canAccessLive', reqId });
         }
       } catch (err: any) {
         if (err instanceof StageTimeoutError) {
           log('stage_timeout', { stage: err.stage, timeoutMs: err.timeoutMs });
-          return respond(504, { error: 'Stage timed out', stage: err.stage, timeoutMs: err.timeoutMs });
+          return respond(504, { error: 'Stage timed out', stage: err.stage, timeoutMs: err.timeoutMs, reqId });
         }
         throw err;
       }
@@ -231,7 +236,7 @@ export async function POST(request: NextRequest) {
           missingRoomName: !roomName,
           missingParticipantName: !participantName,
         });
-        return respond(400, { error: 'roomName and participantName are required' });
+        return respond(400, { error: 'roomName and participantName are required', stage: 'body_parse', reqId });
       }
       log('body_validate_done', {
         canPublish: canPublish === true,
@@ -338,14 +343,14 @@ export async function POST(request: NextRequest) {
       log('token_sign_start');
       let token: string;
       try {
-        token = await withStageTimeout('token_sign', async () => at.toJwt());
+        token = await withStageTimeout('livekit_token_sign', async () => at.toJwt());
       } catch (jwtErr: any) {
         if (jwtErr instanceof StageTimeoutError) {
           log('stage_timeout', { stage: jwtErr.stage, timeoutMs: jwtErr.timeoutMs });
-          return respond(504, { error: 'Stage timed out', stage: jwtErr.stage, timeoutMs: jwtErr.timeoutMs });
+          return respond(504, { error: 'Stage timed out', stage: jwtErr.stage, timeoutMs: jwtErr.timeoutMs, reqId });
         }
         log('token_sign_error', { message: jwtErr?.message || 'toJwt_failed' });
-        return respond(500, { error: `Failed to generate token: ${jwtErr.message || 'Unknown error'}` });
+        return respond(500, { error: `Failed to generate token: ${jwtErr.message || 'Unknown error'}`, stage: 'livekit_token_sign', reqId });
       }
       log('token_sign_done', { tokenLength: typeof token === 'string' ? token.length : null });
 
@@ -383,10 +388,10 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
       if (error instanceof StageTimeoutError) {
         log('stage_timeout', { stage: error.stage, timeoutMs: error.timeoutMs });
-        return respond(504, { error: 'Stage timed out', stage: error.stage, timeoutMs: error.timeoutMs });
+        return respond(504, { error: 'Stage timed out', stage: error.stage, timeoutMs: error.timeoutMs, reqId });
       }
       log('handler_error', { message: error?.message || 'unknown_error' });
-      return respond(500, { error: error.message || 'Failed to generate token' });
+      return respond(500, { error: error.message || 'Failed to generate token', stage: 'handler', reqId });
     }
   })();
 
