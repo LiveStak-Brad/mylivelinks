@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, context: { params: { postId: str
     const supabase = createAuthedRouteHandlerClient(request);
     const user = await getSessionUser(request); // Get current user for like status
 
-    // Fetch top-level comments (parent_comment_id IS NULL) AND their replies
+    // Fetch ALL comments for this post (both top-level and replies)
     const { data: comments, error } = await supabase
       .from('post_comments')
       .select(`
@@ -31,14 +31,19 @@ export async function GET(request: NextRequest, context: { params: { postId: str
       .limit(limit);
 
     if (error) {
+      console.error('Comments fetch error:', error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    if (!comments || comments.length === 0) {
+      return NextResponse.json({ comments: [], limit }, { status: 200 });
+    }
+
     // Separate top-level comments from replies
-    const topLevelComments = (comments ?? []).filter((c: any) => !c.parent_comment_id);
+    const topLevelComments = comments.filter((c: any) => !c.parent_comment_id);
     const repliesMap = new Map<string, any[]>();
     
-    (comments ?? []).forEach((c: any) => {
+    comments.forEach((c: any) => {
       if (c.parent_comment_id) {
         const parentId = String(c.parent_comment_id);
         if (!repliesMap.has(parentId)) {
@@ -58,10 +63,10 @@ export async function GET(request: NextRequest, context: { params: { postId: str
         created_at: String(r.created_at),
         like_count: Number(r.like_count || 0),
         reply_count: Number(r.reply_count || 0),
-        is_liked_by_current_user: user ? r.comment_likes.some((l: any) => l.profile_id === user.id) : false,
+        is_liked_by_current_user: user ? (r.comment_likes?.some?.((l: any) => l.profile_id === user.id) || false) : false,
         author: {
           id: String(r.profiles?.id ?? r.author_id),
-          username: String(r.profiles?.username ?? ''),
+          username: String(r.profiles?.username ?? 'Unknown'),
           avatar_url: r.profiles?.avatar_url ? String(r.profiles.avatar_url) : null,
         },
       }));
@@ -74,11 +79,11 @@ export async function GET(request: NextRequest, context: { params: { postId: str
         created_at: String(c.created_at),
         like_count: Number(c.like_count || 0),
         reply_count: Number(c.reply_count || 0),
-        is_liked_by_current_user: user ? c.comment_likes.some((l: any) => l.profile_id === user.id) : false,
+        is_liked_by_current_user: user ? (c.comment_likes?.some?.((l: any) => l.profile_id === user.id) || false) : false,
         replies,
         author: {
           id: String(c.profiles?.id ?? c.author_id),
-          username: String(c.profiles?.username ?? ''),
+          username: String(c.profiles?.username ?? 'Unknown'),
           avatar_url: c.profiles?.avatar_url ? String(c.profiles.avatar_url) : null,
         },
       };
