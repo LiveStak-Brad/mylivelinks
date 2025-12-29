@@ -1,6 +1,18 @@
 import { createAuthedRouteHandlerClient } from '@/lib/admin';
 import { NextRequest, NextResponse } from 'next/server';
 
+ function normalizeUsername(input: string) {
+   let username = input ?? '';
+   try {
+     username = decodeURIComponent(username);
+   } catch {
+     // ignore
+   }
+   username = username.trim();
+   if (username.startsWith('@')) username = username.slice(1);
+   return username.toLowerCase();
+ }
+
 /**
  * GET /api/profile/[username]/bundle
  * Fetch profile bundle data (profile header + profile_type + blocks) via single RPC.
@@ -12,7 +24,10 @@ export async function GET(
   const supabase = createAuthedRouteHandlerClient(request);
 
   try {
-    const { username } = params;
+    const username = normalizeUsername(params.username);
+    if (!username) {
+      return NextResponse.json({ error: 'Invalid username' }, { status: 400 });
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
     const viewerId = user?.id || null;

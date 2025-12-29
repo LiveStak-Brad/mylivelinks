@@ -2,6 +2,18 @@ import { createAuthedRouteHandlerClient } from '@/lib/admin';
 import { NextRequest, NextResponse } from 'next/server';
 import { getGifterStatus } from '@/lib/gifter-status';
 
+ function normalizeUsername(input: string) {
+   let username = input ?? '';
+   try {
+     username = decodeURIComponent(username);
+   } catch {
+     // ignore
+   }
+   username = username.trim();
+   if (username.startsWith('@')) username = username.slice(1);
+   return username.toLowerCase();
+ }
+
 /**
  * GET /api/profile/[username]
  * Fetch complete public profile data (single query)
@@ -13,7 +25,10 @@ export async function GET(
   const supabase = createAuthedRouteHandlerClient(request);
   
   try {
-    const { username } = params;
+    const username = normalizeUsername(params.username);
+    if (!username) {
+      return NextResponse.json({ error: 'Invalid username' }, { status: 400 });
+    }
     
     // Get current user (optional - for relationship status)
     const { data: { user } } = await supabase.auth.getUser();
@@ -77,7 +92,7 @@ export async function GET(
       if (ids.length > 0) {
         const { data: rows, error: rowsErr } = await supabase
           .from('profiles')
-          .select('id, lifetime_coins_gifted, profile_type')
+          .select('id, lifetime_coins_gifted, profile_type, enabled_modules, enabled_tabs')
           .in('id', ids);
 
         if (!rowsErr && Array.isArray(rows)) {
@@ -93,6 +108,18 @@ export async function GET(
               ((data as any).profile as any).profile_type == null
             ) {
               ((data as any).profile as any).profile_type = (row as any)?.profile_type ?? null;
+            }
+
+            if (id === profileId && (data as any)?.profile) {
+              const profileObj = ((data as any).profile as any) ?? null;
+              if (profileObj) {
+                if (profileObj.enabled_modules == null) {
+                  profileObj.enabled_modules = (row as any)?.enabled_modules ?? null;
+                }
+                if (profileObj.enabled_tabs == null) {
+                  profileObj.enabled_tabs = (row as any)?.enabled_tabs ?? null;
+                }
+              }
             }
           }
         }

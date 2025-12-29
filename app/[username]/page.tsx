@@ -2,15 +2,28 @@ import { Metadata } from 'next';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import ModernProfilePage from './modern-page';
 
+ function normalizeUsername(input: string) {
+   let username = input ?? '';
+   try {
+     username = decodeURIComponent(username);
+   } catch {
+     // ignore
+   }
+   username = username.trim();
+   if (username.startsWith('@')) username = username.slice(1);
+   return username;
+ }
+
 // Generate dynamic metadata for SEO and social sharing
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
   const admin = getSupabaseAdmin();
   
   try {
+    const username = normalizeUsername(params.username);
     const { data: profile } = await admin
       .from('profiles')
       .select('username, display_name, bio, avatar_url')
-      .ilike('username', params.username)
+      .ilike('username', username)
       .maybeSingle();
     
     if (!profile) {

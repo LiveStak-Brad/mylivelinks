@@ -335,12 +335,12 @@ export function isSectionEnabled(
   }
   
   // For optional modules, check custom list if provided
-  // Important: Check for null/undefined explicitly - empty array [] means "disable all optional"
-  // When customEnabledModules is set, we COMPLETELY BYPASS profile_type defaults
-  if (customEnabledModules !== null && customEnabledModules !== undefined) {
+  // When customEnabledModules is set, we BYPASS profile_type defaults
+  // If the array is empty, treat it as "not customized" and fall back to defaults.
+  if (Array.isArray(customEnabledModules) && customEnabledModules.length > 0) {
     return customEnabledModules.includes(section);
   }
-  
+
   // Fallback to profile_type defaults ONLY if user has never customized
   const config = getProfileTypeConfig(profileType);
   const sectionConfig = config.sections.find(s => s.id === section);

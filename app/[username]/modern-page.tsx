@@ -1141,6 +1141,21 @@ export default function ModernProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Top Friends Section - MySpace Style */}
+        <TopFriendsDisplay
+          key={topFriendsReloadKey}
+          profileId={profile.id}
+          isOwner={isOwnProfile}
+          onManage={() => setTopFriendsManagerOpen(true)}
+          cardStyle={cardStyle}
+          borderRadiusClass={borderRadiusClass}
+          accentColor={accentColor}
+          showTopFriends={profile.show_top_friends !== false}
+          topFriendsTitle={profile.top_friends_title || 'Top Friends'}
+          topFriendsAvatarStyle={profile.top_friends_avatar_style || 'square'}
+          topFriendsMaxCount={profile.top_friends_max_count || 8}
+        />
         
         {/* Profile Tabs (config-driven, parity with mobile) */}
         <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
@@ -1180,21 +1195,6 @@ export default function ModernProfilePage() {
                 />
               </div>
             )}
-
-            {/* Top Friends Section - MySpace Style */}
-            <TopFriendsDisplay
-              key={topFriendsReloadKey}
-              profileId={profile.id}
-              isOwner={isOwnProfile}
-              onManage={() => setTopFriendsManagerOpen(true)}
-              cardStyle={cardStyle}
-              borderRadiusClass={borderRadiusClass}
-              accentColor={accentColor}
-              showTopFriends={profile.show_top_friends !== false}
-              topFriendsTitle={profile.top_friends_title || 'Top Friends'}
-              topFriendsAvatarStyle={profile.top_friends_avatar_style || 'square'}
-              topFriendsMaxCount={profile.top_friends_max_count || 8}
-            />
 
             {/* Streamer schedule (real data, owner-only empty state) */}
             {profile.profile_type === 'streamer' && (

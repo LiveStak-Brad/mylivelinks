@@ -156,7 +156,7 @@ export default function ProfileModulePicker({
       setEnabledModules(new Set(defaults));
       onChange(Array.from(defaults));
     }
-  }, [profileType]); // Re-run when profileType changes
+  }, [profileType, currentEnabledModules]); // Re-run when profileType or current selection changes
 
   const toggleModule = (moduleId: ProfileSection) => {
     const newSet = new Set(enabledModules);
