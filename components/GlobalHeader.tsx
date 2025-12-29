@@ -72,15 +72,15 @@ function NavLink({
   );
 }
 
-// Icon color helper
+// Icon color helper - matches BottomNav colors
 function getIconColor(label: string) {
   switch (label) {
     case 'Home':
-      return 'text-blue-500 dark:text-blue-400';
-    case 'Feed':
-      return 'text-green-500 dark:text-green-400';
-    case 'Rooms':
       return 'text-purple-500 dark:text-purple-400';
+    case 'Feed':
+      return 'text-blue-500 dark:text-blue-400';
+    case 'Rooms':
+      return 'text-pink-500 dark:text-pink-400';
     case 'Live Streams':
       return 'text-red-500 dark:text-red-400';
     default:
