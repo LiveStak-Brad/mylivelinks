@@ -14,12 +14,19 @@ interface MessagesModalProps {
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
+interface ModalPosition {
+  top: number;
+  left: number;
+  right?: number;
+}
+
 export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesModalProps) {
   const [mounted, setMounted] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const { conversations, activeConversationId, setActiveConversationId, totalUnreadCount } = useMessages();
   const [isMobile, setIsMobile] = useState(false);
   const [showThread, setShowThread] = useState(false);
+  const [modalPosition, setModalPosition] = useState<ModalPosition>({ top: 0, left: 0 });
 
   // Get active conversation object
   const activeConversation = conversations.find(c => c.id === activeConversationId);
@@ -36,6 +43,53 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Calculate modal position based on anchor button
+  useEffect(() => {
+    if (!isOpen || isMobile || !anchorRef?.current) return;
+
+    const calculatePosition = () => {
+      const buttonRect = anchorRef.current!.getBoundingClientRect();
+      const modalWidth = 900;
+      const modalHeight = 550;
+      const gap = 12; // Gap between button and modal
+      const viewportPadding = 16; // Minimum distance from viewport edge
+
+      // Start position: align to button's right edge
+      let left = buttonRect.right - modalWidth;
+      let top = buttonRect.bottom + gap;
+
+      // Ensure modal doesn't overflow right edge
+      const maxLeft = window.innerWidth - modalWidth - viewportPadding;
+      if (left > maxLeft) {
+        left = maxLeft;
+      }
+
+      // Ensure modal doesn't overflow left edge
+      if (left < viewportPadding) {
+        left = viewportPadding;
+      }
+
+      // Ensure modal doesn't overflow bottom edge
+      const maxTop = window.innerHeight - modalHeight - viewportPadding;
+      if (top > maxTop) {
+        top = maxTop;
+      }
+
+      setModalPosition({ top, left });
+    };
+
+    calculatePosition();
+
+    // Recalculate on resize
+    window.addEventListener('resize', calculatePosition);
+    window.addEventListener('scroll', calculatePosition);
+    
+    return () => {
+      window.removeEventListener('resize', calculatePosition);
+      window.removeEventListener('scroll', calculatePosition);
+    };
+  }, [isOpen, isMobile, anchorRef]);
 
   // Close on outside click (desktop)
   useEffect(() => {
@@ -161,8 +215,13 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   const desktopContent = (
     <div
       ref={modalRef}
-      className="fixed right-4 top-16 mt-2 w-[900px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[9999]"
-      style={{ height: '550px', maxHeight: 'calc(100vh - 120px)' }}
+      className="fixed w-[900px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[9999]"
+      style={{ 
+        top: `${modalPosition.top}px`,
+        left: `${modalPosition.left}px`,
+        height: '550px', 
+        maxHeight: 'calc(100vh - 120px)' 
+      }}
     >
       <div className="flex h-full">
         {/* Left Pane: Friends List (vertical) */}

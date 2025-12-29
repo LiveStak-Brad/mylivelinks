@@ -15,12 +15,19 @@ interface NotiesModalProps {
   anchorRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
+interface ModalPosition {
+  top: number;
+  left: number;
+  right?: number;
+}
+
 export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalProps) {
   const router = useRouter();
   const modalRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [modalPosition, setModalPosition] = useState<ModalPosition>({ top: 0, left: 0 });
   const { noties, unreadCount, isLoading, markAsRead, markAllAsRead } = useNoties();
 
   // Mount check for portal
@@ -35,6 +42,53 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Calculate modal position based on anchor button
+  useEffect(() => {
+    if (!isOpen || isMobile || !anchorRef?.current) return;
+
+    const calculatePosition = () => {
+      const buttonRect = anchorRef.current!.getBoundingClientRect();
+      const modalWidth = 384; // w-96 = 384px
+      const modalMaxHeight = 500; // Approximate height
+      const gap = 12; // Gap between button and modal
+      const viewportPadding = 16; // Minimum distance from viewport edge
+
+      // Start position: align to button's right edge
+      let left = buttonRect.right - modalWidth;
+      let top = buttonRect.bottom + gap;
+
+      // Ensure modal doesn't overflow right edge
+      const maxLeft = window.innerWidth - modalWidth - viewportPadding;
+      if (left > maxLeft) {
+        left = maxLeft;
+      }
+
+      // Ensure modal doesn't overflow left edge
+      if (left < viewportPadding) {
+        left = viewportPadding;
+      }
+
+      // Ensure modal doesn't overflow bottom edge
+      const maxTop = window.innerHeight - modalMaxHeight - viewportPadding;
+      if (top > maxTop) {
+        top = maxTop;
+      }
+
+      setModalPosition({ top, left });
+    };
+
+    calculatePosition();
+
+    // Recalculate on resize
+    window.addEventListener('resize', calculatePosition);
+    window.addEventListener('scroll', calculatePosition);
+    
+    return () => {
+      window.removeEventListener('resize', calculatePosition);
+      window.removeEventListener('scroll', calculatePosition);
+    };
+  }, [isOpen, isMobile, anchorRef]);
 
   // Close on outside click (desktop)
   useEffect(() => {
@@ -214,8 +268,12 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
   const desktopContent = (
     <div
       ref={modalRef}
-      className="fixed right-4 top-16 mt-2 w-96 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-scale-in z-[9999]"
-      style={{ maxHeight: 'calc(100vh - 120px)' }}
+      className="fixed w-96 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-scale-in z-[9999]"
+      style={{ 
+        top: `${modalPosition.top}px`,
+        left: `${modalPosition.left}px`,
+        maxHeight: 'calc(100vh - 120px)' 
+      }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-purple-500/10 to-pink-500/10">
