@@ -131,22 +131,30 @@ function HeaderIcons() {
     <div className="flex items-center gap-1" onKeyDown={handleKeyDown}>
       {/* Messages Icon */}
       <div className="relative z-[70]">
-        <IconButton
+        <button
           ref={messagesButtonRef}
           onClick={() => {
             setShowMessagesModal(!showMessagesModal);
             setShowNotiesModal(false);
           }}
-          variant={showMessagesModal ? 'primary' : 'ghost'}
-          size="md"
+          className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110 ${
+            showMessagesModal ? 'scale-110' : 'opacity-70 hover:opacity-100'
+          }`}
           aria-label={`Messages${unreadMessages > 0 ? `, ${unreadMessages} unread` : ''}`}
           aria-expanded={showMessagesModal}
           aria-haspopup="dialog"
+          title="Messages"
         >
-          <MessageCircle className="w-5 h-5" />
-        </IconButton>
-        <NotificationBadge count={unreadMessages} />
-        <span className="icon-label">Messages</span>
+          <MessageCircle className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-emerald-500 dark:text-emerald-400" strokeWidth={2} />
+          {unreadMessages > 0 && (
+            <span className="notification-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>
+          )}
+          
+          {/* Hover tooltip */}
+          <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+            Messages
+          </span>
+        </button>
         
         <MessagesModal
           isOpen={showMessagesModal}
@@ -157,22 +165,30 @@ function HeaderIcons() {
 
       {/* Noties Icon */}
       <div className="relative z-[70]">
-        <IconButton
+        <button
           ref={notiesButtonRef}
           onClick={() => {
             setShowNotiesModal(!showNotiesModal);
             setShowMessagesModal(false);
           }}
-          variant={showNotiesModal ? 'primary' : 'ghost'}
-          size="md"
+          className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110 ${
+            showNotiesModal ? 'scale-110' : 'opacity-70 hover:opacity-100'
+          }`}
           aria-label={`Noties${unreadNoties > 0 ? `, ${unreadNoties} unread` : ''}`}
           aria-expanded={showNotiesModal}
           aria-haspopup="dialog"
+          title="Noties"
         >
-          <Bell className="w-5 h-5" />
-        </IconButton>
-        <NotificationBadge count={unreadNoties} />
-        <span className="icon-label">Noties</span>
+          <Bell className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-amber-500 dark:text-amber-400" strokeWidth={2} />
+          {unreadNoties > 0 && (
+            <span className="notification-badge">{unreadNoties > 99 ? '99+' : unreadNoties}</span>
+          )}
+          
+          {/* Hover tooltip */}
+          <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+            Noties
+          </span>
+        </button>
         
         <NotiesModal
           isOpen={showNotiesModal}
@@ -348,11 +364,15 @@ export default function GlobalHeader() {
               {isOwner && (
                 <Link
                   href="/owner"
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-medium rounded-xl hover:from-purple-700 hover:to-pink-700 transition-all duration-200 shadow-md hover:shadow-lg focus-visible-ring"
+                  className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
                   title="Owner Panel"
                 >
-                  <Crown className="w-4 h-4" />
-                  <span>Owner</span>
+                  <Crown className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-violet-500 dark:text-violet-400" strokeWidth={2} />
+                  
+                  {/* Hover tooltip */}
+                  <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                    Owner Panel
+                  </span>
                 </Link>
               )}
 
