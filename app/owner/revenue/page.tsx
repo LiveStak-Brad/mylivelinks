@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { OwnerPanelShell } from '@/components/owner/OwnerPanelShell';
 import Card, { CardHeader } from '@/components/owner/ui-kit/Card';
 import StatCard from '@/components/owner/ui-kit/StatCard';
@@ -34,7 +34,7 @@ interface TopCreator {
   id: string;
   username: string;
   avatar_url: string | null;
-  revenue: number;
+  coins: number;
   gifts_received: number;
 }
 
@@ -42,15 +42,17 @@ interface TopStream {
   id: string;
   streamer_username: string;
   room_name: string;
-  revenue: number;
+  coins: number;
   duration_minutes: number;
   started_at: string;
 }
 
 interface CoinPack {
-  id: string;
+  id: number;
+  sku: string | null;
+  name: string;
   price_usd: number;
-  coins_awarded: number;
+  coins: number;
   is_active: boolean;
   platform: 'web' | 'mobile';
 }
@@ -62,77 +64,70 @@ interface GiftType {
   is_active: boolean;
 }
 
-// ============================================================================
-// Mock Data (placeholder for actual API calls)
-// ============================================================================
+type AdminOk<T> = { ok: true; reqId: string; data: T };
+type AdminErr = { ok: false; reqId: string; error: { message: string } };
 
-const MOCK_REVENUE_STATS: RevenueStats = {
-  gross: 45280.5,
-  net: 31696.35,
-  refunds: 1250.0,
-  chargebacks: 340.0,
+type RevenueOverviewApi = {
+  window_start_at: string;
+  window_end_at: string;
+  currency: 'USD';
+  gross_usd_cents: number;
+  net_usd_cents: number;
+  daily: Array<{ day: string; gross_usd_cents: number; net_usd_cents: number }>;
+  top_creators: Array<{
+    profile_id: string;
+    username: string | null;
+    avatar_url: string | null;
+    gifts_received_count: number;
+    gifts_received_coins: number;
+  }>;
+  top_streams: Array<{
+    stream_id: string;
+    gifts_received_count: number;
+    gifts_received_coins: number;
+  }>;
 };
 
-const MOCK_TOP_CREATORS: TopCreator[] = [
-  {
-    id: '1',
-    username: 'streamer1',
-    avatar_url: null,
-    revenue: 12450.0,
-    gifts_received: 1542,
-  },
-  {
-    id: '2',
-    username: 'streamer2',
-    avatar_url: null,
-    revenue: 8920.5,
-    gifts_received: 982,
-  },
-  {
-    id: '3',
-    username: 'streamer3',
-    avatar_url: null,
-    revenue: 6780.25,
-    gifts_received: 756,
-  },
-];
+type EconomyApi = {
+  coin_packs: Array<{
+    id: number;
+    sku: string | null;
+    name: string;
+    platform: 'web' | 'mobile' | string;
+    coins: number;
+    price_usd: number;
+    is_active: boolean;
+  }>;
+  gift_types: Array<{
+    id: number;
+    name: string;
+    coin_cost: number;
+    is_active: boolean;
+  }>;
+  platform_settings: {
+    take_percent: number;
+    payout_threshold_cents: number;
+  };
+};
 
-const MOCK_TOP_STREAMS: TopStream[] = [
-  {
-    id: '1',
-    streamer_username: 'streamer1',
-    room_name: 'Epic Stream Session',
-    revenue: 3420.0,
-    duration_minutes: 180,
-    started_at: '2025-12-28T18:00:00Z',
-  },
-  {
-    id: '2',
-    streamer_username: 'streamer2',
-    room_name: 'Late Night Vibes',
-    revenue: 2890.5,
-    duration_minutes: 240,
-    started_at: '2025-12-28T22:00:00Z',
-  },
-];
+function dateRangeToWindow(range: '7d' | '30d' | '90d' | 'all') {
+  const end = new Date();
+  const start = new Date(
+    range === '7d'
+      ? Date.now() - 7 * 24 * 60 * 60 * 1000
+      : range === '30d'
+        ? Date.now() - 30 * 24 * 60 * 60 * 1000
+        : range === '90d'
+          ? Date.now() - 90 * 24 * 60 * 60 * 1000
+          : Date.now() - 365 * 24 * 60 * 60 * 1000
+  );
+  return { start, end };
+}
 
-const MOCK_COIN_PACKS: CoinPack[] = [
-  { id: '1', price_usd: 5, coins_awarded: 350, is_active: true, platform: 'web' },
-  { id: '2', price_usd: 10, coins_awarded: 700, is_active: true, platform: 'web' },
-  { id: '3', price_usd: 25, coins_awarded: 1750, is_active: true, platform: 'web' },
-  { id: '4', price_usd: 50, coins_awarded: 3500, is_active: true, platform: 'web' },
-  { id: '5', price_usd: 100, coins_awarded: 7000, is_active: true, platform: 'web' },
-  { id: '6', price_usd: 5, coins_awarded: 250, is_active: true, platform: 'mobile' },
-  { id: '7', price_usd: 10, coins_awarded: 500, is_active: true, platform: 'mobile' },
-];
-
-const MOCK_GIFT_TYPES: GiftType[] = [
-  { id: 1, name: 'Rose', coin_cost: 10, is_active: true },
-  { id: 2, name: 'Heart', coin_cost: 50, is_active: true },
-  { id: 3, name: 'Diamond', coin_cost: 100, is_active: true },
-  { id: 4, name: 'Crown', coin_cost: 500, is_active: true },
-  { id: 5, name: 'Legendary', coin_cost: 50000, is_active: true },
-];
+function safeNumber(v: unknown) {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
 
 // ============================================================================
 // Component
@@ -140,17 +135,131 @@ const MOCK_GIFT_TYPES: GiftType[] = [
 
 export default function RevenueOwnerPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'economy'>('overview');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const [revenueStats, setRevenueStats] = useState<RevenueStats>({ gross: 0, net: 0, refunds: 0, chargebacks: 0 });
+  const [topCreators, setTopCreators] = useState<TopCreator[]>([]);
+  const [topStreams, setTopStreams] = useState<TopStream[]>([]);
 
   // Economy Control State
-  const [coinPacks, setCoinPacks] = useState<CoinPack[]>(MOCK_COIN_PACKS);
-  const [giftTypes, setGiftTypes] = useState<GiftType[]>(MOCK_GIFT_TYPES);
+  const [coinPacks, setCoinPacks] = useState<CoinPack[]>([]);
+  const [giftTypes, setGiftTypes] = useState<GiftType[]>([]);
   const [platformTakePercent, setPlatformTakePercent] = useState(30);
   const [payoutThreshold, setPayoutThreshold] = useState(50);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  const baseCoinPacksRef = useRef<CoinPack[]>([]);
+  const baseGiftTypesRef = useRef<GiftType[]>([]);
+  const baseSettingsRef = useRef<{ platformTakePercent: number; payoutThreshold: number }>({
+    platformTakePercent: 30,
+    payoutThreshold: 50,
+  });
+
   // Date Range Filter (UI only)
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+
+  const loadEconomy = async () => {
+    const res = await fetch('/api/admin/economy', { method: 'GET', credentials: 'include', cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to load economy (${res.status})`);
+    const json = (await res.json()) as AdminOk<EconomyApi> | AdminErr;
+    if (!json.ok) throw new Error(json.error?.message || 'Failed to load economy');
+
+    const d = json.data;
+    const packs: CoinPack[] = (d.coin_packs ?? [])
+      .filter((p) => p && (p.platform === 'web' || p.platform === 'mobile'))
+      .map((p) => ({
+        id: Number(p.id),
+        sku: p.sku ?? null,
+        name: String(p.name ?? ''),
+        platform: p.platform === 'mobile' ? 'mobile' : 'web',
+        coins: safeNumber(p.coins),
+        price_usd: safeNumber(p.price_usd),
+        is_active: p.is_active === true,
+      }));
+
+    const gifts: GiftType[] = (d.gift_types ?? []).map((g) => ({
+      id: Number(g.id),
+      name: String(g.name ?? ''),
+      coin_cost: safeNumber(g.coin_cost),
+      is_active: g.is_active === true,
+    }));
+
+    const takePercent = safeNumber(d.platform_settings?.take_percent);
+    const payoutThresholdCents = safeNumber(d.platform_settings?.payout_threshold_cents);
+
+    setCoinPacks(packs);
+    setGiftTypes(gifts);
+    setPlatformTakePercent(takePercent);
+    setPayoutThreshold(Math.round(payoutThresholdCents / 100));
+
+    baseCoinPacksRef.current = packs;
+    baseGiftTypesRef.current = gifts;
+    baseSettingsRef.current = {
+      platformTakePercent: takePercent,
+      payoutThreshold: Math.round(payoutThresholdCents / 100),
+    };
+  };
+
+  const loadRevenue = async (range: '7d' | '30d' | '90d' | 'all') => {
+    const { start, end } = dateRangeToWindow(range);
+    const qs = `start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+    const res = await fetch(`/api/admin/revenue/overview?${qs}`, { method: 'GET', credentials: 'include', cache: 'no-store' });
+    if (!res.ok) throw new Error(`Failed to load revenue (${res.status})`);
+    const json = (await res.json()) as AdminOk<RevenueOverviewApi> | AdminErr;
+    if (!json.ok) throw new Error(json.error?.message || 'Failed to load revenue');
+
+    const d = json.data;
+    setRevenueStats({
+      gross: safeNumber(d.gross_usd_cents) / 100,
+      net: safeNumber(d.net_usd_cents) / 100,
+      refunds: 0,
+      chargebacks: 0,
+    });
+
+    setTopCreators(
+      (d.top_creators ?? []).map((c) => ({
+        id: String(c.profile_id),
+        username: c.username ?? 'unknown',
+        avatar_url: c.avatar_url ?? null,
+        coins: safeNumber(c.gifts_received_coins),
+        gifts_received: safeNumber(c.gifts_received_count),
+      }))
+    );
+
+    setTopStreams(
+      (d.top_streams ?? []).map((s) => ({
+        id: String(s.stream_id),
+        streamer_username: 'unknown',
+        room_name: `Stream ${String(s.stream_id).slice(0, 8)}`,
+        coins: safeNumber(s.gifts_received_coins),
+        duration_minutes: 0,
+        started_at: new Date().toISOString(),
+      }))
+    );
+  };
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true);
+      try {
+        await Promise.all([loadEconomy(), loadRevenue(dateRange)]);
+      } catch (e) {
+        console.error('[Owner Revenue] load failed:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        await loadRevenue(dateRange);
+      } catch (e) {
+        console.error('[Owner Revenue] revenue reload failed:', e);
+      }
+    })();
+  }, [dateRange]);
 
   // ============================================================================
   // Handlers
@@ -159,7 +268,7 @@ export default function RevenueOwnerPage() {
   const handleCoinPackToggle = (id: string) => {
     setCoinPacks((prev) =>
       prev.map((pack) =>
-        pack.id === id ? { ...pack, is_active: !pack.is_active } : pack
+        String(pack.id) === id ? { ...pack, is_active: !pack.is_active } : pack
       )
     );
     setHasUnsavedChanges(true);
@@ -175,14 +284,84 @@ export default function RevenueOwnerPage() {
   };
 
   const handleSaveChanges = () => {
-    // TODO: Wire to API
-    console.log('Save changes:', {
-      coinPacks,
-      giftTypes,
-      platformTakePercent,
-      payoutThreshold,
-    });
-    setHasUnsavedChanges(false);
+    void (async () => {
+      setLoading(true);
+      try {
+        const basePacks = baseCoinPacksRef.current;
+        const baseGifts = baseGiftTypesRef.current;
+        const baseSettings = baseSettingsRef.current;
+
+        const changedPacks = coinPacks.filter((p) => {
+          const before = basePacks.find((b) => b.id === p.id);
+          return !before || before.is_active !== p.is_active;
+        });
+
+        const changedGifts = giftTypes.filter((g) => {
+          const before = baseGifts.find((b) => b.id === g.id);
+          return !before || before.is_active !== g.is_active;
+        });
+
+        const settingsChanged =
+          baseSettings.platformTakePercent !== platformTakePercent || baseSettings.payoutThreshold !== payoutThreshold;
+
+        if (settingsChanged) {
+          const res = await fetch('/api/admin/economy/platform-settings', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              take_percent: platformTakePercent,
+              payout_threshold_cents: Math.round(payoutThreshold * 100),
+            }),
+          });
+          if (!res.ok) throw new Error(`Failed to update platform settings (${res.status})`);
+        }
+
+        await Promise.all(
+          changedPacks.map(async (p) => {
+            const res = await fetch('/api/admin/economy/coin-pack', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: p.id,
+                sku: p.sku,
+                name: p.name,
+                platform: p.platform,
+                coins: p.coins,
+                price_usd: p.price_usd,
+                is_active: p.is_active,
+              }),
+            });
+            if (!res.ok) throw new Error(`Failed to update coin pack (${res.status})`);
+          })
+        );
+
+        await Promise.all(
+          changedGifts.map(async (g) => {
+            const res = await fetch('/api/admin/economy/gift-type', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: g.id,
+                name: g.name,
+                coin_cost: g.coin_cost,
+                is_active: g.is_active,
+              }),
+            });
+            if (!res.ok) throw new Error(`Failed to update gift type (${res.status})`);
+          })
+        );
+
+        await loadEconomy();
+        setHasUnsavedChanges(false);
+      } catch (e) {
+        console.error('[Owner Revenue] save failed:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   // ============================================================================
@@ -210,25 +389,25 @@ export default function RevenueOwnerPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Gross Revenue"
-          value={formatCurrency(MOCK_REVENUE_STATS.gross)}
+          value={formatCurrency(revenueStats.gross)}
           icon={DollarSign}
           trend={{ value: 12.5, direction: 'up', label: 'vs last period' }}
         />
         <StatCard
           title="Net Revenue"
-          value={formatCurrency(MOCK_REVENUE_STATS.net)}
+          value={formatCurrency(revenueStats.net)}
           icon={TrendingUp}
           subtitle="After platform take"
         />
         <StatCard
           title="Refunds"
-          value={formatCurrency(MOCK_REVENUE_STATS.refunds)}
+          value={formatCurrency(revenueStats.refunds)}
           icon={TrendingDown}
           trend={{ value: 2.1, direction: 'down', label: 'vs last period' }}
         />
         <StatCard
           title="Chargebacks"
-          value={formatCurrency(MOCK_REVENUE_STATS.chargebacks)}
+          value={formatCurrency(revenueStats.chargebacks)}
           icon={AlertTriangle}
         />
       </div>
@@ -314,16 +493,14 @@ export default function RevenueOwnerPage() {
               },
               {
                 key: 'revenue',
-                header: 'Revenue',
+                header: 'Coins',
                 align: 'right',
                 render: (row: TopCreator) => (
-                  <span className="font-semibold text-success">
-                    {formatCurrency(row.revenue)}
-                  </span>
+                  <span className="font-semibold text-success">{formatNumber(row.coins)}</span>
                 ),
               },
             ]}
-            data={MOCK_TOP_CREATORS}
+            data={topCreators}
             keyExtractor={(row) => row.id}
             emptyMessage="No creator data available"
           />
@@ -354,16 +531,14 @@ export default function RevenueOwnerPage() {
               },
               {
                 key: 'revenue',
-                header: 'Revenue',
+                header: 'Coins',
                 align: 'right',
                 render: (row: TopStream) => (
-                  <span className="font-semibold text-success">
-                    {formatCurrency(row.revenue)}
-                  </span>
+                  <span className="font-semibold text-success">{formatNumber(row.coins)}</span>
                 ),
               },
             ]}
-            data={MOCK_TOP_STREAMS}
+            data={topStreams}
             keyExtractor={(row) => row.id}
             emptyMessage="No stream data available"
           />
@@ -422,15 +597,15 @@ export default function RevenueOwnerPage() {
                       <Coins className="w-5 h-5 text-primary" />
                       <div>
                         <p className="text-sm font-semibold text-foreground">
-                          {formatCurrency(pack.price_usd)} = {formatNumber(pack.coins_awarded)} coins
+                          {formatCurrency(pack.price_usd)} = {formatNumber(pack.coins)} coins
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {(pack.coins_awarded / pack.price_usd).toFixed(0)} coins per dollar
+                          {(pack.coins / pack.price_usd).toFixed(0)} coins per dollar
                         </p>
                       </div>
                     </div>
                     <button
-                      onClick={() => handleCoinPackToggle(pack.id)}
+                      onClick={() => handleCoinPackToggle(String(pack.id))}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         pack.is_active ? 'bg-success' : 'bg-muted'
                       }`}

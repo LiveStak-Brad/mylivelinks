@@ -90,10 +90,10 @@ BEGIN
 
     p.hide_streaming_stats,
 
-    p.show_top_friends,
-    p.top_friends_title,
-    p.top_friends_avatar_style,
-    p.top_friends_max_count,
+    COALESCE(p.show_top_friends, true) AS show_top_friends,
+    COALESCE(p.top_friends_title, 'Top Friends') AS top_friends_title,
+    COALESCE(p.top_friends_avatar_style, 'square') AS top_friends_avatar_style,
+    COALESCE(p.top_friends_max_count, 8) AS top_friends_max_count,
 
     p.social_instagram,
     p.social_twitter,
