@@ -839,20 +839,20 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
           onClick={() => setShowDeviceModal(false)}
         >
           <div 
-            className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-md p-6 my-auto max-h-[90vh] overflow-y-auto" 
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-[min(90vw,400px)] sm:max-w-[450px] p-4 sm:p-6 my-auto max-h-[90vh] overflow-y-auto" 
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-semibold mb-4">Select Camera & Microphone</h2>
+            <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Select Camera & Microphone</h2>
             
             {permissionError && (
-              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-sm">
+              <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-xs sm:text-sm">
                 {permissionError}
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {/* Preview */}
-              <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', minHeight: '200px' }}>
+              <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9', minHeight: '180px' }}>
                 <video
                   ref={(el) => {
                     setPreviewVideoRef(el);
@@ -871,7 +871,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
                   className="w-full h-full object-cover"
                 />
                 {!previewStream && (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs sm:text-sm">
                     Camera preview will appear here
                   </div>
                 )}
@@ -927,13 +927,13 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
                           setIsScreenSharing(false);
                           startPreview(undefined, device.deviceId, selectedAudioDevice);
                         }}
-                        className={`w-full px-4 py-3 text-left rounded-lg border-2 transition ${
+                        className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-left rounded-lg border-2 transition text-xs sm:text-sm ${
                           videoSourceType === 'camera' && selectedVideoDevice === device.deviceId
                             ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                             : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                         }`}
                       >
-                        <span className="font-medium">{displayLabel}</span>
+                        <span className="font-medium truncate block">{displayLabel}</span>
                       </button>
                     );
                   })}
@@ -997,17 +997,17 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
+            <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6">
               <button
                 onClick={() => setShowDeviceModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                className="flex-1 px-3 sm:px-4 py-2 sm:py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm sm:text-base font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleStartLive}
                 disabled={(videoSourceType === 'camera' ? !selectedVideoDevice : !isScreenSharing) || !selectedAudioDevice || loading}
-                className={`flex-1 px-4 py-2 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`flex-1 px-3 sm:px-4 py-2 sm:py-3 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base font-medium ${
                   videoSourceType === 'screen' 
                     ? 'bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700'
                     : 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700'
@@ -1016,7 +1016,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
                 {loading ? 'Starting...' : videoSourceType === 'screen' ? '🖥️ Go Live with Screen' : 'Start Live'}
               </button>
               {error && (
-                <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-sm">
+                <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-xs sm:text-sm">
                   Error: {error.message}
                 </div>
               )}
