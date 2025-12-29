@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -43,16 +44,7 @@ export function ReportDetailSheet({ report, onClose, onUpdate, theme }: ReportDe
     });
   };
 
-  const handleModerationAction = useCallback(
-    (action: string) => {
-      Alert.alert(
-        'Not Yet Implemented',
-        `The "${action}" action is not yet implemented. Backend wiring required.`,
-        [{ text: 'OK' }]
-      );
-    },
-    []
-  );
+  // Moderation actions are disabled - no handler needed
 
   const handleStatusChange = useCallback(
     async (newStatus: 'resolved' | 'dismissed') => {
@@ -178,9 +170,11 @@ export function ReportDetailSheet({ report, onClose, onUpdate, theme }: ReportDe
             </View>
             {report.reported_user ? (
               <View style={styles.userCard}>
-                <View style={styles.userAvatar}>
-                  <Feather name="user" size={24} color={theme.colors.textMuted} />
-                </View>
+                <Image
+                  source={require('../assets/no-profile-pic.png')}
+                  style={styles.userAvatar}
+                  resizeMode="cover"
+                />
                 <View style={styles.userInfo}>
                   <Text style={styles.userName}>{report.reported_user.display_name || report.reported_user.username}</Text>
                   <Text style={styles.userHandle}>@{report.reported_user.username}</Text>
@@ -201,9 +195,11 @@ export function ReportDetailSheet({ report, onClose, onUpdate, theme }: ReportDe
             </View>
             {report.reporter ? (
               <View style={styles.userCard}>
-                <View style={styles.userAvatar}>
-                  <Feather name="user" size={24} color={theme.colors.textMuted} />
-                </View>
+                <Image
+                  source={require('../assets/no-profile-pic.png')}
+                  style={styles.userAvatar}
+                  resizeMode="cover"
+                />
                 <View style={styles.userInfo}>
                   <Text style={styles.userName}>{report.reporter.display_name || report.reporter.username}</Text>
                   <Text style={styles.userHandle}>@{report.reporter.username}</Text>
@@ -251,40 +247,24 @@ export function ReportDetailSheet({ report, onClose, onUpdate, theme }: ReportDe
               <Text style={styles.sectionTitle}>Moderation Actions</Text>
             </View>
             <View style={styles.actionsGrid}>
-              <Pressable
-                onPress={() => handleModerationAction('warn')}
-                disabled={!report.reported_user}
-                style={({ pressed }) => [styles.actionButton, pressed ? styles.pressed : null, !report.reported_user ? styles.disabled : null]}
-              >
-                <Feather name="alert-triangle" size={18} color={theme.colors.textPrimary} />
-                <Text style={styles.actionButtonText}>Warn</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleModerationAction('mute')}
-                disabled={!report.reported_user}
-                style={({ pressed }) => [styles.actionButton, pressed ? styles.pressed : null, !report.reported_user ? styles.disabled : null]}
-              >
-                <Feather name="volume-2" size={18} color={theme.colors.textPrimary} />
-                <Text style={styles.actionButtonText}>Mute</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleModerationAction('ban')}
-                disabled={!report.reported_user}
-                style={({ pressed }) => [styles.actionButton, styles.dangerButton, pressed ? styles.pressed : null, !report.reported_user ? styles.disabled : null]}
-              >
-                <Feather name="slash" size={18} color="#fff" />
-                <Text style={[styles.actionButtonText, styles.dangerButtonText]}>Ban</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => handleModerationAction('remove_monetization')}
-                disabled={!report.reported_user}
-                style={({ pressed }) => [styles.actionButton, pressed ? styles.pressed : null, !report.reported_user ? styles.disabled : null]}
-              >
-                <Feather name="dollar-sign" size={18} color={theme.colors.textPrimary} />
-                <Text style={styles.actionButtonText}>Remove $$</Text>
-              </Pressable>
+              <View style={[styles.actionButton, styles.disabled]}>
+                <Feather name="alert-triangle" size={18} color={theme.colors.textMuted} />
+                <Text style={[styles.actionButtonText, styles.disabledText]}>Warn</Text>
+              </View>
+              <View style={[styles.actionButton, styles.disabled]}>
+                <Feather name="volume-2" size={18} color={theme.colors.textMuted} />
+                <Text style={[styles.actionButtonText, styles.disabledText]}>Mute</Text>
+              </View>
+              <View style={[styles.actionButton, styles.dangerButton, styles.disabled]}>
+                <Feather name="slash" size={18} color={theme.colors.textMuted} />
+                <Text style={[styles.actionButtonText, styles.disabledText]}>Ban</Text>
+              </View>
+              <View style={[styles.actionButton, styles.disabled]}>
+                <Feather name="dollar-sign" size={18} color={theme.colors.textMuted} />
+                <Text style={[styles.actionButtonText, styles.disabledText]}>Remove $$</Text>
+              </View>
             </View>
-            <Text style={styles.actionsNote}>Actions disabled until backend wiring complete</Text>
+            <Text style={styles.actionsNote}>Moderation actions require backend implementation</Text>
           </View>
         </ScrollView>
 
@@ -479,8 +459,6 @@ function createStyles(theme: ThemeDefinition) {
       height: 48,
       borderRadius: 24,
       backgroundColor: theme.colors.cardAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     userInfo: {
       flex: 1,
@@ -583,6 +561,9 @@ function createStyles(theme: ThemeDefinition) {
     },
     dangerButtonText: {
       color: '#fff',
+    },
+    disabledText: {
+      color: theme.colors.textMuted,
     },
     actionsNote: {
       color: theme.colors.textMuted,
