@@ -145,13 +145,14 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, avatar_url')
           .eq('id', data.user.id)
           .maybeSingle();
 
         if (canceled) return;
         if (profile && typeof (profile as any).username === 'string') {
           setCurrentUsername(String((profile as any).username));
+          setCurrentUser({ avatar_url: (profile as any).avatar_url || null });
         }
       } catch {
         // ignore
