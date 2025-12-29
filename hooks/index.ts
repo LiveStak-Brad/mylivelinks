@@ -13,10 +13,11 @@ export { useOwnerPanelData } from './useOwnerPanelData';
 export { useOwnerLiveOpsData } from './useOwnerLiveOpsData';
 export type {
   OwnerPanelData,
-  OwnerPanelStats,
+  DashboardStats,
   PlatformHealth,
   LiveStreamInfo,
   ReportInfo,
+  UseOwnerPanelDataReturn,
 } from './useOwnerPanelData';
 export type {
   LiveOpsStreamData,

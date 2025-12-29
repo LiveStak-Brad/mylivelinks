@@ -8,7 +8,7 @@ export { default as RoomForm } from './RoomForm';
 export type { RoomFormData } from './RoomForm';
 
 // New Owner Panel Components
-export { default as OwnerPanelShell } from './OwnerPanelShell';
+// Removed duplicate export - OwnerPanelShell is exported below on line 17
 
 // UI Kit - Re-export for convenience
 export * from './ui-kit';

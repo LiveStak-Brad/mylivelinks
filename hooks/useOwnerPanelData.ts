@@ -280,6 +280,14 @@ export interface ReportInfo {
   status: string;
 }
 
+export interface PlatformHealth {
+  api: 'ok' | 'degraded' | 'down';
+  supabase: 'ok' | 'degraded' | 'down';
+  livekit: 'ok' | 'degraded' | 'down';
+  tokenSuccessRate: number;
+  avgJoinTime: number;
+}
+
 // ============================================================================
 // MOCK DATA (Only used in development, removed in production)
 // ============================================================================
