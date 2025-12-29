@@ -125,7 +125,7 @@ export default function ReferralsPage() {
           </h1>
           <p className="text-muted-foreground">Platform-wide referral performance and analytics</p>
         </div>
-        <Button variant="secondary" onClick={() => void loadData()}>
+        <Button variant="outline" onClick={() => void loadData()}>
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
         </Button>

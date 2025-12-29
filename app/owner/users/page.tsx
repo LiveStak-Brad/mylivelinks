@@ -275,10 +275,10 @@ export default function UsersPage() {
 
             {/* Actions */}
             <div className="space-y-2">
-              <Button variant="secondary" className="w-full" disabled>
+              <Button variant="outline" className="w-full" disabled>
                 Send Message
               </Button>
-              <Button variant="secondary" className="w-full" disabled>
+              <Button variant="outline" className="w-full" disabled>
                 View Transaction History
               </Button>
               <Button variant="destructive" className="w-full" disabled>

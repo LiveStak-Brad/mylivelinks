@@ -302,7 +302,7 @@ export default function SettingsPage() {
         </div>
         <div className="flex items-center gap-3">
           {hasChanges && (
-            <Button variant="secondary" onClick={() => setHasChanges(false)} disabled>
+            <Button variant="outline" onClick={() => setHasChanges(false)} disabled>
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset
             </Button>
