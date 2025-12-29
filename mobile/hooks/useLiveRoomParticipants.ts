@@ -123,6 +123,9 @@ export function useLiveRoomParticipants(
   const [lastConnectError, setLastConnectError] = useState<string | null>(null);
   const tokenAttemptIdRef = useRef(0);
   const tokenAttemptInFlightRef = useRef<number | null>(null);
+  const tokenAbortControllerRef = useRef<AbortController | null>(null);
+  const connectAttemptIdRef = useRef(0);
+  const activeConnectAttemptIdRef = useRef<number | null>(null);
   const isLiveRef = useRef(false);
   const isPublishingRef = useRef(false);
   const goLiveInFlightRef = useRef(false);
@@ -195,6 +198,7 @@ export function useLiveRoomParticipants(
     role: 'viewer' | 'publisher';
     participantMetadata?: Record<string, any>;
   }): Promise<{ token: string; url: string }> => {
+    let controller: AbortController | null = null;
     try {
       tokenAttemptIdRef.current += 1;
       const attemptId = tokenAttemptIdRef.current;
@@ -364,7 +368,14 @@ export function useLiveRoomParticipants(
         });
       }
 
-      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      try {
+        tokenAbortControllerRef.current?.abort();
+      } catch {
+        // ignore
+      }
+
+      controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      tokenAbortControllerRef.current = controller;
       const tokenFetchStart = nowMs();
       const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
       const isDevClient = isDev && Constants.appOwnership === 'standalone';
@@ -479,6 +490,11 @@ export function useLiveRoomParticipants(
 
       setTokenDebug(prev => ({ ...prev, bodySnippet: snippet500 }));
 
+      console.log('[TOKEN] response_json', {
+        attemptId,
+        keys: data && typeof data === 'object' ? Object.keys(data) : null,
+      });
+
       const wsUrl = typeof data?.url === 'string' ? String(data.url) : '';
       setLastWsUrl(wsUrl || null);
 
@@ -530,6 +546,9 @@ export function useLiveRoomParticipants(
       throw error;
     } finally {
       tokenAttemptInFlightRef.current = null;
+      if (tokenAbortControllerRef.current === controller) {
+        tokenAbortControllerRef.current = null;
+      }
     }
   };
 
@@ -644,10 +663,20 @@ export function useLiveRoomParticipants(
       return;
     }
 
+    connectAttemptIdRef.current += 1;
+    const connectAttemptId = connectAttemptIdRef.current;
+    activeConnectAttemptIdRef.current = connectAttemptId;
+    let cancelled = false;
+
+    if (DEBUG) {
+      console.log('[ROOM] connect_attempt', { connectAttemptId });
+    }
+
     isConnectingRef.current = true;
 
     const connectToRoom = async () => {
       try {
+        if (cancelled || activeConnectAttemptIdRef.current !== connectAttemptId) return;
         reachedConnectedRef.current = false;
         setConnectDebug({ wsUrl: null, errorMessage: null, reachedConnected: false });
         const livekit = getLivekit();
@@ -655,6 +684,7 @@ export function useLiveRoomParticipants(
         const Track = livekit.Track;
 
         const authContext = await getAuthContext();
+        if (cancelled || activeConnectAttemptIdRef.current !== connectAttemptId) return;
         if (!authContext.isAuthed || !authContext.profileId) {
           if (DEBUG) {
             console.log('[ROOM] Skipping connect (not authenticated)');
@@ -666,6 +696,7 @@ export function useLiveRoomParticipants(
 
         // 4) Guard against race conditions: do not attempt token fetch until AuthContext has a token.
         const bearer = await getAccessToken();
+        if (cancelled || activeConnectAttemptIdRef.current !== connectAttemptId) return;
         if (!bearer) {
           lastTokenStatusRef.current = 0;
           setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: 0, bodySnippet: null });
@@ -695,6 +726,7 @@ export function useLiveRoomParticipants(
               ? { profile_id: authContext.profileId, platform: 'mobile' }
               : { platform: 'mobile' },
           });
+          if (cancelled || activeConnectAttemptIdRef.current !== connectAttemptId) return;
           token = tokenResult.token;
           url = tokenResult.url;
         } catch (tokenErr: any) {
@@ -734,6 +766,7 @@ export function useLiveRoomParticipants(
               participants: room.remoteParticipants.size,
             });
           }
+          if (cancelled || activeConnectAttemptIdRef.current !== connectAttemptId) return;
           setIsConnected(true);
           hasConnectedRef.current = true;
           isConnectingRef.current = false;
@@ -809,6 +842,7 @@ export function useLiveRoomParticipants(
         if (DEBUG) console.log('[ROOM] About to call room.connect()');
         setConnectDebug({ wsUrl: url, errorMessage: null, reachedConnected: false });
         try {
+          if (cancelled || activeConnectAttemptIdRef.current !== connectAttemptId) return;
           await room.connect(url, token);
         } catch (err: any) {
           const details = [err?.name, err?.message, err?.stack].filter(Boolean).join(' | ').slice(0, 500);
@@ -845,10 +879,39 @@ export function useLiveRoomParticipants(
     };
 
     connectToRoom();
+
+    return () => {
+      cancelled = true;
+      if (activeConnectAttemptIdRef.current === connectAttemptId) {
+        activeConnectAttemptIdRef.current = null;
+      }
+
+      if (DEBUG) {
+        console.log('[ROOM] connect_cleanup', { connectAttemptId });
+      }
+
+      if (!hasConnectedRef.current && isConnectingRef.current) {
+        try {
+          tokenAbortControllerRef.current?.abort();
+        } catch {
+          // ignore
+        }
+        try {
+          roomRef.current?.disconnect();
+        } catch {
+          // ignore
+        }
+      }
+    };
   }, [enabled, getAccessToken, getAuthContext, updateParticipants]);
 
   useEffect(() => {
     return () => {
+      try {
+        tokenAbortControllerRef.current?.abort();
+      } catch {
+        // ignore
+      }
       if (roomRef.current) {
         if (DEBUG) {
           console.log('[ROOM] Cleaning up connection');
