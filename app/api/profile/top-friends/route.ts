@@ -205,6 +205,8 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { friendId, newPosition } = body;
 
+    console.log('[TOP_FRIENDS] Reorder request:', { userId: user.id, friendId, newPosition });
+
     if (!friendId || typeof newPosition !== 'number') {
       return NextResponse.json(
         { error: 'Friend ID and new position are required' },
@@ -226,10 +228,12 @@ export async function PATCH(request: NextRequest) {
       p_new_position: newPosition,
     });
 
+    console.log('[TOP_FRIENDS] Reorder RPC result:', { data, error });
+
     if (error) {
       console.error('[TOP_FRIENDS] Error reordering top friend:', error);
       return NextResponse.json(
-        { error: 'Failed to reorder top friend' },
+        { error: 'Failed to reorder top friend', details: error.message },
         { status: 500 }
       );
     }
@@ -237,12 +241,14 @@ export async function PATCH(request: NextRequest) {
     const result = data as { success: boolean; error?: string };
 
     if (!result.success) {
+      console.error('[TOP_FRIENDS] Reorder failed:', result.error);
       return NextResponse.json(
         { error: result.error || 'Failed to reorder top friend' },
         { status: 400 }
       );
     }
 
+    console.log('[TOP_FRIENDS] Reorder successful');
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[TOP_FRIENDS] Unexpected error:', error);

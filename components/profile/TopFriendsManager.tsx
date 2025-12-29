@@ -50,6 +50,7 @@ export default function TopFriendsManager({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -252,12 +253,19 @@ export default function TopFriendsManager({
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
+    setDropTargetIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDropTargetIndex(null);
   };
 
   const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
     
     console.log('[TOP_FRIENDS_MANAGER] Dropped at index:', dropIndex, 'from index:', draggedIndex);
+
+    setDropTargetIndex(null);
 
     if (draggedIndex === null || draggedIndex === dropIndex) {
       console.log('[TOP_FRIENDS_MANAGER] Ignoring drop - same position or null');
@@ -408,9 +416,14 @@ export default function TopFriendsManager({
                     draggable
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={(e) => handleDragOver(e, index)}
+                    onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, index)}
-                    className={`flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition cursor-move ${
-                      draggedIndex === index ? 'opacity-50' : ''
+                    className={`flex items-center justify-between p-4 rounded-lg transition cursor-move ${
+                      draggedIndex === index 
+                        ? 'opacity-40 bg-gray-100 dark:bg-gray-700' 
+                        : dropTargetIndex === index
+                        ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-400 dark:border-blue-500'
+                        : 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
                     <div className="flex items-center gap-3">
