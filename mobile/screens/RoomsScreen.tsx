@@ -75,7 +75,10 @@ export function RoomsScreen({ navigation }: Props) {
           {/* Enter Live Central Button */}
           <TouchableOpacity
             style={[styles.enterButton, { backgroundColor: theme.colors.accent }]}
-            onPress={() => setLiveRoomEnabled(true)}
+            onPress={() => {
+              console.log('[LIVE_CRASH_FIX] enter_live_central_pressed');
+              setLiveRoomEnabled(true);
+            }}
             activeOpacity={0.8}
           >
             <Text style={styles.enterButtonText}>🔴 Enter Live Central</Text>
