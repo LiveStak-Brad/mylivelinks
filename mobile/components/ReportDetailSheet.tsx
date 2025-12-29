@@ -1,7 +1,7 @@
+// Mobile Owner Panel: Reports Parity (canonical commit)
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   Pressable,
@@ -33,6 +33,14 @@ export function ReportDetailSheet({ report, onClose, onUpdate, theme }: ReportDe
 
   const [adminNotes, setAdminNotes] = useState(report.admin_notes || '');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; variant: 'success' | 'error' } | null>(null);
+
+  const showToast = useCallback((message: string, variant: 'success' | 'error') => {
+    setToast({ message, variant });
+    setTimeout(() => {
+      setToast(null);
+    }, 2500);
+  }, []);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
@@ -65,25 +73,25 @@ export function ReportDetailSheet({ report, onClose, onUpdate, theme }: ReportDe
         });
 
         if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            showToast('You do not have permission to update reports.', 'error');
+            return;
+          }
           throw new Error(res.message || 'Failed to update report status');
         }
 
-        Alert.alert('Success', `Report ${newStatus} successfully.`, [
-          {
-            text: 'OK',
-            onPress: () => {
-              onUpdate();
-            },
-          },
-        ]);
+        showToast(newStatus === 'resolved' ? 'Report resolved.' : 'Report dismissed.', 'success');
+        setTimeout(() => {
+          onUpdate();
+        }, 450);
       } catch (error: any) {
         console.error('Error updating report:', error);
-        Alert.alert('Error', error.message || 'Failed to update report status');
+        showToast(error?.message || 'Failed to update report status', 'error');
       } finally {
         setActionLoading(null);
       }
     },
-    [report.id, adminNotes, fetchAuthed, onUpdate]
+    [report.id, adminNotes, fetchAuthed, onUpdate, showToast]
   );
 
   const getStatusColor = (status: string) => {
@@ -117,6 +125,17 @@ export function ReportDetailSheet({ report, onClose, onUpdate, theme }: ReportDe
             <Feather name="x" size={24} color={theme.colors.textPrimary} />
           </Pressable>
         </View>
+
+        {toast && (
+          <View
+            style={[
+              styles.toast,
+              toast.variant === 'success' ? styles.toastSuccess : styles.toastError,
+            ]}
+          >
+            <Text style={styles.toastText}>{toast.message}</Text>
+          </View>
+        )}
 
         {/* Content */}
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -347,6 +366,28 @@ function createStyles(theme: ThemeDefinition) {
       backgroundColor: theme.colors.cardAlt,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    toast: {
+      marginHorizontal: 16,
+      marginTop: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+    },
+    toastSuccess: {
+      backgroundColor: '#10b98115',
+      borderColor: '#10b98130',
+    },
+    toastError: {
+      backgroundColor: '#ef444415',
+      borderColor: '#ef444430',
+    },
+    toastText: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '700',
+      textAlign: 'center',
     },
     scroll: {
       flex: 1,

@@ -15,6 +15,7 @@
  */
 
 // Mobile Owner Panel Parity: Revenue + Feature Flags
+// Mobile Owner Panel: Reports Parity (canonical commit)
 
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';

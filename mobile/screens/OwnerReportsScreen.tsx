@@ -1,3 +1,4 @@
+// Mobile Owner Panel: Reports Parity (canonical commit)
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,

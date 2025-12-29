@@ -1,3 +1,4 @@
+// Mobile Owner Panel: Reports Parity (canonical commit)
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
 // Root stack for authentication and initial flow
