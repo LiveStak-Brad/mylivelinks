@@ -1074,6 +1074,41 @@ export default function ModernProfilePage() {
                 </div>
               </div>
             </div>
+            
+            {/* Social Counts - Integrated into Hero */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <button
+                  onClick={() => setShowFollowersModal(true)}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
+                >
+                  <div className="text-2xl font-bold" style={{ color: accentColor }}>
+                    {profileData.follower_count.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Followers</div>
+                </button>
+                
+                <button
+                  onClick={() => setShowFollowingModal(true)}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
+                >
+                  <div className="text-2xl font-bold" style={{ color: accentColor }}>
+                    {profileData.following_count.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Following</div>
+                </button>
+                
+                <button
+                  onClick={() => setShowFriendsModal(true)}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg p-3 transition-colors"
+                >
+                  <div className="text-2xl font-bold" style={{ color: accentColor }}>
+                    {profileData.friends_count.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Friends</div>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -1205,23 +1240,9 @@ export default function ModernProfilePage() {
               />
             )}
             
-            {/* Stats & Social Grid - Check if modules are enabled */}
+            {/* Stats Grid - Top Supporters & Top Streamers */}
             {!profile.hide_streaming_stats && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
-                {isSectionEnabled('social_counts', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
-                  <SocialCountsWidget
-                    followerCount={profileData.follower_count}
-                    followingCount={profileData.following_count}
-                    friendsCount={profileData.friends_count}
-                    onShowFollowers={() => setShowFollowersModal(true)}
-                    onShowFollowing={() => setShowFollowingModal(true)}
-                    onShowFriends={() => setShowFriendsModal(true)}
-                    cardStyle={cardStyle}
-                    borderRadiusClass={borderRadiusClass}
-                    accentColor={accentColor}
-                  />
-                )}
-                
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 mb-4 sm:mb-6">
                 {isSectionEnabled('top_supporters', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
                   <TopSupportersWidget
                     supporters={profileData.top_supporters}

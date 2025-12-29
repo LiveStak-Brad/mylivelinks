@@ -46,7 +46,7 @@ export default function StatCard({
                   trend.direction === 'up' ? 'text-success' : 'text-destructive'
                 }`}
               >
-                {trend.value > 0 ? '+' : ''}{trend.value}%
+                {trend.value > 0 ? '+' : ''}{trend.value.toFixed(2)}%
               </span>
               {trend.label && (
                 <span className="text-xs text-muted-foreground ml-1">
