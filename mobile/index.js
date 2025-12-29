@@ -15,6 +15,15 @@ const { TextDecoder, TextEncoder } = require('text-encoding');
 if (global.TextEncoder == null) global.TextEncoder = TextEncoder;
 if (global.TextDecoder == null) global.TextDecoder = TextDecoder;
 
+if (global.__LIVEKIT_GLOBALS_REGISTERED__ !== true) {
+  try {
+    require('@livekit/react-native').registerGlobals();
+  } catch {
+    // ignore
+  }
+  global.__LIVEKIT_GLOBALS_REGISTERED__ = true;
+}
+
 const App = require('./App').default;
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
