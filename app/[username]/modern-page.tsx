@@ -1070,7 +1070,7 @@ export default function ModernProfilePage() {
         
         {/* Profile Tabs (config-driven, parity with mobile) */}
         <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
-          <div className="flex border-b border-gray-200 dark:border-gray-700">
+          <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-hide">
             {enabledTabs.map((tab) => {
               const TabIcon = tabIconMap[tab.id as ConfigProfileTab] || Info;
               const isActive = activeTab === tab.id;
@@ -1078,15 +1078,15 @@ export default function ModernProfilePage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm sm:text-base font-semibold transition-colors border-b-2 ${
+                  className={`flex-1 min-w-max flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-base font-semibold transition-colors border-b-2 ${
                     isActive
                       ? 'border-purple-500 text-purple-500'
                       : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                   }`}
                   style={isActive ? { borderColor: accentColor, color: accentColor } : {}}
                 >
-                  <TabIcon className="w-5 h-5" />
-                  {tab.label}
+                  <TabIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-[10px] sm:text-sm leading-tight">{tab.label}</span>
                 </button>
               );
             })}
