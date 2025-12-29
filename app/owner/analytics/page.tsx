@@ -471,20 +471,20 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Stripe Events Table */}
-            <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-700">
-                <h3 className="font-semibold text-white">Recent Stripe Events</h3>
+            <div className="bg-card rounded-lg border border-border overflow-hidden">
+              <div className="px-6 py-4 border-b border-border">
+                <h3 className="font-semibold text-foreground">Recent Stripe Events</h3>
               </div>
               
               {loading ? (
-                <div className="divide-y divide-gray-700">
+                <div className="divide-y divide-border">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div key={i} className="flex items-center gap-4 px-6 py-4">
-                      <div className="h-4 w-32 bg-gray-700 rounded animate-pulse" />
+                      <div className="h-4 w-32 bg-muted rounded animate-pulse" />
                       <div className="flex-1" />
-                      <div className="h-4 w-16 bg-gray-700 rounded animate-pulse" />
-                      <div className="h-4 w-16 bg-gray-700 rounded animate-pulse" />
-                      <div className="h-4 w-20 bg-gray-700 rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                      <div className="h-4 w-16 bg-muted rounded animate-pulse" />
+                      <div className="h-4 w-20 bg-muted rounded animate-pulse" />
                     </div>
                   ))}
                 </div>
@@ -492,7 +492,7 @@ export default function AnalyticsPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="bg-gray-700/30 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      <tr className="bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         <th className="px-6 py-3 text-left">Date</th>
                         <th className="px-6 py-3 text-left">Type</th>
                         <th className="px-6 py-3 text-right">Amount</th>
@@ -501,10 +501,10 @@ export default function AnalyticsPage() {
                         <th className="px-6 py-3 text-center">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-700">
+                    <tbody className="divide-y divide-border">
                       {(data?.stripeEvents ?? []).slice(0, 20).map((event) => (
-                        <tr key={event.id} className="hover:bg-gray-700/30 transition">
-                          <td className="px-6 py-3 text-sm text-gray-300">
+                        <tr key={event.id} className="hover:bg-muted/30 transition">
+                          <td className="px-6 py-3 text-sm text-foreground">
                             {formatDate(event.date)}
                           </td>
                           <td className="px-6 py-3">
@@ -516,14 +516,14 @@ export default function AnalyticsPage() {
                               {event.type}
                             </span>
                           </td>
-                          <td className="px-6 py-3 text-sm text-white text-right font-mono">
+                          <td className="px-6 py-3 text-sm text-foreground text-right font-mono">
                             {formatCurrency(event.amount)}
                           </td>
-                          <td className="px-6 py-3 text-sm text-gray-400 text-right font-mono">
+                          <td className="px-6 py-3 text-sm text-muted-foreground text-right font-mono">
                             {formatCurrency(event.fees)}
                           </td>
                           <td className={`px-6 py-3 text-sm text-right font-mono ${
-                            event.net >= 0 ? 'text-green-400' : 'text-red-400'
+                            event.net >= 0 ? 'text-success' : 'text-destructive'
                           }`}>
                             {event.net >= 0 ? '+' : ''}{formatCurrency(event.net)}
                           </td>
@@ -604,9 +604,9 @@ export default function AnalyticsPage() {
             />
 
             {/* Recommendations */}
-            <div className="bg-gray-800 rounded-xl border border-gray-700 p-6">
-              <h3 className="font-semibold text-white mb-4">Risk Management Recommendations</h3>
-              <ul className="space-y-3 text-sm text-gray-300">
+            <div className="bg-card rounded-lg border border-border p-6">
+              <h3 className="font-semibold text-foreground mb-4">Risk Management Recommendations</h3>
+              <ul className="space-y-3 text-sm text-foreground">
                 <li className="flex items-start gap-3">
                   <span className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
                   <span>Maintain a reserve fund equal to at least 50% of your estimated exposure</span>

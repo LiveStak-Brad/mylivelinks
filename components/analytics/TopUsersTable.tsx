@@ -42,18 +42,18 @@ export default function TopUsersTable({
 
   if (loading) {
     return (
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-700">
-          <div className="h-5 w-32 bg-gray-700 rounded animate-pulse" />
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
+          <div className="h-5 w-32 bg-muted rounded animate-pulse" />
         </div>
-        <div className="divide-y divide-gray-700">
+        <div className="divide-y divide-border">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="flex items-center gap-4 px-6 py-4">
-              <div className="w-8 h-8 rounded-full bg-gray-700 animate-pulse" />
+              <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
               <div className="flex-1">
-                <div className="h-4 w-24 bg-gray-700 rounded animate-pulse" />
+                <div className="h-4 w-24 bg-muted rounded animate-pulse" />
               </div>
-              <div className="h-4 w-16 bg-gray-700 rounded animate-pulse" />
+              <div className="h-4 w-16 bg-muted rounded animate-pulse" />
             </div>
           ))}
         </div>
@@ -62,19 +62,19 @@ export default function TopUsersTable({
   }
 
   return (
-    <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-700">
-        <h3 className="font-semibold text-white">{title}</h3>
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
+      <div className="px-6 py-4 border-b border-border">
+        <h3 className="font-semibold text-foreground">{title}</h3>
       </div>
       
       {users.length === 0 ? (
-        <div className="px-6 py-12 text-center text-gray-500">
+        <div className="px-6 py-12 text-center text-muted-foreground">
           {emptyMessage}
         </div>
       ) : (
         <>
           {/* Header */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-700/30 text-xs font-medium text-gray-400 uppercase tracking-wider">
+          <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-muted/30 text-xs font-medium text-muted-foreground uppercase tracking-wider">
             <div className="col-span-1">#</div>
             <div className="col-span-5">User</div>
             <div className="col-span-3 text-right">{columns.primary.label}</div>
@@ -84,22 +84,22 @@ export default function TopUsersTable({
           </div>
           
           {/* Rows */}
-          <div className="divide-y divide-gray-700">
+          <div className="divide-y divide-border">
             {users.slice(0, maxRows).map((user, index) => (
               <div
                 key={user.id}
                 onClick={() => onUserClick?.(user.id)}
                 className={`grid grid-cols-12 gap-4 px-6 py-4 items-center ${
-                  onUserClick ? 'cursor-pointer hover:bg-gray-700/50 transition' : ''
+                  onUserClick ? 'cursor-pointer hover:bg-muted/50 transition' : ''
                 }`}
               >
                 {/* Rank */}
                 <div className="col-span-1">
                   <span className={`font-bold ${
-                    index === 0 ? 'text-yellow-400' :
-                    index === 1 ? 'text-gray-300' :
-                    index === 2 ? 'text-amber-600' :
-                    'text-gray-500'
+                    index === 0 ? 'text-warning' :
+                    index === 1 ? 'text-muted-foreground' :
+                    index === 2 ? 'text-warning/70' :
+                    'text-muted-foreground'
                   }`}>
                     {index + 1}
                   </span>
@@ -119,11 +119,11 @@ export default function TopUsersTable({
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-white truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {user.displayName || user.username}
                     </p>
                     {user.displayName && (
-                      <p className="text-xs text-gray-500 truncate">@{user.username}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
                     )}
                   </div>
                   {user.badge}
@@ -131,7 +131,7 @@ export default function TopUsersTable({
                 
                 {/* Primary value */}
                 <div className="col-span-3 text-right">
-                  <span className="text-sm font-semibold text-white">
+                  <span className="text-sm font-semibold text-foreground">
                     {formatValue(
                       user.primaryValue,
                       columns.primary.prefix,
@@ -143,7 +143,7 @@ export default function TopUsersTable({
                 {/* Secondary value */}
                 {columns.secondary && (
                   <div className="col-span-3 text-right">
-                    <span className="text-sm text-gray-400">
+                    <span className="text-sm text-muted-foreground">
                       {formatValue(
                         user.secondaryValue ?? 0,
                         columns.secondary.prefix,
