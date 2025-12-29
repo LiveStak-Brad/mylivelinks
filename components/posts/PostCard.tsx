@@ -60,12 +60,12 @@ export interface PostCardProps {
 function AvatarPlaceholder({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const sizeClasses = {
     sm: 'w-8 h-8',
-    md: 'w-10 h-10',
+    md: 'w-11 h-11',
   };
   
   return (
     <div 
-      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-primary/60 to-accent/60 flex items-center justify-center`}
+      className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-primary/60 to-accent/60 flex items-center justify-center ring-1 ring-gray-200 dark:ring-gray-700`}
     >
       <span className="text-white font-semibold text-sm">?</span>
     </div>
@@ -75,11 +75,11 @@ function AvatarPlaceholder({ size = 'md' }: { size?: 'sm' | 'md' }) {
 /** Comment preview row */
 function CommentPreviewRow() {
   return (
-    <div className="flex items-start gap-2 py-2">
+    <div className="flex items-start gap-2.5 py-1.5">
       <AvatarPlaceholder size="sm" />
-      <div className="flex-1 bg-muted rounded-2xl px-3 py-2">
-        <span className="font-semibold text-sm text-foreground">Commenter</span>
-        <p className="text-sm text-muted-foreground">This is a preview comment...</p>
+      <div className="flex-1 bg-muted/50 rounded-2xl px-3.5 py-2.5">
+        <span className="font-semibold text-[15px] text-foreground">Commenter</span>
+        <p className="text-[15px] text-foreground mt-0.5">This is a preview comment...</p>
       </div>
     </div>
   );
@@ -158,16 +158,16 @@ function ActionButton({
     <button
       onClick={onClick}
       className={`
-        flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
-        font-medium text-sm transition-all duration-200
-        hover:bg-muted active:scale-[0.98]
-        ${active ? activeColor : 'text-muted-foreground hover:text-foreground'}
+        flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg
+        font-semibold text-[15px] transition-all duration-150
+        hover:bg-muted/60 active:scale-95
+        ${active ? activeColor : 'text-muted-foreground'}
       `}
     >
-      <Icon className="w-5 h-5" />
+      <Icon className="w-[22px] h-[22px]" />
       <span className="hidden sm:inline">{label}</span>
       {count !== undefined && count > 0 && (
-        <span className="text-xs">({count})</span>
+        <span className="font-medium text-sm">({count})</span>
       )}
     </button>
   );
@@ -192,18 +192,16 @@ const PostCard = memo(function PostCard({
   onMore,
 }: PostCardProps) {
   return (
-    <Card className={`overflow-hidden ${className}`}>
-      {/* Header */}
-      <div className="flex items-start gap-3 p-4 pb-2">
+    <Card className={`overflow-hidden hover:shadow-md transition-shadow ${className}`}>
+      {/* Header - Instagram/Facebook Style */}
+      <div className="flex items-center gap-3 px-4 py-3">
         <div className="flex-shrink-0">
           {avatar || <AvatarPlaceholder />}
         </div>
         
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h4 className="font-semibold text-foreground truncate">{displayName}</h4>
-          </div>
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <div className="flex-1 min-w-0 leading-tight">
+          <div className="font-semibold text-[15px] text-foreground truncate">{displayName}</div>
+          <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
             <span className="truncate">{username}</span>
             <span>·</span>
             <span className="flex-shrink-0">{timestamp}</span>
@@ -213,7 +211,7 @@ const PostCard = memo(function PostCard({
         {typeof onMore === 'function' ? (
           <button
             onClick={onMore}
-            className="flex-shrink-0 p-1.5 -mr-1.5 rounded-full hover:bg-muted transition-colors"
+            className="flex-shrink-0 p-2 -mr-2 rounded-full hover:bg-muted/60 transition-colors"
             aria-label="More options"
           >
             <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
@@ -221,64 +219,68 @@ const PostCard = memo(function PostCard({
         ) : null}
       </div>
       
-      {/* Content */}
+      {/* Content - Larger Font Like Facebook/Instagram */}
       {content && (
         <div className="px-4 pb-3">
-          <p className="text-foreground leading-relaxed whitespace-pre-wrap">{content}</p>
+          <p className="text-[15px] leading-[1.5] text-foreground whitespace-pre-wrap">{content}</p>
         </div>
       )}
       
-      {/* Media */}
+      {/* Media - Full Width No Padding */}
       {media && (
-        <MediaPlaceholder type={media.type} aspectRatio={media.aspectRatio} />
+        <div className="w-full">
+          <MediaPlaceholder type={media.type} aspectRatio={media.aspectRatio} />
+        </div>
       )}
       
       {/* Stats row */}
       {(likeCount > 0 || commentCount > 0 || shareCount > 0) && (
-        <div className="flex items-center justify-between px-4 py-2 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between px-4 py-2.5 text-[13px] text-muted-foreground">
+          <div className="flex items-center gap-1.5">
             {likeCount > 0 && (
               <>
-                <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-pink-500 to-pink-600 flex items-center justify-center shadow-sm">
                   <Heart className="w-3 h-3 text-white fill-white" />
                 </div>
-                <span>{likeCount}</span>
+                <span className="font-medium">{likeCount}</span>
               </>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 font-medium">
             {commentCount > 0 && <span>{commentCount} comments</span>}
             {shareCount > 0 && <span>{shareCount} shares</span>}
           </div>
         </div>
       )}
       
-      {/* Actions */}
-      <div className="flex items-center border-t border-border mx-4 py-1">
-        <ActionButton
-          icon={Heart}
-          label="Like"
-          onClick={onLike}
-        />
-        <ActionButton
-          icon={MessageCircle}
-          label="Comment"
-          onClick={onComment}
-        />
-        <ActionButton
-          icon={Share2}
-          label="Share"
-          onClick={onShare}
-        />
+      {/* Actions - Clean Facebook/Instagram Style */}
+      <div className="border-t border-border">
+        <div className="flex items-center px-2 py-1">
+          <ActionButton
+            icon={Heart}
+            label="Like"
+            onClick={onLike}
+          />
+          <ActionButton
+            icon={MessageCircle}
+            label="Comment"
+            onClick={onComment}
+          />
+          <ActionButton
+            icon={Share2}
+            label="Share"
+            onClick={onShare}
+          />
+        </div>
       </div>
       
       {/* Comment Preview Section */}
       {showCommentPreview && (
-        <div className="px-4 pb-3 border-t border-border">
+        <div className="px-4 pb-3 pt-2 border-t border-border">
           {Array.from({ length: commentPreviewCount }).map((_, i) => (
             <CommentPreviewRow key={i} />
           ))}
-          <button className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mt-1">
+          <button className="text-[13px] font-semibold text-muted-foreground hover:text-foreground transition-colors mt-2">
             View more comments
           </button>
         </div>

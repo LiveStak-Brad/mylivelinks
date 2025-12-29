@@ -81,6 +81,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ avatar_url?: string | null } | null>(null);
   const shouldShowComposer = !username || (currentUsername && currentUsername === username);
 
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
@@ -760,21 +761,21 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
 
                 {isExpanded && (
                   <Card className={`overflow-hidden backdrop-blur-sm border-t-0 rounded-t-none ${borderRadiusClass}`} style={cardStyle}>
-                    <div className="border-t border-border p-4 space-y-3">
+                    <div className="bg-background/50 border-t border-border px-4 py-3 space-y-3">
                       {isCommentsLoading ? (
                         <div className="text-sm text-muted-foreground">Loading comments...</div>
                       ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           {comments.map((c) => (
                             <div key={c.id} className="space-y-2">
                               {/* Main Comment */}
-                              <div className="flex items-start gap-3">
+                              <div className="flex items-start gap-2.5">
                                 {/* Profile Picture */}
-                                <Link href={`/${c.author.username}`} className="flex-shrink-0">
+                                <Link href={`/${c.author.username}`} className="flex-shrink-0 mt-0.5">
                                   <img
                                     src={c.author.avatar_url || '/no-profile-pic.png'}
                                     alt={`${c.author.username}'s avatar`}
-                                    className="w-8 h-8 rounded-full object-cover hover:opacity-80 transition-opacity"
+                                    className="w-8 h-8 rounded-full object-cover hover:opacity-80 transition-opacity ring-1 ring-border"
                                     onError={(e) => {
                                       e.currentTarget.src = '/no-profile-pic.png';
                                     }}
@@ -783,75 +784,84 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
 
                                 {/* Comment Content */}
                                 <div className="flex-1 min-w-0">
-                                  <div className="bg-muted rounded-2xl px-3 py-2">
+                                  {/* Facebook-style comment bubble */}
+                                  <div className="inline-block bg-muted/60 hover:bg-muted/80 transition-colors rounded-2xl px-3 py-2 max-w-[85%]">
                                     <Link 
                                       href={`/${c.author.username}`} 
-                                      className="text-sm font-semibold text-foreground hover:underline"
+                                      className="text-[13px] font-semibold text-foreground hover:underline"
                                     >
                                       {c.author.username}
                                     </Link>
-                                    <div className="text-sm text-foreground whitespace-pre-wrap mt-0.5">
+                                    <div className="text-[14px] text-foreground leading-[1.4] mt-0.5 break-words">
                                       <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
                                     </div>
                                   </div>
 
-                                  {/* Comment Actions */}
-                                  <div className="flex items-center gap-3 px-3 mt-1">
+                                  {/* Comment Actions - Compact like Facebook */}
+                                  <div className="flex items-center gap-3 px-3 mt-0.5 text-xs font-semibold">
                                     <button
-                                      className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition group"
+                                      className={`hover:underline transition ${
+                                        c.is_liked_by_current_user ? 'text-primary' : 'text-muted-foreground'
+                                      }`}
                                       onClick={() => void toggleCommentLike(c.id, post.id)}
                                     >
-                                      <Heart 
-                                        className={`w-3.5 h-3.5 transition ${
-                                          c.is_liked_by_current_user 
-                                            ? 'fill-primary text-primary' 
-                                            : 'group-hover:fill-primary/20'
-                                        }`}
-                                      />
-                                      <span className={c.is_liked_by_current_user ? 'text-primary' : ''}>
-                                        {c.like_count > 0 ? c.like_count : 'Like'}
-                                      </span>
+                                      {c.like_count > 0 ? `Like (${c.like_count})` : 'Like'}
                                     </button>
+                                    <span className="text-muted-foreground">·</span>
                                     <button
-                                      className="text-xs font-semibold text-muted-foreground hover:text-foreground transition"
+                                      className="text-muted-foreground hover:underline transition"
                                       onClick={() => setActiveReplyTo(activeReplyTo === c.id ? null : c.id)}
                                     >
                                       Reply
                                     </button>
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className="text-muted-foreground">·</span>
+                                    <span className="text-muted-foreground text-[11px]">
                                       {formatDateTime(c.created_at)}
                                     </span>
                                   </div>
 
                                   {/* Reply Input */}
                                   {activeReplyTo === c.id && (
-                                    <div className="mt-2 pl-3 space-y-2">
-                                      <Textarea
-                                        textareaSize="sm"
-                                        placeholder={`Reply to ${c.author.username}...`}
-                                        value={replyDrafts[c.id] || ''}
-                                        onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                                        disabled={!!replySubmitting[c.id]}
+                                    <div className="mt-2 flex items-start gap-2">
+                                      <img
+                                        src={currentUser?.avatar_url || '/no-profile-pic.png'}
+                                        alt="Your avatar"
+                                        className="w-7 h-7 rounded-full object-cover ring-1 ring-border flex-shrink-0"
+                                        onError={(e) => {
+                                          e.currentTarget.src = '/no-profile-pic.png';
+                                        }}
                                       />
-                                      <div className="flex gap-2 justify-end">
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => {
-                                            setActiveReplyTo(null);
-                                            setReplyDrafts((prev) => ({ ...prev, [c.id]: '' }));
-                                          }}
-                                        >
-                                          Cancel
-                                        </Button>
-                                        <Button
-                                          size="sm"
-                                          onClick={() => void submitReply(c.id, post.id)}
-                                          disabled={!!replySubmitting[c.id] || !String(replyDrafts[c.id] || '').trim()}
-                                          isLoading={!!replySubmitting[c.id]}
-                                        >
-                                          Reply
-                                        </Button>
+                                      <div className="flex-1 space-y-2">
+                                        <div className="bg-muted/60 rounded-2xl overflow-hidden">
+                                          <Textarea
+                                            textareaSize="sm"
+                                            placeholder={`Reply to ${c.author.username}...`}
+                                            value={replyDrafts[c.id] || ''}
+                                            onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                                            disabled={!!replySubmitting[c.id]}
+                                            className="border-0 bg-transparent resize-none"
+                                          />
+                                        </div>
+                                        <div className="flex gap-2 justify-end">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              setActiveReplyTo(null);
+                                              setReplyDrafts((prev) => ({ ...prev, [c.id]: '' }));
+                                            }}
+                                          >
+                                            Cancel
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            onClick={() => void submitReply(c.id, post.id)}
+                                            disabled={!!replySubmitting[c.id] || !String(replyDrafts[c.id] || '').trim()}
+                                            isLoading={!!replySubmitting[c.id]}
+                                          >
+                                            Reply
+                                          </Button>
+                                        </div>
                                       </div>
                                     </div>
                                   )}
@@ -864,29 +874,35 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                                   {/* View Replies Toggle */}
                                   {!expandedReplies[c.id] && (
                                     <button
-                                      className="text-xs font-semibold text-primary hover:underline"
+                                      className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
                                       onClick={() => setExpandedReplies((prev) => ({ ...prev, [c.id]: true }))}
                                     >
-                                      View {c.replies.length} {c.replies.length === 1 ? 'reply' : 'replies'}
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                      </svg>
+                                      {c.replies.length} {c.replies.length === 1 ? 'reply' : 'replies'}
                                     </button>
                                   )}
 
                                   {expandedReplies[c.id] && (
                                     <>
                                       <button
-                                        className="text-xs font-semibold text-muted-foreground hover:text-foreground"
+                                        className="text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1"
                                         onClick={() => setExpandedReplies((prev) => ({ ...prev, [c.id]: false }))}
                                       >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                        </svg>
                                         Hide replies
                                       </button>
                                       {c.replies.map((reply) => (
-                                        <div key={reply.id} className="flex items-start gap-3">
+                                        <div key={reply.id} className="flex items-start gap-2.5">
                                           {/* Reply Profile Picture */}
-                                          <Link href={`/${reply.author.username}`} className="flex-shrink-0">
+                                          <Link href={`/${reply.author.username}`} className="flex-shrink-0 mt-0.5">
                                             <img
                                               src={reply.author.avatar_url || '/no-profile-pic.png'}
                                               alt={`${reply.author.username}'s avatar`}
-                                              className="w-7 h-7 rounded-full object-cover hover:opacity-80 transition-opacity"
+                                              className="w-7 h-7 rounded-full object-cover hover:opacity-80 transition-opacity ring-1 ring-border"
                                               onError={(e) => {
                                                 e.currentTarget.src = '/no-profile-pic.png';
                                               }}
@@ -895,36 +911,30 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
 
                                           {/* Reply Content */}
                                           <div className="flex-1 min-w-0">
-                                            <div className="bg-muted rounded-2xl px-3 py-2">
+                                            <div className="inline-block bg-muted/60 hover:bg-muted/80 transition-colors rounded-2xl px-3 py-2 max-w-[85%]">
                                               <Link 
                                                 href={`/${reply.author.username}`} 
-                                                className="text-sm font-semibold text-foreground hover:underline"
+                                                className="text-[13px] font-semibold text-foreground hover:underline"
                                               >
                                                 {reply.author.username}
                                               </Link>
-                                              <div className="text-sm text-foreground whitespace-pre-wrap mt-0.5">
+                                              <div className="text-[14px] text-foreground leading-[1.4] mt-0.5 break-words">
                                                 <SafeRichText text={reply.text_content} className="whitespace-pre-wrap" />
                                               </div>
                                             </div>
 
                                             {/* Reply Actions */}
-                                            <div className="flex items-center gap-3 px-3 mt-1">
+                                            <div className="flex items-center gap-3 px-3 mt-0.5 text-xs font-semibold">
                                               <button
-                                                className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition group"
+                                                className={`hover:underline transition ${
+                                                  reply.is_liked_by_current_user ? 'text-primary' : 'text-muted-foreground'
+                                                }`}
                                                 onClick={() => void toggleCommentLike(reply.id, post.id)}
                                               >
-                                                <Heart 
-                                                  className={`w-3.5 h-3.5 transition ${
-                                                    reply.is_liked_by_current_user 
-                                                      ? 'fill-primary text-primary' 
-                                                      : 'group-hover:fill-primary/20'
-                                                  }`}
-                                                />
-                                                <span className={reply.is_liked_by_current_user ? 'text-primary' : ''}>
-                                                  {reply.like_count > 0 ? reply.like_count : 'Like'}
-                                                </span>
+                                                {reply.like_count > 0 ? `Like (${reply.like_count})` : 'Like'}
                                               </button>
-                                              <span className="text-xs text-muted-foreground">
+                                              <span className="text-muted-foreground">·</span>
+                                              <span className="text-muted-foreground text-[11px]">
                                                 {formatDateTime(reply.created_at)}
                                               </span>
                                             </div>
@@ -938,23 +948,40 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                             </div>
                           ))}
 
-                          <div className="pt-2 space-y-2">
-                            <Textarea
-                              textareaSize="sm"
-                              placeholder="Write a comment..."
-                              value={commentDrafts[post.id] || ''}
-                              onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
-                              disabled={!!commentSubmitting[post.id]}
+                          {/* New Comment Input - Facebook Style */}
+                          <div className="flex items-start gap-2.5 pt-2 border-t border-border/50">
+                            <img
+                              src={currentUser?.avatar_url || '/no-profile-pic.png'}
+                              alt="Your avatar"
+                              className="w-8 h-8 rounded-full object-cover ring-1 ring-border flex-shrink-0 mt-0.5"
+                              onError={(e) => {
+                                e.currentTarget.src = '/no-profile-pic.png';
+                              }}
                             />
-                            <div className="flex justify-end">
-                              <Button
-                                size="sm"
-                                onClick={() => void submitComment(post.id)}
-                                disabled={!!commentSubmitting[post.id] || !String(commentDrafts[post.id] || '').trim()}
-                                isLoading={!!commentSubmitting[post.id]}
-                              >
-                                Comment
-                              </Button>
+                            <div className="flex-1">
+                              <div className="bg-muted/60 hover:bg-muted/80 focus-within:bg-muted/80 transition-colors rounded-3xl overflow-hidden">
+                                <Textarea
+                                  textareaSize="sm"
+                                  placeholder="Write a comment..."
+                                  value={commentDrafts[post.id] || ''}
+                                  onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                                  disabled={!!commentSubmitting[post.id]}
+                                  className="border-0 bg-transparent resize-none min-h-[40px] py-2.5"
+                                />
+                              </div>
+                              {commentDrafts[post.id]?.trim() && (
+                                <div className="flex justify-end mt-1.5">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => void submitComment(post.id)}
+                                    disabled={!!commentSubmitting[post.id] || !String(commentDrafts[post.id] || '').trim()}
+                                    isLoading={!!commentSubmitting[post.id]}
+                                    className="px-4 h-8"
+                                  >
+                                    Post
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

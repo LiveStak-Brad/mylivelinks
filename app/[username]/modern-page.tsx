@@ -1031,7 +1031,10 @@ export default function ModernProfilePage() {
                 </div>
                 
                 {profile.bio && (
-                  <p className="text-gray-700 dark:text-gray-300 mb-4 max-w-2xl text-sm sm:text-base break-words">
+                  <p 
+                    className="mb-4 max-w-2xl text-sm sm:text-base break-words"
+                    style={{ color: contentTextColor }}
+                  >
                     {profile.bio}
                   </p>
                 )}
@@ -1044,7 +1047,7 @@ export default function ModernProfilePage() {
                         onClick={handleFollow}
                         disabled={followLoading}
                         className={`px-4 sm:px-6 py-2 rounded-lg font-semibold transition flex items-center gap-2 text-sm sm:text-base ${followBtnConfig.className}`}
-                        style={{ backgroundColor: profileData.relationship === 'none' ? accentColor : undefined }}
+                        style={followBtnConfig.style}
                       >
                         <FollowIcon size={18} className="sm:w-5 sm:h-5" />
                         {followLoading ? 'Loading...' : followBtnConfig.text}
@@ -1099,7 +1102,7 @@ export default function ModernProfilePage() {
                   <div className="text-2xl font-bold" style={{ color: accentColor }}>
                     {profileData.follower_count.toLocaleString()}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Followers</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Followers</div>
                 </button>
                 
                 <button
@@ -1109,7 +1112,7 @@ export default function ModernProfilePage() {
                   <div className="text-2xl font-bold" style={{ color: accentColor }}>
                     {profileData.following_count.toLocaleString()}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Following</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Following</div>
                 </button>
                 
                 <button
@@ -1119,7 +1122,7 @@ export default function ModernProfilePage() {
                   <div className="text-2xl font-bold" style={{ color: accentColor }}>
                     {profileData.friends_count.toLocaleString()}
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Friends</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400" style={{ color: uiTextColor }}>Friends</div>
                 </button>
               </div>
             </div>
@@ -1312,6 +1315,9 @@ export default function ModernProfilePage() {
                 cardStyle={cardStyle}
                 borderRadiusClass={borderRadiusClass}
                 accentColor={accentColor}
+                buttonColor={buttonColor}
+                linkColor={linkColor}
+                uiTextColor={uiTextColor}
                 isOwner={isOwnProfile}
               />
             )}

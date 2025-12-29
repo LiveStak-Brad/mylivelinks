@@ -37,48 +37,51 @@ const PostCardSkeleton = memo(function PostCardSkeleton({
   };
 
   return (
-    <Card className={`overflow-hidden ${className}`}>
-      {/* Header */}
-      <div className="flex items-start gap-3 p-4 pb-2">
-        <SkeletonAvatar size="md" />
+    <Card className={`overflow-hidden animate-pulse ${className}`}>
+      {/* Header - Instagram/Facebook Style */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <SkeletonAvatar size="md" className="w-11 h-11" />
         
         <div className="flex-1 space-y-2">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-[15px] w-32 rounded-md" />
+          <Skeleton className="h-[13px] w-28 rounded-md" />
         </div>
         
-        <Skeleton className="w-8 h-8 rounded-full" />
+        <Skeleton className="w-9 h-9 rounded-full" />
       </div>
       
-      {/* Content */}
-      <div className="px-4 pb-3">
-        <SkeletonText lines={2} />
+      {/* Content - Larger Font Skeleton */}
+      <div className="px-4 pb-3 space-y-2">
+        <Skeleton className="h-[15px] w-full rounded-md" />
+        <Skeleton className="h-[15px] w-4/5 rounded-md" />
       </div>
       
-      {/* Media */}
+      {/* Media - Full Width */}
       {showMedia && (
         <Skeleton className={`w-full ${aspectClasses[mediaAspect]} rounded-none`} />
       )}
       
       {/* Stats row */}
-      <div className="flex items-center justify-between px-4 py-2">
-        <Skeleton className="h-4 w-16" />
-        <Skeleton className="h-4 w-24" />
+      <div className="flex items-center justify-between px-4 py-2.5">
+        <Skeleton className="h-4 w-16 rounded-md" />
+        <Skeleton className="h-4 w-24 rounded-md" />
       </div>
       
-      {/* Actions */}
-      <div className="flex items-center justify-around border-t border-border mx-4 py-2">
-        <Skeleton className="h-8 w-20 rounded-lg" />
-        <Skeleton className="h-8 w-20 rounded-lg" />
-        <Skeleton className="h-8 w-20 rounded-lg" />
+      {/* Actions - Cleaner Skeleton */}
+      <div className="border-t border-border">
+        <div className="flex items-center px-2 py-1 gap-1">
+          <Skeleton className="flex-1 h-10 rounded-lg" />
+          <Skeleton className="flex-1 h-10 rounded-lg" />
+          <Skeleton className="flex-1 h-10 rounded-lg" />
+        </div>
       </div>
       
       {/* Comment Preview Section */}
       {showCommentPreview && (
-        <div className="px-4 pb-3 border-t border-border pt-3">
+        <div className="px-4 pb-3 pt-2 border-t border-border">
           <div className="flex items-start gap-2">
             <SkeletonAvatar size="sm" />
-            <Skeleton className="flex-1 h-12 rounded-2xl" />
+            <Skeleton className="flex-1 h-14 rounded-2xl" />
           </div>
         </div>
       )}

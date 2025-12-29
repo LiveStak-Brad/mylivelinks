@@ -18,6 +18,9 @@ interface ModernLinksSectionProps {
   cardStyle: React.CSSProperties;
   borderRadiusClass: string;
   accentColor: string;
+  buttonColor?: string;
+  linkColor?: string;
+  uiTextColor?: string;
   isOwner: boolean;
 }
 
@@ -27,6 +30,9 @@ export default function ModernLinksSection({
   cardStyle,
   borderRadiusClass,
   accentColor,
+  buttonColor,
+  linkColor,
+  uiTextColor,
   isOwner
 }: ModernLinksSectionProps) {
   const handleLinkClick = async (linkId: number) => {
@@ -48,11 +54,12 @@ export default function ModernLinksSection({
       style={cardStyle}
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold">{sectionTitle}</h3>
+        <h3 className="text-lg font-bold" style={{ color: uiTextColor }}>{sectionTitle}</h3>
         {isOwner && (
           <Link
             href="/settings/profile#links"
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 flex items-center gap-1"
+            className="text-sm hover:opacity-80 flex items-center gap-1"
+            style={{ color: linkColor || accentColor }}
           >
             <Edit size={16} />
             Edit
@@ -70,7 +77,7 @@ export default function ModernLinksSection({
             onClick={() => handleLinkClick(link.id)}
             className="block w-full p-4 rounded-xl font-semibold transition transform hover:scale-[1.02] hover:shadow-lg text-center"
             style={{
-              backgroundColor: accentColor,
+              backgroundColor: buttonColor || accentColor,
               color: '#FFFFFF'
             }}
           >

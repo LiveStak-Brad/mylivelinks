@@ -103,7 +103,7 @@ function DefaultAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string |
   
   return (
     <div 
-      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+      className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity ring-1 ring-gray-200 dark:ring-gray-700"
       aria-hidden="true"
     >
       <img 
@@ -137,31 +137,31 @@ function ActionButton({
 }) {
   const getStyles = () => {
     if (variant === 'gift') {
-      return 'text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30';
+      return 'text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/20';
     }
     if (variant === 'coins') {
       return 'text-transparent bg-clip-text bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600';
     }
     if (isActive) {
-      return 'text-pink-600 dark:text-pink-400 hover:text-pink-700 dark:hover:text-pink-300 hover:bg-pink-50 dark:hover:bg-pink-950/30';
+      return 'text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-950/20';
     }
-    return 'text-muted-foreground hover:text-foreground hover:bg-muted';
+    return 'text-muted-foreground hover:bg-muted/60';
   };
 
   return (
     <button
       onClick={onClick}
       className={`
-        flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg
-        font-medium text-sm transition-all duration-200
-        active:scale-[0.98]
+        flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg
+        font-semibold text-[15px] transition-all duration-150
+        active:scale-95
         ${getStyles()}
       `}
       aria-label={label}
     >
-      <Icon className={`w-5 h-5 ${isActive ? 'fill-current' : ''}`} aria-hidden="true" />
+      <Icon className={`w-[22px] h-[22px] ${isActive ? 'fill-current' : ''}`} aria-hidden="true" />
       {count !== undefined && count > 0 && (
-        <span className={variant === 'coins' ? 'font-bold' : ''}>{count}</span>
+        <span className={`${variant === 'coins' ? 'font-bold' : 'font-medium'}`}>{count}</span>
       )}
       <span className="hidden sm:inline">{label}</span>
     </button>
@@ -191,9 +191,9 @@ const FeedPostCard = memo(function FeedPostCard({
   const formattedTimestamp = formatTimestamp(timestamp);
   
   return (
-    <Card className={`overflow-hidden ${className}`} style={style}>
-      {/* Header - New Format: Avatar + Username + Date/Time */}
-      <div className="flex items-start gap-3 p-4 pb-2">
+    <Card className={`overflow-hidden hover:shadow-md transition-shadow ${className}`} style={style}>
+      {/* Header - Instagram/Facebook Style */}
+      <div className="flex items-center gap-3 px-4 py-3">
         <div 
           className="flex-shrink-0"
           onClick={onProfileClick}
@@ -203,22 +203,22 @@ const FeedPostCard = memo(function FeedPostCard({
           <DefaultAvatar name={authorName} avatarUrl={authorAvatarUrl} />
         </div>
         
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 leading-tight">
           <div 
-            className={`font-bold text-foreground truncate ${onProfileClick ? 'cursor-pointer hover:underline' : ''}`}
+            className={`font-semibold text-[15px] text-foreground truncate ${onProfileClick ? 'cursor-pointer hover:underline' : ''}`}
             onClick={onProfileClick}
             role={onProfileClick ? 'button' : undefined}
             tabIndex={onProfileClick ? 0 : undefined}
           >
             {authorName}
           </div>
-          <time className="text-sm text-muted-foreground">{formattedTimestamp}</time>
+          <time className="text-[13px] text-muted-foreground">{formattedTimestamp}</time>
         </div>
         
         {typeof onMore === 'function' ? (
           <button
             onClick={onMore}
-            className="flex-shrink-0 p-1.5 -mr-1.5 rounded-full hover:bg-muted transition-colors"
+            className="flex-shrink-0 p-2 -mr-2 rounded-full hover:bg-muted/60 transition-colors"
             aria-label="More options"
           >
             <MoreHorizontal className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
@@ -226,26 +226,26 @@ const FeedPostCard = memo(function FeedPostCard({
         ) : null}
       </div>
       
-      {/* Content */}
+      {/* Content - Larger Font Like Facebook/Instagram */}
       {content && (
         <div className="px-4 pb-3">
-          <p className="text-foreground leading-relaxed whitespace-pre-wrap">
+          <div className="text-[15px] leading-[1.5] text-foreground whitespace-pre-wrap">
             <SafeRichText text={content} className="whitespace-pre-wrap" showLinkPreview={true} />
-          </p>
+          </div>
         </div>
       )}
       
-      {/* Media */}
+      {/* Media - Full Width No Padding */}
       {media && (
-        <div className="relative">
+        <div className="relative w-full">
           {media}
         </div>
       )}
       
-      {/* Actions */}
+      {/* Actions - Clean Facebook/Instagram Style */}
       {isClipCompletion ? (
         // Clip Completion Actions
-        <div className="px-4 py-4 border-t border-border">
+        <div className="px-4 py-3 border-t border-border">
           <ClipActions
             clipId={clipId}
             onAction={onClipAction}
@@ -254,33 +254,35 @@ const FeedPostCard = memo(function FeedPostCard({
           />
         </div>
       ) : (
-        // Standard Post Actions - New Format: Like | Gift | Coin Count | Comments
-        <div className="flex items-center border-t border-border mx-4 py-1">
-          <ActionButton
-            icon={Heart}
-            label="Like"
-            onClick={onLike}
-            isActive={isLiked}
-          />
-          <ActionButton
-            icon={Gift}
-            label="Gift"
-            onClick={onGift}
-            variant="gift"
-          />
-          {coinCount > 0 && (
+        // Standard Post Actions
+        <div className="border-t border-border">
+          <div className="flex items-center px-2 py-1">
             <ActionButton
-              icon={Coins}
-              label="Coins"
-              count={coinCount}
-              variant="coins"
+              icon={Heart}
+              label="Like"
+              onClick={onLike}
+              isActive={isLiked}
             />
-          )}
-          <ActionButton
-            icon={MessageCircle}
-            label="Comment"
-            onClick={onComment}
-          />
+            <ActionButton
+              icon={MessageCircle}
+              label="Comment"
+              onClick={onComment}
+            />
+            <ActionButton
+              icon={Gift}
+              label="Gift"
+              onClick={onGift}
+              variant="gift"
+            />
+            {coinCount > 0 && (
+              <ActionButton
+                icon={Coins}
+                label="Coins"
+                count={coinCount}
+                variant="coins"
+              />
+            )}
+          </div>
         </div>
       )}
     </Card>
