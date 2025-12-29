@@ -1,38 +1,24 @@
 'use client';
 
-import { useState } from 'react';
 import { useOwnerPanelData } from '@/hooks/useOwnerPanelData';
 import {
-  Card,
-  CardHeader,
   StatCard,
-  Table,
-  TableToolbar,
   EmptyState,
-  Skeleton,
   SkeletonCard,
-  SkeletonTable,
-  Badge,
   Button,
-  IconButton,
-  RowActions,
 } from '@/components/owner/ui-kit';
+import { LiveNowTable } from '@/components/owner/LiveNowTable';
+import { RecentReportsTable } from '@/components/owner/RecentReportsTable';
+import { PlatformHealthCard } from '@/components/owner/PlatformHealthCard';
 import {
   Users,
-  Crown,
   Radio,
-  DollarSign,
-  Eye,
-  Edit,
-  Trash2,
-  Plus,
-  Download,
+  Gift,
   AlertCircle,
 } from 'lucide-react';
 
 export default function OwnerDashboard() {
   const { data, loading, error, refetch } = useOwnerPanelData();
-  const [searchQuery, setSearchQuery] = useState('');
 
   // ============================================================================
   // ERROR STATE
@@ -41,15 +27,14 @@ export default function OwnerDashboard() {
     return (
       <div className="max-w-7xl mx-auto">
         <EmptyState
-          icon={AlertCircle}
+          icon={<AlertCircle className="w-12 h-12" />}
           title="Failed to Load Data"
           description={error}
-          variant="error"
-          action={
-            <Button variant="primary" onClick={refetch}>
-              Try Again
-            </Button>
-          }
+          action={{
+            label: 'Try Again',
+            onClick: refetch,
+            variant: 'primary',
+          }}
         />
       </div>
     );
@@ -61,12 +46,6 @@ export default function OwnerDashboard() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Page Header Skeleton */}
-        <div>
-          <Skeleton variant="text" width="200px" height="32px" className="mb-2" />
-          <Skeleton variant="text" width="400px" height="20px" />
-        </div>
-
         {/* Stats Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <SkeletonCard />
@@ -75,35 +54,14 @@ export default function OwnerDashboard() {
           <SkeletonCard />
         </div>
 
-        {/* Table Skeleton */}
-        <Card>
-          <CardHeader title="Loading..." />
-          <SkeletonTable rows={5} columns={4} />
-        </Card>
-      </div>
-    );
-  }
+        {/* Platform Health Skeleton */}
+        <SkeletonCard />
 
-  // ============================================================================
-  // EMPTY STATE (No data available)
-  // ============================================================================
-  const hasNoData = 
-    !data.stats && 
-    data.liveNow.length === 0 && 
-    data.users.length === 0;
-
-  if (hasNoData) {
-    return (
-      <div className="max-w-7xl mx-auto">
-        <EmptyState
-          title="No Data Available"
-          description="There is currently no data to display. This could be because the system is initializing or no data has been generated yet."
-          action={
-            <Button variant="primary" onClick={refetch}>
-              Refresh Data
-            </Button>
-          }
-        />
+        {/* Tables Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       </div>
     );
   }
@@ -112,49 +70,15 @@ export default function OwnerDashboard() {
   // SUCCESS STATE (Data loaded)
   // ============================================================================
 
-  // Mock data for demonstration (since hook returns empty data)
-  const mockStats = data.stats || {
-    totalUsers: 1234,
-    totalCreators: 567,
-    activeStreams: 12,
-    totalRevenue: 89456,
-    trends: {
-      users: { value: 12.5, direction: 'up' as const },
-      creators: { value: 8.3, direction: 'up' as const },
-      streams: { value: -5.2, direction: 'down' as const },
-      revenue: { value: 23.1, direction: 'up' as const },
-    },
-  };
+  // Calculate today's delta for users (mock for now)
+  const todayDelta = 12;
+  const todayDeltaPercent = 12.5;
 
-  const mockLiveStreams = data.liveNow.length > 0 ? data.liveNow : [
-    {
-      id: '1',
-      roomName: 'Room 1',
-      streamerId: 'user1',
-      streamerUsername: 'streamer1',
-      streamerDisplayName: 'Streamer One',
-      streamerAvatarUrl: null,
-      viewerCount: 145,
-      startedAt: new Date().toISOString(),
-      isAdultContent: false,
-    },
-    {
-      id: '2',
-      roomName: 'Room 2',
-      streamerId: 'user2',
-      streamerUsername: 'streamer2',
-      streamerDisplayName: 'Streamer Two',
-      streamerAvatarUrl: null,
-      viewerCount: 89,
-      startedAt: new Date().toISOString(),
-      isAdultContent: true,
-    },
-  ];
+  // Mock gifts today count
+  const giftsToday = 234;
 
-  const filteredStreams = mockLiveStreams.filter((stream) =>
-    stream.streamerUsername.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (stream.streamerDisplayName || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Pending reports count
+  const pendingReports = data.recentReports?.filter(r => r.status === 'pending').length || 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -166,186 +90,64 @@ export default function OwnerDashboard() {
         </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Top KPI Row - 4 StatCards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Users with today delta */}
         <StatCard
           title="Total Users"
-          value={mockStats.totalUsers.toLocaleString()}
+          value={(data.stats?.totalUsers || 0).toLocaleString()}
           icon={Users}
           trend={{
-            value: mockStats.trends.users.value,
-            direction: mockStats.trends.users.direction,
-            label: 'vs last month',
+            value: todayDeltaPercent,
+            direction: todayDelta >= 0 ? 'up' : 'down',
+            label: `+${todayDelta} today`,
           }}
         />
+
+        {/* Live Streams Now */}
         <StatCard
-          title="Total Creators"
-          value={mockStats.totalCreators.toLocaleString()}
-          icon={Crown}
-          trend={{
-            value: mockStats.trends.creators.value,
-            direction: mockStats.trends.creators.direction,
-            label: 'vs last month',
-          }}
-        />
-        <StatCard
-          title="Active Streams"
-          value={mockStats.activeStreams}
+          title="Live Streams Now"
+          value={data.liveStreamInfo?.length || 0}
           icon={Radio}
-          trend={{
-            value: mockStats.trends.streams.value,
-            direction: mockStats.trends.streams.direction,
-            label: 'vs last hour',
-          }}
+          subtitle="Active streams"
         />
+
+        {/* Gifts Today */}
         <StatCard
-          title="Total Revenue"
-          value={`$${(mockStats.totalRevenue / 100).toLocaleString()}`}
-          icon={DollarSign}
-          subtitle="USD"
-          trend={{
-            value: mockStats.trends.revenue.value,
-            direction: mockStats.trends.revenue.direction,
-            label: 'vs last month',
-          }}
+          title="Gifts Today"
+          value={giftsToday.toLocaleString()}
+          icon={Gift}
+          subtitle="Sent across platform"
+        />
+
+        {/* Pending Reports */}
+        <StatCard
+          title="Pending Reports"
+          value={pendingReports}
+          icon={AlertCircle}
+          subtitle="Awaiting review"
         />
       </div>
 
-      {/* Live Streams Table */}
-      <Card>
-        <CardHeader
-          title="Live Streams"
-          subtitle={`${filteredStreams.length} active stream${filteredStreams.length !== 1 ? 's' : ''}`}
-          action={
-            <Button
-              variant="primary"
-              leftIcon={Plus}
-              size="sm"
-            >
-              New Stream
-            </Button>
-          }
+      {/* Platform Health Strip */}
+      <PlatformHealthCard health={data.platformHealth} loading={false} />
+
+      {/* Live Now Table & Recent Reports Table */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LiveNowTable
+          streams={data.liveStreamInfo || []}
+          loading={false}
+          onJoinInvisibly={(id) => console.log('Join invisibly:', id)}
+          onEndStream={(id) => console.log('End stream:', id)}
+          onShadowMute={(id) => console.log('Shadow mute:', id)}
         />
 
-        <TableToolbar
-          searchValue={searchQuery}
-          onSearchChange={setSearchQuery}
-          searchPlaceholder="Search streamers..."
-          actions={
-            <>
-              <IconButton
-                icon={Download}
-                label="Export data"
-                variant="ghost"
-              />
-            </>
-          }
+        <RecentReportsTable
+          reports={data.recentReports || []}
+          loading={false}
+          onReview={(id) => console.log('Review report:', id)}
         />
-
-        {filteredStreams.length === 0 ? (
-          <EmptyState
-            title="No Active Streams"
-            description={
-              searchQuery
-                ? `No streams match "${searchQuery}"`
-                : 'There are currently no active streams.'
-            }
-          />
-        ) : (
-          <Table
-            columns={[
-              {
-                key: 'streamer',
-                header: 'Streamer',
-                render: (stream) => (
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-foreground font-semibold">
-                      {stream.streamerUsername[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="font-medium text-foreground">
-                        {stream.streamerDisplayName || stream.streamerUsername}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        @{stream.streamerUsername}
-                      </div>
-                    </div>
-                  </div>
-                ),
-              },
-              {
-                key: 'viewers',
-                header: 'Viewers',
-                width: '120px',
-                render: (stream) => (
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium text-foreground">
-                      {stream.viewerCount}
-                    </span>
-                  </div>
-                ),
-              },
-              {
-                key: 'content',
-                header: 'Content',
-                width: '120px',
-                render: (stream) => (
-                  <Badge variant={stream.isAdultContent ? 'warning' : 'success'}>
-                    {stream.isAdultContent ? 'Adult' : 'General'}
-                  </Badge>
-                ),
-              },
-              {
-                key: 'duration',
-                header: 'Duration',
-                width: '120px',
-                render: (stream) => {
-                  const minutes = Math.floor(
-                    (Date.now() - new Date(stream.startedAt).getTime()) / 60000
-                  );
-                  return (
-                    <span className="text-muted-foreground">
-                      {minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`}
-                    </span>
-                  );
-                },
-              },
-              {
-                key: 'actions',
-                header: '',
-                width: '60px',
-                align: 'right',
-                render: (stream) => (
-                  <RowActions
-                    actions={[
-                      {
-                        label: 'View Stream',
-                        icon: Eye,
-                        onClick: () => console.log('View', stream.id),
-                      },
-                      {
-                        label: 'Edit',
-                        icon: Edit,
-                        onClick: () => console.log('Edit', stream.id),
-                      },
-                      {
-                        label: 'End Stream',
-                        icon: Trash2,
-                        variant: 'destructive',
-                        onClick: () => console.log('End', stream.id),
-                      },
-                    ]}
-                  />
-                ),
-              },
-            ]}
-            data={filteredStreams}
-            keyExtractor={(stream) => stream.id}
-          />
-        )}
-      </Card>
+      </div>
     </div>
   );
 }
-

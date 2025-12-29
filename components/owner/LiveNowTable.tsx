@@ -62,7 +62,7 @@ export function LiveNowTable({
       <CardContent>
         {streams.length === 0 ? (
           <EmptyState
-            icon={Radio}
+            icon={<Radio className="w-12 h-12" />}
             title="No live streams"
             description="No streamers are currently live."
           />

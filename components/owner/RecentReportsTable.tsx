@@ -91,7 +91,7 @@ export function RecentReportsTable({
       <CardContent>
         {reports.length === 0 ? (
           <EmptyState
-            icon={AlertTriangle}
+            icon={<AlertTriangle className="w-12 h-12" />}
             title="No reports"
             description="No moderation reports to review."
           />
