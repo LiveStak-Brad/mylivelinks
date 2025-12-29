@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ThemeDefinition } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
 
@@ -135,16 +136,16 @@ export function ReferralLeaderboardPreview({
     }
   };
 
-  const getRankIcon = (rank: number): string => {
+  const getRankIcon = (rank: number): { name: string; color: string } | null => {
     switch (rank) {
       case 1:
-        return '🥇';
+        return { name: 'trophy', color: '#EAB308' };
       case 2:
-        return '🥈';
+        return { name: 'medal', color: '#9CA3AF' };
       case 3:
-        return '🥉';
+        return { name: 'ribbon', color: '#FB923C' };
       default:
-        return '';
+        return null;
     }
   };
 
@@ -153,7 +154,7 @@ export function ReferralLeaderboardPreview({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerIconContainer}>
-          <Text style={styles.headerIcon}>🏆</Text>
+          <Ionicons name="trophy" size={24} color="#EAB308" />
         </View>
         <View style={styles.headerTextContainer}>
           <Text style={styles.title}>Top Referrers</Text>
@@ -183,9 +184,11 @@ export function ReferralLeaderboardPreview({
               {/* Rank */}
               <View style={styles.rankContainer}>
                 {getRankIcon(entry.rank) ? (
-                  <Text style={styles.rankIconText}>
-                    {getRankIcon(entry.rank)}
-                  </Text>
+                  <Ionicons 
+                    name={getRankIcon(entry.rank)!.name as any} 
+                    size={20} 
+                    color={getRankIcon(entry.rank)!.color} 
+                  />
                 ) : (
                   <Text
                     style={[

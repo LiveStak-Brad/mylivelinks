@@ -20,6 +20,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { BrandLogo } from './BrandLogo';
 import { UserMenu } from '../UserMenu';
 import { LeaderboardModal } from '../LeaderboardModal';
+import { SearchModal } from '../SearchModal';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 type GlobalHeaderProps = {
@@ -45,6 +46,7 @@ export function GlobalHeader({
 }: GlobalHeaderProps) {
   const navigation = useNavigation<any>();
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -130,7 +132,7 @@ export function GlobalHeader({
   return (
     <>
       <View style={styles.container}>
-        {/* Left Section: Trophy + Rooms */}
+        {/* Left Section: Trophy + Rooms + Search */}
         <View style={styles.leftSection}>
           {/* Leaderboard Trophy (Gold) */}
           <Pressable 
@@ -143,6 +145,14 @@ export function GlobalHeader({
           {/* Rooms Video Icon (Red) */}
           <Pressable style={styles.iconButton} onPress={handleRoomsPress}>
             <Feather name="video" size={24} color="#f44336" />
+          </Pressable>
+
+          {/* Search Icon (Blue) */}
+          <Pressable 
+            style={styles.iconButton}
+            onPress={() => setShowSearch(true)}
+          >
+            <Feather name="search" size={24} color="#3b82f6" />
           </Pressable>
         </View>
 
@@ -173,6 +183,14 @@ export function GlobalHeader({
         onClose={() => setShowLeaderboard(false)}
         onNavigateToProfile={handleProfilePress}
       />
+
+      {/* Search Modal */}
+      <SearchModal
+        visible={showSearch}
+        onClose={() => setShowSearch(false)}
+        onNavigateToProfile={handleProfilePress}
+        onNavigateToRoom={handleRoomsPress}
+      />
     </>
   );
 }
@@ -193,7 +211,7 @@ function createStyles(theme: ThemeDefinition) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      width: 96, // Fixed width: 2 buttons (40px each) + gap (8px) + padding
+      width: 136, // Fixed width: 3 buttons (40px each) + 2 gaps (8px each) + padding
     },
     iconButton: {
       width: 40,
@@ -208,7 +226,7 @@ function createStyles(theme: ThemeDefinition) {
       justifyContent: 'center',
     },
     rightSection: {
-      width: 96, // Match left section width for centering
+      width: 136, // Match left section width for centering
       alignItems: 'flex-end',
       justifyContent: 'center',
     },

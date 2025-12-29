@@ -143,11 +143,8 @@ export function UserMenu({
       onNavigateToApply();
       return;
     }
-    try {
-      void Linking.openURL('https://www.mylivelinks.com/apply');
-    } catch {
-      // ignore
-    }
+    // Navigate to in-app ApplyForRoom screen (no web redirect)
+    navigateRoot('ApplyForRoom');
   };
 
   const handleRoomRules = () => {

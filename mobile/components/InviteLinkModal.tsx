@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { useThemeMode, ThemeDefinition } from '../contexts/ThemeContext';
 
@@ -142,12 +143,16 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
           <View style={styles.header}>
             <View style={styles.headerContent}>
               <View style={styles.iconContainer}>
-                <Text style={styles.iconEmoji}>🔗</Text>
+                <Ionicons name="link" size={20} color="#fff" />
               </View>
               <Text style={styles.headerTitle}>Your Invite Link</Text>
             </View>
-            <Pressable style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>✕</Text>
+            <Pressable 
+              style={styles.closeButton} 
+              onPress={onClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={28} color={textMuted} />
             </Pressable>
           </View>
 
@@ -159,7 +164,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
             {/* Explainer Section */}
             <View style={styles.explainerCard}>
               <View style={styles.explainerIconContainer}>
-                <Text style={styles.explainerIcon}>📈</Text>
+                <Ionicons name="trending-up" size={20} color="#fff" />
               </View>
               <View style={styles.explainerContent}>
                 <Text style={styles.explainerTitle}>Grow Your Network</Text>
@@ -178,7 +183,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
             ) : (
               <View style={styles.linkCard}>
                 <View style={styles.linkHeader}>
-                  <Text style={styles.linkIcon}>🔗</Text>
+                  <Ionicons name="link" size={14} color={accent} />
                   <Text style={styles.linkLabel}>Your Referral Link</Text>
                 </View>
                 <Text style={styles.linkUrl} numberOfLines={2}>
@@ -199,7 +204,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
                 onPress={handleCopyLink}
                 disabled={loading}
               >
-                <Text style={styles.buttonIcon}>{copied ? '✓' : '📋'}</Text>
+                <Ionicons name={copied ? "checkmark" : "copy-outline"} size={18} color="#fff" />
                 <Text style={styles.primaryButtonText}>
                   {copied ? 'Link Copied!' : 'Copy Link'}
                 </Text>
@@ -215,25 +220,28 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
                 onPress={handleShare}
                 disabled={loading}
               >
-                <Text style={styles.buttonIcon}>📤</Text>
+                <Ionicons name="share-outline" size={18} color={textPrimary} />
                 <Text style={styles.secondaryButtonText}>Share</Text>
               </Pressable>
             </View>
 
             {/* Quality Note */}
             <View style={styles.qualityNote}>
-              <Text style={styles.qualityNoteText}>
-                <Text style={styles.qualityNoteEmoji}>💎 </Text>
+              <View style={styles.qualityNoteHeader}>
+                <Ionicons name="diamond" size={14} color={isLight ? '#2563eb' : '#60a5fa'} />
                 <Text style={styles.qualityNoteBold}>Quality matters:</Text>
-                {' '}Focus on inviting engaged creators and viewers who'll actively participate in the community.
+              </View>
+              <Text style={styles.qualityNoteText}>
+                Focus on inviting engaged creators and viewers who'll actively participate in the community.
               </Text>
             </View>
           </ScrollView>
 
           {/* Footer */}
           <View style={styles.footer}>
+            <Ionicons name="rocket" size={14} color={textMuted} style={{ marginRight: 4 }} />
             <Text style={styles.footerText}>
-              Build your network. Grow together. 🚀
+              Build your network. Grow together.
             </Text>
           </View>
         </View>
@@ -297,21 +305,17 @@ function createStyles(theme: ThemeDefinition) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    iconEmoji: {
-      fontSize: 20,
-    },
     headerTitle: {
       fontSize: 20,
       fontWeight: '800',
       color: isLight ? accent : textPrimary,
     },
     closeButton: {
-      padding: 4,
-    },
-    closeButtonText: {
-      fontSize: 24,
-      color: textMuted,
-      fontWeight: '300',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     scrollView: {
       flex: 1,
@@ -336,9 +340,6 @@ function createStyles(theme: ThemeDefinition) {
       backgroundColor: accent,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    explainerIcon: {
-      fontSize: 20,
     },
     explainerContent: {
       flex: 1,
@@ -368,9 +369,6 @@ function createStyles(theme: ThemeDefinition) {
       alignItems: 'center',
       gap: 6,
       marginBottom: 8,
-    },
-    linkIcon: {
-      fontSize: 14,
     },
     linkLabel: {
       fontSize: 11,
@@ -425,9 +423,6 @@ function createStyles(theme: ThemeDefinition) {
     buttonDisabled: {
       opacity: 0.5,
     },
-    buttonIcon: {
-      fontSize: 18,
-    },
     primaryButtonText: {
       color: '#fff',
       fontSize: 16,
@@ -445,18 +440,24 @@ function createStyles(theme: ThemeDefinition) {
       borderWidth: 1,
       borderColor: isLight ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.3)',
     },
+    qualityNoteHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 6,
+    },
     qualityNoteText: {
       fontSize: 12,
       lineHeight: 17,
       color: isLight ? 'rgba(30, 64, 175, 1)' : 'rgba(147, 197, 253, 1)',
     },
-    qualityNoteEmoji: {
-      fontSize: 12,
-    },
     qualityNoteBold: {
       fontWeight: '700',
     },
     footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
       paddingHorizontal: 20,
       paddingVertical: 16,
       backgroundColor: isLight ? '#F9FAFB' : '#0D1220',

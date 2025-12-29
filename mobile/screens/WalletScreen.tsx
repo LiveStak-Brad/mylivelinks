@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Feather } from '@expo/vector-icons';
 
 import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, Modal, PageShell } from '../components/ui';
@@ -242,20 +243,44 @@ export function WalletScreen({ navigation }: Props) {
         </View>
       ) : (
         <View style={styles.content}>
+          {/* Coins Card */}
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Coins</Text>
-            <Text style={styles.cardValue}>🪙 {wallet.coin_balance}</Text>
+            <View style={styles.cardHeader}>
+              <View style={[styles.iconCircle, { backgroundColor: theme.colors.warning + '20' }]}>
+                <Feather name="circle" size={20} color={theme.colors.warning} />
+              </View>
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardLabel}>Coins</Text>
+                <Text style={styles.cardValue}>{wallet.coin_balance.toLocaleString()}</Text>
+              </View>
+            </View>
+            <Text style={styles.cardSubtext}>Use coins to send gifts to streamers</Text>
           </View>
 
+          {/* Diamonds Card */}
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Diamonds</Text>
-            <Text style={styles.cardValue}>💎 {wallet.diamond_balance}</Text>
-            <Text style={styles.cardSubValue}>${wallet.diamond_usd.toFixed(2)} USD</Text>
+            <View style={styles.cardHeader}>
+              <View style={[styles.iconCircle, { backgroundColor: theme.colors.accent + '20' }]}>
+                <Feather name="gift" size={20} color={theme.colors.accent} />
+              </View>
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardLabel}>Diamonds</Text>
+                <Text style={styles.cardValue}>{wallet.diamond_balance.toLocaleString()}</Text>
+              </View>
+            </View>
+            <Text style={styles.cardSubtext}>
+              Diamonds from gifts · ${wallet.diamond_usd.toFixed(2)} USD
+            </Text>
           </View>
 
+          {/* Actions Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
-            <Button title="Purchase Coins" variant="secondary" onPress={() => void openPacks()} />
+            <Button 
+              title="Purchase Coins" 
+              variant="secondary" 
+              onPress={() => void openPacks()}
+            />
             <Button
               title={
                 connectLoading
@@ -293,7 +318,7 @@ export function WalletScreen({ navigation }: Props) {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Buy Coins</Text>
               <Pressable onPress={() => setShowPacksModal(false)} hitSlop={12}>
-                <Text style={styles.modalClose}>✕</Text>
+                <Feather name="x" size={22} color={theme.colors.textSecondary} />
               </Pressable>
             </View>
 
@@ -364,20 +389,38 @@ function createStyles(theme: ThemeDefinition) {
       shadowOffset: cardShadow.offset,
       elevation: cardShadow.elevation,
     },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 8,
+    },
+    iconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardHeaderText: {
+      flex: 1,
+    },
     cardLabel: {
       color: theme.colors.textSecondary,
       fontSize: 12,
-      marginBottom: 8,
+      fontWeight: '600',
+      marginBottom: 2,
     },
     cardValue: {
       color: theme.colors.textPrimary,
       fontSize: 24,
       fontWeight: '900',
     },
-    cardSubValue: {
-      color: theme.colors.textSecondary,
-      fontSize: 14,
-      marginTop: 6,
+    cardSubtext: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 4,
     },
     section: {
       marginTop: 8,
@@ -398,11 +441,6 @@ function createStyles(theme: ThemeDefinition) {
       color: theme.colors.textPrimary,
       fontSize: 18,
       fontWeight: '900',
-    },
-    modalClose: {
-      color: theme.colors.textSecondary,
-      fontSize: 22,
-      fontWeight: '300',
     },
     modalCenter: {
       alignItems: 'center',

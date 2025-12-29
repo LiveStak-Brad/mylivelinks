@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,13 @@ import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 type Props = NativeStackScreenProps<RootStackParamList, 'ReportUser'>;
 
 type Reason = { value: string; label: string };
+
+type UserSearchResult = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
 
 const REPORT_REASONS: Reason[] = [
   { value: 'harassment', label: 'Harassment or Bullying' },
@@ -34,10 +41,59 @@ export function ReportUserScreen({ navigation, route }: Props) {
   const [details, setDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // User search state (only used when no user is pre-selected)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(
+    reportedUserId && reportedUsername
+      ? { id: reportedUserId, username: reportedUsername, display_name: null, avatar_url: null }
+      : null
+  );
+
   const title = useMemo(() => {
+    if (selectedUser?.username) return `Report ${selectedUser.username}`;
     if (reportedUsername) return `Report ${reportedUsername}`;
     return 'Report a User';
-  }, [reportedUsername]);
+  }, [reportedUsername, selectedUser]);
+
+  const searchUsers = useCallback(async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .ilike('username', `%${query}%`)
+        .limit(10);
+
+      if (error) throw error;
+      setSearchResults((data as UserSearchResult[]) || []);
+    } catch (err) {
+      console.error('User search error:', err);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      setSearchQuery(text);
+      searchUsers(text);
+    },
+    [searchUsers]
+  );
+
+  const handleSelectUser = useCallback((user: UserSearchResult) => {
+    setSelectedUser(user);
+    setSearchQuery('');
+    setSearchResults([]);
+  }, []);
 
   const submit = useCallback(async () => {
     const client = supabase;
@@ -55,7 +111,15 @@ export function ReportUserScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (reportedUserId && reportedUserId === userId) {
+    // Determine the target user ID - prioritize selectedUser, fall back to route params
+    const targetUserId = selectedUser?.id || reportedUserId;
+
+    if (!targetUserId) {
+      Alert.alert('Missing user', 'Please select a user to report.');
+      return;
+    }
+
+    if (targetUserId === userId) {
       Alert.alert('Not allowed', 'You cannot report yourself.');
       return;
     }
@@ -75,7 +139,7 @@ export function ReportUserScreen({ navigation, route }: Props) {
 
       const insert = await client.from('content_reports').insert({
         reporter_id: userId,
-        reported_user_id: reportedUserId || null,
+        reported_user_id: targetUserId,
         report_type: 'user',
         report_reason: selectedReason,
         report_details: details.trim() || null,
@@ -98,7 +162,7 @@ export function ReportUserScreen({ navigation, route }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [details, navigation, reportedUserId, selectedReason, userId]);
+  }, [details, navigation, reportedUserId, selectedReason, userId, selectedUser]);
 
   return (
     <PageShell
@@ -110,6 +174,60 @@ export function ReportUserScreen({ navigation, route }: Props) {
         <Text style={styles.note}>
           Reports are reviewed by our moderation team. False reports may result in account restrictions.
         </Text>
+
+        {/* User Selection (only shown if no user was pre-selected) */}
+        {!reportedUserId && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Who are you reporting? *</Text>
+            {selectedUser ? (
+              <View style={styles.selectedUserRow}>
+                <View style={styles.selectedUserInfo}>
+                  <Text style={styles.selectedUserName}>@{selectedUser.username}</Text>
+                  {selectedUser.display_name && (
+                    <Text style={styles.selectedUserDisplayName}>{selectedUser.display_name}</Text>
+                  )}
+                </View>
+                <Pressable onPress={() => setSelectedUser(null)} style={styles.clearButton}>
+                  <Text style={styles.clearButtonText}>Change</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={handleSearchChange}
+                  placeholder="Search by username..."
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={styles.searchInput}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {searchLoading && (
+                  <View style={styles.searchLoading}>
+                    <ActivityIndicator size="small" color={theme.colors.accentSecondary} />
+                  </View>
+                )}
+                {searchResults.length > 0 && (
+                  <View style={styles.searchResults}>
+                    {searchResults.map((user) => (
+                      <Pressable
+                        key={user.id}
+                        onPress={() => handleSelectUser(user)}
+                        style={({ pressed }) => [styles.searchResultRow, pressed ? styles.pressed : null]}
+                      >
+                        <Text style={styles.searchResultUsername}>@{user.username}</Text>
+                        {user.display_name && <Text style={styles.searchResultDisplayName}>{user.display_name}</Text>}
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+                {searchQuery.length >= 2 && !searchLoading && searchResults.length === 0 && (
+                  <Text style={styles.noResults}>No users found</Text>
+                )}
+              </>
+            )}
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Reason *</Text>
@@ -142,7 +260,12 @@ export function ReportUserScreen({ navigation, route }: Props) {
           <Text style={styles.counter}>{details.length}/500</Text>
         </View>
 
-        <Button title={submitting ? 'Submitting…' : 'Submit Report'} onPress={submit} disabled={submitting || !selectedReason} loading={submitting} />
+        <Button
+          title={submitting ? 'Submitting…' : 'Submit Report'}
+          onPress={submit}
+          disabled={submitting || !selectedReason || (!reportedUserId && !selectedUser)}
+          loading={submitting}
+        />
       </ScrollView>
     </PageShell>
   );
@@ -191,6 +314,90 @@ function createStyles(theme: ThemeDefinition) {
       fontSize: 13,
       fontWeight: '900',
     },
+    // User search styles
+    searchInput: {
+      minHeight: 44,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 12,
+      color: theme.colors.textPrimary,
+      backgroundColor: theme.colors.cardAlt,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    searchLoading: {
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    searchResults: {
+      gap: 4,
+    },
+    searchResultRow: {
+      paddingVertical: 10,
+      paddingHorizontal: 10,
+      borderRadius: 12,
+      backgroundColor: theme.colors.cardAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    searchResultUsername: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    searchResultDisplayName: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 2,
+    },
+    noResults: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      fontWeight: '600',
+      textAlign: 'center',
+      paddingVertical: 8,
+    },
+    selectedUserRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      backgroundColor: theme.colors.highlight,
+      borderWidth: 1,
+      borderColor: theme.colors.accentSecondary,
+    },
+    selectedUserInfo: {
+      flex: 1,
+    },
+    selectedUserName: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    selectedUserDisplayName: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 2,
+    },
+    clearButton: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      backgroundColor: theme.colors.cardAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    clearButtonText: {
+      color: theme.colors.textPrimary,
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    // Reason selection styles
     reasonRow: {
       paddingVertical: 10,
       paddingHorizontal: 10,

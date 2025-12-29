@@ -49,6 +49,7 @@ import { AdminApplicationsScreen } from './screens/AdminApplicationsScreen';
 import { AdminGiftsScreen } from './screens/AdminGiftsScreen';
 import { ComposerListScreen } from './screens/ComposerListScreen';
 import { ComposerEditorScreen } from './screens/ComposerEditorScreen';
+import { ApplyForRoomScreen } from './screens/ApplyForRoomScreen';
 import { setPendingReferralCode } from './lib/referrals';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -121,6 +122,7 @@ function AppNavigation() {
             <Stack.Screen name="AdminGifts" component={AdminGiftsScreen} />
             <Stack.Screen name="ComposerList" component={ComposerListScreen} />
             <Stack.Screen name="ComposerEditor" component={ComposerEditorScreen} />
+            <Stack.Screen name="ApplyForRoom" component={ApplyForRoomScreen} />
             <Stack.Screen name="ProfileRoute" component={ProfileRouteScreen} options={{ presentation: 'card', animation: 'none' }} />
           </Stack.Navigator>
         </NavigationContainer>

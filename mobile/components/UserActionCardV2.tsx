@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import type { GifterStatus } from '../lib/gifter-status';
@@ -67,6 +68,7 @@ export const UserActionCardV2: React.FC<UserActionCardV2Props> = ({
 }) => {
   const { theme } = useThemeMode();
   const isDark = theme === 'dark';
+  const navigation = useNavigation<any>();
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [detectedRole, setDetectedRole] = useState<UserRole>(currentUserRole);
@@ -341,22 +343,17 @@ export const UserActionCardV2: React.FC<UserActionCardV2Props> = ({
   };
 
   const handleReport = () => {
-    // TODO: Implement mobile report flow (potentially using Alert or navigation to report screen)
-    Alert.alert(
-      'Report User',
-      `Report ${username} for violating community guidelines?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Report',
-          onPress: () => {
-            console.log('[TODO] Open report flow for:', username);
-            Alert.alert('Report', 'Report feature coming soon. Please use the web version for now.');
-            // TODO: Navigate to ReportUserScreen or show report modal
-          },
-        },
-      ]
-    );
+    onClose();
+    // Navigate to ReportUser screen with target user context
+    try {
+      navigation.getParent?.()?.navigate?.('ReportUser', {
+        reportedUserId: profileId,
+        reportedUsername: username,
+      });
+    } catch (err) {
+      console.error('Failed to navigate to ReportUser:', err);
+      Alert.alert('Error', 'Failed to open report screen');
+    }
   };
 
   const handleBlock = async () => {
@@ -437,7 +434,7 @@ export const UserActionCardV2: React.FC<UserActionCardV2Props> = ({
                 {/* Avatar */}
                 <Image
                   source={{
-                    uri: avatarUrl || 'https://mylivelinks.com/no-profile-pic.png',
+                    uri: avatarUrl || 'https://www.mylivelinks.com/no-profile-pic.png',
                   }}
                   style={styles.avatar}
                 />

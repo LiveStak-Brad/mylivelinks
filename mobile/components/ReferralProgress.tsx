@@ -14,6 +14,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { fetchAuthed } from '../lib/api';
 import { useAuthContext } from '../contexts/AuthContext';
 import { ThemeDefinition } from '../contexts/ThemeContext';
@@ -155,7 +156,7 @@ export function ReferralProgress({
         {/* Invites Sent */}
         <View style={[styles.metricCard, styles.metricCardBlue]}>
           <View style={styles.metricHeader}>
-            <Text style={styles.metricIcon}>✉️</Text>
+            <Ionicons name="mail-outline" size={16} color={isDark ? '#93C5FD' : '#1E40AF'} />
             <Text style={[styles.metricLabel, styles.metricLabelBlue]}>
               INVITES SENT
             </Text>
@@ -171,7 +172,7 @@ export function ReferralProgress({
         {/* Users Joined */}
         <View style={[styles.metricCard, styles.metricCardGreen]}>
           <View style={styles.metricHeader}>
-            <Text style={styles.metricIcon}>👥</Text>
+            <Ionicons name="people-outline" size={16} color={isDark ? '#86EFAC' : '#15803D'} />
             <Text style={[styles.metricLabel, styles.metricLabelGreen]}>
               USERS JOINED
             </Text>
@@ -189,7 +190,7 @@ export function ReferralProgress({
         {/* Active Users */}
         <View style={[styles.metricCard, styles.metricCardPurple]}>
           <View style={styles.metricHeader}>
-            <Text style={styles.metricIcon}>🎯</Text>
+            <Ionicons name="radio-button-on" size={16} color={isDark ? '#D8B4FE' : '#7C3AED'} />
             <Text style={[styles.metricLabel, styles.metricLabelPurple]}>
               ACTIVE USERS
             </Text>
@@ -207,7 +208,7 @@ export function ReferralProgress({
         {/* Progress Score */}
         <View style={[styles.metricCard, styles.metricCardOrange]}>
           <View style={styles.metricHeader}>
-            <Text style={styles.metricIcon}>📈</Text>
+            <Ionicons name="trending-up" size={16} color={isDark ? '#FED7AA' : '#C2410C'} />
             <Text style={[styles.metricLabel, styles.metricLabelOrange]}>
               TOTAL SCORE
             </Text>
@@ -226,8 +227,9 @@ export function ReferralProgress({
         <Pressable style={styles.primaryButton} onPress={onShareInvite} disabled={!onShareInvite}>
           {({ pressed }) => (
             <View style={[styles.buttonContent, pressed && styles.buttonPressed]}>
+              <Ionicons name="share-outline" size={20} color="#fff" style={styles.buttonIcon} />
               <Text style={styles.primaryButtonText}>
-                📤 Share Your Referral Link
+                Share Your Referral Link
               </Text>
             </View>
           )}
@@ -264,6 +266,9 @@ export function ReferralProgress({
 function createStyles(theme: ThemeDefinition) {
   const isDark = theme.mode === 'dark';
   return StyleSheet.create({
+    buttonIcon: {
+      marginRight: 4,
+    },
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
@@ -361,10 +366,7 @@ function createStyles(theme: ThemeDefinition) {
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 8,
-    },
-    metricIcon: {
-      fontSize: 16,
-      marginRight: 6,
+      gap: 6,
     },
     metricLabel: {
       fontSize: 10,

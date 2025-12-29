@@ -26,6 +26,7 @@ export type RootStackParamList = {
   ComposerEditor: { draftId?: string | null; clipData?: any } | undefined;
   Profile: { username?: string };
   ProfileRoute: { username: string };
+  ApplyForRoom: undefined;
 };
 
 // Bottom tab navigator param list (matches WEB bottom nav)

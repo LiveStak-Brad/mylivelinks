@@ -17,6 +17,7 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { getAvatarSource } from '../lib/defaultAvatar';
 
@@ -109,7 +110,7 @@ export function LeaderboardModal({ visible, onClose, onNavigateToProfile }: Lead
       transparent
       onRequestClose={onClose}
     >
-      <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) + 60 }]}>
+      <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) + 20 }]}>
         <Pressable style={styles.backdropTouchable} onPress={onClose} />
         
         <View style={styles.modalContainer}>
@@ -117,14 +118,18 @@ export function LeaderboardModal({ visible, onClose, onNavigateToProfile }: Lead
           <View style={styles.header}>
             <View style={styles.headerTop}>
               <View style={styles.headerIconContainer}>
-                <Text style={styles.headerIcon}>🏆</Text>
+                <Ionicons name="trophy" size={24} color="#fff" />
               </View>
               <View style={styles.headerText}>
                 <Text style={styles.headerTitle}>Leaderboards</Text>
                 <Text style={styles.headerSubtitle}>Top performers</Text>
               </View>
-              <Pressable style={styles.closeButton} onPress={onClose}>
-                <Text style={styles.closeButtonText}>✕</Text>
+              <Pressable 
+                style={styles.closeButton} 
+                onPress={onClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
               </Pressable>
             </View>
 
@@ -198,7 +203,7 @@ export function LeaderboardModal({ visible, onClose, onNavigateToProfile }: Lead
               </View>
             ) : entries.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyIcon}>🏆</Text>
+                <Ionicons name="trophy-outline" size={48} color="#9aa0a6" style={{ marginBottom: 12 }} />
                 <Text style={styles.emptyText}>No entries yet</Text>
                 <Text style={styles.emptySubtext}>Be the first to make the leaderboard!</Text>
               </View>
@@ -327,9 +332,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  headerIcon: {
-    fontSize: 24,
-  },
   headerText: {
     flex: 1,
   },
@@ -344,16 +346,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#fff',
-    fontWeight: '300',
   },
   typeTabs: {
     flexDirection: 'row',
@@ -417,10 +414,6 @@ const styles = StyleSheet.create({
   emptyState: {
     paddingVertical: 48,
     alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
   },
   emptyText: {
     fontSize: 16,

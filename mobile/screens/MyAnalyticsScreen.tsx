@@ -39,7 +39,20 @@ export function MyAnalyticsScreen({ navigation }: Props) {
     try {
       const res = await fetchAuthed('/api/user-analytics?range=30d', { method: 'GET' });
       if (!res.ok) {
-        throw new Error(res.message || `Failed to load analytics (${res.status})`);
+        // Provide meaningful error messages based on status code
+        let errorMsg = 'Failed to load analytics';
+        if (res.status === 401) {
+          errorMsg = 'Unauthorized. Please log in again.';
+        } else if (res.status === 403) {
+          errorMsg = 'Access denied. You do not have permission to view this data.';
+        } else if (res.status === 404) {
+          errorMsg = 'Analytics data not found.';
+        } else if (res.status >= 500) {
+          errorMsg = 'Server error. Please try again later.';
+        } else if (res.message) {
+          errorMsg = res.message;
+        }
+        throw new Error(errorMsg);
       }
       setData((res.data || null) as Analytics | null);
     } catch (e: any) {
@@ -48,7 +61,7 @@ export function MyAnalyticsScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchAuthed]);
 
   useEffect(() => {
     void load();

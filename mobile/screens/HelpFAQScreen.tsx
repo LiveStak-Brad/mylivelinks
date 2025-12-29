@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { Button, PageShell } from '../components/ui';
 import type { RootStackParamList } from '../types/navigation';
@@ -12,14 +13,14 @@ type QA = { q: string; a: string };
 
 type Section = {
   category: string;
-  icon: string;
+  iconName: string;
   questions: QA[];
 };
 
 const FAQ_SECTIONS: Section[] = [
   {
     category: 'Getting Started',
-    icon: '👤',
+    iconName: 'person-outline',
     questions: [
       {
         q: 'How do I create an account?',
@@ -37,7 +38,7 @@ const FAQ_SECTIONS: Section[] = [
   },
   {
     category: 'Coins & Diamonds',
-    icon: '🪙',
+    iconName: 'diamond-outline',
     questions: [
       {
         q: 'What are Coins?',
@@ -59,7 +60,7 @@ const FAQ_SECTIONS: Section[] = [
   },
   {
     category: 'Sending Gifts',
-    icon: '🎁',
+    iconName: 'gift-outline',
     questions: [
       {
         q: 'How do I send a gift?',
@@ -73,7 +74,7 @@ const FAQ_SECTIONS: Section[] = [
   },
   {
     category: 'Streaming',
-    icon: '📺',
+    iconName: 'videocam-outline',
     questions: [
       {
         q: 'What equipment do I need to stream?',
@@ -91,7 +92,7 @@ const FAQ_SECTIONS: Section[] = [
   },
   {
     category: 'Safety & Privacy',
-    icon: '🛡️',
+    iconName: 'shield-checkmark-outline',
     questions: [
       {
         q: 'How do I block someone?',
@@ -132,9 +133,12 @@ export function HelpFAQScreen({ navigation }: Props) {
                 style={({ pressed }) => [styles.sectionHeader, pressed ? styles.pressed : null]}
                 onPress={() => setExpandedCategory(isExpanded ? '' : section.category)}
               >
-                <Text style={styles.sectionHeaderText}>
-                  {section.icon} {section.category}
-                </Text>
+                <View style={styles.sectionHeaderContent}>
+                  <Ionicons name={section.iconName as any} size={18} color={theme.colors.accent} style={styles.sectionIcon} />
+                  <Text style={styles.sectionHeaderText}>
+                    {section.category}
+                  </Text>
+                </View>
                 <Text style={styles.sectionCount}>{section.questions.length} questions</Text>
               </Pressable>
 
@@ -207,6 +211,15 @@ function createStyles(theme: ThemeDefinition) {
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 10,
+    },
+    sectionHeaderContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+    },
+    sectionIcon: {
+      marginRight: 2,
     },
     sectionHeaderText: {
       color: theme.colors.textPrimary,

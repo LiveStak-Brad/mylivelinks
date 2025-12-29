@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { assertRouteExists } from '../lib/routeAssert';
 import { useTopBarState } from '../hooks/topbar/useTopBarState';
@@ -156,7 +157,7 @@ export function OptionsMenu({
       {/* Trigger Button - Only show if not controlled externally */}
       {!isControlled && (
         <Pressable style={styles.triggerButton} onPress={openMenu}>
-          <Text style={styles.triggerIcon}>⚙️</Text>
+          <Ionicons name="settings-sharp" size={14} color="#fff" />
           <Text style={styles.triggerText}>Options</Text>
         </Pressable>
       )}
@@ -169,15 +170,19 @@ export function OptionsMenu({
         supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
         onRequestClose={closeMenu}
       >
-        <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) + 40 }]}>
+        <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) }]}>
           <Pressable style={styles.backdropTouchable} onPress={closeMenu} />
 
           <View style={styles.menuContainer}>
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.headerTitle}>Options</Text>
-              <Pressable style={styles.closeButton} onPress={closeMenu}>
-                <Text style={styles.closeButtonText}>✕</Text>
+              <Pressable 
+                style={styles.closeButton} 
+                onPress={closeMenu}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={28} color={textMuted} />
               </Pressable>
             </View>
 
@@ -246,11 +251,8 @@ export function OptionsMenu({
                     onNavigateToApply();
                     return;
                   }
-                  try {
-                    void Linking.openURL('https://www.mylivelinks.com/apply');
-                  } catch {
-                    // ignore
-                  }
+                  // Navigate to in-app ApplyForRoom screen (no web redirect)
+                  navigateRoot('ApplyForRoom');
                 }}
                 disabled={!topBar.enabledItems.optionsMenu_applyRoom}
               />
@@ -475,14 +477,11 @@ function createStyles(theme: ThemeDefinition) {
     triggerButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 6,
       paddingHorizontal: 12,
       paddingVertical: 6,
       backgroundColor: theme.colors.accent,
       borderRadius: 8,
-    },
-    triggerIcon: {
-      fontSize: 14,
     },
     triggerText: {
       color: '#fff',
@@ -526,12 +525,11 @@ function createStyles(theme: ThemeDefinition) {
       color: isLight ? accent : theme.colors.textPrimary,
     },
     closeButton: {
-      padding: 4,
-    },
-    closeButtonText: {
-      fontSize: 24,
-      color: textMuted,
-      fontWeight: '300',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     scrollView: {
       flex: 1,

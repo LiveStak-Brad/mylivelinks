@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Feather } from '@expo/vector-icons';
 
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -10,6 +11,7 @@ import ProfileModulePicker from '../components/ProfileModulePicker';
 import ProfileTabPicker from '../components/ProfileTabPicker';
 import type { ProfileSection, ProfileTab } from '../config/profileTypeConfig';
 import type { RootStackParamList } from '../types/navigation';
+import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -24,6 +26,8 @@ type ProfileRow = {
 
 export function EditProfileScreen({ navigation }: Props) {
   const { session } = useAuthContext();
+  const { theme } = useThemeMode();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const userId = session?.user?.id ?? null;
 
   const [loading, setLoading] = useState(true);
@@ -169,68 +173,110 @@ export function EditProfileScreen({ navigation }: Props) {
           <Button title="Retry" onPress={() => void load()} />
         </View>
       ) : (
-        <View style={styles.form}>
-          <View style={styles.field}>
-            <Text style={styles.label}>Username</Text>
-            <Text style={styles.readonlyValue}>@{String(profile.username ?? '')}</Text>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Display Name</Text>
-            <Input value={displayName} onChangeText={setDisplayName} placeholder="Display name" autoCapitalize="words" />
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Bio</Text>
-            <Input
-              value={bio}
-              onChangeText={setBio}
-              placeholder="Bio"
-              multiline
-              style={styles.bioInput}
-            />
-          </View>
-
-          {/* Profile Type Row */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Profile Type</Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.profileTypeRow,
-                pressed && styles.profileTypeRowPressed,
-              ]}
-              onPress={() => setShowTypePickerModal(true)}
-            >
-              <Text style={styles.profileTypeValue}>{formatProfileType(profileType)}</Text>
-              <Text style={styles.profileTypeChevron}>›</Text>
-            </Pressable>
-            <Text style={styles.warningText}>
-              Changing type may hide/show sections. Nothing is deleted.
-            </Text>
-          </View>
-
-          {/* Optional Modules */}
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+          {/* Basic Info Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Profile Sections</Text>
-            <ProfileModulePicker
-              profileType={profileType}
-              currentEnabledModules={enabledModules}
-              onChange={setEnabledModules}
-            />
+            <View style={styles.sectionHeader}>
+              <Feather name="user" size={18} color={theme.colors.accent} />
+              <Text style={styles.sectionTitle}>Basic Information</Text>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Username</Text>
+              <View style={styles.readonlyContainer}>
+                <Text style={styles.readonlyValue}>@{String(profile.username ?? '')}</Text>
+              </View>
+              <Text style={styles.fieldHint}>Username cannot be changed</Text>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Display Name</Text>
+              <Input value={displayName} onChangeText={setDisplayName} placeholder="Display name" autoCapitalize="words" />
+              <Text style={styles.fieldHint}>How your name appears on your profile</Text>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Bio</Text>
+              <Input
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Tell people about yourself..."
+                multiline
+                style={styles.bioInput}
+              />
+              <Text style={styles.fieldHint}>A brief description for your profile</Text>
+            </View>
           </View>
 
-          {/* Optional Tabs */}
+          {/* Profile Type Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Profile Tabs</Text>
-            <ProfileTabPicker
-              profileType={profileType}
-              currentEnabledTabs={enabledTabs}
-              onChange={setEnabledTabs}
-            />
+            <View style={styles.sectionHeader}>
+              <Feather name="star" size={18} color={theme.colors.accent} />
+              <Text style={styles.sectionTitle}>Profile Type</Text>
+            </View>
+            
+            <View style={styles.field}>
+              <Text style={styles.label}>Current Type</Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.profileTypeRow,
+                  pressed && styles.profileTypeRowPressed,
+                ]}
+                onPress={() => setShowTypePickerModal(true)}
+              >
+                <Text style={styles.profileTypeValue}>{formatProfileType(profileType)}</Text>
+                <Feather name="chevron-right" size={20} color={theme.colors.textSecondary} />
+              </Pressable>
+              <Text style={styles.warningText}>
+                Changing type may hide/show sections. Nothing is deleted.
+              </Text>
+            </View>
           </View>
 
-          <Button title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={!canSave} loading={saving} />
-        </View>
+          {/* Customization Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Feather name="sliders" size={18} color={theme.colors.accent} />
+              <Text style={styles.sectionTitle}>Profile Customization</Text>
+            </View>
+
+            <View style={styles.subsection}>
+              <Text style={styles.subsectionTitle}>Profile Sections</Text>
+              <Text style={styles.subsectionHint}>Choose which sections appear on your profile</Text>
+              <ProfileModulePicker
+                profileType={profileType}
+                currentEnabledModules={enabledModules}
+                onChange={setEnabledModules}
+              />
+            </View>
+
+            <View style={styles.subsection}>
+              <Text style={styles.subsectionTitle}>Profile Tabs</Text>
+              <Text style={styles.subsectionHint}>Choose which tabs are visible to visitors</Text>
+              <ProfileTabPicker
+                profileType={profileType}
+                currentEnabledTabs={enabledTabs}
+                onChange={setEnabledTabs}
+              />
+            </View>
+          </View>
+
+          {/* Placeholder for future features */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Feather name="link" size={18} color={theme.colors.textMuted} />
+              <Text style={styles.sectionTitle}>Links & Social Media</Text>
+            </View>
+            <View style={styles.placeholderBox}>
+              <Feather name="link-2" size={32} color={theme.colors.textMuted} />
+              <Text style={styles.placeholderText}>Social links coming soon</Text>
+              <Text style={styles.placeholderSubtext}>Connect your Instagram, Twitter, and more</Text>
+            </View>
+          </View>
+
+          <Button title={saving ? 'Saving…' : 'Save Changes'} onPress={save} disabled={!canSave} loading={saving} />
+          <View style={{ height: 20 }} />
+        </ScrollView>
       )}
 
       {/* Profile Type Picker Modal */}
@@ -247,7 +293,6 @@ export function EditProfileScreen({ navigation }: Props) {
   );
 }
 
-// Helper function to format profile type for display
 function formatProfileType(type: ProfileType): string {
   const labels: Record<ProfileType, string> = {
     streamer: 'Streamer',
@@ -259,97 +304,163 @@ function formatProfileType(type: ProfileType): string {
   return labels[type];
 }
 
-const styles = StyleSheet.create({
-  headerButton: {
-    height: 36,
-    paddingHorizontal: 12,
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  mutedText: {
-    color: '#bdbdbd',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  form: {
-    gap: 14,
-  },
-  field: {
-    gap: 8,
-  },
-  label: {
-    color: '#9aa0a6',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  readonlyValue: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '800',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  bioInput: {
-    height: 110,
-    textAlignVertical: 'top',
-    paddingTop: 12,
-  },
-  profileTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  profileTypeRowPressed: {
-    opacity: 0.7,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  profileTypeValue: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  profileTypeChevron: {
-    color: '#9aa0a6',
-    fontSize: 24,
-    fontWeight: '300',
-  },
-  warningText: {
-    color: '#f59e0b',
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  section: {
-    marginTop: 10,
-    gap: 10,
-  },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  const cardShadow = theme.elevations.card;
+  return StyleSheet.create({
+    headerButton: {
+      height: 32,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: theme.tokens.backgroundSecondary,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+    },
+    mutedText: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    errorText: {
+      color: theme.colors.danger,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    form: {
+      padding: 16,
+      gap: 16,
+    },
+    section: {
+      backgroundColor: theme.colors.cardSurface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 14,
+      padding: 16,
+      gap: 14,
+      shadowColor: cardShadow.color,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      shadowOffset: cardShadow.offset,
+      elevation: cardShadow.elevation,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 4,
+    },
+    sectionTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '900',
+    },
+    subsection: {
+      gap: 8,
+    },
+    subsectionTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    subsectionHint: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    field: {
+      gap: 8,
+    },
+    label: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    fieldHint: {
+      color: theme.colors.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: -4,
+    },
+    readonlyContainer: {
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.tokens.backgroundPrimary,
+    },
+    readonlyValue: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    bioInput: {
+      height: 110,
+      textAlignVertical: 'top',
+      paddingTop: 12,
+    },
+    profileTypeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.tokens.backgroundPrimary,
+    },
+    profileTypeRowPressed: {
+      opacity: 0.7,
+      backgroundColor: theme.colors.surface,
+    },
+    profileTypeValue: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    warningText: {
+      color: theme.colors.warning,
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: -2,
+    },
+    placeholderBox: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 32,
+      paddingHorizontal: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      backgroundColor: theme.tokens.backgroundPrimary,
+      gap: 8,
+    },
+    placeholderText: {
+      color: theme.colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    placeholderSubtext: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+  });
+}

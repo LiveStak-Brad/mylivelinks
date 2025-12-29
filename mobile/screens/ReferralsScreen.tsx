@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Feather } from '@expo/vector-icons';
 
 import type { RootStackParamList } from '../types/navigation';
 import { PageHeader, PageShell } from '../components/ui';
@@ -39,7 +40,8 @@ export function ReferralsScreen({ navigation }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Open invite link"
           >
-            <Text style={styles.primaryButtonText}>🔗 Open Invite Link</Text>
+            <Feather name="link" size={16} color="#fff" style={styles.buttonIcon} />
+            <Text style={styles.primaryButtonText}>Open Invite Link</Text>
           </Pressable>
         </View>
 
@@ -120,9 +122,14 @@ function createStyles(theme: ThemeDefinition) {
     primaryButton: {
       height: 44,
       borderRadius: 12,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 8,
       backgroundColor: theme.colors.accent,
+    },
+    buttonIcon: {
+      marginRight: -4,
     },
     primaryButtonPressed: {
       opacity: 0.9,

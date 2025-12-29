@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 
@@ -23,7 +24,7 @@ export type ProfileType = 'streamer' | 'musician' | 'comedian' | 'business' | 'c
 
 type ProfileTypeOption = {
   id: ProfileType;
-  icon: string;
+  iconName: string;
   title: string;
   description: string;
 };
@@ -31,31 +32,31 @@ type ProfileTypeOption = {
 const PROFILE_TYPES: ProfileTypeOption[] = [
   {
     id: 'streamer',
-    icon: '📡',
+    iconName: 'radio',
     title: 'Streamer',
     description: 'Live streaming and broadcasting content',
   },
   {
     id: 'musician',
-    icon: '🎵',
+    iconName: 'musical-notes',
     title: 'Musician / Artist',
     description: 'Music performances and creative arts',
   },
   {
     id: 'comedian',
-    icon: '🎭',
+    iconName: 'happy',
     title: 'Comedian',
     description: 'Comedy shows and entertainment',
   },
   {
     id: 'business',
-    icon: '💼',
+    iconName: 'briefcase',
     title: 'Business / Brand',
     description: 'Professional and corporate presence',
   },
   {
     id: 'creator',
-    icon: '✨',
+    iconName: 'sparkles',
     title: 'Creator',
     description: 'General content creation (default)',
   },
@@ -152,8 +153,12 @@ export function ProfileTypePickerModal({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Choose Profile Type</Text>
-            <Pressable style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>✕</Text>
+            <Pressable 
+              style={styles.closeButton} 
+              onPress={onClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={28} color={theme.colors.textMuted} />
             </Pressable>
           </View>
 
@@ -232,7 +237,7 @@ function ProfileTypeCard({ option, selected, onPress, styles }: ProfileTypeCardP
       onPress={onPress}
     >
       <View style={styles.typeCardContent}>
-        <Text style={styles.typeIcon}>{option.icon}</Text>
+        <Ionicons name={option.iconName as any} size={32} color={selected ? styles.typeTitleSelected.color : styles.typeTitle.color} />
         <View style={styles.typeTextContainer}>
           <Text style={[styles.typeTitle, selected && styles.typeTitleSelected]}>
             {option.title}
@@ -244,7 +249,7 @@ function ProfileTypeCard({ option, selected, onPress, styles }: ProfileTypeCardP
       </View>
       {selected && (
         <View style={styles.checkmark}>
-          <Text style={styles.checkmarkText}>✓</Text>
+          <Ionicons name="checkmark" size={14} color="#fff" />
         </View>
       )}
     </Pressable>
@@ -293,12 +298,11 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       color: theme.colors.textPrimary,
     },
     closeButton: {
-      padding: 4,
-    },
-    closeButtonText: {
-      fontSize: 22,
-      color: theme.colors.textMuted,
-      fontWeight: '300',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     scrollView: {
       flex: 1,
@@ -331,9 +335,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       flex: 1,
       gap: 14,
     },
-    typeIcon: {
-      fontSize: 32,
-    },
     typeTextContainer: {
       flex: 1,
       gap: 4,
@@ -362,11 +363,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       backgroundColor: theme.colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    checkmarkText: {
-      color: '#fff',
-      fontSize: 14,
-      fontWeight: '800',
     },
     actions: {
       padding: 18,
