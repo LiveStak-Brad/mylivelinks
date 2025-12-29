@@ -4,10 +4,10 @@ import { Feather } from '@expo/vector-icons';
 
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 import { Button } from '../ui/Button';
-import type { LiveStreamData } from '../../screens/LiveOpsScreen';
+import type { LiveOpsStreamData } from '../../hooks/useOwnerLiveOpsData';
 
 interface StreamDetailSheetProps {
-  stream: LiveStreamData;
+  stream: LiveOpsStreamData;
   visible: boolean;
   onClose: () => void;
 }

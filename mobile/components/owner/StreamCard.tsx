@@ -3,11 +3,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
-import type { LiveStreamData } from '../../screens/LiveOpsScreen';
+import type { LiveOpsStreamData } from '../../hooks/useOwnerLiveOpsData';
 
 interface StreamCardProps {
-  stream: LiveStreamData;
-  onPress: (stream: LiveStreamData) => void;
+  stream: LiveOpsStreamData;
+  onPress: (stream: LiveOpsStreamData) => void;
 }
 
 const regionLabels: Record<string, string> = {

@@ -204,15 +204,15 @@ Implemented the complete Live Operations experience for the mobile Owner Panel, 
 
 ## Next Steps for Backend Integration
 
-### API Endpoints Needed (Same as Web):
-- `GET /api/admin/streams/live` - Fetch active streams
-- `POST /api/admin/streams/end` - End a stream
-- `POST /api/admin/streams/mute-chat` - Mute chat
-- `POST /api/admin/streams/throttle-gifts` - Throttle gifting
+### Data Hook (Same as Web):
+- `useOwnerLiveOpsData()` - Located in `/mobile/hooks/useOwnerLiveOpsData.ts`
+- Returns: `{ streams, loading, error, refetch }`
+- **Current Status**: STUB implementation with mock data in `__DEV__` only
+- **Backend Task**: Wire this hook to actual data source (agents will implement)
 
-### Data Structure (Shared):
+### Data Structure (Shared with Web):
 ```typescript
-interface LiveStreamData {
+interface LiveOpsStreamData {
   id: string;
   streamer: string;
   streamerId: string;
@@ -227,6 +227,13 @@ interface LiveStreamData {
   chatPerMin: number;
 }
 ```
+
+### Mock Data Approach:
+- Mock data generator lives ONLY in the hook
+- Gated behind `__DEV__` check
+- Returns empty array in production
+- No random numbers in components
+- Clean separation of concerns
 
 ## Web/Mobile Parity Verification
 

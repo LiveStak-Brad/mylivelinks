@@ -145,17 +145,17 @@ From Agent 1's shared UI kit:
 
 ## Backend Integration Points (Not Implemented - Wire-Ready)
 
-The following are UI-only and ready for backend wiring:
+The Live Ops UI consumes data from a stub hook layer:
 
-### API Endpoints Needed:
-- `GET /api/admin/streams/live` - Fetch active streams
-- `POST /api/admin/streams/end` - End a stream
-- `POST /api/admin/streams/mute-chat` - Mute chat
-- `POST /api/admin/streams/throttle-gifts` - Throttle gifting
+### Data Hook:
+- `useOwnerLiveOpsData()` - Located in `/hooks/useOwnerLiveOpsData.ts`
+- Returns: `{ streams, loading, error, refetch }`
+- **Current Status**: STUB implementation with mock data in `__DEV__` only
+- **Backend Task**: Wire this hook to actual data source (agents will implement)
 
 ### Data Structure Expected:
 ```typescript
-interface LiveStreamData {
+interface LiveOpsStreamData {
   id: string;
   streamer: string;
   streamerId: string;
@@ -170,6 +170,13 @@ interface LiveStreamData {
   chatPerMin: number;
 }
 ```
+
+### Mock Data Location:
+- Mock data generator lives ONLY in the hook (`useOwnerLiveOpsData.ts`)
+- Gated behind `__DEV__` check
+- Returns empty array in production
+- No random numbers in components
+- Clean separation of concerns
 
 ## Testing Checklist
 

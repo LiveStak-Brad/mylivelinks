@@ -290,29 +290,6 @@ export function LiveOpsScreen({ navigation }: Props) {
   );
 }
 
-// Mock data generator for development
-function generateMockStreams(): LiveStreamData[] {
-  const streamers = ['DJ_Emma', 'GamerMike', 'ArtistSarah', 'ComedyJoe', 'MusicLive', 'FitnessQueen', 'TechTalk', 'ChefMaster'];
-  const rooms = ['Main Stage', 'Gaming Arena', 'Art Studio', 'Comedy Club', 'Music Hall', 'Fitness Zone', 'Tech Corner', 'Kitchen Live'];
-  const regions: RegionFilter[] = ['us-east', 'us-west', 'eu-west', 'ap-south'];
-  const statuses: Array<'live' | 'starting' | 'ending'> = ['live', 'starting', 'ending'];
-
-  return Array.from({ length: 25 }, (_, i) => ({
-    id: `stream-${i + 1}`,
-    streamer: streamers[i % streamers.length],
-    streamerId: `user-${i + 1}`,
-    avatarUrl: null,
-    room: rooms[i % rooms.length],
-    roomId: `room-${i + 1}`,
-    region: regions[i % regions.length],
-    status: i < 20 ? 'live' : statuses[i % statuses.length],
-    startedAt: new Date(Date.now() - Math.random() * 7200000).toISOString(),
-    viewers: Math.floor(Math.random() * 500) + 10,
-    giftsPerMin: Math.floor(Math.random() * 50),
-    chatPerMin: Math.floor(Math.random() * 200) + 10,
-  }));
-}
-
 function createStyles(theme: ThemeDefinition) {
   return StyleSheet.create({
     headerButton: {
