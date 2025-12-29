@@ -313,7 +313,7 @@ export function useLiveRoomParticipants(
 
       // Preflight reachability check (diagnostic) before token POST
       try {
-        const reachabilityUrl = API_BASE_URL;
+        const reachabilityUrl = `${API_BASE_URL}/api/ping`;
         const t0 = nowMs();
         const preflightController = typeof AbortController !== 'undefined' ? new AbortController() : null;
         const preflightTimeoutId = setTimeout(() => {
@@ -325,23 +325,25 @@ export function useLiveRoomParticipants(
         }, 8_000);
 
         const preflightResponse = await fetch(reachabilityUrl, {
-          method: 'HEAD',
+          method: 'GET',
           ...(preflightController ? { signal: preflightController.signal } : {}),
         }).finally(() => clearTimeout(preflightTimeoutId));
 
         const dt = Math.round(nowMs() - t0);
+        const jsonSnippet = await preflightResponse.text().catch(() => '');
         console.log('[NET] reachability', {
           url: reachabilityUrl,
-          method: 'HEAD',
+          method: 'GET',
           status: preflightResponse.status,
           ok: preflightResponse.ok,
           ms: dt,
+          textSnippet: toSnippet(jsonSnippet, 200),
         });
       } catch (preflightErr: any) {
         const { name, message, cause } = getErrorDetails(preflightErr);
         console.log('[NET] reachability_error', {
-          url: API_BASE_URL,
-          method: 'HEAD',
+          url: `${API_BASE_URL}/api/ping`,
+          method: 'GET',
           name,
           message,
           cause,
