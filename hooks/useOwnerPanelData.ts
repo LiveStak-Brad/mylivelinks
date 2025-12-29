@@ -242,6 +242,9 @@ export interface OwnerPanelData {
   featureFlags: FeatureFlag[];
   systemHealth: SystemHealth | null;
   auditLogs: AuditLog[];
+  platformHealth: PlatformHealth | null;
+  liveStreamInfo: LiveStreamInfo[];
+  recentReports: ReportInfo[];
 }
 
 export interface UseOwnerPanelDataReturn {
@@ -299,6 +302,9 @@ const MOCK_DATA: OwnerPanelData = {
   featureFlags: [],
   systemHealth: null,
   auditLogs: [],
+  platformHealth: null,
+  liveStreamInfo: [],
+  recentReports: [],
 };
 
 // ============================================================================
