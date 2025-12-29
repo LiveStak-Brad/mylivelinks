@@ -81,6 +81,8 @@ export default function MusicShowcase({
   const [newAudioSource, setNewAudioSource] = useState<'url' | 'upload'>('url');
   const [newAudioFile, setNewAudioFile] = useState<File | null>(null);
   const [newCoverUrl, setNewCoverUrl] = useState('');
+  const [newCoverSource, setNewCoverSource] = useState<'url' | 'upload'>('url');
+  const [newCoverFile, setNewCoverFile] = useState<File | null>(null);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -90,7 +92,7 @@ export default function MusicShowcase({
   const [tracksLoaded, setTracksLoaded] = useState(false);
 
   const loadTracks = async (pid: string) => {
-    const { data, error } = await supabase.rpc('get_profile_music_tracks', { p_profile_id: pid });
+    const { data, error } = await supabase.rpc('get_music_tracks', { p_profile_id: pid });
     if (error) throw error;
     const rows = Array.isArray(data) ? (data as any[]) : [];
     const next = rows.map((r) => ({
@@ -234,11 +236,10 @@ export default function MusicShowcase({
 
     if (isOwner && profileId) {
       try {
-        const { error } = await supabase.rpc('delete_profile_music_track', { p_track_id: id });
+        const { error } = await supabase.rpc('delete_music_track', { p_id: id });
         if (error) throw error;
         if (next.length) {
-          await supabase.rpc('reorder_profile_music_tracks', {
-            p_profile_id: profileId,
+          await supabase.rpc('reorder_music_tracks', {
             p_ordered_ids: next.map((t) => t.id),
           });
         }
@@ -286,8 +287,7 @@ export default function MusicShowcase({
 
     if (isOwner && profileId) {
       try {
-        const { error } = await supabase.rpc('reorder_profile_music_tracks', {
-          p_profile_id: profileId,
+        const { error } = await supabase.rpc('reorder_music_tracks', {
           p_ordered_ids: next.map((t) => t.id),
         });
         if (error) throw error;
@@ -311,6 +311,8 @@ export default function MusicShowcase({
     setNewAudioSource('url');
     setNewAudioFile(null);
     setNewCoverUrl('');
+    setNewCoverSource('url');
+    setNewCoverFile(null);
     setRightsConfirmed(false);
     setShowAddModal(true);
   };
@@ -320,7 +322,7 @@ export default function MusicShowcase({
     const title = newTitle.trim();
     let audioUrl = newAudioUrl.trim();
     const artist = newArtist.trim();
-    const cover = newCoverUrl.trim();
+    let coverUrl = newCoverUrl.trim();
 
     if (!title) return setFormError('Track title is required.');
     if (!rightsConfirmed) return setFormError('You must confirm you own the rights or have permission.');
@@ -335,6 +337,17 @@ export default function MusicShowcase({
       if (newAudioFile.size > 50 * 1024 * 1024) return setFormError('Audio file too large (max 50MB).');
     }
 
+    if (newCoverSource === 'upload') {
+      if (!newCoverFile) return setFormError('Please select a cover image to upload.');
+      const name = String(newCoverFile.name || '').toLowerCase();
+      const type = String(newCoverFile.type || '').toLowerCase();
+      const isJpg = type === 'image/jpeg' || name.endsWith('.jpg') || name.endsWith('.jpeg');
+      const isPng = type === 'image/png' || name.endsWith('.png');
+      const isWebp = type === 'image/webp' || name.endsWith('.webp');
+      if (!isJpg && !isPng && !isWebp) return setFormError('Cover art must be a JPG, PNG, or WEBP image.');
+      if (newCoverFile.size > 10 * 1024 * 1024) return setFormError('Cover image too large (max 10MB).');
+    }
+
     if (newAudioSource === 'upload' && profileId) {
       try {
         const storageId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : safeUuid();
@@ -342,6 +355,20 @@ export default function MusicShowcase({
       } catch (e: any) {
         const msg = typeof e?.message === 'string' ? e.message : 'Failed to upload audio.';
         console.error('[MusicShowcase] audio upload failed', e);
+        return setFormError(msg);
+      }
+    }
+
+    if (newCoverSource === 'upload') {
+      if (!profileId) {
+        return setFormError('Unable to upload cover art right now. Please try again after reloading the page.');
+      }
+      try {
+        const storageId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : safeUuid();
+        coverUrl = await uploadProfileMedia(profileId, `music/tracks/${storageId}/cover`, newCoverFile as File, { upsert: false });
+      } catch (e: any) {
+        const msg = typeof e?.message === 'string' ? e.message : 'Failed to upload cover art.';
+        console.error('[MusicShowcase] cover upload failed', e);
         return setFormError(msg);
       }
     }
@@ -355,7 +382,7 @@ export default function MusicShowcase({
         title,
         artist_name: artist || null,
         audio_url: audioUrl,
-        cover_art_url: cover || null,
+        cover_art_url: coverUrl || null,
         rights_confirmed: true,
       };
       const next = [...uiTracks, nextTrack];
@@ -372,11 +399,11 @@ export default function MusicShowcase({
         title,
         artist_name: artist || null,
         audio_url: audioUrl,
-        cover_art_url: cover || null,
+        cover_art_url: coverUrl || null,
         sort_order: uiTracks.length,
         rights_confirmed: true,
       };
-      const { data, error } = await supabase.rpc('upsert_profile_music_track', { p_track: payload });
+      const { data, error } = await supabase.rpc('upsert_music_track', { p_id: null, p_payload: payload });
       if (error) throw error;
       const row: any = data ?? null;
       if (!row?.id) throw new Error('Missing track id from RPC');
@@ -386,7 +413,7 @@ export default function MusicShowcase({
         title: String(row.title ?? title),
         artist_name: row.artist_name ?? (artist || null),
         audio_url: String(row.audio_url ?? audioUrl),
-        cover_art_url: row.cover_art_url ?? (cover || null),
+        cover_art_url: row.cover_art_url ?? (coverUrl || null),
         sort_order: row.sort_order ?? uiTracks.length,
         rights_confirmed: row.rights_confirmed ?? true,
       };
@@ -444,6 +471,10 @@ export default function MusicShowcase({
             setNewAudioFile={setNewAudioFile}
             newCoverUrl={newCoverUrl}
             setNewCoverUrl={setNewCoverUrl}
+            newCoverSource={newCoverSource}
+            setNewCoverSource={setNewCoverSource}
+            newCoverFile={newCoverFile}
+            setNewCoverFile={setNewCoverFile}
             rightsConfirmed={rightsConfirmed}
             setRightsConfirmed={setRightsConfirmed}
             formError={formError}
@@ -641,6 +672,10 @@ export default function MusicShowcase({
           setNewAudioFile={setNewAudioFile}
           newCoverUrl={newCoverUrl}
           setNewCoverUrl={setNewCoverUrl}
+          newCoverSource={newCoverSource}
+          setNewCoverSource={setNewCoverSource}
+          newCoverFile={newCoverFile}
+          setNewCoverFile={setNewCoverFile}
           rightsConfirmed={rightsConfirmed}
           setRightsConfirmed={setRightsConfirmed}
           formError={formError}
@@ -665,6 +700,10 @@ function AddTrackModal(props: {
   setNewAudioFile: (v: File | null) => void;
   newCoverUrl: string;
   setNewCoverUrl: (v: string) => void;
+  newCoverSource: 'url' | 'upload';
+  setNewCoverSource: (v: 'url' | 'upload') => void;
+  newCoverFile: File | null;
+  setNewCoverFile: (v: File | null) => void;
   rightsConfirmed: boolean;
   setRightsConfirmed: (v: boolean) => void;
   formError: string | null;
@@ -759,14 +798,54 @@ function AddTrackModal(props: {
               </div>
             )}
           </div>
+
           <div>
-            <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Cover Art URL</label>
-            <input
-              value={props.newCoverUrl}
-              onChange={(e) => props.setNewCoverUrl(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-white"
-              placeholder="https://.../cover.jpg"
-            />
+            <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Cover Art (optional)</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => props.setNewCoverSource('url')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold border ${
+                  props.newCoverSource === 'url' ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700'
+                }`}
+              >
+                Cover URL
+              </button>
+              <button
+                type="button"
+                onClick={() => props.setNewCoverSource('upload')}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-extrabold border ${
+                  props.newCoverSource === 'upload' ? 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-300' : 'border-gray-200 dark:border-gray-700'
+                }`}
+              >
+                Upload Image
+              </button>
+            </div>
+
+            {props.newCoverSource === 'url' ? (
+              <div className="mt-2">
+                <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Cover Art URL</label>
+                <input
+                  value={props.newCoverUrl}
+                  onChange={(e) => props.setNewCoverUrl(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-white"
+                  placeholder="https://.../cover.jpg"
+                />
+              </div>
+            ) : (
+              <div className="mt-2">
+                <label className="block text-xs font-extrabold text-gray-700 dark:text-gray-300 mb-1">Cover Art File</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                  onChange={(e) => props.setNewCoverFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm"
+                />
+                {!!props.newCoverFile && (
+                  <div className="mt-1 text-xs font-semibold text-gray-600 dark:text-gray-400">Selected: {props.newCoverFile.name}</div>
+                )}
+              </div>
+            )}
           </div>
 
           <label className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800">
