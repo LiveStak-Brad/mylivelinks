@@ -23,6 +23,7 @@ import {
   Button,
   Badge,
   Tooltip,
+  useToast,
 } from '@/components/ui';
 import type { Report } from '@/app/owner/reports/page';
 import Image from 'next/image';
@@ -41,6 +42,7 @@ export default function ReportDetailPanel({
 }: ReportDetailPanelProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState(report.admin_notes || '');
+  const { toast } = useToast();
 
   const handleAction = async (action: 'warn' | 'mute' | 'ban' | 'remove_monetization') => {
     // Placeholder - backend not wired yet
@@ -49,7 +51,12 @@ export default function ReportDetailPanel({
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    alert(`Action "${action}" is not yet implemented. Backend wiring required.`);
+    toast({
+      title: 'Action not available',
+      description: 'Backend wiring required.',
+      variant: 'info',
+      duration: 3500,
+    });
     setActionLoading(null);
   };
 
@@ -74,13 +81,25 @@ export default function ReportDetailPanel({
       });
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          toast({
+            title: 'Not allowed',
+            description: 'You do not have permission to update reports.',
+            variant: 'error',
+          });
+          return;
+        }
         throw new Error('Failed to update report status');
       }
 
       onUpdate();
     } catch (error) {
       console.error('Error updating report:', error);
-      alert('Failed to update report status');
+      toast({
+        title: 'Update failed',
+        description: error instanceof Error ? error.message : 'Failed to update report status',
+        variant: 'error',
+      });
     } finally {
       setActionLoading(null);
     }
@@ -202,7 +221,7 @@ export default function ReportDetailPanel({
             <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
               <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-gray-700">
                 <Image
-                  src={getAvatarUrl(null, report.reported_user.username)}
+                  src={getAvatarUrl(null)}
                   alt={report.reported_user.username}
                   fill
                   className="object-cover"
@@ -234,7 +253,7 @@ export default function ReportDetailPanel({
             <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
               <div className="relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-gray-700">
                 <Image
-                  src={getAvatarUrl(null, report.reporter.username)}
+                  src={getAvatarUrl(null)}
                   alt={report.reporter.username}
                   fill
                   className="object-cover"

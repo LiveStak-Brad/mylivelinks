@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { useToast } from '@/components/ui';
 
 interface TemplateData {
   id: string;
@@ -67,6 +68,7 @@ export default function EditTemplatePage() {
   const params = useParams();
   const templateId = params.templateId as string;
   const isNew = templateId === 'new';
+  const { toast } = useToast();
   
   const [template, setTemplate] = useState<TemplateData | null>(null);
   const [formData, setFormData] = useState<Partial<TemplateData>>({
@@ -162,11 +164,19 @@ export default function EditTemplatePage() {
         }
       } else {
         const err = await res.json();
-        alert(err.error || 'Failed to save template');
+        toast({
+          title: 'Save failed',
+          description: err?.error || 'Failed to save template',
+          variant: 'error',
+        });
       }
     } catch (err) {
       console.error('Error saving template:', err);
-      alert('Failed to save template');
+      toast({
+        title: 'Save failed',
+        description: 'Failed to save template',
+        variant: 'error',
+      });
     } finally {
       setSaving(false);
     }

@@ -15,11 +15,13 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { SkeletonCard } from '@/components/ui';
+import { useToast } from '@/components/ui';
 import { PageShell, PageHeader, PageSection } from '@/components/layout';
 import TemplateCard, { RoomTemplate } from '@/components/owner/TemplateCard';
 
 export default function OwnerTemplatesPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [templates, setTemplates] = useState<RoomTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,11 +134,19 @@ export default function OwnerTemplatesPage() {
         router.push(`/owner/rooms/${data.room.id}`);
       } else {
         const err = await res.json();
-        alert(err.error || 'Failed to create room');
+        toast({
+          title: 'Create failed',
+          description: err?.error || 'Failed to create room',
+          variant: 'error',
+        });
       }
     } catch (err) {
       console.error('Error creating room:', err);
-      alert('Failed to create room');
+      toast({
+        title: 'Create failed',
+        description: 'Failed to create room',
+        variant: 'error',
+      });
     } finally {
       setCreating(false);
     }

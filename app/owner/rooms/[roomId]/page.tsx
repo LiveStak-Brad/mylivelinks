@@ -21,6 +21,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import BannerUploader from '@/components/owner/BannerUploader';
 import { RoomRolesPanel, RoleUser } from '@/components/admin';
 import RoomCard from '@/components/rooms/RoomCard';
+import { useToast } from '@/components/ui';
 
 type TabId = 'settings' | 'appearance' | 'roles' | 'preview';
 
@@ -79,6 +80,7 @@ export default function EditRoomPage() {
   const router = useRouter();
   const params = useParams();
   const roomId = params.roomId as string;
+  const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState<TabId>('settings');
   const [room, setRoom] = useState<RoomData | null>(null);
@@ -168,11 +170,19 @@ export default function EditRoomPage() {
         setHasChanges(false);
       } else {
         const err = await res.json();
-        alert(err.error || 'Failed to save changes');
+        toast({
+          title: 'Save failed',
+          description: err?.error || 'Failed to save changes',
+          variant: 'error',
+        });
       }
     } catch (err) {
       console.error('Error saving room:', err);
-      alert('Failed to save changes');
+      toast({
+        title: 'Save failed',
+        description: 'Failed to save changes',
+        variant: 'error',
+      });
     } finally {
       setSaving(false);
     }

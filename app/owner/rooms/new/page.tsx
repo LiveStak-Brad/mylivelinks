@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, LayoutTemplate, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/ui';
 import RoomForm, { RoomFormData } from '@/components/owner/RoomForm';
 import { RoomTemplate } from '@/components/owner/TemplateCard';
 
 export default function CreateRoomPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const templateId = searchParams.get('template');
   
   const [templates, setTemplates] = useState<RoomTemplate[]>([]);
@@ -68,11 +70,19 @@ export default function CreateRoomPage() {
         router.push(`/owner/rooms/${result.room.id}`);
       } else {
         const err = await res.json();
-        alert(err.error || 'Failed to create room');
+        toast({
+          title: 'Create failed',
+          description: err?.error || 'Failed to create room',
+          variant: 'error',
+        });
       }
     } catch (err) {
       console.error('Error creating room:', err);
-      alert('Failed to create room');
+      toast({
+        title: 'Create failed',
+        description: 'Failed to create room',
+        variant: 'error',
+      });
     } finally {
       setSaving(false);
     }

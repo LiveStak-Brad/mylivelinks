@@ -12,19 +12,6 @@ interface StreamDetailSheetProps {
   onClose: () => void;
 }
 
-interface ViewerPreview {
-  id: string;
-  username: string;
-  isGifting: boolean;
-}
-
-interface ChatMessage {
-  id: string;
-  username: string;
-  message: string;
-  timestamp: string;
-}
-
 const regionLabels: Record<string, string> = {
   'us-east': 'US East',
   'us-west': 'US West',
@@ -36,20 +23,6 @@ const regionLabels: Record<string, string> = {
 export function StreamDetailSheet({ stream, visible, onClose }: StreamDetailSheetProps) {
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
-
-  // Mock data for UI
-  const mockViewers: ViewerPreview[] = [
-    { id: '1', username: 'viewer_123', isGifting: true },
-    { id: '2', username: 'fan_user', isGifting: false },
-    { id: '3', username: 'supporter_99', isGifting: true },
-    { id: '4', username: 'watcher_42', isGifting: false },
-  ];
-
-  const mockChat: ChatMessage[] = [
-    { id: '1', username: 'viewer_123', message: 'Amazing stream!', timestamp: '2 min ago' },
-    { id: '2', username: 'fan_user', message: 'Love this content', timestamp: '3 min ago' },
-    { id: '3', username: 'supporter_99', message: 'Keep it up!', timestamp: '5 min ago' },
-  ];
 
   const duration = getStreamDuration(stream.startedAt);
 
@@ -150,35 +123,19 @@ export function StreamDetailSheet({ stream, visible, onClose }: StreamDetailShee
 
             {/* Viewers Preview */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>ACTIVE VIEWERS ({mockViewers.length})</Text>
-              <View style={styles.viewersList}>
-                {mockViewers.map((viewer) => (
-                  <View key={viewer.id} style={styles.viewerItem}>
-                    <View style={styles.viewerAvatar}>
-                      <Feather name="user" size={14} color="#fff" />
-                    </View>
-                    <Text style={styles.viewerName}>{viewer.username}</Text>
-                    {viewer.isGifting && (
-                      <Feather name="gift" size={14} color="#a855f7" />
-                    )}
-                  </View>
-                ))}
+              <Text style={styles.sectionTitle}>ACTIVE VIEWERS ({stream.viewers.toLocaleString()})</Text>
+              <View style={styles.placeholderCard}>
+                <Text style={styles.placeholderTitle}>Viewer list not available</Text>
+                <Text style={styles.placeholderText}>Backend wiring required</Text>
               </View>
             </View>
 
             {/* Recent Chat */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>RECENT CHAT</Text>
-              <View style={styles.chatList}>
-                {mockChat.map((msg) => (
-                  <View key={msg.id} style={styles.chatItem}>
-                    <View style={styles.chatHeader}>
-                      <Text style={styles.chatUsername}>{msg.username}</Text>
-                      <Text style={styles.chatTimestamp}>{msg.timestamp}</Text>
-                    </View>
-                    <Text style={styles.chatMessage}>{msg.message}</Text>
-                  </View>
-                ))}
+              <View style={styles.placeholderCard}>
+                <Text style={styles.placeholderTitle}>Chat preview not available</Text>
+                <Text style={styles.placeholderText}>Backend wiring required</Text>
               </View>
             </View>
 
@@ -192,7 +149,6 @@ export function StreamDetailSheet({ stream, visible, onClose }: StreamDetailShee
                 onPress={() => {}}
                 disabled
                 style={[styles.actionButton, { opacity: 0.5 }]}
-                icon={<Feather name="stop-circle" size={18} color="#fff" />}
               />
               <Text style={styles.actionHint}>Backend wiring required</Text>
 
@@ -202,7 +158,6 @@ export function StreamDetailSheet({ stream, visible, onClose }: StreamDetailShee
                 onPress={() => {}}
                 disabled
                 style={[styles.actionButton, { opacity: 0.5 }]}
-                icon={<Feather name="volume-2" size={18} color={theme.colors.text} />}
               />
               <Text style={styles.actionHint}>Backend wiring required</Text>
 
@@ -212,7 +167,6 @@ export function StreamDetailSheet({ stream, visible, onClose }: StreamDetailShee
                 onPress={() => {}}
                 disabled
                 style={[styles.actionButton, { opacity: 0.5 }]}
-                icon={<Feather name="trending-down" size={18} color={theme.colors.text} />}
               />
               <Text style={styles.actionHint}>Backend wiring required</Text>
 
@@ -288,6 +242,26 @@ function createStyles(theme: ThemeDefinition) {
     section: {
       padding: 20,
       gap: 12,
+    },
+    placeholderCard: {
+      backgroundColor: theme.tokens.surfaceCard,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 14,
+      gap: 6,
+    },
+    placeholderTitle: {
+      color: theme.colors.text,
+      fontSize: 14,
+      fontWeight: '800',
+      textAlign: 'center',
+    },
+    placeholderText: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
     },
     sectionTitle: {
       color: theme.colors.textMuted,
