@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 export type PortfolioMediaType = 'image' | 'video' | 'link';
@@ -49,9 +50,9 @@ export function PortfolioSection({
     return (
       <View style={styles.container}>
         <View style={styles.sectionCard}>
-          <Text style={styles.title}>🎨 Portfolio</Text>
+          <Text style={styles.title}>Portfolio</Text>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🎨</Text>
+            <Ionicons name="briefcase" size={48} color={theme.colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>No Portfolio Items</Text>
             <Text style={styles.emptyDescription}>Work samples and projects will appear here</Text>
             <Pressable style={styles.ctaButton} onPress={onAdd}>
@@ -67,7 +68,7 @@ export function PortfolioSection({
   if (items.length === 0) return null;
 
   const mediaLabel = (t: PortfolioMediaType) => (t === 'image' ? 'IMAGE' : t === 'video' ? 'VIDEO' : 'LINK');
-  const mediaEmoji = (t: PortfolioMediaType) => (t === 'image' ? '🖼️' : t === 'video' ? '🎥' : '🔗');
+  const mediaEmoji = (t: PortfolioMediaType) => (t === 'image' ? 'image' : t === 'video' ? 'videocam' : 'link');
 
   const resolveThumb = (it: PortfolioItem) => {
     if (it.media_type === 'image') return it.media_url;
@@ -78,7 +79,7 @@ export function PortfolioSection({
     <View style={styles.container}>
       <View style={styles.sectionCard}>
         <View style={styles.header}>
-          <Text style={styles.title}>🎨 Portfolio</Text>
+          <Text style={styles.title}>Portfolio</Text>
           {isOwner && (
             <Pressable onPress={onAdd} style={styles.addButton}>
               <Text style={styles.addButtonText}>+ Add</Text>
@@ -103,13 +104,14 @@ export function PortfolioSection({
                   <Image source={{ uri: thumb }} style={styles.image} resizeMode="cover" />
                 ) : (
                   <View style={styles.imageFallback}>
-                    <Text style={styles.imageFallbackIcon}>{mediaEmoji(it.media_type)}</Text>
+                    <Ionicons name={mediaEmoji(it.media_type)} size={42} color={theme.colors.textMuted} />
                   </View>
                 )}
 
                 <View style={styles.badge}>
+                  <Ionicons name={mediaEmoji(it.media_type)} size={10} color="#fff" style={{ marginRight: 4 }} />
                   <Text style={styles.badgeText}>
-                    {mediaEmoji(it.media_type)} {mediaLabel(it.media_type)}
+                    {mediaLabel(it.media_type)}
                   </Text>
                 </View>
               </View>
@@ -182,12 +184,13 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 12,
+      paddingBottom: 0,
     },
     title: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
       color: theme.colors.textPrimary,
+      marginBottom: 12,
     },
     addButton: {
       backgroundColor: theme.colors.accent,
@@ -236,10 +239,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       justifyContent: 'center',
       alignItems: 'center',
     },
-    imageFallbackIcon: {
-      fontSize: 42,
-      opacity: 0.6,
-    },
     badge: {
       position: 'absolute',
       top: 10,
@@ -248,6 +247,8 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       paddingHorizontal: 8,
       paddingVertical: 4,
       borderRadius: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     badgeText: {
       color: '#fff',
@@ -324,7 +325,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       marginBottom: 16,
     },
     emptyIcon: {
-      fontSize: 48,
       marginBottom: 12,
       opacity: 0.6,
     },

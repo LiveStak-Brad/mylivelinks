@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 export interface ScheduleItem {
@@ -47,7 +48,7 @@ export function ScheduleSection({
         <View style={styles.sectionCard}>
           <Text style={styles.title}>Stream Schedule</Text>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={48} color={theme.colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>No Schedule Set</Text>
             <Text style={styles.emptyDescription}>
               Let your followers know when you'll be streaming
@@ -87,9 +88,10 @@ export function ScheduleSection({
                 {item.time && <Text style={styles.timeText}>{item.time}</Text>}
               </View>
               {item.recurring && (
-                <View style={styles.recurringBadge}>
-                  <Text style={styles.recurringText}>🔁 Recurring</Text>
-                </View>
+              <View style={styles.recurringBadge}>
+                <Ionicons name="repeat" size={11} color={theme.colors.textMuted} style={{ marginRight: 4 }} />
+                <Text style={styles.recurringText}>Recurring</Text>
+              </View>
               )}
             </View>
 
@@ -153,12 +155,13 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 12,
+      paddingBottom: 0,
     },
     title: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
       color: theme.colors.textPrimary,
+      marginBottom: 12,
     },
     addButton: {
       backgroundColor: theme.colors.accent,
@@ -270,7 +273,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       borderStyle: 'dashed',
     },
     emptyIcon: {
-      fontSize: 48,
       marginBottom: 12,
       opacity: 0.5,
     },

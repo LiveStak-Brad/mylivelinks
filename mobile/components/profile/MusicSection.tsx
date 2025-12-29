@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 export interface MusicItem {
@@ -56,7 +57,7 @@ export function MusicSection({
         <View style={styles.sectionCard}>
           <Text style={styles.title}>Music</Text>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🎵</Text>
+            <Ionicons name="musical-notes" size={48} color={theme.colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>No Music Added</Text>
             <Text style={styles.emptyDescription}>
               Share your tracks, albums, and singles with your fans
@@ -107,7 +108,7 @@ export function MusicSection({
                 />
               ) : (
                 <View style={styles.coverFallback}>
-                  <Text style={styles.coverFallbackIcon}>🎶</Text>
+                  <Ionicons name="musical-note" size={48} color={theme.colors.textMuted} />
                 </View>
               )}
               
@@ -218,12 +219,13 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 12,
+      paddingBottom: 0,
     },
     title: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
       color: theme.colors.textPrimary,
+      marginBottom: 12,
     },
     addButton: {
       backgroundColor: theme.colors.accent,
@@ -271,10 +273,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(94, 155, 255, 0.1)',
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    coverFallbackIcon: {
-      fontSize: 48,
-      opacity: 0.5,
     },
     playOverlay: {
       position: 'absolute',
@@ -394,7 +392,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       marginBottom: 16,
     },
     emptyIcon: {
-      fontSize: 48,
       marginBottom: 12,
       opacity: 0.5,
     },

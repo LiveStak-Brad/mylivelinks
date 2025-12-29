@@ -165,7 +165,7 @@ export function VideoPlaylistPlayer({
           </View>
 
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🎬</Text>
+            <Ionicons name="videocam-outline" size={48} color={theme.colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>{emptyTitle}</Text>
             <Text style={styles.emptyText}>{emptyText}</Text>
             {isOwner && onAdd ? (
@@ -390,13 +390,14 @@ function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: 
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 12,
+      paddingBottom: 0,
       gap: 10,
     },
     title: {
       color: theme.colors.textPrimary,
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: '800',
+      marginBottom: 12,
     },
     subtitle: {
       color: theme.colors.textMuted,
@@ -426,7 +427,7 @@ function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: 
       gap: 8,
     },
     emptyIcon: {
-      fontSize: 44,
+      marginBottom: 8,
     },
     emptyTitle: {
       color: theme.colors.textPrimary,

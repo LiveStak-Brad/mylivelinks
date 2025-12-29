@@ -2452,7 +2452,7 @@ export function ProfileScreen({
         {/* PROFILE STATS CARD */}
         {isSectionEnabled('profile_stats', profileType, profile.enabled_modules as any) && !profile.hide_streaming_stats && (
           <View style={[styles.card, customCardStyle]}>
-            <Text style={styles.cardTitle}>📊 Profile Stats</Text>
+            <Text style={styles.cardTitle}>Profile Stats</Text>
             <View style={styles.statsDetailRow}>
               <Text style={styles.statsDetailLabel}>Streams</Text>
               <Text style={styles.statsDetailValue}>

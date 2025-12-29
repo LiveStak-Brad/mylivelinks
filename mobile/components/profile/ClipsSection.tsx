@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 export interface ClipItem {
@@ -50,7 +51,7 @@ export function ClipsSection({
         <View style={styles.sectionCard}>
           <Text style={styles.title}>Clips</Text>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🎬</Text>
+            <Ionicons name="film" size={48} color={theme.colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>No Clips Yet</Text>
             <Text style={styles.emptyDescription}>
               Share your best moments with your audience
@@ -101,7 +102,7 @@ export function ClipsSection({
                 />
               ) : (
                 <View style={styles.thumbnailFallback}>
-                  <Text style={styles.thumbnailFallbackIcon}>🎥</Text>
+                  <Ionicons name="videocam" size={40} color={theme.colors.textMuted} />
                 </View>
               )}
               
@@ -187,12 +188,13 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 12,
+      paddingBottom: 0,
     },
     title: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
       color: theme.colors.textPrimary,
+      marginBottom: 12,
     },
     addButton: {
       backgroundColor: theme.colors.accent,
@@ -240,10 +242,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(94, 155, 255, 0.1)',
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    thumbnailFallbackIcon: {
-      fontSize: 40,
-      opacity: 0.5,
     },
     playOverlay: {
       position: 'absolute',
@@ -342,7 +340,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       marginBottom: 16,
     },
     emptyIcon: {
-      fontSize: 48,
       marginBottom: 12,
       opacity: 0.5,
     },

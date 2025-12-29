@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, ScrollView, Linking } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 export interface MerchItem {
@@ -31,9 +32,9 @@ export function MerchSection({ items, isOwner, onAdd, onEdit, onDelete, onMove, 
     return (
       <View style={styles.container}>
         <View style={styles.sectionCard}>
-          <Text style={styles.title}>🛍️ Merchandise</Text>
+          <Text style={styles.title}>Merchandise</Text>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🛍️</Text>
+            <Ionicons name="cart" size={48} color={theme.colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>No Merch Yet</Text>
             <Text style={styles.emptyDescription}>Add products so fans can support you.</Text>
             <Pressable style={styles.ctaButton} onPress={onAdd}>
@@ -51,7 +52,7 @@ export function MerchSection({ items, isOwner, onAdd, onEdit, onDelete, onMove, 
     <View style={styles.container}>
       <View style={styles.sectionCard}>
         <View style={styles.header}>
-          <Text style={styles.title}>🛍️ Merchandise</Text>
+          <Text style={styles.title}>Merchandise</Text>
           {isOwner && (
             <Pressable onPress={onAdd} style={styles.addButton}>
               <Text style={styles.addButtonText}>+ Add</Text>
@@ -67,7 +68,7 @@ export function MerchSection({ items, isOwner, onAdd, onEdit, onDelete, onMove, 
                 <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
               ) : (
                 <View style={styles.imageFallback}>
-                  <Text style={styles.imageFallbackIcon}>🛍️</Text>
+                  <Ionicons name="cart-outline" size={40} color={theme.colors.textMuted} />
                 </View>
               )}
             </View>
@@ -153,12 +154,13 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 12,
+      paddingBottom: 0,
     },
     title: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
       color: theme.colors.textPrimary,
+      marginBottom: 12,
     },
     addButton: {
       backgroundColor: theme.colors.accent,
@@ -205,10 +207,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255,255,255,0.08)',
-    },
-    imageFallbackIcon: {
-      fontSize: 40,
-      opacity: 0.5,
     },
     content: {
       padding: 12,
@@ -287,7 +285,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       marginBottom: 16,
     },
     emptyIcon: {
-      fontSize: 48,
       marginBottom: 12,
       opacity: 0.5,
     },

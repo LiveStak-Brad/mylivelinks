@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 export type BusinessInfoData = {
@@ -38,9 +39,9 @@ export function BusinessInfoSection({ data, isOwner, onEdit, cardOpacity = 0.95 
     return (
       <View style={styles.container}>
         <View style={styles.sectionCard}>
-          <Text style={styles.title}>💼 Business Info</Text>
+          <Text style={styles.title}>Business Info</Text>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💼</Text>
+            <Ionicons name="business" size={48} color={theme.colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>No Business Info Yet</Text>
             <Text style={styles.emptyDescription}>
               Add your business description and contact details. Visitors won&apos;t see placeholders.
@@ -61,7 +62,7 @@ export function BusinessInfoSection({ data, isOwner, onEdit, cardOpacity = 0.95 
     <View style={styles.container}>
       <View style={styles.card}>
         <View style={styles.header}>
-          <Text style={styles.title}>💼 Business Info</Text>
+          <Text style={styles.title}>Business Info</Text>
           {isOwner && (
             <Pressable onPress={onEdit} style={styles.editButton}>
               <Text style={styles.editButtonText}>Edit</Text>
@@ -138,12 +139,13 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 12,
+      paddingBottom: 0,
     },
     title: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
       color: theme.colors.textPrimary,
+      marginBottom: 12,
     },
     editButton: {
       backgroundColor: theme.colors.accent,
@@ -205,7 +207,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       marginBottom: 16,
     },
     emptyIcon: {
-      fontSize: 48,
       marginBottom: 12,
       opacity: 0.5,
     },

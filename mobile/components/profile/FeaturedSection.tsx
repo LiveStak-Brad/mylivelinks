@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useThemeMode, type ThemeDefinition } from '../../contexts/ThemeContext';
 
 export interface FeaturedItem {
@@ -46,7 +47,7 @@ export function FeaturedSection({
         <View style={styles.sectionCard}>
           <Text style={styles.title}>Featured</Text>
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>⭐</Text>
+            <Ionicons name="star" size={48} color={theme.colors.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyTitle}>No Featured Content</Text>
             <Text style={styles.emptyDescription}>
               Showcase your best work by adding featured content
@@ -94,9 +95,11 @@ export function FeaturedSection({
                 />
               ) : (
                 <View style={styles.thumbnailFallback}>
-                  <Text style={styles.thumbnailFallbackIcon}>
-                    {item.type === 'video' ? '🎥' : item.type === 'link' ? '🔗' : '📌'}
-                  </Text>
+                  <Ionicons 
+                    name={item.type === 'video' ? 'videocam' : item.type === 'link' ? 'link' : 'document-text'} 
+                    size={48} 
+                    color={theme.colors.textMuted} 
+                  />
                 </View>
               )}
               {item.type && (
@@ -172,12 +175,13 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 12,
+      paddingBottom: 0,
     },
     title: {
-      fontSize: 20,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
       color: theme.colors.textPrimary,
+      marginBottom: 12,
     },
     addButton: {
       backgroundColor: theme.colors.accent,
@@ -299,7 +303,6 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       marginBottom: 16,
     },
     emptyIcon: {
-      fontSize: 48,
       marginBottom: 12,
       opacity: 0.5,
     },
