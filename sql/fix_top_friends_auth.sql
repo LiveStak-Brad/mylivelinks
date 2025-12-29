@@ -1,4 +1,90 @@
--- FIXED VERSION - Pass profile_id explicitly instead of relying on auth.uid()
+-- ================================================
+-- TOP FRIENDS FEATURE - COMPLETE SETUP (FIXED TYPE CASTING)
+-- ================================================
+
+-- Drop existing functions if they exist
+DROP FUNCTION IF EXISTS get_top_friends(UUID);
+DROP FUNCTION IF EXISTS upsert_top_friend(UUID, UUID, INTEGER);
+DROP FUNCTION IF EXISTS remove_top_friend(UUID, UUID);
+DROP FUNCTION IF EXISTS reorder_top_friends(UUID, UUID, INTEGER);
+
+-- Drop table if exists (careful - this deletes data!)
+DROP TABLE IF EXISTS top_friends CASCADE;
+
+-- Create top_friends table
+CREATE TABLE top_friends (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  friend_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  friend_position INTEGER NOT NULL CHECK (friend_position >= 1 AND friend_position <= 8),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  
+  UNIQUE(profile_id, friend_position),
+  UNIQUE(profile_id, friend_id),
+  CHECK (profile_id != friend_id)
+);
+
+CREATE INDEX idx_top_friends_profile_id ON top_friends(profile_id);
+CREATE INDEX idx_top_friends_friend_id ON top_friends(friend_id);
+CREATE INDEX idx_top_friends_position ON top_friends(profile_id, friend_position);
+
+-- Updated at trigger
+CREATE OR REPLACE FUNCTION update_top_friends_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER top_friends_updated_at
+  BEFORE UPDATE ON top_friends
+  FOR EACH ROW
+  EXECUTE FUNCTION update_top_friends_updated_at();
+
+-- Get top friends (returns profile data) - FIXED WITH CASTS
+CREATE OR REPLACE FUNCTION get_top_friends(p_profile_id UUID)
+RETURNS TABLE (
+  id UUID,
+  profile_id UUID,
+  friend_id UUID,
+  "position" INTEGER,
+  username TEXT,
+  display_name TEXT,
+  avatar_url TEXT,
+  bio TEXT,
+  is_live BOOLEAN,
+  follower_count INTEGER,
+  total_gifts_received BIGINT,
+  gifter_level INTEGER,
+  created_at TIMESTAMPTZ
+)
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    tf.id,
+    tf.profile_id,
+    tf.friend_id,
+    tf.friend_position,
+    p.username::TEXT,
+    p.display_name::TEXT,
+    p.avatar_url::TEXT,
+    p.bio::TEXT,
+    p.is_live,
+    p.follower_count,
+    p.total_gifts_received,
+    p.gifter_level,
+    tf.created_at
+  FROM top_friends tf
+  JOIN profiles p ON p.id = tf.friend_id
+  WHERE tf.profile_id = p_profile_id
+  ORDER BY tf.friend_position ASC;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Add or update a top friend
 CREATE OR REPLACE FUNCTION upsert_top_friend(
@@ -115,8 +201,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Update grants
+-- RLS Policies
+ALTER TABLE top_friends ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Top friends viewable" ON top_friends;
+DROP POLICY IF EXISTS "Users insert own" ON top_friends;
+DROP POLICY IF EXISTS "Users update own" ON top_friends;
+DROP POLICY IF EXISTS "Users delete own" ON top_friends;
+
+CREATE POLICY "Top friends viewable" ON top_friends FOR SELECT USING (true);
+CREATE POLICY "Users insert own" ON top_friends FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users update own" ON top_friends FOR UPDATE USING (true);
+CREATE POLICY "Users delete own" ON top_friends FOR DELETE USING (true);
+
+-- Grants
+GRANT EXECUTE ON FUNCTION get_top_friends(UUID) TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION upsert_top_friend(UUID, UUID, INTEGER) TO authenticated;
 GRANT EXECUTE ON FUNCTION remove_top_friend(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION reorder_top_friends(UUID, UUID, INTEGER) TO authenticated;
-

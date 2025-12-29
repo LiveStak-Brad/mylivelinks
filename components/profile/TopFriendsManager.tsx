@@ -173,7 +173,7 @@ export default function TopFriendsManager({
 
   const reorderFriend = async (friendId: string, newPosition: number) => {
     try {
-      const response = await fetch('/api/profile/top-friends/reorder', {
+      const response = await fetch('/api/profile/top-friends', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ friendId, newPosition }),
