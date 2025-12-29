@@ -1,1416 +1,425 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { 
   Film, 
+  ArrowLeft, 
   Save, 
   Upload, 
-  X, 
-  User, 
-  UserPlus, 
-  Scissors, 
-  Sliders, 
+  Play, 
+  Settings, 
+  Trash2, 
+  Eye,
+  Clock,
+  FileVideo,
+  Scissors,
+  Palette,
   Music,
   Type,
-  Sparkles,
-  ArrowLeft,
-  Info,
-  Smartphone,
-  TrendingUp,
-  Hash,
-  Wand2,
-  ImageIcon,
-  ChevronDown,
-  ChevronUp,
-  LayoutGrid,
-  Maximize2,
-  Undo2,
-  Redo2,
-  Volume2,
-  Keyboard
+  AlertCircle
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
-import Link from 'next/link';
-import { createClient } from '@/lib/supabase';
+import { Card, CardContent, Button, Input, Textarea, Badge, Skeleton } from '@/components/ui';
+import { PageShell } from '@/components/layout';
 
 /* =============================================================================
-   COMPOSER EDITOR PAGE - Creator-Grade Canvas
+   COMPOSER - PROJECT EDITOR PAGE
    
-   Layout Philosophy:
-   - Canvas is THE STAR (center, elevated)
-   - Tool rail (left) = immediate reach
-   - Inspector (right) = contextual details
-   - Visual hierarchy enforced through contrast and space
+   Route: /composer/[projectId]
+   
+   Purpose: Edit an existing video project
+   
+   UI ONLY - No backend integration yet. Shows realistic editor interface
+   with clear placeholders for features not yet implemented.
 ============================================================================= */
 
-export default function ComposerEditorPage() {
-  const params = useParams();
+interface Project {
+  id: string;
+  title: string;
+  type: string;
+  description: string;
+  status: 'draft' | 'published' | 'processing';
+  createdAt: string;
+  updatedAt: string;
+  thumbnail?: string;
+  duration?: number;
+  videoUrl?: string;
+}
+
+export default function ProjectEditorPage() {
   const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params?.projectId as string;
-  
-  const isNewProject = projectId === 'new';
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Project state (placeholder)
-  const [projectTitle, setProjectTitle] = useState('');
-  const [producer, setProducer] = useState<{ id: string; username: string } | null>(null);
-  const [actors, setActors] = useState<{ id: string; username: string }[]>([]);
-
-  const [clipId, setClipId] = useState<string | null>(null);
-  const [clipAssetUrl, setClipAssetUrl] = useState<string | null>(null);
-  const [clipDurationSeconds, setClipDurationSeconds] = useState<number | null>(null);
-
-  const canvasRef = useRef<HTMLDivElement | null>(null);
-
-  const [overlayText, setOverlayText] = useState<
-    Array<{
-      id: string;
-      text: string;
-      x: number;
-      y: number;
-      scale: number;
-      color: string;
-      font: string;
-      startMs?: number | null;
-      endMs?: number | null;
-    }>
-  >([]);
-
-  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null);
-  const dragRef = useRef<{
-    overlayId: string;
-    pointerId: number;
-    rect: DOMRect;
-    offsetX: number;
-    offsetY: number;
-  } | null>(null);
-  
-  // Editor affordances (UI-only)
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | '1:1' | '9:16'>('16:9');
-  const [showGrid, setShowGrid] = useState(false);
-  const [showSafeArea, setShowSafeArea] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [isPublishing, setIsPublishing] = useState(false);
-  
-  // Inspector panel states (compact by default)
-  const [expandedPanels, setExpandedPanels] = useState<{
-    clipInfo: boolean;
-    captions: boolean;
-    engagement: boolean;
-    export: boolean;
-  }>({
-    clipInfo: false,
-    captions: false,
-    engagement: false,
-    export: true,
-  });
-
-  const togglePanel = (panel: keyof typeof expandedPanels) => {
-    setExpandedPanels(prev => ({ ...prev, [panel]: !prev[panel] }));
-  };
-
-  const addTextOverlay = (preset?: { color?: string; font?: string; scale?: number }) => {
-    const text = prompt('Text') || '';
-    const trimmed = text.trim();
-    if (!trimmed) return;
-
-    const id =
-      typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function'
-        ? (crypto as any).randomUUID()
-        : String(Date.now());
-
-    setOverlayText((prev) => [
-      ...prev,
-      {
-        id,
-        text: trimmed,
-        x: 0.5,
-        y: 0.5,
-        scale: preset?.scale ?? 1,
-        color: preset?.color ?? '#ffffff',
-        font: preset?.font ?? 'bold',
-        startMs: null,
-        endMs: null,
-      },
-    ]);
-
-    setSelectedOverlayId(id);
-  };
-
-  const updateOverlay = (overlayId: string, patch: Partial<(typeof overlayText)[number]>) => {
-    setOverlayText((prev) => prev.map((o) => (o.id === overlayId ? { ...o, ...patch } : o)));
-  };
-
-  const deleteOverlay = (overlayId: string) => {
-    setOverlayText((prev) => prev.filter((o) => o.id !== overlayId));
-    setSelectedOverlayId((cur) => (cur === overlayId ? null : cur));
-  };
-
-  const startDragOverlay = (e: React.PointerEvent, overlayId: string) => {
-    const el = canvasRef.current;
-    if (!el) return;
-
-    const rect = el.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-
-    setSelectedOverlayId(overlayId);
-
-    const overlay = overlayText.find((o) => o.id === overlayId);
-    if (!overlay) return;
-
-    dragRef.current = {
-      overlayId,
-      pointerId: e.pointerId,
-      rect,
-      offsetX: x - overlay.x,
-      offsetY: y - overlay.y,
-    };
-
-    try {
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-  };
-
-  const moveDragOverlay = (e: React.PointerEvent) => {
-    const info = dragRef.current;
-    if (!info) return;
-    if (e.pointerId !== info.pointerId) return;
-
-    const x = (e.clientX - info.rect.left) / info.rect.width - info.offsetX;
-    const y = (e.clientY - info.rect.top) / info.rect.height - info.offsetY;
-
-    const clampedX = Math.min(1, Math.max(0, x));
-    const clampedY = Math.min(1, Math.max(0, y));
-
-    updateOverlay(info.overlayId, { x: clampedX, y: clampedY });
-  };
-
-  const endDragOverlay = (e: React.PointerEvent) => {
-    const info = dragRef.current;
-    if (!info) return;
-    if (e.pointerId !== info.pointerId) return;
-    dragRef.current = null;
-
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-  };
-
-  const getVideoDurationSeconds = async (file: File): Promise<number> => {
-    const url = URL.createObjectURL(file);
-    try {
-      const video = document.createElement('video');
-      video.preload = 'metadata';
-
-      const duration = await new Promise<number>((resolve, reject) => {
-        const cleanup = () => {
-          video.removeEventListener('loadedmetadata', onLoaded);
-          video.removeEventListener('error', onError);
-        };
-
-        const onLoaded = () => {
-          cleanup();
-          resolve(video.duration);
-        };
-
-        const onError = () => {
-          cleanup();
-          reject(new Error('Failed to read video metadata'));
-        };
-
-        video.addEventListener('loadedmetadata', onLoaded);
-        video.addEventListener('error', onError);
-        video.src = url;
-      });
-
-      if (!Number.isFinite(duration) || duration <= 0) {
-        throw new Error('Invalid video duration');
-      }
-
-      return Math.max(1, Math.round(duration));
-    } finally {
-      URL.revokeObjectURL(url);
-    }
-  };
-
-  const handleUploadVideoClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleUploadVideoSelected = async (file: File) => {
-    try {
-      const supabase = createClient();
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token || '';
-
-      const durationSeconds = await getVideoDurationSeconds(file);
-
-      const uploadPrepRes = await fetch('/api/clips/upload-url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({
-          mimeType: file.type || 'video/mp4',
-          durationSeconds,
-        }),
-      });
-
-      const uploadPrepJson = await uploadPrepRes.json().catch(() => null);
-      if (!uploadPrepRes.ok) {
-        throw new Error(uploadPrepJson?.error || 'Failed to prepare upload');
-      }
-
-      const bucket = String(uploadPrepJson?.bucket || '');
-      const path = String(uploadPrepJson?.path || '');
-      const uploadToken = String(uploadPrepJson?.token || '');
-      const clipId = String(uploadPrepJson?.clip_id || '');
-      const createdProjectId = String(uploadPrepJson?.project_id || '');
-
-      if (!bucket || !path || !uploadToken || !clipId || !createdProjectId) {
-        throw new Error('Upload response missing required fields');
-      }
-
-      const { error: uploadErr } = await supabase.storage.from(bucket).uploadToSignedUrl(path, uploadToken, file, {
-        contentType: file.type || 'video/mp4',
-      });
-
-      if (uploadErr) {
-        throw new Error(uploadErr.message);
-      }
-
-      const finalizeRes = await fetch('/api/clips/upload-complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({ clip_id: clipId, project_id: createdProjectId }),
-      });
-
-      const finalizeJson = await finalizeRes.json().catch(() => null);
-      if (!finalizeRes.ok) {
-        throw new Error(finalizeJson?.error || 'Failed to finalize upload');
-      }
-
-      showTemporaryToast('Uploaded');
-      router.replace(`/composer/${createdProjectId}`);
-    } catch (err: any) {
-      console.error('Upload video error:', err);
-      showTemporaryToast(err?.message || 'Upload failed');
-    }
-  };
+  const [loading, setLoading] = useState(true);
+  const [project, setProject] = useState<Project | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (!projectId || isNewProject) {
-      setClipId(null);
-      setClipAssetUrl(null);
-      setClipDurationSeconds(null);
-      setProjectTitle('');
-      setOverlayText([]);
-      setSelectedOverlayId(null);
-      return;
+    // Simulate loading project data
+    const loadProject = async () => {
+      setLoading(true);
+
+      // Check if this is a new project from /composer/new
+      const isNew = searchParams?.get('new') === 'true';
+      const titleParam = searchParams?.get('title');
+
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Mock project data
+      const mockProject: Project = {
+        id: projectId,
+        title: isNew && titleParam ? decodeURIComponent(titleParam) : `Project ${projectId.substring(0, 8)}`,
+        type: 'comedy_special',
+        description: isNew ? '' : 'This is a placeholder project description.',
+        status: 'draft',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setProject(mockProject);
+      setLoading(false);
+    };
+
+    if (projectId) {
+      loadProject();
     }
-
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const supabase = createClient();
-
-        const { data: projectJson, error: projectErr } = await supabase.rpc('get_clip_project', {
-          p_project_id: projectId,
-        });
-
-        if (projectErr) {
-          throw projectErr;
-        }
-
-        const project = projectJson?.project;
-        const clip = projectJson?.clip;
-        const id = typeof clip?.id === 'string' ? clip.id : null;
-        const durationSeconds = typeof clip?.duration_seconds === 'number' ? clip.duration_seconds : null;
-
-        const caption = typeof project?.caption === 'string' ? project.caption : '';
-
-        const overlay = project?.overlay_json;
-        const overlayTextRaw = overlay && typeof overlay === 'object' ? (overlay as any).text : null;
-        const loadedText = Array.isArray(overlayTextRaw)
-          ? overlayTextRaw
-              .map((item: any) => {
-                const itemId = typeof item?.id === 'string' ? item.id : null;
-                const itemText = typeof item?.text === 'string' ? item.text : null;
-                const x = typeof item?.x === 'number' ? item.x : null;
-                const y = typeof item?.y === 'number' ? item.y : null;
-                const scale = typeof item?.scale === 'number' ? item.scale : null;
-                const color = typeof item?.color === 'string' ? item.color : null;
-                const font = typeof item?.font === 'string' ? item.font : null;
-                const startMs = typeof item?.startMs === 'number' ? item.startMs : item?.startMs === null ? null : undefined;
-                const endMs = typeof item?.endMs === 'number' ? item.endMs : item?.endMs === null ? null : undefined;
-                if (!itemId || !itemText || x === null || y === null || scale === null || !color || !font) return null;
-                return { id: itemId, text: itemText, x, y, scale, color, font, startMs, endMs };
-              })
-              .filter(Boolean)
-          : [];
-
-        if (!id) {
-          throw new Error('Clip id missing');
-        }
-
-        if (cancelled) return;
-
-        setProjectTitle(caption);
-        setOverlayText(loadedText as any);
-        setSelectedOverlayId((cur) => {
-          if (cur && (loadedText as any[]).some((t) => t?.id === cur)) return cur;
-          const first = (loadedText as any[])[0];
-          return typeof first?.id === 'string' ? first.id : null;
-        });
-        setClipId(id);
-        setClipDurationSeconds(durationSeconds);
-
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token || '';
-
-        const playbackRes = await fetch(`/api/clips/${id}/playback`, {
-          method: 'GET',
-          headers: {
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
-        });
-
-        const playbackJson = await playbackRes.json().catch(() => null);
-        if (!playbackRes.ok) {
-          throw new Error(playbackJson?.error || 'Failed to load clip playback');
-        }
-
-        const assetUrl = typeof playbackJson?.asset_url === 'string' ? playbackJson.asset_url : null;
-        if (!assetUrl) {
-          throw new Error('Clip asset_url missing');
-        }
-
-        if (cancelled) return;
-        setClipAssetUrl(assetUrl);
-      } catch (err: any) {
-        console.error('Load project error:', err);
-        if (!cancelled) {
-          showTemporaryToast(err?.message || 'Failed to load project');
-        }
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, isNewProject]);
-
-  const showTemporaryToast = (message: string) => {
-    setToastMessage(message);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2000);
-  };
-
-  // Load current user as producer on mount
-  useEffect(() => {
-    // Placeholder: would load from auth
-    setProducer({ id: 'current-user-id', username: 'YourUsername' });
-  }, []);
-
-  const handleAddActor = () => {
-    // Placeholder: would open actor search modal
-    alert('Actor search UI not implemented yet');
-  };
-
-  const handleRemoveActor = (actorId: string) => {
-    setActors(actors.filter(a => a.id !== actorId));
-  };
+  }, [projectId, searchParams]);
 
   const handleSave = async () => {
-    if (!projectId || isNewProject) {
-      showTemporaryToast('Create a project before saving');
+    setIsSaving(true);
+    // Simulate save
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setIsSaving(false);
+    alert('Project saved! (UI only - no backend yet)');
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
       return;
     }
 
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.rpc('save_clip_project', {
-        p_project_id: projectId,
-        p_caption: projectTitle || null,
-        p_overlay_json: {
-          text: overlayText,
-        },
-      });
-
-      if (error) throw error;
-      showTemporaryToast('Saved');
-    } catch (err: any) {
-      console.error('Save project error:', err);
-      showTemporaryToast(err?.message || 'Save failed');
-    }
+    // Simulate delete
+    await new Promise(resolve => setTimeout(resolve, 300));
+    router.push('/composer');
   };
 
-  const handlePublish = async () => {
-    if (isPublishing) return;
-
-    if (!projectId || isNewProject) {
-      showTemporaryToast('Create a project before publishing');
-      return;
-    }
-
-    setIsPublishing(true);
-
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc('create_feed_post_from_clip_project', {
-        p_project_id: projectId,
-        p_caption: null,
-      });
-
-      if (error) throw error;
-
-      const row = Array.isArray(data) ? data[0] : data;
-      const postId = row?.post_id as string | undefined;
-
-      if (!postId) {
-        throw new Error('Publish succeeded but no post_id was returned');
-      }
-
-      showTemporaryToast('Published');
-      router.push(`/feed?postId=${postId}`);
-    } catch (err: any) {
-      console.error('Publish error:', err);
-      showTemporaryToast(err?.message || 'Publish failed');
-    } finally {
-      setIsPublishing(false);
-    }
+  const handleBack = () => {
+    router.push('/composer');
   };
 
-  return (
-    <main 
-      id="main"
-      className="min-h-screen bg-background"
-    >
-      {/* TOP BANNER - Web Coins Cheaper Message */}
-      <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white py-3 px-4 shadow-md">
-        <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-sm font-medium">
-          <Info className="w-4 h-4 flex-shrink-0" />
-          <p className="text-center">
-            <strong>Save more!</strong> Coins are cheaper on the Web app than mobile
-          </p>
-        </div>
-      </div>
-
-      <div className="max-w-[1920px] mx-auto px-4 sm:px-6 py-6">
-        
-        {/* Top Bar - Title + Actions */}
-        <header className="mb-4 md:mb-6 animate-fade-in">
-          <div className="flex items-center gap-2 md:gap-4 mb-3 md:mb-4">
-            <Link
-              href="/composer"
-              className="p-2 rounded-lg hover:bg-muted transition-colors touch-manipulation"
-              aria-label="Back to projects"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div className="flex-1 flex items-center gap-2 md:gap-3">
-              <input
-                type="text"
-                value={projectTitle}
-                onChange={(e) => setProjectTitle(e.target.value)}
-                placeholder="Untitled Project"
-                className="
-                  text-lg md:text-2xl font-bold bg-transparent border-none outline-none
-                  text-foreground placeholder:text-muted-foreground
-                  flex-1 focus:ring-2 focus:ring-primary/20 rounded-lg px-2 py-1
-                "
-              />
-              {/* Draft Status Badge */}
-              <span className="hidden sm:inline-flex px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
-                Draft
-              </span>
-            </div>
-            <div className="flex items-center gap-1 md:gap-2">
-              {/* Undo/Redo - Hidden on mobile */}
-              <div className="hidden md:flex items-center gap-1 mr-2">
-                <button
-                  disabled
-                  className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Undo (coming soon)"
-                >
-                  <Undo2 className="w-4 h-4" />
-                </button>
-                <button
-                  disabled
-                  className="p-2 rounded-lg text-muted-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Redo (coming soon)"
-                >
-                  <Redo2 className="w-4 h-4" />
-                </button>
-              </div>
-              <button
-                onClick={handleSave}
-                className="
-                  inline-flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 md:py-2.5
-                  bg-muted text-foreground
-                  text-sm font-semibold rounded-xl
-                  hover:bg-muted/80 active:scale-[0.98]
-                  transition-all duration-200
-                  touch-manipulation
-                "
-              >
-                <Save className="w-4 h-4" />
-                <span className="hidden sm:inline">Save</span>
-              </button>
-              <button
-                onClick={handlePublish}
-                disabled={isPublishing || isNewProject}
-                className="
-                  inline-flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 md:py-2.5
-                  bg-gradient-to-r from-primary to-accent text-white
-                  text-sm font-semibold rounded-xl
-                  hover:opacity-90 active:scale-[0.98]
-                  transition-all duration-200
-                  shadow-lg shadow-primary/30
-                  touch-manipulation
-                  disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
-                "
-              >
-                <Upload className="w-4 h-4" />
-                <span className="hidden sm:inline">{isPublishing ? 'Publishing…' : 'Publish'}</span>
-              </button>
+  if (loading) {
+    return (
+      <PageShell maxWidth="full" padding="none">
+        <div className="min-h-screen bg-background">
+          {/* Header Skeleton */}
+          <div className="border-b border-border bg-card px-4 sm:px-6 py-4">
+            <div className="max-w-7xl mx-auto">
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
             </div>
           </div>
 
-          {/* Producer + Actors - Compact Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 px-2 py-2 bg-card/50 rounded-lg border border-border">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Producer</span>
-              {producer && (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
-                  <User className="w-3.5 h-3.5 text-purple-500" />
-                  <span className="text-xs font-medium text-foreground">@{producer.username}</span>
-                </div>
-              )}
+          {/* Content Skeleton */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+            <Skeleton className="h-64 w-full rounded-xl" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <Skeleton className="h-96 w-full rounded-xl" />
+              </div>
+              <Skeleton className="h-96 w-full rounded-xl" />
             </div>
-            <div className="hidden sm:block h-4 w-px bg-border" />
-            <div className="flex items-center gap-2 flex-wrap flex-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Actors</span>
-              {actors.map((actor) => (
-                <div
-                  key={actor.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 group"
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (!project) {
+    return (
+      <PageShell maxWidth="lg" padding="lg">
+        <Card>
+          <CardContent className="py-16 text-center">
+            <AlertCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-foreground mb-2">Project Not Found</h2>
+            <p className="text-muted-foreground mb-6">
+              The project you're looking for doesn't exist or you don't have access to it.
+            </p>
+            <Button onClick={handleBack}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Projects
+            </Button>
+          </CardContent>
+        </Card>
+      </PageShell>
+    );
+  }
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <PageShell maxWidth="full" padding="none">
+      <div className="min-h-screen bg-background">
+        {/* Sticky Header */}
+        <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur-sm shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+            <div className="flex items-center justify-between gap-4">
+              {/* Left: Back + Project Info */}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleBack}
+                  leftIcon={<ArrowLeft className="w-4 h-4" />}
+                  className="flex-shrink-0"
                 >
-                  <User className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="text-xs font-medium text-foreground">@{actor.username}</span>
-                  <button
-                    onClick={() => handleRemoveActor(actor.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
-                  >
-                    <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
-                  </button>
+                  <span className="hidden sm:inline">Projects</span>
+                </Button>
+
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-lg sm:text-xl font-bold text-foreground truncate">
+                    {project.title}
+                  </h1>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <Badge variant="default" size="sm">{project.status}</Badge>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatDate(project.updatedAt)}
+                    </span>
+                  </div>
                 </div>
-              ))}
-              <button
-                onClick={handleAddActor}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border-2 border-dashed border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-all touch-manipulation"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span className="text-xs font-medium">Add</span>
-              </button>
+              </div>
+
+              {/* Right: Actions */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDelete}
+                  leftIcon={<Trash2 className="w-4 h-4" />}
+                  className="text-destructive hover:bg-destructive/10"
+                >
+                  <span className="hidden sm:inline">Delete</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled
+                  leftIcon={<Eye className="w-4 h-4" />}
+                  title="Preview coming soon"
+                >
+                  <span className="hidden sm:inline">Preview</span>
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSave}
+                  isLoading={isSaving}
+                  leftIcon={!isSaving ? <Save className="w-4 h-4" /> : undefined}
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
             </div>
           </div>
         </header>
 
-        {/* MAIN EDITOR LAYOUT - Responsive Choreography */}
-        <div className="flex flex-col md:flex-row gap-4">
-          
-          {/* 🎨 TOOL RAIL (Desktop) / TOOL BAR (Mobile) */}
-          <aside className="md:w-16 md:flex-shrink-0 order-2 md:order-1">
-            {/* Desktop: Vertical Rail */}
-            <div className="hidden md:block sticky top-20 space-y-2">
-              <ToolRailButton icon={Scissors} label="Trim" disabled />
-              <ToolRailButton 
-                icon={Type} 
-                label="Text" 
-                onClick={() => addTextOverlay()}
-              />
-              <ToolRailButton icon={Music} label="Audio" disabled />
-              <ToolRailButton icon={Sliders} label="Filters" disabled />
-              <ToolRailButton icon={Sparkles} label="Effects" disabled />
-              <ToolRailButton icon={ImageIcon} label="Stickers" disabled />
+        {/* Coming Soon Notice */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="p-4 bg-info/10 border border-info/20 rounded-xl flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-info flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-foreground mb-1">Editor Under Construction</h3>
+              <p className="text-sm text-muted-foreground">
+                The full video editor with timeline, effects, and publishing is coming soon. 
+                For now, you can update project details and settings.
+              </p>
             </div>
-            
-            {/* Mobile: Horizontal Tool Bar */}
-            <div className="md:hidden">
-              <div className="flex gap-2 overflow-x-auto pb-2 px-1 -mx-1 scrollbar-thin">
-                <ToolBarButton icon={Scissors} label="Trim" disabled />
-                <ToolBarButton 
-                  icon={Type} 
-                  label="Text" 
-                  onClick={() => addTextOverlay()}
-                />
-                <ToolBarButton icon={Music} label="Audio" disabled />
-                <ToolBarButton icon={Sliders} label="Filters" disabled />
-                <ToolBarButton icon={Sparkles} label="Effects" disabled />
-                <ToolBarButton icon={ImageIcon} label="Stickers" disabled />
-              </div>
-            </div>
-          </aside>
+          </div>
+        </div>
 
-          {/* 🌟 CANVAS (THE STAR) - First on Mobile, Center on Desktop */}
-          <div className="flex-1 space-y-4 min-w-0 order-1 md:order-2">
-            
-            {/* Canvas Controls Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 px-2">
-              {/* Aspect Ratio Presets */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Aspect:</span>
-                <div className="flex items-center gap-1">
-                  {(['9:16', '1:1', '16:9'] as const).map((ratio) => (
-                    <button
-                      key={ratio}
-                      onClick={() => setAspectRatio(ratio)}
-                      className={`
-                        px-3 py-1.5 rounded-lg text-xs font-semibold transition-all touch-manipulation min-h-[44px]
-                        ${aspectRatio === ratio
-                          ? 'bg-primary text-white shadow-sm'
-                          : 'bg-muted text-foreground hover:bg-muted/80'
-                        }
-                      `}
-                    >
-                      {ratio}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Canvas Overlays */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowGrid(!showGrid)}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-manipulation min-h-[44px]
-                    ${showGrid
-                      ? 'bg-primary/10 text-primary border border-primary/20'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }
-                  `}
-                  title="Toggle alignment grid"
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Grid</span>
-                </button>
-                <button
-                  onClick={() => setShowSafeArea(!showSafeArea)}
-                  className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-manipulation min-h-[44px]
-                    ${showSafeArea
-                      ? 'bg-primary/10 text-primary border border-primary/20'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }
-                  `}
-                  title="Toggle safe area guides"
-                >
-                  <Maximize2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Safe Area</span>
-                </button>
-              </div>
-            </div>
-            
-            {/* Canvas Container with Glow */}
-            <div className="relative">
-              {/* Ambient Glow */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 rounded-2xl blur-2xl opacity-50" />
-              
-              {/* Canvas */}
-              <Card className="relative overflow-hidden shadow-2xl border-2 border-primary/20 bg-gradient-to-br from-card via-card to-muted/20">
+        {/* Main Content */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column: Editor Area (2/3 width) */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Video Preview / Upload Area */}
+              <Card>
                 <CardContent className="p-0">
-                  <div 
-                    className={`
-                      relative flex items-center justify-center bg-gradient-to-br from-muted/20 via-background/50 to-muted/20
-                      ${aspectRatio === '9:16' ? 'aspect-[9/16] max-w-md mx-auto' : ''}
-                      ${aspectRatio === '1:1' ? 'aspect-square max-w-2xl mx-auto' : ''}
-                      ${aspectRatio === '16:9' ? 'aspect-video' : ''}
-                    `}
-                  >
-                    {clipAssetUrl ? (
-                      <>
-                        <video
-                          key={clipAssetUrl}
-                          src={clipAssetUrl}
-                          controls
-                          playsInline
-                          className="absolute inset-0 w-full h-full object-contain bg-black"
-                        />
-                        <div
-                          ref={canvasRef}
-                          className="absolute inset-0"
-                          style={{ pointerEvents: 'none' }}
-                          onPointerMove={moveDragOverlay}
-                          onPointerUp={endDragOverlay}
-                          onPointerCancel={endDragOverlay}
-                        >
-                          {overlayText.map((item) => (
-                            <div
-                              key={item.id}
-                              className="absolute"
-                              onPointerDown={(e) => startDragOverlay(e, item.id)}
-                              onClick={() => setSelectedOverlayId(item.id)}
-                              style={{
-                                left: `${Math.round(item.x * 100)}%`,
-                                top: `${Math.round(item.y * 100)}%`,
-                                transform: `translate(-50%, -50%) scale(${item.scale})`,
-                                color: item.color,
-                                fontWeight: item.font === 'bold' ? 800 : 600,
-                                textShadow: '0 2px 8px rgba(0,0,0,0.6)',
-                                whiteSpace: 'pre-wrap',
-                                maxWidth: '90%',
-                                textAlign: 'center',
-                                cursor: 'grab',
-                                outline: item.id === selectedOverlayId ? '2px solid rgba(255,255,255,0.85)' : 'none',
-                                outlineOffset: 6,
-                                padding: '6px 10px',
-                                borderRadius: 10,
-                                background: item.id === selectedOverlayId ? 'rgba(0,0,0,0.25)' : 'transparent',
-                                pointerEvents: 'auto',
-                              }}
-                            >
-                              {item.text}
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-center space-y-4 md:space-y-5 px-4 md:px-6 py-6 md:py-8">
-                        <div className="w-20 h-20 md:w-24 md:h-24 mx-auto rounded-2xl md:rounded-3xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center ring-4 ring-primary/10">
-                          <Film className="w-10 h-10 md:w-12 md:h-12 text-primary" />
-                        </div>
-                        <div className="space-y-2">
-                          <h2 className="text-xl md:text-2xl font-bold text-foreground">
-                            Drop a clip here
-                          </h2>
-                          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                            Upload a video or add from your live streams to start creating
-                          </p>
-                        </div>
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 md:gap-3">
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="video/mp4"
-                            className="hidden"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0] || null;
-                              e.target.value = '';
-                              if (f) void handleUploadVideoSelected(f);
-                            }}
-                          />
-                          <button
-                            onClick={handleUploadVideoClick}
-                            className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-gradient-to-r from-primary to-accent text-white rounded-xl font-semibold hover:opacity-90 transition-opacity shadow-lg shadow-primary/30 touch-manipulation min-h-[48px]"
-                          >
-                            <Upload className="w-5 h-5" />
-                            Upload Video
-                          </button>
-                          <button className="inline-flex items-center justify-center gap-2 px-5 md:px-6 py-3 bg-muted text-foreground rounded-xl font-semibold hover:bg-muted/80 transition-colors touch-manipulation min-h-[48px]">
-                            <Film className="w-5 h-5" />
-                            From Streams
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                  <div className="aspect-video bg-muted rounded-t-xl relative overflow-hidden">
+                    {/* Placeholder Video Area */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                      <FileVideo className="w-16 h-16 text-muted-foreground/30 mb-4" />
+                      <h3 className="text-lg font-semibold text-foreground mb-2">
+                        No Video Uploaded
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4 max-w-md">
+                        Video upload and editing features are coming soon. Stay tuned!
+                      </p>
+                      <Button variant="secondary" disabled leftIcon={<Upload className="w-4 h-4" />}>
+                        Upload Video (Coming Soon)
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Timeline / Editor Tools (Placeholder) */}
+              <Card>
+                <CardContent className="py-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Scissors className="w-4 h-4" />
+                    Editor Timeline
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Timeline placeholder */}
+                    <div className="h-24 rounded-lg bg-muted border-2 border-dashed border-border flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">Timeline • Coming Soon</p>
+                    </div>
                     
-                    {/* Floating Indicators */}
-                    <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                      <span className="px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-sm border border-border text-xs font-bold text-foreground shadow-sm">
-                        {aspectRatio}
+                    {/* Editor tools */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <Button variant="ghost" size="sm" disabled leftIcon={<Scissors className="w-4 h-4" />}>
+                        Trim
+                      </Button>
+                      <Button variant="ghost" size="sm" disabled leftIcon={<Palette className="w-4 h-4" />}>
+                        Effects
+                      </Button>
+                      <Button variant="ghost" size="sm" disabled leftIcon={<Music className="w-4 h-4" />}>
+                        Audio
+                      </Button>
+                      <Button variant="ghost" size="sm" disabled leftIcon={<Type className="w-4 h-4" />}>
+                        Text
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Column: Project Details (1/3 width) */}
+            <div className="space-y-6">
+              {/* Project Details */}
+              <Card>
+                <CardContent className="py-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4">Project Details</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-2">
+                        Title
+                      </label>
+                      <Input
+                        value={project.title}
+                        onChange={(e) => setProject({ ...project, title: e.target.value })}
+                        placeholder="Project title"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-2">
+                        Description
+                      </label>
+                      <Textarea
+                        value={project.description}
+                        onChange={(e) => setProject({ ...project, description: e.target.value })}
+                        placeholder="Add a description..."
+                        rows={4}
+                        className="resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-2">
+                        Project Type
+                      </label>
+                      <Input
+                        value={project.type.replace('_', ' ')}
+                        disabled
+                        className="capitalize"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Publish Settings */}
+              <Card>
+                <CardContent className="py-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Settings className="w-4 h-4" />
+                    Publish Settings
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-2">Visibility</p>
+                      <Badge variant="default">Draft</Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Button 
+                        variant="primary" 
+                        size="sm" 
+                        className="w-full"
+                        disabled
+                        leftIcon={<Play className="w-4 h-4" />}
+                      >
+                        Publish (Coming Soon)
+                      </Button>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Publishing features will be available soon
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Project Stats */}
+              <Card>
+                <CardContent className="py-6">
+                  <h3 className="text-sm font-semibold text-foreground mb-4">Stats</h3>
+                  
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Created</span>
+                      <span className="text-foreground font-medium">
+                        {new Date(project.createdAt).toLocaleDateString()}
                       </span>
-                      <span className="px-3 py-1.5 rounded-lg bg-card/95 backdrop-blur-sm border border-border text-xs font-medium text-muted-foreground shadow-sm">
-                        {clipDurationSeconds ? `0:${String(clipDurationSeconds).padStart(2, '0')}` : '0:00'}
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Last Edited</span>
+                      <span className="text-foreground font-medium">
+                        {new Date(project.updatedAt).toLocaleDateString()}
                       </span>
                     </div>
-
-                    {/* Grid Overlay */}
-                    {showGrid && (
-                      <div className="absolute inset-0 pointer-events-none">
-                        {/* Rule of thirds grid */}
-                        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-                          <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="currentColor" strokeWidth="1" className="text-primary/40" />
-                          <line x1="66.66%" y1="0" x2="66.66%" y2="100%" stroke="currentColor" strokeWidth="1" className="text-primary/40" />
-                          <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="currentColor" strokeWidth="1" className="text-primary/40" />
-                          <line x1="0" y1="66.66%" x2="100%" y2="66.66%" stroke="currentColor" strokeWidth="1" className="text-primary/40" />
-                          <line x1="50%" y1="0" x2="50%" y2="100%" stroke="currentColor" strokeWidth="1" className="text-accent/30 stroke-dasharray-4" />
-                          <line x1="0" y1="50%" x2="100%" y2="50%" stroke="currentColor" strokeWidth="1" className="text-accent/30 stroke-dasharray-4" />
-                        </svg>
-                        <div className="absolute top-2 right-2 px-2 py-1 rounded-md bg-primary/90 text-white text-[10px] font-medium">
-                          Grid: Rule of Thirds
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Safe Area Overlay */}
-                    {showSafeArea && (
-                      <div className="absolute inset-0 pointer-events-none">
-                        <div className="absolute inset-[10%] border-2 border-dashed border-amber-500/60" />
-                        <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-amber-500/90 text-white text-[10px] font-medium">
-                          Safe Area (Preview Only)
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Timeline - Full Width, Mobile-Optimized */}
-            <Card className="border-2 border-primary/30 bg-gradient-to-r from-primary/5 via-background to-accent/5 shadow-lg">
-              <CardContent className="p-4 md:p-6">
-                <div className="flex items-center gap-3 mb-3 md:mb-4">
-                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
-                    <Scissors className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-foreground text-base md:text-lg">Timeline</h3>
-                    <p className="text-xs text-muted-foreground hidden sm:block">Your edits will take shape here</p>
-                  </div>
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-medium whitespace-nowrap">
-                    Coming Soon
-                  </span>
-                </div>
-                <div className="h-20 md:h-28 rounded-xl bg-muted/30 border-2 border-dashed border-border/50 flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground font-medium text-center px-4">
-                    <span className="hidden sm:inline">Trim · Text Timing · Effects</span>
-                    <span className="sm:hidden">Editing unlocks here</span>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-          </div>
-
-          {/* 📋 INSPECTOR (Right on Desktop, Stack on Mobile) */}
-          <aside className="md:w-72 md:flex-shrink-0 order-3">
-            <div className="md:sticky md:top-20 space-y-3">
-              
-              <InspectorPanel
-                icon={Smartphone}
-                title="Clip Info"
-                isExpanded={expandedPanels.clipInfo}
-                onToggle={() => togglePanel('clipInfo')}
-              >
-                <div className="space-y-2.5 text-xs">
-                  <InfoRow label="Aspect Ratio" value="Auto" />
-                  <InfoRow label="Source" value="—" />
-                  <InfoRow label="Length" value="Auto-detect" />
-                  <div className="pt-2 border-t border-border">
-                    <label className="text-muted-foreground font-medium mb-1.5 block">Platforms</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge>TikTok</Badge>
-                      <Badge>Reels</Badge>
-                      <Badge>Shorts</Badge>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Duration</span>
+                      <span className="text-foreground font-medium">
+                        {project.duration ? `${project.duration}s` : '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Views</span>
+                      <span className="text-foreground font-medium">0</span>
                     </div>
                   </div>
-                </div>
-              </InspectorPanel>
-
-              <InspectorPanel
-                icon={Hash}
-                title="Captions"
-                badge="Soon"
-                isExpanded={expandedPanels.captions}
-                onToggle={() => togglePanel('captions')}
-              >
-                <div className="space-y-2">
-                  <div className="p-2.5 rounded-lg bg-muted/50 border border-border">
-                    <p className="text-xs text-foreground mb-1">
-                      🔥 Best moment from last night&apos;s stream
-                    </p>
-                    <p className="text-[10px] text-primary font-medium">
-                      #LiveStreams #Gaming #Clips
-                    </p>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    AI-generated captions and hashtags
-                  </p>
-                </div>
-              </InspectorPanel>
-
-              <InspectorPanel
-                icon={TrendingUp}
-                title="Engagement"
-                badge="Soon"
-                isExpanded={expandedPanels.engagement}
-                onToggle={() => togglePanel('engagement')}
-              >
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border-2 border-dashed border-border">
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                    <span className="text-lg font-bold">—</span>
-                  </div>
-                  <div className="text-left min-w-0">
-                    <div className="text-xs font-semibold text-foreground">Estimate</div>
-                    <div className="text-[10px] text-muted-foreground truncate">Length · Pacing · Format</div>
-                  </div>
-                </div>
-              </InspectorPanel>
-
-              {/* Audio Balance Meter (Static UI) */}
-              <InspectorPanel
-                icon={Volume2}
-                title="Audio Balance"
-                badge="Soon"
-                isExpanded={false}
-                onToggle={() => {}}
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-muted-foreground">Music</span>
-                    <span className="text-foreground font-medium">-</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted">
-                    <div className="h-full w-1/2 rounded-full bg-primary/30" />
-                  </div>
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-muted-foreground">Voice</span>
-                    <span className="text-foreground font-medium">-</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-muted">
-                    <div className="h-full w-3/4 rounded-full bg-primary/30" />
-                  </div>
-                </div>
-              </InspectorPanel>
-
-              {/* Text Style Presets */}
-              <Card className="overflow-hidden bg-card/50 backdrop-blur-sm">
-                <div className="px-3 py-2.5 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <Type className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-sm text-foreground">Text Styles</span>
-                  </div>
-                </div>
-                <CardContent className="px-3 py-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <TextStyleChip 
-                      label="Bold" 
-                      style="font-bold" 
-                      onClick={() => addTextOverlay({ font: 'bold', scale: 1 })}
-                    />
-                    <TextStyleChip 
-                      label="Outline" 
-                      style="font-bold" 
-                      onClick={() => addTextOverlay({ font: 'bold', scale: 1 })}
-                    />
-                    <TextStyleChip 
-                      label="Shadow" 
-                      style="font-semibold" 
-                      onClick={() => addTextOverlay({ font: 'semibold', scale: 1 })}
-                    />
-                    <TextStyleChip 
-                      label="Neon" 
-                      style="font-bold" 
-                      onClick={() => addTextOverlay({ font: 'bold', scale: 1, color: '#a855f7' })}
-                    />
-                  </div>
                 </CardContent>
               </Card>
-
-              <Card className="overflow-hidden bg-card/50 backdrop-blur-sm">
-                <div className="px-3 py-2.5 border-b border-border">
-                  <div className="flex items-center gap-2">
-                    <Type className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-sm text-foreground">Selected Text</span>
-                  </div>
-                </div>
-                <CardContent className="px-3 py-3">
-                  {selectedOverlayId ? (
-                    (() => {
-                      const selected = overlayText.find((o) => o.id === selectedOverlayId) || null;
-                      if (!selected) {
-                        return <div className="text-xs text-muted-foreground">Select a text layer</div>;
-                      }
-                      return (
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Text</div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium text-foreground truncate">{selected.text}</div>
-                              </div>
-                              <button
-                                className="px-2.5 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-xs font-semibold"
-                                onClick={() => {
-                                  const next = prompt('Edit text', selected.text) || '';
-                                  const trimmed = next.trim();
-                                  if (trimmed) updateOverlay(selected.id, { text: trimmed });
-                                }}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="px-2.5 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/15 text-destructive text-xs font-semibold"
-                                onClick={() => deleteOverlay(selected.id)}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Color</div>
-                              <input
-                                type="color"
-                                value={selected.color}
-                                onChange={(e) => updateOverlay(selected.id, { color: e.target.value })}
-                                className="h-9 w-full rounded-lg border border-border bg-background"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Font</div>
-                              <select
-                                value={selected.font}
-                                onChange={(e) => updateOverlay(selected.id, { font: e.target.value })}
-                                className="h-9 w-full rounded-lg border border-border bg-background text-xs px-2"
-                              >
-                                <option value="bold">Bold</option>
-                                <option value="semibold">Semibold</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Size</div>
-                              <div className="text-[10px] text-muted-foreground">{selected.scale.toFixed(2)}x</div>
-                            </div>
-                            <input
-                              type="range"
-                              min={0.5}
-                              max={3}
-                              step={0.05}
-                              value={selected.scale}
-                              onChange={(e) => updateOverlay(selected.id, { scale: Number(e.target.value) })}
-                              className="w-full"
-                            />
-                          </div>
-
-                          <div className="text-[10px] text-muted-foreground">
-                            Drag text on the video to reposition
-                          </div>
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    <div className="text-xs text-muted-foreground">Select a text layer</div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <InspectorPanel
-                icon={Upload}
-                title="Export"
-                isExpanded={expandedPanels.export}
-                onToggle={() => togglePanel('export')}
-              >
-                <div className="space-y-3">
-                  <div className="space-y-1.5 text-xs">
-                    <InfoRow label="Quality" value="1080p" />
-                    <InfoRow label="Format" value="MP4" />
-                  </div>
-                  <div className="pt-2 border-t border-border">
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2 block">
-                      Presets
-                    </label>
-                    <div className="space-y-1.5">
-                      <PresetRow icon={Smartphone} label="TikTok" details="9:16 · 60s" disabled />
-                      <PresetRow icon={ImageIcon} label="Reels" details="9:16 · 90s" disabled />
-                      <PresetRow icon={Film} label="Shorts" details="9:16 · 60s" disabled />
-                    </div>
-                  </div>
-                </div>
-              </InspectorPanel>
-
             </div>
-          </aside>
-
-        </div>
-
-        {/* Keyboard Shortcuts Hint Bar (Web Only, Hidden on Mobile) */}
-        <div className="mt-6 px-2 hidden md:block">
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-muted/50 border border-border">
-            <Keyboard className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">Shortcuts:</span>
-            <div className="flex items-center gap-4">
-              <KbdShortcut keys={['Space']} label="Play/Pause" />
-              <KbdShortcut keys={['Cmd', 'Z']} label="Undo" />
-              <KbdShortcut keys={['Cmd', 'S']} label="Save" />
-              <KbdShortcut keys={['Cmd', 'K']} label="Export" />
-            </div>
-            <span className="ml-auto text-[10px] text-muted-foreground">Coming soon</span>
           </div>
         </div>
-
       </div>
-
-      {/* Toast Notification */}
-      {showToast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-slide-up">
-          <div className="px-4 py-3 rounded-xl bg-card border border-border shadow-2xl flex items-center gap-2">
-            <Info className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-foreground">{toastMessage}</span>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
-
-/* -----------------------------------------------------------------------------
-   Keyboard Shortcut Display
------------------------------------------------------------------------------ */
-function KbdShortcut({ keys, label }: { keys: string[]; label: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex items-center gap-1">
-        {keys.map((key, i) => (
-          <kbd
-            key={i}
-            className="px-1.5 py-0.5 rounded bg-background border border-border text-[10px] font-semibold text-foreground"
-          >
-            {key}
-          </kbd>
-        ))}
-      </div>
-      <span className="text-[10px] text-muted-foreground">{label}</span>
-    </div>
-  );
-}
-
-/* -----------------------------------------------------------------------------
-   Tool Rail Button (Vertical, Icon-First)
------------------------------------------------------------------------------ */
-function ToolRailButton({
-  icon: Icon,
-  label,
-  disabled = false,
-  onClick,
-}: {
-  icon: React.ElementType;
-  label: string;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <div className="relative group">
-      <button
-        disabled={disabled}
-        onClick={onClick}
-        className="
-          w-14 h-14 rounded-xl flex items-center justify-center
-          bg-muted/50 border-2 border-border
-          hover:bg-muted hover:border-primary/50 hover:shadow-md
-          transition-all duration-200
-          disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:bg-muted/50
-        "
-      >
-        <Icon className="w-6 h-6 text-foreground" />
-        {disabled && (
-          <span className="absolute -top-1 -right-1 text-[9px] px-1.5 py-0.5 rounded-md bg-card border border-border text-muted-foreground font-medium shadow-sm">
-            Soon
-          </span>
-        )}
-      </button>
-      {/* Hover Label */}
-      <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-        <div className="px-3 py-1.5 rounded-lg bg-card border border-border shadow-lg text-xs font-medium text-foreground whitespace-nowrap">
-          {label}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* -----------------------------------------------------------------------------
-   Tool Bar Button (Horizontal, Mobile)
------------------------------------------------------------------------------ */
-function ToolBarButton({
-  icon: Icon,
-  label,
-  disabled = false,
-  onClick,
-}: {
-  icon: React.ElementType;
-  label: string;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      disabled={disabled}
-      onClick={onClick}
-      className="
-        flex-shrink-0 flex flex-col items-center justify-center gap-1
-        w-20 h-16 rounded-xl
-        bg-muted/50 border-2 border-border
-        hover:bg-muted hover:border-primary/50
-        transition-all duration-200
-        disabled:opacity-40 disabled:cursor-not-allowed
-        touch-manipulation
-      "
-    >
-      <Icon className="w-5 h-5 text-foreground" />
-      <span className="text-[10px] font-medium text-foreground">{label}</span>
-      {disabled && (
-        <span className="absolute top-1 right-1 text-[8px] px-1 py-0.5 rounded-md bg-card text-muted-foreground font-medium">
-          Soon
-        </span>
-      )}
-    </button>
-  );
-}
-
-/* -----------------------------------------------------------------------------
-   Inspector Panel (Compact, Contextual)
------------------------------------------------------------------------------ */
-function InspectorPanel({
-  icon: Icon,
-  title,
-  badge,
-  isExpanded,
-  onToggle,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  badge?: string;
-  isExpanded: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card className="overflow-hidden bg-card/50 backdrop-blur-sm">
-      <button
-        onClick={onToggle}
-        className="w-full px-3 py-2.5 flex items-center justify-between hover:bg-muted/30 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Icon className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm text-foreground">{title}</span>
-          {badge && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-medium">
-              {badge}
-            </span>
-          )}
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-        )}
-      </button>
-      {isExpanded && (
-        <CardContent className="px-3 pb-3 pt-0">
-          {children}
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-/* -----------------------------------------------------------------------------
-   Info Row (Compact)
------------------------------------------------------------------------------ */
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-center">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-foreground font-semibold">{value}</span>
-    </div>
-  );
-}
-
-/* -----------------------------------------------------------------------------
-   Badge (Platform)
------------------------------------------------------------------------------ */
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-[10px] text-foreground font-semibold">
-      {children}
-    </span>
-  );
-}
-
-/* -----------------------------------------------------------------------------
-   Preset Row (Compact)
------------------------------------------------------------------------------ */
-function PresetRow({
-  icon: Icon,
-  label,
-  details,
-  disabled = false,
-}: {
-  icon: React.ElementType;
-  label: string;
-  details: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      disabled={disabled}
-      className="
-        w-full flex items-center gap-2 px-2.5 py-2 rounded-lg
-        bg-muted/30 border border-border
-        hover:bg-muted/50 hover:border-primary/30
-        transition-all duration-150
-        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-muted/30 disabled:hover:border-border
-      "
-    >
-      <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <Icon className="w-3.5 h-3.5 text-primary" />
-      </div>
-      <div className="flex-1 text-left min-w-0">
-        <div className="text-xs font-semibold text-foreground truncate">{label}</div>
-        <div className="text-[10px] text-muted-foreground">{details}</div>
-      </div>
-      {disabled && (
-        <span className="text-[10px] text-muted-foreground font-medium">Soon</span>
-      )}
-    </button>
-  );
-}
-
-/* -----------------------------------------------------------------------------
-   Text Style Chip
------------------------------------------------------------------------------ */
-function TextStyleChip({
-  label,
-  style,
-  onClick,
-}: {
-  label: string;
-  style: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`
-        px-3 py-2 rounded-lg bg-muted/50 border border-border
-        hover:bg-muted hover:border-primary/30
-        transition-all duration-150
-        text-xs ${style} text-foreground
-      `}
-    >
-      {label}
-    </button>
+    </PageShell>
   );
 }

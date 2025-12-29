@@ -1,43 +1,25 @@
 import { ReactNode } from 'react';
-import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
 
-export default async function MeLayout({
+/* =============================================================================
+   USER SETTINGS LAYOUT
+   
+   Route: /me/*
+   
+   Purpose: Layout wrapper for user-specific settings and analytics pages
+   
+   Provides consistent navigation and layout for all /me/* routes:
+   - /me/analytics (existing)
+   - Future: /me/settings, /me/privacy, etc.
+============================================================================= */
+
+export default function MeLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const cookieStore = await cookies();
+  // Simple pass-through layout for now
+  // The individual pages (like /me/analytics) handle their own layouts
+  // This ensures the route structure is properly recognized by Next.js
   
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  const { data: { user }, error } = await supabase.auth.getUser();
-  
-  if (error || !user) {
-    redirect('/login');
-  }
-
   return <>{children}</>;
 }
-
-
-
-
-
-

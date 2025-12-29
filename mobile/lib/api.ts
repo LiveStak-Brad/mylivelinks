@@ -10,7 +10,7 @@ export type FetchAuthedResult = {
 };
 
 function getApiBaseUrl() {
-  const raw = process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com';
+  const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
   return raw.replace(/\/+$/, '');
 }
 

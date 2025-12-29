@@ -57,7 +57,7 @@ export function ReferralProgress({
   const [loading, setLoading] = useState(true);
 
   const apiBaseUrl = useMemo(() => {
-    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com';
+    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
     return raw.replace(/\/+$/, '');
   }, []);
 

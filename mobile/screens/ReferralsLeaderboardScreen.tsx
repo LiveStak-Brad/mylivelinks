@@ -23,7 +23,7 @@ export function ReferralsLeaderboardScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const apiBaseUrl = useMemo(() => {
-    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com';
+    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
     return raw.replace(/\/+$/, '');
   }, []);
 
