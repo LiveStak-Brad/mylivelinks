@@ -17,6 +17,9 @@ export async function POST(request: NextRequest) {
 
     const textContent = typeof body?.text_content === 'string' ? body.text_content.trim() : '';
     const mediaUrl = typeof body?.media_url === 'string' ? body.media_url.trim() : null;
+    const visibility = typeof body?.visibility === 'string' && ['public', 'friends', 'private'].includes(body.visibility) 
+      ? body.visibility 
+      : 'public';
 
     if (!textContent && !(mediaUrl && mediaUrl.length)) {
       return NextResponse.json({ error: 'text_content or media_url is required' }, { status: 400 });
@@ -30,8 +33,9 @@ export async function POST(request: NextRequest) {
         author_id: user.id,
         text_content: textContent,
         media_url: mediaUrl && mediaUrl.length ? mediaUrl : null,
+        visibility: visibility,
       })
-      .select('id, author_id, text_content, media_url, created_at')
+      .select('id, author_id, text_content, media_url, visibility, created_at')
       .single();
 
     if (error) {

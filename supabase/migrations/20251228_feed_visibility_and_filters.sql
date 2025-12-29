@@ -15,7 +15,7 @@ BEGIN
       AND c.conname = 'posts_visibility_check'
   ) THEN
     ALTER TABLE public.posts
-      ADD CONSTRAINT posts_visibility_check CHECK (visibility IN ('public', 'friends'));
+      ADD CONSTRAINT posts_visibility_check CHECK (visibility IN ('public', 'friends', 'private'));
   END IF;
 END;
 $$;
@@ -39,6 +39,10 @@ CREATE POLICY "Posts are viewable by everyone"
         WHERE fr.user_id_1 = LEAST(auth.uid(), author_id)
           AND fr.user_id_2 = GREATEST(auth.uid(), author_id)
       )
+    )
+    OR (
+      visibility = 'private'
+      AND auth.uid() = author_id
     )
   );
 
@@ -102,6 +106,10 @@ AS $$
             )
           )
           AND p.visibility IN ('public', 'friends')
+        WHEN COALESCE(p_filter, 'global') = 'private' THEN
+          p_viewer_id IS NOT NULL
+          AND p.author_id = p_viewer_id
+          AND p.visibility = 'private'
         ELSE
           p.visibility = 'public'
       END

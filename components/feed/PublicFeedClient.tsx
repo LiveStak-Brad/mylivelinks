@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, Upload, X } from 'lucide-react';
+import { RefreshCw, Upload, X, Globe, Users, Lock } from 'lucide-react';
 import { Button, Card, Modal, Textarea } from '@/components/ui';
 import { FeedPostCard } from './FeedPostCard';
 import PostMedia from './PostMedia';
@@ -71,6 +71,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
   const [composerMediaPreviewUrl, setComposerMediaPreviewUrl] = useState<string | null>(null);
   const [composerMediaKind, setComposerMediaKind] = useState<'image' | 'video' | null>(null);
   const [composerPhotoFilterId, setComposerPhotoFilterId] = useState<PhotoFilterId>('original');
+  const [composerVisibility, setComposerVisibility] = useState<'public' | 'friends' | 'private'>('public');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -232,7 +233,11 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text_content: safeTextContent, media_url: mediaUrl }),
+        body: JSON.stringify({ 
+          text_content: safeTextContent, 
+          media_url: mediaUrl,
+          visibility: composerVisibility 
+        }),
       });
 
       const json = (await res.json()) as any;
@@ -248,6 +253,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
       setComposerMediaPreviewUrl(null);
       setComposerMediaKind(null);
       setComposerPhotoFilterId('original');
+      setComposerVisibility('public');
       await loadFeed('replace');
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to create post');
@@ -469,6 +475,25 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                   >
                     Add photo/video
                   </Button>
+
+                  {/* Visibility Selector */}
+                  <div className="relative">
+                    <select
+                      value={composerVisibility}
+                      onChange={(e) => setComposerVisibility(e.target.value as 'public' | 'friends' | 'private')}
+                      disabled={isPosting}
+                      className="appearance-none pl-8 pr-8 py-1.5 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="public">Public</option>
+                      <option value="friends">Friends Only</option>
+                      <option value="private">Private</option>
+                    </select>
+                    <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                      {composerVisibility === 'public' && <Globe className="w-4 h-4 text-muted-foreground" />}
+                      {composerVisibility === 'friends' && <Users className="w-4 h-4 text-muted-foreground" />}
+                      {composerVisibility === 'private' && <Lock className="w-4 h-4 text-muted-foreground" />}
+                    </div>
+                  </div>
                 </div>
                 <Button onClick={createPost} disabled={isPosting || (!composerText.trim() && !composerMediaFile)} isLoading={isPosting}>
                   Post
