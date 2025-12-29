@@ -103,7 +103,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Map activity to unified format
-    const recentActivity = (activityData ?? []).map((a: any) => {
+    const recentActivity: Array<{
+      id: any;
+      type: 'click' | 'signup' | 'activation';
+      referrer_username: any;
+      referrer_avatar_url: any;
+      referred_username: any;
+      referred_avatar_url: any;
+      created_at: any;
+      event_type: any;
+    }> = (activityData ?? []).map((a: any) => {
       let action: 'click' | 'signup' | 'activation' = 'signup';
       
       if (a.event_type === 'activated' || a.event_type === 'profile_completed' || a.event_type === 'first_post_created') {

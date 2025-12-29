@@ -74,6 +74,21 @@ export function OwnerPanelScreen({ navigation }: Props) {
           <StatCard theme={theme} label="Gifts Sent (24h)" value={Number(totals.gifts_sent_24h ?? 0)} iconName="gift" iconColor="#ec4899" />
           <StatCard theme={theme} label="Pending Reports" value={Number(totals.pending_reports ?? 0)} iconName="alert-circle" iconColor="#ef4444" />
           
+          {/* Live Ops Section */}
+          <View style={styles.actionCard}>
+            <Feather name="activity" size={24} color="#ef4444" />
+            <View style={styles.actionCardContent}>
+              <Text style={styles.actionCardTitle}>Live Operations</Text>
+              <Text style={styles.actionCardText}>Monitor and manage active live streams</Text>
+            </View>
+            <Button 
+              title="View" 
+              variant="primary" 
+              onPress={() => navigation.navigate('LiveOps')} 
+              style={styles.actionButton}
+            />
+          </View>
+          
           {/* Referrals Section */}
           <View style={styles.actionCard}>
             <Feather name="link" size={24} color="#8b5cf6" />
@@ -85,6 +100,36 @@ export function OwnerPanelScreen({ navigation }: Props) {
               title="View" 
               variant="primary" 
               onPress={() => navigation.navigate('OwnerReferrals')} 
+              style={styles.actionButton}
+            />
+          </View>
+          
+          {/* Coins & Revenue Section */}
+          <View style={styles.actionCard}>
+            <Feather name="dollar-sign" size={24} color="#10b981" />
+            <View style={styles.actionCardContent}>
+              <Text style={styles.actionCardTitle}>Coins & Revenue</Text>
+              <Text style={styles.actionCardText}>Manage economy and view revenue analytics</Text>
+            </View>
+            <Button 
+              title="View" 
+              variant="primary" 
+              onPress={() => navigation.navigate('OwnerCoinsRevenue')} 
+              style={styles.actionButton}
+            />
+          </View>
+          
+          {/* Feature Flags Section */}
+          <View style={styles.actionCard}>
+            <Feather name="toggle-right" size={24} color="#3b82f6" />
+            <View style={styles.actionCardContent}>
+              <Text style={styles.actionCardTitle}>Feature Flags</Text>
+              <Text style={styles.actionCardText}>Control platform features and kill switches</Text>
+            </View>
+            <Button 
+              title="View" 
+              variant="primary" 
+              onPress={() => navigation.navigate('OwnerFeatureFlags')} 
               style={styles.actionButton}
             />
           </View>

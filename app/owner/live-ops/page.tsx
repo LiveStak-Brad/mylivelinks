@@ -271,7 +271,7 @@ function generateMockStreams(): LiveStreamData[] {
   const streamers = ['DJ_Emma', 'GamerMike', 'ArtistSarah', 'ComedyJoe', 'MusicLive', 'FitnessQueen', 'TechTalk', 'ChefMaster'];
   const rooms = ['Main Stage', 'Gaming Arena', 'Art Studio', 'Comedy Club', 'Music Hall', 'Fitness Zone', 'Tech Corner', 'Kitchen Live'];
   const regions: RegionFilter[] = ['us-east', 'us-west', 'eu-west', 'ap-south'];
-  const statuses: StatusFilter[] = ['live', 'starting', 'ending'];
+  const statuses: Array<'live' | 'starting' | 'ending'> = ['live', 'starting', 'ending'];
 
   return Array.from({ length: 25 }, (_, i) => ({
     id: `stream-${i + 1}`,
@@ -281,7 +281,7 @@ function generateMockStreams(): LiveStreamData[] {
     room: rooms[i % rooms.length],
     roomId: `room-${i + 1}`,
     region: regions[i % regions.length],
-    status: i < 20 ? 'live' : statuses[i % statuses.length],
+    status: i < 20 ? 'live' : statuses[i % statuses.length] as 'live' | 'starting' | 'ending',
     startedAt: new Date(Date.now() - Math.random() * 7200000).toISOString(),
     viewers: Math.floor(Math.random() * 500) + 10,
     giftsPerMin: Math.floor(Math.random() * 50),

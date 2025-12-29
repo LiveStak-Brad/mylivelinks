@@ -252,6 +252,32 @@ export interface UseOwnerPanelDataReturn {
 }
 
 // ============================================================================
+// Dashboard Component Helper Types
+// ============================================================================
+
+export interface LiveStreamInfo {
+  id: number;
+  streamer_username: string;
+  streamer_avatar: string | null;
+  viewer_count: number;
+  gifts_per_min: number;
+  chat_per_min: number;
+  region: string;
+  started_at: string;
+  room_name: string;
+}
+
+export interface ReportInfo {
+  id: string;
+  reported_user_username: string | null;
+  reported_stream_id: number | null;
+  report_type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  created_at: string;
+  status: string;
+}
+
+// ============================================================================
 // MOCK DATA (Only used in development, removed in production)
 // ============================================================================
 

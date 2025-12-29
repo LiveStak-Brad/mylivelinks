@@ -1,3 +1,4 @@
+// Legacy Components (kept for backwards compatibility)
 export { default as BannerUploader } from './BannerUploader';
 export { default as TemplateCard } from './TemplateCard';
 export type { RoomTemplate } from './TemplateCard';
@@ -5,6 +6,12 @@ export { default as RoomRow } from './RoomRow';
 export type { RoomInstance } from './RoomRow';
 export { default as RoomForm } from './RoomForm';
 export type { RoomFormData } from './RoomForm';
+
+// New Owner Panel Components
+export { default as OwnerPanelShell } from './OwnerPanelShell';
+
+// UI Kit - Re-export for convenience
+export * from './ui-kit';
 export { default as ReportsInbox } from './ReportsInbox';
 export { default as ReportDetailPanel } from './ReportDetailPanel';
 export { OwnerPanelShell } from './OwnerPanelShell';

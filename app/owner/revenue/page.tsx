@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import OwnerPanelShell from '@/components/owner/OwnerPanelShell';
+import { OwnerPanelShell } from '@/components/owner/OwnerPanelShell';
 import Card, { CardHeader } from '@/components/owner/ui-kit/Card';
 import StatCard from '@/components/owner/ui-kit/StatCard';
 import Table, { TableBadge } from '@/components/owner/ui-kit/Table';
