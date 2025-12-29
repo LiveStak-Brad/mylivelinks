@@ -30,14 +30,16 @@ export function MerchSection({ items, isOwner, onAdd, onEdit, onDelete, onMove, 
   if (items.length === 0 && isOwner) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>🛍️ Merchandise</Text>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🛍️</Text>
-          <Text style={styles.emptyTitle}>No Merch Yet</Text>
-          <Text style={styles.emptyDescription}>Add products so fans can support you.</Text>
-          <Pressable style={styles.ctaButton} onPress={onAdd}>
-            <Text style={styles.ctaButtonText}>Add Merchandise</Text>
-          </Pressable>
+        <View style={styles.sectionCard}>
+          <Text style={styles.title}>🛍️ Merchandise</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>🛍️</Text>
+            <Text style={styles.emptyTitle}>No Merch Yet</Text>
+            <Text style={styles.emptyDescription}>Add products so fans can support you.</Text>
+            <Pressable style={styles.ctaButton} onPress={onAdd}>
+              <Text style={styles.ctaButtonText}>Add Merchandise</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -47,18 +49,19 @@ export function MerchSection({ items, isOwner, onAdd, onEdit, onDelete, onMove, 
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>🛍️ Merchandise</Text>
-        {isOwner && (
-          <Pressable onPress={onAdd} style={styles.addButton}>
-            <Text style={styles.addButtonText}>+ Add</Text>
-          </Pressable>
-        )}
-      </View>
+      <View style={styles.sectionCard}>
+        <View style={styles.header}>
+          <Text style={styles.title}>🛍️ Merchandise</Text>
+          {isOwner && (
+            <Pressable onPress={onAdd} style={styles.addButton}>
+              <Text style={styles.addButtonText}>+ Add</Text>
+            </Pressable>
+          )}
+        </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {items.map((item, idx) => (
-          <View key={item.id} style={styles.card}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {items.map((item, idx) => (
+            <View key={item.id} style={styles.card}>
             <View style={styles.imageContainer}>
               {item.image_url ? (
                 <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
@@ -119,6 +122,7 @@ export function MerchSection({ items, isOwner, onAdd, onEdit, onDelete, onMove, 
           </View>
         ))}
       </ScrollView>
+      </View>
     </View>
   );
 }
@@ -128,13 +132,28 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
   return StyleSheet.create({
     container: {
       paddingVertical: 20,
+      paddingHorizontal: 16,
+    },
+    sectionCard: {
+      backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: cardShadow.color,
+      shadowOffset: cardShadow.offset,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      elevation: cardShadow.elevation,
+      overflow: 'hidden',
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: 16,
-      marginBottom: 12,
+      paddingTop: 16,
+      paddingBottom: 12,
     },
     title: {
       fontSize: 20,
@@ -154,6 +173,7 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
     },
     scrollContent: {
       paddingHorizontal: 16,
+      paddingBottom: 16,
       gap: 12,
     },
     card: {
@@ -257,13 +277,14 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       alignItems: 'center',
       paddingHorizontal: 32,
       paddingVertical: 40,
-      marginHorizontal: 16,
-      backgroundColor: theme.colors.surfaceCard,
-      opacity: cardOpacity,
-      borderRadius: 16,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
       borderStyle: 'dashed',
+      backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(94, 155, 255, 0.05)',
+      marginHorizontal: 16,
+      marginTop: 8,
+      marginBottom: 16,
     },
     emptyIcon: {
       fontSize: 48,

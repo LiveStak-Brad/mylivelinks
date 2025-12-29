@@ -44,16 +44,18 @@ export function ScheduleSection({
   if (items.length === 0 && isOwner) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Stream Schedule</Text>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📅</Text>
-          <Text style={styles.emptyTitle}>No Schedule Set</Text>
-          <Text style={styles.emptyDescription}>
-            Let your followers know when you'll be streaming
-          </Text>
-          <Pressable style={styles.ctaButton} onPress={onAdd}>
-            <Text style={styles.ctaButtonText}>Add Schedule</Text>
-          </Pressable>
+        <View style={styles.sectionCard}>
+          <Text style={styles.title}>Stream Schedule</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>📅</Text>
+            <Text style={styles.emptyTitle}>No Schedule Set</Text>
+            <Text style={styles.emptyDescription}>
+              Let your followers know when you'll be streaming
+            </Text>
+            <Pressable style={styles.ctaButton} onPress={onAdd}>
+              <Text style={styles.ctaButtonText}>Add Schedule</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -66,16 +68,17 @@ export function ScheduleSection({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Stream Schedule</Text>
-        {isOwner && (
-          <Pressable onPress={onAdd} style={styles.addButton}>
-            <Text style={styles.addButtonText}>+ Add</Text>
-          </Pressable>
-        )}
-      </View>
+      <View style={styles.sectionCard}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Stream Schedule</Text>
+          {isOwner && (
+            <Pressable onPress={onAdd} style={styles.addButton}>
+              <Text style={styles.addButtonText}>+ Add</Text>
+            </Pressable>
+          )}
+        </View>
 
-      <ScrollView style={styles.listContainer}>
+        <ScrollView style={styles.listContainer}>
         {items.map((item) => (
           <View key={item.id} style={styles.scheduleItem}>
             <View style={styles.scheduleItemHeader}>
@@ -118,6 +121,7 @@ export function ScheduleSection({
           </View>
         ))}
       </ScrollView>
+      </View>
     </View>
   );
 }
@@ -128,13 +132,28 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
   return StyleSheet.create({
     container: {
       paddingVertical: 20,
+      paddingHorizontal: 16,
+    },
+    sectionCard: {
+      backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: cardShadow.color,
+      shadowOffset: cardShadow.offset,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      elevation: cardShadow.elevation,
+      overflow: 'hidden',
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: 16,
-      marginBottom: 12,
+      paddingTop: 16,
+      paddingBottom: 12,
     },
     title: {
       fontSize: 20,
@@ -154,20 +173,15 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
     },
     listContainer: {
       paddingHorizontal: 16,
+      paddingBottom: 16,
     },
     scheduleItem: {
-      backgroundColor: theme.colors.surfaceCard,
-      opacity: cardOpacity, // Apply user-selected opacity
+      backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(94, 155, 255, 0.05)',
       borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
       padding: 14,
       marginBottom: 12,
-      shadowColor: cardShadow.color,
-      shadowOffset: cardShadow.offset,
-      shadowOpacity: cardShadow.opacity,
-      shadowRadius: cardShadow.radius,
-      elevation: cardShadow.elevation,
     },
     scheduleItemHeader: {
       flexDirection: 'row',
@@ -247,9 +261,10 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number = 0.95) {
       paddingHorizontal: 32,
       paddingVertical: 40,
       marginHorizontal: 16,
-      backgroundColor: theme.colors.surfaceCard,
-      opacity: cardOpacity, // Apply user-selected opacity
-      borderRadius: 16,
+      marginTop: 8,
+      marginBottom: 16,
+      backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(94, 155, 255, 0.05)',
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
       borderStyle: 'dashed',

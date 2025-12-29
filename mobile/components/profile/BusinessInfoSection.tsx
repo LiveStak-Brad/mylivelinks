@@ -37,19 +37,21 @@ export function BusinessInfoSection({ data, isOwner, onEdit, cardOpacity = 0.95 
     if (!isOwner) return null;
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>💼 Business Info</Text>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>💼</Text>
-          <Text style={styles.emptyTitle}>No Business Info Yet</Text>
-          <Text style={styles.emptyDescription}>
-            Add your business description and contact details. Visitors won&apos;t see placeholders.
-          </Text>
-          <Pressable style={styles.ctaButton} onPress={onEdit}>
-            <Text style={styles.ctaButtonText}>Add Business Description (Edit)</Text>
-          </Pressable>
-          <Pressable style={styles.ctaButtonSecondary} onPress={onEdit}>
-            <Text style={styles.ctaButtonText}>Add Website / Email / Phone / Location/Service Area</Text>
-          </Pressable>
+        <View style={styles.sectionCard}>
+          <Text style={styles.title}>💼 Business Info</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>💼</Text>
+            <Text style={styles.emptyTitle}>No Business Info Yet</Text>
+            <Text style={styles.emptyDescription}>
+              Add your business description and contact details. Visitors won&apos;t see placeholders.
+            </Text>
+            <Pressable style={styles.ctaButton} onPress={onEdit}>
+              <Text style={styles.ctaButtonText}>Add Business Description (Edit)</Text>
+            </Pressable>
+            <Pressable style={styles.ctaButtonSecondary} onPress={onEdit}>
+              <Text style={styles.ctaButtonText}>Add Website / Email / Phone / Location/Service Area</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -57,16 +59,16 @@ export function BusinessInfoSection({ data, isOwner, onEdit, cardOpacity = 0.95 
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>💼 Business Info</Text>
-        {isOwner && (
-          <Pressable onPress={onEdit} style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit</Text>
-          </Pressable>
-        )}
-      </View>
-
       <View style={styles.card}>
+        <View style={styles.header}>
+          <Text style={styles.title}>💼 Business Info</Text>
+          {isOwner && (
+            <Pressable onPress={onEdit} style={styles.editButton}>
+              <Text style={styles.editButtonText}>Edit</Text>
+            </Pressable>
+          )}
+        </View>
+
         {!!data?.business_description && (
           <Text style={styles.bodyText}>{String(data.business_description)}</Text>
         )}
@@ -115,13 +117,28 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
   return StyleSheet.create({
     container: {
       paddingVertical: 20,
+      paddingHorizontal: 16,
+    },
+    sectionCard: {
+      backgroundColor: theme.colors.surfaceCard,
+      opacity: cardOpacity,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: cardShadow.color,
+      shadowOffset: cardShadow.offset,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      elevation: cardShadow.elevation,
+      overflow: 'hidden',
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: 16,
-      marginBottom: 12,
+      paddingTop: 16,
+      paddingBottom: 12,
     },
     title: {
       fontSize: 20,
@@ -140,13 +157,13 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       fontWeight: '800',
     },
     card: {
-      marginHorizontal: 16,
       backgroundColor: theme.colors.surfaceCard,
       opacity: cardOpacity,
-      borderRadius: 12,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      padding: 14,
+      paddingHorizontal: 0,
+      paddingBottom: 14,
       shadowColor: cardShadow.color,
       shadowOffset: cardShadow.offset,
       shadowOpacity: cardShadow.opacity,
@@ -158,9 +175,11 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       color: theme.colors.textSecondary,
       fontSize: 14,
       lineHeight: 20,
+      paddingHorizontal: 16,
     },
     row: {
       gap: 4,
+      paddingHorizontal: 16,
     },
     rowLabel: {
       color: theme.colors.textMuted,
@@ -176,13 +195,14 @@ function createStyles(theme: ThemeDefinition, cardOpacity: number) {
       alignItems: 'center',
       paddingHorizontal: 32,
       paddingVertical: 40,
-      marginHorizontal: 16,
-      backgroundColor: theme.colors.surfaceCard,
-      opacity: cardOpacity,
-      borderRadius: 16,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
       borderStyle: 'dashed',
+      backgroundColor: theme.mode === 'light' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(94, 155, 255, 0.05)',
+      marginHorizontal: 16,
+      marginTop: 8,
+      marginBottom: 16,
     },
     emptyIcon: {
       fontSize: 48,

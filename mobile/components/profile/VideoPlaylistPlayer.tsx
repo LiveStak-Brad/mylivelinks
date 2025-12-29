@@ -153,8 +153,42 @@ export function VideoPlaylistPlayer({
   if (items.length === 0) {
     return (
       <View style={styles.container}>
+        <View style={styles.sectionCard}>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>{title}</Text>
+            {isOwner && onAdd ? (
+              <Pressable onPress={onAdd} style={styles.addButton}>
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text style={styles.addButtonText}>Add</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>🎬</Text>
+            <Text style={styles.emptyTitle}>{emptyTitle}</Text>
+            <Text style={styles.emptyText}>{emptyText}</Text>
+            {isOwner && onAdd ? (
+              <Pressable onPress={onAdd} style={styles.primaryCta}>
+                <Text style={styles.primaryCtaText}>{emptyOwnerCTA}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.sectionCard}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>{title}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {current ? `Now playing: ${current.title}` : '—'}
+            </Text>
+          </View>
           {isOwner && onAdd ? (
             <Pressable onPress={onAdd} style={styles.addButton}>
               <Ionicons name="add" size={18} color="#fff" />
@@ -163,38 +197,7 @@ export function VideoPlaylistPlayer({
           ) : null}
         </View>
 
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🎬</Text>
-          <Text style={styles.emptyTitle}>{emptyTitle}</Text>
-          <Text style={styles.emptyText}>{emptyText}</Text>
-          {isOwner && onAdd ? (
-            <Pressable onPress={onAdd} style={styles.primaryCta}>
-              <Text style={styles.primaryCtaText}>{emptyOwnerCTA}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {current ? `Now playing: ${current.title}` : '—'}
-          </Text>
-        </View>
-        {isOwner && onAdd ? (
-          <Pressable onPress={onAdd} style={styles.addButton}>
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={styles.addButtonText}>Add</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      <View style={styles.playerCard}>
+        <View style={styles.playerCard}>
         <View style={styles.nowRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.nowTitle} numberOfLines={1}>
@@ -285,6 +288,7 @@ export function VideoPlaylistPlayer({
           </Pressable>
         </View>
       </View>
+      </View>
 
       {/* Playlist Modal */}
       <Modal visible={playlistOpen} transparent animationType="fade" onRequestClose={() => setPlaylistOpen(false)}>
@@ -361,22 +365,32 @@ export function VideoPlaylistPlayer({
 }
 
 function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: number) {
+  const cardShadow = theme.elevations.card;
   return StyleSheet.create({
     container: {
-      marginHorizontal: 16,
-      marginBottom: 14,
-      borderRadius: 18,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+    },
+    sectionCard: {
       backgroundColor: theme.colors.surfaceCard,
       opacity: cardOpacity,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      shadowColor: cardShadow.color,
+      shadowOffset: cardShadow.offset,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      elevation: cardShadow.elevation,
+      overflow: 'hidden',
     },
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 12,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 12,
       gap: 10,
     },
     title: {
@@ -408,6 +422,7 @@ function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: 
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 30,
+      paddingHorizontal: 16,
       gap: 8,
     },
     emptyIcon: {
@@ -439,12 +454,14 @@ function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: 
       fontSize: 14,
     },
     playerCard: {
-      borderRadius: 16,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.mode === 'light' ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.06)',
       padding: 12,
       gap: 12,
+      marginHorizontal: 16,
+      marginBottom: 16,
     },
     nowRow: {
       flexDirection: 'row',
