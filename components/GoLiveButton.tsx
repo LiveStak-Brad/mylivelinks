@@ -826,7 +826,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         
         {/* Hover tooltip for desktop */}
         <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-          {loading ? 'Loading...' : isLive && (isPublishing || isPublishingState) && isScreenSharing ? '🖥️ Screen Live' : isLive && (isPublishing || isPublishingState) ? '🔴 Live' : isLive ? '⏸️ Stop Live' : '▶️ Go Live'}
+          {loading ? 'Loading...' : isLive && (isPublishing || isPublishingState) && isScreenSharing ? 'Screen Live' : isLive && (isPublishing || isPublishingState) ? 'Live' : isLive ? 'Stop Live' : 'Go Live'}
         </span>
       </button>
 
