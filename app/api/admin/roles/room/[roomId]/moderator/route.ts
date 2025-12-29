@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { requireCanAssignRoomModerator } from '@/lib/rbac';
 
 // POST /api/admin/roles/room/[roomId]/moderator - Add a room moderator
 export async function POST(
@@ -7,13 +8,8 @@ export async function POST(
   { params }: { params: { roomId: string } }
 ) {
   try {
+    await requireCanAssignRoomModerator({ request, roomId: params.roomId });
     const supabase = createRouteHandlerClient(request);
-
-    // Check auth
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const { roomId } = params;
     const body = await request.json();
@@ -23,11 +19,16 @@ export async function POST(
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
     }
 
-    // TODO: Implement actual role assignment in database
-    // Should also record who assigned this moderator (assigned_by)
-    console.log(`[Roles] Adding room moderator to ${roomId}: ${user_id}, assigned by ${user.id}`);
+    const { error } = await supabase.rpc('grant_room_moderator', {
+      p_room_id: roomId,
+      p_target_profile_id: user_id,
+    });
 
-    return NextResponse.json({ success: true, message: 'Room moderator added (stub)' });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (err) {
     console.error('[API /admin/roles/room/[roomId]/moderator] Exception:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

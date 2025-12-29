@@ -674,4 +674,43 @@ BEGIN
 END;
 $$;
 
+-- Explicit grants (avoid exposing SECURITY DEFINER RPCs to anonymous callers)
+REVOKE ALL ON FUNCTION public.is_owner(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_app_admin(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_admin(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_room_admin(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_room_moderator(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.can_manage_room_roles(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.can_assign_room_moderator(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.grant_app_admin(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.revoke_app_admin(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.grant_room_admin(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.revoke_room_admin(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.grant_room_moderator(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.revoke_room_moderator(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_overview() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_end_stream(bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_end_all_streams() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_resolve_report(uuid, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_decide_application(uuid, text, text) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.is_owner(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_app_admin(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_room_admin(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_room_moderator(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_manage_room_roles(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_assign_room_moderator(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.grant_app_admin(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.revoke_app_admin(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.grant_room_admin(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.revoke_room_admin(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.grant_room_moderator(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.revoke_room_moderator(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_overview() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_end_stream(bigint) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_end_all_streams() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_resolve_report(uuid, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_decide_application(uuid, text, text) TO authenticated;
+
 COMMIT;
