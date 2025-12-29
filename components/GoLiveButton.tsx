@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveKitPublisher } from '@/hooks/useLiveKitPublisher';
 import { createClient } from '@/lib/supabase';
 import { LocalVideoTrack, LocalAudioTrack, Room } from 'livekit-client';
@@ -830,8 +831,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         </span>
       </button>
 
-      {/* Device Selection Modal - Portal to ensure it renders above everything */}
-      {showDeviceModal && (
+      {/* Device Selection Modal - Use Portal to render at document root */}
+      {showDeviceModal && typeof document !== 'undefined' && createPortal(
         <div 
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
           style={{ zIndex: 99999 }}
