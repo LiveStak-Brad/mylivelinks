@@ -527,18 +527,56 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                       {isCommentsLoading ? (
                         <div className="text-sm text-muted-foreground">Loading comments...</div>
                       ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           {comments.map((c) => (
-                            <div key={c.id} className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="text-sm font-medium text-foreground">
-                                  <Link href={`/${c.author.username}`} className="hover:underline">
-                                    @{c.author.username}
+                            <div key={c.id} className="flex items-start gap-3">
+                              {/* Profile Picture */}
+                              <Link href={`/${c.author.username}`} className="flex-shrink-0">
+                                <img
+                                  src={c.author.avatar_url || '/no-profile-pic.png'}
+                                  alt={`${c.author.username}'s avatar`}
+                                  className="w-8 h-8 rounded-full object-cover hover:opacity-80 transition-opacity"
+                                  onError={(e) => {
+                                    e.currentTarget.src = '/no-profile-pic.png';
+                                  }}
+                                />
+                              </Link>
+
+                              {/* Comment Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="bg-muted rounded-2xl px-3 py-2">
+                                  <Link 
+                                    href={`/${c.author.username}`} 
+                                    className="text-sm font-semibold text-foreground hover:underline"
+                                  >
+                                    {c.author.username}
                                   </Link>
+                                  <div className="text-sm text-foreground whitespace-pre-wrap mt-0.5">
+                                    <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
+                                  </div>
                                 </div>
-                                <div className="text-xs text-muted-foreground">{formatDateTime(c.created_at)}</div>
-                                <div className="text-sm text-foreground whitespace-pre-wrap mt-1">
-                                  <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
+
+                                {/* Comment Actions */}
+                                <div className="flex items-center gap-3 px-3 mt-1">
+                                  <button
+                                    className="text-xs font-semibold text-muted-foreground hover:text-foreground transition"
+                                    onClick={() => {
+                                      // TODO: Implement like comment
+                                    }}
+                                  >
+                                    Like
+                                  </button>
+                                  <button
+                                    className="text-xs font-semibold text-muted-foreground hover:text-foreground transition"
+                                    onClick={() => {
+                                      // TODO: Implement reply to comment
+                                    }}
+                                  >
+                                    Reply
+                                  </button>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDateTime(c.created_at)}
+                                  </span>
                                 </div>
                               </div>
                             </div>
