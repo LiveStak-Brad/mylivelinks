@@ -33,6 +33,8 @@ type FeedComment = {
   post_id: string;
   text_content: string;
   created_at: string;
+  like_count: number;
+  is_liked: boolean;
   author: FeedAuthor;
 };
 
@@ -82,6 +84,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
   const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({});
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({});
+  const [commentLikeLoading, setCommentLikeLoading] = useState<Record<string, boolean>>({});
 
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftTargetPost, setGiftTargetPost] = useState<FeedPost | null>(null);
@@ -363,6 +366,47 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
     }
   }, [commentDrafts]);
 
+  const toggleCommentLike = useCallback(async (commentId: string, postId: string, currentlyLiked: boolean) => {
+    if (!currentUserId) {
+      setLoadError('Please log in to like comments.');
+      return;
+    }
+
+    setCommentLikeLoading((prev) => ({ ...prev, [commentId]: true }));
+    try {
+      const method = currentlyLiked ? 'DELETE' : 'POST';
+      const res = await fetch(`/api/comments/${encodeURIComponent(commentId)}/like`, {
+        method,
+      });
+
+      const json = (await res.json()) as any;
+
+      if (!res.ok && res.status !== 409) {
+        setLoadError(json?.error || 'Failed to update like');
+        return;
+      }
+
+      // Optimistically update the UI
+      setCommentsByPost((prev) => {
+        const comments = prev[postId] || [];
+        const updated = comments.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                is_liked: !currentlyLiked,
+                like_count: currentlyLiked ? Math.max(0, c.like_count - 1) : c.like_count + 1,
+              }
+            : c
+        );
+        return { ...prev, [postId]: updated };
+      });
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to update like');
+    } finally {
+      setCommentLikeLoading((prev) => ({ ...prev, [commentId]: false }));
+    }
+  }, [currentUserId]);
+
   const openGiftModal = useCallback((post: FeedPost) => {
     setGiftTargetPost(post);
     setGiftModalOpen(true);
@@ -528,17 +572,62 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                       ) : (
                         <div className="space-y-3">
                           {comments.map((c) => (
-                            <div key={c.id} className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="text-sm font-medium text-foreground">
-                                  <Link href={`/${c.author.username}`} className="hover:underline">
-                                    @{c.author.username}
-                                  </Link>
+                            <div key={c.id} className="flex items-start gap-3 group">
+                              {/* Comment Avatar */}
+                              <Link href={`/${c.author.username}`} className="flex-shrink-0">
+                                <div className="w-8 h-8 rounded-full overflow-hidden hover:opacity-80 transition-opacity">
+                                  <img
+                                    src={c.author.avatar_url || '/no-profile-pic.png'}
+                                    alt={`${c.author.username}'s avatar`}
+                                    className="w-full h-full object-cover"
+                                  />
                                 </div>
-                                <div className="text-xs text-muted-foreground">{formatDateTime(c.created_at)}</div>
-                                <div className="text-sm text-foreground whitespace-pre-wrap mt-1">
+                              </Link>
+                              
+                              {/* Comment Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <Link href={`/${c.author.username}`} className="text-sm font-bold text-foreground hover:underline">
+                                    {c.author.username}
+                                  </Link>
+                                  <span className="text-xs text-muted-foreground">{formatDateTime(c.created_at)}</span>
+                                </div>
+                                <div className="text-sm text-foreground whitespace-pre-wrap mt-0.5">
                                   <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
                                 </div>
+                              </div>
+                              
+                              {/* Comment Like Button */}
+                              <div className="flex-shrink-0 flex items-center gap-1.5">
+                                {c.like_count > 0 && (
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    {c.like_count}
+                                  </span>
+                                )}
+                                <button
+                                  onClick={() => void toggleCommentLike(c.id, post.id, c.is_liked)}
+                                  disabled={!!commentLikeLoading[c.id]}
+                                  className={`p-1.5 rounded-lg transition-all ${
+                                    c.is_liked
+                                      ? 'text-pink-600 dark:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-950/30'
+                                      : 'text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-pink-600 dark:hover:text-pink-400 hover:bg-pink-50 dark:hover:bg-pink-950/30'
+                                  } ${commentLikeLoading[c.id] ? 'opacity-50 cursor-wait' : ''}`}
+                                  aria-label={c.is_liked ? 'Unlike comment' : 'Like comment'}
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill={c.is_liked ? 'currentColor' : 'none'}
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                                  </svg>
+                                </button>
                               </div>
                             </div>
                           ))}

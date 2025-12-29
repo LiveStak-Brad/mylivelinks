@@ -166,6 +166,7 @@ export async function POST(request: NextRequest) {
       const deviceType = body?.deviceType;
       const deviceId = body?.deviceId;
       const sessionId = body?.sessionId;
+      const role = body?.role;
 
       if (!roomName || !participantName) {
         return sendJson(400, { error: 'roomName and participantName are required', stage: 'body_parse' }, 'body_parse');
@@ -173,7 +174,15 @@ export async function POST(request: NextRequest) {
 
       try {
         const allowed = await runStage('can_access_live', 2_000, async () => {
-          return canAccessLive({ id: user.id, email: user.email });
+          const baseAllowed = canAccessLive({ id: user.id, email: user.email });
+          if (baseAllowed) return true;
+
+          try {
+            const { data } = await (auth.supabase as any).rpc('is_live_tester', { p_profile_id: user.id });
+            return data === true;
+          } catch {
+            return false;
+          }
         });
 
         if (!allowed) {
@@ -198,6 +207,17 @@ export async function POST(request: NextRequest) {
           const effectiveSessionId = sessionId || Date.now().toString();
           const identity = `u_${userId}:${effectiveDeviceType}:${effectiveDeviceId}:${effectiveSessionId}`;
 
+          const effectiveRole = role === 'publisher' ? 'publisher' : 'viewer';
+          const requestedCanPublish = canPublish === true;
+          const requestedCanSubscribe = canSubscribe !== false;
+
+          // Safety: mobile viewers must never receive publish-capable tokens.
+          // (Publishing must be an explicit, separate flow that upgrades to a publisher role.)
+          const effectiveCanPublish =
+            effectiveDeviceType === 'mobile' && effectiveRole === 'viewer'
+              ? false
+              : requestedCanPublish;
+
           const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
             identity,
             name: participantName,
@@ -207,8 +227,8 @@ export async function POST(request: NextRequest) {
           at.addGrant({
             room: roomName,
             roomJoin: true,
-            canPublish: canPublish === true,
-            canSubscribe: canSubscribe !== false,
+            canPublish: effectiveCanPublish,
+            canSubscribe: requestedCanSubscribe,
             canPublishData: true,
             canUpdateOwnMetadata: true,
           });

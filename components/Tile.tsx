@@ -202,6 +202,7 @@ export default function Tile({
       if (participantUserId === streamerId) {
         const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
         const source = (publication as any)?.source as Track.Source | undefined;
+        const isLocalParticipant = !!sharedRoom?.localParticipant && (participant as any)?.sid === (sharedRoom as any).localParticipant?.sid;
         if (DEBUG_LIVEKIT) {
           console.log('[SUB] trackSubscribed', {
             slotIndex,
@@ -256,6 +257,11 @@ export default function Tile({
             }
           }
         } else if (track.kind === Track.Kind.Audio) {
+          if (isLocalParticipant) {
+            // Prevent local mic monitoring/echo: never attach the local participant's own audio.
+            return;
+          }
+
           const isScreenAudio = source === Track.Source.ScreenShareAudio;
           const isMic = source === Track.Source.Microphone;
 

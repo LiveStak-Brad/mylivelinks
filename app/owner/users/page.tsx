@@ -16,6 +16,7 @@ import {
   ExternalLink,
   MoreVertical,
   Eye,
+  Radio,
 } from 'lucide-react';
 import {
   StatCard,
@@ -39,6 +40,7 @@ interface User {
   avatarUrl: string | null;
   isBanned: boolean;
   isVerified: boolean;
+  hasLiveAccess: boolean;
   coinBalance: number;
   diamondBalance: number;
   createdAt: string;
@@ -89,6 +91,9 @@ export default function UsersPage() {
 
         const isVerified = isTruthy(p?.is_verified ?? p?.verified ?? p?.adult_verified ?? p?.is_adult_verified);
 
+        const liveAccessRow = p?.live_access_grants;
+        const hasLiveAccess = Array.isArray(liveAccessRow) ? liveAccessRow.length > 0 : Boolean(liveAccessRow);
+
         return {
           id: String(p?.id ?? ''),
           username,
@@ -97,6 +102,7 @@ export default function UsersPage() {
           avatarUrl: p?.avatar_url ?? null,
           isBanned,
           isVerified,
+          hasLiveAccess,
           coinBalance,
           diamondBalance: earningsBalance,
           createdAt: String(p?.created_at ?? new Date().toISOString()),
@@ -147,11 +153,26 @@ export default function UsersPage() {
     { key: 'user', label: 'User', width: 'flex-1' },
     { key: 'email', label: 'Email', width: 'w-48' },
     { key: 'status', label: 'Status', width: 'w-32' },
+    { key: 'live', label: 'Live', width: 'w-24' },
     { key: 'coins', label: 'Coins', width: 'w-24' },
     { key: 'diamonds', label: 'Diamonds', width: 'w-24' },
     { key: 'joined', label: 'Joined', width: 'w-32' },
     { key: 'actions', label: '', width: 'w-16' },
   ];
+
+  const setUserLiveAccess = async (userId: string, enabled: boolean) => {
+    const res = await fetch('/api/admin/users/live-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ profileId: userId, enabled }),
+    });
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new Error(json?.error || `Failed (${res.status})`);
+    }
+  };
 
   const renderRow = (user: User) => (
     <>
@@ -186,6 +207,13 @@ export default function UsersPage() {
         )}
       </TableCell>
       <TableCell className="w-24">
+        {user.hasLiveAccess ? (
+          <Badge variant="info">Enabled</Badge>
+        ) : (
+          <Badge variant="default">Off</Badge>
+        )}
+      </TableCell>
+      <TableCell className="w-24">
         <span className="text-sm font-mono">{user.coinBalance.toLocaleString()}</span>
       </TableCell>
       <TableCell className="w-24">
@@ -201,6 +229,28 @@ export default function UsersPage() {
           actions={[
             { label: 'View Details', icon: Eye, onClick: () => setSelectedUser(user) },
             { label: 'View Profile', icon: ExternalLink, onClick: () => window.open(`/${user.username}`, '_blank'), disabled: false },
+            {
+              label: user.hasLiveAccess ? 'Revoke Live Access' : 'Grant Live Access',
+              icon: Radio,
+              variant: user.hasLiveAccess ? 'destructive' : 'default',
+              onClick: async () => {
+                const next = !user.hasLiveAccess;
+                const ok = window.confirm(
+                  next
+                    ? `Grant Live access to @${user.username}?`
+                    : `Revoke Live access from @${user.username}?`
+                );
+                if (!ok) return;
+
+                try {
+                  await setUserLiveAccess(user.id, next);
+                  setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, hasLiveAccess: next } : u)));
+                } catch (e) {
+                  console.error('[Owner Users] live access toggle failed:', e);
+                  alert('Failed to update live access');
+                }
+              },
+            },
             { label: 'Send Message', icon: Mail, onClick: () => {}, disabled: true, tooltip: 'Coming soon' },
             { label: user.isBanned ? 'Unban User' : 'Ban User', icon: Ban, onClick: () => {}, disabled: true, tooltip: 'Wire to ban RPC' },
           ]}

@@ -24,6 +24,20 @@ type GiftType = {
   emoji?: string;
 };
 
+type FeedComment = {
+  id: string;
+  post_id: string;
+  text_content: string;
+  created_at: string;
+  like_count: number;
+  is_liked: boolean;
+  author: {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+  };
+};
+
 export function FeedScreen({ navigation }: Props) {
   const { posts, nextCursor, isLoading, error, refresh, loadMore } = useFeed();
   const { fetchAuthed } = useFetchAuthed();
@@ -49,6 +63,14 @@ export function FeedScreen({ navigation }: Props) {
   const [giftTypes, setGiftTypes] = useState<GiftType[]>([]);
   const [selectedGift, setSelectedGift] = useState<GiftType | null>(null);
   const [giftSubmitting, setGiftSubmitting] = useState(false);
+
+  // Comments State
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [commentsByPost, setCommentsByPost] = useState<Record<string, FeedComment[]>>({});
+  const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({});
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({});
+  const [commentLikeLoading, setCommentLikeLoading] = useState<Record<string, boolean>>({});
 
   const canPost = (composerText.trim().length > 0 || !!mediaUrl) && !composerLoading && !mediaUploading;
   const { theme } = useThemeMode();
@@ -285,6 +307,109 @@ export function FeedScreen({ navigation }: Props) {
     }
   }, [selectedGift, giftTargetPost, fetchAuthed, refresh]);
 
+  const toggleComments = useCallback(
+    async (postId: string) => {
+      setExpandedComments((prev) => ({ ...prev, [postId]: !prev[postId] }));
+
+      const alreadyLoaded = Array.isArray(commentsByPost[postId]);
+      if (alreadyLoaded) return;
+
+      setCommentsLoading((prev) => ({ ...prev, [postId]: true }));
+      try {
+        const res = await fetchAuthed(`/api/posts/${encodeURIComponent(postId)}/comments?limit=10`);
+
+        if (!res.ok) {
+          Alert.alert('Error', res.message || 'Failed to load comments');
+          return;
+        }
+
+        const rows = (res.data?.comments ?? []) as FeedComment[];
+        setCommentsByPost((prev) => ({ ...prev, [postId]: rows }));
+      } catch (err: any) {
+        Alert.alert('Error', String(err?.message || err || 'Failed to load comments'));
+      } finally {
+        setCommentsLoading((prev) => ({ ...prev, [postId]: false }));
+      }
+    },
+    [commentsByPost, fetchAuthed]
+  );
+
+  const submitComment = useCallback(
+    async (postId: string) => {
+      const text = String(commentDrafts[postId] || '').trim();
+      if (!text) return;
+
+      setCommentSubmitting((prev) => ({ ...prev, [postId]: true }));
+      try {
+        const res = await fetchAuthed(`/api/posts/${encodeURIComponent(postId)}/comments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text_content: text }),
+        });
+
+        if (!res.ok) {
+          Alert.alert('Error', res.message || 'Failed to create comment');
+          return;
+        }
+
+        setCommentDrafts((prev) => ({ ...prev, [postId]: '' }));
+
+        // Reload comments
+        await toggleComments(postId);
+        if (!expandedComments[postId]) {
+          setExpandedComments((prev) => ({ ...prev, [postId]: true }));
+        }
+      } catch (err: any) {
+        Alert.alert('Error', String(err?.message || err || 'Failed to create comment'));
+      } finally {
+        setCommentSubmitting((prev) => ({ ...prev, [postId]: false }));
+      }
+    },
+    [commentDrafts, fetchAuthed, toggleComments, expandedComments]
+  );
+
+  const toggleCommentLike = useCallback(
+    async (commentId: string, postId: string, currentlyLiked: boolean) => {
+      if (!user) {
+        Alert.alert('Login Required', 'Please log in to like comments.');
+        return;
+      }
+
+      setCommentLikeLoading((prev) => ({ ...prev, [commentId]: true }));
+      try {
+        const method = currentlyLiked ? 'DELETE' : 'POST';
+        const res = await fetchAuthed(`/api/comments/${encodeURIComponent(commentId)}/like`, {
+          method,
+        });
+
+        if (!res.ok && res.status !== 409) {
+          Alert.alert('Error', res.message || 'Failed to update like');
+          return;
+        }
+
+        // Optimistically update the UI
+        setCommentsByPost((prev) => {
+          const comments = prev[postId] || [];
+          const updated = comments.map((c) =>
+            c.id === commentId
+              ? {
+                  ...c,
+                  is_liked: !currentlyLiked,
+                  like_count: currentlyLiked ? Math.max(0, c.like_count - 1) : c.like_count + 1,
+                }
+              : c
+          );
+          return { ...prev, [postId]: updated };
+        });
+      } catch (err: any) {
+        Alert.alert('Error', String(err?.message || err || 'Failed to update like'));
+      } finally {
+        setCommentLikeLoading((prev) => ({ ...prev, [commentId]: false }));
+      }
+    },
+    [user, fetchAuthed]
+  );
+
   const formatDateTime = useCallback((value: string) => {
     try {
       const d = new Date(value);
@@ -310,70 +435,174 @@ export function FeedScreen({ navigation }: Props) {
     ({ item }: { item: FeedPost }) => {
       const avatarUri = resolveMediaUrl(item.author?.avatar_url ?? null);
       const mediaUri = resolveMediaUrl(item.media_url ?? null);
+      const isExpanded = !!expandedComments[item.id];
+      const comments = commentsByPost[item.id] || [];
+      const isCommentsLoading = !!commentsLoading[item.id];
+      
       return (
-        <View style={styles.postCard}>
-          {/* New Header: Avatar + Username + Date/Time */}
-          <Pressable
-            style={styles.postHeader}
-            onPress={() => {
-              const username = item.author?.username;
-              if (username) {
-                navigation.navigate('Profile', { username });
-              }
-            }}
-          >
-            <Image source={getAvatarSource(avatarUri)} style={styles.avatarImage} />
-            <View style={styles.postMeta}>
-              <Text style={styles.authorBold} numberOfLines={1}>
-                {item.author?.username || 'Unknown'}
-              </Text>
-              <Text style={styles.timestamp} numberOfLines={1}>
-                {formatDateTime(item.created_at)}
-              </Text>
-            </View>
-          </Pressable>
-
-          {!!item.text_content && (
-            <Text style={styles.contentText}>{String(item.text_content)}</Text>
-          )}
-
-          {!!mediaUri && (
-            <View style={styles.mediaWrap}>
-              <Image source={{ uri: mediaUri }} style={styles.mediaImage} resizeMode="cover" />
-            </View>
-          )}
-
-          {/* New Engagement Bar: Like | Gift | Coin Count | Comments */}
-          <View style={styles.engagementBar}>
-            <Pressable style={styles.engagementButton}>
-              <Text style={styles.engagementIcon}>♡</Text>
-              <Text style={styles.engagementLabel}>Like</Text>
-            </Pressable>
-
-            <Pressable 
-              style={styles.engagementButton}
-              onPress={() => openGiftModal(item)}
+        <View>
+          <View style={styles.postCard}>
+            {/* New Header: Avatar + Username + Date/Time */}
+            <Pressable
+              style={styles.postHeader}
+              onPress={() => {
+                const username = item.author?.username;
+                if (username) {
+                  navigation.navigate('Profile', { username });
+                }
+              }}
             >
-              <Text style={styles.giftIcon}>🎁</Text>
-              <Text style={styles.giftLabel}>Gift</Text>
+              <Image source={getAvatarSource(avatarUri)} style={styles.avatarImage} />
+              <View style={styles.postMeta}>
+                <Text style={styles.authorBold} numberOfLines={1}>
+                  {item.author?.username || 'Unknown'}
+                </Text>
+                <Text style={styles.timestamp} numberOfLines={1}>
+                  {formatDateTime(item.created_at)}
+                </Text>
+              </View>
             </Pressable>
 
-            {(item.gift_total_coins ?? 0) > 0 && (
-              <View style={styles.coinCount}>
-                <Text style={styles.coinIcon}>🪙</Text>
-                <Text style={styles.coinText}>{item.gift_total_coins ?? 0}</Text>
+            {!!item.text_content && (
+              <Text style={styles.contentText}>{String(item.text_content)}</Text>
+            )}
+
+            {!!mediaUri && (
+              <View style={styles.mediaWrap}>
+                <Image source={{ uri: mediaUri }} style={styles.mediaImage} resizeMode="cover" />
               </View>
             )}
 
-            <Pressable style={styles.engagementButton}>
-              <Text style={styles.engagementIcon}>💬</Text>
-              <Text style={styles.engagementLabel}>Comment</Text>
-            </Pressable>
+            {/* New Engagement Bar: Like | Gift | Coin Count | Comments */}
+            <View style={styles.engagementBar}>
+              <Pressable style={styles.engagementButton}>
+                <Text style={styles.engagementIcon}>♡</Text>
+                <Text style={styles.engagementLabel}>Like</Text>
+              </Pressable>
+
+              <Pressable 
+                style={styles.engagementButton}
+                onPress={() => openGiftModal(item)}
+              >
+                <Text style={styles.giftIcon}>🎁</Text>
+                <Text style={styles.giftLabel}>Gift</Text>
+              </Pressable>
+
+              {(item.gift_total_coins ?? 0) > 0 && (
+                <View style={styles.coinCount}>
+                  <Text style={styles.coinIcon}>🪙</Text>
+                  <Text style={styles.coinText}>{item.gift_total_coins ?? 0}</Text>
+                </View>
+              )}
+
+              <Pressable 
+                style={styles.engagementButton}
+                onPress={() => void toggleComments(item.id)}
+              >
+                <Text style={styles.engagementIcon}>💬</Text>
+                <Text style={styles.engagementLabel}>Comment</Text>
+              </Pressable>
+            </View>
           </View>
+
+          {/* Comments Section */}
+          {isExpanded && (
+            <View style={styles.commentsSection}>
+              {isCommentsLoading ? (
+                <Text style={styles.commentsLoadingText}>Loading comments...</Text>
+              ) : (
+                <>
+                  {comments.map((c) => (
+                    <View key={c.id} style={styles.commentItem}>
+                      {/* Comment Avatar */}
+                      <Pressable
+                        onPress={() => {
+                          if (c.author.username) {
+                            navigation.navigate('Profile', { username: c.author.username });
+                          }
+                        }}
+                      >
+                        <Image 
+                          source={getAvatarSource(resolveMediaUrl(c.author.avatar_url))} 
+                          style={styles.commentAvatar}
+                        />
+                      </Pressable>
+
+                      {/* Comment Content */}
+                      <View style={styles.commentContent}>
+                        <Pressable
+                          onPress={() => {
+                            if (c.author.username) {
+                              navigation.navigate('Profile', { username: c.author.username });
+                            }
+                          }}
+                        >
+                          <Text style={styles.commentUsername}>{c.author.username}</Text>
+                        </Pressable>
+                        <Text style={styles.commentTimestamp}>{formatDateTime(c.created_at)}</Text>
+                        <Text style={styles.commentText}>{c.text_content}</Text>
+                      </View>
+
+                      {/* Comment Like Button */}
+                      <View style={styles.commentLikeContainer}>
+                        {c.like_count > 0 && (
+                          <Text style={styles.commentLikeCount}>{c.like_count}</Text>
+                        )}
+                        <Pressable
+                          onPress={() => void toggleCommentLike(c.id, item.id, c.is_liked)}
+                          disabled={!!commentLikeLoading[c.id]}
+                          style={[
+                            styles.commentLikeButton,
+                            commentLikeLoading[c.id] && styles.commentLikeButtonDisabled,
+                          ]}
+                        >
+                          <Text style={[styles.commentLikeIcon, c.is_liked && styles.commentLikeIconActive]}>
+                            {c.is_liked ? '♥' : '♡'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* Comment Input */}
+                  <View style={styles.commentInputContainer}>
+                    <Input
+                      placeholder="Write a comment..."
+                      value={commentDrafts[item.id] || ''}
+                      onChangeText={(text) => setCommentDrafts((prev) => ({ ...prev, [item.id]: text }))}
+                      style={styles.commentInput}
+                      multiline
+                    />
+                    <Button
+                      title={commentSubmitting[item.id] ? 'Posting...' : 'Post'}
+                      onPress={() => void submitComment(item.id)}
+                      disabled={!!commentSubmitting[item.id] || !String(commentDrafts[item.id] || '').trim()}
+                      loading={!!commentSubmitting[item.id]}
+                      style={styles.commentSubmitButton}
+                    />
+                  </View>
+                </>
+              )}
+            </View>
+          )}
         </View>
       );
     },
-    [formatDateTime, navigation, styles]
+    [
+      expandedComments,
+      commentsByPost,
+      commentsLoading,
+      commentDrafts,
+      commentSubmitting,
+      commentLikeLoading,
+      formatDateTime,
+      navigation,
+      styles,
+      openGiftModal,
+      toggleComments,
+      toggleCommentLike,
+      submitComment,
+    ]
   );
 
   const renderComposer = useMemo(() => {
@@ -1224,6 +1453,97 @@ function createStyles(theme: ThemeDefinition) {
     },
     giftModalButtonPressed: {
       opacity: 0.85,
+    },
+
+    // Comments Section Styles
+    commentsSection: {
+      backgroundColor: theme.colors.cardSurface,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginHorizontal: 16,
+      borderBottomLeftRadius: 16,
+      borderBottomRightRadius: 16,
+      marginTop: -8,
+      borderWidth: 1,
+      borderTopWidth: 0,
+      borderColor: theme.colors.border,
+    },
+    commentsLoadingText: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      textAlign: 'center',
+      paddingVertical: 12,
+    },
+    commentItem: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      marginBottom: 12,
+    },
+    commentAvatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: 'rgba(255,255,255,0.06)',
+    },
+    commentContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    commentUsername: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '900',
+      marginBottom: 2,
+    },
+    commentTimestamp: {
+      color: theme.colors.textSecondary,
+      fontSize: 11,
+      marginBottom: 4,
+    },
+    commentText: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    commentLikeContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    commentLikeCount: {
+      color: theme.colors.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    commentLikeButton: {
+      padding: 6,
+      borderRadius: 8,
+    },
+    commentLikeButtonDisabled: {
+      opacity: 0.5,
+    },
+    commentLikeIcon: {
+      fontSize: 16,
+      color: theme.colors.textSecondary,
+    },
+    commentLikeIconActive: {
+      color: '#ec4899',
+    },
+    commentInputContainer: {
+      marginTop: 8,
+      gap: 8,
+    },
+    commentInput: {
+      minHeight: 40,
+      paddingTop: 8,
+      paddingBottom: 8,
+    },
+    commentSubmitButton: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: 20,
     },
   });
 }

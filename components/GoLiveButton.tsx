@@ -528,6 +528,11 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   const handleGoLive = async () => {
     if (isLive) {
       // Stop live
+      if (!isPublishingRef.current) {
+        alert("You're live on another device. Stop the stream from the device that's currently broadcasting.");
+        return;
+      }
+
       setLoading(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();

@@ -9,10 +9,14 @@ export async function GET(request: NextRequest, context: { params: { postId: str
     const limit = Math.min(Math.max(parseInt(limitParam || '10', 10) || 10, 1), 50);
 
     const supabase = createAuthedRouteHandlerClient(request);
+    
+    // Get current user (may be null for anonymous users)
+    const user = await getSessionUser(request);
+    const currentUserId = user?.id || null;
 
     const { data: comments, error } = await supabase
       .from('post_comments')
-      .select('id, post_id, author_id, text_content, created_at, profiles:author_id(id, username, avatar_url)')
+      .select('id, post_id, author_id, text_content, created_at, like_count, profiles:author_id(id, username, avatar_url)')
       .eq('post_id', postId)
       .order('created_at', { ascending: true })
       .limit(limit);
@@ -21,11 +25,28 @@ export async function GET(request: NextRequest, context: { params: { postId: str
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Check which comments the current user has liked
+    let likedCommentIds = new Set<string>();
+    if (currentUserId && comments && comments.length > 0) {
+      const commentIds = comments.map((c: any) => c.id);
+      const { data: likes } = await supabase
+        .from('comment_likes')
+        .select('comment_id')
+        .eq('profile_id', currentUserId)
+        .in('comment_id', commentIds);
+      
+      if (likes) {
+        likedCommentIds = new Set(likes.map((l: any) => String(l.comment_id)));
+      }
+    }
+
     const normalized = (comments ?? []).map((c: any) => ({
       id: String(c.id),
       post_id: String(c.post_id),
       text_content: String(c.text_content ?? ''),
       created_at: String(c.created_at),
+      like_count: Number(c.like_count ?? 0),
+      is_liked: likedCommentIds.has(String(c.id)),
       author: {
         id: String(c.profiles?.id ?? c.author_id),
         username: String(c.profiles?.username ?? ''),

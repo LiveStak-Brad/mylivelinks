@@ -688,7 +688,7 @@ export function useLiveRoomParticipants(
         try {
           const tokenResult = await fetchToken({
             participantName,
-            canPublish: true,
+            canPublish: false,
             canSubscribe: true,
             role: 'viewer',
             participantMetadata: authContext.isAuthed
@@ -740,6 +740,16 @@ export function useLiveRoomParticipants(
           reachedConnectedRef.current = true;
           setConnectDebug(prev => ({ ...prev, reachedConnected: true }));
           setConnectionError(null);
+
+          // Defensive: ensure viewer join never starts with local A/V enabled.
+          // (Publishing should only happen after explicit goLive which upgrades the token.)
+          try {
+            void room.localParticipant.setCameraEnabled(false);
+            void room.localParticipant.setMicrophoneEnabled(false);
+          } catch {
+            // ignore
+          }
+
           updateParticipants(room);
         });
 
@@ -933,6 +943,23 @@ export function useLiveRoomParticipants(
         throw new Error(connectionError || 'LiveKit room not connected');
       }
 
+      // If you're already live in the DB but not publishing on this device,
+      // assume another device is the active broadcaster and block takeover.
+      try {
+        const { data: existingLive } = await supabase
+          .from('live_streams')
+          .select('id')
+          .eq('profile_id', authContext.profileId)
+          .eq('live_available', true)
+          .maybeSingle();
+
+        if (existingLive && !isPublishingRef.current) {
+          throw new Error('You are already live on another device');
+        }
+      } catch (err: any) {
+        throw new Error(err?.message || 'You are already live on another device');
+      }
+
       setIsLive(true);
       isLiveRef.current = true;
 
@@ -986,6 +1013,27 @@ export function useLiveRoomParticipants(
         );
       } catch {
         // ignore
+      }
+
+      // Upgrade to a publisher-capable connection before enabling camera/mic.
+      // This prevents accidental takeovers from viewer connections on the same account.
+      try {
+        const tokenResult = await fetchToken({
+          participantName: authContext.profileId,
+          canPublish: true,
+          canSubscribe: true,
+          role: 'publisher',
+          participantMetadata: {
+            profile_id: authContext.profileId,
+            live_stream_id: liveStream.id,
+            platform: 'mobile',
+          },
+        });
+
+        await room.disconnect();
+        await room.connect(tokenResult.url, tokenResult.token);
+      } catch (err: any) {
+        throw new Error(err?.message || 'Failed to upgrade LiveKit connection for publishing');
       }
 
       // Enable camera + mic (publishing)

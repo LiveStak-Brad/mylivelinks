@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const admin = getSupabaseAdmin();
     let query = admin
       .from('profiles')
-      .select('*')
+      .select('*, live_access_grants(profile_id)')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
