@@ -79,6 +79,7 @@ interface ProfileData {
     created_at: string;
     profile_type?: ProfileType;
     enabled_modules?: string[] | null; // Optional modules only
+    enabled_tabs?: string[] | null; // Optional tabs only
     // Customization
     profile_bg_url?: string;
     profile_bg_overlay?: string;
@@ -305,7 +306,10 @@ export default function ModernProfilePage() {
   useEffect(() => {
     if (!profileData?.profile) return;
     const profile = profileData.profile;
-    const enabledTabs = getEnabledTabs((profile.profile_type || 'creator') as ConfigProfileType);
+    const enabledTabs = getEnabledTabs(
+      (profile.profile_type || 'creator') as ConfigProfileType,
+      profile.enabled_tabs as ConfigProfileTab[] | null
+    );
     if (!enabledTabs?.length) return;
     const allowed = new Set(enabledTabs.map((t) => t.id));
     if (!allowed.has(activeTab as any)) {
@@ -313,7 +317,7 @@ export default function ModernProfilePage() {
     }
     // Only re-run when profile type changes or profileData loads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileData?.profile?.profile_type]);
+  }, [profileData?.profile?.profile_type, profileData?.profile?.enabled_tabs]);
 
   // Load profile-type module data (tracks + profile_content_blocks) after the main profile loads.
   useEffect(() => {
@@ -803,7 +807,10 @@ export default function ModernProfilePage() {
   const { profile } = profileData;
 
   // Tabs are config-driven (parity with mobile).
-  const enabledTabs = getEnabledTabs((profile.profile_type || 'creator') as ConfigProfileType);
+  const enabledTabs = getEnabledTabs(
+    (profile.profile_type || 'creator') as ConfigProfileType,
+    profile.enabled_tabs as ConfigProfileTab[] | null
+  );
 
   const tabIconMap: Record<ConfigProfileTab, any> = {
     info: Info,
