@@ -26,27 +26,27 @@ export default function KpiCard({
   loading = false,
 }: KpiCardProps) {
   const variantStyles = {
-    default: 'border-gray-700',
-    success: 'border-green-500/50 bg-green-500/5',
-    warning: 'border-yellow-500/50 bg-yellow-500/5',
-    danger: 'border-red-500/50 bg-red-500/5',
-    info: 'border-blue-500/50 bg-blue-500/5',
+    default: 'border-border',
+    success: 'border-success/50 bg-success/5',
+    warning: 'border-warning/50 bg-warning/5',
+    danger: 'border-destructive/50 bg-destructive/5',
+    info: 'border-info/50 bg-info/5',
   };
 
   const iconBgStyles = {
-    default: 'bg-gray-700',
-    success: 'bg-green-500/20',
-    warning: 'bg-yellow-500/20',
-    danger: 'bg-red-500/20',
-    info: 'bg-blue-500/20',
+    default: 'bg-muted',
+    success: 'bg-success/20',
+    warning: 'bg-warning/20',
+    danger: 'bg-destructive/20',
+    info: 'bg-info/20',
   };
 
   const trendColor = trend
     ? trend.value > 0
-      ? 'text-green-400'
+      ? 'text-success'
       : trend.value < 0
-      ? 'text-red-400'
-      : 'text-gray-400'
+      ? 'text-destructive'
+      : 'text-muted-foreground'
     : '';
 
   const TrendIcon = trend
@@ -59,23 +59,23 @@ export default function KpiCard({
 
   if (loading) {
     return (
-      <div className={`bg-gray-800 rounded-xl p-6 border ${variantStyles[variant]}`}>
+      <div className={`bg-card rounded-lg p-6 border ${variantStyles[variant]}`}>
         <div className="animate-pulse">
           <div className="flex items-center justify-between mb-4">
-            <div className="h-4 w-24 bg-gray-700 rounded" />
-            <div className="h-10 w-10 bg-gray-700 rounded-lg" />
+            <div className="h-4 w-24 bg-muted rounded" />
+            <div className="h-10 w-10 bg-muted rounded-lg" />
           </div>
-          <div className="h-8 w-32 bg-gray-700 rounded mb-2" />
-          <div className="h-3 w-20 bg-gray-700 rounded" />
+          <div className="h-8 w-32 bg-muted rounded mb-2" />
+          <div className="h-3 w-20 bg-muted rounded" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`bg-gray-800 rounded-xl p-6 border ${variantStyles[variant]} hover:border-gray-600 transition`}>
+    <div className={`bg-card rounded-lg p-6 border ${variantStyles[variant]} hover:border-border-hover transition`}>
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm font-medium text-gray-400">{title}</span>
+        <span className="text-sm font-medium text-muted-foreground">{title}</span>
         {icon && (
           <div className={`p-2.5 rounded-lg ${iconBgStyles[variant]}`}>
             {icon}
@@ -85,11 +85,11 @@ export default function KpiCard({
       
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-2xl md:text-3xl font-bold text-white mb-1">
+          <p className="text-2xl md:text-3xl font-bold text-foreground mb-1">
             {typeof value === 'number' ? value.toLocaleString() : value}
           </p>
           {subtitle && (
-            <p className="text-xs text-gray-500">{subtitle}</p>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
           )}
         </div>
         
@@ -100,7 +100,7 @@ export default function KpiCard({
               {trend.value > 0 ? '+' : ''}{trend.value}%
             </span>
             {trend.label && (
-              <span className="text-xs text-gray-500 ml-1">{trend.label}</span>
+              <span className="text-xs text-muted-foreground ml-1">{trend.label}</span>
             )}
           </div>
         )}
