@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy, Menu, X } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import LeaderboardModal from './LeaderboardModal';
-import { IconButton } from './ui';
 import { createClient } from '@/lib/supabase';
 import { LIVE_LAUNCH_ENABLED } from '@/lib/livekit-constants';
 import { isRouteActive, MAIN_NAV_ITEMS, type NavItem } from '@/lib/navigation';
@@ -205,10 +204,8 @@ export default function GlobalHeader() {
   const [isOwner, setIsOwner] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const supabase = createClient();
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     checkOwnerStatus();
@@ -241,53 +238,6 @@ export default function GlobalHeader() {
       subscription.unsubscribe();
     };
   }, [supabase]);
-
-  // Scroll lock when mobile menu is open
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.classList.add('scroll-lock');
-      return () => {
-        document.body.classList.remove('scroll-lock');
-      };
-    }
-  }, [mobileMenuOpen]);
-
-  // Close mobile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
-        setMobileMenuOpen(false);
-      }
-    };
-
-    if (mobileMenuOpen) {
-      // Small delay to prevent immediate close on the same click that opened it
-      const timer = setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-      }, 10);
-      return () => {
-        clearTimeout(timer);
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [mobileMenuOpen]);
-
-  // Close mobile menu on escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && mobileMenuOpen) {
-        setMobileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [mobileMenuOpen]);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
   
   // Don't show header on certain pages
   const hideHeader = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
@@ -378,70 +328,9 @@ export default function GlobalHeader() {
 
               {/* User Menu */}
               <UserMenu />
-
-              {/* Mobile Menu Toggle */}
-              <IconButton
-                className="md:hidden"
-                variant="ghost"
-                size="md"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                aria-expanded={mobileMenuOpen}
-                aria-controls="mobile-menu"
-              >
-                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </IconButton>
             </div>
           </div>
         </div>
-
-        {/* Mobile Navigation Overlay */}
-        {mobileMenuOpen && (
-          <>
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm md:hidden animate-fade-in z-[64]" 
-              aria-hidden="true"
-              onClick={() => setMobileMenuOpen(false)}
-            />
-            
-            {/* Menu Container */}
-            <div 
-              ref={mobileMenuRef}
-              id="mobile-menu"
-              className="md:hidden fixed top-16 left-0 right-0 bg-background border-b border-border shadow-xl animate-slide-down z-[65] max-h-[calc(100vh-4rem)] overflow-y-auto"
-              role="navigation"
-              aria-label="Mobile navigation"
-            >
-              <nav className="container mx-auto px-4 py-4 flex flex-col gap-1">
-                {MAIN_NAV_ITEMS.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    isActive={isRouteActive(pathname, item.href, {
-                      matchType: item.matchType,
-                      excludePaths: item.excludePaths,
-                    })}
-                    disabled={item.requiresLive && !canOpenLive}
-                    onClick={() => setMobileMenuOpen(false)}
-                  />
-                ))}
-                
-                {/* Owner link in mobile menu */}
-                {isOwner && (
-                  <Link
-                    href="/owner"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
-                  >
-                    <Crown className="w-4 h-4" />
-                    Owner Panel
-                  </Link>
-                )}
-              </nav>
-            </div>
-          </>
-        )}
       </header>
       
       {/* Leaderboard Modal */}
