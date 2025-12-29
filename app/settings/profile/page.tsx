@@ -11,6 +11,7 @@ import ProfileCustomization from '@/components/profile/ProfileCustomization';
 import { ProfileTypePickerModal, ProfileType } from '@/components/ProfileTypePickerModal';
 import ProfileModulePicker from '@/components/profile/ProfileModulePicker';
 import ProfileTabPicker from '@/components/profile/ProfileTabPicker';
+import TopFriendsSettings from '@/components/profile/TopFriendsSettings';
 import { ProfileSection, ProfileTab } from '@/lib/profileTypeConfig';
 
 interface UserLink {
@@ -65,6 +66,12 @@ export default function ProfileSettingsPage() {
   
   // Display preferences
   const [hideStreamingStats, setHideStreamingStats] = useState(false);
+  
+  // Top Friends Customization
+  const [showTopFriends, setShowTopFriends] = useState(true);
+  const [topFriendsTitle, setTopFriendsTitle] = useState('Top Friends');
+  const [topFriendsAvatarStyle, setTopFriendsAvatarStyle] = useState<'circle' | 'square'>('square');
+  const [topFriendsMaxCount, setTopFriendsMaxCount] = useState(8);
   
   // Profile Type
   const [profileType, setProfileType] = useState<ProfileType>('creator');
@@ -144,6 +151,12 @@ export default function ProfileSettingsPage() {
         
         // Load display preferences
         setHideStreamingStats(p.hide_streaming_stats || false);
+        
+        // Load top friends customization
+        setShowTopFriends(p.show_top_friends !== false); // default true
+        setTopFriendsTitle(p.top_friends_title || 'Top Friends');
+        setTopFriendsAvatarStyle(p.top_friends_avatar_style || 'square');
+        setTopFriendsMaxCount(p.top_friends_max_count || 8);
         
         // Load profile type
         setProfileType((p.profile_type || 'creator') as ProfileType);
@@ -274,6 +287,11 @@ export default function ProfileSettingsPage() {
         social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
         // Display preferences
         hide_streaming_stats: hideStreamingStats,
+        // Top Friends Customization
+        show_top_friends: showTopFriends,
+        top_friends_title: topFriendsTitle,
+        top_friends_avatar_style: topFriendsAvatarStyle,
+        top_friends_max_count: topFriendsMaxCount,
         // Customization fields
         profile_bg_url: customization.profile_bg_url || null,
         profile_bg_overlay: customization.profile_bg_overlay,
@@ -587,6 +605,20 @@ export default function ProfileSettingsPage() {
             onChange={setEnabledTabs}
           />
         </div>
+
+        {/* Top Friends Customization */}
+        <TopFriendsSettings
+          showTopFriends={showTopFriends}
+          topFriendsTitle={topFriendsTitle}
+          topFriendsAvatarStyle={topFriendsAvatarStyle}
+          topFriendsMaxCount={topFriendsMaxCount}
+          onChange={(settings) => {
+            setShowTopFriends(settings.showTopFriends);
+            setTopFriendsTitle(settings.topFriendsTitle);
+            setTopFriendsAvatarStyle(settings.topFriendsAvatarStyle);
+            setTopFriendsMaxCount(settings.topFriendsMaxCount);
+          }}
+        />
 
         {/* Save Button (Top) */}
         <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg shadow-lg p-4 mb-6 sticky top-4 z-10">

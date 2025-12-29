@@ -28,6 +28,11 @@ interface TopFriendsDisplayProps {
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
   accentColor?: string;
+  // Customization props
+  showTopFriends?: boolean;
+  topFriendsTitle?: string;
+  topFriendsAvatarStyle?: 'circle' | 'square';
+  topFriendsMaxCount?: number;
 }
 
 export default function TopFriendsDisplay({
@@ -37,6 +42,10 @@ export default function TopFriendsDisplay({
   cardStyle = {},
   borderRadiusClass = 'rounded-xl',
   accentColor = '#3B82F6',
+  showTopFriends = true,
+  topFriendsTitle = 'Top Friends',
+  topFriendsAvatarStyle = 'square',
+  topFriendsMaxCount = 8,
 }: TopFriendsDisplayProps) {
   const [topFriends, setTopFriends] = useState<TopFriend[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,10 +72,27 @@ export default function TopFriendsDisplay({
     }
   };
 
-  // Don't show section if no friends and not owner
-  if (!loading && topFriends.length === 0 && !isOwner) {
+  // Don't show section if disabled or (no friends and not owner)
+  if (!showTopFriends || (!loading && topFriends.length === 0 && !isOwner)) {
     return null;
   }
+
+  // Limit friends to maxCount
+  const displayedFriends = topFriends.slice(0, topFriendsMaxCount);
+  const friendCount = displayedFriends.length;
+
+  // Calculate dynamic grid classes based on friend count
+  const getGridClasses = () => {
+    if (friendCount === 1) return 'grid-cols-1 max-w-[200px] mx-auto';
+    if (friendCount === 2) return 'grid-cols-2 max-w-[400px] mx-auto';
+    if (friendCount === 3) return 'grid-cols-3 max-w-[600px] mx-auto';
+    if (friendCount <= 4) return 'grid-cols-2 sm:grid-cols-4 max-w-[800px] mx-auto';
+    if (friendCount <= 6) return 'grid-cols-3 sm:grid-cols-3';
+    return 'grid-cols-2 sm:grid-cols-4'; // 7-8 friends
+  };
+
+  // Avatar shape classes
+  const avatarShapeClass = topFriendsAvatarStyle === 'circle' ? 'rounded-full' : 'rounded-lg';
 
   return (
     <div
@@ -83,7 +109,7 @@ export default function TopFriendsDisplay({
             <Users size={24} style={{ color: accentColor }} />
           </div>
           <div>
-            <h3 className="text-xl font-bold">Top Friends</h3>
+            <h3 className="text-xl font-bold">{topFriendsTitle}</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {isOwner ? 'Your favorite people' : 'Their favorite people'}
             </p>
@@ -104,10 +130,10 @@ export default function TopFriendsDisplay({
 
       {/* Loading State */}
       {loading && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
+        <div className={`grid gap-4 ${getGridClasses()}`}>
+          {[...Array(topFriendsMaxCount)].map((_, i) => (
             <div key={i} className="animate-pulse">
-              <div className="aspect-square bg-gray-300 dark:bg-gray-700 rounded-lg mb-2" />
+              <div className={`aspect-square bg-gray-300 dark:bg-gray-700 ${avatarShapeClass} mb-2`} />
               <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-3/4 mx-auto" />
             </div>
           ))}
@@ -119,7 +145,7 @@ export default function TopFriendsDisplay({
         <div className="text-center py-12">
           <Users size={48} className="mx-auto mb-4 text-gray-400" />
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Add up to 8 favorite friends to showcase on your profile!
+            Add up to {topFriendsMaxCount} favorite friends to showcase on your profile!
           </p>
           <button
             onClick={onManage}
@@ -127,21 +153,21 @@ export default function TopFriendsDisplay({
             style={{ backgroundColor: accentColor, color: 'white' }}
           >
             <Users size={20} />
-            Add Top Friends
+            Add {topFriendsTitle}
           </button>
         </div>
       )}
 
-      {/* Friends Grid */}
-      {!loading && topFriends.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {topFriends.map((friend) => (
+      {/* Friends Grid - Dynamic layout based on count */}
+      {!loading && displayedFriends.length > 0 && (
+        <div className={`grid gap-4 ${getGridClasses()}`}>
+          {displayedFriends.map((friend) => (
             <Link
               key={friend.friend_id}
               href={`/${friend.username}`}
               className="group relative"
             >
-              <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-800 transition-transform duration-200 group-hover:scale-105 shadow-md group-hover:shadow-xl">
+              <div className={`relative aspect-square ${avatarShapeClass} overflow-hidden bg-gray-200 dark:bg-gray-800 transition-transform duration-200 group-hover:scale-105 shadow-md group-hover:shadow-xl`}>
                 {/* Avatar */}
                 {friend.avatar_url ? (
                   <Image
@@ -192,14 +218,14 @@ export default function TopFriendsDisplay({
             </Link>
           ))}
 
-          {/* Empty Slots (Owner Only) */}
+          {/* Empty Slots (Owner Only) - Only show if under max count */}
           {isOwner &&
-            topFriends.length < 8 &&
-            [...Array(8 - topFriends.length)].map((_, i) => (
+            displayedFriends.length < topFriendsMaxCount &&
+            [...Array(topFriendsMaxCount - displayedFriends.length)].map((_, i) => (
               <button
                 key={`empty-${i}`}
                 onClick={onManage}
-                className="aspect-square rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 flex items-center justify-center transition-colors"
+                className={`aspect-square ${avatarShapeClass} border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500 flex items-center justify-center transition-colors`}
               >
                 <Users
                   size={32}
@@ -211,7 +237,7 @@ export default function TopFriendsDisplay({
       )}
 
       {/* MySpace Nostalgia Note */}
-      {!loading && topFriends.length > 0 && (
+      {!loading && displayedFriends.length > 0 && (
         <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6 italic">
           Just like the good old days 💙
         </p>
@@ -219,4 +245,3 @@ export default function TopFriendsDisplay({
     </div>
   );
 }
-

@@ -155,7 +155,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Reorder top friends
+-- Reorder top friends (FIXED: use temporary position to avoid constraint violation)
 CREATE OR REPLACE FUNCTION reorder_top_friends(
   p_profile_id UUID,
   p_friend_id UUID,
@@ -168,6 +168,7 @@ AS $$
 DECLARE
   v_old_position INTEGER;
   v_friend_at_new_position UUID;
+  v_temp_position INTEGER := -999;
 BEGIN
   IF p_profile_id IS NULL THEN
     RETURN json_build_object('success', false, 'error', 'Profile ID required');
@@ -177,6 +178,7 @@ BEGIN
     RETURN json_build_object('success', false, 'error', 'Position must be between 1 and 8');
   END IF;
   
+  -- Get current position of the friend being moved
   SELECT friend_position INTO v_old_position
   FROM top_friends
   WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
@@ -185,17 +187,33 @@ BEGIN
     RETURN json_build_object('success', false, 'error', 'Friend not in list');
   END IF;
   
+  IF v_old_position = p_new_position THEN
+    RETURN json_build_object('success', true);
+  END IF;
+  
+  -- Get friend currently at the new position
   SELECT friend_id INTO v_friend_at_new_position
   FROM top_friends
   WHERE profile_id = p_profile_id AND friend_position = p_new_position;
   
+  -- If there's a friend at the target position, swap using temporary position
   IF v_friend_at_new_position IS NOT NULL THEN
+    -- Move current friend to temporary negative position
+    UPDATE top_friends SET friend_position = v_temp_position
+    WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
+    
+    -- Move friend at target position to old position
     UPDATE top_friends SET friend_position = v_old_position
     WHERE profile_id = p_profile_id AND friend_id = v_friend_at_new_position;
+    
+    -- Move current friend from temp to new position
+    UPDATE top_friends SET friend_position = p_new_position
+    WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
+  ELSE
+    -- No one at target position, just move directly
+    UPDATE top_friends SET friend_position = p_new_position
+    WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
   END IF;
-  
-  UPDATE top_friends SET friend_position = p_new_position
-  WHERE profile_id = p_profile_id AND friend_id = p_friend_id;
   
   RETURN json_build_object('success', true);
 END;

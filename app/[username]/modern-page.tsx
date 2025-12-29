@@ -104,6 +104,11 @@ interface ProfileData {
     social_onlyfans?: string;
     // Display preferences
     hide_streaming_stats?: boolean;
+    // Top Friends Customization
+    show_top_friends?: boolean;
+    top_friends_title?: string;
+    top_friends_avatar_style?: 'circle' | 'square';
+    top_friends_max_count?: number;
     // Private (only if owner)
     coin_balance?: number;
     earnings_balance?: number;
@@ -1100,8 +1105,8 @@ export default function ModernProfilePage() {
         {/* Tab Content - Render based on activeTab */}
         {activeTab === 'info' && (
           <>
-            {/* Referral Progress Module - Owner View Only */}
-            {isOwnProfile && (
+            {/* Referral Progress Module - Owner View Only - Check if referral_network is enabled */}
+            {isOwnProfile && isSectionEnabled('referral_network', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
               <div className="mb-4 sm:mb-6">
                 <ReferralProgressModule
                   cardStyle={cardStyle}
@@ -1120,6 +1125,10 @@ export default function ModernProfilePage() {
               cardStyle={cardStyle}
               borderRadiusClass={borderRadiusClass}
               accentColor={accentColor}
+              showTopFriends={profile.show_top_friends !== false}
+              topFriendsTitle={profile.top_friends_title || 'Top Friends'}
+              topFriendsAvatarStyle={profile.top_friends_avatar_style || 'square'}
+              topFriendsMaxCount={profile.top_friends_max_count || 8}
             />
 
             {/* Streamer schedule (real data, owner-only empty state) */}
@@ -1196,35 +1205,41 @@ export default function ModernProfilePage() {
               />
             )}
             
-            {/* Stats & Social Grid - Hide if hideStreamingStats is true */}
+            {/* Stats & Social Grid - Check if modules are enabled */}
             {!profile.hide_streaming_stats && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
-                <SocialCountsWidget
-                  followerCount={profileData.follower_count}
-                  followingCount={profileData.following_count}
-                  friendsCount={profileData.friends_count}
-                  onShowFollowers={() => setShowFollowersModal(true)}
-                  onShowFollowing={() => setShowFollowingModal(true)}
-                  onShowFriends={() => setShowFriendsModal(true)}
-                  cardStyle={cardStyle}
-                  borderRadiusClass={borderRadiusClass}
-                  accentColor={accentColor}
-                />
+                {isSectionEnabled('social_counts', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+                  <SocialCountsWidget
+                    followerCount={profileData.follower_count}
+                    followingCount={profileData.following_count}
+                    friendsCount={profileData.friends_count}
+                    onShowFollowers={() => setShowFollowersModal(true)}
+                    onShowFollowing={() => setShowFollowingModal(true)}
+                    onShowFriends={() => setShowFriendsModal(true)}
+                    cardStyle={cardStyle}
+                    borderRadiusClass={borderRadiusClass}
+                    accentColor={accentColor}
+                  />
+                )}
                 
-                <TopSupportersWidget
-                  supporters={profileData.top_supporters}
-                  cardStyle={cardStyle}
-                  borderRadiusClass={borderRadiusClass}
-                  accentColor={accentColor}
-                  gifterStatuses={profileData.gifter_statuses}
-                />
+                {isSectionEnabled('top_supporters', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+                  <TopSupportersWidget
+                    supporters={profileData.top_supporters}
+                    cardStyle={cardStyle}
+                    borderRadiusClass={borderRadiusClass}
+                    accentColor={accentColor}
+                    gifterStatuses={profileData.gifter_statuses}
+                  />
+                )}
                 
-                <TopStreamersWidget
-                  streamers={profileData.top_streamers}
-                  cardStyle={cardStyle}
-                  borderRadiusClass={borderRadiusClass}
-                  accentColor={accentColor}
-                />
+                {isSectionEnabled('top_streamers', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+                  <TopStreamersWidget
+                    streamers={profileData.top_streamers}
+                    cardStyle={cardStyle}
+                    borderRadiusClass={borderRadiusClass}
+                    accentColor={accentColor}
+                  />
+                )}
               </div>
             )}
             
@@ -1254,8 +1269,9 @@ export default function ModernProfilePage() {
               </div>
             )}
             
-            {/* Connections Section - Following, Followers, Friends */}
-            <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
+            {/* Connections Section - Following, Followers, Friends - Check if connections module is enabled */}
+            {isSectionEnabled('connections', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) && (
+              <div className={`${borderRadiusClass} overflow-hidden shadow-lg mb-4 sm:mb-6`} style={cardStyle}>
               {/* Header with Collapse Button */}
               <div className="p-4 sm:p-6 pb-0">
                 <button
@@ -1323,6 +1339,7 @@ export default function ModernProfilePage() {
                 </div>
               )}
             </div>
+            )}
             
             {/* Links Section */}
             {profileData.links.length > 0 && (
@@ -1345,8 +1362,8 @@ export default function ModernProfilePage() {
               accentColor={accentColor}
             />
             
-            {/* Stats Card - Hide if hideStreamingStats is true */}
-            {!profile.hide_streaming_stats && (
+            {/* Stats Card - Check if profile_stats or streaming_stats modules are enabled */}
+            {!profile.hide_streaming_stats && (isSectionEnabled('profile_stats', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) || isSectionEnabled('streaming_stats', profile.profile_type as ConfigProfileType, profile.enabled_modules as any)) && (
               <StatsCard
                 streamStats={profileData.stream_stats}
                 gifterLevel={profile.gifter_level}
