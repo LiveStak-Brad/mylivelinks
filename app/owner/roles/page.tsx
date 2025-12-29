@@ -97,17 +97,17 @@ export default function RolesPage() {
       <TableCell className="w-24">
         <span className="text-sm font-mono">{role.userCount}</span>
       </TableCell>
-      <TableCell width="w-32">
+      <TableCell className="w-32">
         <span className="text-sm text-muted-foreground">{role.permissions.length} permissions</span>
       </TableCell>
-      <TableCell width="w-32">
+      <TableCell className="w-32">
         {role.isSystem ? (
           <Badge variant="default">System</Badge>
         ) : (
           <Badge variant="secondary">Custom</Badge>
         )}
       </TableCell>
-      <TableCell width="w-16">
+      <TableCell className="w-16">
         <RowActions
           actions={[
             { label: 'View Details', icon: UserCog, onClick: () => setSelectedRole(role) },
