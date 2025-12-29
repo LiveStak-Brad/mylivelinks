@@ -50,6 +50,7 @@ export default function ReferralsPage() {
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [copied, setCopied] = useState(false);
   const [username, setUsername] = useState<string>('');
+  const [inviteUrl, setInviteUrl] = useState<string>('');
 
   useEffect(() => {
     loadReferralData();
@@ -88,6 +89,15 @@ export default function ReferralsPage() {
       const statsData = statsRes.ok ? await statsRes.json() : null;
       const rankData = rankRes.ok ? await rankRes.json() : null;
 
+      const apiInviteUrl = typeof codeData?.url === 'string' ? String(codeData.url).trim() : '';
+      if (apiInviteUrl) {
+        setInviteUrl(apiInviteUrl);
+      } else {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.mylivelinks.com';
+        const uname = typeof profile?.username === 'string' ? String(profile.username).trim() : '';
+        if (uname) setInviteUrl(`${origin}/invite/${encodeURIComponent(uname)}`);
+      }
+
       setStats({
         referralCode: codeData?.code || profile?.username || 'loading',
         clicks: statsData?.clicks || 0,
@@ -107,14 +117,21 @@ export default function ReferralsPage() {
         rank: null,
         totalReferrers: 0,
       });
+
+      if (!inviteUrl) {
+        const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.mylivelinks.com';
+        if (username) setInviteUrl(`${origin}/invite/${encodeURIComponent(username)}`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const getReferralUrl = () => {
-    if (!stats?.referralCode) return '';
-    return `https://www.mylivelinks.com/invite/${stats.referralCode}`;
+    if (inviteUrl) return inviteUrl;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.mylivelinks.com';
+    if (username) return `${origin}/invite/${encodeURIComponent(username)}`;
+    return '';
   };
 
   const handleCopyLink = () => {
