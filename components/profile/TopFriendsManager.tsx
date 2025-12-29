@@ -113,7 +113,11 @@ export default function TopFriendsManager({
 
     try {
       setSaving(true);
-      const nextPosition = topFriends.length + 1;
+      // Find the next available position (in case there are gaps)
+      const maxPosition = topFriends.length > 0 
+        ? Math.max(...topFriends.map(f => f.position))
+        : 0;
+      const nextPosition = maxPosition + 1;
 
       const response = await fetch('/api/profile/top-friends', {
         method: 'POST',
@@ -158,8 +162,9 @@ export default function TopFriendsManager({
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Reload top friends
+        // Reload and compact positions
         await loadTopFriends();
+        await compactPositions();
       } else {
         alert(data.error || 'Failed to remove friend');
       }
@@ -168,6 +173,43 @@ export default function TopFriendsManager({
       alert('Failed to remove friend');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Compact positions to remove gaps (1,2,4,5 becomes 1,2,3,4)
+  const compactPositions = async () => {
+    try {
+      // Reload to get current state
+      const response = await fetch(`/api/profile/top-friends?profileId=${profileId}`);
+      const data = await response.json();
+      
+      if (!response.ok) return;
+      
+      const friends = (data.topFriends || []) as TopFriend[];
+      if (friends.length === 0) return;
+      
+      // Sort by position and reassign sequential positions
+      const sorted = friends.sort((a, b) => a.position - b.position);
+      
+      for (let i = 0; i < sorted.length; i++) {
+        const expectedPosition = i + 1;
+        if (sorted[i].position !== expectedPosition) {
+          // Update position
+          await fetch('/api/profile/top-friends', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              friendId: sorted[i].friend_id,
+              position: expectedPosition,
+            }),
+          });
+        }
+      }
+      
+      // Final reload
+      await loadTopFriends();
+    } catch (error) {
+      console.error('[TOP_FRIENDS_MANAGER] Error compacting positions:', error);
     }
   };
 
