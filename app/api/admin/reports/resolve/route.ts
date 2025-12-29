@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     await requireAdmin(request);
 
     const body = await request.json().catch(() => null);
-    const reportId = body?.report_id;
+    const reportId = typeof body?.report_id === 'string' ? body.report_id : null;
     const resolution = body?.resolution;
     const note = body?.note ?? null;
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createRouteHandlerClient(request);
     const { error } = await supabase.rpc('admin_resolve_report', {
-      p_report_id: Number(reportId),
+      p_report_id: reportId,
       p_resolution: resolution,
       p_note: note,
     });

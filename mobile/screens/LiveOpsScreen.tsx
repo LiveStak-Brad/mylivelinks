@@ -31,35 +31,11 @@ export function LiveOpsScreen({ navigation }: Props) {
   const [showStatusModal, setShowStatusModal] = useState(false);
   
   // Detail sheet state
-  const [selectedStream, setSelectedStream] = useState<LiveStreamData | null>(null);
+  const [selectedStream, setSelectedStream] = useState<LiveOpsStreamData | null>(null);
   
   // Pagination
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetchAuthed('/api/admin/streams/live', { method: 'GET' });
-      if (!res.ok) {
-        throw new Error(res.message || `Failed to load streams (${res.status})`);
-      }
-      const data = (res.data?.streams || []) as LiveStreamData[];
-      setStreams(data);
-    } catch (e: any) {
-      console.error('Error fetching streams:', e);
-      // Use mock data for development
-      setStreams(generateMockStreams());
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchAuthed]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   // Apply filters
   useEffect(() => {
@@ -99,7 +75,7 @@ export function LiveOpsScreen({ navigation }: Props) {
     }
   };
 
-  const handleStreamPress = (stream: LiveStreamData) => {
+  const handleStreamPress = (stream: LiveOpsStreamData) => {
     setSelectedStream(stream);
   };
 
@@ -154,7 +130,7 @@ export function LiveOpsScreen({ navigation }: Props) {
           Showing {paginatedStreams.length} of {filteredStreams.length} streams
           {activeFiltersCount > 0 && ' (filtered)'}
         </Text>
-        <Pressable onPress={load} disabled={loading}>
+        <Pressable onPress={refetch} disabled={loading}>
           <Feather
             name="refresh-cw"
             size={18}
@@ -174,7 +150,7 @@ export function LiveOpsScreen({ navigation }: Props) {
         <View style={styles.center}>
           <Feather name="alert-circle" size={48} color={theme.colors.error} />
           <Text style={styles.errorText}>{error}</Text>
-          <Button title="Retry" onPress={() => void load()} />
+          <Button title="Retry" onPress={() => void refetch()} />
         </View>
       ) : filteredStreams.length === 0 ? (
         <View style={styles.center}>

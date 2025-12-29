@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { requireCanManageRoomRoles } from '@/lib/rbac';
 
 // DELETE /api/admin/roles/room/[roomId]/admin/[adminId] - Remove a room admin
 export async function DELETE(
@@ -7,20 +8,21 @@ export async function DELETE(
   { params }: { params: { roomId: string; adminId: string } }
 ) {
   try {
+    await requireCanManageRoomRoles({ request, roomId: params.roomId });
     const supabase = createRouteHandlerClient(request);
-
-    // Check auth
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
 
     const { roomId, adminId } = params;
 
-    // TODO: Implement actual role removal in database
-    console.log(`[Roles] Removing room admin ${adminId} from room ${roomId}`);
+    const { error } = await supabase.rpc('revoke_room_admin', {
+      p_room_id: roomId,
+      p_target_profile_id: adminId,
+    });
 
-    return NextResponse.json({ success: true, message: 'Room admin removed (stub)' });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
+    return NextResponse.json({ success: true });
   } catch (err) {
     console.error('[API /admin/roles/room/[roomId]/admin/[adminId]] Exception:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

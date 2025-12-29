@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     await requireAdmin(request);
 
     const body = await request.json().catch(() => null);
-    const applicationId = body?.application_id;
+    const applicationId = typeof body?.application_id === 'string' ? body.application_id : null;
     const decision = body?.decision;
     const note = body?.note ?? null;
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createRouteHandlerClient(request);
     const { error } = await supabase.rpc('admin_decide_application', {
-      p_application_id: Number(applicationId),
+      p_application_id: applicationId,
       p_decision: decision,
       p_note: note,
     });
