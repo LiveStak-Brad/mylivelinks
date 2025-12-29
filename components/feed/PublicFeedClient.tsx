@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, Upload, X, Globe, Users, Lock } from 'lucide-react';
+import { RefreshCw, Upload, X, Globe, Users, Lock, Heart } from 'lucide-react';
 import { Button, Card, Modal, Textarea } from '@/components/ui';
 import { FeedPostCard } from './FeedPostCard';
 import PostMedia from './PostMedia';
@@ -33,6 +33,8 @@ type FeedComment = {
   post_id: string;
   text_content: string;
   created_at: string;
+  like_count: number;
+  is_liked_by_current_user: boolean;
   author: FeedAuthor;
 };
 
@@ -83,6 +85,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
   const [commentsLoading, setCommentsLoading] = useState<Record<string, boolean>>({});
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({});
+  const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
 
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftTargetPost, setGiftTargetPost] = useState<FeedPost | null>(null);
@@ -353,6 +356,8 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
             post_id: String(created.post_id),
             text_content: String(created.text_content ?? ''),
             created_at: String(created.created_at),
+            like_count: 0,
+            is_liked_by_current_user: false,
             author: { id: '', username: 'You', avatar_url: null },
           };
           const next: FeedComment[] = [...existing, newComment];
@@ -369,6 +374,73 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
       setCommentSubmitting((prev) => ({ ...prev, [postId]: false }));
     }
   }, [commentDrafts]);
+
+  const toggleCommentLike = useCallback(async (commentId: string, postId: string) => {
+    if (!currentUserId) return;
+
+    const currentComments = commentsByPost[postId] || [];
+    const comment = currentComments.find((c) => c.id === commentId);
+    if (!comment) return;
+
+    const wasLiked = comment.is_liked_by_current_user;
+    const newLikedState = !wasLiked;
+
+    // Optimistic UI update
+    setCommentsByPost((prev) => {
+      const comments = prev[postId] || [];
+      const updated = comments.map((c) =>
+        c.id === commentId
+          ? {
+              ...c,
+              is_liked_by_current_user: newLikedState,
+              like_count: newLikedState ? c.like_count + 1 : Math.max(0, c.like_count - 1),
+            }
+          : c
+      );
+      return { ...prev, [postId]: updated };
+    });
+
+    // Call API
+    try {
+      const method = newLikedState ? 'POST' : 'DELETE';
+      const res = await fetch(`/api/comments/${encodeURIComponent(commentId)}/like`, {
+        method,
+      });
+
+      if (!res.ok) {
+        // Revert on error
+        setCommentsByPost((prev) => {
+          const comments = prev[postId] || [];
+          const reverted = comments.map((c) =>
+            c.id === commentId
+              ? {
+                  ...c,
+                  is_liked_by_current_user: wasLiked,
+                  like_count: wasLiked ? c.like_count + 1 : Math.max(0, c.like_count - 1),
+                }
+              : c
+          );
+          return { ...prev, [postId]: reverted };
+        });
+      }
+    } catch (err) {
+      console.error('Failed to toggle comment like:', err);
+      // Revert on error
+      setCommentsByPost((prev) => {
+        const comments = prev[postId] || [];
+        const reverted = comments.map((c) =>
+          c.id === commentId
+            ? {
+                ...c,
+                is_liked_by_current_user: wasLiked,
+                like_count: wasLiked ? c.like_count + 1 : Math.max(0, c.like_count - 1),
+              }
+            : c
+        );
+        return { ...prev, [postId]: reverted };
+      });
+    }
+  }, [commentsByPost, currentUserId]);
 
   const openGiftModal = useCallback((post: FeedPost) => {
     setGiftTargetPost(post);
@@ -584,20 +656,19 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                                 {/* Comment Actions */}
                                 <div className="flex items-center gap-3 px-3 mt-1">
                                   <button
-                                    className="text-xs font-semibold text-muted-foreground hover:text-foreground transition"
-                                    onClick={() => {
-                                      // TODO: Implement like comment
-                                    }}
+                                    className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition group"
+                                    onClick={() => void toggleCommentLike(c.id, post.id)}
                                   >
-                                    Like
-                                  </button>
-                                  <button
-                                    className="text-xs font-semibold text-muted-foreground hover:text-foreground transition"
-                                    onClick={() => {
-                                      // TODO: Implement reply to comment
-                                    }}
-                                  >
-                                    Reply
+                                    <Heart 
+                                      className={`w-3.5 h-3.5 transition ${
+                                        c.is_liked_by_current_user 
+                                          ? 'fill-primary text-primary' 
+                                          : 'group-hover:fill-primary/20'
+                                      }`}
+                                    />
+                                    <span className={c.is_liked_by_current_user ? 'text-primary' : ''}>
+                                      {c.like_count > 0 ? c.like_count : 'Like'}
+                                    </span>
                                   </button>
                                   <span className="text-xs text-muted-foreground">
                                     {formatDateTime(c.created_at)}

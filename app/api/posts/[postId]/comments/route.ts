@@ -9,10 +9,20 @@ export async function GET(request: NextRequest, context: { params: { postId: str
     const limit = Math.min(Math.max(parseInt(limitParam || '10', 10) || 10, 1), 50);
 
     const supabase = createAuthedRouteHandlerClient(request);
+    const user = await getSessionUser(request); // Get current user for like status
 
     const { data: comments, error } = await supabase
       .from('post_comments')
-      .select('id, post_id, author_id, text_content, created_at, profiles:author_id(id, username, avatar_url)')
+      .select(`
+        id, 
+        post_id, 
+        author_id, 
+        text_content, 
+        created_at, 
+        like_count,
+        profiles:author_id(id, username, avatar_url),
+        comment_likes!left(profile_id)
+      `)
       .eq('post_id', postId)
       .order('created_at', { ascending: true })
       .limit(limit);
@@ -26,6 +36,8 @@ export async function GET(request: NextRequest, context: { params: { postId: str
       post_id: String(c.post_id),
       text_content: String(c.text_content ?? ''),
       created_at: String(c.created_at),
+      like_count: Number(c.like_count || 0),
+      is_liked_by_current_user: user ? c.comment_likes.some((l: any) => l.profile_id === user.id) : false,
       author: {
         id: String(c.profiles?.id ?? c.author_id),
         username: String(c.profiles?.username ?? ''),
