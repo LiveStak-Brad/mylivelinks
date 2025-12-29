@@ -20,21 +20,46 @@ export async function GET(request: NextRequest) {
 
     const admin = getSupabaseAdmin();
 
-    let query = admin
-      .from('profiles')
-      .select('*, live_access_grants(profile_id)')
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const applySearch = (query: any) => {
+      if (q) {
+        const escaped = q.replace(/,/g, '');
+        return query.or(`username.ilike.%${escaped}%,display_name.ilike.%${escaped}%`);
+      }
+      return query;
+    };
 
-    if (q) {
-      const escaped = q.replace(/,/g, '');
-      query = query.or(`username.ilike.%${escaped}%,display_name.ilike.%${escaped}%`);
+    const queryWithLiveAccess = applySearch(
+      admin
+        .from('profiles')
+        .select('*, live_access_grants(profile_id)')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+    );
+
+    const { data: data1, error: err1 } = await queryWithLiveAccess;
+
+    if (!err1) {
+      return NextResponse.json({ users: data1 ?? [], limit, offset });
     }
 
-    const { data, error } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const msg = String(err1.message || '').toLowerCase();
+    const canFallback = msg.includes('live_access_grants') || msg.includes('relationship') || msg.includes('schema cache');
+    if (!canFallback) {
+      return NextResponse.json({ error: err1.message }, { status: 500 });
+    }
 
-    return NextResponse.json({ users: data ?? [], limit, offset });
+    const queryFallback = applySearch(
+      admin
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+    );
+
+    const { data: data2, error: err2 } = await queryFallback;
+    if (err2) return NextResponse.json({ error: err2.message }, { status: 500 });
+
+    return NextResponse.json({ users: data2 ?? [], limit, offset });
   } catch (err) {
     return authErrorToResponse(err);
   }
