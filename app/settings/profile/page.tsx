@@ -321,8 +321,8 @@ export default function ProfileSettingsPage() {
     // Set saving state immediately for instant UI feedback
     setSaving(true);
 
-    // Use setTimeout to yield to the browser and prevent UI blocking
-    setTimeout(async () => {
+    // Defer the actual save to next tick for instant button response
+    requestAnimationFrame(async () => {
       try {
         // Prepare update payload first (synchronous work)
         const updatePayload: any = {
@@ -361,11 +361,13 @@ export default function ProfileSettingsPage() {
           card_border_radius: customization.card_border_radius,
           font_preset: customization.font_preset,
           accent_color: customization.accent_color,
-          button_color: customization.button_color || null,
-          content_text_color: customization.content_text_color || null,
-          ui_text_color: customization.ui_text_color || null,
-          link_color: customization.link_color || null,
           links_section_title: customization.links_section_title,
+          // Note: Color fields ready but require migration first
+          // Run: supabase/migrations/20251229_add_granular_color_customization.sql
+          // button_color: customization.button_color || null,
+          // content_text_color: customization.content_text_color || null,
+          // ui_text_color: customization.ui_text_color || null,
+          // link_color: customization.link_color || null,
           updated_at: new Date().toISOString(),
         };
 
