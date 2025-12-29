@@ -82,7 +82,7 @@ export default function RolesPage() {
 
   const renderRow = (role: Role) => (
     <>
-      <TableCell className="flex-1">
+      <td className="px-4 py-3">
         <div>
           <div className="flex items-center gap-2">
             <span className="font-medium text-foreground">{role.name}</span>
@@ -92,21 +92,21 @@ export default function RolesPage() {
           </div>
           <span className="text-sm text-muted-foreground">{role.description}</span>
         </div>
-      </TableCell>
-      <TableCell className="w-24">
+      </td>
+      <td className="px-4 py-3 text-center">
         <span className="text-sm font-mono">{role.userCount}</span>
-      </TableCell>
-      <TableCell className="w-32">
+      </td>
+      <td className="px-4 py-3">
         <span className="text-sm text-muted-foreground">{role.permissions.length} permissions</span>
-      </TableCell>
-      <TableCell className="w-32">
+      </td>
+      <td className="px-4 py-3 text-center">
         {role.isSystem ? (
           <Badge variant="default">System</Badge>
         ) : (
-          <Badge variant="secondary">Custom</Badge>
+          <Badge variant="info">Custom</Badge>
         )}
-      </TableCell>
-      <TableCell className="w-16">
+      </td>
+      <td className="px-4 py-3 text-center">
         <RowActions
           actions={[
             { label: 'View Details', icon: UserCog, onClick: () => setSelectedRole(role) },
@@ -114,7 +114,7 @@ export default function RolesPage() {
             { label: 'Delete Role', icon: Trash2, onClick: () => {}, disabled: role.isSystem || role.userCount > 0, tooltip: role.isSystem ? 'System roles cannot be deleted' : role.userCount > 0 ? 'Role has assigned users' : undefined },
           ]}
         />
-      </TableCell>
+      </td>
     </>
   );
 
