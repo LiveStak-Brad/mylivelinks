@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { OwnerPanelShell } from '@/components/owner/OwnerPanelShell';
 import Card from '@/components/owner/ui-kit/Card';
 import {
@@ -92,14 +92,90 @@ const MOCK_FEATURE_FLAGS: FeatureFlag[] = [
   },
 ];
 
+type FeatureFlagsApiFlag = {
+  key: string;
+  enabled: boolean;
+  description?: string | null;
+  updated_at?: string | null;
+};
+
+function titleFromKey(key: string) {
+  return key
+    .replace(/[_-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function categoryFromKey(key: string): FeatureFlag['category'] {
+  const k = key.toLowerCase();
+  if (k.includes('payout') || k.includes('gift') || k.includes('coin') || k.includes('diamond')) return 'monetization';
+  if (k.includes('chat') || k.includes('dm') || k.includes('message') || k.includes('social')) return 'social';
+  return 'core';
+}
+
+function iconFromKey(key: string): FeatureFlag['icon'] {
+  const k = key.toLowerCase();
+  if (k.includes('live') || k.includes('stream')) return Radio;
+  if (k.includes('gift')) return Gift;
+  if (k.includes('chat') || k.includes('message')) return MessageSquare;
+  if (k.includes('battle')) return Swords;
+  if (k.includes('payout') || k.includes('cashout')) return DollarSign;
+  return User;
+}
+
 // ============================================================================
 // Component
 // ============================================================================
 
 export default function FeatureFlagsPage() {
-  const [flags, setFlags] = useState<FeatureFlag[]>(MOCK_FEATURE_FLAGS);
-  const [loading, setLoading] = useState(false);
+  const [flags, setFlags] = useState<FeatureFlag[]>([]);
+  const [loading, setLoading] = useState(true);
   const [confirmingToggle, setConfirmingToggle] = useState<string | null>(null);
+
+  const loadFlags = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/owner/feature-flags', {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to load feature flags (${res.status})`);
+      }
+
+      const json = (await res.json()) as { ok: boolean; flags?: FeatureFlagsApiFlag[] };
+      if (!json.ok) {
+        throw new Error('Failed to load feature flags');
+      }
+
+      const apiFlags = Array.isArray(json.flags) ? json.flags : [];
+      const mapped: FeatureFlag[] = apiFlags.map((f) => ({
+        id: f.key,
+        name: titleFromKey(f.key),
+        description: typeof f.description === 'string' && f.description.trim() ? f.description : titleFromKey(f.key),
+        icon: iconFromKey(f.key),
+        enabled: f.enabled === true,
+        lastChangedBy: null,
+        lastChangedAt: f.updated_at ?? null,
+        category: categoryFromKey(f.key),
+      }));
+
+      setFlags(mapped);
+    } catch (e) {
+      console.error('[Owner Feature Flags] load failed:', e);
+      setFlags(MOCK_FEATURE_FLAGS);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadFlags();
+  }, []);
 
   // ============================================================================
   // Handlers
@@ -118,20 +194,68 @@ export default function FeatureFlagsPage() {
   };
 
   const toggleFlag = (id: string) => {
-    // TODO: Wire to API
+    const current = flags.find((f) => f.id === id);
+    if (!current) return;
+    const nextEnabled = !current.enabled;
+
     setFlags((prev) =>
       prev.map((flag) =>
         flag.id === id
           ? {
               ...flag,
-              enabled: !flag.enabled,
-              lastChangedBy: 'owner@mylivelinks.com',
+              enabled: nextEnabled,
               lastChangedAt: new Date().toISOString(),
             }
           : flag
       )
     );
+
     setConfirmingToggle(null);
+
+    void (async () => {
+      try {
+        const res = await fetch('/api/owner/feature-flags', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: id, enabled: nextEnabled }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to update flag (${res.status})`);
+        }
+
+        const json = (await res.json()) as { ok: boolean; flag?: FeatureFlagsApiFlag };
+        if (!json.ok) {
+          throw new Error('Failed to update flag');
+        }
+
+        const updatedAt = json.flag?.updated_at ?? new Date().toISOString();
+        setFlags((prev) =>
+          prev.map((flag) =>
+            flag.id === id
+              ? {
+                  ...flag,
+                  enabled: nextEnabled,
+                  lastChangedAt: updatedAt,
+                }
+              : flag
+          )
+        );
+      } catch (e) {
+        console.error('[Owner Feature Flags] update failed:', e);
+        setFlags((prev) =>
+          prev.map((flag) =>
+            flag.id === id
+              ? {
+                  ...flag,
+                  enabled: current.enabled,
+                }
+              : flag
+          )
+        );
+      }
+    })();
   };
 
   const cancelToggle = () => {
