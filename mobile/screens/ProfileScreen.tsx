@@ -1677,7 +1677,18 @@ export function ProfileScreen({
 
                     {!!business?.website_url?.trim() && (
                       <Pressable
-                        onPress={() => (isOwnProfile ? openBusinessModal() : Linking.openURL(business.website_url!))}
+                        onPress={() => {
+                          if (isOwnProfile) {
+                            openBusinessModal();
+                          } else {
+                            try {
+                              void Linking.openURL(business.website_url!);
+                            } catch (err) {
+                              console.error('[ProfileScreen] Failed to open website:', err);
+                              Alert.alert('Error', 'Could not open website link');
+                            }
+                          }
+                        }}
                         style={styles.businessLineRow}
                       >
                         <Ionicons name="globe-outline" size={18} color={theme.colors.textMuted} />
@@ -1689,9 +1700,18 @@ export function ProfileScreen({
 
                     {!!business?.contact_email?.trim() && (
                       <Pressable
-                        onPress={() =>
-                          isOwnProfile ? openBusinessModal() : Linking.openURL(`mailto:${business.contact_email}`)
-                        }
+                        onPress={() => {
+                          if (isOwnProfile) {
+                            openBusinessModal();
+                          } else {
+                            try {
+                              void Linking.openURL(`mailto:${business.contact_email}`);
+                            } catch (err) {
+                              console.error('[ProfileScreen] Failed to open email:', err);
+                              Alert.alert('Error', 'Could not open email client');
+                            }
+                          }
+                        }}
                         style={styles.businessLineRow}
                       >
                         <Ionicons name="mail-outline" size={18} color={theme.colors.textMuted} />
@@ -1703,9 +1723,18 @@ export function ProfileScreen({
 
                     {!!business?.contact_phone?.trim() && (
                       <Pressable
-                        onPress={() =>
-                          isOwnProfile ? openBusinessModal() : Linking.openURL(`tel:${business.contact_phone}`)
-                        }
+                        onPress={() => {
+                          if (isOwnProfile) {
+                            openBusinessModal();
+                          } else {
+                            try {
+                              void Linking.openURL(`tel:${business.contact_phone}`);
+                            } catch (err) {
+                              console.error('[ProfileScreen] Failed to open phone:', err);
+                              Alert.alert('Error', 'Could not open phone dialer');
+                            }
+                          }
+                        }}
                         style={styles.businessLineRow}
                       >
                         <Ionicons name="call-outline" size={18} color={theme.colors.textMuted} />
@@ -1845,7 +1874,14 @@ export function ProfileScreen({
                 onPlay={(it) => {
                   const t = musicTracks.find((x) => x.id === it.id);
                   const url = t?.audio_url;
-                  if (url) void Linking.openURL(url);
+                  if (url) {
+                    try {
+                      void Linking.openURL(url);
+                    } catch (err) {
+                      console.error('[ProfileScreen] Failed to open audio:', err);
+                      Alert.alert('Error', 'Could not open audio link');
+                    }
+                  }
                 }}
                 cardOpacity={cardOpacity}
               />
@@ -1880,7 +1916,14 @@ export function ProfileScreen({
                   ]);
                 }}
                 onGetTickets={(it) => {
-                  if (it.ticket_link) void Linking.openURL(it.ticket_link);
+                  if (it.ticket_link) {
+                    try {
+                      void Linking.openURL(it.ticket_link);
+                    } catch (err) {
+                      console.error('[ProfileScreen] Failed to open ticket link:', err);
+                      Alert.alert('Error', 'Could not open ticket link');
+                    }
+                  }
                 }}
                 cardOpacity={cardOpacity}
               />
@@ -1953,7 +1996,12 @@ export function ProfileScreen({
                 onOpen={(it) => {
                   const url = String(it.media_url ?? '').trim();
                   if (!url) return;
-                  void Linking.openURL(url);
+                  try {
+                    void Linking.openURL(url);
+                  } catch (err) {
+                    console.error('[ProfileScreen] Failed to open portfolio link:', err);
+                    Alert.alert('Error', 'Could not open portfolio link');
+                  }
                 }}
                 cardOpacity={cardOpacity}
               />
@@ -2432,7 +2480,14 @@ export function ProfileScreen({
               <Pressable 
                 key={link.id} 
                 style={styles.linkItem}
-                onPress={() => Linking.openURL(link.url)}
+                onPress={() => {
+                  try {
+                    void Linking.openURL(link.url);
+                  } catch (err) {
+                    console.error('[ProfileScreen] Failed to open link:', err);
+                    Alert.alert('Error', 'Could not open link');
+                  }
+                }}
               >
               <View style={styles.linkIcon}>
                 <Ionicons name="link" size={20} color={accentColor} />

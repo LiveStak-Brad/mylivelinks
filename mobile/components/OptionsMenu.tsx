@@ -124,8 +124,13 @@ export function OptionsMenu({
   };
 
   const navigateRoot = (routeName: string, params?: any) => {
-    assertRouteExists(navigation, routeName);
-    navigation.getParent?.()?.navigate?.(routeName, params);
+    try {
+      assertRouteExists(navigation, routeName);
+      navigation.getParent?.()?.navigate?.(routeName, params);
+    } catch (err: any) {
+      console.error('[OptionsMenu] Navigation error:', err);
+      Alert.alert('Navigation Error', `Could not navigate to ${routeName}`);
+    }
   };
 
   const navigateToProfile = (username?: string | null) => {

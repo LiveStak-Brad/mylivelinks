@@ -33,6 +33,7 @@ interface ChatOverlayProps {
 export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) => {
   const { messages, loading, sendMessage } = useChatMessages();
   const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   
   const translateY = useSharedValue(0);
@@ -68,11 +69,18 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) =>
   if (!visible) return null;
 
   const handleSend = async () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || sending) return;
     
-    const success = await sendMessage(inputText.trim());
-    if (success) {
-      setInputText('');
+    setSending(true);
+    try {
+      const success = await sendMessage(inputText.trim());
+      if (success) {
+        setInputText('');
+      }
+    } catch (err) {
+      console.error('[ChatOverlay] Send failed:', err);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -126,12 +134,12 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({ visible, onClose }) =>
                 placeholderTextColor="#888"
                 returnKeyType="send"
                 onSubmitEditing={handleSend}
-                editable={!loading}
+                editable={!loading && !sending}
               />
               <TouchableOpacity 
-                style={[styles.sendButton, (!inputText.trim() || loading) && styles.sendButtonDisabled]} 
+                style={[styles.sendButton, (!inputText.trim() || loading || sending) && styles.sendButtonDisabled]} 
                 onPress={handleSend} 
-                disabled={!inputText.trim() || loading}
+                disabled={!inputText.trim() || loading || sending}
               >
                 <Text style={styles.sendButtonText}>Send</Text>
               </TouchableOpacity>

@@ -83,8 +83,12 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
                         key={p.identity}
                         style={[styles.row, selected && styles.rowSelected]}
                         onPress={() => {
-                          onSelectRecipientId(p.identity);
-                          onClose();
+                          try {
+                            onSelectRecipientId(p.identity);
+                            onClose();
+                          } catch (err) {
+                            console.error('[GiftOverlay] Selection error:', err);
+                          }
                         }}
                       >
                         <Text style={styles.rowText}>{p.username || p.identity}</Text>

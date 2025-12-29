@@ -316,15 +316,19 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
   }, [openOverlay]);
 
   const handlePiPPress = useCallback(() => {
-    if (state.focusedIdentity) {
-      setFocusedIdentity(null);
-      return;
+    try {
+      if (state.focusedIdentity) {
+        setFocusedIdentity(null);
+        return;
+      }
+      if (participants.length > 0) {
+        setFocusedIdentity(participants[0].identity);
+        return;
+      }
+      Alert.alert('Coming soon', 'Picture-in-Picture mode will be available in a future update.');
+    } catch (err: any) {
+      if (DEBUG) console.error('[PiP] Error:', err);
     }
-    if (participants.length > 0) {
-      setFocusedIdentity(participants[0].identity);
-      return;
-    }
-    Alert.alert('PiP', 'PiP coming soon');
   }, [participants, setFocusedIdentity, state.focusedIdentity]);
 
   const handleSharePress = useCallback(async () => {
