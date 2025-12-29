@@ -26,6 +26,7 @@ import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
 import { useOrientation } from '@/hooks/useOrientation';
 import MobileWebWatchLayout from './mobile/MobileWebWatchLayout';
 import RotatePhoneOverlay from './mobile/RotatePhoneOverlay';
+import RoomBanner from './RoomBanner';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 
@@ -2699,13 +2700,17 @@ export default function LiveRoom() {
         </div>
       )}
       
-      {/* Beta/Testing Banner */}
-      <div className="bg-yellow-500 text-black text-center py-2 px-4 text-sm font-semibold z-50 flex-shrink-0">
-        <span className="inline-block">BETA/TESTING - NO CASH VALUE</span>
-      </div>
+      {/* Room Banner */}
+      <RoomBanner
+        roomKey="live-central"
+        roomName="Live Central"
+        roomLogoUrl="/livecentral.png"
+        presentedBy="MyLiveLinks Official"
+        bannerStyle="default"
+      />
       
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-50 relative pb-2 lg:pb-8">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-50 relative pb-1 lg:pb-4">
         <div className="w-full px-1 md:px-3 lg:px-6 flex items-center justify-between relative min-h-[56px] md:min-h-[70px] lg:min-h-[100px] xl:min-h-[120px]">
           {/* Left Section - Apply for a Room */}
           <div className="flex items-center flex-shrink-0 z-10">
