@@ -59,7 +59,26 @@ export async function GET(request: NextRequest) {
     const { data: data2, error: err2 } = await queryFallback;
     if (err2) return NextResponse.json({ error: err2.message }, { status: 500 });
 
-    return NextResponse.json({ users: data2 ?? [], limit, offset });
+    const users = (data2 ?? []) as any[];
+    const ids = users.map((u) => u?.id).filter((id) => typeof id === 'string');
+
+    if (ids.length > 0) {
+      const { data: grants, error: grantsError } = await admin
+        .from('live_access_grants')
+        .select('profile_id')
+        .in('profile_id', ids);
+
+      if (!grantsError) {
+        const enabled = new Set((grants ?? []).map((g: any) => g?.profile_id).filter((x) => typeof x === 'string'));
+        for (const u of users) {
+          const id = u?.id;
+          if (typeof id !== 'string') continue;
+          u.live_access_grants = enabled.has(id) ? [{ profile_id: id }] : [];
+        }
+      }
+    }
+
+    return NextResponse.json({ users, limit, offset });
   } catch (err) {
     return authErrorToResponse(err);
   }
