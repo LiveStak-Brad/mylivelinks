@@ -6,6 +6,7 @@ import { createRouteHandlerClient } from '@/lib/supabase-server';
  * Get top friends for a profile
  */
 export async function GET(request: NextRequest) {
+  const response = NextResponse.next();
   try {
     const { searchParams } = new URL(request.url);
     const profileId = searchParams.get('profileId');
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createRouteHandlerClient(request);
+    const supabase = createRouteHandlerClient(request, response);
 
     console.log('[TOP_FRIENDS] Fetching for profile:', profileId);
 
@@ -51,8 +52,9 @@ export async function GET(request: NextRequest) {
  * Body: { friendId: string, position: number }
  */
 export async function POST(request: NextRequest) {
+  const response = NextResponse.next();
   try {
-    const supabase = createRouteHandlerClient(request);
+    const supabase = createRouteHandlerClient(request, response);
 
     // Check authentication
     const {
@@ -125,8 +127,9 @@ export async function POST(request: NextRequest) {
  * Remove a top friend
  */
 export async function DELETE(request: NextRequest) {
+  const response = NextResponse.next();
   try {
-    const supabase = createRouteHandlerClient(request);
+    const supabase = createRouteHandlerClient(request, response);
 
     // Check authentication
     const {
@@ -186,8 +189,9 @@ export async function DELETE(request: NextRequest) {
  * Body: { friendId: string, newPosition: number }
  */
 export async function PATCH(request: NextRequest) {
+  const response = NextResponse.next();
   try {
-    const supabase = createRouteHandlerClient(request);
+    const supabase = createRouteHandlerClient(request, response);
 
     // Check authentication
     const {
