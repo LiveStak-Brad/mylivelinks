@@ -221,6 +221,7 @@ export default function TopFriendsManager({
   };
 
   const reorderFriend = async (friendId: string, newPosition: number) => {
+    console.log('[TOP_FRIENDS_MANAGER] Reordering friend:', friendId, 'to position:', newPosition);
     try {
       const response = await fetch('/api/profile/top-friends', {
         method: 'PATCH',
@@ -229,11 +230,13 @@ export default function TopFriendsManager({
       });
 
       const data = await response.json();
+      console.log('[TOP_FRIENDS_MANAGER] Reorder response:', response.status, data);
 
       if (response.ok && data.success) {
         // Reload top friends
         await loadTopFriends();
       } else {
+        console.error('[TOP_FRIENDS_MANAGER] Reorder failed:', data);
         alert(data.error || 'Failed to reorder friend');
       }
     } catch (error) {
@@ -243,6 +246,7 @@ export default function TopFriendsManager({
   };
 
   const handleDragStart = (index: number) => {
+    console.log('[TOP_FRIENDS_MANAGER] Drag started from index:', index);
     setDraggedIndex(index);
   };
 
@@ -252,14 +256,19 @@ export default function TopFriendsManager({
 
   const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
+    
+    console.log('[TOP_FRIENDS_MANAGER] Dropped at index:', dropIndex, 'from index:', draggedIndex);
 
     if (draggedIndex === null || draggedIndex === dropIndex) {
+      console.log('[TOP_FRIENDS_MANAGER] Ignoring drop - same position or null');
       setDraggedIndex(null);
       return;
     }
 
     const draggedFriend = topFriends[draggedIndex];
     const newPosition = dropIndex + 1;
+    
+    console.log('[TOP_FRIENDS_MANAGER] Moving friend:', draggedFriend.username, 'from position:', draggedFriend.position, 'to position:', newPosition);
 
     await reorderFriend(draggedFriend.friend_id, newPosition);
     setDraggedIndex(null);
