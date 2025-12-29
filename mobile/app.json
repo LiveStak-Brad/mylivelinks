@@ -50,7 +50,8 @@
           "backgroundColor": "#000000",
           "imageWidth": 200
         }
-      ]
+      ],
+      "./plugins/withNoApsEnvironment"
     ],
     "extra": {
       "EXPO_PUBLIC_SUPABASE_URL": "https://dfiyrmqobjfsdsgklweg.supabase.co",
