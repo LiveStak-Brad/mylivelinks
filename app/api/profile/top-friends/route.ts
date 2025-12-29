@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@/lib/supabase-server';
 
 /**
  * GET /api/profile/top-friends?profileId=xxx
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createClient();
+    const supabase = createRouteHandlerClient(request);
 
     // Call RPC function to get top friends with full profile data
     const { data, error } = await supabase.rpc('get_top_friends', {
@@ -49,19 +49,25 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = createRouteHandlerClient(request);
 
     // Check authentication
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
 
+    console.log('[TOP_FRIENDS] Auth check:', { user: user?.id, authError });
+
     if (!user) {
+      console.error('[TOP_FRIENDS] No authenticated user');
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
     const body = await request.json();
     const { friendId, position } = body;
+    
+    console.log('[TOP_FRIENDS] Adding friend:', { userId: user.id, friendId, position });
 
     if (!friendId || typeof position !== 'number') {
       return NextResponse.json(
@@ -117,7 +123,7 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = createRouteHandlerClient(request);
 
     // Check authentication
     const {
@@ -178,7 +184,7 @@ export async function DELETE(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = createRouteHandlerClient(request);
 
     // Check authentication
     const {
