@@ -808,23 +808,21 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       <button
         onClick={handleGoLive}
         disabled={loading}
-        className={`group relative p-2 md:p-2.5 lg:p-3 xl:p-3.5 rounded-lg transition-all duration-200 font-semibold shadow-md hover:shadow-lg ${
-          isLive
-            ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white hover:from-red-600 hover:to-pink-700'
-            : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
-        } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
+          loading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110'
+        }`}
         title={loading ? 'Loading...' : isLive && (isPublishing || isPublishingState) && isScreenSharing ? 'Screen Live' : isLive && (isPublishing || isPublishingState) ? 'Live' : isLive ? 'Stop Live' : 'Go Live'}
       >
         {loading ? (
-          <div className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          <div className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 animate-spin rounded-full border-3 border-pink-500 border-t-transparent" />
         ) : isLive && (isPublishing || isPublishingState) ? (
-          <Video className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-white" />
+          <Video className={`w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 ${isScreenSharing ? 'text-blue-500' : 'text-red-500'}`} strokeWidth={2} />
         ) : isLive ? (
-          <VideoOff className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-white" />
+          <VideoOff className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-pink-500" strokeWidth={2} />
         ) : (
-          <Video className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-white" />
+          <Video className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-pink-500" strokeWidth={2} />
         )}
-        {error && <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span></span>}
+        {error && <span className="absolute top-0 right-0 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span></span>}
         
         {/* Hover tooltip for desktop */}
         <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">

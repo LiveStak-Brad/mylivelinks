@@ -2719,17 +2719,15 @@ export default function LiveRoom() {
           </div>
 
           {/* Sort Buttons Group - Positioned halfway between Apply and Logo */}
-          <div className="flex items-center gap-1 md:gap-1.5 lg:gap-2 flex-shrink-0 z-10 absolute left-[22%] md:left-[25%] transform -translate-x-1/2">
+          <div className="flex items-center gap-2 md:gap-3 lg:gap-4 flex-shrink-0 z-10 absolute left-[22%] md:left-[25%] transform -translate-x-1/2">
             <button
               onClick={handleRandomize}
-              className={`group relative p-2 md:p-2.5 lg:p-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
-                sortMode === 'random'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white opacity-70 hover:opacity-100'
+              className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
+                sortMode === 'random' ? 'scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'
               }`}
               title="Randomize"
             >
-              <Shuffle className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
+              <Shuffle className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 🎲 Randomize
               </span>
@@ -2737,14 +2735,12 @@ export default function LiveRoom() {
             
             <button
               onClick={() => handleSortModeChange('most_viewed')}
-              className={`group relative p-2 md:p-2.5 lg:p-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
-                sortMode === 'most_viewed'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white opacity-70 hover:opacity-100'
+              className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
+                sortMode === 'most_viewed' ? 'scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'
               }`}
               title="Most Viewed"
             >
-              <Eye className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
+              <Eye className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 👁️ Most Viewed
               </span>
@@ -2752,14 +2748,12 @@ export default function LiveRoom() {
             
             <button
               onClick={() => handleSortModeChange('most_gifted')}
-              className={`group relative p-2 md:p-2.5 lg:p-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
-                sortMode === 'most_gifted'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white opacity-70 hover:opacity-100'
+              className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
+                sortMode === 'most_gifted' ? 'scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'
               }`}
               title="Most Gifted"
             >
-              <GiftIcon className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
+              <GiftIcon className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 🎁 Most Gifted
               </span>
@@ -2767,14 +2761,12 @@ export default function LiveRoom() {
             
             <button
               onClick={() => handleSortModeChange('newest')}
-              className={`group relative p-2 md:p-2.5 lg:p-3 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg ${
-                sortMode === 'newest'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                  : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white opacity-70 hover:opacity-100'
+              className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
+                sortMode === 'newest' ? 'scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'
               }`}
               title="Newest"
             >
-              <Sparkles className="w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6" />
+              <Sparkles className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 🆕 Newest
               </span>
@@ -2796,7 +2788,7 @@ export default function LiveRoom() {
           </div>
 
           {/* Right Section - Go Live, Unmute All, Focus Mode, Options and Login grouped together */}
-          <div className="flex items-center gap-1 md:gap-1.5 lg:gap-2 flex-shrink-0 z-10">
+          <div className="flex items-center gap-2 md:gap-3 lg:gap-4 flex-shrink-0 z-10">
             <GoLiveButton 
               sharedRoom={sharedRoom} 
               isRoomConnected={isRoomConnected} 
@@ -2806,20 +2798,20 @@ export default function LiveRoom() {
             />
             <button
               onClick={handleUnmuteAll}
-              className="group relative p-2 md:p-2.5 lg:p-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all duration-200 shadow-md hover:shadow-lg"
+              className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
               title="Unmute all tiles to enable sound"
             >
-              <Volume2 className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7" />
+              <Volume2 className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-gray-700 dark:text-white" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 🔊 Unmute All
               </span>
             </button>
             <button
               onClick={toggleFocusMode}
-              className="group relative p-2 md:p-2.5 lg:p-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 shadow-md hover:shadow-lg"
+              className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
               title={uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}
             >
-              <Focus className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7" />
+              <Focus className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-gray-700 dark:text-white" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 {uiPanels.focusMode ? '📺 Show UI' : '🎯 Focus Mode'}
               </span>
