@@ -76,6 +76,7 @@ export default function Tile({
   const [isVisible, setIsVisible] = useState(true);
   const [isActive, setIsActive] = useState(true);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9); // Track video orientation
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
