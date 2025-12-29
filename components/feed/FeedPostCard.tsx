@@ -61,6 +61,8 @@ export interface FeedPostCardProps {
   onClipAction?: (action: 'post' | 'save' | 'post-save' | 'composer') => void;
   /** Additional className */
   className?: string;
+  /** Inline styles */
+  style?: React.CSSProperties;
 }
 
 /* -----------------------------------------------------------------------------
@@ -184,11 +186,12 @@ const FeedPostCard = memo(function FeedPostCard({
   onProfileClick,
   onClipAction,
   className = '',
+  style,
 }: FeedPostCardProps) {
   const formattedTimestamp = formatTimestamp(timestamp);
   
   return (
-    <Card className={`overflow-hidden ${className}`}>
+    <Card className={`overflow-hidden ${className}`} style={style}>
       {/* Header - New Format: Avatar + Username + Date/Time */}
       <div className="flex items-start gap-3 p-4 pb-2">
         <div 
