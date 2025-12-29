@@ -455,10 +455,11 @@ export async function GET(request: NextRequest) {
     
     // Load gifter status
     try {
+      const cookies = await cookieStore.getAll();
       const statusRes = await fetch(
         `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/gifter-status/me`,
         {
-          headers: { cookie: cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ') },
+          headers: { cookie: cookies.map(c => `${c.name}=${c.value}`).join('; ') },
           cache: 'no-store',
         }
       );
