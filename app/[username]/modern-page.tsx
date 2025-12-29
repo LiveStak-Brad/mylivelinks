@@ -280,7 +280,10 @@ export default function ModernProfilePage() {
       console.log('[PROFILE] Loaded:', {
         username: profileData.profile.username,
         relationship: profileData.relationship,
-        isOwnProfile: user?.id === profileData.profile.id
+        isOwnProfile: user?.id === profileData.profile.id,
+        profile_type: profileData.profile.profile_type,
+        enabled_modules: profileData.profile.enabled_modules,
+        enabled_tabs: profileData.profile.enabled_tabs
       });
 
       const cleanedProfileData = {
