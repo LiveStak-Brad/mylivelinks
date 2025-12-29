@@ -2714,7 +2714,7 @@ export default function LiveRoom() {
               className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
               title="Apply for a Room"
             >
-              <FileText className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
+              <FileText className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-blue-500 dark:text-blue-400" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 Apply for a Room
               </span>
@@ -2730,7 +2730,7 @@ export default function LiveRoom() {
               }`}
               title="Randomize"
             >
-              <Shuffle className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
+              <Shuffle className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-purple-500 dark:text-purple-400" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 Randomize
               </span>
@@ -2743,7 +2743,7 @@ export default function LiveRoom() {
               }`}
               title="Most Viewed"
             >
-              <Eye className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
+              <Eye className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-cyan-500 dark:text-cyan-400" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 Most Viewed
               </span>
@@ -2756,7 +2756,7 @@ export default function LiveRoom() {
               }`}
               title="Most Gifted"
             >
-              <GiftIcon className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
+              <GiftIcon className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-pink-500 dark:text-pink-400" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 Most Gifted
               </span>
@@ -2769,7 +2769,7 @@ export default function LiveRoom() {
               }`}
               title="Newest"
             >
-              <Sparkles className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-gray-700 dark:text-white" strokeWidth={2} />
+              <Sparkles className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-yellow-500 dark:text-yellow-400" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 Newest
               </span>
@@ -2804,7 +2804,7 @@ export default function LiveRoom() {
               className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
               title="Unmute all tiles to enable sound"
             >
-              <Volume2 className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-gray-700 dark:text-white" strokeWidth={2} />
+              <Volume2 className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-green-500 dark:text-green-400" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 Unmute All
               </span>
@@ -2814,7 +2814,7 @@ export default function LiveRoom() {
               className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
               title={uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}
             >
-              <Focus className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-gray-700 dark:text-white" strokeWidth={2} />
+              <Focus className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-indigo-500 dark:text-indigo-400" strokeWidth={2} />
               <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
                 {uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}
               </span>
