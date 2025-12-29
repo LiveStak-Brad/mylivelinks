@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/admin';
+import { OwnerPanelShell } from '@/components/owner/OwnerPanelShell';
 
 export default async function OwnerLayout({
   children,
@@ -31,5 +32,5 @@ export default async function OwnerLayout({
     );
   }
 
-  return children;
+  return <OwnerPanelShell>{children}</OwnerPanelShell>;
 }

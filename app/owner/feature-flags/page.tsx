@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import OwnerPanelShell from '@/components/owner/OwnerPanelShell';
+import { OwnerPanelShell } from '@/components/owner/OwnerPanelShell';
 import Card from '@/components/owner/ui-kit/Card';
 import {
   Radio,

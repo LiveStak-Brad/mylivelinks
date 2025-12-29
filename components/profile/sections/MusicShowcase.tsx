@@ -12,6 +12,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronDown,
   ChevronUp,
@@ -710,10 +711,24 @@ function AddTrackModal(props: {
   onClose: () => void;
   onSubmit: () => void | Promise<void>;
 }) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" onClick={props.onClose} />
-      <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl p-5">
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 'var(--z-modal)' }}>
+      <div
+        className="fixed inset-0 bg-black/60"
+        style={{ zIndex: 'var(--z-modal-backdrop)' }}
+        onClick={props.onClose}
+      />
+      <div
+        className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl p-5"
+        style={{ zIndex: 'var(--z-modal)' }}
+      >
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-extrabold text-gray-900 dark:text-white">Add Track</div>
           <button
@@ -883,7 +898,8 @@ function AddTrackModal(props: {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -74,6 +74,21 @@ export function OwnerPanelScreen({ navigation }: Props) {
           <StatCard theme={theme} label="Gifts Sent (24h)" value={Number(totals.gifts_sent_24h ?? 0)} iconName="gift" iconColor="#ec4899" />
           <StatCard theme={theme} label="Pending Reports" value={Number(totals.pending_reports ?? 0)} iconName="alert-circle" iconColor="#ef4444" />
           
+          {/* Referrals Section */}
+          <View style={styles.actionCard}>
+            <Feather name="link" size={24} color="#8b5cf6" />
+            <View style={styles.actionCardContent}>
+              <Text style={styles.actionCardTitle}>Global Referrals</Text>
+              <Text style={styles.actionCardText}>View platform-wide referral analytics</Text>
+            </View>
+            <Button 
+              title="View" 
+              variant="primary" 
+              onPress={() => navigation.navigate('OwnerReferrals')} 
+              style={styles.actionButton}
+            />
+          </View>
+          
           {/* Placeholder for future sections */}
           <View style={styles.placeholderSection}>
             <Feather name="settings" size={32} color={theme.colors.textMuted} />
@@ -214,6 +229,39 @@ function createStyles(theme: ThemeDefinition) {
       fontSize: 12,
       fontWeight: '600',
       textAlign: 'center',
+    },
+    actionCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 14,
+      padding: 16,
+      shadowColor: cardShadow.color,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      shadowOffset: cardShadow.offset,
+      elevation: cardShadow.elevation,
+    },
+    actionCardContent: {
+      flex: 1,
+      gap: 4,
+    },
+    actionCardTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    actionCardText: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    actionButton: {
+      paddingHorizontal: 16,
+      height: 36,
     },
   });
 }

@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, S
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import * as ImagePicker from 'expo-image-picker';
 
-import { Button, Input, PageShell, PageHeader } from '../components/ui';
+import { Button, Input, PageShell, PageHeader, Modal } from '../components/ui';
 import { useFeed, type FeedPost } from '../hooks/useFeed';
 import type { MainTabsParamList } from '../types/navigation';
 import { resolveMediaUrl } from '../lib/mediaUrl';
@@ -12,11 +12,17 @@ import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { getAvatarSource } from '../lib/defaultAvatar';
-import { Modal } from '../components/ui/Modal';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId } from '../lib/photoFilters';
 import { Cool, Grayscale, Sepia, Warm, Contrast as ContrastFilter, cleanExtractedImagesCache } from 'react-native-image-filter-kit';
 
 type Props = BottomTabScreenProps<MainTabsParamList, 'Feed'>;
+
+type GiftType = {
+  id: number;
+  name: string;
+  coin_cost: number;
+  emoji?: string;
+};
 
 export function FeedScreen({ navigation }: Props) {
   const { posts, nextCursor, isLoading, error, refresh, loadMore } = useFeed();
@@ -37,9 +43,37 @@ export function FeedScreen({ navigation }: Props) {
   const pendingResolveRef = useRef<((uri: string) => void) | null>(null);
   const pendingRejectRef = useRef<((err: Error) => void) | null>(null);
 
+  // Gift Modal State
+  const [giftModalVisible, setGiftModalVisible] = useState(false);
+  const [giftTargetPost, setGiftTargetPost] = useState<FeedPost | null>(null);
+  const [giftTypes, setGiftTypes] = useState<GiftType[]>([]);
+  const [selectedGift, setSelectedGift] = useState<GiftType | null>(null);
+  const [giftSubmitting, setGiftSubmitting] = useState(false);
+
   const canPost = (composerText.trim().length > 0 || !!mediaUrl) && !composerLoading && !mediaUploading;
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  // Load gift types on mount
+  const loadGiftTypes = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('gift_types')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order');
+      
+      if (!error && data) {
+        setGiftTypes(data);
+      }
+    } catch (e) {
+      console.error('[Feed] Failed to load gift types:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadGiftTypes();
+  }, [loadGiftTypes]);
 
   const uploadPostMedia = useCallback(
     async (uri: string, mime: string | null): Promise<string> => {
@@ -208,11 +242,65 @@ export function FeedScreen({ navigation }: Props) {
     }
   }, [exportFilteredPhotoUri, pendingPhotoMime, pendingPhotoUri, selectedFilterId, uploadPostMedia]);
 
+  const openGiftModal = useCallback((post: FeedPost) => {
+    setGiftTargetPost(post);
+    setSelectedGift(null);
+    setGiftModalVisible(true);
+  }, []);
+
+  const sendGift = useCallback(async () => {
+    if (!selectedGift || !giftTargetPost) return;
+
+    setGiftSubmitting(true);
+    try {
+      const requestId = crypto.randomUUID();
+      
+      const res = await fetchAuthed('/api/gifts/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toUserId: giftTargetPost.author.id,
+          coinsAmount: selectedGift.coin_cost,
+          giftTypeId: selectedGift.id,
+          requestId,
+        }),
+      });
+
+      if (!res.ok) {
+        Alert.alert('Error', res.message || 'Failed to send gift');
+        return;
+      }
+
+      Alert.alert('Success', `Sent ${selectedGift.name} to ${giftTargetPost.author.username}!`);
+      setGiftModalVisible(false);
+      setGiftTargetPost(null);
+      setSelectedGift(null);
+      
+      // Refresh feed to show updated coin count
+      await refresh();
+    } catch (e: any) {
+      Alert.alert('Error', String(e?.message || e || 'Failed to send gift'));
+    } finally {
+      setGiftSubmitting(false);
+    }
+  }, [selectedGift, giftTargetPost, fetchAuthed, refresh]);
+
   const formatDateTime = useCallback((value: string) => {
     try {
       const d = new Date(value);
       if (Number.isNaN(d.getTime())) return value;
-      return d.toLocaleString();
+      
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[d.getMonth()];
+      const day = d.getDate();
+      
+      let hours = d.getHours();
+      const minutes = d.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      const minutesStr = minutes < 10 ? `0${minutes}` : minutes;
+      
+      return `${month} ${day} • ${hours}:${minutesStr} ${ampm}`;
     } catch {
       return value;
     }
@@ -224,22 +312,26 @@ export function FeedScreen({ navigation }: Props) {
       const mediaUri = resolveMediaUrl(item.media_url ?? null);
       return (
         <View style={styles.postCard}>
-          <View style={styles.postHeader}>
+          {/* New Header: Avatar + Username + Date/Time */}
+          <Pressable
+            style={styles.postHeader}
+            onPress={() => {
+              const username = item.author?.username;
+              if (username) {
+                navigation.navigate('Profile', { username });
+              }
+            }}
+          >
             <Image source={getAvatarSource(avatarUri)} style={styles.avatarImage} />
             <View style={styles.postMeta}>
-              <Text style={styles.author} numberOfLines={1}>
+              <Text style={styles.authorBold} numberOfLines={1}>
                 {item.author?.username || 'Unknown'}
               </Text>
               <Text style={styles.timestamp} numberOfLines={1}>
                 {formatDateTime(item.created_at)}
               </Text>
             </View>
-
-            <View style={styles.metrics}>
-              <Text style={styles.metricText}>💬 {item.comment_count ?? 0}</Text>
-              <Text style={styles.metricText}>🎁 {item.gift_total_coins ?? 0}</Text>
-            </View>
-          </View>
+          </Pressable>
 
           {!!item.text_content && (
             <Text style={styles.contentText}>{String(item.text_content)}</Text>
@@ -250,10 +342,38 @@ export function FeedScreen({ navigation }: Props) {
               <Image source={{ uri: mediaUri }} style={styles.mediaImage} resizeMode="cover" />
             </View>
           )}
+
+          {/* New Engagement Bar: Like | Gift | Coin Count | Comments */}
+          <View style={styles.engagementBar}>
+            <Pressable style={styles.engagementButton}>
+              <Text style={styles.engagementIcon}>♡</Text>
+              <Text style={styles.engagementLabel}>Like</Text>
+            </Pressable>
+
+            <Pressable 
+              style={styles.engagementButton}
+              onPress={() => openGiftModal(item)}
+            >
+              <Text style={styles.giftIcon}>🎁</Text>
+              <Text style={styles.giftLabel}>Gift</Text>
+            </Pressable>
+
+            {(item.gift_total_coins ?? 0) > 0 && (
+              <View style={styles.coinCount}>
+                <Text style={styles.coinIcon}>🪙</Text>
+                <Text style={styles.coinText}>{item.gift_total_coins ?? 0}</Text>
+              </View>
+            )}
+
+            <Pressable style={styles.engagementButton}>
+              <Text style={styles.engagementIcon}>💬</Text>
+              <Text style={styles.engagementLabel}>Comment</Text>
+            </Pressable>
+          </View>
         </View>
       );
     },
-    [formatDateTime]
+    [formatDateTime, navigation, styles]
   );
 
   const renderComposer = useMemo(() => {
@@ -529,6 +649,91 @@ export function FeedScreen({ navigation }: Props) {
           )
         }
       />
+      
+      {/* Gift Modal */}
+      <Modal
+        visible={giftModalVisible}
+        onRequestClose={() => {
+          if (giftSubmitting) return;
+          setGiftModalVisible(false);
+          setGiftTargetPost(null);
+          setSelectedGift(null);
+        }}
+      >
+        <View style={styles.giftModalContent}>
+          <Text style={styles.giftModalTitle}>
+            Send Gift to {giftTargetPost?.author?.username || 'User'}
+          </Text>
+          
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.giftGrid}
+          >
+            {giftTypes.map((gift) => {
+              const isSelected = selectedGift?.id === gift.id;
+              return (
+                <Pressable
+                  key={gift.id}
+                  onPress={() => setSelectedGift(gift)}
+                  style={[
+                    styles.giftItem,
+                    isSelected ? styles.giftItemSelected : null,
+                  ]}
+                >
+                  <Text style={styles.giftEmoji}>{gift.emoji || '🎁'}</Text>
+                  <Text style={styles.giftName} numberOfLines={1}>{gift.name}</Text>
+                  <Text style={styles.giftCost}>{gift.coin_cost} 🪙</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {selectedGift && (
+            <View style={styles.selectedGiftInfo}>
+              <Text style={styles.selectedGiftEmoji}>{selectedGift.emoji || '🎁'}</Text>
+              <View style={styles.selectedGiftDetails}>
+                <Text style={styles.selectedGiftName}>{selectedGift.name}</Text>
+                <Text style={styles.selectedGiftCost}>{selectedGift.coin_cost} coins</Text>
+              </View>
+            </View>
+          )}
+
+          <View style={styles.giftModalActions}>
+            <Pressable
+              onPress={() => {
+                if (giftSubmitting) return;
+                setGiftModalVisible(false);
+                setGiftTargetPost(null);
+                setSelectedGift(null);
+              }}
+              style={({ pressed }) => [
+                styles.giftModalCancelButton,
+                pressed ? styles.giftModalButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.giftModalCancelText}>Cancel</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                if (!selectedGift || giftSubmitting) return;
+                void sendGift();
+              }}
+              disabled={!selectedGift || giftSubmitting}
+              style={({ pressed }) => [
+                styles.giftModalSendButton,
+                (!selectedGift || giftSubmitting) && styles.giftModalSendButtonDisabled,
+                pressed && !giftSubmitting ? styles.giftModalButtonPressed : null,
+              ]}
+            >
+              <Text style={styles.giftModalSendText}>
+                {giftSubmitting ? 'Sending...' : 'Send Gift'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </PageShell>
   );
 }
@@ -776,27 +981,25 @@ function createStyles(theme: ThemeDefinition) {
       fontSize: 15,
       fontWeight: '800',
     },
+    authorBold: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '900',
+    },
     timestamp: {
       color: theme.colors.textSecondary,
       fontSize: 12,
       marginTop: 2,
     },
-    metrics: {
-      alignItems: 'flex-end',
-      gap: 2,
-    },
-    metricText: {
-      color: theme.colors.textMuted,
-      fontSize: 12,
-      fontWeight: '700',
-    },
     contentText: {
       color: theme.colors.textPrimary,
       fontSize: 15,
       lineHeight: 22,
+      marginBottom: 12,
     },
     mediaWrap: {
       marginTop: 12,
+      marginBottom: 12,
       borderRadius: 12,
       overflow: 'hidden',
       backgroundColor: 'rgba(255,255,255,0.06)',
@@ -806,6 +1009,59 @@ function createStyles(theme: ThemeDefinition) {
     mediaImage: {
       width: '100%',
       height: 220,
+    },
+    engagementBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      marginTop: 8,
+      paddingTop: 8,
+      gap: 4,
+    },
+    engagementButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    engagementIcon: {
+      fontSize: 18,
+      color: theme.colors.textSecondary,
+    },
+    engagementLabel: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    giftIcon: {
+      fontSize: 18,
+    },
+    giftLabel: {
+      color: '#a855f7',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    coinCount: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+    },
+    coinIcon: {
+      fontSize: 16,
+    },
+    coinText: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '900',
+      textShadowColor: 'rgba(168, 85, 247, 0.5)',
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 4,
     },
 
     stateContainer: {
@@ -858,6 +1114,116 @@ function createStyles(theme: ThemeDefinition) {
     },
     footerSpacer: {
       height: 12,
+    },
+
+    // Gift Modal Styles
+    giftModalContent: {
+      gap: 16,
+    },
+    giftModalTitle: {
+      color: theme.colors.textPrimary,
+      fontSize: 18,
+      fontWeight: '900',
+      textAlign: 'center',
+    },
+    giftGrid: {
+      gap: 12,
+      paddingVertical: 8,
+    },
+    giftItem: {
+      width: 80,
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardAlt,
+    },
+    giftItemSelected: {
+      borderColor: '#a855f7',
+      backgroundColor: 'rgba(168, 85, 247, 0.15)',
+    },
+    giftEmoji: {
+      fontSize: 32,
+      marginBottom: 4,
+    },
+    giftName: {
+      color: theme.colors.textPrimary,
+      fontSize: 11,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    giftCost: {
+      color: '#a855f7',
+      fontSize: 11,
+      fontWeight: '900',
+      marginTop: 2,
+    },
+    selectedGiftInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: 'rgba(168, 85, 247, 0.12)',
+      borderWidth: 1,
+      borderColor: 'rgba(168, 85, 247, 0.3)',
+    },
+    selectedGiftEmoji: {
+      fontSize: 36,
+    },
+    selectedGiftDetails: {
+      flex: 1,
+    },
+    selectedGiftName: {
+      color: theme.colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '900',
+    },
+    selectedGiftCost: {
+      color: '#a855f7',
+      fontSize: 13,
+      fontWeight: '800',
+      marginTop: 2,
+    },
+    giftModalActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 4,
+    },
+    giftModalCancelButton: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      backgroundColor: theme.colors.cardAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    giftModalCancelText: {
+      color: theme.colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '900',
+    },
+    giftModalSendButton: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      backgroundColor: '#a855f7',
+      alignItems: 'center',
+    },
+    giftModalSendButtonDisabled: {
+      opacity: 0.5,
+    },
+    giftModalSendText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '900',
+    },
+    giftModalButtonPressed: {
+      opacity: 0.85,
     },
   });
 }

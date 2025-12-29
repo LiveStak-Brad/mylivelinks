@@ -7,6 +7,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
+        profile: {
+          is_owner: ctx.is_owner,
+          is_app_admin: ctx.is_app_admin,
+        },
         is_owner: ctx.is_owner,
         is_app_admin: ctx.is_app_admin,
         room_roles: ctx.room_roles,

@@ -44,6 +44,7 @@ import { ThemeScreen } from './screens/ThemeScreen';
 import { ReferralsScreen } from './screens/ReferralsScreen';
 import { ReferralsLeaderboardScreen } from './screens/ReferralsLeaderboardScreen';
 import { OwnerPanelScreen } from './screens/OwnerPanelScreen';
+import { OwnerReferralsScreen } from './screens/OwnerReferralsScreen';
 import { ModerationPanelScreen } from './screens/ModerationPanelScreen';
 import { AdminApplicationsScreen } from './screens/AdminApplicationsScreen';
 import { AdminGiftsScreen } from './screens/AdminGiftsScreen';
@@ -117,6 +118,7 @@ function AppNavigation() {
             <Stack.Screen name="Referrals" component={ReferralsScreen} />
             <Stack.Screen name="ReferralsLeaderboard" component={ReferralsLeaderboardScreen} />
             <Stack.Screen name="OwnerPanel" component={OwnerPanelScreen} />
+            <Stack.Screen name="OwnerReferrals" component={OwnerReferralsScreen} />
             <Stack.Screen name="ModerationPanel" component={ModerationPanelScreen} />
             <Stack.Screen name="AdminApplications" component={AdminApplicationsScreen} />
             <Stack.Screen name="AdminGifts" component={AdminGiftsScreen} />

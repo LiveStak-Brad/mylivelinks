@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { MessageCircle, Gift, RefreshCw, Upload, X } from 'lucide-react';
+import { RefreshCw, Upload, X } from 'lucide-react';
 import { Button, Card, Modal, Textarea } from '@/components/ui';
+import { FeedPostCard } from './FeedPostCard';
 import PostMedia from './PostMedia';
 import SafeRichText from '@/components/SafeRichText';
+import GiftModal from '@/components/GiftModal';
 import { createClient } from '@/lib/supabase';
 import { uploadPostMedia } from '@/lib/storage';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
@@ -82,14 +84,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
   const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({});
 
   const [giftModalOpen, setGiftModalOpen] = useState(false);
-  const [giftTarget, setGiftTarget] = useState<
-    | { kind: 'post'; postId: string }
-    | { kind: 'comment'; commentId: string }
-    | null
-  >(null);
-  const [giftSubmitting, setGiftSubmitting] = useState(false);
-
-  const giftPresets = useMemo(() => [10, 50, 100], []);
+  const [giftTargetPost, setGiftTargetPost] = useState<FeedPost | null>(null);
 
   const loadFeed = useCallback(async (mode: 'replace' | 'append') => {
     setIsLoading(true);
@@ -368,56 +363,17 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
     }
   }, [commentDrafts]);
 
-  const openGiftModal = useCallback((target: { kind: 'post'; postId: string } | { kind: 'comment'; commentId: string }) => {
-    setGiftTarget(target);
+  const openGiftModal = useCallback((post: FeedPost) => {
+    setGiftTargetPost(post);
     setGiftModalOpen(true);
   }, []);
 
-  const sendGift = useCallback(
-    async (coins: number) => {
-      if (!giftTarget) return;
-
-      setGiftSubmitting(true);
-      try {
-        const requestId = crypto.randomUUID();
-
-        const endpoint =
-          giftTarget.kind === 'post'
-            ? `/api/posts/${encodeURIComponent(giftTarget.postId)}/gift`
-            : `/api/comments/${encodeURIComponent(giftTarget.commentId)}/gift`;
-
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': requestId,
-          },
-          body: JSON.stringify({ coins }),
-        });
-
-        const json = (await res.json()) as any;
-
-        if (!res.ok) {
-          setLoadError(json?.error || 'Failed to send gift');
-          return;
-        }
-
-        if (giftTarget.kind === 'post') {
-          setPosts((prev) =>
-            prev.map((p) => (p.id === giftTarget.postId ? { ...p, gift_total_coins: (p.gift_total_coins || 0) + coins } : p))
-          );
-        }
-
-        setGiftModalOpen(false);
-        setGiftTarget(null);
-      } catch (err) {
-        setLoadError(err instanceof Error ? err.message : 'Failed to send gift');
-      } finally {
-        setGiftSubmitting(false);
-      }
-    },
-    [giftTarget]
-  );
+  const handleGiftSent = useCallback(() => {
+    if (giftTargetPost) {
+      // Refresh feed to show updated coin count
+      void loadFeed('replace');
+    }
+  }, [giftTargetPost, loadFeed]);
 
   return (
     <div className="space-y-4">
@@ -537,98 +493,81 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
             const isVideo = !!post.media_url && /(\.mp4|\.webm|\.mov|\.m4v)(\?|$)/i.test(post.media_url);
 
             return (
-              <Card key={post.id} className={`overflow-hidden backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>
-                <div className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-foreground truncate">
-                        <Link href={`/${post.author.username}`} className="hover:underline">
-                          @{post.author.username}
-                        </Link>
+              <div key={post.id} className="space-y-0">
+                <FeedPostCard
+                  authorName={post.author.username}
+                  authorUsername={post.author.username}
+                  authorAvatarUrl={post.author.avatar_url}
+                  content={post.text_content}
+                  timestamp={post.created_at}
+                  media={
+                    post.media_url ? (
+                      <div className="rounded-xl overflow-hidden border border-border bg-muted/20">
+                        <PostMedia mediaUrl={post.media_url} mediaType={isVideo ? 'video' : 'photo'} mode="feed" alt="Post media" />
                       </div>
-                      <div className="text-xs text-muted-foreground">{formatDateTime(post.created_at)}</div>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => openGiftModal({ kind: 'post', postId: post.id })} leftIcon={<Gift className="w-4 h-4" />}>
-                      Gift
-                    </Button>
-                  </div>
-
-                  <div className="text-foreground whitespace-pre-wrap">
-                    <SafeRichText text={post.text_content} className="whitespace-pre-wrap" showLinkPreview={true} />
-                  </div>
-
-                  {post.media_url && (
-                    <div className="rounded-xl overflow-hidden border border-border bg-muted/20">
-                      <PostMedia mediaUrl={post.media_url} mediaType={isVideo ? 'video' : 'photo'} mode="feed" alt="Post media" />
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <div>{post.gift_total_coins} coins gifted</div>
-                    <button
-                      className="flex items-center gap-2 hover:text-foreground transition-colors"
-                      onClick={() => void toggleComments(post.id)}
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      <span>{post.comment_count} comments</span>
-                    </button>
-                  </div>
-                </div>
+                    ) : undefined
+                  }
+                  coinCount={post.gift_total_coins}
+                  onLike={() => {
+                    // TODO: Implement like functionality when backend is ready
+                  }}
+                  onComment={() => void toggleComments(post.id)}
+                  onGift={() => openGiftModal(post)}
+                  onProfileClick={() => {
+                    window.location.href = `/${post.author.username}`;
+                  }}
+                  className={`backdrop-blur-sm ${borderRadiusClass}`}
+                  style={cardStyle}
+                />
 
                 {isExpanded && (
-                  <div className="border-t border-border p-4 space-y-3">
-                    {isCommentsLoading ? (
-                      <div className="text-sm text-muted-foreground">Loading comments...</div>
-                    ) : (
-                      <div className="space-y-3">
-                        {comments.map((c) => (
-                          <div key={c.id} className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium text-foreground">
-                                <Link href={`/${c.author.username}`} className="hover:underline">
-                                  @{c.author.username}
-                                </Link>
-                              </div>
-                              <div className="text-xs text-muted-foreground">{formatDateTime(c.created_at)}</div>
-                              <div className="text-sm text-foreground whitespace-pre-wrap mt-1">
-                                <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
+                  <Card className={`overflow-hidden backdrop-blur-sm border-t-0 rounded-t-none ${borderRadiusClass}`} style={cardStyle}>
+                    <div className="border-t border-border p-4 space-y-3">
+                      {isCommentsLoading ? (
+                        <div className="text-sm text-muted-foreground">Loading comments...</div>
+                      ) : (
+                        <div className="space-y-3">
+                          {comments.map((c) => (
+                            <div key={c.id} className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-foreground">
+                                  <Link href={`/${c.author.username}`} className="hover:underline">
+                                    @{c.author.username}
+                                  </Link>
+                                </div>
+                                <div className="text-xs text-muted-foreground">{formatDateTime(c.created_at)}</div>
+                                <div className="text-sm text-foreground whitespace-pre-wrap mt-1">
+                                  <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
+                                </div>
                               </div>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openGiftModal({ kind: 'comment', commentId: c.id })}
-                              leftIcon={<Gift className="w-4 h-4" />}
-                            >
-                              Gift
-                            </Button>
-                          </div>
-                        ))}
+                          ))}
 
-                        <div className="pt-2 space-y-2">
-                          <Textarea
-                            textareaSize="sm"
-                            placeholder="Write a comment..."
-                            value={commentDrafts[post.id] || ''}
-                            onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
-                            disabled={!!commentSubmitting[post.id]}
-                          />
-                          <div className="flex justify-end">
-                            <Button
-                              size="sm"
-                              onClick={() => void submitComment(post.id)}
-                              disabled={!!commentSubmitting[post.id] || !String(commentDrafts[post.id] || '').trim()}
-                              isLoading={!!commentSubmitting[post.id]}
-                            >
-                              Comment
-                            </Button>
+                          <div className="pt-2 space-y-2">
+                            <Textarea
+                              textareaSize="sm"
+                              placeholder="Write a comment..."
+                              value={commentDrafts[post.id] || ''}
+                              onChange={(e) => setCommentDrafts((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                              disabled={!!commentSubmitting[post.id]}
+                            />
+                            <div className="flex justify-end">
+                              <Button
+                                size="sm"
+                                onClick={() => void submitComment(post.id)}
+                                disabled={!!commentSubmitting[post.id] || !String(commentDrafts[post.id] || '').trim()}
+                                isLoading={!!commentSubmitting[post.id]}
+                              >
+                                Comment
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  </Card>
                 )}
-              </Card>
+              </div>
             );
           })}
 
@@ -642,25 +581,17 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
         </div>
       )}
 
-      <Modal
-        isOpen={giftModalOpen}
-        onClose={() => {
-          if (giftSubmitting) return;
-          setGiftModalOpen(false);
-          setGiftTarget(null);
-        }}
-        title="Send a gift"
-        description="Choose an amount of coins to send"
-        size="sm"
-      >
-        <div className="grid grid-cols-3 gap-2">
-          {giftPresets.map((amt) => (
-            <Button key={amt} variant="outline" onClick={() => void sendGift(amt)} disabled={giftSubmitting} isLoading={giftSubmitting}>
-              {amt}
-            </Button>
-          ))}
-        </div>
-      </Modal>
+      {giftModalOpen && giftTargetPost && (
+        <GiftModal
+          recipientId={giftTargetPost.author.id}
+          recipientUsername={giftTargetPost.author.username}
+          onGiftSent={handleGiftSent}
+          onClose={() => {
+            setGiftModalOpen(false);
+            setGiftTargetPost(null);
+          }}
+        />
+      )}
     </div>
   );
 }
