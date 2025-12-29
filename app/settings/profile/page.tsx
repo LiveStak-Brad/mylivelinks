@@ -247,6 +247,10 @@ export default function ProfileSettingsPage() {
           card_border_radius: p.card_border_radius || 'medium',
           font_preset: p.font_preset || 'modern',
           accent_color: p.accent_color || '#3B82F6',
+          button_color: p.button_color || '',
+          content_text_color: p.content_text_color || '',
+          ui_text_color: p.ui_text_color || '',
+          link_color: p.link_color || '',
           links_section_title: p.links_section_title || 'My Links'
         });
       }
@@ -372,6 +376,10 @@ export default function ProfileSettingsPage() {
         card_border_radius: customization.card_border_radius,
         font_preset: customization.font_preset,
         accent_color: customization.accent_color,
+        button_color: customization.button_color || null,
+        content_text_color: customization.content_text_color || null,
+        ui_text_color: customization.ui_text_color || null,
+        link_color: customization.link_color || null,
         links_section_title: customization.links_section_title,
         updated_at: new Date().toISOString(),
       };

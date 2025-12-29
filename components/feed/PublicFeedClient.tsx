@@ -31,11 +31,14 @@ type FeedPost = {
 type FeedComment = {
   id: string;
   post_id: string;
+  parent_comment_id: string | null;
   text_content: string;
   created_at: string;
   like_count: number;
+  reply_count: number;
   is_liked_by_current_user: boolean;
   author: FeedAuthor;
+  replies?: FeedComment[];
 };
 
 type FeedResponse = {
@@ -86,6 +89,12 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [commentSubmitting, setCommentSubmitting] = useState<Record<string, boolean>>({});
   const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
+  
+  // Reply state
+  const [activeReplyTo, setActiveReplyTo] = useState<string | null>(null); // commentId being replied to
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replySubmitting, setReplySubmitting] = useState<Record<string, boolean>>({});
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>>({}); // Show/hide replies
 
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftTargetPost, setGiftTargetPost] = useState<FeedPost | null>(null);
@@ -354,11 +363,14 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
           const newComment: FeedComment = {
             id: String(created.id),
             post_id: String(created.post_id),
+            parent_comment_id: null,
             text_content: String(created.text_content ?? ''),
             created_at: String(created.created_at),
             like_count: 0,
+            reply_count: 0,
             is_liked_by_current_user: false,
             author: { id: '', username: 'You', avatar_url: null },
+            replies: [],
           };
           const next: FeedComment[] = [...existing, newComment];
           return { ...prev, [postId]: next };
@@ -379,7 +391,28 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
     if (!currentUserId) return;
 
     const currentComments = commentsByPost[postId] || [];
-    const comment = currentComments.find((c) => c.id === commentId);
+    
+    // Find comment (could be top-level or reply)
+    let comment: FeedComment | undefined;
+    let isReply = false;
+    let parentCommentId: string | undefined;
+
+    for (const c of currentComments) {
+      if (c.id === commentId) {
+        comment = c;
+        break;
+      }
+      if (c.replies) {
+        const reply = c.replies.find((r) => r.id === commentId);
+        if (reply) {
+          comment = reply;
+          isReply = true;
+          parentCommentId = c.id;
+          break;
+        }
+      }
+    }
+
     if (!comment) return;
 
     const wasLiked = comment.is_liked_by_current_user;
@@ -388,15 +421,31 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
     // Optimistic UI update
     setCommentsByPost((prev) => {
       const comments = prev[postId] || [];
-      const updated = comments.map((c) =>
-        c.id === commentId
-          ? {
-              ...c,
-              is_liked_by_current_user: newLikedState,
-              like_count: newLikedState ? c.like_count + 1 : Math.max(0, c.like_count - 1),
-            }
-          : c
-      );
+      const updated = comments.map((c) => {
+        if (isReply && c.id === parentCommentId) {
+          // Update reply within parent comment
+          return {
+            ...c,
+            replies: c.replies?.map((r) =>
+              r.id === commentId
+                ? {
+                    ...r,
+                    is_liked_by_current_user: newLikedState,
+                    like_count: newLikedState ? r.like_count + 1 : Math.max(0, r.like_count - 1),
+                  }
+                : r
+            ),
+          };
+        } else if (c.id === commentId) {
+          // Update top-level comment
+          return {
+            ...c,
+            is_liked_by_current_user: newLikedState,
+            like_count: newLikedState ? c.like_count + 1 : Math.max(0, c.like_count - 1),
+          };
+        }
+        return c;
+      });
       return { ...prev, [postId]: updated };
     });
 
@@ -411,15 +460,29 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
         // Revert on error
         setCommentsByPost((prev) => {
           const comments = prev[postId] || [];
-          const reverted = comments.map((c) =>
-            c.id === commentId
-              ? {
-                  ...c,
-                  is_liked_by_current_user: wasLiked,
-                  like_count: wasLiked ? c.like_count + 1 : Math.max(0, c.like_count - 1),
-                }
-              : c
-          );
+          const reverted = comments.map((c) => {
+            if (isReply && c.id === parentCommentId) {
+              return {
+                ...c,
+                replies: c.replies?.map((r) =>
+                  r.id === commentId
+                    ? {
+                        ...r,
+                        is_liked_by_current_user: wasLiked,
+                        like_count: wasLiked ? r.like_count + 1 : Math.max(0, r.like_count - 1),
+                      }
+                    : r
+                ),
+              };
+            } else if (c.id === commentId) {
+              return {
+                ...c,
+                is_liked_by_current_user: wasLiked,
+                like_count: wasLiked ? c.like_count + 1 : Math.max(0, c.like_count - 1),
+              };
+            }
+            return c;
+          });
           return { ...prev, [postId]: reverted };
         });
       }
@@ -428,19 +491,96 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
       // Revert on error
       setCommentsByPost((prev) => {
         const comments = prev[postId] || [];
-        const reverted = comments.map((c) =>
-          c.id === commentId
-            ? {
-                ...c,
-                is_liked_by_current_user: wasLiked,
-                like_count: wasLiked ? c.like_count + 1 : Math.max(0, c.like_count - 1),
-              }
-            : c
-        );
+        const reverted = comments.map((c) => {
+          if (isReply && c.id === parentCommentId) {
+            return {
+              ...c,
+              replies: c.replies?.map((r) =>
+                r.id === commentId
+                  ? {
+                      ...r,
+                      is_liked_by_current_user: wasLiked,
+                      like_count: wasLiked ? r.like_count + 1 : Math.max(0, r.like_count - 1),
+                    }
+                  : r
+              ),
+            };
+          } else if (c.id === commentId) {
+            return {
+              ...c,
+              is_liked_by_current_user: wasLiked,
+              like_count: wasLiked ? c.like_count + 1 : Math.max(0, c.like_count - 1),
+            };
+          }
+          return c;
+        });
         return { ...prev, [postId]: reverted };
       });
     }
   }, [commentsByPost, currentUserId]);
+
+  const submitReply = useCallback(async (parentCommentId: string, postId: string) => {
+    const text = String(replyDrafts[parentCommentId] || '').trim();
+    if (!text) return;
+
+    setReplySubmitting((prev) => ({ ...prev, [parentCommentId]: true }));
+    try {
+      const res = await fetch(`/api/posts/${encodeURIComponent(postId)}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text_content: text, parent_comment_id: parentCommentId }),
+      });
+
+      const json = (await res.json()) as any;
+
+      if (!res.ok) {
+        setLoadError(json?.error || 'Failed to create reply');
+        return;
+      }
+
+      setReplyDrafts((prev) => ({ ...prev, [parentCommentId]: '' }));
+      setActiveReplyTo(null);
+
+      const created = json?.comment;
+      if (created) {
+        setCommentsByPost((prev) => {
+          const existing = prev[postId] ?? [];
+          const newReply: FeedComment = {
+            id: String(created.id),
+            post_id: String(created.post_id),
+            parent_comment_id: String(parentCommentId),
+            text_content: String(created.text_content ?? ''),
+            created_at: String(created.created_at),
+            like_count: 0,
+            reply_count: 0,
+            is_liked_by_current_user: false,
+            author: { id: '', username: 'You', avatar_url: null },
+            replies: [],
+          };
+
+          // Add reply to parent comment
+          const updated = existing.map((c) =>
+            c.id === parentCommentId
+              ? {
+                  ...c,
+                  reply_count: (c.reply_count || 0) + 1,
+                  replies: [...(c.replies || []), newReply],
+                }
+              : c
+          );
+
+          return { ...prev, [postId]: updated };
+        });
+
+        // Expand replies to show the new reply
+        setExpandedReplies((prev) => ({ ...prev, [parentCommentId]: true }));
+      }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to create reply');
+    } finally {
+      setReplySubmitting((prev) => ({ ...prev, [parentCommentId]: false }));
+    }
+  }, [replyDrafts]);
 
   const openGiftModal = useCallback((post: FeedPost) => {
     setGiftTargetPost(post);
@@ -626,55 +766,175 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                       ) : (
                         <div className="space-y-4">
                           {comments.map((c) => (
-                            <div key={c.id} className="flex items-start gap-3">
-                              {/* Profile Picture */}
-                              <Link href={`/${c.author.username}`} className="flex-shrink-0">
-                                <img
-                                  src={c.author.avatar_url || '/no-profile-pic.png'}
-                                  alt={`${c.author.username}'s avatar`}
-                                  className="w-8 h-8 rounded-full object-cover hover:opacity-80 transition-opacity"
-                                  onError={(e) => {
-                                    e.currentTarget.src = '/no-profile-pic.png';
-                                  }}
-                                />
-                              </Link>
+                            <div key={c.id} className="space-y-2">
+                              {/* Main Comment */}
+                              <div className="flex items-start gap-3">
+                                {/* Profile Picture */}
+                                <Link href={`/${c.author.username}`} className="flex-shrink-0">
+                                  <img
+                                    src={c.author.avatar_url || '/no-profile-pic.png'}
+                                    alt={`${c.author.username}'s avatar`}
+                                    className="w-8 h-8 rounded-full object-cover hover:opacity-80 transition-opacity"
+                                    onError={(e) => {
+                                      e.currentTarget.src = '/no-profile-pic.png';
+                                    }}
+                                  />
+                                </Link>
 
-                              {/* Comment Content */}
-                              <div className="flex-1 min-w-0">
-                                <div className="bg-muted rounded-2xl px-3 py-2">
-                                  <Link 
-                                    href={`/${c.author.username}`} 
-                                    className="text-sm font-semibold text-foreground hover:underline"
-                                  >
-                                    {c.author.username}
-                                  </Link>
-                                  <div className="text-sm text-foreground whitespace-pre-wrap mt-0.5">
-                                    <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
+                                {/* Comment Content */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="bg-muted rounded-2xl px-3 py-2">
+                                    <Link 
+                                      href={`/${c.author.username}`} 
+                                      className="text-sm font-semibold text-foreground hover:underline"
+                                    >
+                                      {c.author.username}
+                                    </Link>
+                                    <div className="text-sm text-foreground whitespace-pre-wrap mt-0.5">
+                                      <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
+                                    </div>
                                   </div>
-                                </div>
 
-                                {/* Comment Actions */}
-                                <div className="flex items-center gap-3 px-3 mt-1">
-                                  <button
-                                    className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition group"
-                                    onClick={() => void toggleCommentLike(c.id, post.id)}
-                                  >
-                                    <Heart 
-                                      className={`w-3.5 h-3.5 transition ${
-                                        c.is_liked_by_current_user 
-                                          ? 'fill-primary text-primary' 
-                                          : 'group-hover:fill-primary/20'
-                                      }`}
-                                    />
-                                    <span className={c.is_liked_by_current_user ? 'text-primary' : ''}>
-                                      {c.like_count > 0 ? c.like_count : 'Like'}
+                                  {/* Comment Actions */}
+                                  <div className="flex items-center gap-3 px-3 mt-1">
+                                    <button
+                                      className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition group"
+                                      onClick={() => void toggleCommentLike(c.id, post.id)}
+                                    >
+                                      <Heart 
+                                        className={`w-3.5 h-3.5 transition ${
+                                          c.is_liked_by_current_user 
+                                            ? 'fill-primary text-primary' 
+                                            : 'group-hover:fill-primary/20'
+                                        }`}
+                                      />
+                                      <span className={c.is_liked_by_current_user ? 'text-primary' : ''}>
+                                        {c.like_count > 0 ? c.like_count : 'Like'}
+                                      </span>
+                                    </button>
+                                    <button
+                                      className="text-xs font-semibold text-muted-foreground hover:text-foreground transition"
+                                      onClick={() => setActiveReplyTo(activeReplyTo === c.id ? null : c.id)}
+                                    >
+                                      Reply
+                                    </button>
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDateTime(c.created_at)}
                                     </span>
-                                  </button>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDateTime(c.created_at)}
-                                  </span>
+                                  </div>
+
+                                  {/* Reply Input */}
+                                  {activeReplyTo === c.id && (
+                                    <div className="mt-2 pl-3 space-y-2">
+                                      <Textarea
+                                        textareaSize="sm"
+                                        placeholder={`Reply to ${c.author.username}...`}
+                                        value={replyDrafts[c.id] || ''}
+                                        onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                                        disabled={!!replySubmitting[c.id]}
+                                      />
+                                      <div className="flex gap-2 justify-end">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setActiveReplyTo(null);
+                                            setReplyDrafts((prev) => ({ ...prev, [c.id]: '' }));
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => void submitReply(c.id, post.id)}
+                                          disabled={!!replySubmitting[c.id] || !String(replyDrafts[c.id] || '').trim()}
+                                          isLoading={!!replySubmitting[c.id]}
+                                        >
+                                          Reply
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
+
+                              {/* Nested Replies */}
+                              {c.replies && c.replies.length > 0 && (
+                                <div className="ml-11 space-y-2">
+                                  {/* View Replies Toggle */}
+                                  {!expandedReplies[c.id] && (
+                                    <button
+                                      className="text-xs font-semibold text-primary hover:underline"
+                                      onClick={() => setExpandedReplies((prev) => ({ ...prev, [c.id]: true }))}
+                                    >
+                                      View {c.replies.length} {c.replies.length === 1 ? 'reply' : 'replies'}
+                                    </button>
+                                  )}
+
+                                  {expandedReplies[c.id] && (
+                                    <>
+                                      <button
+                                        className="text-xs font-semibold text-muted-foreground hover:text-foreground"
+                                        onClick={() => setExpandedReplies((prev) => ({ ...prev, [c.id]: false }))}
+                                      >
+                                        Hide replies
+                                      </button>
+                                      {c.replies.map((reply) => (
+                                        <div key={reply.id} className="flex items-start gap-3">
+                                          {/* Reply Profile Picture */}
+                                          <Link href={`/${reply.author.username}`} className="flex-shrink-0">
+                                            <img
+                                              src={reply.author.avatar_url || '/no-profile-pic.png'}
+                                              alt={`${reply.author.username}'s avatar`}
+                                              className="w-7 h-7 rounded-full object-cover hover:opacity-80 transition-opacity"
+                                              onError={(e) => {
+                                                e.currentTarget.src = '/no-profile-pic.png';
+                                              }}
+                                            />
+                                          </Link>
+
+                                          {/* Reply Content */}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="bg-muted rounded-2xl px-3 py-2">
+                                              <Link 
+                                                href={`/${reply.author.username}`} 
+                                                className="text-sm font-semibold text-foreground hover:underline"
+                                              >
+                                                {reply.author.username}
+                                              </Link>
+                                              <div className="text-sm text-foreground whitespace-pre-wrap mt-0.5">
+                                                <SafeRichText text={reply.text_content} className="whitespace-pre-wrap" />
+                                              </div>
+                                            </div>
+
+                                            {/* Reply Actions */}
+                                            <div className="flex items-center gap-3 px-3 mt-1">
+                                              <button
+                                                className="flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-primary transition group"
+                                                onClick={() => void toggleCommentLike(reply.id, post.id)}
+                                              >
+                                                <Heart 
+                                                  className={`w-3.5 h-3.5 transition ${
+                                                    reply.is_liked_by_current_user 
+                                                      ? 'fill-primary text-primary' 
+                                                      : 'group-hover:fill-primary/20'
+                                                  }`}
+                                                />
+                                                <span className={reply.is_liked_by_current_user ? 'text-primary' : ''}>
+                                                  {reply.like_count > 0 ? reply.like_count : 'Like'}
+                                                </span>
+                                              </button>
+                                              <span className="text-xs text-muted-foreground">
+                                                {formatDateTime(reply.created_at)}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           ))}
 

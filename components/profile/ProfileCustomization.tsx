@@ -14,6 +14,10 @@ interface ProfileCustomizationProps {
     card_border_radius?: string;
     font_preset?: string;
     accent_color?: string;
+    button_color?: string;
+    content_text_color?: string;
+    ui_text_color?: string;
+    link_color?: string;
     links_section_title?: string;
   };
   hideStreamingStats?: boolean;
@@ -267,17 +271,18 @@ export default function ProfileCustomization({
         </div>
       </div>
       
-      {/* Typography */}
+      {/* Colors & Typography */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
           <Type size={20} />
-          Typography
+          Colors & Typography
         </h3>
         
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Font Preset */}
           <div>
             <label className="block text-sm font-semibold mb-2">
-              Font Preset
+              Font Style
             </label>
             <select
               value={settings.font_preset || 'modern'}
@@ -290,10 +295,111 @@ export default function ProfileCustomization({
               <option value="minimal">Minimal (Light)</option>
             </select>
           </div>
-          
+
+          {/* Button Color */}
           <div>
-            <label className="block text-sm font-semibold mb-2">
-              Accent Color
+            <label className="block text-sm font-semibold mb-3">
+              🎯 Button Color
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={settings.button_color || settings.accent_color || '#3B82F6'}
+                onChange={(e) => setSettings({ ...settings, button_color: e.target.value })}
+                className="w-16 h-10 rounded-lg cursor-pointer"
+              />
+              <input
+                type="text"
+                value={settings.button_color || settings.accent_color || '#3B82F6'}
+                onChange={(e) => setSettings({ ...settings, button_color: e.target.value })}
+                placeholder="#3B82F6"
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Color for buttons, CTAs, and primary actions
+            </p>
+          </div>
+
+          {/* Content Text Color */}
+          <div>
+            <label className="block text-sm font-semibold mb-3">
+              ✍️ Content Text Color
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={settings.content_text_color || '#1F2937'}
+                onChange={(e) => setSettings({ ...settings, content_text_color: e.target.value })}
+                className="w-16 h-10 rounded-lg cursor-pointer"
+              />
+              <input
+                type="text"
+                value={settings.content_text_color || '#1F2937'}
+                onChange={(e) => setSettings({ ...settings, content_text_color: e.target.value })}
+                placeholder="#1F2937"
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Color for your bio, post captions, and user-written content
+            </p>
+          </div>
+
+          {/* UI Text Color */}
+          <div>
+            <label className="block text-sm font-semibold mb-3">
+              🏷️ UI Text Color
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={settings.ui_text_color || '#374151'}
+                onChange={(e) => setSettings({ ...settings, ui_text_color: e.target.value })}
+                className="w-16 h-10 rounded-lg cursor-pointer"
+              />
+              <input
+                type="text"
+                value={settings.ui_text_color || '#374151'}
+                onChange={(e) => setSettings({ ...settings, ui_text_color: e.target.value })}
+                placeholder="#374151"
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Color for labels, headings, stats, and UI elements
+            </p>
+          </div>
+
+          {/* Link Color */}
+          <div>
+            <label className="block text-sm font-semibold mb-3">
+              🔗 Link Color
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={settings.link_color || '#3B82F6'}
+                onChange={(e) => setSettings({ ...settings, link_color: e.target.value })}
+                className="w-16 h-10 rounded-lg cursor-pointer"
+              />
+              <input
+                type="text"
+                value={settings.link_color || '#3B82F6'}
+                onChange={(e) => setSettings({ ...settings, link_color: e.target.value })}
+                placeholder="#3B82F6"
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Color for clickable links in your profile
+            </p>
+          </div>
+          
+          {/* Accent Color (Legacy - kept for compatibility) */}
+          <div>
+            <label className="block text-sm font-semibold mb-3">
+              ✨ Accent Color (Highlights)
             </label>
             <div className="flex items-center gap-3">
               <input
@@ -311,8 +417,101 @@ export default function ProfileCustomization({
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Used for buttons, links, and highlights
+              Used for highlights, badges, and special elements
             </p>
+          </div>
+
+          {/* Color Presets */}
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <label className="block text-sm font-semibold mb-3">
+              🎨 Quick Color Presets
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSettings({
+                  ...settings,
+                  button_color: '#3B82F6',
+                  content_text_color: '#1F2937',
+                  ui_text_color: '#374151',
+                  link_color: '#2563EB',
+                  accent_color: '#3B82F6'
+                })}
+                className="px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition text-sm font-medium"
+              >
+                💙 Classic Blue
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettings({
+                  ...settings,
+                  button_color: '#8B5CF6',
+                  content_text_color: '#1F2937',
+                  ui_text_color: '#374151',
+                  link_color: '#7C3AED',
+                  accent_color: '#8B5CF6'
+                })}
+                className="px-3 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition text-sm font-medium"
+              >
+                💜 Purple Dream
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettings({
+                  ...settings,
+                  button_color: '#EC4899',
+                  content_text_color: '#1F2937',
+                  ui_text_color: '#374151',
+                  link_color: '#DB2777',
+                  accent_color: '#EC4899'
+                })}
+                className="px-3 py-2 bg-pink-100 text-pink-800 rounded-lg hover:bg-pink-200 transition text-sm font-medium"
+              >
+                💗 Hot Pink
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettings({
+                  ...settings,
+                  button_color: '#10B981',
+                  content_text_color: '#1F2937',
+                  ui_text_color: '#374151',
+                  link_color: '#059669',
+                  accent_color: '#10B981'
+                })}
+                className="px-3 py-2 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 transition text-sm font-medium"
+              >
+                💚 Fresh Green
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettings({
+                  ...settings,
+                  button_color: '#F59E0B',
+                  content_text_color: '#1F2937',
+                  ui_text_color: '#374151',
+                  link_color: '#D97706',
+                  accent_color: '#F59E0B'
+                })}
+                className="px-3 py-2 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition text-sm font-medium"
+              >
+                🧡 Warm Amber
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettings({
+                  ...settings,
+                  button_color: '#1F2937',
+                  content_text_color: '#111827',
+                  ui_text_color: '#374151',
+                  link_color: '#1F2937',
+                  accent_color: '#1F2937'
+                })}
+                className="px-3 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition text-sm font-medium"
+              >
+                🖤 Dark Mode
+              </button>
+            </div>
           </div>
         </div>
       </div>

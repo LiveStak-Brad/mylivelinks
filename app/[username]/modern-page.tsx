@@ -88,6 +88,10 @@ interface ProfileData {
     card_border_radius?: string;
     font_preset?: string;
     accent_color?: string;
+    button_color?: string;
+    content_text_color?: string;
+    ui_text_color?: string;
+    link_color?: string;
     links_section_title?: string;
     // Social Media
     social_instagram?: string;
@@ -851,6 +855,11 @@ export default function ModernProfilePage() {
     'minimal': 'font-light'
   }[profile.font_preset || 'modern'] || 'font-sans';
   
+  // Custom colors with fallbacks
+  const buttonColor = profile.button_color || profile.accent_color || '#3B82F6';
+  const contentTextColor = profile.content_text_color || '#1F2937';
+  const uiTextColor = profile.ui_text_color || '#374151';
+  const linkColor = profile.link_color || profile.accent_color || '#3B82F6';
   const accentColor = profile.accent_color || '#3B82F6';
   
   // Follow button config
@@ -872,7 +881,8 @@ export default function ModernProfilePage() {
         return {
           icon: UserPlus,
           text: 'Follow',
-          className: 'text-white'
+          className: 'text-white',
+          style: { backgroundColor: buttonColor }
         };
     }
   };

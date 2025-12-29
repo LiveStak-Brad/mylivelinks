@@ -31,6 +31,10 @@ export async function POST(request: NextRequest) {
       'card_border_radius',
       'font_preset',
       'accent_color',
+      'button_color',
+      'content_text_color',
+      'ui_text_color',
+      'link_color',
       'links_section_title'
     ];
     
