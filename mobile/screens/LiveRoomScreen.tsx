@@ -335,7 +335,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
     try {
       const roomName = 'live_central';
       const handle = currentUser?.username ? `@${currentUser.username}` : 'MyLiveLinks';
-      const url = `https://mylivelinks.com/rooms?room=${encodeURIComponent(roomName)}`;
+      const url = `https://www.mylivelinks.com/rooms?room=${encodeURIComponent(roomName)}`;
 
       await Share.share({
         message: `${handle} is live in ${roomName}. Join: ${url}`,

@@ -49,7 +49,8 @@ export function RoomsCarousel({ onApplyPress }: RoomsCarouselProps) {
 
   const loadRooms = async () => {
     try {
-      const res = await fetch('https://mylivelinks.com/api/rooms');
+      const baseUrl = (process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com').replace(/\/+$/, '');
+      const res = await fetch(`${baseUrl}/api/rooms`);
       const json = await res.json();
       if (res.ok) {
         const dbRooms = (json?.rooms as ComingSoonRoom[]) ?? [];

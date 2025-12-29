@@ -223,6 +223,10 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
           width={36}
           height={36}
           className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover ring-2 ring-primary/20"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = '/no-profile-pic.png';
+          }}
         />
         
         {/* Chevron indicator */}
@@ -248,6 +252,10 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
                   width={40}
                   height={40}
                   className="w-10 h-10 rounded-full object-cover ring-2 ring-primary/20"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/no-profile-pic.png';
+                  }}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">

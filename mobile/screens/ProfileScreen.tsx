@@ -234,7 +234,7 @@ type FeedCursor = { before_created_at: string; before_id: string };
 export function ProfileScreen({
   username,
   isOwnProfile = false,
-  apiBaseUrl = 'https://mylivelinks.com',
+  apiBaseUrl = 'https://www.mylivelinks.com',
   authToken,
   onBack,
   onEditProfile,
@@ -2567,7 +2567,7 @@ export function ProfileScreen({
                   // ignore
                 }
                 try {
-                  void Linking.openURL('https://mylivelinks.com/signup');
+                  void Linking.openURL('https://www.mylivelinks.com/signup');
                 } catch {
                   // ignore
                 }

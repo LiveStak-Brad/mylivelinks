@@ -155,7 +155,7 @@ export function HomeDashboardScreen({ navigation }: Props) {
   };
 
   const handleApplyPress = () => {
-    Linking.openURL('https://mylivelinks.com/apply');
+    Linking.openURL('https://www.mylivelinks.com/apply');
   };
 
   if (loading) {

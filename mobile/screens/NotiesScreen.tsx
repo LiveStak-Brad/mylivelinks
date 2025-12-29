@@ -96,7 +96,7 @@ export function NotiesScreen({ navigation }: Props) {
     }
 
     try {
-      const absolute = url.startsWith('http') ? url : `https://mylivelinks.com${url}`;
+      const absolute = url.startsWith('http') ? url : `https://www.mylivelinks.com${url}`;
       void Linking.openURL(absolute);
     } catch {
       // ignore

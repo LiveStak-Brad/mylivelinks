@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import Image from 'next/image';
 import Link from 'next/link';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface UserConnection {
   id: string;
@@ -175,20 +176,16 @@ export default function UserConnectionsList({
           >
             {/* Avatar */}
             <div className="relative w-12 h-12 flex-shrink-0">
-              {user.avatar_url ? (
-                <Image
-                  src={user.avatar_url}
-                  alt={user.username}
-                  fill
-                  className="rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">
-                    {(user.username?.charAt(0) ?? '?').toUpperCase()}
-                  </span>
-                </div>
-              )}
+              <Image
+                src={getAvatarUrl(user.avatar_url)}
+                alt={user.username}
+                fill
+                className="rounded-full object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/no-profile-pic.png';
+                }}
+              />
             </div>
 
             {/* User Info */}

@@ -84,7 +84,7 @@ export function ProfileTabScreen({ navigation, route }: Props) {
     <ProfileScreen
       username={resolvedUsername}
       isOwnProfile={isOwnProfile}
-      apiBaseUrl="https://mylivelinks.com"
+      apiBaseUrl="https://www.mylivelinks.com"
       authToken={authToken}
       navigation={navigation}
       onBack={() => navigation.navigate('Home')}

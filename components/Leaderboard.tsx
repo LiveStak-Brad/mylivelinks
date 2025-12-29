@@ -266,6 +266,9 @@ export default function Leaderboard() {
                   src={getAvatarUrl(entry.avatar_url)}
                   alt={entry.username}
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 dark:border-gray-700"
+                  onError={(e) => {
+                    e.currentTarget.src = '/no-profile-pic.png';
+                  }}
                 />
               </div>
 

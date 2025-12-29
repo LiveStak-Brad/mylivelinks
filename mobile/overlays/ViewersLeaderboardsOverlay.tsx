@@ -15,10 +15,13 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useViewers } from '../hooks/useViewers';
 import { useLeaderboard } from '../hooks/useLeaderboard';
+import { UserActionCardV2 } from '../components/UserActionCardV2';
 
 interface ViewersLeaderboardsOverlayProps {
   visible: boolean;
   onClose: () => void;
+  onNavigateToProfile?: (username: string) => void;
+  onOpenIM?: (profileId: string, username: string, avatarUrl?: string) => void;
 }
 
 type Tab = 'viewers' | 'streamers' | 'gifters';
@@ -26,8 +29,17 @@ type Tab = 'viewers' | 'streamers' | 'gifters';
 export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProps> = ({
   visible,
   onClose,
+  onNavigateToProfile,
+  onOpenIM,
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('viewers');
+  const [selectedViewer, setSelectedViewer] = useState<{
+    profileId: string;
+    username: string;
+    avatarUrl?: string;
+    gifterLevel?: number;
+    isLive?: boolean;
+  } | null>(null);
   
   // Fetch real data
   const { viewers, loading: viewersLoading } = useViewers();
@@ -111,13 +123,25 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
                     </View>
                   ) : (
                     viewers.map((viewer) => (
-                      <View key={viewer.profile_id} style={styles.listItem}>
+                      <TouchableOpacity
+                        key={viewer.profile_id}
+                        style={styles.listItem}
+                        onPress={() => {
+                          setSelectedViewer({
+                            profileId: viewer.profile_id,
+                            username: viewer.username,
+                            avatarUrl: viewer.avatar_url,
+                            gifterLevel: viewer.gifter_level,
+                            isLive: viewer.is_live_available,
+                          });
+                        }}
+                      >
                         {viewer.is_live_available && <Text style={styles.liveIndicator}>🔴</Text>}
                         <Text style={styles.itemText}>{viewer.username}</Text>
                         {viewer.gifter_level > 0 && (
                           <Text style={styles.levelBadge}>Lvl {viewer.gifter_level}</Text>
                         )}
-                      </View>
+                      </TouchableOpacity>
                     ))
                   )}
                 </View>
@@ -171,6 +195,22 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
             </ScrollView>
           </View>
         </BlurView>
+
+        {/* User Action Card V2 */}
+        {selectedViewer && (
+          <UserActionCardV2
+            visible={true}
+            profileId={selectedViewer.profileId}
+            username={selectedViewer.username}
+            avatarUrl={selectedViewer.avatarUrl}
+            isLive={selectedViewer.isLive}
+            onClose={() => setSelectedViewer(null)}
+            inLiveRoom={true}
+            currentUserRole="viewer"
+            onNavigateToProfile={onNavigateToProfile}
+            onOpenIM={onOpenIM}
+          />
+        )}
       </Animated.View>
     </GestureDetector>
   );

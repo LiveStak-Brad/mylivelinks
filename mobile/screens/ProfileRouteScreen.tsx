@@ -34,7 +34,7 @@ export function ProfileRouteScreen({ navigation, route }: Props) {
     <ProfileScreen
       username={username}
       isOwnProfile={isOwnProfile}
-      apiBaseUrl="https://mylivelinks.com"
+      apiBaseUrl="https://www.mylivelinks.com"
       authToken={authToken}
       navigation={parentNav}
       onBack={() => navigation.goBack()}

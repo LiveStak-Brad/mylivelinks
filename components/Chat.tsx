@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
-import MiniProfile from './MiniProfile';
+import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
 
@@ -511,6 +511,9 @@ export default function Chat() {
                     src={getAvatarUrl(msg.avatar_url)}
                     alt={msg.username}
                     className="w-8 h-8 rounded-full flex-shrink-0"
+                    onError={(e) => {
+                      e.currentTarget.src = '/no-profile-pic.png';
+                    }}
                   />
                 </>
               )}
@@ -597,9 +600,9 @@ export default function Chat() {
         </div>
       </form>
 
-      {/* Mini Profile Modal */}
+      {/* User Action Card V2 */}
       {selectedProfile && (
-        <MiniProfile
+        <UserActionCardV2
           profileId={selectedProfile.profileId}
           username={selectedProfile.username}
           displayName={selectedProfile.displayName}
@@ -607,6 +610,8 @@ export default function Chat() {
           gifterStatus={selectedProfile.gifterStatus}
           isLive={selectedProfile.isLive}
           onClose={() => setSelectedProfile(null)}
+          inLiveRoom={true}
+          currentUserRole="viewer"
         />
       )}
     </div>

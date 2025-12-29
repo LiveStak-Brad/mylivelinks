@@ -1065,7 +1065,7 @@ export function useLiveRoomParticipants(
         const accessToken = sessionData?.session?.access_token || null;
         const cleanupUrl = process.env.EXPO_PUBLIC_API_URL
           ? `${process.env.EXPO_PUBLIC_API_URL}/api/stream-cleanup`
-          : 'https://mylivelinks.com/api/stream-cleanup';
+          : 'https://www.mylivelinks.com/api/stream-cleanup';
 
         await fetch(cleanupUrl, {
           method: 'POST',

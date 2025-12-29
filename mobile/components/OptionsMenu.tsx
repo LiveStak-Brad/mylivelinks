@@ -84,7 +84,7 @@ export function OptionsMenu({
               if (!accessToken) {
                 throw new Error('No auth session. Please log in again.');
               }
-              const res = await fetch('https://mylivelinks.com/api/admin/end-streams', {
+              const res = await fetch('https://www.mylivelinks.com/api/admin/end-streams', {
                 method: 'POST',
                 credentials: 'include',
                 headers: {
@@ -247,7 +247,7 @@ export function OptionsMenu({
                     return;
                   }
                   try {
-                    void Linking.openURL('https://mylivelinks.com/apply');
+                    void Linking.openURL('https://www.mylivelinks.com/apply');
                   } catch {
                     // ignore
                   }

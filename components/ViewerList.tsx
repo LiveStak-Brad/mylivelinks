@@ -6,7 +6,7 @@ import { Eye } from 'lucide-react';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
-import MiniProfile from './MiniProfile';
+import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface Viewer {
@@ -272,6 +272,9 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                     src={getAvatarUrl(viewer.avatar_url)}
                     alt={viewer.username}
                     className="w-8 h-8 rounded-full flex-shrink-0"
+                    onError={(e) => {
+                      e.currentTarget.src = '/no-profile-pic.png';
+                    }}
                   />
                 ) : (
                   // Default avatar if no image
@@ -279,6 +282,9 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                     src={getAvatarUrl(null)}
                     alt={viewer.username}
                     className="w-8 h-8 rounded-full flex-shrink-0"
+                    onError={(e) => {
+                      e.currentTarget.src = '/no-profile-pic.png';
+                    }}
                   />
                 )}
 
@@ -368,9 +374,9 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         )}
       </div>
 
-      {/* Mini Profile Modal */}
+      {/* User Action Card V2 */}
       {selectedProfile && (
-        <MiniProfile
+        <UserActionCardV2
           profileId={selectedProfile.profileId}
           username={selectedProfile.username}
           displayName={selectedProfile.displayName}
@@ -378,6 +384,8 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
           gifterStatus={selectedProfile.gifterStatus}
           isLive={selectedProfile.isLive}
           onClose={() => setSelectedProfile(null)}
+          inLiveRoom={true}
+          currentUserRole="viewer"
         />
       )}
     </div>

@@ -144,7 +144,7 @@ export function UserMenu({
       return;
     }
     try {
-      void Linking.openURL('https://mylivelinks.com/apply');
+      void Linking.openURL('https://www.mylivelinks.com/apply');
     } catch {
       // ignore
     }

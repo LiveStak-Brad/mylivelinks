@@ -199,17 +199,15 @@ export function ReferralLeaderboardPreview({
               </View>
 
               {/* Avatar */}
-              {entry.avatarUrl && (
-                <View style={styles.avatarContainer}>
-                  <Image
-                    source={{ uri: entry.avatarUrl }}
-                    style={[
-                      styles.avatar,
-                      isCurrentUser && styles.avatarHighlighted,
-                    ]}
-                  />
-                </View>
-              )}
+              <View style={styles.avatarContainer}>
+                <Image
+                  source={getAvatarSource(entry.avatarUrl)}
+                  style={[
+                    styles.avatar,
+                    isCurrentUser && styles.avatarHighlighted,
+                  ]}
+                />
+              </View>
 
               {/* Username and Referrals */}
               <View style={styles.userInfo}>
@@ -267,11 +265,9 @@ export function ReferralLeaderboardPreview({
               <View style={styles.rankContainer}>
                 <Text style={styles.rankText}>#{currentUserEntry.rank}</Text>
               </View>
-              {currentUserEntry.avatarUrl ? (
-                <View style={styles.avatarContainer}>
-                  <Image source={{ uri: currentUserEntry.avatarUrl }} style={[styles.avatar, styles.avatarHighlighted]} />
-                </View>
-              ) : null}
+              <View style={styles.avatarContainer}>
+                <Image source={getAvatarSource(currentUserEntry.avatarUrl)} style={[styles.avatar, styles.avatarHighlighted]} />
+              </View>
               <View style={styles.userInfo}>
                 <View style={styles.usernameRow}>
                   <Text style={styles.username} numberOfLines={1}>

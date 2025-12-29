@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { X, Minus, Send, MoreHorizontal, Phone, Video, Smile } from 'lucide-react';
 import Image from 'next/image';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 export interface IMMessage {
   id: string;
@@ -146,13 +147,14 @@ export default function IMChatWindow({
         <div className="relative">
           {/* Avatar bubble */}
           <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-white shadow-lg hover:scale-110 transition-transform">
-            {recipientAvatar ? (
-              <img src={recipientAvatar} alt={recipientUsername} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xl">
-                {recipientUsername.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <img 
+              src={getAvatarUrl(recipientAvatar)} 
+              alt={recipientUsername} 
+              className="w-full h-full object-cover bg-muted"
+              onError={(e) => {
+                e.currentTarget.src = '/no-profile-pic.png';
+              }}
+            />
           </div>
           
           {/* Online indicator */}
@@ -205,13 +207,14 @@ export default function IMChatWindow({
           {/* Avatar */}
           <div className="relative flex-shrink-0">
             <div className="w-8 h-8 rounded-full overflow-hidden">
-              {recipientAvatar ? (
-                <img src={recipientAvatar} alt={recipientUsername} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-white/20 flex items-center justify-center text-white font-bold text-sm">
-                  {recipientUsername.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <img 
+                src={getAvatarUrl(recipientAvatar)} 
+                alt={recipientUsername} 
+                className="w-full h-full object-cover bg-muted"
+                onError={(e) => {
+                  e.currentTarget.src = '/no-profile-pic.png';
+                }}
+              />
             </div>
             {isOnline && (
               <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-purple-600" />
@@ -266,12 +269,15 @@ export default function IMChatWindow({
         {/* Messages */}
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-3">
-              {recipientAvatar ? (
-                <img src={recipientAvatar} alt="" className="w-12 h-12 rounded-full object-cover" />
-              ) : (
-                <span className="text-2xl font-bold">{recipientUsername.charAt(0).toUpperCase()}</span>
-              )}
+            <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-3 overflow-hidden">
+              <img 
+                src={getAvatarUrl(recipientAvatar)} 
+                alt="" 
+                className="w-12 h-12 rounded-full object-cover bg-muted"
+                onError={(e) => {
+                  e.currentTarget.src = '/no-profile-pic.png';
+                }}
+              />
             </div>
             <p className="text-sm font-medium">{recipientUsername}</p>
             <p className="text-xs mt-1">Start a conversation</p>

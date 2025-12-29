@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface User {
   id: string;
@@ -117,20 +118,18 @@ export default function FollowersModal({
                 >
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
-                    {user.avatar_url ? (
-                      <div className="relative w-14 h-14 rounded-full overflow-hidden">
-                        <Image
-                          src={user.avatar_url}
-                          alt={user.username}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
-                        {(user.username?.[0] ?? '?').toUpperCase()}
-                      </div>
-                    )}
+                    <div className="relative w-14 h-14 rounded-full overflow-hidden">
+                      <Image
+                        src={getAvatarUrl(user.avatar_url)}
+                        alt={user.username}
+                        fill
+                        className="object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = '/no-profile-pic.png';
+                        }}
+                      />
+                    </div>
                     {user.is_live && (
                       <div className="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                         LIVE

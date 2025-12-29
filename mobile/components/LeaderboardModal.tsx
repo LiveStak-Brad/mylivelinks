@@ -14,9 +14,11 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../lib/supabase';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 interface LeaderboardEntry {
   profile_id: string;
@@ -227,34 +229,15 @@ export function LeaderboardModal({ visible, onClose, onNavigateToProfile }: Lead
 
                     {/* Avatar */}
                     <View style={styles.avatarContainer}>
-                      {entry.avatar_url ? (
-                        <View
-                          style={[
-                            styles.avatar,
-                            entry.rank === 1 && styles.avatar1,
-                            entry.rank === 2 && styles.avatar2,
-                            entry.rank === 3 && styles.avatar3,
-                          ]}
-                        >
-                          {/* Note: In production, use <Image source={{ uri: entry.avatar_url }} /> */}
-                          <Text style={styles.avatarPlaceholder}>
-                            {(entry.username?.[0] ?? '?').toUpperCase()}
-                          </Text>
-                        </View>
-                      ) : (
-                        <View
-                          style={[
-                            styles.avatar,
-                            entry.rank === 1 && styles.avatar1,
-                            entry.rank === 2 && styles.avatar2,
-                            entry.rank === 3 && styles.avatar3,
-                          ]}
-                        >
-                          <Text style={styles.avatarText}>
-                            {(entry.username?.[0] ?? '?').toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
+                      <Image
+                        source={getAvatarSource(entry.avatar_url)}
+                        style={[
+                          styles.avatar,
+                          entry.rank === 1 && styles.avatar1,
+                          entry.rank === 2 && styles.avatar2,
+                          entry.rank === 3 && styles.avatar3,
+                        ]}
+                      />
                     </View>
 
                     {/* User Info */}

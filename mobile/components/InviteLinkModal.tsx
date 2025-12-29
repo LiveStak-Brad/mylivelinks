@@ -35,7 +35,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
   const [loading, setLoading] = useState(true);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [inviteUrl, setInviteUrl] = useState<string>('https://mylivelinks.com/join');
+  const [inviteUrl, setInviteUrl] = useState<string>('https://www.mylivelinks.com/join');
 
   useEffect(() => {
     if (visible) {
@@ -48,7 +48,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
     try {
       if (!supabaseConfigured) {
         setReferralCode(null);
-        setInviteUrl('https://mylivelinks.com/join');
+        setInviteUrl('https://www.mylivelinks.com/join');
         setLoading(false);
         return;
       }
@@ -64,7 +64,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
 
         const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username).trim() : '';
         if (uname) {
-          setInviteUrl(`https://mylivelinks.com/invite/${encodeURIComponent(uname)}`);
+          setInviteUrl(`https://www.mylivelinks.com/invite/${encodeURIComponent(uname)}`);
         }
 
         // Prefer DB-backed referral codes (stable + unique)
@@ -74,24 +74,24 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
         if (!referralErr && code) {
           setReferralCode(code);
           if (!uname) {
-            setInviteUrl(`https://mylivelinks.com/join?ref=${encodeURIComponent(code)}`);
+            setInviteUrl(`https://www.mylivelinks.com/join?ref=${encodeURIComponent(code)}`);
           }
           return;
         }
 
         if (!uname) {
           setReferralCode(null);
-          setInviteUrl('https://mylivelinks.com/join');
+          setInviteUrl('https://www.mylivelinks.com/join');
         }
         return;
       } else {
         setReferralCode(null);
-        setInviteUrl('https://mylivelinks.com/join');
+        setInviteUrl('https://www.mylivelinks.com/join');
       }
     } catch (error) {
       console.error('Failed to load referral code:', error);
       setReferralCode(null);
-      setInviteUrl('https://mylivelinks.com/join');
+      setInviteUrl('https://www.mylivelinks.com/join');
     } finally {
       setLoading(false);
     }

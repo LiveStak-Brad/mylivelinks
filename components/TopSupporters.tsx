@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 interface Supporter {
   profile_id: string;
@@ -190,17 +191,14 @@ export default function TopSupporters() {
             </div>
 
             {/* Avatar */}
-            {supporter.avatar_url ? (
-              <img
-                src={supporter.avatar_url}
-                alt={supporter.username}
-                className="w-8 h-8 rounded-full flex-shrink-0"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {supporter.username[0]?.toUpperCase() || 'U'}
-              </div>
-            )}
+            <img
+              src={getAvatarUrl(supporter.avatar_url)}
+              alt={supporter.username}
+              className="w-8 h-8 rounded-full flex-shrink-0"
+              onError={(e) => {
+                e.currentTarget.src = '/no-profile-pic.png';
+              }}
+            />
 
             {/* Username & Badge */}
             <div className="flex-1 min-w-0">
