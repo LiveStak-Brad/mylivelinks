@@ -72,7 +72,7 @@ export default function UsersPage() {
 
   const renderRow = (user: User) => (
     <>
-      <TableCell width="flex-1">
+      <TableCell className="flex-1">
         <div className="flex items-center gap-3">
           <img
             src={user.avatarUrl || '/no-profile-pic.png'}
@@ -92,28 +92,28 @@ export default function UsersPage() {
           </div>
         </div>
       </TableCell>
-      <TableCell width="w-48">
+      <TableCell className="w-48">
         <span className="text-sm text-muted-foreground">{user.email}</span>
       </TableCell>
-      <TableCell width="w-32">
+      <TableCell className="w-32">
         {user.isBanned ? (
           <Badge variant="destructive">Banned</Badge>
         ) : (
           <Badge variant="success">Active</Badge>
         )}
       </TableCell>
-      <TableCell width="w-24">
+      <TableCell className="w-24">
         <span className="text-sm font-mono">{user.coinBalance.toLocaleString()}</span>
       </TableCell>
-      <TableCell width="w-24">
+      <TableCell className="w-24">
         <span className="text-sm font-mono">{user.diamondBalance.toLocaleString()}</span>
       </TableCell>
-      <TableCell width="w-32">
+      <TableCell className="w-32">
         <span className="text-xs text-muted-foreground">
           {new Date(user.createdAt).toLocaleDateString()}
         </span>
       </TableCell>
-      <TableCell width="w-16">
+      <TableCell className="w-16">
         <RowActions
           actions={[
             { label: 'View Details', icon: Eye, onClick: () => setSelectedUser(user) },
