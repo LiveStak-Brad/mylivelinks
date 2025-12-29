@@ -99,6 +99,42 @@ export default function Tile({
   
   // Helper to extract user ID from device-scoped identity
   // Identity format: u_<userId>:web:<deviceId>:<sessionId>
+  // Detect video aspect ratio for orientation-aware display
+  useEffect(() => {
+    if (!videoTrack || !videoRef.current) return;
+
+    const detectAspectRatio = () => {
+      const video = videoRef.current;
+      if (video && video.videoWidth && video.videoHeight) {
+        const ratio = video.videoWidth / video.videoHeight;
+        setVideoAspectRatio(ratio);
+        console.log('[Tile] Video aspect ratio detected:', {
+          slotIndex,
+          streamerId,
+          width: video.videoWidth,
+          height: video.videoHeight,
+          ratio,
+          isPortrait: ratio < 1,
+        });
+      }
+    };
+
+    // Detect immediately if video is ready
+    detectAspectRatio();
+
+    // Also detect on loadedmetadata event
+    const video = videoRef.current;
+    if (video) {
+      video.addEventListener('loadedmetadata', detectAspectRatio);
+      return () => {
+        video.removeEventListener('loadedmetadata', detectAspectRatio);
+      };
+    }
+  }, [videoTrack, slotIndex, streamerId]);
+
+  const isPortraitVideo = videoAspectRatio < 1;
+  const isSquareVideo = videoAspectRatio >= 0.9 && videoAspectRatio <= 1.1;
+
   const extractUserId = (identity: string): string => {
     if (identity.startsWith('u_')) {
       // Format: u_<userId>:web:device:session
@@ -981,7 +1017,9 @@ export default function Tile({
         {videoTrack && (
           <video
             ref={videoRef}
-            className={`absolute inset-0 w-full h-full object-cover ${isMuted ? 'grayscale' : ''}`}
+            className={`absolute inset-0 w-full h-full ${
+              isPortraitVideo || isSquareVideo ? 'object-contain' : 'object-cover'
+            } ${isMuted ? 'grayscale' : ''}`}
             autoPlay
             playsInline
             muted={isMuted}
