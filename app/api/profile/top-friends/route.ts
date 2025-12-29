@@ -19,24 +19,27 @@ export async function GET(request: NextRequest) {
 
     const supabase = createRouteHandlerClient(request);
 
+    console.log('[TOP_FRIENDS] Fetching for profile:', profileId);
+
     // Call RPC function to get top friends with full profile data
     const { data, error } = await supabase.rpc('get_top_friends', {
       p_profile_id: profileId,
     });
 
     if (error) {
-      console.error('[TOP_FRIENDS] Error fetching top friends:', error);
+      console.error('[TOP_FRIENDS] RPC Error:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch top friends' },
+        { error: 'Failed to fetch top friends', details: error.message },
         { status: 500 }
       );
     }
 
+    console.log('[TOP_FRIENDS] Success, found', data?.length || 0, 'friends');
     return NextResponse.json({ topFriends: data || [] });
-  } catch (error) {
+  } catch (error: any) {
     console.error('[TOP_FRIENDS] Unexpected error:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred' },
+      { error: 'An unexpected error occurred', details: error?.message },
       { status: 500 }
     );
   }
