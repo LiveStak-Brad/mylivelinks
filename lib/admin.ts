@@ -69,7 +69,7 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
     throw new Error('UNAUTHORIZED');
   }
 
-  const supabase = request ? createRouteHandlerClient(request) : createServerSupabaseClient();
+  const supabase = request ? createAuthedRouteHandlerClient(request) : createServerSupabaseClient();
   const { data: isAdmin, error: isAdminError } = await supabase.rpc('is_admin', {
     uid: user.id,
   });

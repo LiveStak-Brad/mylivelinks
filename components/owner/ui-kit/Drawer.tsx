@@ -5,6 +5,7 @@ interface DrawerProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
   position?: 'left' | 'right';
@@ -16,6 +17,7 @@ export default function Drawer({
   isOpen,
   onClose,
   title,
+  subtitle,
   children,
   footer,
   position = 'right',
@@ -75,7 +77,10 @@ export default function Drawer({
         {/* Header */}
         {title && (
           <div className="flex items-center justify-between p-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+              {subtitle && <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>}
+            </div>
             <button
               onClick={onClose}
               className="p-2 hover:bg-accent rounded-lg transition-colors"

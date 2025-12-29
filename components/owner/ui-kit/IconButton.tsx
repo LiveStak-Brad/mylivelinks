@@ -56,7 +56,7 @@ export default function IconButton({
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
-  variant?: 'default' | 'primary' | 'destructive' | 'ghost' | 'outline';
+  variant?: 'default' | 'primary' | 'secondary' | 'destructive' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   leftIcon?: React.ComponentType<{ className?: string }>;
   rightIcon?: React.ComponentType<{ className?: string }>;
@@ -78,6 +78,7 @@ export function Button({
   const variantClasses = {
     default: 'bg-accent hover:bg-accent-hover text-foreground',
     primary: 'bg-primary hover:bg-primary-hover text-primary-foreground',
+    secondary: 'bg-transparent border border-input hover:bg-accent text-foreground',
     destructive: 'bg-destructive hover:bg-destructive/90 text-destructive-foreground',
     ghost: 'bg-transparent hover:bg-accent text-foreground',
     outline: 'bg-transparent border border-input hover:bg-accent text-foreground',

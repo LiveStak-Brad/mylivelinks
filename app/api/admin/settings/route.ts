@@ -16,12 +16,12 @@ export async function GET(request: NextRequest) {
     const supabase = createRouteHandlerClient(request);
 
     const { data, error } = await supabase
-      .from('platform_settings')
+      .from('platform_settings_kv')
       .select('key, value, updated_at')
       .order('key', { ascending: true });
 
     if (!error) {
-      return NextResponse.json({ settings: data ?? [], source: 'platform_settings' });
+      return NextResponse.json({ settings: data ?? [], source: 'platform_settings_kv' });
     }
 
     return NextResponse.json({ settings: [], source: 'none' });

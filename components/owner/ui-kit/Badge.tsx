@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 
 interface BadgeProps {
   children: ReactNode;
-  variant?: 'default' | 'primary' | 'success' | 'warning' | 'destructive' | 'info' | 'accent';
+  variant?: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info' | 'accent';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   dot?: boolean;
@@ -18,6 +18,7 @@ export default function Badge({
   const variantClasses = {
     default: 'bg-muted text-muted-foreground',
     primary: 'bg-primary/10 text-primary',
+    secondary: 'bg-accent text-accent-foreground',
     success: 'bg-success/10 text-success',
     warning: 'bg-warning/10 text-warning',
     destructive: 'bg-destructive/10 text-destructive',
@@ -34,6 +35,7 @@ export default function Badge({
   const dotColors = {
     default: 'bg-muted-foreground',
     primary: 'bg-primary',
+    secondary: 'bg-accent-foreground',
     success: 'bg-success',
     warning: 'bg-warning',
     destructive: 'bg-destructive',

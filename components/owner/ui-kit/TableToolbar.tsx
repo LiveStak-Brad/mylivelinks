@@ -1,12 +1,25 @@
 import { ReactNode } from 'react';
 import { Search, Filter } from 'lucide-react';
 
+type TableToolbarFilter = {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+};
+
+type TableToolbarAction = {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tooltip?: string;
+};
+
 interface TableToolbarProps {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
-  actions?: ReactNode;
-  filters?: ReactNode;
+  actions?: ReactNode | TableToolbarAction[];
+  filters?: ReactNode | TableToolbarFilter[];
   className?: string;
 }
 
@@ -18,6 +31,54 @@ export default function TableToolbar({
   filters,
   className = '',
 }: TableToolbarProps) {
+  const renderFilters = () => {
+    if (!filters) return null;
+    if (Array.isArray(filters)) {
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          {filters.map((f) => (
+            <button
+              key={f.label}
+              type="button"
+              onClick={f.onClick}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                f.active
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-accent text-foreground hover:bg-accent-hover'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+    return filters;
+  };
+
+  const renderActions = () => {
+    if (!actions) return null;
+    if (Array.isArray(actions)) {
+      return (
+        <div className="flex items-center gap-2">
+          {actions.map((a) => (
+            <button
+              key={a.label}
+              type="button"
+              onClick={a.onClick}
+              disabled={a.disabled}
+              title={a.tooltip}
+              className="px-3 py-1.5 rounded-md text-sm font-medium bg-accent text-foreground hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+    return actions;
+  };
+
   return (
     <div className={`flex flex-col sm:flex-row gap-3 mb-4 ${className}`}>
       {/* Search Input */}
@@ -38,12 +99,12 @@ export default function TableToolbar({
       {filters && (
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-muted-foreground" />
-          {filters}
+          {renderFilters()}
         </div>
       )}
 
       {/* Action Buttons */}
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2">{renderActions()}</div>}
     </div>
   );
 }
