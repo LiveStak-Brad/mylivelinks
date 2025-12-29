@@ -197,5 +197,32 @@ COMMENT ON TABLE public.post_comments IS 'Comments on feed posts.';
 COMMENT ON TABLE public.post_gifts IS 'Gifts sent to feed posts (monetization).';
 COMMENT ON TABLE public.friends IS 'Friend relationships for friends-only post visibility.';
 
+-- ============================================================================
+-- Referral Activation Trigger: First Post
+-- ============================================================================
+-- This trigger hooks into the referral activation system (20251228_referrals_activation_v1.sql)
+-- When a user creates their first post, log the activity which may activate their referral
+-- ============================================================================
+
+-- Ensure the trigger function exists (it's defined in referrals_activation_v1 migration)
+-- If that migration hasn't run yet, this will fail gracefully
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'on_posts_first_post_activity'
+  ) THEN
+    -- Drop and recreate trigger to ensure it's properly attached
+    DROP TRIGGER IF EXISTS trg_posts_first_post_activity ON public.posts;
+    
+    CREATE TRIGGER trg_posts_first_post_activity
+    AFTER INSERT ON public.posts
+    FOR EACH ROW
+    EXECUTE FUNCTION public.on_posts_first_post_activity();
+  END IF;
+END;
+$$;
+
 COMMIT;
 
