@@ -43,25 +43,25 @@ export default function RoomBanner({
     default: {
       container: 'bg-gradient-to-r from-purple-600 to-pink-600 text-white',
       padding: 'py-2 px-4',
-      logoSize: 'w-12 h-12',
+      logoSize: 'w-16 h-16',
       fontSize: 'text-base',
     },
     minimal: {
       container: 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700',
       padding: 'py-1.5 px-4',
-      logoSize: 'w-10 h-10',
+      logoSize: 'w-14 h-14',
       fontSize: 'text-sm',
     },
     card: {
       container: 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-b-2 border-purple-500 shadow-sm',
       padding: 'py-2 px-4',
-      logoSize: 'w-14 h-14',
+      logoSize: 'w-20 h-20',
       fontSize: 'text-base',
     },
     gradient: {
       container: 'bg-gradient-to-r from-blue-600 to-purple-600 text-white',
       padding: 'py-2 px-4',
-      logoSize: 'w-12 h-12',
+      logoSize: 'w-16 h-16',
       fontSize: 'text-base',
     },
   };
@@ -72,14 +72,14 @@ export default function RoomBanner({
     <div 
       className={`w-full ${currentStyle.container} ${currentStyle.padding} ${currentStyle.fontSize} z-50 flex-shrink-0 flex items-center justify-between ${className}`}
     >
-      {/* Left: Logo Only */}
+      {/* Left: Logo Only - Large and slightly overflowing */}
       {roomLogoUrl && (
-        <div className={`${currentStyle.logoSize} flex-shrink-0 relative`}>
+        <div className={`${currentStyle.logoSize} flex-shrink-0 relative -my-1`}>
           <Image
             src={roomLogoUrl}
             alt={`${roomName} logo`}
-            width={56}
-            height={56}
+            width={80}
+            height={80}
             className="object-contain"
             unoptimized
           />
