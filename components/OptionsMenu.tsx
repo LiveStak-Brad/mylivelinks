@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { Settings } from 'lucide-react';
 import WalletModal from './WalletModal';
 import TransactionsModal from './TransactionsModal';
 import RoomRulesModal from './RoomRulesModal';
