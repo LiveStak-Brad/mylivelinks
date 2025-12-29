@@ -1022,7 +1022,8 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Screen Share Confirmation Modal */}
