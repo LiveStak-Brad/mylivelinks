@@ -537,7 +537,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
 
         // Update database first (this will trigger realtime updates)
         const { error: updateError } = await (supabase.from('live_streams') as any)
-          .update({ live_available: false, ended_at: new Date().toISOString() })
+          .update({ live_available: false, status: 'ended', ended_at: new Date().toISOString() })
           .eq('profile_id', user.id);
 
         if (updateError) {
@@ -714,7 +714,9 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         .upsert({
           profile_id: user.id,
           live_available: true,
+          status: 'live',
           started_at: new Date().toISOString(),
+          ended_at: null,
         }, {
           onConflict: 'profile_id',
         })

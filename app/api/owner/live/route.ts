@@ -94,7 +94,6 @@ async function fetchLiveStreams(limit: number, offset: number): Promise<{ items:
         profile:profiles!live_streams_profile_id_fkey(id, username, display_name, avatar_url)
       `
     )
-    .eq('status', 'live')
     .eq('live_available', true)
     .order('started_at', { ascending: false })
     .range(offset, offset + limit - 1);
@@ -124,8 +123,7 @@ async function fetchLiveStreams(limit: number, offset: number): Promise<{ items:
       items: rows.map((r: any) => {
         const streamIdNum = Number(r?.id);
         const host = r?.profile;
-        const rawStatus = String(r?.status ?? '').toLowerCase();
-        const mappedStatus: LiveStreamRow['status'] = rawStatus === 'live' ? 'live' : rawStatus === 'starting' ? 'starting' : rawStatus === 'scheduled' ? 'scheduled' : 'ended';
+        const mappedStatus: LiveStreamRow['status'] = 'live';
 
         return {
           stream_id: String(r?.id ?? ''),
