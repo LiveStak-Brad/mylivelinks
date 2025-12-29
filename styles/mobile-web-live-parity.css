@@ -242,6 +242,62 @@
     will-change: transform;
   }
 
+  /* =========================================================================
+     PERMISSIONS / DEVICE SELECTION MODAL - CENTERED ON MOBILE WEB
+     Must appear centered over grid, NOT as a side panel
+     ========================================================================= */
+  
+  /* Device modal overlay - ensure it appears above everything */
+  .mobile-live-container ~ div[class*="fixed inset-0"] {
+    z-index: 10000 !important; /* Above mobile-live-container (9998) */
+  }
+
+  /* Force center alignment for device selection modal */
+  @supports (display: flex) {
+    .mobile-live-container ~ div[class*="fixed inset-0"] {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 1rem !important;
+    }
+  }
+
+  /* Device modal content - ensure it's centered and contained */
+  .mobile-live-container ~ div[class*="fixed inset-0"] > div {
+    position: relative !important;
+    margin: auto !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    /* Ensure modal doesn't clip on small screens */
+    max-width: calc(100vw - 2rem) !important;
+  }
+
+  /* Device modal in portrait mode - stack vertically */
+  @media (orientation: portrait) {
+    .mobile-live-container ~ div[class*="fixed inset-0"] > div {
+      max-height: 85vh !important;
+    }
+  }
+
+  /* Device modal in landscape mode - more width available */
+  @media (orientation: landscape) {
+    .mobile-live-container ~ div[class*="fixed inset-0"] > div {
+      max-width: min(28rem, calc(100vw - 4rem)) !important;
+      max-height: 90vh !important;
+    }
+  }
+
+  /* Ensure preview video doesn't overflow */
+  .mobile-live-container ~ div[class*="fixed inset-0"] video {
+    max-width: 100% !important;
+    max-height: 40vh !important;
+    object-fit: contain !important;
+  }
+
+  /* =========================================================================
+     END PERMISSIONS MODAL STYLES
+     ========================================================================= */
+
   /* Color variables matching native mobile */
   .mobile-live-color-back {
     color: #60a5fa; /* Blue - Back button */
