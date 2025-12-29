@@ -17,7 +17,6 @@ import {
   CardHeader,
   CardBody,
   Table,
-  TableCell,
   EmptyState,
   Button,
   Badge,
@@ -100,11 +99,11 @@ export default function RolesPage() {
       <TableCell className="w-32">
         <span className="text-sm text-muted-foreground">{role.permissions.length} permissions</span>
       </TableCell>
-      <TableCell width="w-32">
+      <TableCell className="w-32">
         {role.isSystem ? (
           <Badge variant="default">System</Badge>
         ) : (
-          <Badge variant="info">Custom</Badge>
+          <Badge variant="secondary">Custom</Badge>
         )}
       </TableCell>
       <TableCell className="w-16">
