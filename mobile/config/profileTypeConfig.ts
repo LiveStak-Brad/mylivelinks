@@ -337,9 +337,11 @@ export function getEnabledQuickActions(profileType?: ProfileType): QuickActionCo
 
 /**
  * Check if a specific section is enabled for a profile type
- * Core sections (hero, footer, social_media, links) ALWAYS return true
- * Optional modules respect customEnabledModules setting
- * If customEnabledModules is provided, check that for optional modules
+ * Core sections (hero, footer) ALWAYS return true - these are non-removable shell elements
+ * ALL other sections (including social_media, links, social_counts) are FULLY CUSTOMIZABLE
+ * 
+ * CRITICAL: When user has customEnabledModules set (even empty array), profile_type defaults are BYPASSED
+ * This allows ANY user to add/remove ANY module regardless of their profile type
  */
 export function isSectionEnabled(
   section: ProfileSection, 
@@ -347,19 +349,20 @@ export function isSectionEnabled(
   customEnabledModules?: ProfileSection[] | null
 ): boolean {
   // Core sections are ALWAYS enabled (not customizable)
-  // These are essential shell elements that every profile needs
-  const CORE_SECTIONS: ProfileSection[] = ['hero', 'footer', 'social_media', 'links'];
+  // ONLY hero and footer are truly locked - everything else is optional
+  const CORE_SECTIONS: ProfileSection[] = ['hero', 'footer'];
   if (CORE_SECTIONS.includes(section)) {
     return true;
   }
   
   // For optional modules, check custom list if provided
-  // Important: Check for null/undefined explicitly - empty array [] means "disable all"
+  // Important: Check for null/undefined explicitly - empty array [] means "disable all optional"
+  // When customEnabledModules is set, we COMPLETELY BYPASS profile_type defaults
   if (customEnabledModules !== null && customEnabledModules !== undefined) {
     return customEnabledModules.includes(section);
   }
   
-  // Fallback to profile_type defaults
+  // Fallback to profile_type defaults ONLY if user has never customized
   const config = getProfileTypeConfig(profileType);
   const sectionConfig = config.sections.find(s => s.id === section);
   return sectionConfig?.enabled ?? false;

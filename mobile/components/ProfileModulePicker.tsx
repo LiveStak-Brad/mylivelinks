@@ -7,25 +7,50 @@ import { PROFILE_TYPE_CONFIG } from '../config/profileTypeConfig';
 // ============================================================================
 // OPTIONAL MODULES (Customizable)
 // ============================================================================
-// Core shell (hero, footer, connections, social_media, links) is NOT included
+// ONLY hero and footer are truly locked (core shell)
+// ALL other modules can be toggled on/off by any user regardless of profile type
+// This allows maximum flexibility - a streamer can show music, a musician can show streaming stats, etc.
 
 interface ModuleMetadata {
   id: ProfileSection;
   label: string;
   description: string;
+  category: string;
 }
 
 const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
-  // Network & Community (enabled by default)
+  // Essential Profile Elements (now customizable!)
+  social_counts: {
+    id: 'social_counts',
+    label: 'Social Counts',
+    description: 'Follower/following/friends counts',
+    category: 'Profile',
+  },
+  social_media: {
+    id: 'social_media',
+    label: 'Social Media Links',
+    description: 'Instagram, Twitter, TikTok icons',
+    category: 'Profile',
+  },
+  links: {
+    id: 'links',
+    label: 'Custom Links',
+    description: 'Your link collection',
+    category: 'Profile',
+  },
   connections: {
     id: 'connections',
     label: 'Connections',
-    description: 'Show your friends and followers',
+    description: 'Friends and followers display',
+    category: 'Profile',
   },
+  
+  // Network & Community
   referral_network: {
     id: 'referral_network',
     label: 'Referral Network',
     description: 'Your referral stats and network tree',
+    category: 'Community',
   },
   
   // Music & Entertainment
@@ -33,11 +58,13 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     id: 'music_showcase',
     label: 'Music Tracks',
     description: 'Your music library',
+    category: 'Content',
   },
   upcoming_events: {
     id: 'upcoming_events',
     label: 'Events / Shows',
     description: 'Your event schedule',
+    category: 'Content',
   },
   
   // Streaming & Stats
@@ -45,26 +72,25 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     id: 'streaming_stats',
     label: 'Streaming Stats',
     description: 'Live hours, viewer counts',
+    category: 'Stats',
   },
   profile_stats: {
     id: 'profile_stats',
     label: 'Profile Stats',
     description: 'Account age, join date',
-  },
-  social_counts: {
-    id: 'social_counts',
-    label: 'Social Counts',
-    description: 'Follower/following counts',
+    category: 'Stats',
   },
   top_supporters: {
     id: 'top_supporters',
     label: 'Top Supporters',
     description: 'Users who gifted you',
+    category: 'Stats',
   },
   top_streamers: {
     id: 'top_streamers',
     label: 'Top Streamers',
     description: 'Streamers you support',
+    category: 'Stats',
   },
   
   // Products & Business
@@ -72,16 +98,19 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     id: 'merchandise',
     label: 'Merchandise',
     description: 'Your merch store',
+    category: 'Business',
   },
   portfolio: {
     id: 'portfolio',
     label: 'Portfolio / Products',
     description: 'Your work showcase',
+    category: 'Business',
   },
   business_info: {
     id: 'business_info',
     label: 'Business Info',
     description: 'Hours, location, contact',
+    category: 'Business',
   },
 };
 

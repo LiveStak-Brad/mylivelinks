@@ -12,21 +12,50 @@ import {
 // ============================================================================
 // OPTIONAL MODULES (Customizable)
 // ============================================================================
-// Core shell (hero, footer, connections, social_media, links) is NOT included
-// These are always rendered regardless of user preference
+// ONLY hero and footer are truly locked (core shell)
+// ALL other modules can be toggled on/off by any user regardless of profile type
+// This allows maximum flexibility - a streamer can show music, a musician can show streaming stats, etc.
 
 interface ModuleMetadata {
   id: ProfileSection;
   label: string;
   description: string;
+  category: string;
 }
 
 const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
-  // Network & Community (enabled by default)
+  // Essential Profile Elements (now customizable!)
+  social_counts: {
+    id: 'social_counts',
+    label: 'Social Counts',
+    description: 'Follower/following/friends counts',
+    category: 'Profile',
+  },
+  social_media: {
+    id: 'social_media',
+    label: 'Social Media Links',
+    description: 'Instagram, Twitter, TikTok icons',
+    category: 'Profile',
+  },
+  links: {
+    id: 'links',
+    label: 'Custom Links',
+    description: 'Your Linktree-style link section',
+    category: 'Profile',
+  },
+  connections: {
+    id: 'connections',
+    label: 'Connections',
+    description: 'Friends and followers display',
+    category: 'Profile',
+  },
+  
+  // Network & Community
   referral_network: {
     id: 'referral_network',
     label: 'Referral Network',
     description: 'Your referral stats and network tree',
+    category: 'Community',
   },
   
   // Music & Entertainment
@@ -34,11 +63,13 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     id: 'music_showcase',
     label: 'Music Tracks',
     description: 'Your music library',
+    category: 'Content',
   },
   upcoming_events: {
     id: 'upcoming_events',
     label: 'Events / Shows',
     description: 'Your event schedule',
+    category: 'Content',
   },
   
   // Streaming & Stats
@@ -46,26 +77,25 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     id: 'streaming_stats',
     label: 'Streaming Stats',
     description: 'Live hours, viewer counts',
+    category: 'Stats',
   },
   profile_stats: {
     id: 'profile_stats',
     label: 'Profile Stats',
     description: 'Account age, join date',
-  },
-  social_counts: {
-    id: 'social_counts',
-    label: 'Social Counts',
-    description: 'Follower/following counts',
+    category: 'Stats',
   },
   top_supporters: {
     id: 'top_supporters',
     label: 'Top Supporters',
     description: 'Users who gifted you',
+    category: 'Stats',
   },
   top_streamers: {
     id: 'top_streamers',
     label: 'Top Streamers',
     description: 'Streamers you support',
+    category: 'Stats',
   },
   
   // Products & Business
@@ -73,16 +103,19 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     id: 'merchandise',
     label: 'Merchandise',
     description: 'Your merch store',
+    category: 'Business',
   },
   portfolio: {
     id: 'portfolio',
     label: 'Portfolio / Products',
     description: 'Your work showcase',
+    category: 'Business',
   },
   business_info: {
     id: 'business_info',
     label: 'Business Info',
     description: 'Hours, location, contact',
+    category: 'Business',
   },
 };
 
@@ -151,9 +184,9 @@ export default function ProfileModulePicker({
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-xl font-semibold">Optional Profile Modules</h2>
+          <h2 className="text-xl font-semibold">Profile Modules</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Choose which modules appear on your profile
+            Customize which sections appear on your profile. Profile type is just a starting point - add or remove ANY module!
           </p>
         </div>
         <Button
@@ -163,7 +196,7 @@ export default function ProfileModulePicker({
           className="flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
-          Add Modules
+          Customize Modules
         </Button>
       </div>
 
@@ -184,6 +217,7 @@ export default function ProfileModulePicker({
                 <button
                   onClick={() => removeModule(moduleId)}
                   className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                  title="Remove module"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -192,17 +226,27 @@ export default function ProfileModulePicker({
           })}
         </div>
       ) : (
-        <p className="text-gray-500 dark:text-gray-400 text-sm">
-          No optional modules enabled. Click "Add Modules" to get started.
-        </p>
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+          <p className="text-amber-900 dark:text-amber-100 text-sm font-medium mb-1">
+            ⚠️ No modules enabled
+          </p>
+          <p className="text-amber-700 dark:text-amber-300 text-sm">
+            Your profile will only show the header and footer. Click "Customize Modules" to add sections.
+          </p>
+        </div>
       )}
 
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold">Add / Remove Modules</h3>
+              <div>
+                <h3 className="text-lg font-semibold">Customize Profile Modules</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                  Add or remove ANY module - profile type doesn't limit you!
+                </p>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -211,37 +255,68 @@ export default function ProfileModulePicker({
               </button>
             </div>
 
-            <div className="overflow-y-auto p-4 space-y-2">
-              {availableModules.map((moduleId) => {
-                const module = OPTIONAL_MODULES[moduleId];
-                if (!module) return null;
-                const isEnabled = enabledModules.has(moduleId);
+            <div className="overflow-y-auto p-4">
+              {/* Group modules by category */}
+              {['Profile', 'Content', 'Stats', 'Community', 'Business'].map((category) => {
+                const categoryModules = availableModules.filter(
+                  (id) => OPTIONAL_MODULES[id]?.category === category
+                );
+                if (categoryModules.length === 0) return null;
 
                 return (
-                  <label
-                    key={moduleId}
-                    className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isEnabled}
-                      onChange={() => toggleModule(moduleId)}
-                      className="mt-0.5 w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {module.label}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {module.description}
-                      </div>
+                  <div key={category} className="mb-6 last:mb-0">
+                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">
+                      {category}
+                    </h4>
+                    <div className="space-y-2">
+                      {categoryModules.map((moduleId) => {
+                        const module = OPTIONAL_MODULES[moduleId];
+                        if (!module) return null;
+                        const isEnabled = enabledModules.has(moduleId);
+
+                        return (
+                          <label
+                            key={moduleId}
+                            className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isEnabled}
+                              onChange={() => toggleModule(moduleId)}
+                              className="mt-0.5 w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900 dark:text-white">
+                                {module.label}
+                              </div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                {module.description}
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
-                  </label>
+                  </div>
                 );
               })}
             </div>
 
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {enabledModules.size} {enabledModules.size === 1 ? 'module' : 'modules'} enabled
+                </span>
+                <button
+                  onClick={() => {
+                    setEnabledModules(new Set());
+                    onChange([]);
+                  }}
+                  className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
+                >
+                  Clear All
+                </button>
+              </div>
               <Button
                 onClick={() => setShowModal(false)}
                 variant="primary"

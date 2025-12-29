@@ -318,171 +318,197 @@ export default function ProfileSettingsPage() {
       return;
     }
 
+    // Set saving state immediately for instant UI feedback
     setSaving(true);
-    try {
-      // Upload avatar to storage if changed
-      let finalAvatarUrl = avatarUrl;
-      if (avatarInputRef.current?.files?.[0]) {
-        try {
-          finalAvatarUrl = await uploadAvatar(currentUserId, avatarInputRef.current.files[0]);
-        } catch (error: any) {
-          console.error('Avatar upload error:', error);
-          throw new Error(`Failed to upload avatar: ${error.message}`);
-        }
-      }
 
-      let profileTypeSavedViaRpc = false;
+    // Use setTimeout to yield to the browser and prevent UI blocking
+    setTimeout(async () => {
       try {
-        const resp = await fetch('/api/profile/type', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ type: profileType }),
-        });
-        if (resp.ok) profileTypeSavedViaRpc = true;
-      } catch {
-        profileTypeSavedViaRpc = false;
-      }
+        // Prepare update payload first (synchronous work)
+        const updatePayload: any = {
+          display_name: displayName,
+          bio: bio,
+          avatar_url: avatarUrl, // Will be updated if avatar changed
+          // Enabled modules (optional modules only)
+          enabled_modules: enabledModules || null,
+          // Enabled tabs (optional tabs only)
+          enabled_tabs: enabledTabs || null,
+          // Social media fields (strip @ if user included it)
+          social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
+          social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
+          social_youtube: socialYoutube.trim().replace(/^@/, '') || null,
+          social_tiktok: socialTiktok.trim().replace(/^@/, '') || null,
+          social_facebook: socialFacebook.trim().replace(/^@/, '') || null,
+          social_twitch: socialTwitch.trim().replace(/^@/, '') || null,
+          social_discord: socialDiscord.trim() || null,
+          social_snapchat: socialSnapchat.trim().replace(/^@/, '') || null,
+          social_linkedin: socialLinkedin.trim().replace(/^@/, '') || null,
+          social_github: socialGithub.trim().replace(/^@/, '') || null,
+          social_spotify: socialSpotify.trim() || null,
+          social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
+          // Display preferences
+          hide_streaming_stats: hideStreamingStats,
+          // Top Friends Customization
+          show_top_friends: showTopFriends,
+          top_friends_title: topFriendsTitle,
+          top_friends_avatar_style: topFriendsAvatarStyle,
+          top_friends_max_count: topFriendsMaxCount,
+          // Customization fields
+          profile_bg_url: customization.profile_bg_url || null,
+          profile_bg_overlay: customization.profile_bg_overlay,
+          card_color: customization.card_color,
+          card_opacity: customization.card_opacity,
+          card_border_radius: customization.card_border_radius,
+          font_preset: customization.font_preset,
+          accent_color: customization.accent_color,
+          button_color: customization.button_color || null,
+          content_text_color: customization.content_text_color || null,
+          ui_text_color: customization.ui_text_color || null,
+          link_color: customization.link_color || null,
+          links_section_title: customization.links_section_title,
+          updated_at: new Date().toISOString(),
+        };
 
-      const updatePayload: any = {
-        display_name: displayName,
-        bio: bio,
-        avatar_url: finalAvatarUrl,
-        // Enabled modules (optional modules only)
-        enabled_modules: enabledModules || null,
-        // Enabled tabs (optional tabs only)
-        enabled_tabs: enabledTabs || null,
-        // Social media fields (strip @ if user included it)
-        social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
-        social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
-        social_youtube: socialYoutube.trim().replace(/^@/, '') || null,
-        social_tiktok: socialTiktok.trim().replace(/^@/, '') || null,
-        social_facebook: socialFacebook.trim().replace(/^@/, '') || null,
-        social_twitch: socialTwitch.trim().replace(/^@/, '') || null,
-        social_discord: socialDiscord.trim() || null,
-        social_snapchat: socialSnapchat.trim().replace(/^@/, '') || null,
-        social_linkedin: socialLinkedin.trim().replace(/^@/, '') || null,
-        social_github: socialGithub.trim().replace(/^@/, '') || null,
-        social_spotify: socialSpotify.trim() || null,
-        social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
-        // Display preferences
-        hide_streaming_stats: hideStreamingStats,
-        // Top Friends Customization
-        show_top_friends: showTopFriends,
-        top_friends_title: topFriendsTitle,
-        top_friends_avatar_style: topFriendsAvatarStyle,
-        top_friends_max_count: topFriendsMaxCount,
-        // Customization fields
-        profile_bg_url: customization.profile_bg_url || null,
-        profile_bg_overlay: customization.profile_bg_overlay,
-        card_color: customization.card_color,
-        card_opacity: customization.card_opacity,
-        card_border_radius: customization.card_border_radius,
-        font_preset: customization.font_preset,
-        accent_color: customization.accent_color,
-        button_color: customization.button_color || null,
-        content_text_color: customization.content_text_color || null,
-        ui_text_color: customization.ui_text_color || null,
-        link_color: customization.link_color || null,
-        links_section_title: customization.links_section_title,
-        updated_at: new Date().toISOString(),
-      };
+        // Run async operations in parallel where possible
+        const [avatarResult, profileTypeResult] = await Promise.allSettled([
+          // Upload avatar if changed
+          (async () => {
+            if (avatarInputRef.current?.files?.[0]) {
+              try {
+                return await uploadAvatar(currentUserId, avatarInputRef.current.files[0]);
+              } catch (error: any) {
+                console.error('Avatar upload error:', error);
+                throw new Error(`Failed to upload avatar: ${error.message}`);
+              }
+            }
+            return null;
+          })(),
+          // Save profile type
+          (async () => {
+            try {
+              const resp = await fetch('/api/profile/type', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ type: profileType }),
+              });
+              return resp.ok;
+            } catch {
+              return false;
+            }
+          })(),
+        ]);
 
-      if (!profileTypeSavedViaRpc) {
-        updatePayload.profile_type = profileType;
-      }
+        // Update avatar URL if upload succeeded
+        if (avatarResult.status === 'fulfilled' && avatarResult.value) {
+          updatePayload.avatar_url = avatarResult.value;
+        }
 
-      // Update profile
-      const { data: profileData, error: profileError } = await (supabase.from('profiles') as any)
-        .update(updatePayload)
-        .eq('id', currentUserId)
-        .select();
-      
-      if (profileError) {
-        console.error('Profile update error:', profileError);
-        throw new Error(`Profile update failed: ${profileError.message} (${profileError.code || 'unknown'})`);
-      }
+        // Add profile_type to payload if API call failed
+        const profileTypeSavedViaRpc = profileTypeResult.status === 'fulfilled' && profileTypeResult.value;
+        if (!profileTypeSavedViaRpc) {
+          updatePayload.profile_type = profileType;
+        }
 
-      // Update links
-      // Delete all existing links
-      await supabase
-        .from('user_links')
-        .delete()
-        .eq('profile_id', currentUserId);
+        // Update profile
+        const { error: profileError } = await (supabase.from('profiles') as any)
+          .update(updatePayload)
+          .eq('id', currentUserId)
+          .select();
+        
+        if (profileError) {
+          console.error('Profile update error:', profileError);
+          throw new Error(`Profile update failed: ${profileError.message} (${profileError.code || 'unknown'})`);
+        }
 
-      // Insert updated links
-      if (links.length > 0) {
-        const linksToInsert = links
-          .filter(link => link.title.trim() && link.url.trim())
-          .map((link, index) => {
-            let url = link.url.trim();
-            
-            // Clean up URL - remove our domain if it was accidentally prepended
-            url = url.replace(/^https?:\/\/(www\.)?mylivelinks\.com\//gi, '');
-            
-            // Auto-add https:// if no protocol specified
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-              url = 'https://' + url;
+        // Process links in parallel with pinned post
+        const linksPromise = (async () => {
+          // Delete all existing links
+          await supabase
+            .from('user_links')
+            .delete()
+            .eq('profile_id', currentUserId);
+
+          // Insert updated links
+          if (links.length > 0) {
+            const linksToInsert = links
+              .filter(link => link.title.trim() && link.url.trim())
+              .map((link, index) => {
+                let url = link.url.trim();
+                
+                // Clean up URL - remove our domain if it was accidentally prepended
+                url = url.replace(/^https?:\/\/(www\.)?mylivelinks\.com\//gi, '');
+                
+                // Auto-add https:// if no protocol specified
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                  url = 'https://' + url;
+                }
+                
+                return {
+                  profile_id: currentUserId,
+                  title: link.title,
+                  url: url,
+                  display_order: index,
+                  is_active: true,
+                };
+              });
+
+            if (linksToInsert.length > 0) {
+              const { error: linksError } = await (supabase.from('user_links') as any)
+                .insert(linksToInsert);
+
+              if (linksError) throw linksError;
+            }
+          }
+        })();
+
+        // Update pinned post
+        const pinnedPostPromise = (async () => {
+          if (pinnedPostMedia && pinnedPostMediaPreview) {
+            // Upload media to storage
+            let mediaUrl: string;
+            try {
+              mediaUrl = await uploadPinnedPostMedia(currentUserId, pinnedPostMedia);
+            } catch (error: any) {
+              console.error('Pinned post media upload error:', error);
+              throw new Error(`Failed to upload media: ${error.message}`);
             }
             
-            return {
-              profile_id: currentUserId,
-              title: link.title,
-              url: url,
-              display_order: index,
-              is_active: true,
-            };
-          });
+            await upsertPinnedPost(
+              currentUserId,
+              pinnedPostCaption,
+              mediaUrl,
+              pinnedPostMediaType
+            );
+          } else if (pinnedPost && pinnedPostCaption) {
+            // Update caption only (keep existing media URL)
+            await upsertPinnedPost(
+              currentUserId,
+              pinnedPostCaption,
+              pinnedPost.media_url,
+              pinnedPost.media_type
+            );
+          } else if (!pinnedPostMediaPreview && pinnedPost) {
+            // Delete pinned post if media removed
+            // Also delete from storage
+            await deletePinnedPostMedia(currentUserId);
+            await deletePinnedPost(currentUserId);
+          }
+        })();
 
-        if (linksToInsert.length > 0) {
-          const { error: linksError } = await (supabase.from('user_links') as any)
-            .insert(linksToInsert);
+        // Wait for all parallel operations to complete
+        await Promise.all([linksPromise, pinnedPostPromise]);
 
-          if (linksError) throw linksError;
-        }
+        alert('Profile saved successfully!');
+        router.push(`/${username}`);
+      } catch (error: any) {
+        console.error('Error saving profile:', error);
+        const errorMessage = error?.message || error?.toString() || 'Unknown error';
+        alert(`Failed to save profile: ${errorMessage}\n\nCheck the browser console (F12) for more details.`);
+      } finally {
+        setSaving(false);
       }
-
-      // Update pinned post
-      if (pinnedPostMedia && pinnedPostMediaPreview) {
-        // Upload media to storage
-        let mediaUrl: string;
-        try {
-          mediaUrl = await uploadPinnedPostMedia(currentUserId, pinnedPostMedia);
-        } catch (error: any) {
-          console.error('Pinned post media upload error:', error);
-          throw new Error(`Failed to upload media: ${error.message}`);
-        }
-        
-        await upsertPinnedPost(
-          currentUserId,
-          pinnedPostCaption,
-          mediaUrl,
-          pinnedPostMediaType
-        );
-      } else if (pinnedPost && pinnedPostCaption) {
-        // Update caption only (keep existing media URL)
-        await upsertPinnedPost(
-          currentUserId,
-          pinnedPostCaption,
-          pinnedPost.media_url,
-          pinnedPost.media_type
-        );
-      } else if (!pinnedPostMediaPreview && pinnedPost) {
-        // Delete pinned post if media removed
-        // Also delete from storage
-        await deletePinnedPostMedia(currentUserId);
-        await deletePinnedPost(currentUserId);
-      }
-
-      alert('Profile saved successfully!');
-      router.push(`/${username}`);
-    } catch (error: any) {
-      console.error('Error saving profile:', error);
-      const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      alert(`Failed to save profile: ${errorMessage}\n\nCheck the browser console (F12) for more details.`);
-    } finally {
-      setSaving(false);
-    }
+    }, 0); // Yield to browser immediately
   };
 
   const addLink = () => {
@@ -703,14 +729,11 @@ export default function ProfileSettingsPage() {
         </div>
 
         {/* Optional Modules */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-2">Profile Sections</h2>
-          <ProfileModulePicker
-            profileType={profileType}
-            currentEnabledModules={enabledModules}
-            onChange={setEnabledModules}
-          />
-        </div>
+        <ProfileModulePicker
+          profileType={profileType}
+          currentEnabledModules={enabledModules}
+          onChange={setEnabledModules}
+        />
 
         {/* Optional Tabs */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
