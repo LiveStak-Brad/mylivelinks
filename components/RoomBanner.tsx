@@ -72,31 +72,24 @@ export default function RoomBanner({
     <div 
       className={`w-full ${currentStyle.container} ${currentStyle.padding} ${currentStyle.fontSize} z-50 flex-shrink-0 flex items-center justify-between ${className}`}
     >
-      {/* Left: Logo + Room Name */}
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        {roomLogoUrl && (
-          <div className={`${currentStyle.logoSize} flex-shrink-0 relative`}>
-            <Image
-              src={roomLogoUrl}
-              alt={`${roomName} logo`}
-              width={56}
-              height={56}
-              className="object-contain"
-              unoptimized
-            />
-          </div>
-        )}
-        <span className="font-bold truncate">
-          {roomName}
-        </span>
-      </div>
-
-      {/* Right: Presented By */}
-      {presentedBy && (
-        <span className="hidden sm:block font-medium opacity-90 text-right flex-shrink-0 ml-4">
-          by {presentedBy}
-        </span>
+      {/* Left: Logo Only */}
+      {roomLogoUrl && (
+        <div className={`${currentStyle.logoSize} flex-shrink-0 relative`}>
+          <Image
+            src={roomLogoUrl}
+            alt={`${roomName} logo`}
+            width={56}
+            height={56}
+            className="object-contain"
+            unoptimized
+          />
+        </div>
       )}
+
+      {/* Right: All Text */}
+      <div className="flex-1 text-right font-semibold ml-4">
+        {roomName} by {presentedBy}
+      </div>
     </div>
   );
 }
