@@ -4,6 +4,8 @@ import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { canAccessLive } from '@/lib/livekit-constants';
 
+const TOKEN_ROUTE_VERSION = 'mll-token-2025-12-29a';
+
 // Trim whitespace from environment variables to prevent issues
 const LIVEKIT_URL = process.env.LIVEKIT_URL?.trim();
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY?.trim();
@@ -20,7 +22,15 @@ const corsHeaders = {
 
 // Handle OPTIONS preflight request
 export async function OPTIONS(request: NextRequest) {
-  return NextResponse.json({}, { headers: corsHeaders });
+  return NextResponse.json(
+    {},
+    {
+      headers: {
+        ...corsHeaders,
+        'X-MLL-TOKEN-ROUTE': TOKEN_ROUTE_VERSION,
+      },
+    }
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -47,7 +57,14 @@ export async function POST(request: NextRequest) {
         ms: Date.now() - t0,
       });
     }
-    return NextResponse.json(body, { status, headers: corsHeaders });
+    return NextResponse.json(body, {
+      status,
+      headers: {
+        ...corsHeaders,
+        'X-MLL-TOKEN-ROUTE': TOKEN_ROUTE_VERSION,
+        'X-MLL-REQID': reqId,
+      },
+    });
   };
 
   class StageTimeoutError extends Error {

@@ -24,7 +24,7 @@ import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT } from '../lib/li
 
 const DEBUG = DEBUG_LIVEKIT;
 const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://mylivelinks.com').replace(/\/+$/, '');
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com').replace(/\/+$/, '');
 const TOKEN_ENDPOINT = `${API_BASE_URL}${TOKEN_ENDPOINT_PATH}`;
 
 const nowMs = (): number => {
@@ -121,6 +121,8 @@ export function useLiveRoomParticipants(
   const [lastTokenError, setLastTokenError] = useState<{ status: number | null; bodySnippet: string; message: string } | null>(null);
   const [lastWsUrl, setLastWsUrl] = useState<string | null>(null);
   const [lastConnectError, setLastConnectError] = useState<string | null>(null);
+  const tokenAttemptIdRef = useRef(0);
+  const tokenAttemptInFlightRef = useRef<number | null>(null);
   const isLiveRef = useRef(false);
   const isPublishingRef = useRef(false);
   const goLiveInFlightRef = useRef(false);
@@ -194,11 +196,22 @@ export function useLiveRoomParticipants(
     participantMetadata?: Record<string, any>;
   }): Promise<{ token: string; url: string }> => {
     try {
+      tokenAttemptIdRef.current += 1;
+      const attemptId = tokenAttemptIdRef.current;
+      if (tokenAttemptInFlightRef.current != null) {
+        console.log('[TOKEN] overlap_attempt', {
+          attemptId,
+          inFlightAttemptId: tokenAttemptInFlightRef.current,
+        });
+      }
+      tokenAttemptInFlightRef.current = attemptId;
+
       setConnectionError(null);
       setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: null, bodySnippet: null });
       setLastTokenError(null);
       setLastWsUrl(null);
       setLastConnectError(null);
+      
       // Get stable device ID
       const deviceId = await getDeviceId();
       
@@ -358,6 +371,7 @@ export function useLiveRoomParticipants(
       const timeoutMs = isDevClient ? 45_000 : 15_000;
 
       console.log('[TOKEN] start', {
+        attemptId,
         endpoint: TOKEN_ENDPOINT,
         timeoutMs,
         elapsedMs: 0,
@@ -366,6 +380,7 @@ export function useLiveRoomParticipants(
         try {
           const elapsedMs = Math.round(nowMs() - tokenFetchStart);
           console.log('[TOKEN] abort', {
+            attemptId,
             endpoint: TOKEN_ENDPOINT,
             timeoutMs,
             elapsedMs,
@@ -378,6 +393,7 @@ export function useLiveRoomParticipants(
 
       const response = await fetch(TOKEN_ENDPOINT, {
         method: 'POST',
+        redirect: 'follow',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
@@ -388,11 +404,24 @@ export function useLiveRoomParticipants(
 
       const tokenFetchMs = Math.round(nowMs() - tokenFetchStart);
 
+      const responseHeaders: Record<string, string> = {};
+      try {
+        (response.headers as any)?.forEach?.((value: string, key: string) => {
+          responseHeaders[String(key).toLowerCase()] = String(value);
+        });
+      } catch {
+        // ignore
+      }
+
       console.log('[TOKEN] response_arrived', {
+        attemptId,
         status: response.status,
         ok: response.ok,
         timeoutMs,
         elapsedMs: tokenFetchMs,
+        responseUrl: (response as any)?.url ?? null,
+        x_mll_token_route: responseHeaders['x-mll-token-route'] ?? null,
+        x_mll_reqid: responseHeaders['x-mll-reqid'] ?? null,
       });
 
       lastTokenStatusRef.current = response.status;
@@ -402,10 +431,13 @@ export function useLiveRoomParticipants(
       const responseText = redactTokenFromText(responseTextRaw);
       const snippet500 = toSnippet(responseText, 500);
       console.log('[TOKEN][HTTP] response', {
+        attemptId,
         status: response.status,
         ok: response.ok,
         timeoutMs,
         elapsedMs: tokenFetchMs,
+        responseUrl: (response as any)?.url ?? null,
+        headers: responseHeaders,
         textSnippet: snippet500,
       });
 
@@ -474,10 +506,11 @@ export function useLiveRoomParticipants(
 
       return data;
     } catch (error: any) {
+      const attemptId = tokenAttemptInFlightRef.current;
       const { name, message, cause } = getErrorDetails(error);
       const msg = message || 'Token fetch error';
       const stack = error?.stack ? String(error.stack).slice(0, 1200) : null;
-      console.error('[TOKEN] Fetch error:', { name, msg, cause, stack });
+      console.error('[TOKEN] Fetch error:', { attemptId, name, msg, cause, stack });
 
       const isAbort = name === 'AbortError' || msg === 'Aborted' || /aborted/i.test(msg);
 
@@ -495,6 +528,8 @@ export function useLiveRoomParticipants(
         message: msg,
       });
       throw error;
+    } finally {
+      tokenAttemptInFlightRef.current = null;
     }
   };
 
