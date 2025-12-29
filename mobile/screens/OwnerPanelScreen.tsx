@@ -86,71 +86,134 @@ export function OwnerPanelScreen({ navigation }: Props) {
   );
 }
 
-function StatCard({ label, value, iconName, iconColor }: { label: string; value: number; iconName: string; iconColor: string }) {
+function StatCard({ 
+  theme, 
+  label, 
+  value, 
+  iconName, 
+  iconColor 
+}: { 
+  theme: ThemeDefinition;
+  label: string; 
+  value: number; 
+  iconName: keyof typeof Feather.glyphMap; 
+  iconColor: string;
+}) {
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Ionicons name={iconName as any} size={20} color={iconColor} />
-        <Text style={styles.cardLabel}>{label}</Text>
+        <View style={[styles.iconCircle, { backgroundColor: iconColor + '20' }]}>
+          <Feather name={iconName} size={20} color={iconColor} />
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardLabel}>{label}</Text>
+          <Text style={styles.cardValue}>{value.toLocaleString()}</Text>
+        </View>
       </View>
-      <Text style={styles.cardValue}>
-        {value.toLocaleString()}
-      </Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  headerButton: {
-    height: 36,
-    paddingHorizontal: 12,
-  },
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  mutedText: {
-    color: '#bdbdbd',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  scroll: {
-    paddingBottom: 24,
-    gap: 10,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 14,
-    padding: 12,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  cardLabel: {
-    color: '#9aa0a6',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  cardValue: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-});
+function createStyles(theme: ThemeDefinition) {
+  const cardShadow = theme.elevations.card;
+  return StyleSheet.create({
+    headerButton: {
+      height: 32,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+    },
+    container: {
+      flex: 1,
+      padding: 16,
+      backgroundColor: theme.tokens.backgroundSecondary,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+    },
+    mutedText: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    errorText: {
+      color: theme.colors.danger,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    scroll: {
+      paddingBottom: 24,
+      gap: 12,
+    },
+    card: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardSurface,
+      borderRadius: 14,
+      padding: 16,
+      shadowColor: cardShadow.color,
+      shadowOpacity: cardShadow.opacity,
+      shadowRadius: cardShadow.radius,
+      shadowOffset: cardShadow.offset,
+      elevation: cardShadow.elevation,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    iconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardContent: {
+      flex: 1,
+    },
+    cardLabel: {
+      color: theme.colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 4,
+    },
+    cardValue: {
+      color: theme.colors.textPrimary,
+      fontSize: 24,
+      fontWeight: '900',
+    },
+    placeholderSection: {
+      marginTop: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+      paddingHorizontal: 24,
+      borderRadius: 14,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      backgroundColor: theme.colors.cardAlt,
+      gap: 10,
+    },
+    placeholderText: {
+      color: theme.colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    placeholderSubtext: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+  });
+}
