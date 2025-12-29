@@ -379,3 +379,4 @@ style={activeTab === 'info' ? { borderColor: accentColor, color: accentColor } :
 **The tabbed profile structure is now live on both web and mobile, creating a consistent, modern UX that matches popular social platforms like Instagram and Facebook.**
 
 
+

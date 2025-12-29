@@ -503,3 +503,4 @@ When testing, verify these visual elements:
 **Files**: components/ProfileTypePickerModal.tsx, app/settings/profile/page.tsx
 
 
+

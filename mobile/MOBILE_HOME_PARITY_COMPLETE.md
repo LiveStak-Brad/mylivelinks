@@ -246,3 +246,4 @@ eas build --profile preview --platform all --clear-cache
 The mobile Home page now provides the exact same information, functionality, and visual experience as the web version, adapted appropriately for mobile interaction patterns. A user familiar with the web experience will immediately recognize and understand the mobile experience.
 
 
+

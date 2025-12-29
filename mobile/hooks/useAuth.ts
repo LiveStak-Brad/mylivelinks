@@ -73,7 +73,16 @@ export function useAuth(): UseAuthReturn {
       try {
         console.log('[AUTH] Bootstrap: fetching initial session...');
         const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        if (error) {
+          // If the stored auth state is corrupted (e.g. missing refresh token), treat as signed out.
+          // This keeps first-launch / dev-client reload from hard-failing.
+          console.warn('[AUTH] Bootstrap: getSession returned error (treating as signed out)');
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            // ignore
+          }
+        }
         if (mounted) {
           console.log('[AUTH] Bootstrap: session loaded', {
             hasSession: !!data.session,
@@ -182,12 +191,24 @@ export function useAuth(): UseAuthReturn {
       return session.access_token;
     }
 
+    // If we don't have a session in React state, we also don't have a refresh token.
+    // Calling refreshSession() in this case throws "Refresh Token Not Found".
+    if (!session) {
+      return null;
+    }
+
     // If token is missing at time of request, attempt a single refresh to recover.
     // This is intentionally minimal and does not log any secrets.
     try {
       const { data, error } = await supabase.auth.refreshSession();
       if (error) {
         console.warn('[AUTH] refreshSession failed');
+        // Best-effort: if refresh token is invalid/missing, clear local auth state.
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // ignore
+        }
         return null;
       }
       if (data?.session) {

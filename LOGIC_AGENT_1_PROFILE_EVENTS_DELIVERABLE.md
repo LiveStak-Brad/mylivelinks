@@ -342,3 +342,4 @@ WHERE proname LIKE '%profile_event%';
 **Ready for QA testing and deployment to Supabase production.**
 
 
+

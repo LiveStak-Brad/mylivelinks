@@ -3,10 +3,12 @@ import { registerRootComponent } from 'expo';
 require('react-native-url-polyfill/auto');
 require('react-native-get-random-values');
 
-console.log('[ENV_BOOT]', {
-  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
-  SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL ? 'set' : 'missing',
-});
+if (process.env.EXPO_PUBLIC_DEBUG_ENV_BOOT === '1') {
+  console.log('[ENV_BOOT]', {
+    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+    SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL ? 'set' : 'missing',
+  });
+}
 
 const { TextDecoder, TextEncoder } = require('text-encoding');
 
@@ -19,6 +21,7 @@ const App = require('./App').default;
 // It also ensures that whether you load the app in Expo Go or in a native build,
 // the environment is set up appropriately
 registerRootComponent(App);
+
 
 
 

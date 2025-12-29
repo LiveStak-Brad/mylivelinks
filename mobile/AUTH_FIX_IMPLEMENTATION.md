@@ -355,3 +355,4 @@ Run the app with these fixes and you'll see:
 6. Verify all screens show consistent auth state
 
 
+

@@ -423,3 +423,4 @@ function createStyles(theme) {
 **The mobile profile is no longer a "simplified version" — it's the full experience, adapted for touch.**
 
 
+

@@ -179,7 +179,7 @@ export const Grid12: React.FC<Grid12Props> = ({
     );
 
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.container}>
         {/* Top bar - active count + exit button */}
         <View style={styles.focusTopBar}>
           <View style={styles.activeCountBadge}>
@@ -245,7 +245,7 @@ export const Grid12: React.FC<Grid12Props> = ({
 
   // Normal grid layout
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
       {/* Exit edit mode button */}
       {isEditMode && (
         <TouchableOpacity style={styles.exitEditButton} onPress={onExitEditMode}>
@@ -285,15 +285,17 @@ export const Grid12: React.FC<Grid12Props> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
-    padding: 0, // CRITICAL: NO padding - cameras fill 100% of screen
+    backgroundColor: '#000', // Black background visible through gaps
+    padding: 2, // Small padding creates black gaps between tiles
   },
   row: {
     flex: 1,
     flexDirection: 'row',
+    gap: 2, // Black gap between tiles horizontally
   },
   tileWrapper: {
     flex: 1,
+    marginVertical: 1, // Black gap between tiles vertically
   },
   exitEditButton: {
     position: 'absolute',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { ArrowLeft, Users, Volume2, VolumeX, Gift, Maximize2, Minimize2, AlertTriangle, LayoutGrid, Video } from 'lucide-react';
+import { ArrowLeft, Gift, Maximize2, Volume2, Share2, Settings, Sparkles, Video as VideoIcon } from 'lucide-react';
 import { Room } from 'livekit-client';
 import Tile from '@/components/Tile';
 import GoLiveButton from '@/components/GoLiveButton';
@@ -45,22 +45,22 @@ interface MobileWebWatchLayoutProps {
   onCloseTile: (slotIndex: number) => void;
 }
 
-// Grid configurations for different orientations and screen sizes
+// Grid configurations for different orientations
 const PORTRAIT_ROWS = 4;
 const PORTRAIT_COLS = 3;
 const LANDSCAPE_ROWS = 3;
 const LANDSCAPE_COLS = 4;
 
 /**
- * Mobile Web Watch Layout - Video-only experience for phone browsers
+ * Mobile Web Watch Layout v2.0 - NATIVE MOBILE PARITY
  * 
- * Features:
+ * Matches native mobile LiveRoomScreen exactly:
+ * - 3-column layout: [LEFT RAIL] [GRID] [RIGHT RAIL]
+ * - LEFT rail: 5 buttons evenly distributed (Back, [spacer], [spacer], Filter, Go Live)
+ * - RIGHT rail: 5 buttons evenly distributed (Gift, PiP, Mixer, Share, Options)
  * - Full-screen black background
- * - Always shows grid (even empty slots) - 4x3 portrait, 3x4 landscape
- * - Focus mode: tap to focus single tile, tap again to return
- * - Adaptive grid based on orientation
- * - Gift button + volume controls
- * - No chat UI at all
+ * - Landscape-first orientation
+ * - All touch targets ≥44px
  */
 export default function MobileWebWatchLayout({
   gridSlots,
@@ -185,7 +185,7 @@ export default function MobileWebWatchLayout({
     });
   }, [globalMuted, gridSlots, onMuteTile]);
 
-  // Handle gift button for focused tile or first active tile
+  // Handle gift button
   const handleGiftPress = useCallback(() => {
     const targetSlot = focusedSlot || activeSlots[0];
     if (targetSlot?.streamer) {
@@ -206,77 +206,95 @@ export default function MobileWebWatchLayout({
     }
   }, [focusedSlot, activeSlots]);
 
-  // Handle report
-  const handleReport = useCallback(() => {
-    const targetSlot = focusedSlot || activeSlots[0];
-    if (targetSlot?.streamer) {
-      setReportModalTarget({
-        reportedUserId: targetSlot.streamer.profile_id,
-        reportType: 'stream',
-        reportedUsername: targetSlot.streamer.username,
-      });
+  // Handle PiP toggle (focus mode)
+  const handlePiPToggle = useCallback(() => {
+    if (focusedSlotIndex !== null) {
+      handleExitFocus();
+    } else if (activeSlots.length > 0) {
+      setFocusedSlotIndex(activeSlots[0].slotIndex);
     }
-  }, [focusedSlot, activeSlots]);
+  }, [focusedSlotIndex, activeSlots, handleExitFocus]);
+
+  // Handle mixer (volume control)
+  const handleMixerPress = useCallback(() => {
+    handleGlobalMuteToggle();
+  }, [handleGlobalMuteToggle]);
+
+  // Handle share
+  const handleSharePress = useCallback(async () => {
+    try {
+      const url = `${window.location.origin}/rooms`;
+      await navigator.share({
+        title: 'Join Live Central',
+        text: 'Watch live streamers on MyLiveLinks!',
+        url: url,
+      });
+    } catch (err) {
+      // Share failed or cancelled - silent fail
+      console.log('Share cancelled or failed');
+    }
+  }, []);
+
+  // Handle options (placeholder)
+  const handleOptionsPress = useCallback(() => {
+    // TODO: Open options overlay/modal
+    alert('Options menu coming soon');
+  }, []);
+
+  // Handle filter (placeholder)
+  const handleFilterPress = useCallback(() => {
+    // TODO: Open filter options
+    alert('Filters coming soon');
+  }, []);
 
   return (
-    <div className="fixed inset-0 bg-black z-[9998] flex flex-col mobile-no-bounce">
-      {/* Top Bar - Minimal controls with safe area handling */}
-      <div className="absolute top-0 left-0 right-0 z-50 px-3 py-2 bg-gradient-to-b from-black/80 via-black/40 to-transparent mobile-safe-top mobile-safe-left mobile-safe-right">
-        <div className="flex items-center justify-between">
-          {/* Left: Back button */}
-          <button
-            onClick={onLeave}
-            className="flex items-center gap-2 text-white/90 hover:text-white transition p-2 -ml-2"
-          >
-            <ArrowLeft size={20} />
-            <span className="text-sm font-medium">Leave</span>
-          </button>
+    <div className="mobile-live-container">
+      {/* LEFT RAIL - Controller buttons (1/1/1/1/1 distribution) */}
+      <div className="mobile-live-left-rail">
+        {/* 1. Back Button */}
+        <button
+          onClick={onLeave}
+          className="mobile-live-button mobile-live-color-back"
+          aria-label="Leave"
+        >
+          <ArrowLeft />
+        </button>
 
-          {/* Center: Grid info (LIVE badge removed - if visible, they're live) */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 text-white/90 text-sm">
-              <Video size={14} />
-              <span>{activeCount}/{totalSlots}</span>
-            </div>
+        {/* 2. Spacer (maintains even distribution) */}
+        <div className="mobile-live-button-spacer" />
+
+        {/* 3. Spacer (maintains even distribution) */}
+        <div className="mobile-live-button-spacer" />
+
+        {/* 4. Filter Button */}
+        <button
+          onClick={handleFilterPress}
+          className="mobile-live-button mobile-live-color-filter"
+          aria-label="Filters"
+        >
+          <Sparkles />
+        </button>
+
+        {/* 5. Go Live Camera Button */}
+        {currentUserId && (
+          <div className="mobile-live-button mobile-live-button-primary">
+            <GoLiveButton
+              sharedRoom={sharedRoom}
+              isRoomConnected={isRoomConnected}
+              onGoLive={onGoLive}
+              onPublishingChange={onPublishingChange}
+              publishAllowed={publishAllowed}
+            />
           </div>
-
-          {/* Right: Focus mode indicator / exit */}
-          {focusedSlotIndex !== null && (
-            <button
-              onClick={handleExitFocus}
-              className="flex items-center gap-1 text-white/90 hover:text-white transition p-2 -mr-2"
-            >
-              <LayoutGrid size={18} />
-              <span className="text-xs">Grid</span>
-            </button>
-          )}
-          {focusedSlotIndex === null && (
-            <div className="flex items-center gap-2 p-2 -mr-2">
-              <div className="flex items-center gap-1 text-white/50 text-xs">
-                <Users size={14} />
-                <span>{viewerCount}</span>
-              </div>
-              {currentUserId && (
-                <div className="scale-125 origin-right">
-                  <GoLiveButton 
-                    sharedRoom={sharedRoom} 
-                    isRoomConnected={isRoomConnected} 
-                    onGoLive={onGoLive}
-                    onPublishingChange={onPublishingChange}
-                    publishAllowed={publishAllowed}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        )}
+        {!currentUserId && <div className="mobile-live-button-spacer" />}
       </div>
 
-      {/* Video Area - Full screen */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden pt-12 pb-16">
+      {/* CENTER GRID - Camera grid area */}
+      <div className="mobile-live-grid-area">
         {/* Focus Mode - Single tile maximized */}
         {focusedSlotIndex !== null && focusedSlot?.streamer ? (
-          <div className="w-full h-full relative" key={`${focusedSlot.slotIndex}:${focusedSlot.streamer.profile_id}`}>
+          <div className="mobile-live-focus-tile" key={`${focusedSlot.slotIndex}:${focusedSlot.streamer.profile_id}`}>
             <Tile
               streamerId={focusedSlot.streamer.profile_id}
               streamerUsername={focusedSlot.streamer.username}
@@ -305,30 +323,22 @@ export default function MobileWebWatchLayout({
             />
           </div>
         ) : (
-          /* Grid Mode - Always show full grid */
+          /* Grid Mode - Show full grid */
           <div 
-            className="w-full h-full p-1 grid gap-1"
+            className="mobile-live-grid"
             style={{
               gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
               gridTemplateRows: `repeat(${gridRows}, 1fr)`,
             }}
           >
-            {displaySlots.map((slot, index) => {
+            {displaySlots.map((slot) => {
               const hasStreamer = slot.streamer?.live_available;
-              
               const occupantKey = slot.streamer?.profile_id || 'empty';
+              
               return (
                 <div
                   key={`${slot.slotIndex}:${occupantKey}`}
-                  className={`relative rounded-lg overflow-hidden ${
-                    hasStreamer 
-                      ? 'cursor-pointer' 
-                      : 'cursor-default'
-                  } ${
-                    focusedSlotIndex === slot.slotIndex 
-                      ? 'ring-2 ring-blue-500' 
-                      : ''
-                  }`}
+                  className={hasStreamer ? 'mobile-live-grid-tile' : 'mobile-live-grid-tile mobile-live-grid-tile-empty'}
                   onClick={() => hasStreamer && handleTileTap(slot.slotIndex, true)}
                 >
                   {hasStreamer && slot.streamer ? (
@@ -362,10 +372,10 @@ export default function MobileWebWatchLayout({
                     />
                   ) : (
                     /* Empty slot placeholder */
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
-                      <Video size={isLandscape ? 20 : 24} className="opacity-30" />
-                      <span className="text-[10px] mt-1 opacity-50">Available</span>
-                    </div>
+                    <>
+                      <VideoIcon size={isLandscape ? 20 : 24} style={{ opacity: 0.3 }} />
+                      <span style={{ fontSize: '10px', marginTop: '4px', opacity: 0.5 }}>Available</span>
+                    </>
                   )}
                 </div>
               );
@@ -374,42 +384,54 @@ export default function MobileWebWatchLayout({
         )}
       </div>
 
-      {/* Bottom Bar - Gift + Volume controls with safe area handling */}
-      <div className="absolute bottom-0 left-0 right-0 z-50 px-4 py-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent mobile-safe-bottom mobile-safe-left mobile-safe-right">
-        <div className="flex items-center justify-between">
-          {/* Left: Report button */}
-          <button
-            onClick={handleReport}
-            disabled={activeCount === 0}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Report"
-          >
-            <AlertTriangle size={18} />
-          </button>
+      {/* RIGHT RAIL - Controller buttons (1/1/1/1/1 distribution) */}
+      <div className="mobile-live-right-rail">
+        {/* 1. Gift Button */}
+        <button
+          onClick={handleGiftPress}
+          disabled={activeCount === 0}
+          className="mobile-live-button mobile-live-button-primary mobile-live-color-gift"
+          aria-label="Send Gift"
+        >
+          <Gift />
+        </button>
 
-          {/* Center: Gift button */}
-          <button
-            onClick={handleGiftPress}
-            disabled={activeCount === 0}
-            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-full hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 active:scale-95 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            <Gift size={18} />
-            <span>Send Gift</span>
-          </button>
+        {/* 2. PiP / Focus Toggle Button */}
+        <button
+          onClick={handlePiPToggle}
+          disabled={activeCount === 0}
+          className={`mobile-live-button mobile-live-color-pip ${focusedSlotIndex !== null ? 'mobile-live-button-active' : ''}`}
+          aria-label={focusedSlotIndex !== null ? 'Exit Focus' : 'Focus Mode'}
+        >
+          <Maximize2 />
+        </button>
 
-          {/* Right: Volume toggle */}
-          <button
-            onClick={handleGlobalMuteToggle}
-            className={`flex items-center justify-center w-10 h-10 rounded-full transition ${
-              globalMuted 
-                ? 'bg-red-500/80 text-white' 
-                : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
-            }`}
-            title={globalMuted ? 'Unmute All' : 'Mute All'}
-          >
-            {globalMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-          </button>
-        </div>
+        {/* 3. Mixer / Volume Button */}
+        <button
+          onClick={handleMixerPress}
+          className={`mobile-live-button mobile-live-color-mixer ${globalMuted ? 'mobile-live-button-active' : ''}`}
+          aria-label={globalMuted ? 'Unmute All' : 'Mute All'}
+        >
+          <Volume2 />
+        </button>
+
+        {/* 4. Share Button */}
+        <button
+          onClick={handleSharePress}
+          className="mobile-live-button mobile-live-color-share"
+          aria-label="Share"
+        >
+          <Share2 />
+        </button>
+
+        {/* 5. Options Button */}
+        <button
+          onClick={handleOptionsPress}
+          className="mobile-live-button mobile-live-color-options"
+          aria-label="Options"
+        >
+          <Settings />
+        </button>
       </div>
 
       {/* Gift Modal */}
@@ -437,4 +459,3 @@ export default function MobileWebWatchLayout({
     </div>
   );
 }
-

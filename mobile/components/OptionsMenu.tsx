@@ -166,6 +166,7 @@ export function OptionsMenu({
         visible={showMenu}
         animationType="fade"
         transparent
+        supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
         onRequestClose={closeMenu}
       >
         <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) + 40 }]}>

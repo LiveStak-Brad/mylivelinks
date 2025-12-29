@@ -123,24 +123,17 @@ export const Tile: React.FC<TileProps> = ({
   const containerStyle = useMemo(
     () => [
       styles.container,
-      { backgroundColor: theme.colors.card, borderColor: theme.colors.border },
       isMinimized && styles.minimized,
-      isFocused && { borderColor: theme.colors.accent },
+      isFocused && { borderColor: '#4a9eff', borderWidth: 3 },
     ],
-    [isFocused, isMinimized, theme.colors.accent, theme.colors.border, theme.colors.card]
+    [isFocused, isMinimized]
   );
 
   if (!participant) {
     // Empty tile (autofill placeholder)
     return (
-      <View
-        style={[
-          styles.container,
-          styles.emptyTile,
-          { backgroundColor: theme.colors.cardAlt, borderColor: theme.colors.border },
-        ]}
-      >
-        <Text style={[styles.emptyText, { color: theme.colors.mutedText }]}>Available</Text>
+      <View style={[styles.container, styles.emptyTile]}>
+        <Text style={styles.emptyText}>Available</Text>
       </View>
     );
   }
@@ -154,11 +147,11 @@ export const Tile: React.FC<TileProps> = ({
         {videoTrack ? (
           <VideoView
             videoTrack={videoTrack}
-            style={{ ...styles.videoRenderer, backgroundColor: theme.colors.background }}
+            style={{ ...styles.videoRenderer }}
             objectFit="cover"
           />
         ) : (
-          <View style={[styles.videoPlaceholder, { backgroundColor: theme.colors.cardAlt }]}>
+          <View style={styles.videoPlaceholder}>
             <Text style={styles.placeholderText}>📹</Text>
           </View>
         )}
@@ -169,7 +162,7 @@ export const Tile: React.FC<TileProps> = ({
       </View>
 
         {/* Username - bottom left */}
-        <View style={[styles.bottomLeft, { backgroundColor: theme.colors.overlay }]}>
+        <View style={styles.bottomLeft}>
           <Text style={styles.username} numberOfLines={1}>
             {username}
           </Text>
@@ -177,7 +170,7 @@ export const Tile: React.FC<TileProps> = ({
 
         {/* Viewer count - bottom right */}
         {viewerCount !== undefined && (
-          <View style={[styles.bottomRight, { backgroundColor: theme.colors.overlay }]}>
+          <View style={styles.bottomRight}>
             <Text style={styles.viewerCount}>👁 {viewerCount}</Text>
           </View>
         )}
@@ -203,34 +196,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
-    borderRadius: 0, // NO rounded corners - full bleed
+    borderRadius: 4, // Slight rounded corners
     overflow: 'hidden',
-    margin: 0, // NO margins - tiles touch edges
-    borderWidth: 0.5, // Optional: 1px hairline divider
-    borderColor: 'rgba(255, 255, 255, 0.05)',
+    margin: 0,
+    borderWidth: 0, // Remove border since we have gaps now
     position: 'relative',
   },
   emptyTile: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0a',
-    borderWidth: 1,
-    borderColor: '#333',
-    borderStyle: 'dashed',
+    backgroundColor: '#1a1a1a', // Dark color for empty slots
+    borderRadius: 4, // Slight rounded corners
   },
   emptyText: {
-    color: '#555',
+    color: '#ffffff', // White text for "Available"
     fontSize: 12,
+    fontWeight: '500',
   },
   videoRenderer: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#000', // Force black background
   },
   videoPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: '#1a1a1a', // Dark gray when no video
   },
   placeholderText: {
     fontSize: 32,

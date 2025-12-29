@@ -266,3 +266,4 @@ grep -r "className.*p-[0-9]" components/profile/sections
 **Agent directive**: Fix ModernLinksSection and AdultLinksSection first, then verify all other sections follow the standard. Test with different opacity values (30%, 50%, 100%) to ensure consistency.
 
 
+

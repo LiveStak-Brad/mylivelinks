@@ -360,6 +360,10 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
     setSlotVolume(slotIndex, value);
   }, [setSlotVolume]);
 
+  const handleFilterPress = useCallback(() => {
+    Alert.alert('Coming soon', 'Video filters will be available in a future update.');
+  }, []);
+
   // Gesture handlers for tiles
   const handleLongPress = useCallback((identity: string) => {
     if (DEBUG) console.log(`[GESTURE] Long-press → enter edit mode (identity=${identity})`);
@@ -451,21 +455,37 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         
         {/* LEFT COLUMN - Controls */}
         <View style={[styles.leftColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingLeft: insets.left || 12 }]}>
-          {/* Back Button - TOP LEFT */}
+          {/* Back Button - Position 1 */}
           <TouchableOpacity onPress={handleExitLive} style={styles.vectorButton} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={28} color="#4a9eff" />
+            <Ionicons name="arrow-back" size={28} color="#ffffff" />
           </TouchableOpacity>
           
-          <View style={styles.spacer} />
+          {/* Empty space - Position 2 (aligns with Gift) */}
+          <View style={styles.vectorButton} />
           
-          {/* GO LIVE - BOTTOM LEFT */}
+          {/* Empty space - Position 3 (aligns with PiP) */}
+          <View style={styles.vectorButton} />
+          
+          {/* FILTER BUTTON - Position 4 (aligns with Mixer) */}
           <TouchableOpacity
-            style={[styles.goLiveButton, (isLive && isPublishing) && styles.goLiveButtonActive]}
-            disabled={false}
-            onPress={handleToggleGoLive}
-            activeOpacity={0.8}
+            style={styles.vectorButton}
+            onPress={handleFilterPress}
+            activeOpacity={0.7}
           >
-            <Ionicons name="videocam" size={20} color="#ffffff" />
+            <Ionicons name="color-wand" size={26} color="#ffffff" />
+          </TouchableOpacity>
+
+          {/* GO LIVE CAMERA ICON - Position 5 (aligns with Share) */}
+          <TouchableOpacity
+            style={styles.vectorButton}
+            onPress={handleToggleGoLive}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="videocam" 
+              size={28} 
+              color={(isLive && isPublishing) ? "#ef4444" : "#ffffff"} 
+            />
           </TouchableOpacity>
         </View>
 
@@ -502,27 +522,27 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         <View style={[styles.rightColumn, { paddingTop: insets.top || 8, paddingBottom: insets.bottom || 8, paddingRight: insets.right || 12 }]}>
           {/* Options */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleOptionsPress} activeOpacity={0.7}>
-            <Ionicons name="settings-sharp" size={26} color="#fbbf24" />
+            <Ionicons name="settings-sharp" size={26} color="#ffffff" />
           </TouchableOpacity>
 
           {/* Gift */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleGiftPress} activeOpacity={0.7}>
-            <Ionicons name="gift" size={26} color="#ff6b9d" />
+            <Ionicons name="gift" size={26} color="#ffffff" />
           </TouchableOpacity>
 
           {/* PiP */}
           <TouchableOpacity style={styles.vectorButton} onPress={handlePiPPress} activeOpacity={0.7}>
-            <Ionicons name="contract" size={26} color="#a78bfa" />
+            <Ionicons name="contract" size={26} color={state.focusedIdentity ? "#a855f7" : "#ffffff"} />
           </TouchableOpacity>
 
           {/* Mixer */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleMixerPress} activeOpacity={0.7}>
-            <Ionicons name="options" size={26} color="#10b981" />
+            <Ionicons name="options" size={26} color="#ffffff" />
           </TouchableOpacity>
 
           {/* Share */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleSharePress} activeOpacity={0.7}>
-            <Ionicons name="share-outline" size={26} color="#34d399" />
+            <Ionicons name="share-outline" size={26} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -579,15 +599,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row', // Side by side columns
+    backgroundColor: '#000',
   },
   
-  // LEFT COLUMN (Back + GO LIVE) - Increased padding for breathing room
+  // LEFT COLUMN - Matches right column spacing with space-evenly
   leftColumn: {
     width: 88,
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly', // Same as right column for alignment
     alignItems: 'center',
     paddingLeft: 12,
     paddingRight: 20,
+    paddingVertical: 16, // Same as right column
     backgroundColor: '#000',
     overflow: 'hidden',
     zIndex: 100,
@@ -632,10 +654,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   
-  // RIGHT COLUMN - Increased padding, evenly distributed controls
+  // RIGHT COLUMN - Evenly distributed controls
   rightColumn: {
     width: 88,
-    justifyContent: 'space-evenly', // Even distribution (NO GROUPING)
+    justifyContent: 'space-evenly', // Evenly distributed
     alignItems: 'center',
     paddingLeft: 20,
     paddingRight: 12,
@@ -649,30 +671,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   
-  // GO LIVE BUTTON - Redesigned: smaller, red with white camera icon
-  goLiveButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#ef4444',
-    borderWidth: 2,
-    borderColor: '#dc2626',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#ef4444',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  
-  goLiveButtonActive: {
-    shadowOpacity: 0.8,
-    shadowRadius: 12,
-    elevation: 16,
-  },
-  
-  // VECTOR BUTTONS - Consistent size and touch target (44x44 minimum)
+  // VECTOR BUTTONS - Consistent size and touch target (48x48 for better accessibility)
   vectorButton: {
     width: 48,
     height: 48,

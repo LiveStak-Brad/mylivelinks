@@ -381,3 +381,4 @@ ADD COLUMN enabled_sections text[] DEFAULT NULL;
 **Tested**: ✅ Web + Mobile  
 **Documentation**: ✅ Complete  
 
+

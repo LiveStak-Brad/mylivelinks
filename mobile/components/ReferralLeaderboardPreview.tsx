@@ -15,12 +15,20 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import {
-  formatReferralCount,
-  type LeaderboardEntry,
-} from '../../lib/referralMockData';
 import { ThemeDefinition } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
+
+type LeaderboardEntry = {
+  rank: number;
+  profileId?: string;
+  username: string;
+  avatarUrl?: string;
+  referralCount: number;
+  activeCount?: number;
+  isCurrentUser?: boolean;
+};
+
+const formatReferralCount = (count: number) => count.toLocaleString();
 
 interface ReferralLeaderboardPreviewProps {
   showCurrentUser?: boolean;

@@ -1,0 +1,292 @@
+/* =============================================================================
+   MOBILE-WEB LIVE PARITY - Match Native Mobile Layout Exactly
+   
+   Native mobile structure:
+   - Full-screen black background
+   - 3-column layout: [LEFT RAIL] [GRID] [RIGHT RAIL]
+   - LEFT rail: 5 buttons evenly distributed (1/1/1/1/1)
+   - RIGHT rail: 5 buttons evenly distributed (1/1/1/1/1)
+   - Grid: Fits perfectly between rails with proper padding
+   - All touch targets: minimum 44px
+   
+   Breakpoint: Applied at ≤767px (mobile web)
+============================================================================= */
+
+@media (max-width: 767px) {
+  /* Full-screen container - black background, no scroll */
+  .mobile-live-container {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    z-index: 9998;
+    /* Prevent any scrolling or bounce */
+    touch-action: none;
+    overscroll-behavior: none;
+  }
+
+  /* LEFT RAIL - Controller buttons, evenly distributed */
+  .mobile-live-left-rail {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly; /* CRITICAL: Even distribution 1/1/1/1/1 */
+    align-items: center;
+    padding: max(12px, env(safe-area-inset-left)) 8px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    min-width: 60px;
+    gap: 0; /* Remove gap, use space-evenly for perfect distribution */
+    z-index: 10;
+  }
+
+  /* RIGHT RAIL - Controller buttons, evenly distributed */
+  .mobile-live-right-rail {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly; /* CRITICAL: Even distribution 1/1/1/1/1 */
+    align-items: center;
+    padding: max(12px, env(safe-area-inset-right)) 8px;
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    min-width: 60px;
+    gap: 0; /* Remove gap, use space-evenly for perfect distribution */
+    z-index: 10;
+  }
+
+  /* CENTER GRID - Fits between rails */
+  .mobile-live-grid-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 4px; /* Breathing room around grid */
+    min-width: 0; /* Allow flex shrink */
+  }
+
+  /* Grid wrapper - responsive to orientation */
+  .mobile-live-grid {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    gap: 2px; /* Tight spacing like native */
+    /* Grid columns/rows set inline via style attribute based on orientation */
+  }
+
+  /* Vector button - matches native touch targets */
+  .mobile-live-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* WCAG minimum touch target: 44x44px */
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    /* Ensure icons are centered */
+    position: relative;
+  }
+
+  .mobile-live-button:active {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+
+  /* Button when "active" state (e.g., Go Live is ON) */
+  .mobile-live-button-active {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Disabled state */
+  .mobile-live-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .mobile-live-button:disabled:active {
+    transform: none;
+  }
+
+  /* Icon sizing - consistent with native */
+  .mobile-live-button svg,
+  .mobile-live-button i {
+    width: 26px;
+    height: 26px;
+    display: block;
+  }
+
+  /* Larger icon for primary actions (Go Live, Gift) */
+  .mobile-live-button-primary svg,
+  .mobile-live-button-primary i {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Empty spacer button (invisible, maintains spacing) */
+  .mobile-live-button-spacer {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* Hide desktop LIVE UI elements on mobile web */
+  .mobile-live-hide-on-mobile {
+    display: none !important;
+  }
+
+  /* Landscape-specific adjustments */
+  @media (orientation: landscape) {
+    .mobile-live-left-rail,
+    .mobile-live-right-rail {
+      padding-top: max(8px, env(safe-area-inset-top));
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+
+    .mobile-live-grid-area {
+      padding: 4px 2px;
+    }
+  }
+
+  /* Portrait-specific adjustments */
+  @media (orientation: portrait) {
+    .mobile-live-container {
+      /* Portrait is less ideal for LIVE, but still works */
+      flex-direction: column;
+    }
+
+    .mobile-live-left-rail {
+      flex-direction: row;
+      justify-content: space-evenly;
+      padding: 8px max(12px, env(safe-area-inset-left));
+      padding-top: max(8px, env(safe-area-inset-top));
+      min-width: unset;
+      min-height: 60px;
+      width: 100%;
+    }
+
+    .mobile-live-right-rail {
+      flex-direction: row;
+      justify-content: space-evenly;
+      padding: 8px max(12px, env(safe-area-inset-right));
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+      min-width: unset;
+      min-height: 60px;
+      width: 100%;
+    }
+
+    .mobile-live-grid-area {
+      padding: 4px 8px;
+    }
+  }
+
+  /* Focus mode - single tile fills grid area */
+  .mobile-live-focus-tile {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Grid tile wrapper */
+  .mobile-live-grid-tile {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+  }
+
+  .mobile-live-grid-tile:active {
+    transform: scale(0.98);
+  }
+
+  /* Empty tile placeholder */
+  .mobile-live-grid-tile-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.2);
+    cursor: default;
+  }
+
+  .mobile-live-grid-tile-empty:active {
+    transform: none;
+  }
+
+  /* Prevent text selection during touch */
+  .mobile-live-container * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+  }
+
+  /* Hardware acceleration for smooth animations */
+  .mobile-live-button,
+  .mobile-live-grid-tile {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Color variables matching native mobile */
+  .mobile-live-color-back {
+    color: #60a5fa; /* Blue - Back button */
+  }
+
+  .mobile-live-color-filter {
+    color: #22d3ee; /* Cyan - Filter */
+  }
+
+  .mobile-live-color-camera {
+    color: #ffffff; /* White - Camera (changes to red when live) */
+  }
+
+  .mobile-live-color-camera-active {
+    color: #ef4444; /* Red - Camera when live */
+  }
+
+  .mobile-live-color-gift {
+    color: #a855f7; /* Purple - Gift */
+  }
+
+  .mobile-live-color-pip {
+    color: #10b981; /* Green - PiP */
+  }
+
+  .mobile-live-color-mixer {
+    color: #f59e0b; /* Amber - Mixer */
+  }
+
+  .mobile-live-color-share {
+    color: #ec4899; /* Pink - Share */
+  }
+
+  .mobile-live-color-options {
+    color: #ffffff; /* White - Options */
+  }
+}
+
+/* Desktop: Hide mobile-live elements, show normal LiveRoom layout */
+@media (min-width: 768px) {
+  .mobile-live-container,
+  .mobile-live-left-rail,
+  .mobile-live-right-rail,
+  .mobile-live-grid-area {
+    display: none !important;
+  }
+}
+

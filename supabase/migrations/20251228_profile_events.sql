@@ -343,3 +343,4 @@ GRANT INSERT, UPDATE, DELETE ON TABLE public.profile_events TO authenticated;
 COMMIT;
 
 
+

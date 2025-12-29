@@ -219,6 +219,7 @@ export function UserMenu({
         visible={showMenu}
         animationType="fade"
         transparent
+        supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
         onRequestClose={closeMenu}
       >
         <Pressable style={styles.backdrop} onPress={closeMenu}>

@@ -53,6 +53,7 @@ export function MixerModal({ visible, onClose, onChange }: MixerModalProps) {
       visible={visible}
       animationType="fade"
       transparent
+      supportedOrientations={['portrait', 'landscape-left', 'landscape-right']}
       onRequestClose={onClose}
     >
       <View style={[styles.backdrop, { paddingTop: Math.max(insets.top, 20) + 40 }]}>

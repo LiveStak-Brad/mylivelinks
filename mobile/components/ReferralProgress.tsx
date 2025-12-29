@@ -14,13 +14,31 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import {
-  getReferralEncouragementMessage,
-  type ReferralStats,
-} from '../../lib/referralMockData';
 import { fetchAuthed } from '../lib/api';
 import { useAuthContext } from '../contexts/AuthContext';
 import { ThemeDefinition } from '../contexts/ThemeContext';
+
+type ReferralStats = {
+  invitesSent: number;
+  inviteClicks: number;
+  usersJoined: number;
+  activeUsers: number;
+  currentRank: number | null;
+  totalReferrers: number;
+};
+
+const getReferralEncouragementMessage = (stats: ReferralStats): string => {
+  if (stats.usersJoined === 0) {
+    return 'Start inviting friends to climb the leaderboard!';
+  }
+  if (stats.usersJoined < 5) {
+    return 'Great start! Keep sharing to move up the ranks.';
+  }
+  if (stats.usersJoined < 10) {
+    return "You're doing amazing! Keep building your network.";
+  }
+  return "Incredible work! You're a referral superstar!";
+};
 
 interface ReferralProgressProps {
   onViewLeaderboard?: () => void;

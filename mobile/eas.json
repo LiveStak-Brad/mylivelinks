@@ -6,11 +6,12 @@
   "build": {
     "development": {
       "autoIncrement": true,
-      "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
-        "simulator": false
+        "simulator": false,
+        "buildConfiguration": "Release"
       },
       "env": {
         "EXPO_PUBLIC_DEBUG_LIVE": "1",
@@ -21,13 +22,11 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
         "simulator": false,
         "buildConfiguration": "Release"
-      },
-      "android": {
-        "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_DEBUG_LIVE": "0",
@@ -38,13 +37,11 @@
     },
     "production": {
       "distribution": "store",
+      "channel": "production",
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
         "simulator": false,
         "buildConfiguration": "Release"
-      },
-      "android": {
-        "buildType": "app-bundle"
       },
       "env": {
         "EXPO_PUBLIC_DEBUG_LIVE": "0",
@@ -56,16 +53,13 @@
   },
   "submit": {
     "development": {
-      "ios": {},
-      "android": {}
+      "ios": {}
     },
     "preview": {
-      "ios": {},
-      "android": {}
+      "ios": {}
     },
     "production": {
-      "ios": {},
-      "android": {}
+      "ios": {}
     }
   }
 }
