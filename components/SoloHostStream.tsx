@@ -616,35 +616,22 @@ export default function SoloHostStream() {
               </div>
             </div>
 
-            {/* Mobile/Tablet: X button + Streamer info overlay at top (NO BACK BUTTON) */}
+            {/* Mobile/Tablet: Streamer info overlay at top - MATCH VIEWER LAYOUT */}
             <div className="lg:hidden absolute top-4 left-0 right-4 z-20 flex items-center justify-between">
               <div className="flex items-center gap-1">
-                {/* X Button (exit - replaces back button) */}
-                <button
-                  onClick={handleExit}
-                  className="text-white hover:opacity-80 transition-opacity"
-                  title="Exit Stream"
-                >
-                  <X className="w-7 h-7" />
-                </button>
-                
-                {/* Streamer Info */}
+                {/* Streamer Info - EXACTLY like viewer */}
                 <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-2 py-1.5">
                   <button 
                     onClick={() => router.push(`/live/${streamer.username}`)}
                     className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                    title="View your stream as viewer"
                   >
-                    {/* Avatar with red ring when live */}
-                    <div className={`relative ${isPublishing ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-black/40 rounded-full' : ''}`}>
-                      <Image
-                        src={getAvatarUrl(streamer.avatar_url)}
-                        alt={streamer.username}
-                        width={28}
-                        height={28}
-                        className="rounded-full"
-                      />
-                    </div>
+                    <Image
+                      src={getAvatarUrl(streamer.avatar_url)}
+                      alt={streamer.username}
+                      width={28}
+                      height={28}
+                      className="rounded-full"
+                    />
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white text-sm">
@@ -657,15 +644,33 @@ export default function SoloHostStream() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-white/80">
-                        <div className="flex items-center gap-1">
+                        <button 
+                          className="flex items-center gap-1 hover:text-white transition-colors"
+                        >
                           <Sparkles className="w-3 h-3 text-yellow-400" />
-                          <span className="font-semibold">Host</span>
-                        </div>
+                          <span className="font-semibold">12</span>
+                        </button>
+                        <span className="text-white/40">•</span>
+                        <button 
+                          className="flex items-center gap-1 hover:text-white transition-colors"
+                        >
+                          <Trophy className="w-3 h-3 text-yellow-500" />
+                          <span className="font-semibold">8</span>
+                        </button>
                       </div>
                     </div>
                   </button>
                 </div>
               </div>
+              
+              {/* X Button - RIGHT SIDE (where flag is on viewer) */}
+              <button
+                onClick={handleExit}
+                className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
+                title="Exit Stream"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {/* Video element - always rendered for host */}
