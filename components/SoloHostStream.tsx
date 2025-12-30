@@ -64,7 +64,7 @@ export default function SoloHostStream() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(false); // Default closed on mobile, will be true on desktop via lg:block
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
   
