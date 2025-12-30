@@ -660,6 +660,7 @@ export default function SoloHostStream() {
               <div>hasRoom: {roomRef.current ? 'TRUE' : 'FALSE'}</div>
               <div>canPublish: {roomRef.current?.localParticipant?.permissions?.canPublish ? 'TRUE' : 'FALSE'}</div>
               <div className="text-yellow-400">streamId: {streamer.live_stream_id || 'MISSING'}</div>
+              <div className="text-xs text-gray-400 mt-2">Check browser console for Go Live button logs</div>
             </div>
 
             {/* Offline placeholder */}
