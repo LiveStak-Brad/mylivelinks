@@ -12,6 +12,7 @@ import { ProfileTypePickerModal, ProfileType } from '@/components/ProfileTypePic
 import ProfileModulePicker from '@/components/profile/ProfileModulePicker';
 import ProfileTabPicker from '@/components/profile/ProfileTabPicker';
 import TopFriendsSettings from '@/components/profile/TopFriendsSettings';
+import { PHOTO_FILTER_PRESETS, PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
 import { ProfileSection, ProfileTab } from '@/lib/profileTypeConfig';
 
 interface UserLink {
@@ -96,6 +97,7 @@ export default function ProfileSettingsPage() {
   const [pinnedPostMedia, setPinnedPostMedia] = useState<File | null>(null);
   const [pinnedPostMediaPreview, setPinnedPostMediaPreview] = useState<string>('');
   const [pinnedPostMediaType, setPinnedPostMediaType] = useState<'image' | 'video'>('image');
+  const [selectedFilter, setSelectedFilter] = useState<PhotoFilterId>('original');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -243,6 +245,14 @@ export default function ProfileSettingsPage() {
         } else {
           setEnabledModules(null); // null = use profile_type defaults
         }
+
+        // Load enabled tabs (optional tabs only)
+        if (Array.isArray(p.enabled_tabs)) {
+          // Persisted value should only include optional tabs; strip any accidental core values.
+          setEnabledTabs((p.enabled_tabs as ProfileTab[]).filter((t) => t !== 'info'));
+        } else {
+          setEnabledTabs(null); // null = use profile_type defaults
+        }
         
         // Load customization fields
         setCustomization({
@@ -301,6 +311,7 @@ export default function ProfileSettingsPage() {
     const file = e.target.files?.[0];
     if (file) {
       setPinnedPostMedia(file);
+      setSelectedFilter('original'); // Reset filter on new upload
       
       if (file.type.startsWith('image/')) {
         setPinnedPostMediaType('image');
@@ -334,9 +345,9 @@ export default function ProfileSettingsPage() {
           bio: bio,
           avatar_url: avatarUrl, // Will be updated if avatar changed
           // Enabled modules (optional modules only)
-          enabled_modules: enabledModules || null,
+          enabled_modules: Array.isArray(enabledModules) ? enabledModules : null,
           // Enabled tabs (optional tabs only)
-          enabled_tabs: enabledTabs || null,
+          enabled_tabs: Array.isArray(enabledTabs) ? enabledTabs.filter((t) => t !== 'info') : null,
           // Social media fields (strip @ if user included it)
           social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
           social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
@@ -1001,6 +1012,7 @@ export default function ProfileSettingsPage() {
                     width={800}
                     height={600}
                     className="w-full h-auto max-h-96 object-contain rounded-lg"
+                    style={{ filter: getPhotoFilterPreset(selectedFilter).cssFilter }}
                   />
                 </div>
               ) : (
@@ -1032,6 +1044,30 @@ export default function ProfileSettingsPage() {
               )}
             </div>
           ) : null}
+
+          {/* Photo Filters - Only show for images */}
+          {pinnedPostMediaPreview && pinnedPostMediaType === 'image' && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Filter</label>
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {PHOTO_FILTER_PRESETS.map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setSelectedFilter(filter.id)}
+                    className={`
+                      flex-shrink-0 px-4 py-2 rounded-lg border-2 transition-all
+                      ${selectedFilter === filter.id
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500'
+                      }
+                    `}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-4">
             <div>

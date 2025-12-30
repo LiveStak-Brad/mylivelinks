@@ -154,7 +154,6 @@ export default function ProfileModulePicker({
         .filter((s) => s.enabled && OPTIONAL_MODULES[s.id])
         .map((s) => s.id);
       setEnabledModules(new Set(defaults));
-      onChange(Array.from(defaults));
     }
   }, [profileType, currentEnabledModules]); // Re-run when profileType or current selection changes
 

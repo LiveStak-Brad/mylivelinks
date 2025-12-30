@@ -274,7 +274,8 @@ export function getEnabledTabs(
   const config = getProfileTypeConfig(profileType);
   
   // If user has custom enabled tabs, use those
-  if (customEnabledTabs && customEnabledTabs.length > 0) {
+  // Note: empty array means user intentionally disabled all OPTIONAL tabs.
+  if (Array.isArray(customEnabledTabs)) {
     const allowed = new Set<ProfileTab>(['info', ...customEnabledTabs]);
     return config.tabs.filter(tab => allowed.has(tab.id));
   }
@@ -337,8 +338,8 @@ export function isSectionEnabled(
   
   // For optional modules, check custom list if provided
   // When customEnabledModules is set, we BYPASS profile_type defaults
-  // If the array is empty, treat it as "not customized" and fall back to defaults.
-  if (Array.isArray(customEnabledModules) && customEnabledModules.length > 0) {
+  // Note: empty array means user intentionally disabled all OPTIONAL modules.
+  if (Array.isArray(customEnabledModules)) {
     return customEnabledModules.includes(section);
   }
 

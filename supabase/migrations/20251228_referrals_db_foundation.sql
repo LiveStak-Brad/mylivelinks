@@ -1,6 +1,8 @@
 BEGIN;
 
+-- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS citext;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;  -- Required for gen_random_bytes() in generate_referral_code()
 
 CREATE TABLE IF NOT EXISTS public.referral_codes (
   profile_id uuid PRIMARY KEY REFERENCES public.profiles(id) ON DELETE CASCADE,

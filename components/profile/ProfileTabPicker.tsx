@@ -90,7 +90,7 @@ export default function ProfileTabPicker({
 
   // Initialize defaults when component mounts OR when profile type changes (if no custom selection)
   useEffect(() => {
-    if (currentEnabledTabs && currentEnabledTabs.length > 0) {
+    if (Array.isArray(currentEnabledTabs)) {
       // User has custom selection - keep it
       setEnabledTabs(new Set([...currentEnabledTabs, ...CORE_TABS]));
     } else {
@@ -99,8 +99,6 @@ export default function ProfileTabPicker({
         .filter((t) => t.enabled && OPTIONAL_TABS[t.id])
         .map((t) => t.id);
       setEnabledTabs(new Set([...defaults, ...CORE_TABS]));
-      // Persist only OPTIONAL tabs (core tabs like 'info' are implied)
-      onChange(Array.from(new Set<ProfileTab>(defaults)));
     }
   }, [profileType, currentEnabledTabs]); // Re-run when profileType or current selection changes
 
@@ -239,8 +237,15 @@ export default function ProfileTabPicker({
                 type="button"
                 variant="secondary"
                 onClick={() => {
-                  // Reset to current saved state
-                  setEnabledTabs(new Set(currentEnabledTabs || []));
+                  // Reset to current saved state (or template defaults when not customized)
+                  if (Array.isArray(currentEnabledTabs)) {
+                    setEnabledTabs(new Set([...currentEnabledTabs, ...CORE_TABS]));
+                  } else {
+                    const defaults = PROFILE_TYPE_CONFIG[profileType].tabs
+                      .filter((t) => t.enabled && OPTIONAL_TABS[t.id])
+                      .map((t) => t.id);
+                    setEnabledTabs(new Set([...defaults, ...CORE_TABS]));
+                  }
                   setShowModal(false);
                 }}
               >
