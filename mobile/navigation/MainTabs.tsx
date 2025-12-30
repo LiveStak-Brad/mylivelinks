@@ -3,7 +3,7 @@
  * 
  * BOTTOM NAV (5 tabs):
  * ====================
- * Home | Feed | Profile (CENTER) | Messages | Noties
+ * Home | Feed | Go Live (CENTER) | Messages | Noties
  * 
  * TOP NAV (Global Header on all screens):
  * ========================================
@@ -12,7 +12,7 @@
  * ICONS (matching web colors):
  * - Home: Home icon (Purple #8b5cf6)
  * - Feed: Rss/Activity icon (Pink #ec4899)
- * - Profile: User icon (Purple #8b5cf6, CENTER/LARGER)
+ * - Go Live: Video icon (Purple #8b5cf6, CENTER/LARGER) - Routes to Solo Host Stream
  * - Messages: MessageCircle icon (Blue #00a8ff)
  * - Noties: Bell icon (Amber #f59e0b)
  */
@@ -24,9 +24,9 @@ import { Feather } from '@expo/vector-icons';
 import type { MainTabsParamList } from '../types/navigation';
 import { HomeDashboardScreen } from '../screens/HomeDashboardScreen';
 import { FeedScreen } from '../screens/FeedScreen';
+import { SoloHostStreamScreen } from '../screens/SoloHostStreamScreen';
 import { MessagesScreen } from '../screens/MessagesScreen';
 import { NotiesScreen } from '../screens/NotiesScreen';
-import { ProfileTabScreen } from '../screens/ProfileTabScreen';
 import { useThemeMode } from '../contexts/ThemeContext';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
@@ -83,12 +83,12 @@ export function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Profile"
-        component={ProfileTabScreen}
+        name="GoLive"
+        component={SoloHostStreamScreen}
         options={{
-          tabBarLabel: 'Profile',
+          tabBarLabel: 'Go Live',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="user" size={size + 4} color={color} style={{ color: '#8b5cf6' }} />
+            <Feather name="video" size={size + 4} color={color} style={{ color: '#8b5cf6' }} />
           ),
         }}
       />

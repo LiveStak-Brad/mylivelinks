@@ -40,7 +40,7 @@ export type RootStackParamList = {
 export type MainTabsParamList = {
   Home: undefined;
   Feed: undefined;
+  GoLive: undefined;
   Messages: { openUserId?: string; openUsername?: string } | undefined;
   Noties: undefined;
-  Profile: { username?: string };
 };
