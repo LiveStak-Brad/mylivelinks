@@ -663,9 +663,13 @@ export default function SoloHostStream() {
               autoPlay
               playsInline
               muted={true}
-              className={`max-w-full max-h-full ${
-                isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'
-              }`}
+              className={`
+                ${isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'}
+                lg:max-w-full lg:max-h-full
+                md:w-full md:h-auto
+                /* Mobile: portrait crop (full screen) */
+                max-md:h-full max-md:w-full max-md:object-cover
+              `}
               style={{
                 display: isPublishing ? 'block' : 'none',
                 position: 'relative',
