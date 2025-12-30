@@ -741,6 +741,11 @@ export default function SoloHostStream() {
                 }}
               />
               
+              {/* Debug: Show if liveStreamId exists */}
+              <div className="text-xs text-gray-500 ml-2">
+                streamId: {streamer.live_stream_id || 'MISSING'}
+              </div>
+              
               <button
                 className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 font-medium"
                 title="Co-Host"
