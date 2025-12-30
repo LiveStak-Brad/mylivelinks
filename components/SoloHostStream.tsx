@@ -68,6 +68,7 @@ export default function SoloHostStream() {
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
   const [isPublishing, setIsPublishing] = useState(false); // Track if we're publishing
+  const [shouldAutoStartStream, setShouldAutoStartStream] = useState(false); // Trigger from modal
   
   // Stream setup modal
   const [showSetupModal, setShowSetupModal] = useState(true);
@@ -78,6 +79,7 @@ export default function SoloHostStream() {
   // LiveKit room connection
   const roomRef = useRef<Room | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const goLiveButtonRef = useRef<HTMLButtonElement | null>(null);
   const isConnectingRef = useRef(false);
   const connectedUsernameRef = useRef<string | null>(null);
   const [isRoomConnected, setIsRoomConnected] = useState(false);
@@ -391,9 +393,18 @@ export default function SoloHostStream() {
       return;
     }
 
-    // Note: stream_title column doesn't exist in live_streams table
-    // Just close modal and continue
+    console.log('[SoloHostStream] User clicked Go Live from modal');
     setShowSetupModal(false);
+    
+    // Click the hidden GoLiveButton
+    setTimeout(() => {
+      if (goLiveButtonRef.current) {
+        console.log('[SoloHostStream] Triggering GoLiveButton click');
+        goLiveButtonRef.current.click();
+      } else {
+        console.error('[SoloHostStream] GoLiveButton ref not found!');
+      }
+    }, 100);
   };
 
   const handleCancelStream = () => {
@@ -511,9 +522,9 @@ export default function SoloHostStream() {
               <button
                 onClick={handleStartStream}
                 disabled={!permissionsGranted || !streamTitle.trim()}
-                className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Continue
+                🔴 Go Live
               </button>
             </div>
           </div>
@@ -727,15 +738,23 @@ export default function SoloHostStream() {
           {/* Bottom Streamer Options Bar (replaces viewer action bar) - Desktop only */}
           <div className="hidden lg:flex bg-gray-900 border-t border-gray-800 px-4 py-3 items-center justify-between">
             <div className="flex items-center gap-2">
-              <GoLiveButton 
-                sharedRoom={roomRef.current}
-                isRoomConnected={isRoomConnected}
-                publishAllowed={true}
-                onPublishingChange={(publishing) => {
-                  console.log('[SoloHostStream] GoLiveButton publishing state changed:', publishing);
-                  setIsPublishing(publishing);
-                }}
-              />
+              <div ref={(el) => {
+                // Find the actual button inside GoLiveButton component
+                if (el) {
+                  const btn = el.querySelector('button');
+                  if (btn) goLiveButtonRef.current = btn;
+                }
+              }}>
+                <GoLiveButton 
+                  sharedRoom={roomRef.current}
+                  isRoomConnected={isRoomConnected}
+                  publishAllowed={true}
+                  onPublishingChange={(publishing) => {
+                    console.log('[SoloHostStream] GoLiveButton publishing state changed:', publishing);
+                    setIsPublishing(publishing);
+                  }}
+                />
+              </div>
               
               <button
                 className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 font-medium"
