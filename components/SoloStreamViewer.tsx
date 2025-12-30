@@ -446,7 +446,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           <div className="flex items-center gap-3">
             <div className="relative">
               <Image
-                src={getAvatarUrl(streamer.avatar_url, streamer.username)}
+                src={getAvatarUrl(streamer.avatar_url)}
                 alt={streamer.username}
                 width={40}
                 height={40}
@@ -539,7 +539,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               <div className="text-center text-white">
                 <div className="mb-4">
                   <Image
-                    src={getAvatarUrl(streamer.avatar_url, streamer.username)}
+                    src={getAvatarUrl(streamer.avatar_url)}
                     alt={streamer.username}
                     width={120}
                     height={120}
