@@ -660,8 +660,11 @@ export default function SoloHostStream() {
             />
 
             {/* Debug indicator */}
-            <div className="absolute top-20 left-4 bg-black/80 text-white px-4 py-2 rounded-lg text-sm z-50">
-              isPublishing: {isPublishing ? 'TRUE' : 'FALSE'}
+            <div className="absolute top-20 left-4 bg-black/80 text-white px-4 py-2 rounded-lg text-sm z-50 font-mono">
+              <div>isPublishing: {isPublishing ? 'TRUE' : 'FALSE'}</div>
+              <div>isRoomConnected: {isRoomConnected ? 'TRUE' : 'FALSE'}</div>
+              <div>hasRoom: {roomRef.current ? 'TRUE' : 'FALSE'}</div>
+              <div>canPublish: {roomRef.current?.localParticipant?.permissions?.canPublish ? 'TRUE' : 'FALSE'}</div>
             </div>
 
             {/* Offline placeholder */}
