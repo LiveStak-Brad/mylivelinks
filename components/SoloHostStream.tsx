@@ -724,6 +724,10 @@ export default function SoloHostStream() {
               <GoLiveButton 
                 sharedRoom={roomRef.current}
                 isRoomConnected={isRoomConnected}
+                onPublishingChange={(publishing) => {
+                  console.log('[SoloHostStream] GoLiveButton publishing state changed:', publishing);
+                  setIsPublishing(publishing);
+                }}
               />
               
               <button
