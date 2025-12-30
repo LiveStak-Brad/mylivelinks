@@ -9,8 +9,11 @@ export interface Stream {
   thumbnail_url: string | null;
   viewer_count: number;
   category: string | null;
-  tags: ('Featured' | 'Sponsored' | 'New' | 'Nearby')[];
+  badges?: StreamBadge[];
+  gender?: 'Men' | 'Women';
 }
+
+export type StreamBadge = 'Trending' | 'Featured' | 'Sponsored';
 
 interface StreamCardProps {
   stream: Stream;
@@ -33,23 +36,21 @@ export function StreamCard({ stream, onPress }: StreamCardProps) {
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const getBadgeStyle = (tag: string) => {
-    switch (tag) {
+  const getBadgeStyle = (badge: string) => {
+    switch (badge) {
+      case 'Trending':
+        return { bg: '#ef4444', text: 'Trending' };
       case 'Featured':
-        return { bg: '#f59e0b', text: '⭐ Featured' };
+        return { bg: '#f59e0b', text: 'Featured' };
       case 'Sponsored':
-        return { bg: '#8b5cf6', text: '💎 Sponsored' };
-      case 'New':
-        return { bg: '#10b981', text: '✨ New' };
-      case 'Nearby':
-        return { bg: '#3b82f6', text: '📍 Nearby' };
+        return { bg: '#8b5cf6', text: 'Sponsored' };
       default:
         return null;
     }
   };
 
-  const primaryTag = stream.tags?.[0];
-  const badgeInfo = primaryTag ? getBadgeStyle(primaryTag) : null;
+  const primaryBadge = stream.badges?.[0];
+  const badgeInfo = primaryBadge ? getBadgeStyle(primaryBadge) : null;
 
   return (
     <TouchableOpacity
@@ -97,10 +98,16 @@ export function StreamCard({ stream, onPress }: StreamCardProps) {
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Streamer Display Name */}
-        <Text style={styles.streamerName} numberOfLines={1} ellipsizeMode="tail">
-          {stream.streamer_display_name}
-        </Text>
+        <View style={styles.nameRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {stream.streamer_display_name.slice(0, 1).toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.streamerName} numberOfLines={1} ellipsizeMode="tail">
+            {stream.streamer_display_name}
+          </Text>
+        </View>
 
         {/* Category Label */}
         {stream.category && (
@@ -213,11 +220,30 @@ function createStyles(theme: ThemeDefinition) {
       padding: 14,
       gap: 6,
     },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    avatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '900',
+    },
     streamerName: {
       color: theme.colors.textPrimary,
       fontSize: 16,
       fontWeight: '700',
       letterSpacing: -0.2,
+      flex: 1,
     },
     categoryContainer: {
       flexDirection: 'row',
