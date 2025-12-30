@@ -6,7 +6,7 @@
 'use client';
 
 import type { BattleSupporter, BattleSide } from '@/types/battle';
-import { GifterBadge } from '@/components/gifter';
+import GifterBadge from '@/components/GifterBadge';
 
 interface BattleTopSupportersProps {
   supporters: BattleSupporter[];
@@ -77,7 +77,7 @@ export default function BattleTopSupporters({
                     level={supporter.gifter_level}
                     badgeName={supporter.badge_name}
                     badgeColor={supporter.badge_color}
-                    size="xs"
+                    size="sm"
                   />
                 )}
               </div>

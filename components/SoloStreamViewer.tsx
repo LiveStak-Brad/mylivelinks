@@ -638,7 +638,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                   >
                     <div className="relative">
                       <Image
-                        src={getAvatarUrl(stream.avatar_url, stream.username)}
+                        src={getAvatarUrl(stream.avatar_url)}
                         alt={stream.username}
                         width={80}
                         height={80}
@@ -704,6 +704,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
       {showReportModal && streamer && (
         <ReportModal
+          isOpen={showReportModal}
+          reportType="stream"
           reportedUserId={streamer.profile_id}
           reportedUsername={streamer.username}
           onClose={() => setShowReportModal(false)}

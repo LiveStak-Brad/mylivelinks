@@ -17,6 +17,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.38.0",
     "@vercel/og": "^0.8.6",
+    "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
     "livekit-client": "^2.16.1",
     "livekit-server-sdk": "^2.15.0",
@@ -26,6 +27,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "stripe": "^20.1.0",
+    "tailwind-merge": "^3.4.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
