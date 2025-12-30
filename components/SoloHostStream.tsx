@@ -544,8 +544,12 @@ export default function SoloHostStream() {
       <div className="hidden lg:flex bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 items-center justify-between">
         <div className="flex items-center gap-4">
           {/* Streamer Info */}
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <button
+            onClick={() => router.push(`/live/${streamer.username}`)}
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            title="View your stream as viewer"
+          >
+            <div className={`relative ${isPublishing ? 'ring-4 ring-red-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-800 rounded-full' : ''}`}>
               <Image
                 src={getAvatarUrl(streamer.avatar_url)}
                 alt={streamer.username}
@@ -578,7 +582,7 @@ export default function SoloHostStream() {
                 </p>
               )}
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Desktop Action Buttons */}
@@ -626,14 +630,21 @@ export default function SoloHostStream() {
                 
                 {/* Streamer Info */}
                 <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-2 py-1.5">
-                  <div className="flex items-center gap-2">
-                    <Image
-                      src={getAvatarUrl(streamer.avatar_url)}
-                      alt={streamer.username}
-                      width={28}
-                      height={28}
-                      className="rounded-full"
-                    />
+                  <button 
+                    onClick={() => router.push(`/live/${streamer.username}`)}
+                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                    title="View your stream as viewer"
+                  >
+                    {/* Avatar with red ring when live */}
+                    <div className={`relative ${isPublishing ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-black/40 rounded-full' : ''}`}>
+                      <Image
+                        src={getAvatarUrl(streamer.avatar_url)}
+                        alt={streamer.username}
+                        width={28}
+                        height={28}
+                        className="rounded-full"
+                      />
+                    </div>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white text-sm">
@@ -652,7 +663,7 @@ export default function SoloHostStream() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </div>
               </div>
             </div>
