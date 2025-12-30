@@ -653,7 +653,9 @@ export default function SoloHostStream() {
                 isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'
               }`}
               style={{
-                display: isPublishing ? 'block' : 'none'
+                display: isPublishing ? 'block' : 'none',
+                position: 'relative',
+                zIndex: 10
               }}
             />
 
