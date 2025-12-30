@@ -707,7 +707,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              <Chat />
+              <Chat liveStreamId={streamer.live_stream_id} />
             </div>
           </div>
         </div>
