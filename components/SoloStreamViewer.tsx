@@ -28,6 +28,7 @@ import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import Chat from './Chat';
 import GiftModal from './GiftModal';
 import ReportModal from './ReportModal';
+import GoLiveButton from './GoLiveButton';
 import { useIM } from '@/components/im';
 
 interface SoloStreamViewerProps {
@@ -486,6 +487,14 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             <Eye className="w-4 h-4" />
             <span>{streamer.viewer_count.toLocaleString()}</span>
           </div>
+          
+          {/* Show Go Live button if owner is viewing their own page */}
+          {currentUserId && currentUserId === streamer.profile_id && (
+            <GoLiveButton 
+              sharedRoom={roomRef.current}
+              isRoomConnected={isRoomConnected}
+            />
+          )}
           
           {currentUserId && currentUserId !== streamer.profile_id && (
             <button

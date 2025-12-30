@@ -87,12 +87,12 @@ export default function OwnerDashboard() {
   const revenueTodayUsdCents = data.stats?.revenueTodayUsdCents || 0;
   const revenueTodayUsd = (revenueTodayUsdCents / 100).toFixed(2);
 
-  // Mock gifts today count - UI-only, ready for wiring
-  const giftsToday = 0;
-  const giftCoinsToday = 0;
+  // Gifts today (wired)
+  const giftsToday = data.stats?.giftsTodayCount || 0;
+  const giftCoinsToday = data.stats?.giftsTodayCoins || 0;
 
-  // Pending reports count
-  const pendingReports = data.recentReports?.filter(r => r.status === 'pending').length || 0;
+  // Pending reports (wired)
+  const pendingReports = data.stats?.pendingReports || 0;
 
   // UI-only chart data (wire-ready placeholders)
   const giftsChartData: ChartDataPoint[] = [];

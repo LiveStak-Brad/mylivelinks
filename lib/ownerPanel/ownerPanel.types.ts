@@ -6,6 +6,8 @@ export type DashboardStats = {
   users_active_7d: number;
   profiles_total: number;
   streams_live: number;
+  gifts_today_count: number;
+  gifts_today_coins: number;
   reports_pending: number;
   applications_pending: number;
   revenue_today_usd_cents: number;

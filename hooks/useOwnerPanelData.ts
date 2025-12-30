@@ -12,6 +12,9 @@ export interface DashboardStats {
   totalUsers: number;
   totalCreators: number;
   activeStreams: number;
+  pendingReports: number;
+  giftsTodayCount: number;
+  giftsTodayCoins: number;
   totalRevenue: number;
   usersNew24h: number;
   dailyActiveUsers: number;
@@ -371,6 +374,9 @@ function mapSummaryToOwnerPanelData(res: OwnerSummaryResponse): OwnerPanelData {
     totalUsers: Number(stats.users_total ?? 0),
     totalCreators: Number(stats.profiles_total ?? 0),
     activeStreams: Number(stats.streams_live ?? 0),
+    pendingReports: Number(stats.reports_pending ?? 0),
+    giftsTodayCount: Number(stats.gifts_today_count ?? 0),
+    giftsTodayCoins: Number(stats.gifts_today_coins ?? 0),
     totalRevenue: Number(stats.revenue_30d_usd_cents ?? 0),
     usersNew24h: Number(stats.users_new_24h ?? 0),
     dailyActiveUsers: Number(stats.users_active_24h ?? 0),

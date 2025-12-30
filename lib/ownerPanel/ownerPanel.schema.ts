@@ -41,6 +41,8 @@ export const DashboardStatsSchema = z
     users_active_7d: z.number().int().nonnegative(),
     profiles_total: z.number().int().nonnegative(),
     streams_live: z.number().int().nonnegative(),
+    gifts_today_count: z.number().int().nonnegative(),
+    gifts_today_coins: z.number().int().nonnegative(),
     reports_pending: z.number().int().nonnegative(),
     applications_pending: z.number().int().nonnegative(),
     revenue_today_usd_cents: z.number().int().nonnegative(),

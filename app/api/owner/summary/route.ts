@@ -209,6 +209,29 @@ async function buildStats(reqId: string): Promise<{ value: DashboardStats; dataS
     throw error;
   };
 
+  const safeSumGiftCoinsToday = async (sinceIso: string): Promise<number | null> => {
+    const { data, error } = await admin
+      .from('ledger_entries')
+      .select('delta_coins, created_at, entry_type')
+      .gte('created_at', sinceIso)
+      .eq('entry_type', 'coin_spend_gift')
+      .limit(5000);
+
+    if (!error) {
+      dataSource = 'supabase';
+      const rows = Array.isArray(data) ? data : [];
+      let sum = 0;
+      for (const r of rows as any[]) {
+        const v = Math.abs(Number(r?.delta_coins ?? 0));
+        if (Number.isFinite(v) && v > 0) sum += v;
+      }
+      return sum;
+    }
+
+    if (isNotWiredError(error)) return null;
+    throw error;
+  };
+
   const safeSumLedgerCents = async (sinceIso: string): Promise<number | null> => {
     const { data, error } = await admin
       .from('ledger_entries')
@@ -232,7 +255,9 @@ async function buildStats(reqId: string): Promise<{ value: DashboardStats; dataS
     throw error;
   };
 
-  const [usersTotal, usersNew24h, usersActive24h, usersActive7d, profilesTotal, streamsLive, reportsPending, applicationsPending, revenueToday, revenue30d] =
+  const startOfDay = new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString();
+
+  const [usersTotal, usersNew24h, usersActive24h, usersActive7d, profilesTotal, streamsLive, giftsTodayCount, giftsTodayCoins, reportsPending, applicationsPending, revenueToday, revenue30d] =
     await Promise.all([
       safeCount(admin.from('profiles').select('id', { count: 'exact', head: true })),
       safeCount(admin.from('profiles').select('id', { count: 'exact', head: true }).gte('created_at', since24h)),
@@ -240,21 +265,26 @@ async function buildStats(reqId: string): Promise<{ value: DashboardStats; dataS
       safeCount(admin.from('room_presence').select('profile_id', { count: 'exact', head: true }).gte('last_seen_at', since7d)),
       safeCount(admin.from('profiles').select('id', { count: 'exact', head: true })),
       safeCount(admin.from('live_streams').select('id', { count: 'exact', head: true }).eq('live_available', true)),
+      safeCount(admin.from('ledger_entries').select('id', { count: 'exact', head: true }).gte('created_at', startOfDay).eq('entry_type', 'coin_spend_gift')),
+      safeSumGiftCoinsToday(startOfDay),
       (async () => {
-        const c1 = await safeCount(admin.from('content_reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'));
+        const pendingStatuses = ['pending', 'open', 'under_review'];
+        const c1 = await safeCount(
+          admin.from('content_reports').select('id', { count: 'exact', head: true }).in('status', pendingStatuses)
+        );
         if (c1 !== null) return c1;
-        return safeCount(admin.from('reports').select('id', { count: 'exact', head: true }).eq('status', 'pending'));
+        return safeCount(admin.from('reports').select('id', { count: 'exact', head: true }).in('status', pendingStatuses));
       })(),
       (async () => {
         const c1 = await safeCount(admin.from('room_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'));
         if (c1 !== null) return c1;
         return safeCount(admin.from('applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'));
       })(),
-      safeSumLedgerCents(new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString()),
+      safeSumLedgerCents(startOfDay),
       safeSumLedgerCents(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
     ]).catch((e) => {
       logJson('error', { reqId, endpoint: ENDPOINT, event: 'stats_query_failed', error: e instanceof Error ? e.message : String(e) });
-      return [null, null, null, null, null, null, null, null, null, null] as const;
+      return [null, null, null, null, null, null, null, null, null, null, null, null] as const;
     });
 
   const stats: DashboardStats = {
@@ -265,6 +295,8 @@ async function buildStats(reqId: string): Promise<{ value: DashboardStats; dataS
     users_active_7d: usersActive7d ?? 0,
     profiles_total: profilesTotal ?? 0,
     streams_live: streamsLive ?? 0,
+    gifts_today_count: giftsTodayCount ?? 0,
+    gifts_today_coins: giftsTodayCoins ?? 0,
     reports_pending: reportsPending ?? 0,
     applications_pending: applicationsPending ?? 0,
     revenue_today_usd_cents: revenueToday ?? 0,
@@ -534,6 +566,8 @@ export async function GET(request: NextRequest) {
             users_active_7d: 0,
             profiles_total: 0,
             streams_live: 0,
+            gifts_today_count: 0,
+            gifts_today_coins: 0,
             reports_pending: 0,
             applications_pending: 0,
             revenue_today_usd_cents: 0,
@@ -571,6 +605,8 @@ export async function GET(request: NextRequest) {
               users_active_7d: 0,
               profiles_total: 0,
               streams_live: 0,
+              gifts_today_count: 0,
+              gifts_today_coins: 0,
               reports_pending: 0,
               applications_pending: 0,
               revenue_today_usd_cents: 0,
