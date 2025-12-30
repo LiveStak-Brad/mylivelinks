@@ -30,6 +30,8 @@ interface GridSlot {
 }
 
 interface MobileWebWatchLayoutProps {
+  mode?: 'solo' | 'battle';
+  layoutStyle?: 'tiktok-viewer' | 'twitch-viewer' | 'battle-cameras';
   gridSlots: GridSlot[];
   sharedRoom: Room | null;
   isRoomConnected: boolean;
@@ -61,8 +63,14 @@ const LANDSCAPE_COLS = 4;
  * - Full-screen black background
  * - Landscape-first orientation
  * - All touch targets ≥44px
+ * 
+ * Mode support:
+ * - solo: Normal 12-grid layout
+ * - battle: Cameras-only battle layout (minimal UI, portrait preferred)
  */
 export default function MobileWebWatchLayout({
+  mode = 'solo',
+  layoutStyle = 'tiktok-viewer',
   gridSlots,
   sharedRoom,
   isRoomConnected,
@@ -324,8 +332,10 @@ export default function MobileWebWatchLayout({
           </div>
         ) : (
           /* Grid Mode - Show full grid */
+          /* Battle mode: cameras-only layout (minimal UI, portrait optimized) */
+          /* Solo mode: standard 12-grid layout */
           <div 
-            className="mobile-live-grid"
+            className={`mobile-live-grid ${mode === 'battle' ? 'mobile-live-grid-battle' : ''}`}
             style={{
               gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
               gridTemplateRows: `repeat(${gridRows}, 1fr)`,

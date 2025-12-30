@@ -58,7 +58,12 @@ type UiPanels = {
   rightStackOpen: boolean; // supporters/stats/coins block
 };
 
-export default function LiveRoom() {
+interface LiveRoomProps {
+  mode?: 'solo' | 'battle';
+  layoutStyle?: 'tiktok-viewer' | 'twitch-viewer' | 'battle-cameras';
+}
+
+export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' }: LiveRoomProps = {}) {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(true); // Start as true to render immediately
   const [initError, setInitError] = useState<string | null>(null); // Track initialization errors
@@ -2670,6 +2675,8 @@ export default function LiveRoom() {
     // Landscape mode (or portrait dismissed): show mobile watch layout
     return (
       <MobileWebWatchLayout
+        mode={mode}
+        layoutStyle={layoutStyle}
         gridSlots={gridSlots}
         sharedRoom={sharedRoom}
         isRoomConnected={isRoomConnected}

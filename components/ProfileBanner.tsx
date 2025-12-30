@@ -80,14 +80,11 @@ export default function ProfileBanner({
 
   const handleBannerClick = () => {
     if (!canOpenLive) return;
-    if (isLive && liveStreamId) {
-      // Navigate to live stream
-      router.push(`/live?stream=${liveStreamId}`);
-    } else if (isLive) {
-      // Navigate to main live room (streamer will be in grid)
-      router.push(`/live?user=${username}`);
+    if (isLive) {
+      // Navigate to solo stream viewer (Twitch-style)
+      router.push(`/live/${username}`);
     } else {
-      // Navigate to live room (they'll see when user goes live)
+      // Navigate to main live room (they'll see when user goes live)
       router.push(`/live`);
     }
   };

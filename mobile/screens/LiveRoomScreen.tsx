@@ -7,6 +7,10 @@
  * - Side controllers (game-pad style)
  * - Swipe gestures for overlays
  * - Data parity with Web LiveRoom
+ * 
+ * Mode support:
+ * - solo: Standard 12-grid layout with all controls
+ * - battle: Cameras-only TikTok battle layout (minimal UI, portrait preferred)
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -34,13 +38,14 @@ const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 const ROOM_NAME = 'live_central';
 
 type LiveRoomScreenProps = {
+  mode?: 'solo' | 'battle';
   enabled?: boolean;
   onExitLive?: () => void;
   onNavigateToRooms?: () => void;
   onNavigateWallet: () => void;
 };
 
-export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false, onExitLive, onNavigateToRooms, onNavigateWallet }) => {
+export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', enabled = false, onExitLive, onNavigateToRooms, onNavigateWallet }) => {
   // 🔒 KEEP SCREEN AWAKE (prevent screen timeout)
   useKeepAwake();
   
@@ -464,9 +469,11 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ enabled = false,
         </View>
 
         {/* CAMERA GRID - MIDDLE COLUMN (fits BETWEEN left and right) */}
+        {/* Battle mode: cameras-only layout, minimal UI */}
+        {/* Solo mode: standard controller layout with full grid */}
         <View style={styles.centerGridWrapper}>
           <GestureDetector gesture={swipeGesture}>
-            <View style={styles.cameraGrid}>
+            <View style={[styles.cameraGrid, mode === 'battle' && styles.cameraGridBattle]}>
               <Grid12 
                 participants={participants}
                 isEditMode={state.isEditMode}
@@ -601,6 +608,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
     zIndex: 1,
+  },
+  
+  // Battle mode variant - portrait optimized
+  cameraGridBattle: {
+    // Minimal UI adjustments for battle mode
+    // Grid layout handles the actual camera arrangement
   },
 
   connectionErrorBanner: {

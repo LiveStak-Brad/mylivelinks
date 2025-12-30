@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import GiftModal from './GiftModal';
@@ -71,6 +72,7 @@ export default function Tile({
   onVolumeSliderToggle,
   onReplace,
 }: TileProps) {
+  const router = useRouter();
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [showMiniProfile, setShowMiniProfile] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
