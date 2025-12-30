@@ -135,7 +135,7 @@ export default function SoloHostStream() {
 
         const { data: liveStream } = await supabase
           .from('live_streams')
-          .select('id, live_available, stream_title')
+          .select('id, live_available')
           .eq('profile_id', profile.id)
           .single();
 
@@ -153,12 +153,12 @@ export default function SoloHostStream() {
           viewer_count: 0,
           gifter_level: profile.gifter_level || 0,
           gifter_status: gifterStatus,
-          stream_title: liveStream?.stream_title,
+          stream_title: undefined, // No stream_title column
           live_stream_id: liveStream?.id,
         };
 
         setStreamer(streamerData);
-        setStreamTitle(liveStream?.stream_title || '');
+        setStreamTitle(''); // Default empty
         setLoading(false);
 
       } catch (err) {
@@ -391,14 +391,8 @@ export default function SoloHostStream() {
       return;
     }
 
-    // Update stream title in database
-    if (streamer?.live_stream_id) {
-      await supabase
-        .from('live_streams')
-        .update({ stream_title: streamTitle })
-        .eq('id', streamer.live_stream_id);
-    }
-
+    // Note: stream_title column doesn't exist in live_streams table
+    // Just close modal and continue
     setShowSetupModal(false);
   };
 
