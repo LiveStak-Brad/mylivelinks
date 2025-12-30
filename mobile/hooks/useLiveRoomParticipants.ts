@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { Room, RemoteParticipant } from 'livekit-client';
+import type { LocalParticipant, Room, RemoteParticipant } from 'livekit-client';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import type { Participant } from '../types/live';
@@ -102,7 +102,8 @@ export function useLiveRoomParticipants(
   if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked');
 
   const { user, getAccessToken } = useAuthContext();
-  const [allParticipants, setAllParticipants] = useState<RemoteParticipant[]>([]);
+  type LiveKitParticipant = RemoteParticipant | LocalParticipant;
+  const [allParticipants, setAllParticipants] = useState<LiveKitParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isLive, setIsLive] = useState(false);
@@ -556,9 +557,21 @@ export function useLiveRoomParticipants(
    * Map LiveKit participant to ParticipantLite for selection engine
    * Eligibility is derived from LiveKit only (hasVideo = publishing)
    */
-  const toParticipantLite = useCallback((p: RemoteParticipant): ParticipantLite => {
-    const hasVideo = Array.from(p.videoTrackPublications.values()).some(pub => pub.track);
-    const hasAudio = Array.from(p.audioTrackPublications.values()).some(pub => pub.track);
+  const toParticipantLite = useCallback((p: LiveKitParticipant): ParticipantLite => {
+    const raw: any = p as any;
+    const videoPublications = raw?.videoTrackPublications
+      ? Array.from(raw.videoTrackPublications.values())
+      : Array.from(raw?.trackPublications?.values?.() ?? []).filter((pub: any) => pub?.kind === 'video' || pub?.track?.kind === 'video');
+    const audioPublications = raw?.audioTrackPublications
+      ? Array.from(raw.audioTrackPublications.values())
+      : Array.from(raw?.trackPublications?.values?.() ?? []).filter((pub: any) => pub?.kind === 'audio' || pub?.track?.kind === 'audio');
+
+    const hasVideo = p instanceof LocalParticipant
+      ? videoPublications.some((pub: any) => !!pub?.track && !pub?.isMuted)
+      : videoPublications.some((pub: any) => !!pub?.track && !!pub?.isSubscribed);
+    const hasAudio = p instanceof LocalParticipant
+      ? audioPublications.some((pub: any) => !!pub?.track && !pub?.isMuted)
+      : audioPublications.some((pub: any) => !!pub?.track && !!pub?.isSubscribed);
 
     // Stable joinedAt: track first seen timestamp per identity
     let joinedAt: number;
@@ -583,17 +596,18 @@ export function useLiveRoomParticipants(
       hasVideo,
       hasAudio,
       joinedAt,
-      isSelf: false,
+      isSelf: myIdentity != null && p.identity === myIdentity,
       // Metrics not available from LiveKit - would come from Supabase if needed
       metrics: undefined,
     };
-  }, []);
+  }, [myIdentity]);
 
   /**
    * Update all participants list from room
    */
   const updateParticipants = useCallback((room: Room) => {
     const remoteParticipants = Array.from(room.remoteParticipants.values());
+    const localParticipant = room.localParticipant;
 
     if (DEBUG) {
       for (const p of remoteParticipants) {
@@ -616,12 +630,15 @@ export function useLiveRoomParticipants(
 
     if (DEBUG) {
       console.log('[ROOM] All participants updated:', {
-        count: remoteParticipants.length,
-        identities: remoteParticipants.map(p => p.identity.substring(0, 8) + '...'),
+        count: remoteParticipants.length + (localParticipant ? 1 : 0),
+        identities: [
+          ...(localParticipant ? [localParticipant.identity.substring(0, 8) + '...'] : []),
+          ...remoteParticipants.map(p => p.identity.substring(0, 8) + '...'),
+        ],
       });
     }
 
-    setAllParticipants(remoteParticipants);
+    setAllParticipants([localParticipant, ...remoteParticipants].filter(Boolean) as LiveKitParticipant[]);
   }, []);
 
   /**
@@ -716,10 +733,15 @@ export function useLiveRoomParticipants(
           dynacast: true,
           videoCaptureDefaults: {
             resolution: {
-              width: 1280,
-              height: 720,
+              width: 1920,
+              height: 1080,
               frameRate: 30,
             },
+          },
+          audioCaptureDefaults: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
           },
         });
 
@@ -870,6 +892,8 @@ export function useLiveRoomParticipants(
   const selectedParticipants = useMemo(() => {
     if (allParticipants.length === 0) return [];
 
+    const localIdentity = myIdentity;
+
     // Map to ParticipantLite format
     const participantsLite = allParticipants.map(toParticipantLite);
 
@@ -879,7 +903,7 @@ export function useLiveRoomParticipants(
       mode: sortMode,
       currentSelection: currentSelectionRef.current,
       seed: randomSeed,
-      pinned: [], // No pinning in mobile for now
+      pinned: localIdentity ? [localIdentity] : [],
     });
 
     // Persist selection for next render (anti-thrash)
@@ -900,22 +924,36 @@ export function useLiveRoomParticipants(
     const participants: Participant[] = allParticipants
       .filter(p => selectedIdentities.has(p.identity))
       .map(p => {
-        const hasVideo = Array.from(p.videoTrackPublications.values()).some(pub => pub.isSubscribed);
-        const hasAudio = Array.from(p.audioTrackPublications.values()).some(pub => pub.isSubscribed);
+        const isLocal = localIdentity != null && p.identity === localIdentity;
+        const raw: any = p as any;
+
+        const videoPublications = raw?.videoTrackPublications
+          ? Array.from(raw.videoTrackPublications.values())
+          : Array.from(raw?.trackPublications?.values?.() ?? []).filter((pub: any) => pub?.kind === 'video' || pub?.track?.kind === 'video');
+        const audioPublications = raw?.audioTrackPublications
+          ? Array.from(raw.audioTrackPublications.values())
+          : Array.from(raw?.trackPublications?.values?.() ?? []).filter((pub: any) => pub?.kind === 'audio' || pub?.track?.kind === 'audio');
+
+        const hasVideo = isLocal
+          ? videoPublications.some((pub: any) => !!pub?.track && !pub?.isMuted)
+          : videoPublications.some((pub: any) => !!pub?.track && !!pub?.isSubscribed);
+        const hasAudio = isLocal
+          ? audioPublications.some((pub: any) => !!pub?.track && !pub?.isMuted)
+          : audioPublications.some((pub: any) => !!pub?.track && !!pub?.isSubscribed);
 
         return {
           identity: p.identity,
           username: p.name || p.identity,
-          isSpeaking: p.isSpeaking,
+          isSpeaking: (p as any).isSpeaking,
           isCameraEnabled: hasVideo,
           isMicEnabled: hasAudio,
-          isLocal: false,
+          isLocal,
           viewerCount: undefined, // Not available from LiveKit
         };
       });
 
     return participants;
-  }, [allParticipants, toParticipantLite, sortMode, randomSeed]);
+  }, [allParticipants, toParticipantLite, sortMode, randomSeed, myIdentity]);
 
   const goLive = async () => {
     if (goLiveInFlightRef.current) return;
@@ -992,7 +1030,16 @@ export function useLiveRoomParticipants(
       setIsPublishing(true);
       isPublishingRef.current = true;
       try {
-        await room.localParticipant.setCameraEnabled(true);
+        // Enable camera with optimal quality settings
+        await room.localParticipant.setCameraEnabled(true, {
+          resolution: {
+            width: 1920,
+            height: 1080,
+            frameRate: 30,
+          },
+        });
+        
+        // Enable microphone with audio optimizations
         await room.localParticipant.setMicrophoneEnabled(true);
 
         if (DEBUG) {

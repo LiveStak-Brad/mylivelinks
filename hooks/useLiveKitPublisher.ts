@@ -221,17 +221,34 @@ export function useLiveKitPublisher({
       } else {
         // Use camera
         const trackOptions: any = {
-          audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
+          audio: audioDeviceId ? { 
+            deviceId: { exact: audioDeviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 1,
+          } : {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 1,
+          },
           video: videoDeviceId 
             ? { 
                 deviceId: { exact: videoDeviceId },
-                width: 1280,
-                height: 720,
+                width: { ideal: 1920, max: 1920, min: 1280 },
+                height: { ideal: 1080, max: 1080, min: 720 },
+                frameRate: { ideal: 30, max: 30 },
+                aspectRatio: 16/9,
               }
             : {
                 facingMode: 'user',
-                width: 1280,
-                height: 720,
+                width: { ideal: 1920, max: 1920, min: 1280 },
+                height: { ideal: 1080, max: 1080, min: 720 },
+                frameRate: { ideal: 30, max: 30 },
+                aspectRatio: 16/9,
               },
         };
 
@@ -284,7 +301,23 @@ export function useLiveKitPublisher({
               });
             }
             console.log('Publishing track:', track.kind, `(attempt ${publishAttempts + 1})`);
-            await room.localParticipant.publishTrack(track);
+            
+            // Add quality settings for each track type
+            const publishOptions: any = {};
+            
+            if (track.kind === 'video') {
+              publishOptions.videoEncoding = {
+                maxBitrate: 2_500_000, // 2.5 Mbps max for HD quality
+                maxFramerate: 30,
+              };
+              publishOptions.simulcast = true; // Enable simulcast for adaptive quality
+            } else if (track.kind === 'audio') {
+              publishOptions.audioEncoding = {
+                maxBitrate: 64_000, // 64 kbps for audio
+              };
+            }
+            
+            await room.localParticipant.publishTrack(track, publishOptions);
             
             // Wait a moment between tracks to ensure proper registration
             await new Promise(resolve => setTimeout(resolve, 100));

@@ -26,6 +26,29 @@ export const DEVICE_TYPE = 'mobile' as const;
  */
 export const DEBUG_LIVEKIT = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
+/**
+ * Video quality presets
+ */
+export const VIDEO_PRESETS = {
+  HD: {
+    width: 1920,
+    height: 1080,
+    frameRate: 30,
+    maxBitrate: 2_500_000, // 2.5 Mbps for high quality
+  },
+  SD: {
+    width: 1280,
+    height: 720,
+    frameRate: 24,
+    maxBitrate: 1_000_000, // 1 Mbps for standard quality
+  },
+} as const;
+
+/**
+ * Default video capture settings
+ */
+export const DEFAULT_VIDEO_CAPTURE = VIDEO_PRESETS.HD;
+
 
 
 

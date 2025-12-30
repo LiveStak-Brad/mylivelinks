@@ -318,13 +318,15 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       const constraints: MediaStreamConstraints = {
         video: videoDeviceId ? {
           deviceId: { exact: videoDeviceId },
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
-          frameRate: { ideal: 30 },
+          width: { ideal: 1920, max: 1920, min: 1280 },
+          height: { ideal: 1080, max: 1080, min: 720 },
+          frameRate: { ideal: 30, max: 30 },
+          aspectRatio: { ideal: 16/9 },
         } : {
-          width: { ideal: 1920, min: 1280 },
-          height: { ideal: 1080, min: 720 },
-          frameRate: { ideal: 30 },
+          width: { ideal: 1920, max: 1920, min: 1280 },
+          height: { ideal: 1080, max: 1080, min: 720 },
+          frameRate: { ideal: 30, max: 30 },
+          aspectRatio: { ideal: 16/9 },
           facingMode: 'user',
         },
         audio: audioDeviceId ? {
@@ -332,10 +334,14 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          sampleRate: { ideal: 48000 },
+          channelCount: { ideal: 1 }, // Mono for bandwidth savings
         } : {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          sampleRate: { ideal: 48000 },
+          channelCount: { ideal: 1 },
         },
       };
 
@@ -537,7 +543,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
 
         // Update database first (this will trigger realtime updates)
         const { error: updateError } = await (supabase.from('live_streams') as any)
-          .update({ live_available: false, status: 'ended', ended_at: new Date().toISOString() })
+          .update({ live_available: false, ended_at: new Date().toISOString() })
           .eq('profile_id', user.id);
 
         if (updateError) {
@@ -714,7 +720,6 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         .upsert({
           profile_id: user.id,
           live_available: true,
-          status: 'live',
           started_at: new Date().toISOString(),
           ended_at: null,
         }, {
