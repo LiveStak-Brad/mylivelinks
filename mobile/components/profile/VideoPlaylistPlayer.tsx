@@ -341,6 +341,10 @@ export function VideoPlaylistPlayer({
                 useNativeControls={false}
                 resizeMode={ResizeMode.CONTAIN}
                 shouldPlay={isPlaying}
+                videoStyle={{
+                  width: '100%',
+                  height: '100%',
+                }}
                 onError={() => {
                   setIsPlaying(false);
                 }}
@@ -455,7 +459,9 @@ export function VideoPlaylistPlayer({
 
 function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: number, windowWidth: number) {
   const cardShadow = theme.elevations.card;
-  const videoHeight = Math.max(220, Math.min(360, Math.round((Math.max(320, windowWidth) - 24) * (9 / 16))));
+  // Use a flexible container that can adapt to any video orientation
+  // Min 250px for portrait, max 400px for very wide screens
+  const videoHeight = Math.max(250, Math.min(400, Math.round(windowWidth * 0.75)));
   return StyleSheet.create({
     container: {
       paddingVertical: 16,
@@ -599,6 +605,8 @@ function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: 
       borderRadius: 14,
       overflow: 'hidden',
       backgroundColor: '#000',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     video: {
       width: '100%',
