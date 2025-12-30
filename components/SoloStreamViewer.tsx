@@ -465,9 +465,9 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                 </h2>
                 {streamer.gifter_status && (
                   <TierBadge 
-                    gifterStatus={streamer.gifter_status}
+                    tier_key={streamer.gifter_status.tier_key}
+                    level={streamer.gifter_status.level_in_tier}
                     size="sm"
-                    showTooltip={true}
                   />
                 )}
               </div>
