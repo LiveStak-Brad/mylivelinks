@@ -275,7 +275,8 @@ export function getEnabledTabs(
   
   // If user has custom enabled tabs, use those
   if (customEnabledTabs && customEnabledTabs.length > 0) {
-    return config.tabs.filter(tab => customEnabledTabs.includes(tab.id));
+    const allowed = new Set<ProfileTab>(['info', ...customEnabledTabs]);
+    return config.tabs.filter(tab => allowed.has(tab.id));
   }
   
   // Otherwise use profile_type defaults

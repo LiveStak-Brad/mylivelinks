@@ -92,18 +92,20 @@ export default function ProfileTabPicker({
   useEffect(() => {
     if (currentEnabledTabs && currentEnabledTabs.length > 0) {
       // User has custom selection - keep it
-      setEnabledTabs(new Set(currentEnabledTabs));
+      setEnabledTabs(new Set([...currentEnabledTabs, ...CORE_TABS]));
     } else {
       // No custom selection - use profile_type defaults
       const defaults = PROFILE_TYPE_CONFIG[profileType].tabs
         .filter((t) => t.enabled && OPTIONAL_TABS[t.id])
         .map((t) => t.id);
-      setEnabledTabs(new Set(defaults));
-      onChange(Array.from(defaults));
+      setEnabledTabs(new Set([...defaults, ...CORE_TABS]));
+      // Persist only OPTIONAL tabs (core tabs like 'info' are implied)
+      onChange(Array.from(new Set<ProfileTab>(defaults)));
     }
-  }, [profileType]); // Re-run when profileType changes
+  }, [profileType, currentEnabledTabs]); // Re-run when profileType or current selection changes
 
   const handleToggle = (tabId: ProfileTab) => {
+    if (CORE_TABS.includes(tabId)) return;
     setEnabledTabs((prev) => {
       const next = new Set(prev);
       if (next.has(tabId)) {
@@ -116,15 +118,19 @@ export default function ProfileTabPicker({
   };
 
   const handleSave = () => {
-    onChange(Array.from(enabledTabs));
+    const next = new Set<ProfileTab>([...enabledTabs, ...CORE_TABS]);
+    // Persist only OPTIONAL tabs (core tabs like 'info' are implied)
+    onChange(Array.from(next).filter((t) => !CORE_TABS.includes(t)));
     setShowModal(false);
   };
 
   const handleRemoveChip = (tabId: ProfileTab) => {
+    if (CORE_TABS.includes(tabId)) return;
     const next = new Set(enabledTabs);
     next.delete(tabId);
     setEnabledTabs(next);
-    onChange(Array.from(next));
+    // Persist only OPTIONAL tabs (core tabs like 'info' are implied)
+    onChange(Array.from(next).filter((t) => !CORE_TABS.includes(t)));
   };
 
   // Sort tabs alphabetically for display
@@ -162,6 +168,7 @@ export default function ProfileTabPicker({
                 onClick={() => handleRemoveChip(tabId)}
                 className="ml-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 transition-colors"
                 aria-label={`Remove ${tab.label}`}
+                disabled={CORE_TABS.includes(tabId)}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -210,6 +217,7 @@ export default function ProfileTabPicker({
                         checked={isEnabled}
                         onChange={() => handleToggle(tabId)}
                         className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        disabled={CORE_TABS.includes(tabId)}
                       />
                       <div className="flex-1">
                         <div className="font-medium text-sm">{tab.label}</div>
