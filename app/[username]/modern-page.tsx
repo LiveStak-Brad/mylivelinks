@@ -1217,6 +1217,8 @@ export default function ModernProfilePage() {
                 tracks={musicTracks}
                 cardStyle={cardStyle}
                 borderRadiusClass={borderRadiusClass}
+                artistProfileId={profile.id}
+                artistUsername={profile.username}
               />
             )}
             
@@ -1430,6 +1432,7 @@ export default function ModernProfilePage() {
                 isOwner={isOwnProfile}
                 cardStyle={cardStyle}
                 borderRadiusClass={borderRadiusClass}
+                artistUsername={profile.username}
               />
             )}
 
@@ -1470,6 +1473,8 @@ export default function ModernProfilePage() {
             tracks={musicTracks}
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
+            artistProfileId={profile.id}
+            artistUsername={profile.username}
           />
         )}
         

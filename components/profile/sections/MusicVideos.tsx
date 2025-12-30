@@ -39,6 +39,8 @@ type Props = {
   isOwner: boolean;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  /** Username of the artist (for gifting) */
+  artistUsername?: string;
 };
 
 function getYoutubeIdFromUrl(url: string): string | null {
@@ -69,7 +71,7 @@ async function uploadToProfileMedia(profileId: string, videoId: string, file: Fi
   return uploadProfileMedia(profileId, relPath, file, { upsert });
 }
 
-export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiusClass = 'rounded-2xl' }: Props) {
+export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiusClass = 'rounded-2xl', artistUsername }: Props) {
   const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
@@ -179,6 +181,8 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
           emptyTitle="No Music Videos Yet"
           emptyText="Add an uploaded video or a YouTube URL so fans can watch in-app."
           emptyOwnerCTA="+ Add Video"
+          artistProfileId={profileId}
+          artistUsername={artistUsername}
         />
       )}
 

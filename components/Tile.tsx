@@ -1212,13 +1212,22 @@ export default function Tile({
         )}
       </div>
 
-      {/* Gift Button */}
-      <button
-        onClick={() => setShowGiftModal(true)}
-        className="absolute bottom-2 left-2 px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-      >
-        💎 Gift
-      </button>
+      {/* Action Buttons */}
+      <div className="absolute bottom-2 left-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={() => setShowGiftModal(true)}
+          className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors shadow-lg"
+        >
+          💎 Gift
+        </button>
+        <button
+          onClick={() => router.push(`/live/${streamerUsername}`)}
+          className="px-3 py-1.5 bg-purple-500 text-white rounded text-xs font-medium hover:bg-purple-600 transition-colors shadow-lg"
+          title="Watch in Solo View"
+        >
+          📺 Watch Solo
+        </button>
+      </div>
 
       {/* Gift Modal */}
       {showGiftModal && (

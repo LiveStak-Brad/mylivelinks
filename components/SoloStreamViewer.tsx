@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { 
-  Heart, 
   Share2, 
   MessageCircle, 
   Gift as GiftIcon, 
@@ -20,7 +19,7 @@ import {
   VolumeX
 } from 'lucide-react';
 import Image from 'next/image';
-import { Room, RoomEvent } from 'livekit-client';
+import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication } from 'livekit-client';
 import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT } from '@/lib/livekit-constants';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { GifterBadge as TierBadge } from '@/components/gifter';
@@ -76,9 +75,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [showReportModal, setShowReportModal] = useState(false);
   const [recommendedStreams, setRecommendedStreams] = useState<RecommendedStream[]>([]);
   
-  // LiveKit room connection
+  // LiveKit room connection - SINGLE connection per mount
   const roomRef = useRef<Room | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const isConnectingRef = useRef(false); // Guard against duplicate connects
+  const connectedUsernameRef = useRef<string | null>(null); // Track who we're connected to
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
 
@@ -119,7 +120,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         }
 
         // Fetch live stream data
-        const { data: liveStream, error: liveError } = await supabase
+        const { data: liveStream } = await supabase
           .from('live_streams')
           .select('id, live_available, stream_title')
           .eq('profile_id', profile.id)
@@ -160,7 +161,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         }
 
       } catch (err) {
-        console.error('Error loading streamer:', err);
+        console.error('[SoloStreamViewer] Error loading streamer:', err);
         setError('Failed to load stream');
         setLoading(false);
       }
@@ -169,14 +170,35 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     loadStreamer();
   }, [username, currentUserId, supabase]);
 
-  // Connect to LiveKit room
+  // Connect to LiveKit room - SINGLE CONNECTION GUARD
+  // CRITICAL: Minimal stable deps to prevent reconnection loops
   useEffect(() => {
-    if (!streamer?.live_available || !streamer.profile_id) return;
+    if (!streamer?.live_available || !streamer.profile_id || !streamer.username) return;
+
+    // Guard: Only one connect per mount, and only if username changed
+    if (isConnectingRef.current || connectedUsernameRef.current === streamer.username) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[SoloStreamViewer] Skipping connect - already connecting or connected to:', streamer.username);
+      }
+      return;
+    }
+
+    isConnectingRef.current = true;
+    connectedUsernameRef.current = streamer.username;
 
     const connectToRoom = async () => {
       try {
         if (DEBUG_LIVEKIT) {
           console.log('[SoloStreamViewer] Connecting to room for:', streamer.username);
+        }
+
+        // Disconnect existing room if switching streamers
+        if (roomRef.current) {
+          if (DEBUG_LIVEKIT) {
+            console.log('[SoloStreamViewer] Disconnecting previous room before connecting to new streamer');
+          }
+          roomRef.current.disconnect();
+          roomRef.current = null;
         }
 
         const room = new Room({
@@ -186,23 +208,30 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
         roomRef.current = room;
 
-        // Get LiveKit token
-        const tokenResponse = await fetch(`${TOKEN_ENDPOINT}?userId=${currentUserId || 'anonymous'}&username=${streamer.username}`);
+        // Get LiveKit token - use viewer identity (not streamer identity)
+        const viewerIdentity = currentUserId || `anon_${Date.now()}`;
+        const tokenResponse = await fetch(`${TOKEN_ENDPOINT}?userId=${viewerIdentity}&username=viewer_${viewerIdentity}`);
         const { token } = await tokenResponse.json();
 
         await room.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, token);
         setIsRoomConnected(true);
 
-        // Handle track subscriptions
-        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        if (DEBUG_LIVEKIT) {
+          console.log('[SoloStreamViewer] Connected to room, participants:', room.remoteParticipants.size);
+        }
+
+        // Handle track subscriptions - subscribe to streamer's tracks
+        room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
           if (DEBUG_LIVEKIT) {
             console.log('[SoloStreamViewer] Track subscribed:', {
               kind: track.kind,
               participant: participant.identity,
+              source: (publication as any)?.source,
             });
           }
 
-          if (track.kind === 'video' && videoRef.current) {
+          // Only attach video tracks (audio is handled separately)
+          if (track.kind === Track.Kind.Video && videoRef.current) {
             track.attach(videoRef.current);
             
             // Detect aspect ratio
@@ -211,6 +240,9 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               if (video.videoWidth && video.videoHeight) {
                 const ratio = video.videoWidth / video.videoHeight;
                 setVideoAspectRatio(ratio);
+                if (DEBUG_LIVEKIT) {
+                  console.log('[SoloStreamViewer] Video aspect ratio:', ratio);
+                }
               }
             };
             
@@ -219,7 +251,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           }
         });
 
-        room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
           track.detach();
         });
 
@@ -228,22 +260,47 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             console.log('[SoloStreamViewer] Disconnected from room');
           }
           setIsRoomConnected(false);
+          isConnectingRef.current = false;
         });
+
+        room.on(RoomEvent.Reconnecting, () => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[SoloStreamViewer] Reconnecting to room...');
+          }
+        });
+
+        room.on(RoomEvent.Reconnected, () => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[SoloStreamViewer] Reconnected to room');
+          }
+          setIsRoomConnected(true);
+        });
+
+        isConnectingRef.current = false;
 
       } catch (err) {
         console.error('[SoloStreamViewer] Error connecting to room:', err);
+        isConnectingRef.current = false;
+        connectedUsernameRef.current = null;
       }
     };
 
     connectToRoom();
 
+    // Cleanup: disconnect on unmount or username change
     return () => {
+      if (DEBUG_LIVEKIT) {
+        console.log('[SoloStreamViewer] Cleanup: disconnecting room');
+      }
       if (roomRef.current) {
         roomRef.current.disconnect();
         roomRef.current = null;
       }
+      isConnectingRef.current = false;
+      connectedUsernameRef.current = null;
+      setIsRoomConnected(false);
     };
-  }, [streamer?.live_available, streamer?.profile_id, streamer?.username, currentUserId]);
+  }, [streamer?.live_available, streamer?.profile_id, streamer?.username]); // STABLE DEPS: only reconnect if these change
 
   // Load recommended streams
   useEffect(() => {
@@ -298,7 +355,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         setIsFollowing(true);
       }
     } catch (err) {
-      console.error('Error toggling follow:', err);
+      console.error('[SoloStreamViewer] Error toggling follow:', err);
     }
   };
 
@@ -357,6 +414,9 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             {error || 'Stream not found'}
           </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            This streamer does not exist or their profile is not available.
+          </p>
           <button
             onClick={() => router.push('/live')}
             className="mt-4 px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
@@ -526,7 +586,10 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowGiftModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all flex items-center gap-2 font-medium"
+                disabled={!streamer.live_available}
+                className={`px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all flex items-center gap-2 font-medium ${
+                  !streamer.live_available ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 <GiftIcon className="w-5 h-5" />
                 Send Gift
@@ -535,6 +598,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               <button
                 className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
                 title="React"
+                disabled
               >
                 <Sparkles className="w-5 h-5" />
               </button>
@@ -648,4 +712,3 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     </div>
   );
 }
-

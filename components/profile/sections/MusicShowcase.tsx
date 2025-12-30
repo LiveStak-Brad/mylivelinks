@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom';
 import {
   ChevronDown,
   ChevronUp,
+  Gift,
   GripVertical,
   Music,
   Pause,
@@ -28,6 +29,7 @@ import { getEmptyStateText } from '@/lib/mockDataProviders';
 import type { ProfileType } from '@/lib/profileTypeConfig';
 import { createClient } from '@/lib/supabase';
 import { uploadProfileMedia } from '@/lib/storage';
+import GiftModal from '@/components/GiftModal';
 
 export type MusicTrackRow = {
   id: string;
@@ -48,6 +50,10 @@ interface MusicShowcaseProps {
   onTracksChange?: (nextTracks: MusicTrackRow[]) => void;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  /** Profile ID of the artist (for gifting) */
+  artistProfileId?: string;
+  /** Username of the artist (for gifting) */
+  artistUsername?: string;
 }
 
 function safeUuid() {
@@ -65,6 +71,8 @@ export default function MusicShowcase({
   onTracksChange,
   cardStyle,
   borderRadiusClass = 'rounded-2xl',
+  artistProfileId,
+  artistUsername,
 }: MusicShowcaseProps) {
   const supabase = useMemo(() => createClient(), []);
   const emptyState = getEmptyStateText('music_showcase', profileType);
@@ -74,6 +82,7 @@ export default function MusicShowcase({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playlistOpen, setPlaylistOpen] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -656,6 +665,17 @@ export default function MusicShowcase({
           >
             <SkipForward className="w-5 h-5 text-gray-900 dark:text-white" />
           </button>
+
+          {!isOwner && artistProfileId && artistUsername && (
+            <button
+              type="button"
+              onClick={() => setShowGiftModal(true)}
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 flex items-center justify-center shadow-lg transition-all"
+              title="Send Gift"
+            >
+              <Gift className="w-5 h-5 text-white" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -682,6 +702,17 @@ export default function MusicShowcase({
           formError={formError}
           onClose={() => setShowAddModal(false)}
           onSubmit={submitAdd}
+        />
+      )}
+
+      {showGiftModal && artistProfileId && artistUsername && (
+        <GiftModal
+          recipientId={artistProfileId}
+          recipientUsername={artistUsername}
+          onGiftSent={() => {
+            setShowGiftModal(false);
+          }}
+          onClose={() => setShowGiftModal(false)}
         />
       )}
     </div>
