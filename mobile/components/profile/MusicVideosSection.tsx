@@ -27,12 +27,16 @@ type Props = {
 function getYoutubeIdFromUrl(url: string): string | null {
   const v = String(url || '').trim();
   if (!v) return null;
+  // Accept raw 11-char ID
   if (/^[A-Za-z0-9_-]{11}$/.test(v)) return v;
-  const shortMatch = v.match(/youtu\.be\/([^?&/]+)/i);
+  // youtu.be/{id}
+  const shortMatch = v.match(/youtu\.be\/([A-Za-z0-9_-]{11})/i);
   if (shortMatch?.[1]) return shortMatch[1];
-  const watchMatch = v.match(/[?&]v=([^?&/]+)/i);
+  // youtube.com/watch?v={id}
+  const watchMatch = v.match(/[?&]v=([A-Za-z0-9_-]{11})/i);
   if (watchMatch?.[1]) return watchMatch[1];
-  const embedMatch = v.match(/youtube\.com\/(?:embed|shorts)\/([^?&/]+)/i);
+  // youtube.com/embed/{id} or youtube.com/shorts/{id}
+  const embedMatch = v.match(/youtube\.com\/(?:embed|shorts)\/([A-Za-z0-9_-]{11})/i);
   if (embedMatch?.[1]) return embedMatch[1];
   return null;
 }

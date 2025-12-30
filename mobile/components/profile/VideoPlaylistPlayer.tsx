@@ -42,11 +42,15 @@ type Props = {
 function getYoutubeIdFromUrl(url: string): string | null {
   const v = String(url || '').trim();
   if (!v) return null;
+  // Accept raw 11-char ID
   if (/^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+  // youtu.be/{id}
   const shortMatch = v.match(/youtu\.be\/([A-Za-z0-9_-]{11})/i);
   if (shortMatch?.[1]) return shortMatch[1];
+  // youtube.com/watch?v={id}
   const watchMatch = v.match(/[?&]v=([A-Za-z0-9_-]{11})/i);
   if (watchMatch?.[1]) return watchMatch[1];
+  // youtube.com/embed/{id} or youtube.com/shorts/{id}
   const embedMatch = v.match(/youtube\.com\/(?:embed|shorts)\/([A-Za-z0-9_-]{11})/i);
   if (embedMatch?.[1]) return embedMatch[1];
   return null;
@@ -314,12 +318,17 @@ export function VideoPlaylistPlayer({
               />
             ) : (
               <View style={styles.videoFallback}>
+                <Ionicons name="warning-outline" size={48} color="rgba(255,255,255,0.6)" style={{ marginBottom: 12 }} />
                 <Text style={styles.videoFallbackText}>
-                  {youtubeId ? 'YouTube playback needs react-native-webview installed' : 'Invalid YouTube URL'}
+                  {youtubeId ? 'YouTube playback requires react-native-webview package' : 'Invalid YouTube video URL'}
+                </Text>
+                <Text style={[styles.videoFallbackText, { fontSize: 11, marginTop: 4, opacity: 0.7 }]}>
+                  {youtubeId ? 'Install react-native-webview to play videos in-app' : 'Please check the video URL and try again'}
                 </Text>
                 {!!youtubeId && (
                   <Pressable style={styles.youtubeOpenButton} onPress={() => void openYoutubeExternal()}>
-                    <Text style={styles.youtubeOpenButtonText}>Open in YouTube</Text>
+                    <Ionicons name="logo-youtube" size={18} color="#fff" style={{ marginRight: 6 }} />
+                    <Text style={styles.youtubeOpenButtonText}>Watch on YouTube</Text>
                   </Pressable>
                 )}
               </View>
@@ -605,17 +614,27 @@ function createStyles(theme: ThemeDefinition, accentColor: string, cardOpacity: 
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      padding: 16,
-      gap: 10,
+      padding: 20,
+      gap: 8,
     },
     videoFallbackText: {
-      color: 'rgba(255,255,255,0.75)',
-      fontSize: 13,
-      fontWeight: '800',
+      color: 'rgba(255,255,255,0.85)',
+      fontSize: 14,
+      fontWeight: '700',
       textAlign: 'center',
+      lineHeight: 20,
+      paddingHorizontal: 10,
     },
-    youtubeOpenButton: { backgroundColor: accentColor, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999 },
-    youtubeOpenButtonText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+    youtubeOpenButton: { 
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: accentColor, 
+      paddingHorizontal: 20, 
+      paddingVertical: 12, 
+      borderRadius: 999,
+      marginTop: 8,
+    },
+    youtubeOpenButtonText: { color: '#fff', fontSize: 14, fontWeight: '800' },
     controlsRow: {
       flexDirection: 'row',
       alignItems: 'center',
