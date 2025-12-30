@@ -264,10 +264,17 @@ export default function SoloHostStream() {
         // Listen for LOCAL tracks (host's own camera)
         room.on(RoomEvent.LocalTrackPublished, (publication) => {
           if (DEBUG_LIVEKIT) {
-            console.log('[SoloHostStream] Local track published:', publication.kind);
+            console.log('[SoloHostStream] Local track published:', {
+              kind: publication.kind,
+              trackSid: publication.trackSid,
+              hasTrack: !!publication.track
+            });
           }
           
           if (publication.kind === Track.Kind.Video && videoRef.current && publication.track) {
+            if (DEBUG_LIVEKIT) {
+              console.log('[SoloHostStream] Attaching local video track to video element');
+            }
             publication.track.attach(videoRef.current);
             
             const video = videoRef.current;
@@ -283,6 +290,8 @@ export default function SoloHostStream() {
             
             video.addEventListener('loadedmetadata', detectAspectRatio);
             detectAspectRatio();
+          } else if (publication.kind === Track.Kind.Video) {
+            console.warn('[SoloHostStream] Cannot attach video - videoRef:', !!videoRef.current, 'track:', !!publication.track);
           }
         });
 
@@ -621,17 +630,19 @@ export default function SoloHostStream() {
               </div>
             </div>
 
-            {streamer.live_available ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted={isMuted}
-                className={`max-w-full max-h-full ${
-                  isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'
-                }`}
-              />
-            ) : (
+            {/* Video element - always rendered for host (hidden when offline) */}
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted={isMuted}
+              className={`max-w-full max-h-full ${
+                isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'
+              } ${!streamer.live_available ? 'hidden' : ''}`}
+            />
+
+            {/* Offline placeholder */}
+            {!streamer.live_available && (
               <>
                 {/* Desktop: Centered offline message */}
                 <div className="hidden md:block text-center text-white">
