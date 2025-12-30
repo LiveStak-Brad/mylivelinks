@@ -48,6 +48,21 @@
   .touch-pan-x {
     touch-action: pan-x;
   }
+
+  /* Hide global header and bottom nav in stream view mode */
+  body.stream-view-mode header {
+    display: none !important;
+  }
+  body.stream-view-mode nav[class*="bottom"] {
+    display: none !important;
+  }
+  /* Mobile and Tablet: hide all nav elements */
+  @media (max-width: 1024px) {
+    body.stream-view-mode header,
+    body.stream-view-mode nav {
+      display: none !important;
+    }
+  }
   .touch-pan-y {
     touch-action: pan-y;
   }

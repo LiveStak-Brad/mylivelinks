@@ -100,13 +100,13 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
     if (rank === 1) return '🥇';
     if (rank === 2) return '🥈';
     if (rank === 3) return '🥉';
-    return `#${rank}`;
+    return rank;
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pt-20 md:pt-28 lg:pt-32">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-0">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -114,7 +114,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-lg max-h-[calc(100vh-8rem)] md:max-h-[calc(100vh-10rem)] lg:max-h-[calc(100vh-12rem)] bg-card rounded-2xl shadow-2xl border border-border overflow-hidden animate-scale-in">
+      <div className="relative w-full max-w-lg max-h-[60vh] bg-gradient-to-br from-orange-500 to-yellow-600 rounded-b-2xl shadow-2xl overflow-hidden animate-slideDown">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 p-4">
           <div className="flex items-center justify-between">
@@ -187,9 +187,9 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
             </div>
           ) : entries.length === 0 ? (
             <div className="text-center py-12">
-              <Trophy className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-              <p className="text-muted-foreground">No entries yet</p>
-              <p className="text-sm text-muted-foreground/70">Be the first to make the leaderboard!</p>
+              <Trophy className="w-12 h-12 mx-auto text-white/50 mb-3" />
+              <p className="text-white font-semibold">No entries yet</p>
+              <p className="text-sm text-white/70">Be the first to make the leaderboard!</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -200,8 +200,8 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
                   onClick={onClose}
                   className={`flex items-center gap-2 p-2.5 sm:gap-3 sm:p-3 rounded-xl transition-all hover:scale-[1.02] ${
                     entry.rank <= 3
-                      ? 'bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20'
-                      : 'bg-muted/50 hover:bg-muted border border-transparent'
+                      ? 'bg-white/95 shadow-lg'
+                      : 'bg-white/80 hover:bg-white/90'
                   }`}
                   style={{
                     animation: `slideIn 0.3s ease-out ${index * 0.03}s both`,
@@ -210,9 +210,9 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
                   {/* Rank */}
                   <div className="flex-shrink-0 w-8 sm:w-10 text-center">
                     <span className={`text-base sm:text-lg font-bold ${
-                      entry.rank === 1 ? 'sm:text-2xl' : 
-                      entry.rank === 2 ? 'sm:text-xl' : 
-                      entry.rank === 3 ? 'sm:text-lg' : 'text-muted-foreground'
+                      entry.rank === 1 ? 'sm:text-2xl text-amber-600' : 
+                      entry.rank === 2 ? 'sm:text-xl text-gray-500' : 
+                      entry.rank === 3 ? 'sm:text-lg text-orange-600' : 'text-gray-600'
                     }`}>
                       {getRankIcon(entry.rank)}
                     </span>
@@ -227,7 +227,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
                         entry.rank === 1 ? 'w-10 h-10 sm:w-12 sm:h-12 border-amber-400' :
                         entry.rank === 2 ? 'w-9 h-9 sm:w-11 sm:h-11 border-gray-300' :
                         entry.rank === 3 ? 'w-8 h-8 sm:w-10 sm:h-10 border-orange-400' :
-                        'w-8 h-8 sm:w-9 sm:h-9 border-border'
+                        'w-8 h-8 sm:w-9 sm:h-9 border-gray-300'
                       }`}
                     />
                   </div>
@@ -235,7 +235,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
                   {/* User Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-col gap-0.5">
-                      <span className={`font-semibold text-xs sm:text-sm truncate ${entry.rank <= 3 ? 'text-foreground' : 'text-foreground/80'}`}>
+                      <span className="font-semibold text-xs sm:text-sm truncate text-gray-900">
                         {entry.username}
                       </span>
                       {(() => {
@@ -256,10 +256,10 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
 
                   {/* Metric */}
                   <div className="flex-shrink-0 text-right">
-                    <div className={`text-xs sm:text-sm font-bold ${entry.rank <= 3 ? 'text-foreground' : 'text-foreground/90'}`}>
+                    <div className="text-xs sm:text-sm font-bold text-gray-900">
                       {formatMetric(entry.metric_value)}
                     </div>
-                    <div className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wide">
+                    <div className="text-[9px] sm:text-[10px] text-orange-600 uppercase tracking-wide font-semibold">
                       {type === 'top_streamers' ? 'diamonds' : 'coins'}
                     </div>
                   </div>

@@ -20,17 +20,19 @@ interface ChatMessage {
   message_type: string;
   content: string;
   created_at: string;
+  chat_bubble_color?: string;
+  chat_font?: string;
 }
 
 interface ChatProps {
   roomId?: string;
   liveStreamId?: number;
+  onGiftClick?: () => void;
+  onShareClick?: () => void;
+  onSettingsClick?: () => void;
 }
 
-export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
-  // DEBUG: Log props to verify scoping
-  console.log('[CHAT] 🔍 Props received:', { roomId, liveStreamId });
-  
+export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, onSettingsClick }: ChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -126,7 +128,9 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
           profiles (
             username,
             avatar_url,
-            gifter_level
+            gifter_level,
+            chat_bubble_color,
+            chat_font
           )
         `);
 
@@ -196,7 +200,9 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
           profiles (
             username,
             avatar_url,
-            gifter_level
+            gifter_level,
+            chat_bubble_color,
+            chat_font
           )
         `);
 
@@ -215,7 +221,7 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
         const messagesWithProfiles = data.map((msg: any) => {
           const profile = msg.profiles;
 
-          return {
+          const mappedMsg = {
             id: msg.id,
             profile_id: msg.profile_id,
             username: profile?.username || 'Unknown',
@@ -224,7 +230,19 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
             message_type: msg.message_type,
             content: msg.content,
             created_at: msg.created_at,
+            chat_bubble_color: profile?.chat_bubble_color,
+            chat_font: profile?.chat_font,
           };
+          
+          if (profile?.chat_bubble_color || profile?.chat_font) {
+            console.log('[CHAT] 🎨 Loaded message with custom styling:', {
+              username: mappedMsg.username,
+              chat_bubble_color: mappedMsg.chat_bubble_color,
+              chat_font: mappedMsg.chat_font,
+            });
+          }
+          
+          return mappedMsg;
         });
         
         setMessages(messagesWithProfiles);
@@ -273,7 +291,7 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
     Promise.all([
       supabase
         .from('profiles')
-        .select('username, avatar_url, gifter_level')
+        .select('username, avatar_url, gifter_level, chat_bubble_color, chat_font')
         .eq('id', message.profile_id)
         .single(),
       fetchGifterStatuses([message.profile_id]).then((m) => m[message.profile_id] || null),
@@ -289,7 +307,16 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
         message_type: message.message_type,
         content: message.content,
         created_at: message.created_at,
+        chat_bubble_color: (profile as any)?.chat_bubble_color,
+        chat_font: (profile as any)?.chat_font,
       };
+      
+      console.log('[CHAT] 📨 New realtime message loaded:', {
+        username: newMsg.username,
+        chat_bubble_color: newMsg.chat_bubble_color,
+        chat_font: newMsg.chat_font,
+        profile_id: newMsg.profile_id,
+      });
 
       if (status) {
         setGifterStatusMap((prev) => ({ ...prev, [message.profile_id]: status }));
@@ -344,6 +371,41 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
   useEffect(() => {
     loadMessageWithProfileRef.current = loadMessageWithProfile;
   }, [loadMessageWithProfile]);
+
+  // Listen for profile updates (chat styling changes) and refresh messages
+  useEffect(() => {
+    const profileChannel = supabase
+      .channel('profile-updates-all')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+        },
+        (payload: any) => {
+          const updatedProfileId = payload.new.id;
+          
+          // Update all messages from this user with new styling
+          setMessages((prev) => 
+            prev.map((msg) => 
+              msg.profile_id === updatedProfileId
+                ? {
+                    ...msg,
+                    chat_bubble_color: payload.new.chat_bubble_color,
+                    chat_font: payload.new.chat_font,
+                  }
+                : msg
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      profileChannel.unsubscribe();
+    };
+  }, [supabase]);
 
   // CRITICAL: Create realtime subscription ONCE on mount, never recreate
   useEffect(() => {
@@ -518,10 +580,35 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Generate consistent color for each user based on their profile_id
+  const getUserBubbleColor = (profileId: string) => {
+    // Brand color palette - purple/pink/blue gradient theme
+    const colors = [
+      'bg-purple-500/30', // Purple
+      'bg-pink-500/30',   // Pink
+      'bg-blue-500/30',   // Blue
+      'bg-indigo-500/30', // Indigo
+      'bg-violet-500/30', // Violet
+      'bg-fuchsia-500/30',// Fuchsia
+      'bg-rose-500/30',   // Rose
+      'bg-cyan-500/30',   // Cyan
+      'bg-purple-600/30', // Dark Purple
+      'bg-pink-600/30',   // Dark Pink
+    ];
+    
+    // Generate consistent index from profile_id
+    let hash = 0;
+    for (let i = 0; i < profileId.length; i++) {
+      hash = profileId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
   return (
-    <div className="flex flex-col h-full min-h-0 bg-transparent md:bg-white md:dark:bg-gray-800">
+    <div className="flex flex-col h-full min-h-0 bg-transparent lg:bg-white lg:dark:bg-gray-800">
       {/* Chat Header */}
-      <div className="px-3 pb-3 pt-2 border-b border-white/20 md:border-gray-200 md:dark:border-gray-700 flex-shrink-0 hidden md:block">
+      <div className="px-3 pb-3 pt-2 border-b border-white/20 lg:border-gray-200 lg:dark:border-gray-700 flex-shrink-0 hidden lg:block">
         <h2 className="text-base font-semibold">Global Chat</h2>
       </div>
 
@@ -529,23 +616,23 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
       <div
         ref={messagesContainerRef}
         onScroll={updateAutoScrollFlag}
-        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar"
+        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar flex flex-col justify-end"
       >
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-gray-100/50 md:bg-gray-100 dark:bg-gray-700/50 md:dark:bg-gray-700 rounded animate-pulse" />
+              <div key={i} className="h-12 bg-gray-100/50 lg:bg-gray-100 dark:bg-gray-700/50 lg:dark:bg-gray-700 rounded animate-pulse" />
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-white/70 md:text-gray-500 py-8">
+          <div className="text-center text-white/70 lg:text-gray-500 py-8">
             No messages yet. Be the first to chat!
           </div>
         ) : (
           messages.map((msg) => (
             <div
               key={msg.id}
-              className={`flex gap-2 ${
+              className={`flex gap-2 items-start ${
                 msg.message_type === 'system' ? 'justify-center' : ''
               }`}
             >
@@ -564,12 +651,15 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
 
               <div className="flex-1 min-w-0">
                 {msg.message_type === 'system' ? (
-                  <div className="text-center text-sm text-white/70 md:text-gray-500 md:dark:text-gray-400 italic">
+                  <div className="text-center text-sm text-white/70 lg:text-gray-500 lg:dark:text-gray-400 italic">
                     {msg.content}
                   </div>
                 ) : (
-                  <>
-                    <div className="flex items-center gap-2 mb-1">
+                  <div 
+                    className={`flex flex-col ${msg.chat_bubble_color ? '' : (msg.profile_id ? getUserBubbleColor(msg.profile_id) : 'bg-black/20')} lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none rounded-lg px-2 py-1 lg:px-0 lg:py-0`}
+                    style={msg.chat_bubble_color ? { backgroundColor: `${msg.chat_bubble_color}66` } : undefined}
+                  >
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => {
                         if (msg.profile_id && msg.username) {
@@ -581,7 +671,8 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
                           });
                         }
                       }}
-                      className="font-semibold text-sm text-white md:text-gray-900 md:dark:text-white hover:text-blue-300 md:hover:text-blue-500 md:dark:hover:text-blue-400 transition cursor-pointer"
+                      className="font-semibold text-xs text-white lg:text-gray-900 lg:dark:text-white hover:text-blue-300 lg:hover:text-blue-500 lg:dark:hover:text-blue-400 transition cursor-pointer leading-tight"
+                      style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
                     >
                       {msg.username}
                     </button>
@@ -597,15 +688,18 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
                           />
                         );
                       })()}
-                      <span className="text-xs text-white/60 md:text-gray-500 md:dark:text-gray-400">
+                      <span className="text-[10px] text-white/50 lg:text-gray-500 lg:dark:text-gray-400 leading-tight">
                         {formatTime(msg.created_at)}
                       </span>
                     </div>
-                    <div className="text-sm text-white/90 md:text-gray-700 md:dark:text-gray-300 break-words">
+                    <div 
+                      className="text-sm text-white/90 lg:text-gray-700 lg:dark:text-gray-300 break-words leading-snug"
+                      style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                    >
                       <SafeRichText text={msg.content} />
                     </div>
-                  </>
-                )}}
+                  </div>
+                )}
               </div>
             </div>
           ))
@@ -616,10 +710,24 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
       {/* Message Input - Sticky at bottom */}
       <form 
         onSubmit={sendMessage} 
-        className="sticky bottom-0 p-3 border-t border-white/20 md:border-gray-200 md:dark:border-gray-700 bg-transparent md:bg-white md:dark:bg-gray-800 shadow-lg z-40 flex-shrink-0"
+        className="sticky bottom-0 p-3 border-t border-white/20 lg:border-gray-200 lg:dark:border-gray-700 bg-transparent lg:bg-white lg:dark:bg-gray-800 shadow-lg z-40 flex-shrink-0"
       >
         <div className="w-full">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {/* Settings Button - Mobile/Tablet only */}
+            {onSettingsClick && (
+              <button
+                type="button"
+                onClick={onSettingsClick}
+                className="lg:hidden p-2 text-white/70 hover:text-white transition flex-shrink-0"
+                title="Chat Settings"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            )}
             <input
               type="text"
               value={newMessage}
@@ -631,12 +739,47 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
                 }
               }}
               placeholder="Type a message..."
-              className="flex-1 px-3 py-2 text-sm border border-white/30 md:border-gray-300 md:dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 md:bg-white md:dark:bg-gray-700 text-white md:text-gray-900 md:dark:text-white placeholder-white/60 md:placeholder-gray-500 min-w-0"
+              className="flex-1 px-3 py-2 text-sm border border-white/30 lg:border-gray-300 lg:dark:border-gray-600 rounded-full lg:rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 lg:bg-white lg:dark:bg-gray-700 text-white lg:text-gray-900 lg:dark:text-white placeholder-white/60 lg:placeholder-gray-500 min-w-0"
               maxLength={500}
             />
+            {/* Gift Button - Mobile/Tablet only */}
+            {onGiftClick && (
+              <button
+                type="button"
+                onClick={onGiftClick}
+                className="lg:hidden p-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:from-purple-600 hover:to-pink-600 transition flex-shrink-0"
+                title="Send Gift"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 12 20 22 4 22 4 12"></polyline>
+                  <rect x="2" y="7" width="20" height="5"></rect>
+                  <line x1="12" y1="22" x2="12" y2="7"></line>
+                  <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                  <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+                </svg>
+              </button>
+            )}
+            {/* Share Button - Mobile/Tablet only */}
+            {onShareClick && (
+              <button
+                type="button"
+                onClick={onShareClick}
+                className="lg:hidden p-2 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/30 transition flex-shrink-0"
+                title="Share"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3"></circle>
+                  <circle cx="6" cy="12" r="3"></circle>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+              </button>
+            )}
+            {/* Send Button - Desktop only */}
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition flex-shrink-0 whitespace-nowrap"
+              className="hidden lg:block px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition flex-shrink-0 whitespace-nowrap"
             >
               Send
             </button>

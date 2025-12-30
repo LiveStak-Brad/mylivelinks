@@ -152,14 +152,9 @@ export default function BottomNav() {
                 key={item.href}
                 type="button"
                 onClick={() => {
-                  if (isOwner && username) {
-                    // Owner: Route to their solo stream page (shows host controls when viewing own stream)
-                    router.push(`/live/${username}`);
-                    return;
-                  }
-                  if (isOwner && !username) {
-                    // Owner but username not loaded yet - fallback to Live Central
-                    router.push('/live');
+                  if (isOwner) {
+                    // Owner: Route to dedicated host stream page
+                    router.push('/live/host');
                     return;
                   }
                   // Non-owner: show coming soon modal
