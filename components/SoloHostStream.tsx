@@ -648,7 +648,7 @@ export default function SoloHostStream() {
               ref={videoRef}
               autoPlay
               playsInline
-              muted={isMuted}
+              muted={true}
               className={`max-w-full max-h-full ${
                 isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'
               }`}
