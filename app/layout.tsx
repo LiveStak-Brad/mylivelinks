@@ -4,8 +4,7 @@ import './globals.css';
 import ClientThemeProvider from '@/components/ClientThemeProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AgeVerificationModal from '@/components/AgeVerificationModal';
-import GlobalHeader from '@/components/GlobalHeader';
-import BottomNav from '@/components/BottomNav';
+import NavigationWrapper from '@/components/NavigationWrapper';
 import { IMProvider } from '@/components/im';
 import { NotiesProvider } from '@/components/noties';
 import { MessagesProvider } from '@/components/messages';
@@ -60,14 +59,13 @@ export default function RootLayout({
           <ClientThemeProvider>
             <NotiesProvider>
               <MessagesProvider>
-                <GlobalHeader />
+                <NavigationWrapper />
                 <AgeVerificationModal />
                 <IMProvider />
                 {/* Note: Pages should wrap content in PageShell which provides <main id="main">
                     for skip-link accessibility. If not using PageShell, ensure you have a 
                     <main id="main" tabIndex={-1}> landmark element. */}
                 {children}
-                <BottomNav />
               </MessagesProvider>
             </NotiesProvider>
           </ClientThemeProvider>

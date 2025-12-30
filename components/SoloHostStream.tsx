@@ -3,110 +3,215 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import { X, Eye, Camera, Users } from 'lucide-react';
-import { Room, RoomEvent } from 'livekit-client';
-import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT } from '@/lib/livekit-constants';
-import { canUserGoLive } from '@/lib/livekit-constants';
+import { useTheme } from 'next-themes';
+import { 
+  X,
+  Eye,
+  Volume2,
+  VolumeX,
+  Sparkles,
+  Trophy,
+  Users,
+  UserPlus,
+  ChevronRight,
+  ChevronLeft,
+  Settings,
+  Swords,
+  Camera,
+  Wand2
+} from 'lucide-react';
+import Image from 'next/image';
+import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication } from 'livekit-client';
+import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT, canUserGoLive } from '@/lib/livekit-constants';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
+import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import Chat from './Chat';
 import GoLiveButton from './GoLiveButton';
+
+interface StreamerData {
+  id: string;
+  profile_id: string;
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+  bio?: string;
+  live_available: boolean;
+  viewer_count: number;
+  gifter_level: number;
+  gifter_status?: GifterStatus | null;
+  stream_title?: string;
+  live_stream_id?: number;
+}
 
 /**
  * Solo Host Stream Component
  * 
- * Full-screen host interface (matches mobile SoloHostStreamScreen).
- * Features:
- * - Full-screen camera preview
- * - Overlaid controls (mobile-style)
- * - Semi-transparent chat overlay (bottom 1/3)
- * - Go Live button centered at bottom
- * - Exit button top-left
- * - Live status + viewer count top-center
+ * EXACT COPY of SoloStreamViewer layout with these changes:
+ * 1. No back button (top-left)
+ * 2. Flag button → X button (exit)
+ * 3. Bottom action bar → Streamer options (co-host, guests, battle, filters)
+ * 4. Auto-show setup modal on mount (permissions + stream title)
+ * 5. Token: canPublish=true
  */
 export default function SoloHostStream() {
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
   const supabase = useMemo(() => createClient(), []);
   
+  const [streamer, setStreamer] = useState<StreamerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
-  const [canGoLive, setCanGoLive] = useState(false);
-  const [viewerCount, setViewerCount] = useState(0);
-  const [isLive, setIsLive] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(0.5);
+  
+  // Stream setup modal
+  const [showSetupModal, setShowSetupModal] = useState(true);
+  const [streamTitle, setStreamTitle] = useState('');
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [requestingPermissions, setRequestingPermissions] = useState(false);
   
   // LiveKit room connection
   const roomRef = useRef<Room | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isRoomConnected, setIsRoomConnected] = useState(false);
   const isConnectingRef = useRef(false);
+  const connectedUsernameRef = useRef<string | null>(null);
+  const [isRoomConnected, setIsRoomConnected] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
 
-  // Check if user can go live
+  // Get current user
   useEffect(() => {
-    const checkAuth = async () => {
+    const initUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setError('You must be logged in to stream');
+        setLoading(false);
+        return;
+      }
+
+      const canLive = canUserGoLive({ id: user.id, email: user.email });
+      if (!canLive) {
+        setError('Go Live is currently limited to the owner account');
+        setLoading(false);
+        return;
+      }
+
+      setCurrentUserId(user.id);
+    };
+    initUser();
+  }, [supabase]);
+
+  // Load streamer data (current user)
+  useEffect(() => {
+    if (!currentUserId) return;
+    
+    const loadStreamer = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setError('You must be logged in to go live');
-          setLoading(false);
-          return;
-        }
+        setLoading(true);
+        setError(null);
 
-        const canLive = canUserGoLive({ id: user.id, email: user.email });
-        
-        if (!canLive) {
-          setError('Go Live is currently limited to the owner account');
-          setLoading(false);
-          return;
-        }
-
-        setCurrentUserId(user.id);
-        setCanGoLive(true);
-
-        // Get username
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('username')
-          .eq('id', user.id)
+          .select(`
+            id,
+            username,
+            display_name,
+            avatar_url,
+            bio,
+            gifter_level
+          `)
+          .eq('id', currentUserId)
           .single();
-        
-        if (profile) {
-          setCurrentUsername(profile.username);
+
+        if (profileError || !profile) {
+          setError('Failed to load your profile');
+          setLoading(false);
+          return;
         }
 
-        // Check if already live
         const { data: liveStream } = await supabase
           .from('live_streams')
-          .select('id, live_available')
-          .eq('profile_id', user.id)
+          .select('id, live_available, stream_title')
+          .eq('profile_id', profile.id)
           .single();
-        
-        if (liveStream?.live_available) {
-          setIsLive(true);
-        }
 
+        const gifterStatuses = await fetchGifterStatuses([profile.id]);
+        const gifterStatus = gifterStatuses[profile.id] || null;
+
+        const streamerData: StreamerData = {
+          id: liveStream?.id?.toString() || '0',
+          profile_id: profile.id,
+          username: profile.username,
+          display_name: profile.display_name,
+          avatar_url: profile.avatar_url,
+          bio: profile.bio,
+          live_available: liveStream?.live_available || false,
+          viewer_count: 0,
+          gifter_level: profile.gifter_level || 0,
+          gifter_status: gifterStatus,
+          stream_title: liveStream?.stream_title,
+          live_stream_id: liveStream?.id,
+        };
+
+        setStreamer(streamerData);
+        setStreamTitle(liveStream?.stream_title || '');
         setLoading(false);
-      } catch (err: any) {
-        console.error('[SoloHostStream] Error checking auth:', err);
-        setError('Failed to load stream settings');
+
+      } catch (err) {
+        console.error('[SoloHostStream] Error loading profile:', err);
+        setError('Failed to load profile');
         setLoading(false);
       }
     };
 
-    checkAuth();
-  }, [supabase]);
+    loadStreamer();
+  }, [currentUserId, supabase]);
 
-  // Connect to LiveKit room
+  // Request camera/mic permissions automatically
   useEffect(() => {
-    if (!canGoLive || !currentUserId || isConnectingRef.current) return;
+    if (!showSetupModal || requestingPermissions || permissionsGranted) return;
+
+    const requestPermissions = async () => {
+      setRequestingPermissions(true);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: true 
+        });
+        // Stop tracks immediately, we just needed to check permissions
+        stream.getTracks().forEach(track => track.stop());
+        setPermissionsGranted(true);
+      } catch (err) {
+        console.error('[SoloHostStream] Permission denied:', err);
+        alert('Camera and microphone access is required to go live. Please allow access and try again.');
+      } finally {
+        setRequestingPermissions(false);
+      }
+    };
+
+    requestPermissions();
+  }, [showSetupModal, requestingPermissions, permissionsGranted]);
+
+  // Connect to LiveKit room as HOST
+  useEffect(() => {
+    if (!streamer?.profile_id || !currentUserId) return;
+    if (isConnectingRef.current || connectedUsernameRef.current === streamer.username) return;
 
     isConnectingRef.current = true;
+    connectedUsernameRef.current = streamer.username;
 
     const connectToRoom = async () => {
       try {
         if (DEBUG_LIVEKIT) {
-          console.log('[SoloHostStream] Connecting to room as host...');
+          console.log('[SoloHostStream] Connecting to room as HOST');
+        }
+
+        if (roomRef.current) {
+          roomRef.current.disconnect();
+          roomRef.current = null;
         }
 
         const room = new Room({
@@ -116,7 +221,7 @@ export default function SoloHostStream() {
 
         roomRef.current = room;
 
-        // Get LiveKit token with HOST permissions
+        // Get LiveKit token - HOST MODE
         const tokenResponse = await fetch(TOKEN_ENDPOINT, {
           method: 'POST',
           headers: {
@@ -125,12 +230,12 @@ export default function SoloHostStream() {
           credentials: 'include',
           body: JSON.stringify({
             roomName: LIVEKIT_ROOM_NAME,
-            participantName: `host_${currentUsername || currentUserId}`,
-            canPublish: true,  // HOST MODE
+            participantName: `host_${currentUserId}`,
+            canPublish: true,  // ✅ HOST MODE
             canSubscribe: true,
             deviceType: 'web',
             deviceId: `solo_host_${Date.now()}`,
-            sessionId: `host_${Date.now()}`,
+            sessionId: `solo_${Date.now()}`,
             role: 'host',
           }),
         });
@@ -146,236 +251,507 @@ export default function SoloHostStream() {
         }
 
         if (DEBUG_LIVEKIT) {
-          console.log('[SoloHostStream] Token received, connecting...', {
-            canPublish: true,
-            role: 'host'
-          });
+          console.log('[SoloHostStream] Token received, canPublish=true, role=host');
         }
 
         await room.connect(url, token);
         setIsRoomConnected(true);
 
         if (DEBUG_LIVEKIT) {
-          console.log('[SoloHostStream] Connected to room as HOST', {
-            canPublish: room.localParticipant.permissions?.canPublish,
-            roomState: room.state
-          });
+          console.log('[SoloHostStream] Connected as HOST');
         }
 
-        // Room event handlers
-        room.on(RoomEvent.Disconnected, () => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[SoloHostStream] Disconnected from room');
+        room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
+          if (track.kind === Track.Kind.Video && videoRef.current) {
+            track.attach(videoRef.current);
+            
+            const video = videoRef.current;
+            const detectAspectRatio = () => {
+              if (video.videoWidth && video.videoHeight) {
+                const ratio = video.videoWidth / video.videoHeight;
+                setVideoAspectRatio(ratio);
+              }
+            };
+            
+            video.addEventListener('loadedmetadata', detectAspectRatio);
+            detectAspectRatio();
           }
+        });
+
+        room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+          track.detach();
+        });
+
+        room.on(RoomEvent.Disconnected, () => {
           setIsRoomConnected(false);
           isConnectingRef.current = false;
-        });
-
-        room.on(RoomEvent.Reconnecting, () => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[SoloHostStream] Reconnecting to room...');
-          }
-        });
-
-        room.on(RoomEvent.Reconnected, () => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[SoloHostStream] Reconnected to room');
-          }
-          setIsRoomConnected(true);
-        });
-
-        // Track participant count
-        room.on(RoomEvent.ParticipantConnected, () => {
-          setViewerCount(room.remoteParticipants.size);
-        });
-
-        room.on(RoomEvent.ParticipantDisconnected, () => {
-          setViewerCount(room.remoteParticipants.size);
         });
 
         isConnectingRef.current = false;
 
       } catch (err) {
         console.error('[SoloHostStream] Error connecting to room:', err);
-        setError('Failed to connect to streaming server');
         isConnectingRef.current = false;
+        connectedUsernameRef.current = null;
       }
     };
 
     connectToRoom();
 
-    // Cleanup: disconnect on unmount
     return () => {
-      if (DEBUG_LIVEKIT) {
-        console.log('[SoloHostStream] Cleanup: disconnecting room');
-      }
       if (roomRef.current) {
         roomRef.current.disconnect();
         roomRef.current = null;
       }
       isConnectingRef.current = false;
+      connectedUsernameRef.current = null;
       setIsRoomConnected(false);
     };
-  }, [canGoLive, currentUserId, currentUsername, supabase]);
+  }, [streamer?.profile_id, streamer?.username, currentUserId]);
 
-  // Update viewer count from database
-  useEffect(() => {
-    if (!currentUserId || !isLive) return;
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume;
+    }
+    if (newVolume > 0) {
+      setIsMuted(false);
+    }
+  };
 
-    const updateViewerCount = async () => {
-      const { data } = await supabase
-        .from('live_streams')
-        .select('active_viewer_count')
-        .eq('profile_id', currentUserId)
-        .single();
-      
-      if (data) {
-        setViewerCount(data.active_viewer_count || 0);
-      }
-    };
-
-    updateViewerCount();
-    const interval = setInterval(updateViewerCount, 5000);
-
-    return () => clearInterval(interval);
-  }, [currentUserId, isLive, supabase]);
+  const handleMuteToggle = () => {
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    if (videoRef.current) {
+      videoRef.current.muted = newMuted;
+    }
+  };
 
   const handleExit = () => {
-    if (isLive || isPublishing) {
-      if (confirm('Are you sure you want to exit? This will end your stream.')) {
-        router.push('/');
-      }
-    } else {
+    if (window.confirm('Are you sure you want to exit? If you are live, your stream will end.')) {
       router.push('/');
     }
   };
 
+  const handleStartStream = async () => {
+    if (!streamTitle.trim()) {
+      alert('Please enter a stream title');
+      return;
+    }
+
+    // Update stream title in database
+    if (streamer?.live_stream_id) {
+      await supabase
+        .from('live_streams')
+        .update({ stream_title: streamTitle })
+        .eq('id', streamer.live_stream_id);
+    }
+
+    setShowSetupModal(false);
+  };
+
+  const handleCancelStream = () => {
+    router.push('/');
+  };
+
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-          <p className="text-gray-400">Loading stream settings...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading stream...</p>
         </div>
       </div>
     );
   }
 
-  if (error || !canGoLive) {
+  if (error || !streamer) {
     return (
-      <div className="fixed inset-0 bg-gray-900 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Camera className="w-8 h-8 text-red-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
-            {error || 'Access Denied'}
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            {error || 'Failed to load'}
           </h1>
-          <p className="text-gray-400 mb-6">
-            {error || 'You do not have permission to access the streaming interface.'}
-          </p>
           <button
             onClick={() => router.push('/')}
-            className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+            className="mt-4 px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
           >
-            Go Back Home
+            Go Home
           </button>
         </div>
       </div>
     );
   }
 
+  const isPortraitVideo = videoAspectRatio < 1;
+
   return (
-    <div className="fixed inset-0 bg-black">
-      {/* Top Bar - Overlaid on video (mobile-style) */}
-      <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent">
-        {/* Exit Button */}
-        <button
-          onClick={handleExit}
-          className="p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
-          title="Exit"
-        >
-          <X className="w-6 h-6 text-white" />
-        </button>
-
-        {/* Status Indicators */}
-        <div className="flex items-center gap-2">
-          {!isRoomConnected && (
-            <div className="flex items-center gap-2 bg-yellow-500/20 text-yellow-300 px-3 py-1.5 rounded-full text-xs font-medium">
-              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-              Connecting...
-            </div>
-          )}
-
-          {isLive && isPublishing && (
-            <div className="flex items-center gap-2 bg-red-500 px-3 py-1.5 rounded-full">
-              <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-              <span className="text-white text-xs font-bold">LIVE</span>
-              <div className="flex items-center gap-1 ml-1">
-                <Eye className="w-3 h-3 text-white" />
-                <span className="text-white text-xs font-semibold">{viewerCount}</span>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 lg:bg-gray-50 lg:dark:bg-gray-900 overflow-hidden lg:overflow-auto">
+      {/* Stream Setup Modal */}
+      {showSetupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center">
+                <Camera className="w-6 h-6 text-purple-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Ready to Go Live?
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Set up your stream
+                </p>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Placeholder for symmetry */}
-        <div className="w-10" />
-      </div>
-
-      {/* Main Content - Full-screen Camera Preview */}
-      <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-        {!isPublishing && (
-          <div className="text-center text-white px-4">
-            <Camera className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <h2 className="text-xl font-bold mb-2">Ready to Go Live</h2>
-            <p className="text-gray-400 text-sm">Click the button below to start streaming</p>
-            {currentUsername && (
-              <p className="text-gray-500 text-xs mt-2">Streaming as @{currentUsername}</p>
-            )}
-          </div>
-        )}
-        {/* Local video track will be attached here by GoLiveButton */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full h-full object-cover"
-          style={{ display: isPublishing ? 'block' : 'none' }}
-        />
-      </div>
-
-      {/* Semi-transparent Chat Overlay (bottom 1/3 of screen) */}
-      {isLive && (
-        <div className="absolute bottom-20 left-0 right-0 h-1/3 bg-black/40 backdrop-blur-sm overflow-hidden">
-          <div className="h-full flex flex-col p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-white text-sm flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Live Chat
-              </h3>
-              <span className="text-xs text-gray-300">{viewerCount} watching</span>
+            {/* Permissions Status */}
+            <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+              <div className="flex items-center gap-2">
+                {requestingPermissions ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Requesting camera and microphone access...
+                    </span>
+                  </>
+                ) : permissionsGranted ? (
+                  <>
+                    <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                    </div>
+                    <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      ✓ Camera and microphone access granted
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Waiting for permissions...
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <Chat />
+
+            {/* Stream Title Input */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Stream Title
+              </label>
+              <input
+                type="text"
+                value={streamTitle}
+                onChange={(e) => setStreamTitle(e.target.value)}
+                placeholder="What's your stream about?"
+                maxLength={100}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                disabled={!permissionsGranted}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {streamTitle.length}/100 characters
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelStream}
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStartStream}
+                disabled={!permissionsGranted || !streamTitle.trim()}
+                className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Continue
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Bottom Controls - Centered button */}
-      <div className="absolute bottom-0 left-0 right-0 z-50 flex flex-col items-center p-6 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
-        {/* Go Live Button (large, centered) */}
-        <div className="flex items-center justify-center">
-          <GoLiveButton
-            sharedRoom={roomRef.current}
-            isRoomConnected={isRoomConnected}
-            onLiveStatusChange={(live) => setIsLive(live)}
-            onPublishingChange={(publishing) => setIsPublishing(publishing)}
-            publishAllowed={isRoomConnected}
-          />
+      {/* Desktop: Top Navigation Bar (NO BACK BUTTON) */}
+      <div className="hidden lg:flex bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 items-center justify-between">
+        <div className="flex items-center gap-4">
+          {/* Streamer Info */}
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Image
+                src={getAvatarUrl(streamer.avatar_url)}
+                alt={streamer.username}
+                width={40}
+                height={40}
+                className="rounded-full"
+              />
+              {streamer.live_available && (
+                <div className="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
+                  LIVE
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-gray-900 dark:text-white">
+                  {streamer.display_name || streamer.username}
+                </h2>
+                {streamer.gifter_status && (
+                  <TierBadge 
+                    tier_key={streamer.gifter_status.tier_key}
+                    level={streamer.gifter_status.level_in_tier}
+                    size="sm"
+                  />
+                )}
+              </div>
+              {streamer.stream_title && (
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {streamer.stream_title}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* Desktop Action Buttons */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300">
+            <Eye className="w-4 h-4" />
+            <span>{streamer.viewer_count.toLocaleString()}</span>
+          </div>
+          
+          {/* Exit Button (replaces Flag button) */}
+          <button
+            onClick={handleExit}
+            className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            title="Exit Stream"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Area - Desktop: normal layout with header, Mobile/Tablet: full screen */}
+      <div className="flex relative h-screen lg:h-[calc(100vh-73px)] pt-0 lg:pt-0 overflow-hidden">
+        {/* Left/Center: Video Player */}
+        <div className="flex-1 flex flex-col bg-black">
+          <div className="flex-1 flex items-center justify-center relative">
+            {/* Mobile/Tablet: Viewers - Top center */}
+            <div className="lg:hidden absolute top-4 left-1/2 -translate-x-1/2 z-50">
+              <div className="bg-black/40 backdrop-blur-md rounded-full px-4 py-2 shadow-lg flex items-center gap-1.5">
+                <Eye className="w-4 h-4 text-white" />
+                <span className="text-white font-bold text-sm">{streamer.viewer_count.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* Mobile/Tablet: X button + Streamer info overlay at top (NO BACK BUTTON) */}
+            <div className="lg:hidden absolute top-4 left-0 right-4 z-20 flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                {/* X Button (exit - replaces back button) */}
+                <button
+                  onClick={handleExit}
+                  className="text-white hover:opacity-80 transition-opacity"
+                  title="Exit Stream"
+                >
+                  <X className="w-7 h-7" />
+                </button>
+                
+                {/* Streamer Info */}
+                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-2 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <Image
+                      src={getAvatarUrl(streamer.avatar_url)}
+                      alt={streamer.username}
+                      width={28}
+                      height={28}
+                      className="rounded-full"
+                    />
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-sm">
+                          {streamer.display_name || streamer.username}
+                        </span>
+                        {streamer.live_available && (
+                          <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded font-bold">
+                            LIVE
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-white/80">
+                        <div className="flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-yellow-400" />
+                          <span className="font-semibold">Host</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {streamer.live_available ? (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted={isMuted}
+                className={`max-w-full max-h-full ${
+                  isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'
+                }`}
+              />
+            ) : (
+              <>
+                {/* Desktop: Centered offline message */}
+                <div className="hidden md:block text-center text-white">
+                  <div className="mb-4">
+                    <Image
+                      src={getAvatarUrl(streamer.avatar_url)}
+                      alt={streamer.username}
+                      width={120}
+                      height={120}
+                      className="rounded-full mx-auto"
+                    />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">
+                    Ready to go live?
+                  </h3>
+                  <p className="text-gray-400 mb-4">
+                    Click the "Go Live" button below to start streaming
+                  </p>
+                </div>
+                
+                {/* Mobile: Full-screen profile photo */}
+                <div className="md:hidden w-full h-full relative">
+                  <Image
+                    src={getAvatarUrl(streamer.avatar_url)}
+                    alt={streamer.username}
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/20" />
+                </div>
+              </>
+            )}
+
+            {/* Volume Control Overlay - Hidden on mobile */}
+            {streamer.live_available && (
+              <div className="hidden md:flex absolute bottom-4 left-4 items-center gap-2 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2">
+                <button
+                  onClick={handleMuteToggle}
+                  className="text-white hover:text-purple-400 transition-colors"
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="w-5 h-5" />
+                  ) : (
+                    <Volume2 className="w-5 h-5" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={volume}
+                  onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                  className="w-20 accent-purple-500"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Streamer Options Bar (replaces viewer action bar) - Desktop only */}
+          <div className="hidden lg:flex bg-gray-900 border-t border-gray-800 px-4 py-3 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <GoLiveButton 
+                sharedRoom={roomRef.current}
+                isRoomConnected={isRoomConnected}
+              />
+              
+              <button
+                className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 font-medium"
+                title="Co-Host"
+                disabled
+              >
+                <UserPlus className="w-5 h-5" />
+                Co-Host
+              </button>
+              
+              <button
+                className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 font-medium"
+                title="Guests"
+                disabled
+              >
+                <Users className="w-5 h-5" />
+                Guests
+              </button>
+              
+              <button
+                className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 font-medium"
+                title="Battle"
+                disabled
+              >
+                <Swords className="w-5 h-5" />
+                Battle
+              </button>
+              
+              <button
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                title="Filters"
+                disabled
+              >
+                <Wand2 className="w-5 h-5" />
+              </button>
+              
+              <button
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                title="Settings"
+                disabled
+              >
+                <Settings className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-400">
+                Streaming as @{streamer.username}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop: Right Chat Panel */}
+        <div className={`transition-all duration-300 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 ${
+          isChatOpen ? 'w-96' : 'w-0'
+        } overflow-hidden hidden lg:block`}>
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-900 dark:text-white">Live Chat</h3>
+              <button
+                onClick={() => setIsChatOpen(false)}
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <Chat 
+                liveStreamId={streamer.live_stream_id}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Chat Toggle (when closed) - Desktop only */}
+        {!isChatOpen && (
+          <button
+            onClick={() => setIsChatOpen(true)}
+            className="hidden lg:block fixed right-0 top-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors z-20"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </button>
+        )}
       </div>
     </div>
   );
