@@ -21,7 +21,7 @@ import {
   Wand2
 } from 'lucide-react';
 import Image from 'next/image';
-import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication } from 'livekit-client';
+import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication, LocalTrackPublication } from 'livekit-client';
 import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT, canUserGoLive } from '@/lib/livekit-constants';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { GifterBadge as TierBadge } from '@/components/gifter';
@@ -261,7 +261,37 @@ export default function SoloHostStream() {
           console.log('[SoloHostStream] Connected as HOST');
         }
 
+        // Listen for LOCAL tracks (host's own camera)
+        room.on(RoomEvent.LocalTrackPublished, (publication) => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[SoloHostStream] Local track published:', publication.kind);
+          }
+          
+          if (publication.kind === Track.Kind.Video && videoRef.current && publication.track) {
+            publication.track.attach(videoRef.current);
+            
+            const video = videoRef.current;
+            const detectAspectRatio = () => {
+              if (video.videoWidth && video.videoHeight) {
+                const ratio = video.videoWidth / video.videoHeight;
+                setVideoAspectRatio(ratio);
+                if (DEBUG_LIVEKIT) {
+                  console.log('[SoloHostStream] Local video aspect ratio:', ratio);
+                }
+              }
+            };
+            
+            video.addEventListener('loadedmetadata', detectAspectRatio);
+            detectAspectRatio();
+          }
+        });
+
+        // Also listen for remote tracks (in case of co-hosts later)
         room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
+          if (DEBUG_LIVEKIT) {
+            console.log('[SoloHostStream] Remote track subscribed:', track.kind, 'from', participant.identity);
+          }
+          
           if (track.kind === Track.Kind.Video && videoRef.current) {
             track.attach(videoRef.current);
             
