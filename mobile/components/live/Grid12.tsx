@@ -131,10 +131,25 @@ export const Grid12: React.FC<Grid12Props> = ({
   // Initialize tileSlots when participants change (only if empty)
   useEffect(() => {
     if (tileSlots.length === 0 && participants.length > 0) {
-      const identities = participants.map(p => p.identity);
+      const local = participants.find(p => p.isLocal)?.identity;
+      const rest = participants.filter(p => p.identity !== local).map(p => p.identity);
+      const identities = local ? [local, ...rest] : participants.map(p => p.identity);
       onInitializeTileSlots(identities);
     }
   }, [participants, tileSlots.length, onInitializeTileSlots]);
+
+  // Keep local participant pinned to slot 0 (top-left) as participants update.
+  useEffect(() => {
+    if (tileSlots.length === 0 || participants.length === 0) return;
+
+    const local = participants.find(p => p.isLocal)?.identity;
+    if (!local) return;
+
+    if (tileSlots[0] !== local) {
+      const next = [local, ...tileSlots.filter(id => id && id !== local)];
+      onInitializeTileSlots(next);
+    }
+  }, [participants, tileSlots, onInitializeTileSlots]);
 
   const tileItems = useMemo(
     () => createTileItems(participants, tileSlots),

@@ -48,20 +48,32 @@ export const Tile: React.FC<TileProps> = ({
   const videoTrack = useMemo(() => {
     if (!room || !participant) return null;
 
-    const remoteParticipant = room.remoteParticipants.get(participant.identity);
-    if (!remoteParticipant) return null;
+    const isLocal = !!room.localParticipant && room.localParticipant.identity === participant.identity;
 
-    const videoPublications = Array.from(remoteParticipant.videoTrackPublications.values());
+    const targetParticipant: any =
+      room.localParticipant && room.localParticipant.identity === participant.identity
+        ? room.localParticipant
+        : room.remoteParticipants.get(participant.identity);
+    if (!targetParticipant) return null;
 
-    const screenPub = videoPublications.find(
-      (pub: any) => pub?.source === Track.Source.ScreenShare && pub?.isSubscribed && pub?.track
-    );
-    const cameraPub = videoPublications.find(
-      (pub: any) => pub?.source === Track.Source.Camera && pub?.isSubscribed && pub?.track
-    );
-    const anySubscribedPub = videoPublications.find((pub: any) => pub?.isSubscribed && pub?.track);
+    const videoPublications = Array.from(targetParticipant.videoTrackPublications.values());
 
-    const videoPublication: any = screenPub || cameraPub || anySubscribedPub;
+    const screenPub = videoPublications.find((pub: any) => {
+      if (pub?.source !== Track.Source.ScreenShare) return false;
+      if (!pub?.track) return false;
+      return isLocal ? !pub?.isMuted : !!pub?.isSubscribed;
+    });
+    const cameraPub = videoPublications.find((pub: any) => {
+      if (pub?.source !== Track.Source.Camera) return false;
+      if (!pub?.track) return false;
+      return isLocal ? !pub?.isMuted : !!pub?.isSubscribed;
+    });
+    const anyPub = videoPublications.find((pub: any) => {
+      if (!pub?.track) return false;
+      return isLocal ? !pub?.isMuted : !!pub?.isSubscribed;
+    });
+
+    const videoPublication: any = screenPub || cameraPub || anyPub;
     if (!videoPublication) return null;
 
     if (DEBUG) {

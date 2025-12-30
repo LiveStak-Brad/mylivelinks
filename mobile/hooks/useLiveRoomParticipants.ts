@@ -566,10 +566,11 @@ export function useLiveRoomParticipants(
       ? Array.from(raw.audioTrackPublications.values())
       : Array.from(raw?.trackPublications?.values?.() ?? []).filter((pub: any) => pub?.kind === 'audio' || pub?.track?.kind === 'audio');
 
-    const hasVideo = p instanceof LocalParticipant
+    const isSelf = myIdentity != null && p.identity === myIdentity;
+    const hasVideo = isSelf
       ? videoPublications.some((pub: any) => !!pub?.track && !pub?.isMuted)
       : videoPublications.some((pub: any) => !!pub?.track && !!pub?.isSubscribed);
-    const hasAudio = p instanceof LocalParticipant
+    const hasAudio = isSelf
       ? audioPublications.some((pub: any) => !!pub?.track && !pub?.isMuted)
       : audioPublications.some((pub: any) => !!pub?.track && !!pub?.isSubscribed);
 
@@ -596,7 +597,7 @@ export function useLiveRoomParticipants(
       hasVideo,
       hasAudio,
       joinedAt,
-      isSelf: myIdentity != null && p.identity === myIdentity,
+      isSelf,
       // Metrics not available from LiveKit - would come from Supabase if needed
       metrics: undefined,
     };
@@ -1041,6 +1042,9 @@ export function useLiveRoomParticipants(
         
         // Enable microphone with audio optimizations
         await room.localParticipant.setMicrophoneEnabled(true);
+
+        // Force a state refresh so the memoized selection sees the updated local track publications.
+        updateParticipants(room);
 
         if (DEBUG) {
           const pubs = Array.from(room.localParticipant.trackPublications.values()).map((pub: any) => ({
