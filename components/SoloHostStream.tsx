@@ -1,14 +1,22 @@
 'use client';
 
+// This is a COPY of SoloStreamViewer.tsx with minimal changes for host mode:
+// 1. No back button (ChevronLeft removed)
+// 2. Flag button → X button (exit stream)
+// 3. Chat input → GoLiveButton (streamer controls)
+// 4. Token request with canPublish=true
+
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { 
-  X,
+  X, // Changed from Flag
   Eye,
   Volume2,
-  VolumeX
+  VolumeX,
+  ChevronRight,
+  ChevronLeft
 } from 'lucide-react';
 import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication } from 'livekit-client';
@@ -18,7 +26,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import Chat from './Chat';
-import GoLiveButton from './GoLiveButton';
+import GoLiveButton from './GoLiveButton'; // Host controls
 
 interface StreamerData {
   id: string;
@@ -35,16 +43,6 @@ interface StreamerData {
   live_stream_id?: number;
 }
 
-/**
- * Solo Host Stream Component
- * 
- * Host/streamer view for solo streaming.
- * Similar to SoloStreamViewer but optimized for the broadcaster:
- * - No back button (top-left)
- * - X button instead of flag (exit stream)
- * - Streamer controls instead of chat input
- * - Shows own camera preview
- */
 export default function SoloHostStream() {
   const router = useRouter();
   const { resolvedTheme } = useTheme();
@@ -54,14 +52,15 @@ export default function SoloHostStream() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
-  const [viewerCount, setViewerCount] = useState(0);
   
   // LiveKit room connection
   const roomRef = useRef<Room | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isConnectingRef = useRef(false);
+  const connectedUsernameRef = useRef<string | null>(null);
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
 
@@ -69,26 +68,20 @@ export default function SoloHostStream() {
   useEffect(() => {
     const initUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setError('You must be logged in to stream');
-        setLoading(false);
-        return;
-      }
-      setCurrentUserId(user.id);
+      setCurrentUserId(user?.id || null);
     };
     initUser();
   }, [supabase]);
 
-  // Load streamer data (current user)
+  // Load current user's profile as streamer data
   useEffect(() => {
     if (!currentUserId) return;
-
+    
     const loadStreamer = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Fetch current user's profile
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select(`
@@ -108,14 +101,12 @@ export default function SoloHostStream() {
           return;
         }
 
-        // Fetch live stream data
         const { data: liveStream } = await supabase
           .from('live_streams')
           .select('id, live_available, stream_title')
           .eq('profile_id', profile.id)
           .single();
 
-        // Fetch gifter status
         const gifterStatuses = await fetchGifterStatuses([profile.id]);
         const gifterStatus = gifterStatuses[profile.id] || null;
 
@@ -139,7 +130,7 @@ export default function SoloHostStream() {
 
       } catch (err) {
         console.error('[SoloHostStream] Error loading profile:', err);
-        setError('Failed to load profile');
+        setError('Failed to load stream settings');
         setLoading(false);
       }
     };
@@ -149,10 +140,11 @@ export default function SoloHostStream() {
 
   // Connect to LiveKit room as HOST
   useEffect(() => {
-    if (!streamer?.profile_id || !currentUserId) return;
-    if (isConnectingRef.current) return;
+    if (!streamer?.username || !streamer?.profile_id || !currentUserId) return;
+    if (isConnectingRef.current || connectedUsernameRef.current === streamer.username) return;
 
     isConnectingRef.current = true;
+    connectedUsernameRef.current = streamer.username;
 
     const connectToRoom = async () => {
       try {
@@ -160,7 +152,6 @@ export default function SoloHostStream() {
           console.log('[SoloHostStream] Connecting to room as HOST');
         }
 
-        // Disconnect existing room
         if (roomRef.current) {
           roomRef.current.disconnect();
           roomRef.current = null;
@@ -173,7 +164,7 @@ export default function SoloHostStream() {
 
         roomRef.current = room;
 
-        // Get LiveKit token - HOST MODE
+        // Host mode: canPublish=true
         const tokenResponse = await fetch(TOKEN_ENDPOINT, {
           method: 'POST',
           headers: {
@@ -183,7 +174,7 @@ export default function SoloHostStream() {
           body: JSON.stringify({
             roomName: LIVEKIT_ROOM_NAME,
             participantName: `host_${currentUserId}`,
-            canPublish: true,  // ✅ HOST CAN PUBLISH
+            canPublish: true,  // HOST MODE
             canSubscribe: true,
             deviceType: 'web',
             deviceId: `solo_host_${Date.now()}`,
@@ -202,10 +193,6 @@ export default function SoloHostStream() {
           throw new Error('Invalid token response');
         }
 
-        if (DEBUG_LIVEKIT) {
-          console.log('[SoloHostStream] Token received, connecting...');
-        }
-
         await room.connect(url, token);
         setIsRoomConnected(true);
 
@@ -213,15 +200,7 @@ export default function SoloHostStream() {
           console.log('[SoloHostStream] Connected as HOST, canPublish=true');
         }
 
-        // Handle track subscriptions (for preview - host can see their own stream)
         room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[SoloHostStream] Track subscribed:', {
-              kind: track.kind,
-              participant: participant.identity,
-            });
-          }
-
           if (track.kind === Track.Kind.Video && videoRef.current) {
             track.attach(videoRef.current);
             
@@ -243,9 +222,6 @@ export default function SoloHostStream() {
         });
 
         room.on(RoomEvent.Disconnected, () => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[SoloHostStream] Disconnected from room');
-          }
           setIsRoomConnected(false);
           isConnectingRef.current = false;
         });
@@ -255,6 +231,7 @@ export default function SoloHostStream() {
       } catch (err) {
         console.error('[SoloHostStream] Error connecting to room:', err);
         isConnectingRef.current = false;
+        connectedUsernameRef.current = null;
       }
     };
 
@@ -266,11 +243,11 @@ export default function SoloHostStream() {
         roomRef.current = null;
       }
       isConnectingRef.current = false;
+      connectedUsernameRef.current = null;
       setIsRoomConnected(false);
     };
-  }, [streamer?.profile_id, currentUserId]);
+  }, [streamer?.username, streamer?.profile_id, currentUserId]);
 
-  // Handle volume change
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
     if (videoRef.current) {
@@ -281,7 +258,6 @@ export default function SoloHostStream() {
     }
   };
 
-  // Handle mute toggle
   const handleMuteToggle = () => {
     const newMuted = !isMuted;
     setIsMuted(newMuted);
@@ -290,7 +266,6 @@ export default function SoloHostStream() {
     }
   };
 
-  // Handle exit stream
   const handleExit = () => {
     if (window.confirm('Are you sure you want to exit? If you are live, your stream will end.')) {
       router.push('/');
@@ -333,6 +308,8 @@ export default function SoloHostStream() {
       {/* Top Navigation Bar - NO BACK BUTTON */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
+          {/* NO BACK BUTTON HERE (removed ChevronLeft) */}
+          
           {/* Streamer Info */}
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -375,10 +352,10 @@ export default function SoloHostStream() {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300">
             <Eye className="w-4 h-4" />
-            <span>{viewerCount.toLocaleString()}</span>
+            <span>{streamer.viewer_count.toLocaleString()}</span>
           </div>
           
-          {/* Exit Button (replaces Flag) */}
+          {/* EXIT BUTTON (replaces Flag) */}
           <button
             onClick={handleExit}
             className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -450,9 +427,10 @@ export default function SoloHostStream() {
             )}
           </div>
 
-          {/* Bottom Streamer Controls (replaces chat input) */}
+          {/* Bottom Streamer Controls (replaces chat input + action buttons) */}
           <div className="bg-gray-900 border-t border-gray-800 px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
+              {/* GO LIVE BUTTON (replaces Send Gift button) */}
               <GoLiveButton 
                 sharedRoom={roomRef.current}
                 isRoomConnected={isRoomConnected}
@@ -461,23 +439,41 @@ export default function SoloHostStream() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-400">
-                Streamer Controls
+                Streaming as @{streamer.username}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Right: Chat Panel (Read-only for host) */}
-        <div className="w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Right: Chat Panel */}
+        <div className={`transition-all duration-300 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 ${
+          isChatOpen ? 'w-96' : 'w-0'
+        } overflow-hidden`}>
           <div className="h-full flex flex-col">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
               <h3 className="font-semibold text-gray-900 dark:text-white">Live Chat</h3>
+              <button
+                onClick={() => setIsChatOpen(false)}
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
             </div>
             <div className="flex-1 overflow-hidden">
               <Chat />
             </div>
           </div>
         </div>
+
+        {/* Chat Toggle (when closed) */}
+        {!isChatOpen && (
+          <button
+            onClick={() => setIsChatOpen(true)}
+            className="fixed right-0 top-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          </button>
+        )}
       </div>
     </div>
   );
