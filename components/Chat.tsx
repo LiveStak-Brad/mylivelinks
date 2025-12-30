@@ -28,6 +28,9 @@ interface ChatProps {
 }
 
 export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
+  // DEBUG: Log props to verify scoping
+  console.log('[CHAT] 🔍 Props received:', { roomId, liveStreamId });
+  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -172,6 +175,15 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
       }
     } catch (error) {
       console.error('Error loading messages:', error);
+      
+      // If no scope provided, don't show anything
+      if (!roomId && !liveStreamId) {
+        console.error('[CHAT] ❌ No scope provided - cannot load messages');
+        setMessages([]);
+        setLoading(false);
+        return;
+      }
+      
       // Fallback to regular query if RPC fails
       let fallbackQuery = supabase
         .from('chat_messages')
@@ -507,9 +519,9 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 bg-transparent md:bg-white md:dark:bg-gray-800">
       {/* Chat Header */}
-      <div className="px-3 pb-3 pt-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+      <div className="px-3 pb-3 pt-2 border-b border-white/20 md:border-gray-200 md:dark:border-gray-700 flex-shrink-0 hidden md:block">
         <h2 className="text-base font-semibold">Global Chat</h2>
       </div>
 
@@ -522,11 +534,11 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />
+              <div key={i} className="h-12 bg-gray-100/50 md:bg-gray-100 dark:bg-gray-700/50 md:dark:bg-gray-700 rounded animate-pulse" />
             ))}
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-white/70 md:text-gray-500 py-8">
             No messages yet. Be the first to chat!
           </div>
         ) : (
@@ -552,7 +564,7 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
 
               <div className="flex-1 min-w-0">
                 {msg.message_type === 'system' ? (
-                  <div className="text-center text-sm text-gray-500 dark:text-gray-400 italic">
+                  <div className="text-center text-sm text-white/70 md:text-gray-500 md:dark:text-gray-400 italic">
                     {msg.content}
                   </div>
                 ) : (
@@ -569,7 +581,7 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
                           });
                         }
                       }}
-                      className="font-semibold text-sm hover:text-blue-500 dark:hover:text-blue-400 transition cursor-pointer"
+                      className="font-semibold text-sm text-white md:text-gray-900 md:dark:text-white hover:text-blue-300 md:hover:text-blue-500 md:dark:hover:text-blue-400 transition cursor-pointer"
                     >
                       {msg.username}
                     </button>
@@ -585,15 +597,15 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
                           />
                         );
                       })()}
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                      <span className="text-xs text-white/60 md:text-gray-500 md:dark:text-gray-400">
                         {formatTime(msg.created_at)}
                       </span>
                     </div>
-                    <div className="text-sm text-gray-700 dark:text-gray-300 break-words">
+                    <div className="text-sm text-white/90 md:text-gray-700 md:dark:text-gray-300 break-words">
                       <SafeRichText text={msg.content} />
                     </div>
                   </>
-                )}
+                )}}
               </div>
             </div>
           ))
@@ -604,7 +616,7 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
       {/* Message Input - Sticky at bottom */}
       <form 
         onSubmit={sendMessage} 
-        className="sticky bottom-0 p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg z-40 flex-shrink-0"
+        className="sticky bottom-0 p-3 border-t border-white/20 md:border-gray-200 md:dark:border-gray-700 bg-transparent md:bg-white md:dark:bg-gray-800 shadow-lg z-40 flex-shrink-0"
       >
         <div className="w-full">
           <div className="flex gap-2">
@@ -619,7 +631,7 @@ export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
                 }
               }}
               placeholder="Type a message..."
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white min-w-0"
+              className="flex-1 px-3 py-2 text-sm border border-white/30 md:border-gray-300 md:dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 md:bg-white md:dark:bg-gray-700 text-white md:text-gray-900 md:dark:text-white placeholder-white/60 md:placeholder-gray-500 min-w-0"
               maxLength={500}
             />
             <button

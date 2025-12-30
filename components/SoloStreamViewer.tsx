@@ -146,6 +146,12 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           live_stream_id: liveStream?.id,
         };
 
+        console.log('[SoloStreamViewer] 🔍 Streamer data loaded:', {
+          username: streamerData.username,
+          live_stream_id: streamerData.live_stream_id,
+          live_available: streamerData.live_available,
+        });
+
         setStreamer(streamerData);
         setLoading(false);
 
@@ -209,8 +215,22 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
         roomRef.current = room;
 
-        // Get LiveKit token - use viewer identity (not streamer identity)
+        // Detect if current user is the streamer (host mode)
+        const isHost = currentUserId && streamer.profile_id && currentUserId === streamer.profile_id;
+        
+        if (DEBUG_LIVEKIT) {
+          console.log('[SoloStreamViewer] Connection mode:', {
+            isHost,
+            currentUserId,
+            streamerProfileId: streamer.profile_id,
+            canPublish: isHost,
+            role: isHost ? 'host' : 'viewer'
+          });
+        }
+        
+        // Get LiveKit token - use host identity if owner, viewer otherwise
         const viewerIdentity = currentUserId || `anon_${Date.now()}`;
+        const participantName = isHost ? `host_${viewerIdentity}` : `viewer_${viewerIdentity}`;
         const tokenResponse = await fetch(TOKEN_ENDPOINT, {
           method: 'POST',
           headers: {
@@ -219,13 +239,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           credentials: 'include',
           body: JSON.stringify({
             roomName: LIVEKIT_ROOM_NAME,
-            participantName: `viewer_${viewerIdentity}`,
-            canPublish: false,
+            participantName: participantName,
+            canPublish: isHost,  // TRUE for host, FALSE for viewers
             canSubscribe: true,
             deviceType: 'web',
-            deviceId: `solo_viewer_${Date.now()}`,
+            deviceId: `solo_${isHost ? 'host' : 'viewer'}_${Date.now()}`,
             sessionId: `solo_${Date.now()}`,
-            role: 'viewer',
+            role: isHost ? 'host' : 'viewer',
           }),
         });
 
@@ -457,19 +477,37 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const isPortraitVideo = videoAspectRatio < 1;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Top Navigation Bar */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 md:bg-gray-50 md:dark:bg-gray-900">
+      {/* Top Navigation Bar - Desktop: full bar, Mobile: transparent overlay */}
+      <div className="
+        bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 
+        px-4 py-3 flex items-center justify-between
+        md:bg-white md:dark:bg-gray-800 md:border-b md:relative
+        
+        /* Mobile: transparent overlay at top */
+        fixed md:relative top-0 left-0 right-0 z-30
+        bg-transparent md:bg-white md:dark:bg-gray-800
+        border-b-0 md:border-b
+      ">
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.push('/live')}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            className="
+              text-white md:text-gray-600 md:dark:text-gray-400 
+              hover:text-white/80 md:hover:text-gray-900 md:dark:hover:text-white 
+              transition-colors
+              bg-black/30 md:bg-transparent
+              p-2 md:p-0
+              rounded-full
+              backdrop-blur-sm md:backdrop-blur-none
+            "
+            title="Back to Browse"
           >
-            ← Back to Browse
+            <ChevronLeft className="w-6 h-6" />
           </button>
           
-          {/* Streamer Info */}
-          <div className="flex items-center gap-3">
+          {/* Streamer Info - Desktop only */}
+          <div className="hidden md:flex items-center gap-3">
             <div className="relative">
               <Image
                 src={getAvatarUrl(streamer.avatar_url)}
@@ -506,8 +544,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Action Buttons - Desktop only */}
+        <div className="hidden md:flex items-center gap-2">
           <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300">
             <Eye className="w-4 h-4" />
             <span>{streamer.viewer_count.toLocaleString()}</span>
@@ -554,11 +592,77 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex h-[calc(100vh-73px)]">
+      {/* Main Content Area - Desktop: normal layout, Mobile: full screen */}
+      <div className="
+        flex relative
+        h-[calc(100vh-73px)] md:h-[calc(100vh-73px)]
+        h-screen md:h-[calc(100vh-73px)]
+        pt-0 md:pt-0
+      ">
         {/* Left/Center: Video Player */}
         <div className="flex-1 flex flex-col bg-black">
           <div className="flex-1 flex items-center justify-center relative">
+            {/* Mobile: Streamer info overlay at top */}
+            <div className="
+              md:hidden absolute top-4 left-4 right-4 z-20
+              flex items-center justify-between
+            ">
+              <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md rounded-full px-3 py-2">
+                <Image
+                  src={getAvatarUrl(streamer.avatar_url)}
+                  alt={streamer.username}
+                  width={32}
+                  height={32}
+                  className="rounded-full"
+                />
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">
+                      {streamer.display_name || streamer.username}
+                    </span>
+                    {streamer.live_available && (
+                      <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded font-bold">
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-white/80">
+                    <Eye className="w-3 h-3" />
+                    <span>{streamer.viewer_count.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Mobile action buttons */}
+              <div className="flex items-center gap-2">
+                {currentUserId && currentUserId !== streamer.profile_id && (
+                  <button
+                    onClick={handleFollow}
+                    className={`
+                      p-2 rounded-full backdrop-blur-md transition-colors
+                      ${isFollowing 
+                        ? 'bg-white/20 text-white' 
+                        : 'bg-purple-500 text-white'
+                      }
+                    `}
+                  >
+                    {isFollowing ? (
+                      <UserMinus className="w-5 h-5" />
+                    ) : (
+                      <UserPlus className="w-5 h-5" />
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowReportModal(true)}
+                  className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
+                  title="Report"
+                >
+                  <Flag className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
             {streamer.live_available ? (
               <video
                 ref={videoRef}
@@ -589,9 +693,9 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               </div>
             )}
 
-            {/* Volume Control Overlay */}
+            {/* Volume Control Overlay - Hidden on mobile (tap to unmute instead) */}
             {streamer.live_available && (
-              <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2">
+              <div className="hidden md:flex absolute bottom-4 left-4 items-center gap-2 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2">
                 <button
                   onClick={handleMuteToggle}
                   className="text-white hover:text-purple-400 transition-colors"
@@ -659,9 +763,9 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             </div>
           </div>
 
-          {/* Recommended Streams Carousel */}
+          {/* Recommended Streams Carousel - Desktop only */}
           {recommendedStreams.length > 0 && (
-            <div className="bg-gray-900 border-t border-gray-800 px-4 py-4">
+            <div className="hidden md:block bg-gray-900 border-t border-gray-800 px-4 py-4">
               <h3 className="text-white font-semibold mb-3">Recommended Live Streams</h3>
               <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
                 {recommendedStreams.map((stream) => (
@@ -692,16 +796,37 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           )}
         </div>
 
-        {/* Right: Chat Panel */}
-        <div className={`transition-all duration-300 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 ${
-          isChatOpen ? 'w-96' : 'w-0'
-        } overflow-hidden`}>
+        {/* Right: Chat Panel - Desktop: sidebar, Mobile: full-width overlay at bottom */}
+        <div className={`
+          transition-all duration-300
+          
+          /* Mobile: Fixed full-width overlay at bottom */
+          ${isChatOpen ? 'fixed' : 'hidden'}
+          md:block
+          bottom-0 left-0 right-0 w-full
+          h-[33vh]
+          bg-black/20 dark:bg-black/20
+          backdrop-blur-md
+          border-t border-white/10 dark:border-white/10
+          z-20
+          
+          /* Desktop: Sidebar on right */
+          md:relative
+          md:bottom-auto md:left-auto md:right-0
+          md:h-full
+          ${isChatOpen ? 'md:w-96' : 'md:w-0'}
+          md:bg-white md:dark:bg-gray-800
+          md:backdrop-blur-none
+          md:border-t-0 md:border-l md:border-gray-200 md:dark:border-gray-700
+          overflow-hidden
+        `}>
           <div className="h-full flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            {/* Header - Desktop only */}
+            <div className="hidden md:flex items-center justify-between px-4 py-3 border-b border-gray-200 md:dark:border-gray-700 bg-transparent">
               <h3 className="font-semibold text-gray-900 dark:text-white">Live Chat</h3>
               <button
                 onClick={() => setIsChatOpen(false)}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -716,9 +841,10 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         {!isChatOpen && (
           <button
             onClick={() => setIsChatOpen(true)}
-            className="fixed right-0 top-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="fixed right-0 top-1/2 -translate-y-1/2 md:right-0 md:top-1/2 bottom-4 md:bottom-auto left-1/2 md:left-auto -translate-x-1/2 md:translate-x-0 md:-translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full md:rounded-l-lg md:rounded-r-none p-3 md:p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors z-20"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400 hidden md:block" />
+            <MessageCircle className="w-5 h-5 text-gray-600 dark:text-gray-400 block md:hidden" />
           </button>
         )}
       </div>
