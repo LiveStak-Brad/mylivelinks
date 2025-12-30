@@ -665,6 +665,7 @@ export default function SoloHostStream() {
               <div>isRoomConnected: {isRoomConnected ? 'TRUE' : 'FALSE'}</div>
               <div>hasRoom: {roomRef.current ? 'TRUE' : 'FALSE'}</div>
               <div>canPublish: {roomRef.current?.localParticipant?.permissions?.canPublish ? 'TRUE' : 'FALSE'}</div>
+              <div className="text-yellow-400">streamId: {streamer.live_stream_id || 'MISSING'}</div>
             </div>
 
             {/* Offline placeholder */}
@@ -740,11 +741,6 @@ export default function SoloHostStream() {
                   setIsPublishing(publishing);
                 }}
               />
-              
-              {/* Debug: Show if liveStreamId exists */}
-              <div className="text-xs text-gray-500 ml-2">
-                streamId: {streamer.live_stream_id || 'MISSING'}
-              </div>
               
               <button
                 className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2 font-medium"
