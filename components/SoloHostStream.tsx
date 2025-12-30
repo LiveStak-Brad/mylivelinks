@@ -141,6 +141,15 @@ export default function SoloHostStream() {
           .eq('profile_id', profile.id)
           .single();
 
+        // CRITICAL: Ensure live_available is false on page load (cleanup from previous session)
+        if (liveStream?.live_available) {
+          console.log('[SoloHostStream] Resetting live_available to false (cleanup from previous session)');
+          await supabase
+            .from('live_streams')
+            .update({ live_available: false })
+            .eq('profile_id', profile.id);
+        }
+
         const gifterStatuses = await fetchGifterStatuses([profile.id]);
         const gifterStatus = gifterStatuses[profile.id] || null;
 
