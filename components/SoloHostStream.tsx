@@ -67,6 +67,7 @@ export default function SoloHostStream() {
   const [isChatOpen, setIsChatOpen] = useState(false); // Default closed on mobile, will be true on desktop via lg:block
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
+  const [isPublishing, setIsPublishing] = useState(false); // Track if we're publishing
   
   // Stream setup modal
   const [showSetupModal, setShowSetupModal] = useState(true);
@@ -258,40 +259,52 @@ export default function SoloHostStream() {
         setIsRoomConnected(true);
 
         if (DEBUG_LIVEKIT) {
-          console.log('[SoloHostStream] Connected as HOST');
+          console.log('[SoloHostStream] Connected as HOST', {
+            canPublish: room.localParticipant.permissions?.canPublish,
+            identity: room.localParticipant.identity
+          });
         }
+
+        // Log all room events for debugging
+        console.log('[SoloHostStream] Setting up event listeners, videoRef.current:', !!videoRef.current);
 
         // Listen for LOCAL tracks (host's own camera)
         room.on(RoomEvent.LocalTrackPublished, (publication) => {
-          if (DEBUG_LIVEKIT) {
-            console.log('[SoloHostStream] Local track published:', {
-              kind: publication.kind,
-              trackSid: publication.trackSid,
-              hasTrack: !!publication.track
-            });
-          }
+          console.log('[SoloHostStream] ✅ Local track published:', {
+            kind: publication.kind,
+            trackSid: publication.trackSid,
+            hasTrack: !!publication.track,
+            hasVideoRef: !!videoRef.current
+          });
           
-          if (publication.kind === Track.Kind.Video && videoRef.current && publication.track) {
-            if (DEBUG_LIVEKIT) {
-              console.log('[SoloHostStream] Attaching local video track to video element');
-            }
-            publication.track.attach(videoRef.current);
+          if (publication.kind === Track.Kind.Video) {
+            setIsPublishing(true); // Show video when we start publishing
             
-            const video = videoRef.current;
-            const detectAspectRatio = () => {
-              if (video.videoWidth && video.videoHeight) {
-                const ratio = video.videoWidth / video.videoHeight;
-                setVideoAspectRatio(ratio);
-                if (DEBUG_LIVEKIT) {
-                  console.log('[SoloHostStream] Local video aspect ratio:', ratio);
+            if (videoRef.current && publication.track) {
+              console.log('[SoloHostStream] 🎥 Attaching local video track to video element');
+              publication.track.attach(videoRef.current);
+              
+              const video = videoRef.current;
+              const detectAspectRatio = () => {
+                if (video.videoWidth && video.videoHeight) {
+                  const ratio = video.videoWidth / video.videoHeight;
+                  setVideoAspectRatio(ratio);
+                  console.log('[SoloHostStream] 📐 Video aspect ratio:', ratio);
                 }
-              }
-            };
-            
-            video.addEventListener('loadedmetadata', detectAspectRatio);
-            detectAspectRatio();
-          } else if (publication.kind === Track.Kind.Video) {
-            console.warn('[SoloHostStream] Cannot attach video - videoRef:', !!videoRef.current, 'track:', !!publication.track);
+              };
+              
+              video.addEventListener('loadedmetadata', detectAspectRatio);
+              detectAspectRatio();
+            } else {
+              console.error('[SoloHostStream] ❌ Cannot attach video - videoRef:', !!videoRef.current, 'track:', !!publication.track);
+            }
+          }
+        });
+
+        room.on(RoomEvent.LocalTrackUnpublished, (publication) => {
+          console.log('[SoloHostStream] Local track unpublished:', publication.kind);
+          if (publication.kind === Track.Kind.Video) {
+            setIsPublishing(false);
           }
         });
 
@@ -630,7 +643,7 @@ export default function SoloHostStream() {
               </div>
             </div>
 
-            {/* Video element - always rendered for host (hidden when offline) */}
+            {/* Video element - always rendered for host */}
             <video
               ref={videoRef}
               autoPlay
@@ -638,11 +651,14 @@ export default function SoloHostStream() {
               muted={isMuted}
               className={`max-w-full max-h-full ${
                 isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'
-              } ${!streamer.live_available ? 'hidden' : ''}`}
+              }`}
+              style={{
+                display: isPublishing ? 'block' : 'none'
+              }}
             />
 
             {/* Offline placeholder */}
-            {!streamer.live_available && (
+            {!isPublishing && (
               <>
                 {/* Desktop: Centered offline message */}
                 <div className="hidden md:block text-center text-white">

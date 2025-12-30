@@ -20,8 +20,12 @@ export default function NavigationWrapper() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Hide navigation on /rooms page on mobile/tablet
-  const shouldHideNav = pathname === '/rooms' && isMobile;
+  // Hide navigation on live streaming pages at mobile/tablet size
+  const shouldHideNav = (
+    pathname === '/live' ||           // Main live page
+    pathname === '/live/host' ||      // Host/broadcaster page
+    pathname?.startsWith('/live/')    // Individual live streams
+  ) && isMobile;
 
   if (shouldHideNav) {
     return null;
