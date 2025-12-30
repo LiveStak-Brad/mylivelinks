@@ -18,6 +18,8 @@ export type StreamBadge = 'Trending' | 'Featured' | 'Sponsored';
 interface StreamCardProps {
   stream: Stream;
   onPress: (stream: Stream) => void;
+  /** Optional: Use flexible width for grid layouts instead of fixed 280px */
+  flexibleWidth?: boolean;
 }
 
 /**
@@ -31,10 +33,10 @@ interface StreamCardProps {
  * - Category label
  * - TikTok/Kik-level polish
  */
-export function StreamCard({ stream, onPress }: StreamCardProps) {
+export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCardProps) {
   const [imageError, setImageError] = useState(false);
   const { theme } = useThemeMode();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, flexibleWidth), [theme, flexibleWidth]);
 
   const getBadgeStyle = (badge: string) => {
     switch (badge) {
@@ -123,18 +125,18 @@ export function StreamCard({ stream, onPress }: StreamCardProps) {
   );
 }
 
-function createStyles(theme: ThemeDefinition) {
+function createStyles(theme: ThemeDefinition, flexibleWidth: boolean = false) {
   const cardShadow = theme.elevations.card;
 
   return StyleSheet.create({
     card: {
-      width: 280, // Fixed width for horizontal scroll
+      width: flexibleWidth ? '100%' : 280, // Flexible width for grid layouts, fixed for horizontal scroll
       backgroundColor: theme.colors.surfaceCard,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: theme.colors.border,
       overflow: 'hidden',
-      marginRight: 12,
+      marginRight: flexibleWidth ? 0 : 12, // No margin right in grid layouts
       shadowColor: cardShadow.color,
       shadowOffset: cardShadow.offset,
       shadowOpacity: cardShadow.opacity,

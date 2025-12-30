@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Video, Sparkles, Users, TrendingUp, Bell, Zap, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
-import { canAccessLive } from '@/lib/livekit-constants';
+import { canUserGoLive } from '@/lib/livekit-constants';
 import LiveRoom from '@/components/LiveRoom';
 import LiveRoomErrorBoundary from '@/components/LiveRoomErrorBoundary';
 import { Button, Card, StatusBadge } from '@/components/ui';
@@ -35,13 +35,7 @@ export default function LiveComingSoonPage() {
         error: error
       });
       
-      if (canAccessLive({ id: user?.id, email: user?.email })) {
-        console.log('[LIVE PAGE] ✅ Live access allowed, showing LiveRoom');
-        setIsOwner(true);
-      } else {
-        console.log('[LIVE PAGE] ❌ Live access not allowed');
-        setIsOwner(false);
-      }
+      setIsOwner(canUserGoLive({ id: user?.id, email: user?.email }));
     } catch (error) {
       console.error('[LIVE PAGE] Error checking owner:', error);
     } finally {
@@ -120,8 +114,8 @@ export default function LiveComingSoonPage() {
     );
   }
 
-  // If owner and audio enabled, show the actual LiveRoom
-  if (isOwner && audioEnabled) {
+  // Everyone can view LiveRoom. Only the owner can publish (server-side enforced).
+  if (!isOwner) {
     return (
       <LiveRoomErrorBoundary>
         <LiveRoom />
@@ -129,7 +123,15 @@ export default function LiveComingSoonPage() {
     );
   }
 
-  // Everyone else sees "Coming Soon" - Premium version
+  // Owner with audio enabled: show LiveRoom
+  if (audioEnabled) {
+    return (
+      <LiveRoomErrorBoundary>
+        <LiveRoom />
+      </LiveRoomErrorBoundary>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 overflow-hidden">
       {/* Background effects */}

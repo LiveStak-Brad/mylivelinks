@@ -7,6 +7,7 @@ import { useTheme } from 'next-themes';
 import { Volume2, Focus, Shuffle, Eye, Gift as GiftIcon, Sparkles, FileText } from 'lucide-react';
 import SmartBrandLogo from './SmartBrandLogo';
 import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT } from '@/lib/livekit-constants';
+import { canUserGoLive } from '@/lib/livekit-constants';
 import Tile from './Tile';
 import Chat from './Chat';
 import ViewerList from './ViewerList';
@@ -252,6 +253,8 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
         const participantDisplayName = user?.email || user?.id || anonId || 'Viewer';
         const deviceType = 'web';
 
+        const publishEligible = canUserGoLive(user ? { id: user.id, email: user.email } : null);
+
         if (DEBUG_LIVEKIT) {
           console.log('[TOKEN] Requesting token:', {
             endpoint: TOKEN_ENDPOINT,
@@ -260,7 +263,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
             deviceType: deviceType,
             deviceId: deviceId.substring(0, 8) + '...',
             sessionId: sessionId.substring(0, 8) + '...',
-            canPublish: true,
+            canPublish: publishEligible,
             canSubscribe: true,
           });
         }
@@ -275,7 +278,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
           body: JSON.stringify({
             roomName: LIVEKIT_ROOM_NAME,
             participantName: participantIdentity,
-            canPublish: true, // CRITICAL: Must be true so streamers can publish on shared room
+            canPublish: publishEligible,
             canSubscribe: true,
             userId: userId,
             displayName: participantDisplayName,
@@ -283,7 +286,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
             deviceType: deviceType,
             deviceId: deviceId,
             sessionId: sessionId,
-            role: 'viewer', // Will be 'publisher' when Go Live is clicked
+            role: publishEligible ? 'publisher' : 'viewer',
           }),
         });
 
@@ -3274,7 +3277,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
 
                 {/* Chat - Middle (fills remaining space) */}
                 <div className={`flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
-                  <Chat />
+                  <Chat roomId="live_central" />
                 </div>
 
                 {/* Viewers + Stats - Right */}

@@ -65,21 +65,21 @@ export function LiveTVHorizontalRail<T>({
 function createStyles(theme: ThemeDefinition) {
   return StyleSheet.create({
     section: {
-      paddingTop: 12,
-      paddingBottom: 6,
+      paddingTop: 6,
+      paddingBottom: 4,
     },
     headerRow: {
       paddingHorizontal: 16,
-      paddingBottom: 10,
+      paddingBottom: 8,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
     },
     title: {
       color: theme.colors.textPrimary,
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: '900',
-      letterSpacing: -0.4,
+      letterSpacing: -0.3,
     },
     railContent: {
       paddingHorizontal: 16,

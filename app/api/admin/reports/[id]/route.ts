@@ -16,6 +16,19 @@ function genReqId() {
   return randomBytes(8).toString('hex');
 }
 
+function isNotWiredError(err: any) {
+  const code = typeof err?.code === 'string' ? err.code : '';
+  const message = typeof err?.message === 'string' ? err.message : '';
+  return (
+    code === '42P01' ||
+    code === '42883' ||
+    code === '42703' ||
+    /relation .* does not exist/i.test(message) ||
+    /function .* does not exist/i.test(message) ||
+    /column .* does not exist/i.test(message)
+  );
+}
+
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const reqId = genReqId();
 
@@ -29,10 +42,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const supabase = createRouteHandlerClient(request);
 
-    // Fetch report with details
     const { data: report, error: reportError } = await supabase
-      .from('content_reports_with_details')
-      .select('*')
+      .from('content_reports')
+      .select(
+        'id, reporter_id, reported_user_id, report_type, report_reason, report_details, context_details, status, created_at, reviewed_at, reviewed_by, admin_notes, reporter:profiles!content_reports_reporter_id_fkey(id, username, display_name, avatar_url), reported_user:profiles!content_reports_reported_user_id_fkey(id, username, display_name, avatar_url), reviewer:profiles!content_reports_reviewed_by_fkey(id, username, display_name)'
+      )
       .eq('id', reportId)
       .single();
 
@@ -44,31 +58,18 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       );
     }
 
-    // Fetch related messages if message_id or stream_id exists
-    let relatedMessages: any[] = [];
-    if (report.message_id || report.stream_id) {
-      let messageQuery = supabase
-        .from('chat_messages')
-        .select('id, profile_id, message_type, content, created_at, profiles(username, display_name, avatar_url)')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (report.message_id) {
-        messageQuery = messageQuery.eq('id', report.message_id);
-      } else if (report.stream_id) {
-        messageQuery = messageQuery.eq('stream_id', report.stream_id);
-      }
-
-      const { data: messages } = await messageQuery;
-      relatedMessages = messages || [];
-    }
+    const relatedMessages: any[] = [];
 
     // Fetch moderation actions for this report
-    const { data: actions } = await supabase
+    const { data: actions, error: actionsError } = await supabase
       .from('moderation_actions')
-      .select('id, action_type, duration_minutes, reason, created_at, actor:profiles!moderation_actions_actor_profile_id_fkey(username, display_name)')
+      .select(
+        'id, action_type, duration_minutes, reason, created_at, actor:profiles!moderation_actions_actor_profile_id_fkey(username, display_name)'
+      )
       .eq('report_id', reportId)
       .order('created_at', { ascending: false });
+
+    const moderationActions = actionsError && isNotWiredError(actionsError) ? [] : actions || [];
 
     return NextResponse.json({
       ok: true,
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       data: {
         report,
         relatedMessages,
-        moderationActions: actions || [],
+        moderationActions,
       },
     });
   } catch (err) {

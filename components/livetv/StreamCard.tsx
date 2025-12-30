@@ -22,6 +22,8 @@ export type StreamBadge = 'Trending' | 'Featured' | 'Sponsored';
 interface StreamCardProps {
   stream: Stream;
   onPress?: (stream: Stream) => void;
+  /** Optional: Use flexible width for grid layouts instead of fixed width */
+  flexibleWidth?: boolean;
 }
 
 const BADGE_STYLES: Record<StreamBadge, { bg: string; text: string }> = {
@@ -41,7 +43,7 @@ const BADGE_STYLES: Record<StreamBadge, { bg: string; text: string }> = {
  * - Category label
  * - TikTok/Kik-level polish
  */
-export function StreamCard({ stream, onPress }: StreamCardProps) {
+export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCardProps) {
   const [imageError, setImageError] = useState(false);
   
   const primaryBadge = stream.badges?.[0];
@@ -53,6 +55,14 @@ export function StreamCard({ stream, onPress }: StreamCardProps) {
       onPress(stream);
     }
   };
+
+  // Base classes for the card
+  const cardBaseClasses = "group bg-gradient-to-br from-card via-card to-card/95 rounded-xl sm:rounded-2xl border border-border overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-2 hover:border-primary/50 relative before:absolute before:inset-0 before:bg-gradient-to-br before:from-primary/0 before:to-accent/0 hover:before:from-primary/5 hover:before:to-accent/5 before:transition-all before:duration-300";
+  
+  // Width classes: flexible for grids, fixed for rails
+  const widthClasses = flexibleWidth ? "w-full" : "w-[180px] sm:w-[280px] flex-shrink-0";
+  
+  const cardClasses = cn(cardBaseClasses, widthClasses);
 
   const content = (
     <>
@@ -138,7 +148,7 @@ export function StreamCard({ stream, onPress }: StreamCardProps) {
     return (
       <button
         onClick={handleClick}
-        className="group w-[180px] sm:w-[280px] bg-gradient-to-br from-card via-card to-card/95 rounded-xl sm:rounded-2xl border border-border overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-2 hover:border-primary/50 text-left flex-shrink-0 relative before:absolute before:inset-0 before:bg-gradient-to-br before:from-primary/0 before:to-accent/0 hover:before:from-primary/5 hover:before:to-accent/5 before:transition-all before:duration-300"
+        className={cn(cardClasses, "text-left")}
       >
         {content}
       </button>
@@ -148,7 +158,7 @@ export function StreamCard({ stream, onPress }: StreamCardProps) {
   return (
     <Link
       href={`/live/${stream.slug}`}
-      className="group w-[180px] sm:w-[280px] bg-gradient-to-br from-card via-card to-card/95 rounded-xl sm:rounded-2xl border border-border overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-2 hover:border-primary/50 block flex-shrink-0 relative before:absolute before:inset-0 before:bg-gradient-to-br before:from-primary/0 before:to-accent/0 hover:before:from-primary/5 hover:before:to-accent/5 before:transition-all before:duration-300"
+      className={cn(cardClasses, "block")}
     >
       {content}
     </Link>

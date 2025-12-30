@@ -22,7 +22,12 @@ interface ChatMessage {
   created_at: string;
 }
 
-export default function Chat() {
+interface ChatProps {
+  roomId?: string;
+  liveStreamId?: number;
+}
+
+export default function Chat({ roomId, liveStreamId }: ChatProps = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -101,9 +106,13 @@ export default function Chat() {
     }
     
     try {
-      // SIMPLIFIED: Just use direct query - much faster than RPC
-      // Blocking can be handled client-side if needed, but for now prioritize speed
-      const { data, error } = await supabase
+      // Require scope to be specified
+      if (!roomId && !liveStreamId) {
+        throw new Error('Chat requires roomId or liveStreamId');
+      }
+
+      // Build query with scope filter
+      let query = supabase
         .from('chat_messages')
         .select(`
           id,
@@ -116,7 +125,16 @@ export default function Chat() {
             avatar_url,
             gifter_level
           )
-        `)
+        `);
+
+      // Apply scope filter (XOR: exactly one must be set)
+      if (roomId) {
+        query = query.eq('room_id', roomId).is('live_stream_id', null);
+      } else if (liveStreamId) {
+        query = query.eq('live_stream_id', liveStreamId).is('room_id', null);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -155,7 +173,7 @@ export default function Chat() {
     } catch (error) {
       console.error('Error loading messages:', error);
       // Fallback to regular query if RPC fails
-      const { data, error: fallbackError } = await supabase
+      let fallbackQuery = supabase
         .from('chat_messages')
         .select(`
           id,
@@ -168,7 +186,16 @@ export default function Chat() {
             avatar_url,
             gifter_level
           )
-        `)
+        `);
+
+      // Apply scope filter
+      if (roomId) {
+        fallbackQuery = fallbackQuery.eq('room_id', roomId).is('live_stream_id', null);
+      } else if (liveStreamId) {
+        fallbackQuery = fallbackQuery.eq('live_stream_id', liveStreamId).is('room_id', null);
+      }
+
+      const { data, error: fallbackError } = await fallbackQuery
         .order('created_at', { ascending: true })
         .limit(50);
 
@@ -316,7 +343,7 @@ export default function Chat() {
 
     console.log('[CHAT] 🔌 Creating realtime subscription');
     
-    // Subscribe to new messages (realtime)
+    // Subscribe to new messages (realtime) with scope filter
     const channel = supabase
       .channel('chat-messages-realtime')
       .on(
@@ -325,6 +352,9 @@ export default function Chat() {
           event: 'INSERT',
           schema: 'public',
           table: 'chat_messages',
+          filter: roomId 
+            ? `room_id=eq.${roomId}`
+            : `live_stream_id=eq.${liveStreamId}`,
         },
         (payload: any) => {
           // Add new message immediately via realtime - use ref to avoid stale closure
@@ -447,6 +477,8 @@ export default function Chat() {
           profile_id: currentUserId,
           message_type: 'text',
           content: messageToSend,
+          room_id: roomId || null,
+          live_stream_id: liveStreamId || null,
         });
       })
       .then(({ error, data }: { error: any; data: any }) => {

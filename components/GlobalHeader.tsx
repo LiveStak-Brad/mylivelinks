@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy, Tv } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import LeaderboardModal from './LeaderboardModal';
@@ -280,6 +280,16 @@ export default function GlobalHeader() {
               >
                 <Trophy className="w-7 h-7 text-amber-500" />
               </button>
+
+              {/* Rooms Button - Right next to Leaderboard */}
+              <Link
+                href="/rooms"
+                className="p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
+                aria-label="View Rooms"
+                title="Rooms"
+              >
+                <Tv className="w-7 h-7 text-pink-500 dark:text-pink-400" />
+              </Link>
 
               {/* Navigation - Desktop */}
               <nav 

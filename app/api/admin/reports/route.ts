@@ -38,7 +38,15 @@ export async function GET(request: NextRequest) {
 
     const url = new URL(request.url);
     const statusParam = (url.searchParams.get('status') || '').trim().toLowerCase();
-    const status = statusParam && statusParam !== 'all' ? statusParam : null;
+    const normalizedStatus =
+      statusParam === 'resolved'
+        ? 'actioned'
+        : statusParam === 'open'
+          ? 'pending'
+          : statusParam === 'under_review'
+            ? 'reviewed'
+            : statusParam;
+    const status = normalizedStatus && normalizedStatus !== 'all' ? normalizedStatus : null;
     const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '50', 10) || 50, 1), 100);
     const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0);
 

@@ -67,6 +67,10 @@ export const ROOM_OPTIONS = {
    return isOwnerById || isOwnerByEmail;
  }
 
+ export function canUserGoLive(user: { id?: string; email?: string | null } | null | undefined) {
+   return isLiveOwnerUser(user);
+ }
+
  export function canAccessLive(user: { id?: string; email?: string | null } | null | undefined) {
    return LIVE_LAUNCH_ENABLED || isLiveOwnerUser(user);
  }

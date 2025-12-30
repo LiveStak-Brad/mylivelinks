@@ -3,64 +3,86 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import {
-  LiveTVCategoryTabs,
-  LiveTVFindResultRow,
-  LiveTVGenderSegmentedControl,
   type LiveTVGenderFilter,
   LiveTVHorizontalRail,
-  LiveTVQuickFiltersRow,
   LiveTVRoomChannelCard,
   type LiveTVRoomChannel,
   StreamCard,
   type Stream,
 } from '@/components/livetv';
 
-const QUICK_FILTERS = ['Trending', 'Featured', 'Rooms', 'Popular', 'Followed', 'New', 'Nearby', 'Find'];
+const SPECIAL_FILTERS = ['Trending', 'Featured', 'Rooms', 'Battles'];
+const CATEGORY_FILTERS = ['IRL', 'Music', 'Gaming', 'Comedy', 'Just Chatting'];
+const ALL_FILTERS = [...SPECIAL_FILTERS, ...CATEGORY_FILTERS];
 const CATEGORY_TABS = ['Music', 'Comedy', 'Gaming', 'IRL', 'Battles', 'Sports', 'Local'];
 
 type RailKey =
-  | 'Trending'
-  | 'Featured'
-  | 'Rooms'
-  | 'Popular'
-  | 'Followed'
-  | 'CategoryTabs'
-  | 'CategoryTop'
-  | 'CategoryRising'
-  | 'NewCreators'
-  | 'JustStarted'
-  | 'FindResults';
+  | 'TrendingGrid'
+  | 'FeaturedGrid'
+  | 'BattlesGrid'
+  | 'RoomsJustChatting'
+  | 'RoomsMusic'
+  | 'RoomsGaming'
+  | 'RoomsComedy'
+  | 'CategoryTrending'
+  | 'CategoryNew'
+  | 'CategoryNearby';
 
 type RailItem = {
   key: RailKey;
 };
-
-function formatLabelCategoryRail(titlePrefix: string, category: string) {
-  return `${titlePrefix} in ${category}`;
-}
 
 /**
  * LIVETV DISCOVERY PAGE (Web)
  * 
  * Modern discovery hub for live streams and rooms.
  * Features:
- * - Quick filters (Trending, Featured, Rooms, etc.)
+ * - Special filters: Trending (full grid), Featured (full grid), Rooms (horizontal rail)
+ * - Category filters: IRL, Music, Gaming, Comedy, Just Chatting (each shows Trending/New/Nearby rails)
  * - Gender segmented control (All, Men, Women)
- * - Category tabs
- * - Horizontal scrollable rails
- * - Find/search view
+ * - Optimized for mobile with locked header and smooth horizontal scrolling
  * - TikTok/Kik-level polish
  * 
  * Route: /rooms
  */
 export default function LiveTVPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeQuickFilter, setActiveQuickFilter] = useState<string>('Trending');
+  const [activeQuickFilter, setActiveQuickFilter] = useState<string>(() => {
+    // Restore from localStorage on mount
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('livetv_active_filter');
+      if (saved && ALL_FILTERS.includes(saved)) {
+        return saved;
+      }
+    }
+    return 'Trending';
+  });
   const [genderFilter, setGenderFilter] = useState<LiveTVGenderFilter>('All');
-  const [selectedCategoryTab, setSelectedCategoryTab] = useState<string>('Music');
-  const [findSort, setFindSort] = useState<'Trending' | 'Popular'>('Trending');
   const [uiLoading, setUiLoading] = useState(true);
+
+  // Add touch optimization
+  useEffect(() => {
+    // Prevent pull-to-refresh on mobile
+    const preventPullToRefresh = (e: TouchEvent) => {
+      if (e.touches.length > 1) return;
+      const scrollableElement = document.querySelector('.overflow-y-auto');
+      if (scrollableElement && scrollableElement.scrollTop === 0) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('touchmove', preventPullToRefresh, { passive: false });
+    return () => document.removeEventListener('touchmove', preventPullToRefresh);
+  }, []);
+
+  // Persist activeQuickFilter to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('livetv_active_filter', activeQuickFilter);
+    }
+  }, [activeQuickFilter]);
 
   // Mock data for UI display (no backend wiring)
   const mockStreams: Stream[] = [
@@ -114,6 +136,56 @@ export default function LiveTVPage() {
       badges: ['Featured'],
       gender: 'Men',
     },
+    {
+      id: '6',
+      slug: 'stream-6',
+      streamer_display_name: 'ChillVibes',
+      thumbnail_url: null,
+      viewer_count: 1567,
+      category: 'Just Chatting',
+      badges: ['Trending'],
+      gender: 'Women',
+    },
+    {
+      id: '7',
+      slug: 'stream-7',
+      streamer_display_name: 'TalkShowHost',
+      thumbnail_url: null,
+      viewer_count: 892,
+      category: 'Just Chatting',
+      badges: ['Featured'],
+      gender: 'Men',
+    },
+    {
+      id: '8',
+      slug: 'stream-8',
+      streamer_display_name: 'CasualChat',
+      thumbnail_url: null,
+      viewer_count: 445,
+      category: 'Just Chatting',
+      badges: [],
+      gender: 'Women',
+    },
+    {
+      id: '9',
+      slug: 'stream-9',
+      streamer_display_name: 'JustTalking',
+      thumbnail_url: null,
+      viewer_count: 678,
+      category: 'Just Chatting',
+      badges: ['Trending'],
+      gender: 'Men',
+    },
+    {
+      id: '10',
+      slug: 'stream-10',
+      streamer_display_name: 'ChatMaster',
+      thumbnail_url: null,
+      viewer_count: 321,
+      category: 'Just Chatting',
+      badges: [],
+      gender: 'Women',
+    },
   ];
 
   const mockRoomChannels: LiveTVRoomChannel[] = [
@@ -144,9 +216,9 @@ export default function LiveTVPage() {
     },
     {
       id: 'r3',
-      name: 'Battle Arena',
-      liveNowCount: 5,
-      categoryIcon: '⚔️',
+      name: 'Gaming Room',
+      liveNowCount: 15,
+      categoryIcon: '🎮',
       avatars: [
         { id: 'a8', label: 'X' },
         { id: 'a9', label: 'Y' },
@@ -155,6 +227,43 @@ export default function LiveTVPage() {
         { id: 'a12', label: 'R' },
       ],
       gender: 'Men',
+    },
+    {
+      id: 'r4',
+      name: 'Battle Arena',
+      liveNowCount: 8,
+      categoryIcon: '⚔️',
+      avatars: [
+        { id: 'a13', label: 'P' },
+        { id: 'a14', label: 'K' },
+        { id: 'a15', label: 'L' },
+      ],
+      gender: 'Women',
+    },
+    {
+      id: 'r5',
+      name: 'Just Chatting Room',
+      liveNowCount: 24,
+      categoryIcon: '💬',
+      avatars: [
+        { id: 'a16', label: 'S' },
+        { id: 'a17', label: 'T' },
+        { id: 'a18', label: 'U' },
+        { id: 'a19', label: 'V' },
+      ],
+      gender: 'Men',
+    },
+    {
+      id: 'r6',
+      name: 'Chill Chat Room',
+      liveNowCount: 18,
+      categoryIcon: '💬',
+      avatars: [
+        { id: 'a20', label: 'W' },
+        { id: 'a21', label: 'H' },
+        { id: 'a22', label: 'J' },
+      ],
+      gender: 'Women',
     },
   ];
 
@@ -169,81 +278,110 @@ export default function LiveTVPage() {
   const streamsByGender = useMemo(() => applyGenderFilter(mockStreams), [applyGenderFilter, mockStreams]);
   const roomsByGender = useMemo(() => applyGenderFilter(mockRoomChannels), [applyGenderFilter, mockRoomChannels]);
 
-  const trendingStreams = useMemo(
-    () => streamsByGender.filter((s) => (s.badges ?? []).includes('Trending')),
+  // All streams sorted by viewer count (for Trending page)
+  const allStreamsSortedByPopularity = useMemo(
+    () => streamsByGender.slice().sort((a, b) => b.viewer_count - a.viewer_count),
     [streamsByGender]
   );
+  
+  // Featured streams (for Featured page)
   const featuredStreams = useMemo(
     () => streamsByGender.filter((s) => (s.badges ?? []).includes('Featured')),
     [streamsByGender]
   );
-  const popularStreams = useMemo(
-    () => streamsByGender.slice().sort((a, b) => b.viewer_count - a.viewer_count),
+
+  // Battle streams (for Battles page) - sorted by popularity
+  const battlesStreams = useMemo(
+    () => streamsByGender
+      .filter((s) => s.category === 'Battles')
+      .sort((a, b) => b.viewer_count - a.viewer_count),
     [streamsByGender]
   );
-  const followedStreams = useMemo(() => [] as Stream[], []);
 
-  const findResults = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const filtered = query.length === 0
-      ? streamsByGender
-      : streamsByGender.filter((s) => s.streamer_display_name.toLowerCase().includes(query));
-    if (findSort === 'Popular') return filtered.slice().sort((a, b) => b.viewer_count - a.viewer_count);
-    return filtered;
-  }, [findSort, searchQuery, streamsByGender]);
+  // Room channels organized by category
+  const roomsByCategory = useCallback((category: string) => {
+    return roomsByGender.filter((r) => {
+      // Filter by actual room name/category
+      if (category === 'Just Chatting') return r.name.toLowerCase().includes('chat');
+      if (category === 'Music') return r.name.toLowerCase().includes('music');
+      if (category === 'Gaming') return r.name.toLowerCase().includes('gaming');
+      if (category === 'Comedy') return r.name.toLowerCase().includes('comedy');
+      return true;
+    });
+  }, [roomsByGender]);
 
-  const newCreatorsRail = useMemo(() => streamsByGender.slice(0, 3), [streamsByGender]);
-  const justStartedRail = useMemo(() => streamsByGender.slice(2, 5), [streamsByGender]);
+  // For category pages: filter by category and create rails
+  const getCategoryStreams = useCallback((category: string) => {
+    return streamsByGender.filter((s) => s.category === category);
+  }, [streamsByGender]);
 
-  const categoryTopRail = useMemo(
-    () => popularStreams.filter((s) => s.category === selectedCategoryTab).slice(0, 8),
-    [popularStreams, selectedCategoryTab]
-  );
-  const categoryRisingRail = useMemo(
-    () => streamsByGender.filter((s) => s.category === selectedCategoryTab).slice(0, 8),
-    [selectedCategoryTab, streamsByGender]
-  );
+  const categoryTrendingRail = useMemo(() => {
+    if (!CATEGORY_FILTERS.includes(activeQuickFilter)) return [];
+    const categoryStreams = getCategoryStreams(activeQuickFilter);
+    return categoryStreams.filter((s) => (s.badges ?? []).includes('Trending'));
+  }, [activeQuickFilter, getCategoryStreams]);
+
+  const categoryNewRail = useMemo(() => {
+    if (!CATEGORY_FILTERS.includes(activeQuickFilter)) return [];
+    const categoryStreams = getCategoryStreams(activeQuickFilter);
+    return categoryStreams.slice(0, 8); // Mock "new" streams
+  }, [activeQuickFilter, getCategoryStreams]);
+
+  const categoryNearbyRail = useMemo(() => {
+    if (!CATEGORY_FILTERS.includes(activeQuickFilter)) return [];
+    const categoryStreams = getCategoryStreams(activeQuickFilter);
+    return categoryStreams.slice().sort((a, b) => b.viewer_count - a.viewer_count).slice(0, 8);
+  }, [activeQuickFilter, getCategoryStreams]);
 
   const railItems = useMemo((): RailItem[] => {
-    if (activeQuickFilter === 'Find') {
-      return [{ key: 'FindResults' }];
+    // Trending = full page vertical grid of all streams sorted by popularity
+    if (activeQuickFilter === 'Trending') {
+      return [{ key: 'TrendingGrid' }];
     }
-    if (activeQuickFilter === 'Nearby') {
+    
+    // Featured = full page vertical grid of featured streams
+    if (activeQuickFilter === 'Featured') {
+      return [{ key: 'FeaturedGrid' }];
+    }
+    
+    // Battles = full page vertical grid of battle streams sorted by popularity
+    if (activeQuickFilter === 'Battles') {
+      return [{ key: 'BattlesGrid' }];
+    }
+    
+    // Rooms = multiple horizontal rails by room category
+    if (activeQuickFilter === 'Rooms') {
       return [
-        { key: 'Trending' },
-        { key: 'Featured' },
-        { key: 'Rooms' },
-        { key: 'Popular' },
-        { key: 'Followed' },
-        { key: 'CategoryTabs' },
-        { key: 'CategoryTop' },
+        { key: 'RoomsJustChatting' },
+        { key: 'RoomsMusic' },
+        { key: 'RoomsGaming' },
+        { key: 'RoomsComedy' },
       ];
     }
-    if (activeQuickFilter === 'New') {
-      return [{ key: 'NewCreators' }, { key: 'JustStarted' }];
+    
+    // Category filters (IRL, Music, Gaming, etc.) = 3 horizontal rails
+    if (CATEGORY_FILTERS.includes(activeQuickFilter)) {
+      return [
+        { key: 'CategoryTrending' },
+        { key: 'CategoryNew' },
+        { key: 'CategoryNearby' },
+      ];
     }
-    return [
-      { key: 'Trending' },
-      { key: 'Featured' },
-      { key: 'Rooms' },
-      { key: 'Popular' },
-      { key: 'Followed' },
-      { key: 'CategoryTabs' },
-      { key: 'CategoryTop' },
-      { key: 'CategoryRising' },
-    ];
+    
+    // Fallback to Trending
+    return [{ key: 'TrendingGrid' }];
   }, [activeQuickFilter]);
 
   useEffect(() => {
     setUiLoading(true);
     const timeoutId = setTimeout(() => setUiLoading(false), 550);
     return () => clearTimeout(timeoutId);
-  }, [activeQuickFilter, genderFilter, selectedCategoryTab]);
+  }, [activeQuickFilter, genderFilter]);
 
   return (
     <main
       id="main"
-      className="min-h-[calc(100vh-7rem)] bg-gradient-to-br from-background via-background to-muted/20 pb-24 md:pb-8 relative overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 pb-24 md:pb-8 relative overflow-hidden flex flex-col"
     >
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -251,271 +389,414 @@ export default function LiveTVPage() {
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
-      <div className="mx-auto max-w-[1600px] relative z-10">
-        {/* Sticky Top Bar */}
-        <div className="sticky top-0 z-20 bg-background/98 backdrop-blur-2xl border-b-2 border-border/30 shadow-xl">
-          {/* Title Block with gradient */}
-          <div className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 relative overflow-hidden">
+      <div className="mx-auto max-w-[1600px] relative z-10 w-full flex flex-col h-screen">
+        {/* Sticky Top Bar - Fixed on mobile */}
+        <div className="sticky top-0 z-20 bg-background/98 backdrop-blur-2xl border-b-2 border-border/30 shadow-xl flex-shrink-0">
+          {/* Title + Search Row */}
+          <div className="px-4 sm:px-6 pt-3 pb-2 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/8 via-accent/8 to-primary/8 opacity-60" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),transparent)]" />
             <div className="relative flex items-center gap-3">
-              <div className="flex-1">
-                <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-foreground via-primary to-foreground tracking-tight leading-none">
+              {/* Title */}
+              <div className="flex-shrink-0">
+                <h1 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-foreground via-primary to-foreground tracking-tight leading-none">
                   LiveTV
                 </h1>
-                <p className="text-[10px] sm:text-xs font-black text-muted-foreground/80 tracking-[0.15em] uppercase mt-1.5 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-primary to-accent animate-pulse shadow-lg shadow-primary/50" />
-                  MyLiveLinks presents
-                </p>
               </div>
+              
+              {/* Search Bar */}
+              <div className="flex-1 relative group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none transition-all group-focus-within:text-primary" />
+                <Input
+                  type="search"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-9 h-9 text-xs rounded-xl border focus:border-primary/60 shadow-sm bg-card/80 backdrop-blur-xl font-semibold placeholder:text-muted-foreground/60"
+                />
+                {searchQuery.length > 0 && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all p-1 hover:bg-muted/80 rounded-lg"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              
               {/* Live indicator badge */}
-              <div className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-black px-4 py-2 rounded-full shadow-lg shadow-red-500/30 animate-pulse">
-                <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+              <div className="hidden sm:flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] font-black px-2.5 py-1.5 rounded-full shadow-lg shadow-red-500/30 flex-shrink-0">
+                <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
                 <span>LIVE</span>
               </div>
             </div>
           </div>
 
-          {/* Search Bar with enhanced styling */}
-          <div className="px-4 sm:px-6 pb-3 sm:pb-4">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none transition-all group-focus-within:text-primary group-focus-within:scale-110" />
-              <Input
-                type="search"
-                placeholder="Search streams, creators..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="relative pl-12 pr-12 h-12 sm:h-14 text-base rounded-2xl border-2 focus:border-primary/60 shadow-xl focus:shadow-2xl transition-all bg-gradient-to-r from-card/80 to-card backdrop-blur-xl font-semibold placeholder:text-muted-foreground/60"
-              />
-              {searchQuery.length > 0 && (
+          {/* Quick Filters - Two Groups */}
+          <div className="px-4 sm:px-6 pb-2 space-y-2">
+            {/* Group 1: Special Filters (Larger, Prominent) */}
+            <div className="flex gap-2.5 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 snap-x snap-mandatory">
+              {SPECIAL_FILTERS.map((filter) => (
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all p-1.5 hover:bg-muted/80 rounded-xl hover:scale-110 active:scale-95"
+                  key={filter}
+                  onClick={() => setActiveQuickFilter(filter)}
+                  className={cn(
+                    "flex-1 min-w-[90px] px-4 py-2.5 rounded-xl font-black text-sm transition-all duration-200 snap-start",
+                    activeQuickFilter === filter
+                      ? "bg-gradient-to-br from-primary via-primary to-accent text-white shadow-lg shadow-primary/30 scale-[1.02]"
+                      : "bg-gradient-to-br from-card to-card/80 text-foreground hover:from-card/90 hover:to-card/70 border-2 border-border/40 shadow-sm hover:shadow-md hover:border-primary/30"
+                  )}
                 >
-                  <X className="w-5 h-5" />
+                  {filter}
                 </button>
-              )}
+              ))}
+            </div>
+            
+            {/* Group 2: Category Filters (Smaller, Compact) */}
+            <div className="flex gap-2">
+              {CATEGORY_FILTERS.map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setActiveQuickFilter(filter)}
+                  className={cn(
+                    "flex-1 px-2 py-2 rounded-lg font-bold text-xs transition-all duration-200 whitespace-nowrap",
+                    activeQuickFilter === filter
+                      ? "bg-gradient-to-br from-primary to-primary/80 text-white shadow-md"
+                      : "bg-secondary/70 text-muted-foreground hover:bg-secondary/90 border border-border/40 hover:border-primary/20"
+                  )}
+                >
+                  {filter}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Quick Filters */}
-          <LiveTVQuickFiltersRow
-            options={QUICK_FILTERS}
-            selected={activeQuickFilter}
-            onSelect={setActiveQuickFilter}
-          />
-
-          {/* Gender Filter */}
-          <LiveTVGenderSegmentedControl value={genderFilter} onChange={setGenderFilter} />
-
-          {/* Nearby Hint */}
-          {activeQuickFilter === 'Nearby' && (
-            <div className="px-4 py-2.5">
-              <p className="text-sm font-bold text-muted-foreground">Using your location</p>
-            </div>
-          )}
-
-          {/* Find Controls */}
-          {activeQuickFilter === 'Find' && (
-            <div className="px-4 py-2.5 flex gap-2.5">
-              <button className="flex-1 h-11 rounded-xl border border-border bg-secondary text-foreground text-sm font-black hover:bg-secondary/80 transition-colors">
-                Filter
+          {/* Gender Filter - Spread with Color Coding */}
+          <div className="px-4 sm:px-6 pb-2">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setGenderFilter('All')}
+                className={cn(
+                  "flex-1 px-3 py-2 rounded-lg font-bold text-xs transition-all duration-200",
+                  genderFilter === 'All'
+                    ? "bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-md"
+                    : "bg-secondary/70 text-muted-foreground hover:bg-secondary/90 border border-border/40"
+                )}
+              >
+                All
               </button>
               <button
-                onClick={() => setFindSort((prev) => (prev === 'Trending' ? 'Popular' : 'Trending'))}
-                className="flex-1 h-11 rounded-xl border border-border bg-secondary text-foreground text-sm font-black hover:bg-secondary/80 transition-colors"
+                onClick={() => setGenderFilter('Men')}
+                className={cn(
+                  "flex-1 px-3 py-2 rounded-lg font-bold text-xs transition-all duration-200",
+                  genderFilter === 'Men'
+                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md"
+                    : "bg-secondary/70 text-muted-foreground hover:bg-secondary/90 border border-border/40"
+                )}
               >
-                Sort: {findSort}
+                Men
+              </button>
+              <button
+                onClick={() => setGenderFilter('Women')}
+                className={cn(
+                  "flex-1 px-3 py-2 rounded-lg font-bold text-xs transition-all duration-200",
+                  genderFilter === 'Women'
+                    ? "bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-md"
+                    : "bg-secondary/70 text-muted-foreground hover:bg-secondary/90 border border-border/40"
+                )}
+              >
+                Women
               </button>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Rails Content */}
-        <div className="py-4">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="py-2">
           {railItems.map((item) => {
             switch (item.key) {
-              case 'Trending':
+              case 'TrendingGrid':
                 return (
-                  <LiveTVHorizontalRail
-                    key="trending"
-                    title="Trending"
-                    data={trendingStreams}
-                    loading={uiLoading}
-                    itemWidth={292}
-                    keyExtractor={(s) => s.id}
-                    renderItem={({ item: stream }) => <StreamCard stream={stream} />}
-                  />
+                  <div key="trending-grid" className="px-4 py-2">
+                    <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mb-3 flex items-center gap-2.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-red-600 animate-pulse shadow-lg shadow-red-500/50" />
+                      Trending Now
+                    </h2>
+                    {uiLoading ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                        {Array.from({ length: 10 }).map((_, idx) => (
+                          <div
+                            key={`trending-skeleton-${idx}`}
+                            className="aspect-[3/4] bg-muted animate-pulse rounded-2xl border border-border"
+                          />
+                        ))}
+                      </div>
+                    ) : allStreamsSortedByPopularity.length === 0 ? (
+                      <div className="rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-dashed border-border/50 p-8 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(239,68,68,0.08),transparent)]" />
+                        <div className="relative space-y-3">
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center mx-auto">
+                            <span className="text-3xl">📈</span>
+                          </div>
+                          <h3 className="font-black text-lg text-foreground text-center">No streams available</h3>
+                          <p className="text-sm font-semibold text-muted-foreground text-center">
+                            Check back soon for live content
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                        {allStreamsSortedByPopularity.map((stream) => (
+                          <StreamCard key={stream.id} stream={stream} flexibleWidth />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
-              case 'Featured':
+                
+              case 'FeaturedGrid':
                 return (
-                  <LiveTVHorizontalRail
-                    key="featured"
-                    title="Featured"
-                    data={featuredStreams}
-                    loading={uiLoading}
-                    itemWidth={292}
-                    keyExtractor={(s) => s.id}
-                    renderItem={({ item: stream }) => <StreamCard stream={stream} />}
-                  />
+                  <div key="featured-grid" className="px-4 py-2">
+                    <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mb-3 flex items-center gap-2.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 animate-pulse shadow-lg shadow-amber-500/50" />
+                      Featured Streamers
+                    </h2>
+                    {uiLoading ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                        {Array.from({ length: 10 }).map((_, idx) => (
+                          <div
+                            key={`featured-skeleton-${idx}`}
+                            className="aspect-[3/4] bg-muted animate-pulse rounded-2xl border border-border"
+                          />
+                        ))}
+                      </div>
+                    ) : featuredStreams.length === 0 ? (
+                      <div className="rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-dashed border-border/50 p-8 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.08),transparent)]" />
+                        <div className="relative space-y-3">
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/20 to-amber-600/20 flex items-center justify-center mx-auto">
+                            <span className="text-3xl">⭐</span>
+                          </div>
+                          <h3 className="font-black text-lg text-foreground text-center">No featured streams</h3>
+                          <p className="text-sm font-semibold text-muted-foreground text-center">
+                            Check back soon for featured content
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                        {featuredStreams.map((stream) => (
+                          <StreamCard key={stream.id} stream={stream} flexibleWidth />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
-              case 'Rooms':
+                
+              case 'BattlesGrid':
+                return (
+                  <div key="battles-grid" className="px-4 py-2">
+                    <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mb-3 flex items-center gap-2.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 animate-pulse shadow-lg shadow-purple-500/50" />
+                      Live Battles
+                    </h2>
+                    {uiLoading ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {Array.from({ length: 6 }).map((_, idx) => (
+                          <div
+                            key={`battles-skeleton-${idx}`}
+                            className="aspect-[2/1] bg-muted animate-pulse rounded-2xl border border-border"
+                          />
+                        ))}
+                      </div>
+                    ) : battlesStreams.length === 0 ? (
+                      <div className="rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-dashed border-border/50 p-8 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(168,85,247,0.08),transparent)]" />
+                        <div className="relative space-y-3">
+                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center mx-auto">
+                            <span className="text-3xl">⚔️</span>
+                          </div>
+                          <h3 className="font-black text-lg text-foreground text-center">No battles right now</h3>
+                          <p className="text-sm font-semibold text-muted-foreground text-center">
+                            Check back soon for epic battles
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {battlesStreams.map((stream) => (
+                          <div
+                            key={stream.id}
+                            className="relative group cursor-pointer bg-gradient-to-br from-card to-card/95 rounded-2xl border-2 border-border overflow-hidden shadow-lg hover:shadow-2xl hover:border-purple-500/50 transition-all duration-300"
+                          >
+                            {/* Battle Card with 2 users side by side */}
+                            <div className="flex h-48 sm:h-56">
+                              {/* User 1 - Left Side */}
+                              <div className="flex-1 relative bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-r border-border/50">
+                                <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-black text-2xl sm:text-3xl shadow-lg mb-3">
+                                    {stream.streamer_display_name.slice(0, 1)}
+                                  </div>
+                                  <h3 className="font-black text-sm sm:text-base text-foreground text-center mb-1">
+                                    {stream.streamer_display_name}
+                                  </h3>
+                                  <div className="flex items-center gap-1.5 bg-black/20 px-3 py-1 rounded-full">
+                                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+                                    <span className="text-xs font-bold text-foreground">
+                                      {Math.floor(stream.viewer_count * 0.6)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* VS Divider */}
+                              <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex items-center justify-center z-10">
+                                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-2xl border-4 border-background group-hover:scale-110 transition-transform">
+                                  <span className="text-white font-black text-xs sm:text-sm">VS</span>
+                                </div>
+                              </div>
+                              
+                              {/* User 2 - Right Side */}
+                              <div className="flex-1 relative bg-gradient-to-br from-red-500/10 to-red-600/10 border-l border-border/50">
+                                <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-white font-black text-2xl sm:text-3xl shadow-lg mb-3">
+                                    {stream.streamer_display_name.slice(-1)}
+                                  </div>
+                                  <h3 className="font-black text-sm sm:text-base text-foreground text-center mb-1">
+                                    Opponent
+                                  </h3>
+                                  <div className="flex items-center gap-1.5 bg-black/20 px-3 py-1 rounded-full">
+                                    <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+                                    <span className="text-xs font-bold text-foreground">
+                                      {Math.floor(stream.viewer_count * 0.4)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Battle Info Footer */}
+                            <div className="bg-gradient-to-r from-purple-500/10 to-purple-600/10 px-4 py-3 border-t border-border/50">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-2xl">⚔️</span>
+                                  <span className="text-xs sm:text-sm font-black text-muted-foreground">LIVE BATTLE</span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-background/50 px-3 py-1 rounded-lg">
+                                  <span className="text-xs font-bold text-muted-foreground">Total:</span>
+                                  <span className="text-sm font-black text-foreground">{stream.viewer_count}</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Hover Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-600/0 group-hover:from-purple-500/10 group-hover:to-purple-600/10 transition-all duration-300 pointer-events-none" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+                
+              case 'RoomsJustChatting':
                 return (
                   <LiveTVHorizontalRail
-                    key="rooms"
-                    title="Rooms"
-                    data={roomsByGender}
+                    key="rooms-just-chatting"
+                    title="Just Chatting Rooms"
+                    data={roomsByCategory('Just Chatting')}
                     loading={uiLoading}
                     itemWidth={232}
                     keyExtractor={(r) => r.id}
                     renderItem={({ item: room }) => <LiveTVRoomChannelCard room={room} />}
                   />
                 );
-              case 'Popular':
+                
+              case 'RoomsMusic':
                 return (
                   <LiveTVHorizontalRail
-                    key="popular"
-                    title="Popular"
-                    data={popularStreams}
+                    key="rooms-music"
+                    title="Music Rooms"
+                    data={roomsByCategory('Music')}
+                    loading={uiLoading}
+                    itemWidth={232}
+                    keyExtractor={(r) => r.id}
+                    renderItem={({ item: room }) => <LiveTVRoomChannelCard room={room} />}
+                  />
+                );
+                
+              case 'RoomsGaming':
+                return (
+                  <LiveTVHorizontalRail
+                    key="rooms-gaming"
+                    title="Gaming Rooms"
+                    data={roomsByCategory('Gaming')}
+                    loading={uiLoading}
+                    itemWidth={232}
+                    keyExtractor={(r) => r.id}
+                    renderItem={({ item: room }) => <LiveTVRoomChannelCard room={room} />}
+                  />
+                );
+                
+              case 'RoomsComedy':
+                return (
+                  <LiveTVHorizontalRail
+                    key="rooms-comedy"
+                    title="Comedy Rooms"
+                    data={roomsByCategory('Comedy')}
+                    loading={uiLoading}
+                    itemWidth={232}
+                    keyExtractor={(r) => r.id}
+                    renderItem={({ item: room }) => <LiveTVRoomChannelCard room={room} />}
+                  />
+                );
+                
+              case 'CategoryTrending':
+                return (
+                  <LiveTVHorizontalRail
+                    key="category-trending"
+                    title="Trending"
+                    data={categoryTrendingRail}
                     loading={uiLoading}
                     itemWidth={292}
                     keyExtractor={(s) => s.id}
                     renderItem={({ item: stream }) => <StreamCard stream={stream} />}
                   />
                 );
-              case 'Followed':
+                
+              case 'CategoryNew':
                 return (
                   <LiveTVHorizontalRail
-                    key="followed"
-                    title="Followed"
-                    data={followedStreams}
-                    loading={uiLoading}
-                    itemWidth={292}
-                    keyExtractor={(s) => s.id}
-                    renderItem={({ item: stream }) => <StreamCard stream={stream} />}
-                    emptyState={
-                      <div className="rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-dashed border-border/50 p-6 sm:p-8 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(120,119,198,0.08),transparent)]" />
-                        <div className="relative space-y-3">
-                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mx-auto">
-                            <span className="text-3xl">👥</span>
-                          </div>
-                          <h3 className="font-black text-base sm:text-lg text-foreground text-center">
-                            Follow creators to see them here
-                          </h3>
-                          <p className="text-sm sm:text-base font-semibold text-muted-foreground leading-relaxed text-center max-w-sm mx-auto">
-                            Your followed creators will show up as they go live
-                          </p>
-                        </div>
-                      </div>
-                    }
-                  />
-                );
-              case 'CategoryTabs':
-                return (
-                  <div key="category-tabs" className="py-2">
-                    <LiveTVCategoryTabs
-                      tabs={CATEGORY_TABS}
-                      selected={selectedCategoryTab}
-                      onSelect={setSelectedCategoryTab}
-                    />
-                    <div className="px-4 pt-2.5">
-                      <h2 className="text-sm font-extrabold text-muted-foreground tracking-wide uppercase">
-                        Popular by Category
-                      </h2>
-                    </div>
-                  </div>
-                );
-              case 'CategoryTop':
-                return (
-                  <LiveTVHorizontalRail
-                    key="category-top"
-                    title={formatLabelCategoryRail('Top', selectedCategoryTab)}
-                    data={categoryTopRail}
+                    key="category-new"
+                    title="New"
+                    data={categoryNewRail}
                     loading={uiLoading}
                     itemWidth={292}
                     keyExtractor={(s) => s.id}
                     renderItem={({ item: stream }) => <StreamCard stream={stream} />}
                   />
                 );
-              case 'CategoryRising':
+                
+              case 'CategoryNearby':
                 return (
                   <LiveTVHorizontalRail
-                    key="category-rising"
-                    title={formatLabelCategoryRail('Rising', selectedCategoryTab)}
-                    data={categoryRisingRail}
+                    key="category-nearby"
+                    title="Nearby"
+                    data={categoryNearbyRail}
                     loading={uiLoading}
                     itemWidth={292}
                     keyExtractor={(s) => s.id}
                     renderItem={({ item: stream }) => <StreamCard stream={stream} />}
                   />
                 );
-              case 'NewCreators':
-                return (
-                  <LiveTVHorizontalRail
-                    key="new-creators"
-                    title="New creators"
-                    data={newCreatorsRail}
-                    loading={uiLoading}
-                    itemWidth={292}
-                    keyExtractor={(s) => s.id}
-                    renderItem={({ item: stream }) => <StreamCard stream={stream} />}
-                  />
-                );
-              case 'JustStarted':
-                return (
-                  <LiveTVHorizontalRail
-                    key="just-started"
-                    title="Just started"
-                    data={justStartedRail}
-                    loading={uiLoading}
-                    itemWidth={292}
-                    keyExtractor={(s) => s.id}
-                    renderItem={({ item: stream }) => <StreamCard stream={stream} />}
-                  />
-                );
-              case 'FindResults':
-                return (
-                  <div key="find-results" className="px-4 py-3">
-                    <h2 className="text-xl font-black text-foreground tracking-tight mb-2.5">Results</h2>
-                    {uiLoading ? (
-                      <div className="space-y-0 border border-border rounded-2xl overflow-hidden">
-                        {Array.from({ length: 8 }).map((_, idx) => (
-                          <div
-                            key={`find-skeleton-${idx}`}
-                            className="h-20 bg-muted animate-pulse border-b border-border last:border-b-0"
-                          />
-                        ))}
-                      </div>
-                    ) : findResults.length === 0 ? (
-                      <div className="rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-dashed border-border/50 p-8 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(120,119,198,0.08),transparent)]" />
-                        <div className="relative space-y-3">
-                          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-muted/80 to-muted/40 flex items-center justify-center mx-auto">
-                            <span className="text-3xl">🔍</span>
-                          </div>
-                          <h3 className="font-black text-lg text-foreground text-center">No results</h3>
-                          <p className="text-sm font-semibold text-muted-foreground text-center">
-                            Try another search term
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="border border-border rounded-2xl overflow-hidden">
-                        {findResults.slice(0, 12).map((s) => (
-                          <LiveTVFindResultRow key={s.id} stream={s} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
+                
               default:
                 return null;
             }
           })}
         </div>
       </div>
+    </div>
     </main>
   );
 }

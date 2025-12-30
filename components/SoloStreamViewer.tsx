@@ -211,10 +211,35 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
         // Get LiveKit token - use viewer identity (not streamer identity)
         const viewerIdentity = currentUserId || `anon_${Date.now()}`;
-        const tokenResponse = await fetch(`${TOKEN_ENDPOINT}?userId=${viewerIdentity}&username=viewer_${viewerIdentity}`);
-        const { token } = await tokenResponse.json();
+        const tokenResponse = await fetch(TOKEN_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            roomName: LIVEKIT_ROOM_NAME,
+            participantName: `viewer_${viewerIdentity}`,
+            canPublish: false,
+            canSubscribe: true,
+            deviceType: 'web',
+            deviceId: `solo_viewer_${Date.now()}`,
+            sessionId: `solo_${Date.now()}`,
+            role: 'viewer',
+          }),
+        });
 
-        await room.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, token);
+        if (!tokenResponse.ok) {
+          throw new Error(`Failed to get token: ${tokenResponse.status}`);
+        }
+
+        const { token, url } = await tokenResponse.json();
+
+        if (!token || !url) {
+          throw new Error('Invalid token response');
+        }
+
+        await room.connect(url, token);
         setIsRoomConnected(true);
 
         if (DEBUG_LIVEKIT) {

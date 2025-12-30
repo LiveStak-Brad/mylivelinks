@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AccessToken } from 'livekit-server-sdk';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
-import { canAccessLive } from '@/lib/livekit-constants';
+import { canUserGoLive } from '@/lib/livekit-constants';
 
 const TOKEN_ROUTE_VERSION = 'mll-token-2025-12-29a';
 
@@ -171,27 +171,14 @@ export async function POST(request: NextRequest) {
         return sendJson(400, { error: 'roomName and participantName are required', stage: 'body_parse' }, 'body_parse');
       }
 
-      try {
-        const allowed = await runStage('can_access_live', 2_000, async () => {
-          const baseAllowed = canAccessLive({ id: user.id, email: user.email });
-          if (baseAllowed) return true;
+      const wantsPublish = canPublish === true || body?.role === 'publisher';
+      const canGoLive = await runStage('can_user_go_live', 1_000, async () => {
+        return canUserGoLive({ id: user.id, email: user.email });
+      });
+      const effectiveCanPublish = wantsPublish && canGoLive;
 
-          try {
-            const { data } = await (auth.supabase as any).rpc('is_live_tester', { p_profile_id: user.id });
-            return data === true;
-          } catch {
-            return false;
-          }
-        });
-
-        if (!allowed) {
-          return sendJson(403, { error: 'Live is not available yet', stage: 'can_access_live' }, 'can_access_live');
-        }
-      } catch (err: any) {
-        if (err instanceof StageTimeoutError) {
-          return sendJson(504, { error: 'Request timed out', stage: err.stage }, err.stage);
-        }
-        return sendJson(403, { error: 'Live is not available yet', stage: 'can_access_live' }, 'can_access_live');
+      if (wantsPublish && !effectiveCanPublish) {
+        console.log('[LIVEKIT_TOKEN] publish_denied_non_owner', { reqId, userId: user.id, roomName });
       }
 
       if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
@@ -215,7 +202,7 @@ export async function POST(request: NextRequest) {
           at.addGrant({
             room: roomName,
             roomJoin: true,
-            canPublish: canPublish === true,
+            canPublish: effectiveCanPublish,
             canSubscribe: canSubscribe !== false,
             canPublishData: true,
             canUpdateOwnMetadata: true,
