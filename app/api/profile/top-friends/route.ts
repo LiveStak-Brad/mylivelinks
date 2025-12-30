@@ -36,7 +36,16 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('[TOP_FRIENDS] Success, found', data?.length || 0, 'friends');
-    return NextResponse.json({ topFriends: data || [] });
+    return NextResponse.json(
+      { topFriends: data || [] },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
+    );
   } catch (error: any) {
     console.error('[TOP_FRIENDS] Unexpected error:', error);
     return NextResponse.json(

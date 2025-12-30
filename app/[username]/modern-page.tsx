@@ -253,8 +253,8 @@ export default function ModernProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
       
-      // Fetch profile via API
-      const response = await fetch(`/api/profile/${username}`);
+      // Fetch profile via API (no-store to prevent caching of customization changes)
+      const response = await fetch(`/api/profile/${username}`, { cache: 'no-store' });
       const profileData = await response.json();
       
       if (profileData.error) {

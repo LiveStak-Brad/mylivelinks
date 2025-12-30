@@ -236,7 +236,14 @@ export async function GET(
         gifter_rank,
         streamer_rank,
       },
-      { status: 200 }
+      { 
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        }
+      }
     );
   } catch (error) {
     console.error('Profile API error:', error);
