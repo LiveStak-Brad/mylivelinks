@@ -617,10 +617,10 @@ export default function SoloHostStream() {
             </div>
 
             {/* Mobile/Tablet: Streamer info overlay at top - MATCH VIEWER LAYOUT */}
-            <div className="lg:hidden absolute top-4 left-0 right-4 z-20 flex items-center justify-between">
+            <div className="lg:hidden absolute top-4 left-4 right-4 z-20 flex items-center justify-between">
               <div className="flex items-center gap-1">
                 {/* Streamer Info - EXACTLY like viewer */}
-                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-2 py-1.5">
+                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5">
                   <button 
                     onClick={() => router.push(`/live/${streamer.username}`)}
                     className="flex items-center gap-2 hover:opacity-80 transition-opacity"
