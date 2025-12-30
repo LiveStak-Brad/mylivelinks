@@ -751,16 +751,39 @@ export default function SoloHostStream() {
           </div>
         </div>
 
-        {/* Desktop: Right Chat Panel */}
-        <div className={`transition-all duration-300 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 ${
-          isChatOpen ? 'w-96' : 'w-0'
-        } overflow-hidden hidden lg:block`}>
+        {/* Right: Chat Panel - Desktop: sidebar, Mobile: full-width overlay at bottom */}
+        <div className={`
+          transition-all duration-300
+          
+          /* Mobile/Tablet: Fixed full-width overlay at bottom */
+          ${isChatOpen ? 'fixed' : 'hidden'}
+          lg:block
+          bottom-4 left-0 right-0 w-full
+          h-[40vh]
+          bg-transparent lg:bg-white lg:dark:bg-gray-800
+          backdrop-blur-none lg:backdrop-blur-none
+          border-t border-transparent lg:border-white/10 dark:border-transparent lg:dark:border-white/10
+          z-20
+          
+          pb-0
+          
+          /* Desktop: Sidebar on right */
+          lg:relative
+          lg:bottom-auto lg:left-auto lg:right-0
+          lg:h-full
+          ${isChatOpen ? 'lg:w-96' : 'lg:w-0'}
+          lg:bg-white lg:dark:bg-gray-800
+          lg:backdrop-blur-none
+          lg:border-t-0 lg:border-l lg:border-gray-200 lg:dark:border-gray-700
+          overflow-hidden
+        `}>
           <div className="h-full flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            {/* Header - Desktop only */}
+            <div className="hidden lg:flex items-center justify-between px-4 py-3 border-b border-gray-200 lg:dark:border-gray-700 bg-transparent">
               <h3 className="font-semibold text-gray-900 dark:text-white">Live Chat</h3>
               <button
                 onClick={() => setIsChatOpen(false)}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
