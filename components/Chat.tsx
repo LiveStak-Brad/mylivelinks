@@ -9,6 +9,7 @@ import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
 import LiveAvatar from '@/components/LiveAvatar';
+import { trackLiveComment } from '@/lib/trending-hooks';
 
 interface ChatMessage {
   id: number | string;
@@ -634,6 +635,17 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
         } else {
           console.log('[CHAT] ✅ Message inserted successfully!');
           console.log('[CHAT] 📊 Insert response data:', data);
+          
+          // Track comment for trending (fire-and-forget, don't block chat)
+          if (liveStreamId && currentUserId) {
+            trackLiveComment({
+              streamId: liveStreamId,
+              profileId: currentUserId,
+              body: messageToSend
+            }).catch(err => {
+              console.warn('[Trending] Comment tracking failed:', err);
+            });
+          }
         }
         // If success, realtime subscription will receive the new message
         // and replace the optimistic one (matched by profile_id + content + recent timestamp)

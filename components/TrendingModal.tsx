@@ -1,19 +1,22 @@
 'use client';
 
-import { useState } from 'react';
-import { X, TrendingUp, Flame, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, TrendingUp, Flame, Zap, Eye, Heart } from 'lucide-react';
 import Link from 'next/link';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import Image from 'next/image';
+import { createClient } from '@/lib/supabase';
 
 interface TrendingEntry {
+  stream_id: number;
   profile_id: string;
   username: string;
+  display_name?: string;
   avatar_url?: string;
   trending_score: number;
-  rank: number;
-  change: number; // Position change from previous period
-  viewer_count: number;
+  views_count: number;
+  likes_count: number;
+  comments_count: number;
 }
 
 interface TrendingModalProps {
@@ -22,110 +25,57 @@ interface TrendingModalProps {
 }
 
 export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
-  // Mock trending data
-  const [entries] = useState<TrendingEntry[]>([
-    {
-      profile_id: '1',
-      username: 'CannaStreams',
-      avatar_url: undefined,
-      trending_score: 9850,
-      rank: 1,
-      change: 5,
-      viewer_count: 1234,
-    },
-    {
-      profile_id: '2',
-      username: 'TechGuru',
-      avatar_url: undefined,
-      trending_score: 8920,
-      rank: 2,
-      change: 3,
-      viewer_count: 892,
-    },
-    {
-      profile_id: '3',
-      username: 'GamingPro',
-      avatar_url: undefined,
-      trending_score: 8450,
-      rank: 3,
-      change: -1,
-      viewer_count: 756,
-    },
-    {
-      profile_id: '4',
-      username: 'MusicVibes',
-      avatar_url: undefined,
-      trending_score: 7890,
-      rank: 4,
-      change: 2,
-      viewer_count: 645,
-    },
-    {
-      profile_id: '5',
-      username: 'ArtistryLive',
-      avatar_url: undefined,
-      trending_score: 7320,
-      rank: 5,
-      change: 0,
-      viewer_count: 534,
-    },
-    {
-      profile_id: '6',
-      username: 'FitnessFlow',
-      avatar_url: undefined,
-      trending_score: 6890,
-      rank: 6,
-      change: 4,
-      viewer_count: 478,
-    },
-    {
-      profile_id: '7',
-      username: 'CookingShow',
-      avatar_url: undefined,
-      trending_score: 6420,
-      rank: 7,
-      change: -2,
-      viewer_count: 423,
-    },
-    {
-      profile_id: '8',
-      username: 'TravelVlog',
-      avatar_url: undefined,
-      trending_score: 5980,
-      rank: 8,
-      change: 1,
-      viewer_count: 389,
-    },
-  ]);
+  const [entries, setEntries] = useState<TrendingEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const getRankIcon = (rank: number) => {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
-    return rank;
-  };
+  useEffect(() => {
+    if (!isOpen) return;
 
-  const getChangeIndicator = (change: number) => {
-    if (change > 0) {
+    const loadTrending = async () => {
+      setLoading(true);
+      const supabase = createClient();
+      
+      try {
+        const { data, error } = await supabase.rpc('rpc_get_trending_live_streams', {
+          p_limit: 50,
+          p_offset: 0
+        });
+
+        if (error) {
+          console.error('[TrendingModal] Error fetching trending:', error);
+          return;
+        }
+
+        if (data) {
+          setEntries(data);
+        }
+      } catch (err) {
+        console.error('[TrendingModal] Error loading trending:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTrending();
+  }, [isOpen]);
+
+  const getRankBadge = (rank: number) => {
+    if (rank === 1) {
       return (
-        <div className="flex items-center gap-0.5 text-green-600">
-          <TrendingUp className="w-3 h-3" />
-          <span className="text-xs font-semibold">+{change}</span>
-        </div>
-      );
-    } else if (change < 0) {
-      return (
-        <div className="flex items-center gap-0.5 text-red-600">
-          <TrendingUp className="w-3 h-3 rotate-180" />
-          <span className="text-xs font-semibold">{change}</span>
-        </div>
+        <span className="text-2xl font-bold text-yellow-500">1</span>
       );
     }
-    return (
-      <div className="text-xs font-semibold text-gray-400">
-        —
-      </div>
-    );
+    if (rank === 2) {
+      return (
+        <span className="text-xl font-bold text-gray-400">2</span>
+      );
+    }
+    if (rank === 3) {
+      return (
+        <span className="text-lg font-bold text-orange-600">3</span>
+      );
+    }
+    return <span className="text-base font-bold text-gray-600">{rank}</span>;
   };
 
   if (!isOpen) return null;
@@ -149,7 +99,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">Trending Now</h2>
-                <p className="text-white/80 text-sm">Hottest streams right now</p>
+                <p className="text-white/80 text-sm">{entries.length} live streams</p>
               </div>
             </div>
             <button
@@ -164,76 +114,83 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
 
         {/* Content */}
         <div className="modal-body overflow-y-auto max-h-[calc(60vh-5rem)] p-4">
-          <div className="space-y-2">
-            {entries.map((entry, index) => (
-              <Link
-                key={entry.profile_id}
-                href={`/live/${entry.username}`}
-                onClick={onClose}
-                className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-all hover:scale-[1.02] ${
-                  entry.rank <= 3
-                    ? 'bg-white/95 shadow-lg'
-                    : 'bg-white/80 hover:bg-white/90'
-                }`}
-                style={{
-                  animation: `slideIn 0.3s ease-out ${index * 0.03}s both`,
-                }}
-              >
-                {/* Rank */}
-                <div className="flex-shrink-0 w-8 sm:w-10 text-center">
-                  <span className={`text-base sm:text-lg font-bold ${
-                    entry.rank === 1 ? 'sm:text-2xl text-purple-600' : 
-                    entry.rank === 2 ? 'sm:text-xl text-pink-500' : 
-                    entry.rank === 3 ? 'sm:text-lg text-orange-600' : 'text-gray-600'
-                  }`}>
-                    {getRankIcon(entry.rank)}
-                  </span>
-                </div>
-
-                {/* Avatar */}
-                <div className="flex-shrink-0">
-                  <Image
-                    src={getAvatarUrl(entry.avatar_url)}
-                    alt={entry.username}
-                    width={entry.rank <= 3 ? 44 : 36}
-                    height={entry.rank <= 3 ? 44 : 36}
-                    className={`rounded-full object-cover border-2 ${
-                      entry.rank === 1 ? 'border-purple-400' :
-                      entry.rank === 2 ? 'border-pink-300' :
-                      entry.rank === 3 ? 'border-orange-400' :
-                      'border-gray-300'
+          {loading ? (
+            <div className="text-center py-8 text-white">Loading...</div>
+          ) : entries.length === 0 ? (
+            <div className="text-center py-8 text-white">
+              <Flame className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p>No live streams trending right now</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {entries.map((entry, index) => {
+                const rank = index + 1;
+                return (
+                  <Link
+                    key={entry.stream_id}
+                    href={`/live/${entry.username}`}
+                    onClick={onClose}
+                    className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-xl transition-all hover:scale-[1.02] ${
+                      rank <= 3
+                        ? 'bg-white/95 shadow-lg'
+                        : 'bg-white/80 hover:bg-white/90'
                     }`}
-                  />
-                </div>
+                    style={{
+                      animation: `slideIn 0.3s ease-out ${index * 0.03}s both`,
+                    }}
+                  >
+                    {/* Rank */}
+                    <div className="flex-shrink-0 w-8 sm:w-10 text-center">
+                      {getRankBadge(rank)}
+                    </div>
 
-                {/* User Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-xs sm:text-sm truncate text-gray-900">
-                      {entry.username}
-                    </span>
-                    {entry.rank <= 3 && (
-                      <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <span>{entry.viewer_count.toLocaleString()} watching</span>
-                  </div>
-                </div>
+                    {/* Avatar */}
+                    <div className="flex-shrink-0">
+                      <Image
+                        src={getAvatarUrl(entry.avatar_url)}
+                        alt={entry.username}
+                        width={rank <= 3 ? 44 : 36}
+                        height={rank <= 3 ? 44 : 36}
+                        className={`rounded-full object-cover border-2 ${
+                          rank === 1 ? 'border-purple-400' :
+                          rank === 2 ? 'border-pink-300' :
+                          rank === 3 ? 'border-orange-400' :
+                          'border-gray-300'
+                        }`}
+                      />
+                    </div>
 
-                {/* Trending Score & Change */}
-                <div className="flex-shrink-0 text-right">
-                  <div className="text-xs sm:text-sm font-bold text-gray-900">
-                    {entry.trending_score.toLocaleString()}
-                  </div>
-                  <div className="text-[9px] sm:text-[10px] text-purple-600 uppercase tracking-wide font-semibold mb-1">
-                    TRENDING
-                  </div>
-                  {getChangeIndicator(entry.change)}
-                </div>
-              </Link>
-            ))}
-          </div>
+                    {/* User Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-xs sm:text-sm truncate text-gray-900">
+                          {entry.display_name || entry.username}
+                        </span>
+                        {rank <= 3 && (
+                          <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Eye className="w-3 h-3" />
+                        <span>{entry.views_count}</span>
+                        <span>•</span>
+                        <Heart className="w-3 h-3" />
+                        <span>{entry.likes_count}</span>
+                      </div>
+                    </div>
+
+                    {/* Trending Score */}
+                    <div className="flex-shrink-0 text-right">
+                      <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-purple-600">
+                        <Flame className="w-3 h-3 text-orange-500" />
+                        <span>{Math.round(entry.trending_score)}</span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

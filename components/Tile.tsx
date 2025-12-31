@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
@@ -8,8 +8,10 @@ import GiftModal from './GiftModal';
 import MiniProfile from './MiniProfile';
 import GiftAnimation from './GiftAnimation';
 import { useViewerHeartbeat } from '@/hooks/useViewerHeartbeat';
+import { useDailyLeaderboardRank } from '@/hooks/useDailyLeaderboardRank';
 import { RemoteTrack, TrackPublication, RemoteParticipant, Track, RoomEvent, Room } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
+import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
 
 interface GiftAnimationData {
   id: string;
@@ -28,6 +30,7 @@ interface TileProps {
   gifterStatus?: GifterStatus | null;
   slotIndex: number;
   liveStreamId?: number;
+  trendingRank?: number; // NEW: Trending position (1 = top)
   sharedRoom?: Room | null; // Shared LiveKit room connection
   isRoomConnected?: boolean; // Whether shared room is connected
   isCurrentUserPublishing?: boolean; // NEW: Whether current user is publishing (for echo prevention)
@@ -52,6 +55,7 @@ export default function Tile({
   gifterStatus,
   slotIndex,
   liveStreamId,
+  trendingRank,
   sharedRoom,
   isRoomConnected = false,
   isCurrentUserPublishing = false, // NEW: Whether current user is publishing
@@ -79,7 +83,68 @@ export default function Tile({
   const [audioTrack, setAudioTrack] = useState<RemoteTrack | null>(null);
   const [isCurrentUser, setIsCurrentUser] = useState(false);
   const [activeGiftAnimations, setActiveGiftAnimations] = useState<GiftAnimationData[]>([]);
+  const [user, setUser] = useState<{ id: string } | null>(null);
+  const [showLikePop, setShowLikePop] = useState(false);
+  const [showFloatingHeart, setShowFloatingHeart] = useState(false);
   const supabase = createClient();
+
+  // Like system
+  const { isLiked, likesCount, toggleLike, isLoading: isLikeLoading } = useLiveLike({
+    streamId: liveStreamId || null,
+    profileId: user?.id,
+    enabled: !!user && !!liveStreamId && isLive
+  });
+
+  // View tracking for trending (tracks unique views)
+  useLiveViewTracking({
+    streamId: liveStreamId || null,
+    profileId: user?.id,
+    enabled: !!liveStreamId && isLive && !isCurrentUser
+  });
+
+  // View tracking for trending
+  useLiveViewTracking({
+    streamId: liveStreamId || null,
+    profileId: user?.id,
+    enabled: !!liveStreamId && isLive && !isCurrentUser
+  });
+
+  // Daily leaderboard rank for this streamer
+  const leaderboardRank = useDailyLeaderboardRank(streamerId, 'top_streamers');
+
+  // Get current user
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user ? { id: data.user.id } : null);
+    });
+  }, [supabase]);
+
+  // Reset like state when streamId changes (new stream = new like opportunity)
+  useEffect(() => {
+    if (!liveStreamId) return;
+    
+    // Reset fidget animation state for new stream
+    setShowLikePop(false);
+    setShowFloatingHeart(false);
+    
+    // Hook will auto-refetch stats for new stream_id
+  }, [liveStreamId]);
+
+  // Handle like tap: count once per stream, fidget after
+  const handleLikeTap = useCallback(() => {
+    if (!user || isLikeLoading) return;
+    
+    if (!isLiked) {
+      // First like on this stream - call DB
+      toggleLike();
+      setShowLikePop(true);
+      setTimeout(() => setShowLikePop(false), 500);
+    } else {
+      // Already liked this stream - fidget animation only (no DB call)
+      setShowFloatingHeart(true);
+      setTimeout(() => setShowFloatingHeart(false), 800);
+    }
+  }, [user, isLikeLoading, isLiked, toggleLike]);
 
   // Track subscription state to prevent re-subscriptions
   const subscriptionRef = useRef<{ streamerId: string | null; subscribed: boolean }>({ streamerId: null, subscribed: false });
@@ -1101,12 +1166,34 @@ export default function Tile({
 
       {/* LIVE badge removed - if video is visible, they're already live */}
 
-      {/* Stats Overlay - Show viewer count */}
-      {viewerCount > 0 && (
-        <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs z-20">
-          👁️ {viewerCount}
+      {/* Stats Overlay - Show viewer count, likes, and trending rank */}
+      <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-2 z-20">
+        {/* Left side: Trending rank OR likes */}
+        <div className="flex items-center gap-2">
+          {trendingRank && trendingRank <= 10 && (
+            <div className={`px-2 py-1 rounded text-xs font-bold shadow-lg ${
+              trendingRank === 1 ? 'bg-yellow-500 text-black' :
+              trendingRank === 2 ? 'bg-gray-400 text-black' :
+              trendingRank === 3 ? 'bg-orange-600 text-white' :
+              'bg-red-500/90 text-white'
+            }`}>
+              🔥 #{trendingRank}
+            </div>
+          )}
+          {likesCount > 0 && (
+            <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
+              ❤️ {likesCount}
+            </div>
+          )}
         </div>
-      )}
+        
+        {/* Viewer count (right) */}
+        {viewerCount > 0 && (
+          <div className="bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs">
+            👁️ {viewerCount}
+          </div>
+        )}
+      </div>
 
       {/* Muted Indicator */}
       {isMuted && (
@@ -1116,20 +1203,82 @@ export default function Tile({
       )}
 
       {/* Bottom Right Overlay - Username and Badge */}
-      <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-        <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-          <button
-            onClick={() => setShowMiniProfile(true)}
-            className="text-white text-sm font-semibold hover:text-blue-200 transition"
-          >
-            {streamerUsername}
-          </button>
-          {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
-            <TierBadge
-              tier_key={gifterStatus.tier_key}
-              level={gifterStatus.level_in_tier}
-              size="sm"
-            />
+      <div className="absolute bottom-2 right-2 z-20">
+        <div className="flex flex-col items-end gap-1">
+          {/* Username and Badge - Show on hover */}
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <button
+                onClick={() => setShowMiniProfile(true)}
+                className="text-white text-sm font-semibold hover:text-blue-200 transition"
+              >
+                {streamerUsername}
+              </button>
+              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
+                <TierBadge
+                  tier_key={gifterStatus.tier_key}
+                  level={gifterStatus.level_in_tier}
+                  size="sm"
+                />
+              )}
+            </div>
+          </div>
+          
+          {/* Leaderboard Rank - ALWAYS VISIBLE - Prestigious Display */}
+          {!leaderboardRank.isLoading && leaderboardRank.rank !== null && (
+            <div 
+              className={`backdrop-blur-md px-2.5 py-1.5 rounded-lg shadow-xl border-2 transition-all ${
+                leaderboardRank.rank === 1 
+                  ? 'bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-600 border-yellow-300 shadow-yellow-500/50' 
+                  : leaderboardRank.rank === 2
+                  ? 'bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 border-gray-200 shadow-gray-400/50'
+                  : leaderboardRank.rank === 3
+                  ? 'bg-gradient-to-br from-orange-400 via-amber-600 to-orange-700 border-orange-300 shadow-orange-500/50'
+                  : leaderboardRank.rank <= 10
+                  ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 border-blue-400 shadow-blue-500/50'
+                  : leaderboardRank.rank <= 50
+                  ? 'bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 border-purple-400 shadow-purple-500/50'
+                  : 'bg-gradient-to-br from-green-500 via-green-600 to-emerald-700 border-green-400 shadow-green-500/50'
+              }`}
+            >
+              <div className="flex flex-col items-end gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  {leaderboardRank.rank === 1 && <span className="text-sm">👑</span>}
+                  {leaderboardRank.rank === 2 && <span className="text-sm">🥈</span>}
+                  {leaderboardRank.rank === 3 && <span className="text-sm">🥉</span>}
+                  <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
+                    #{leaderboardRank.rank}
+                  </span>
+                  <span className="text-white/90 text-[10px] font-semibold uppercase tracking-wider drop-shadow">
+                    {leaderboardRank.tierName}
+                  </span>
+                </div>
+                {leaderboardRank.pointsToNextRank !== null && (
+                  <span className="text-white/95 text-[9px] font-medium tracking-tight drop-shadow">
+                    {leaderboardRank.rank === 1 
+                      ? '🏆 First Place' 
+                      : `+${leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to #${leaderboardRank.rank - 1}`
+                    }
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Unranked but has some progress - ALWAYS VISIBLE */}
+          {!leaderboardRank.isLoading && leaderboardRank.rank === null && leaderboardRank.metricValue > 0 && (
+            <div className="bg-gradient-to-br from-slate-600 via-slate-700 to-gray-800 backdrop-blur-md px-2.5 py-1.5 rounded-lg border-2 border-slate-500 shadow-xl shadow-slate-600/30">
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
+                  Unranked
+                </span>
+                {leaderboardRank.pointsToNextRank !== null && (
+                  <span className="text-slate-200 text-[9px] font-medium tracking-tight drop-shadow">
+                    +{leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to Top 100
+                  </span>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1240,7 +1389,36 @@ export default function Tile({
       </div>
 
       {/* Action Buttons */}
-      <div className="absolute bottom-2 left-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute bottom-2 left-2 flex gap-2 opacity-100 transition-opacity z-10">
+        {user && (
+          <button
+            onClick={handleLikeTap}
+            disabled={isLikeLoading}
+            className={`relative px-3 py-1.5 rounded text-xs font-medium transition-all shadow-lg ${
+              isLiked
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-black/50 text-white hover:bg-black/70'
+            } ${showLikePop ? 'scale-125' : 'scale-100'}`}
+            title={isLiked ? 'Liked!' : 'Like'}
+          >
+            <span className="flex items-center gap-1">
+              <span className="text-base">{isLiked ? '❤️' : '🤍'}</span>
+              <span>{likesCount}</span>
+            </span>
+            {/* First like animation */}
+            {showLikePop && (
+              <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-red-500 text-lg font-bold animate-fade-up pointer-events-none">
+                ❤️
+              </span>
+            )}
+            {/* Fidget tap animation (already liked) */}
+            {showFloatingHeart && (
+              <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-red-500 text-2xl animate-fade-up pointer-events-none">
+                ❤️
+              </span>
+            )}
+          </button>
+        )}
         <button
           onClick={() => setShowGiftModal(true)}
           className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors shadow-lg"

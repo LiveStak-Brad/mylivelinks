@@ -272,7 +272,7 @@ export default function GlobalHeader() {
             >
               <Trophy className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-amber-500" strokeWidth={2} />
             </button>
-            <Link href="/rooms" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
+            <Link href="/liveTV" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
               <Tv className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
             </Link>
             <Link href="/" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Home">
@@ -295,7 +295,7 @@ export default function GlobalHeader() {
             >
               <Trophy className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-amber-500" strokeWidth={2} />
             </button>
-            <Link href="/rooms" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
+            <Link href="/liveTV" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
               <Tv className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
             </Link>
             

@@ -47,7 +47,8 @@ export function resolveNotieAction(actionUrl: string): ResolvedNotieAction | nul
 
   if (pathOnly === '/wallet' || pathOnly.startsWith('/wallet/')) return { route: 'wallet', params: {} };
   if (pathOnly === '/me/analytics' || pathOnly.startsWith('/me/analytics/')) return { route: 'my_analytics', params: {} };
-  if (pathOnly === '/rooms' || pathOnly.startsWith('/rooms/')) return { route: 'rooms', params: {} };
+  if (pathOnly === '/liveTV' || pathOnly.startsWith('/liveTV/')) return { route: 'liveTV', params: {} };
+  if (pathOnly === '/rooms' || pathOnly.startsWith('/rooms/')) return { route: 'liveTV', params: {} };
   if (pathOnly === '/live' || pathOnly.startsWith('/live/')) return { route: 'live', params: {} };
   if (pathOnly === '/feed' || pathOnly.startsWith('/feed/')) return { route: 'feed', params: {} };
   if (pathOnly === '/messages' || pathOnly.startsWith('/messages/')) return { route: 'messages', params: {} };
@@ -76,6 +77,7 @@ export function resolveNotieAction(actionUrl: string): ResolvedNotieAction | nul
     const reserved = new Set([
       'wallet',
       'rooms',
+      'livetv',
       'feed',
       'messages',
       'noties',

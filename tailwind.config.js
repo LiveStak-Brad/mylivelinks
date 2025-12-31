@@ -145,6 +145,18 @@ module.exports = {
       
       // KEYFRAME ANIMATIONS
       keyframes: {
+        'flame-flow': {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        'pulse-gold': {
+          '0%, 100%': { 
+            boxShadow: '0 0 25px rgba(234, 179, 8, 0.7)',
+          },
+          '50%': { 
+            boxShadow: '0 0 40px rgba(234, 179, 8, 1)',
+          },
+        },
         'fade-in': {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
@@ -152,6 +164,10 @@ module.exports = {
         'fade-out': {
           '0%': { opacity: '1' },
           '100%': { opacity: '0' },
+        },
+        'fade-up': {
+          '0%': { opacity: '1', transform: 'translateY(0)' },
+          '100%': { opacity: '0', transform: 'translateY(-20px)' },
         },
         'slide-up': {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
@@ -201,8 +217,11 @@ module.exports = {
       
       // ANIMATION CLASSES
       animation: {
+        'flame-flow': 'flame-flow 3s ease-in-out infinite',
+        'pulse-gold': 'pulse-gold 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'fade-in': 'fade-in 0.2s ease-out',
         'fade-out': 'fade-out 0.2s ease-out forwards',
+        'fade-up': 'fade-up 0.5s ease-out forwards',
         'slide-up': 'slide-up 0.3s ease-out',
         'slide-down': 'slide-down 0.3s ease-out',
         'slide-left': 'slide-left 0.3s ease-out',

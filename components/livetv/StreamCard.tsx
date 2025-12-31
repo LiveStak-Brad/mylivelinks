@@ -8,13 +8,15 @@ import { cn } from '@/lib/utils';
 
 export interface Stream {
   id: string;
-  slug: string;
+  slug?: string;
   streamer_display_name: string;
   thumbnail_url: string | null;
   viewer_count: number;
   category: string | null;
+  stream_type?: string | null;
   badges?: StreamBadge[];
   gender?: 'Men' | 'Women';
+  trendingRank?: number;
 }
 
 export type StreamBadge = 'Trending' | 'Featured' | 'Sponsored';
@@ -57,7 +59,11 @@ export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCar
   };
 
   // Base classes for the card
-  const cardBaseClasses = "group bg-gradient-to-br from-card via-card to-card/95 rounded-xl sm:rounded-2xl border border-border overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-2 hover:border-primary/50 relative before:absolute before:inset-0 before:bg-gradient-to-br before:from-primary/0 before:to-accent/0 hover:before:from-primary/5 hover:before:to-accent/5 before:transition-all before:duration-300";
+  const isTopTrending = stream.trendingRank === 1;
+  const cardBaseClasses = cn(
+    "group bg-gradient-to-br from-card via-card to-card/95 rounded-xl sm:rounded-2xl transition-all duration-300 hover:-translate-y-1 sm:hover:-translate-y-2 relative",
+    isTopTrending ? "overflow-visible ring-4 ring-yellow-500 shadow-[0_0_25px_rgba(234,179,8,0.7)] before:absolute before:inset-0 before:rounded-xl before:sm:rounded-2xl before:p-1 before:bg-gradient-to-r before:from-yellow-400 before:via-amber-500 before:to-yellow-400 before:bg-[length:200%_100%] before:animate-flame-flow before:-z-10" : "overflow-hidden border border-border hover:border-primary/50 shadow-md hover:shadow-xl"
+  );
   
   // Width classes: flexible for grids, fixed for rails
   const widthClasses = flexibleWidth ? "w-full" : "w-[180px] sm:w-[280px] flex-shrink-0";
@@ -66,8 +72,17 @@ export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCar
 
   const content = (
     <>
+      {/* #1 Trending Banner - Top of Card */}
+      {isTopTrending && (
+        <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-400 bg-[length:200%_100%] animate-flame-flow py-0.5 flex items-center justify-center rounded-t-xl sm:rounded-t-2xl">
+          <span className="font-black text-sm sm:text-base tracking-widest text-gray-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] leading-none">
+            1st TRENDING
+          </span>
+        </div>
+      )}
+
       {/* Thumbnail Container (16:9 aspect ratio) */}
-      <div className="relative w-full aspect-video bg-muted overflow-hidden">
+      <div className="relative w-full aspect-video bg-muted overflow-hidden rounded-t-xl sm:rounded-t-2xl">
         {stream.thumbnail_url && !imageError ? (
           <Image
             src={stream.thumbnail_url}
@@ -118,28 +133,15 @@ export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCar
       </div>
 
       {/* Content */}
-      <div className="p-2 sm:p-4 flex flex-col gap-1 sm:gap-2">
-        {/* Name Row with Avatar */}
-        <div className="flex items-center gap-1.5 sm:gap-3">
-          <div className="w-6 h-6 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center flex-shrink-0 shadow-md ring-1 sm:ring-2 ring-primary/20">
-            <span className="text-white text-xs sm:text-base font-black">
-              {stream.streamer_display_name.slice(0, 1).toUpperCase()}
-            </span>
-          </div>
-          <span className="text-foreground font-bold text-xs sm:text-base leading-tight truncate flex-1 tracking-tight group-hover:text-primary transition-colors">
-            {stream.streamer_display_name}
-          </span>
-        </div>
-
-        {/* Category Label */}
-        {stream.category && (
-          <div className="flex items-center gap-1 sm:gap-2 pl-0.5">
-            <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-gradient-to-r from-primary to-accent" />
-            <span className="text-muted-foreground text-[10px] sm:text-sm font-semibold truncate">
-              {stream.category}
-            </span>
-          </div>
-        )}
+      <div className={`py-1 px-1.5 flex items-center justify-center relative overflow-hidden rounded-b-xl sm:rounded-b-2xl ${
+        isTopTrending ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-400 bg-[length:200%_100%] animate-flame-flow' : ''
+      }`}>
+        {/* Streamer Name - Standard size for up to 15 chars */}
+        <span className={`font-black text-lg sm:text-2xl leading-tight text-center transition-colors relative z-10 ${
+          isTopTrending ? 'text-gray-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]' : 'text-foreground group-hover:text-primary'
+        }`}>
+          {stream.streamer_display_name}
+        </span>
       </div>
     </>
   );
@@ -157,7 +159,7 @@ export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCar
 
   return (
     <Link
-      href={`/live/${stream.slug}`}
+      href={`/live/${stream.slug || stream.id}`}
       className={cn(cardClasses, "block")}
     >
       {content}

@@ -64,6 +64,7 @@ export function NotiesScreen({ navigation }: Props) {
           return;
         }
         case 'rooms':
+        case 'liveTV':
         case 'live': {
           parent?.navigate?.('Rooms');
           return;

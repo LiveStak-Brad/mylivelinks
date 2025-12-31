@@ -155,8 +155,8 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
   const disconnectedDueToVisibilityRef = useRef(false); // Track if we disconnected due to visibility
   
   // Live Grid Sort Mode
-  type LiveSortMode = 'random' | 'most_viewed' | 'most_gifted' | 'newest';
-  const [sortMode, setSortMode] = useState<LiveSortMode>('random');
+  type LiveSortMode = 'random' | 'most_viewed' | 'most_gifted' | 'newest' | 'trending';
+  const [sortMode, setSortMode] = useState<LiveSortMode>('trending');
   const [randomSeed] = useState<number>(() => Math.floor(Date.now() / 1000)); // Stable seed per page load
   
   // UI Panel state management
@@ -1243,6 +1243,20 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
 
         // If random mode or get_live_grid failed, use fallback RPC
         if (sortMode === 'random' || error) {
+          const result = await supabase.rpc('get_live_grid', {
+            p_viewer_id: viewerId,
+            p_sort_mode: sortMode,
+          });
+          if (!result.error && result.data) {
+            data = result.data;
+          } else {
+            // Fallback if get_live_grid doesn't exist
+            error = result.error;
+          }
+        }
+
+        // If random mode or get_live_grid failed, use fallback RPC
+        if (sortMode === 'random' || (error && sortMode !== 'trending')) {
           const fallbackResult = await supabase.rpc('get_available_streamers_filtered', {
             p_viewer_id: viewerId,
           });

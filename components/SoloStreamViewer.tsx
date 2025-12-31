@@ -25,7 +25,8 @@ import {
   Volume2,
   VolumeX,
   Trophy,
-  Star
+  Star,
+  Heart
 } from 'lucide-react';
 import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication } from 'livekit-client';
@@ -47,6 +48,7 @@ import MiniProfileModal from './MiniProfileModal';
 import StreamGiftersModal from './StreamGiftersModal';
 import { useIM } from '@/components/im';
 import { useViewerHeartbeat } from '@/hooks/useViewerHeartbeat';
+import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
 
 interface SoloStreamViewerProps {
   username: string;
@@ -82,6 +84,15 @@ interface TopGifter {
   total_coins: number;
 }
 
+interface LeaderboardRank {
+  current_rank: number;
+  total_entries: number;
+  metric_value: number;
+  rank_tier: string | null;
+  points_to_next_rank: number;
+  next_rank: number;
+}
+
 export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const router = useRouter();
   const { resolvedTheme } = useTheme();
@@ -109,6 +120,31 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
   const [streamEnded, setStreamEnded] = useState(false);
   const [countdown, setCountdown] = useState(5);
+  const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
+  const [trendingRank, setTrendingRank] = useState<number | null>(null);
+  
+  // Like system for trending
+  const { isLiked, likesCount, toggleLike, isLoading: isLikeLoading } = useLiveLike({
+    streamId: streamer?.live_stream_id || null,
+    profileId: currentUserId || undefined,
+    enabled: !!currentUserId && !!streamer?.live_stream_id && streamer?.live_available
+  });
+
+  // Fidget like counter (visual only, increments on every tap)
+  const [fidgetLikeCount, setFidgetLikeCount] = useState(0);
+  const [showLikePop, setShowLikePop] = useState(false);
+
+  // Reset fidget counter when stream changes
+  useEffect(() => {
+    setFidgetLikeCount(0);
+  }, [streamer?.live_stream_id]);
+
+  // View tracking for trending
+  useLiveViewTracking({
+    streamId: streamer?.live_stream_id || null,
+    profileId: currentUserId || undefined,
+    enabled: !!streamer?.live_stream_id && streamer?.live_available && currentUserId !== streamer?.profile_id
+  });
   
   // LiveKit room connection - SINGLE connection per mount
   const roomRef = useRef<Room | null>(null);
@@ -790,6 +826,73 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     loadRecommended();
   }, [streamer?.profile_id, supabase]);
 
+  // Load leaderboard rank for streamer
+  useEffect(() => {
+    const loadLeaderboardRank = async () => {
+      if (!streamer?.profile_id) return;
+
+      try {
+        // Fetch rank for daily top streamers leaderboard
+        const { data, error } = await supabase
+          .rpc('rpc_get_leaderboard_rank', {
+            p_profile_id: streamer.profile_id,
+            p_leaderboard_type: 'top_streamers_daily'
+          });
+
+        if (error) {
+          console.error('[SoloStreamViewer] Error fetching leaderboard rank:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          setLeaderboardRank(data[0]);
+        }
+      } catch (err) {
+        console.error('[SoloStreamViewer] Error loading leaderboard rank:', err);
+      }
+    };
+
+    const loadTrendingRank = async () => {
+      if (!streamer?.live_stream_id || !streamer?.live_available) return;
+
+      try {
+        // Fetch trending streams and find this stream's rank
+        const { data, error } = await supabase
+          .rpc('rpc_get_trending_live_streams', {
+            p_limit: 100,
+            p_offset: 0
+          });
+
+        if (error) {
+          console.error('[SoloStreamViewer] Error fetching trending rank:', error);
+          return;
+        }
+
+        if (data && Array.isArray(data)) {
+          const rank = data.findIndex((s: any) => s.stream_id === streamer.live_stream_id);
+          if (rank !== -1) {
+            setTrendingRank(rank + 1); // 1-indexed
+          } else {
+            setTrendingRank(null);
+          }
+        }
+      } catch (err) {
+        console.error('[SoloStreamViewer] Error loading trending rank:', err);
+      }
+    };
+
+    loadLeaderboardRank();
+    loadTrendingRank();
+    
+    // Refresh rank every 30 seconds while streaming
+    const interval = setInterval(() => {
+      loadLeaderboardRank();
+      loadTrendingRank();
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [streamer?.profile_id, streamer?.live_stream_id, streamer?.live_available, supabase]);
+
   // Handle follow/unfollow
   const handleFollow = async () => {
     if (!currentUserId || !streamer) return;
@@ -937,7 +1040,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             >
               {/* Mobile: Top gifters vertical stack on the left */}
               {topGifters.length > 0 && (
-                <div className="md:hidden absolute left-2 top-16 flex flex-col gap-2 z-30">
+                <div className="md:hidden absolute left-2 top-24 flex flex-col gap-px z-30">
                   {topGifters.slice(0, 3).map((gifter, index) => {
                     const colors = [
                       { border: 'ring-yellow-400', bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600' },
@@ -976,70 +1079,140 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                   <ChevronLeft className="w-7 h-7" />
                 </button>
                 
-                {/* Streamer Info */}
-                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-2 py-1.5">
-                  <button 
-                    onClick={() => setShowMiniProfile(true)}
-                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                  >
-                    <Image
-                      src={getAvatarUrl(streamer.avatar_url)}
-                      alt={streamer.username}
-                      width={28}
-                      height={28}
-                      className="rounded-full"
-                    />
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm">
-                          {streamer.display_name || streamer.username}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-white/80">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowTrending(true);
-                          }}
-                          className="flex items-center gap-1 hover:text-white transition-colors"
-                        >
-                          <Flame className="w-4 h-4 text-orange-500" />
-                          <span className="font-semibold text-sm">12</span>
-                        </button>
-                        <span className="text-white/40">•</span>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowLeaderboard(true);
-                          }}
-                          className="flex items-center gap-1 hover:text-white transition-colors"
-                        >
-                          <Trophy className="w-4 h-4 text-yellow-500" />
-                          <span className="font-semibold text-sm">8</span>
-                        </button>
-                      </div>
-                    </div>
-                  </button>
-                  
-                  {/* Follow Star Button - Centered with profile photo */}
-                  {currentUserId && currentUserId !== streamer.profile_id && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleFollow();
-                      }}
-                      disabled={isFollowLoading}
-                      className="transition-all hover:scale-110 self-center"
-                      title={isFollowing ? 'Unfollow' : 'Follow'}
+                {/* Streamer Info with hanging rank badge */}
+                <div className="relative flex flex-col">
+                  {/* Main profile bubble */}
+                  <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-2 py-1.5">
+                    <button 
+                      onClick={() => setShowMiniProfile(true)}
+                      className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                     >
-                      <Star 
-                        className={`w-5 h-5 transition-all ${
-                          isFollowing 
-                            ? 'fill-yellow-400 text-yellow-400' 
-                            : 'text-yellow-400 hover:fill-yellow-400'
-                        }`}
+                      <Image
+                        src={getAvatarUrl(streamer.avatar_url)}
+                        alt={streamer.username}
+                        width={28}
+                        height={28}
+                        className="rounded-full"
                       />
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-sm">
+                            {streamer.display_name || streamer.username}
+                          </span>
+                        </div>
+                        {/* Trending/Leaderboard buttons row */}
+                        <div className="flex items-center gap-2 text-xs text-white/80">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowTrending(true);
+                            }}
+                            className="flex items-center gap-1 hover:text-white transition-colors"
+                          >
+                            <Flame className="w-4 h-4 text-orange-500" />
+                            <span className="font-semibold text-sm">{trendingRank ?? '—'}</span>
+                          </button>
+                          <span className="text-white/40">•</span>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowLeaderboard(true);
+                            }}
+                            className="flex items-center gap-1 hover:text-white transition-colors"
+                          >
+                            <Trophy className="w-4 h-4 text-yellow-500" />
+                            <span className="font-semibold text-sm">
+                              {leaderboardRank?.current_rank || '-'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
                     </button>
+                    
+                    {/* Follow Star Button */}
+                    {currentUserId && currentUserId !== streamer.profile_id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFollow();
+                        }}
+                        disabled={isFollowLoading}
+                        className="transition-all hover:scale-110 self-center"
+                        title={isFollowing ? 'Unfollow' : 'Follow'}
+                      >
+                        <Star 
+                          className={`w-5 h-5 transition-all ${
+                            isFollowing 
+                              ? 'fill-yellow-400 text-yellow-400' 
+                              : 'text-yellow-400 hover:fill-yellow-400'
+                          }`}
+                        />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Rank badge hanging BELOW the bubble - ABSOLUTE positioned */}
+                  {leaderboardRank && leaderboardRank.current_rank <= 100 && (
+                    <div className="absolute top-full left-2 mt-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-yellow-500/90 to-orange-500/90 border-2 border-yellow-400/50 shadow-lg shadow-yellow-500/30 backdrop-blur-md w-fit z-10">
+                      <span className={`text-[13px] font-bold ${
+                        leaderboardRank.current_rank === 1 
+                          ? 'text-white' 
+                          : leaderboardRank.current_rank === 2
+                          ? 'text-gray-100'
+                          : leaderboardRank.current_rank === 3
+                          ? 'text-orange-100'
+                          : leaderboardRank.current_rank <= 10
+                          ? 'text-purple-100'
+                          : 'text-blue-100'
+                      }`}>
+                        {leaderboardRank.current_rank}<sup className="text-[8px]">{leaderboardRank.current_rank === 1 ? 'st' : leaderboardRank.current_rank === 2 ? 'nd' : leaderboardRank.current_rank === 3 ? 'rd' : 'th'}</sup>
+                      </span>
+                      {leaderboardRank.current_rank === 1 && leaderboardRank.points_to_next_rank > 0 && (
+                        <>
+                          <span className="text-white/60 text-[10px]">•</span>
+                          <Trophy className="w-3.5 h-3.5 text-yellow-300" />
+                          <span className="text-white/60 text-[10px]">•</span>
+                          <span className="text-[10px] text-white/90 font-medium">+{leaderboardRank.points_to_next_rank.toLocaleString()}</span>
+                        </>
+                      )}
+                      {leaderboardRank.current_rank === 1 && leaderboardRank.points_to_next_rank === 0 && (
+                        <>
+                          <span className="text-white/60 text-[10px]">•</span>
+                          <Trophy className="w-3.5 h-3.5 text-yellow-300" />
+                        </>
+                      )}
+                      {leaderboardRank.current_rank > 1 && leaderboardRank.points_to_next_rank >= 1 && (
+                        <>
+                          <span className="text-white/60 text-[10px]">•</span>
+                        <div className="flex items-center gap-0.5">
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L4 7L2 14L12 22L22 14L20 7L12 2Z" fill="currentColor" className="text-cyan-400"/>
+                            <path d="M12 2L20 7L12 12L4 7L12 2Z" fill="currentColor" className="text-cyan-200" opacity="0.8"/>
+                          </svg>
+                          <span className="text-[10px] text-white/90 font-medium">
+                            {leaderboardRank.points_to_next_rank.toLocaleString()}
+                          </span>
+                          <span className="text-[10px] text-white/90 font-medium">→</span>
+                          <span className="text-[10px] text-white/90 font-medium">{leaderboardRank.next_rank}<sup className="text-[6px]">{leaderboardRank.next_rank === 1 ? 'st' : leaderboardRank.next_rank === 2 ? 'nd' : leaderboardRank.next_rank === 3 ? 'rd' : 'th'}</sup></span>
+                        </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  
+                  {leaderboardRank && leaderboardRank.current_rank > 100 && (
+                    <div className="absolute top-full left-2 mt-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-600/90 to-gray-700/90 border-2 border-gray-500/50 shadow-lg backdrop-blur-md w-fit z-10">
+                    <div className="flex items-center gap-0.5">
+                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L4 7L2 14L12 22L22 14L20 7L12 2Z" fill="currentColor" className="text-cyan-400"/>
+                        <path d="M12 2L20 7L12 12L4 7L12 2Z" fill="currentColor" className="text-cyan-200" opacity="0.8"/>
+                      </svg>
+                      <span className="text-[10px] text-white/80 font-medium">
+                        {leaderboardRank.points_to_next_rank.toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-white/80 font-medium">→ Top 100</span>
+                    </div>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1235,6 +1408,41 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           z-20
           pb-0
         `}>
+          {/* Like Button - Top Right of Chat */}
+          {currentUserId && streamer?.live_stream_id && (
+            <button
+              onClick={() => {
+                if (!isLikeLoading) {
+                  // First tap: count for trending (DB)
+                  if (!isLiked) {
+                    toggleLike();
+                  }
+                  // Every tap: increment fidget counter (visual only)
+                  setFidgetLikeCount(prev => prev + 1);
+                  setShowLikePop(true);
+                  setTimeout(() => setShowLikePop(false), 300);
+                }
+              }}
+              disabled={isLikeLoading}
+              className={`
+                absolute -top-16 right-4 z-30
+                flex flex-col items-center gap-1
+                transition-all
+                ${showLikePop ? 'scale-110' : 'scale-100'}
+              `}
+            >
+              <Heart 
+                className={`w-10 h-10 drop-shadow-lg ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`}
+                strokeWidth={2}
+              />
+              {(likesCount + fidgetLikeCount) > 0 && (
+                <span className="text-white text-sm font-bold drop-shadow-lg">
+                  {(likesCount + fidgetLikeCount) > 999 ? '999+' : (likesCount + fidgetLikeCount)}
+                </span>
+              )}
+            </button>
+          )}
+
           <div className="h-full flex flex-col mobile-safe-bottom min-h-0">
             <div className="flex-1 min-h-0 overflow-hidden">
               {streamer.live_stream_id ? (
