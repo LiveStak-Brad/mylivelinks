@@ -26,11 +26,6 @@ export default function ViewersModal({ isOpen, onClose, liveStreamId, roomId }: 
 
   console.log('[ViewersModal] Render:', { isOpen, liveStreamId, roomId });
 
-  useEffect(() => {
-    if (!isOpen) return;
-    loadViewers();
-  }, [isOpen, liveStreamId, roomId, loadViewers]);
-
   const loadViewers = useCallback(async () => {
     setLoading(true);
 
@@ -69,6 +64,11 @@ export default function ViewersModal({ isOpen, onClose, liveStreamId, roomId }: 
       setLoading(false);
     }
   }, [liveStreamId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadViewers();
+  }, [isOpen, liveStreamId, roomId, loadViewers]);
 
   // Poll while open to keep list fresh
   useEffect(() => {
