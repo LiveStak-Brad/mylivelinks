@@ -12,12 +12,14 @@ interface ReferralLeaderboardPreviewProps {
   className?: string;
   showCurrentUser?: boolean;
   onViewFull?: () => void;
+  limit?: number;
 }
 
 export default function ReferralLeaderboardPreview({
   className = '',
   showCurrentUser = false,
   onViewFull,
+  limit = 5,
 }: ReferralLeaderboardPreviewProps) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [currentUserEntry, setCurrentUserEntry] = useState<LeaderboardEntry | null>(null);
@@ -32,11 +34,11 @@ export default function ReferralLeaderboardPreview({
         const { data: userData } = await supabase.auth.getUser();
         const userId = userData?.user?.id ?? null;
 
-        const res = await fetch('/api/referrals/leaderboard?range=all&limit=5');
+        const res = await fetch(`/api/referrals/leaderboard?range=all&limit=${limit}`);
         const json = await res.json().catch(() => null);
         const rows = res.ok && Array.isArray((json as any)?.items) ? (json as any).items : [];
 
-        const mapped: LeaderboardEntry[] = rows.slice(0, 5).map((r: any) => ({
+        const mapped: LeaderboardEntry[] = rows.slice(0, limit).map((r: any) => ({
           rank: Number(r?.rank ?? 0),
           profileId: r?.profile_id ? String(r.profile_id) : undefined,
           username: String(r?.username ?? 'Unknown'),
@@ -64,7 +66,7 @@ export default function ReferralLeaderboardPreview({
             const uname = typeof (profile as any)?.username === 'string' ? String((profile as any).username) : 'You';
             const avatarUrl = (profile as any)?.avatar_url ? String((profile as any).avatar_url) : undefined;
 
-            if (rank && rank > 5) {
+            if (rank && rank > limit) {
               me = {
                 rank,
                 profileId: String(userId),
@@ -78,6 +80,7 @@ export default function ReferralLeaderboardPreview({
         }
 
         if (mounted) {
+          console.log('[ReferralLeaderboard] Setting entries:', mapped);
           setEntries(mapped);
           setCurrentUserEntry(me);
         }
@@ -93,10 +96,10 @@ export default function ReferralLeaderboardPreview({
     };
 
     void load();
-    return () => {
+      return () => {
       mounted = false;
     };
-  }, [showCurrentUser]);
+  }, [showCurrentUser, limit]);
 
   if (loading) {
     return (

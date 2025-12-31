@@ -137,5 +137,5 @@ function ReferralsLeaderboardContent() {
     );
   }
 
-  return <ReferralLeaderboardComponent showCurrentUser={false} />;
+  return <ReferralLeaderboardComponent showCurrentUser={false} limit={50} />;
 }
