@@ -1,11 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SmartBrandLogo from '@/components/SmartBrandLogo';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Badge } from '@/components/ui';
 import { createClient } from '@/lib/supabase';
+
+// Force dynamic rendering; this page needs the client session and URL params at runtime.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
 
 type ConsentStatus = 'idle' | 'loading';
 
@@ -21,7 +26,7 @@ function getSafeRedirectUri(raw: string | null) {
   }
 }
 
-export default function OAuthConsentPage() {
+function OAuthConsentInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -232,3 +237,16 @@ export default function OAuthConsentPage() {
   );
 }
 
+export default function OAuthConsentPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10">
+          <div className="animate-pulse h-10 w-32 rounded-full bg-muted" />
+        </main>
+      }
+    >
+      <OAuthConsentInner />
+    </Suspense>
+  );
+}
