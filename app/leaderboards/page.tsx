@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Video, Users } from 'lucide-react';
@@ -25,6 +25,29 @@ type LeaderboardType = 'gifts' | 'referrals';
  * Route: /leaderboards?type=gifts (default) or /leaderboards?type=referrals
  */
 export default function LeaderboardsPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <LeaderboardsContent />
+    </Suspense>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <main 
+      id="main"
+      className="min-h-[calc(100vh-7rem)] bg-background pb-24 md:pb-8"
+    >
+      <div className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function LeaderboardsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const typeParam = searchParams.get('type') as LeaderboardType | null;
