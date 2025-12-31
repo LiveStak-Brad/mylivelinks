@@ -112,6 +112,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   // LiveKit room connection - SINGLE connection per mount
   const roomRef = useRef<Room | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const isConnectingRef = useRef(false); // Guard against duplicate connects
   const connectedUsernameRef = useRef<string | null>(null); // Track who we're connected to
   const [isRoomConnected, setIsRoomConnected] = useState(false);
@@ -397,6 +398,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               video.addEventListener('loadedmetadata', detectAspectRatio);
               detectAspectRatio();
             }
+
+            if (publication.track && publication.kind === Track.Kind.Audio && audioRef.current) {
+              console.log('[SoloStreamViewer] 🔊 Attaching EXISTING audio track to audio element');
+              publication.track.attach(audioRef.current);
+            }
           });
         });
 
@@ -421,7 +427,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             });
           }
 
-          // Only attach video tracks (audio is handled separately)
+          // Attach video + audio tracks
           if (track.kind === Track.Kind.Video && videoRef.current) {
             console.log('[SoloStreamViewer] 🎥 Attaching VIDEO track to video element');
             track.attach(videoRef.current);
@@ -440,6 +446,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             
             video.addEventListener('loadedmetadata', detectAspectRatio);
             detectAspectRatio();
+          }
+
+          if (track.kind === Track.Kind.Audio && audioRef.current) {
+            console.log('[SoloStreamViewer] 🔊 Attaching AUDIO track to audio element');
+            track.attach(audioRef.current);
           }
         });
 
@@ -645,6 +656,9 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     if (videoRef.current) {
       videoRef.current.volume = newVolume;
     }
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume;
+    }
     if (newVolume > 0) {
       setIsMuted(false);
     }
@@ -656,6 +670,9 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     setIsMuted(newMuted);
     if (videoRef.current) {
       videoRef.current.muted = newMuted;
+    }
+    if (audioRef.current) {
+      audioRef.current.muted = newMuted;
     }
   };
 
@@ -853,17 +870,20 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             </div>
 
             {streamer.live_available ? (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted={isMuted}
-                className={`
-                  w-full h-full object-cover
-                  lg:max-w-full lg:max-h-full lg:object-contain
-                  ${isPortraitVideo ? 'lg:h-full lg:w-auto' : 'lg:w-full lg:h-auto'}
-                `}
-              />
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted={isMuted}
+                  className={`
+                    w-full h-full object-cover
+                    lg:max-w-full lg:max-h-full lg:object-contain
+                    ${isPortraitVideo ? 'lg:h-full lg:w-auto' : 'lg:w-full lg:h-auto'}
+                  `}
+                />
+                <audio ref={audioRef} autoPlay playsInline muted={isMuted} />
+              </>
             ) : (
               <>
                 {/* Desktop: Centered offline message */}
