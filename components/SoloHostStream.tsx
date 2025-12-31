@@ -114,6 +114,7 @@ export default function SoloHostStream() {
   const connectedUsernameRef = useRef<string | null>(null);
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
+  const [viewerCount, setViewerCount] = useState<number>(0);
 
   // Get current user
   useEffect(() => {
@@ -136,6 +137,40 @@ export default function SoloHostStream() {
     };
     initUser();
   }, [supabase]);
+
+  // Service-count for host view (bypasses client RLS)
+  useEffect(() => {
+    if (!streamer?.live_stream_id) {
+      setViewerCount(0);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadViewerCount = async () => {
+      try {
+        const res = await fetch(`/api/active-viewers?live_stream_id=${streamer.live_stream_id}`);
+        if (!res.ok) {
+          console.error('[SoloHostStream] Viewer count fetch failed:', res.status);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled && typeof data.viewer_count === 'number') {
+          setViewerCount(data.viewer_count);
+        }
+      } catch (err) {
+        console.error('[SoloHostStream] Error loading viewer count:', err);
+      }
+    };
+
+    loadViewerCount();
+    const interval = setInterval(loadViewerCount, 15000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [streamer?.live_stream_id]);
 
   // Load streamer data (current user)
   useEffect(() => {
@@ -744,13 +779,13 @@ export default function SoloHostStream() {
                 </div>
               </div>
               
-              {/* Center: Viewer count */}
+            {/* Center: Viewer count */}
               <button
                 onClick={() => setShowViewers(true)}
                 className="absolute left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full px-4 py-2 shadow-lg flex items-center gap-1.5 hover:bg-black/50 transition-colors cursor-pointer"
               >
                 <Eye className="w-4 h-4 text-white" />
-                <span className="text-white font-bold text-sm">{streamer.viewer_count.toLocaleString()}</span>
+              <span className="text-white font-bold text-sm">{viewerCount.toLocaleString()}</span>
               </button>
               
               {/* Right: Top 3 Gifters + X + Share (vertical stack) */}
