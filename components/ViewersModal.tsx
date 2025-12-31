@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X, Eye } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import Image from 'next/image';
 
@@ -24,15 +23,13 @@ interface ViewersModalProps {
 export default function ViewersModal({ isOpen, onClose, liveStreamId, roomId }: ViewersModalProps) {
   const [viewers, setViewers] = useState<Viewer[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
 
   console.log('[ViewersModal] Render:', { isOpen, liveStreamId, roomId });
 
   useEffect(() => {
     if (!isOpen) return;
-    console.log('[ViewersModal] Loading viewers...');
     loadViewers();
-  }, [isOpen, liveStreamId, roomId]);
+  }, [isOpen, liveStreamId, roomId, loadViewers]);
 
   const loadViewers = useCallback(async () => {
     setLoading(true);
@@ -53,85 +50,36 @@ export default function ViewersModal({ isOpen, onClose, liveStreamId, roomId }: 
         return;
       }
 
-      const cutoffIso = new Date(Date.now() - 60_000).toISOString();
-
-      const { data, error } = await supabase
-        .from('active_viewers')
-        .select('viewer_id, is_active, last_active_at')
-        .eq('live_stream_id', liveStreamId)
-        .order('last_active_at', { ascending: false })
-        .limit(200);
-
-      if (error) throw error;
-
-      const rows = (data || []) as Array<{ viewer_id: string; is_active: boolean; last_active_at: string }>;
-      const viewerIds = Array.from(new Set(rows.map((r) => r.viewer_id).filter(Boolean)));
-
-      if (viewerIds.length === 0) {
+      const res = await fetch(`/api/active-viewers/list?live_stream_id=${liveStreamId}`);
+      if (!res.ok) {
+        console.error('[ViewersModal] list fetch failed:', res.status);
         setViewers([]);
         return;
       }
-
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .in('id', viewerIds);
-
-      if (profileError) throw profileError;
-
-      const profileMap = new Map<string, { username: string; avatar_url?: string }>(
-        (profiles || []).map((p: any) => [String(p.id), { username: String(p.username || 'Unknown'), avatar_url: p.avatar_url || undefined }])
-      );
-
-      const mapped: Viewer[] = rows
-        .map((row) => {
-          const profile = profileMap.get(row.viewer_id);
-          if (!profile) return null;
-          const isActive = Boolean(row.is_active) && row.last_active_at > cutoffIso;
-
-          return {
-            profile_id: row.viewer_id,
-            username: profile.username,
-            avatar_url: profile.avatar_url,
-            is_active: isActive,
-            last_seen: row.last_active_at,
-          };
-        })
-        .filter(Boolean) as Viewer[];
-
-      setViewers(mapped);
+      const data = await res.json();
+      if (Array.isArray(data.viewers)) {
+        setViewers(data.viewers as Viewer[]);
+      } else {
+        setViewers([]);
+      }
     } catch (err) {
       console.error('[ViewersModal] Error loading viewers:', err);
       setViewers([]);
     } finally {
       setLoading(false);
     }
-  }, [liveStreamId, roomId, supabase]);
+  }, [liveStreamId]);
 
+  // Poll while open to keep list fresh
   useEffect(() => {
-    if (!isOpen) return;
-    if (!liveStreamId) return;
+    if (!isOpen || !liveStreamId) return;
 
-    const channel = supabase
-      .channel(`active-viewers-web-${liveStreamId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'active_viewers',
-          filter: `live_stream_id=eq.${liveStreamId}`,
-        },
-        () => {
-          loadViewers();
-        }
-      )
-      .subscribe();
+    const interval = setInterval(() => {
+      loadViewers();
+    }, 15000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isOpen, liveStreamId, loadViewers, supabase]);
+    return () => clearInterval(interval);
+  }, [isOpen, liveStreamId, loadViewers]);
 
   if (!isOpen) return null;
 
