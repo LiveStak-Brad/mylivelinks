@@ -50,6 +50,10 @@ export function FeedScreen({ navigation }: Props) {
   const [selectedGift, setSelectedGift] = useState<GiftType | null>(null);
   const [giftSubmitting, setGiftSubmitting] = useState(false);
 
+  // Like State - Track which posts current user has liked
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [likesLoading, setLikesLoading] = useState<Set<string>>(new Set());
+
   const canPost = (composerText.trim().length > 0 || !!mediaUrl) && !composerLoading && !mediaUploading;
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -71,9 +75,102 @@ export function FeedScreen({ navigation }: Props) {
     }
   }, []);
 
+  // Load which posts the current user has liked (for current batch)
+  const loadLikedPostsForBatch = useCallback(async (postIds: string[]) => {
+    if (!user?.id || postIds.length === 0) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('rpc_get_user_post_likes', {
+        p_profile_id: user.id,
+        p_post_ids: postIds,
+      });
+
+      if (!error && data) {
+        const likedIds = data.map((row: { post_id: string }) => row.post_id);
+        setLikedPostIds((prev) => {
+          const updated = new Set(prev);
+          likedIds.forEach((id) => updated.add(id));
+          return updated;
+        });
+      }
+    } catch (e) {
+      console.error('[Feed] Failed to load liked posts:', e);
+    }
+  }, [user?.id]);
+
+  // Load liked posts when posts change (only for new posts)
+  const prevPostIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentPostIds = new Set(posts.map((p) => p.id));
+    const newPostIds: string[] = [];
+    
+    currentPostIds.forEach((id) => {
+      if (!prevPostIdsRef.current.has(id)) {
+        newPostIds.push(id);
+      }
+    });
+
+    if (newPostIds.length > 0) {
+      void loadLikedPostsForBatch(newPostIds);
+    }
+
+    prevPostIdsRef.current = currentPostIds;
+  }, [posts, loadLikedPostsForBatch]);
+
   useEffect(() => {
     void loadGiftTypes();
   }, [loadGiftTypes]);
+
+  // Handle like button press
+  const handleLike = useCallback(async (post: FeedPost) => {
+    if (!user?.id) {
+      Alert.alert('Sign in required', 'Please sign in to like posts');
+      return;
+    }
+
+    const postId = post.id;
+    const alreadyLiked = likedPostIds.has(postId);
+
+    if (alreadyLiked) {
+      // Already liked - no action (design: like-only, no unlike)
+      return;
+    }
+
+    // Optimistic update
+    setLikedPostIds((prev) => new Set(prev).add(postId));
+    setLikesLoading((prev) => new Set(prev).add(postId));
+
+    try {
+      const { data, error } = await supabase.rpc('rpc_like_post', {
+        p_post_id: postId,
+        p_profile_id: user.id,
+      });
+
+      if (error) {
+        // Revert optimistic update
+        setLikedPostIds((prev) => {
+          const next = new Set(prev);
+          next.delete(postId);
+          return next;
+        });
+        Alert.alert('Error', 'Failed to like post');
+      }
+    } catch (e) {
+      // Revert optimistic update
+      setLikedPostIds((prev) => {
+        const next = new Set(prev);
+        next.delete(postId);
+        return next;
+      });
+      Alert.alert('Error', 'Failed to like post');
+    } finally {
+      setLikesLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(postId);
+        return next;
+      });
+    }
+  }, [user?.id, likedPostIds]);
 
   const uploadPostMedia = useCallback(
     async (uri: string, mime: string | null): Promise<string> => {
@@ -310,9 +407,13 @@ export function FeedScreen({ navigation }: Props) {
     ({ item }: { item: FeedPost }) => {
       const avatarUri = resolveMediaUrl(item.author?.avatar_url ?? null);
       const mediaUri = resolveMediaUrl(item.media_url ?? null);
+      const isLiked = likedPostIds.has(item.id);
+      const isLiking = likesLoading.has(item.id);
+      const displayLikesCount = item.likes_count + (isLiked && !item.likes_count ? 1 : 0);
+
       return (
         <View style={styles.postCard}>
-          {/* New Header: Avatar + Username + Date/Time */}
+          {/* Header: Avatar + Username + Date */}
           <Pressable
             style={styles.postHeader}
             onPress={() => {
@@ -333,47 +434,71 @@ export function FeedScreen({ navigation }: Props) {
             </View>
           </Pressable>
 
+          {/* Content */}
           {!!item.text_content && (
             <Text style={styles.contentText}>{String(item.text_content)}</Text>
           )}
 
+          {/* Media */}
           {!!mediaUri && (
             <View style={styles.mediaWrap}>
               <Image source={{ uri: mediaUri }} style={styles.mediaImage} resizeMode="cover" />
             </View>
           )}
 
-          {/* New Engagement Bar: Like | Gift | Coin Count | Comments */}
-          <View style={styles.engagementBar}>
-            <Pressable style={styles.engagementButton}>
-              <Text style={styles.engagementIcon}>♡</Text>
-              <Text style={styles.engagementLabel}>Like</Text>
+          {/* Stats Bar - Like count, Comment count, Coins */}
+          {(displayLikesCount > 0 || item.comment_count > 0 || (item.gift_total_coins ?? 0) > 0) && (
+            <View style={styles.statsBar}>
+              {displayLikesCount > 0 && (
+                <Text style={styles.statsText}>
+                  ❤️ {displayLikesCount} {displayLikesCount === 1 ? 'like' : 'likes'}
+                </Text>
+              )}
+              {item.comment_count > 0 && (
+                <Text style={styles.statsText}>
+                  💬 {item.comment_count} {item.comment_count === 1 ? 'comment' : 'comments'}
+                </Text>
+              )}
+              {(item.gift_total_coins ?? 0) > 0 && (
+                <Text style={styles.statsText}>
+                  🪙 {item.gift_total_coins}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Action Buttons - Like, Comment, Gift */}
+          <View style={styles.actionsBar}>
+            <Pressable 
+              style={styles.actionButton}
+              onPress={() => handleLike(item)}
+              disabled={isLiking || isLiked}
+            >
+              <Text style={[styles.actionIcon, isLiked && styles.actionIconLiked]}>
+                {isLiked ? '❤️' : '♡'}
+              </Text>
+              <Text style={[styles.actionLabel, isLiked && styles.actionLabelLiked]}>
+                Like
+              </Text>
+            </Pressable>
+
+            <Pressable style={styles.actionButton}>
+              <Text style={styles.actionIcon}>💬</Text>
+              <Text style={styles.actionLabel}>Comment</Text>
             </Pressable>
 
             <Pressable 
-              style={styles.engagementButton}
+              style={styles.actionButton}
               onPress={() => openGiftModal(item)}
             >
-              <Text style={styles.giftIcon}>🎁</Text>
-              <Text style={styles.giftLabel}>Gift</Text>
-            </Pressable>
-
-            {(item.gift_total_coins ?? 0) > 0 && (
-              <View style={styles.coinCount}>
-                <Text style={styles.coinIcon}>🪙</Text>
-                <Text style={styles.coinText}>{item.gift_total_coins ?? 0}</Text>
-              </View>
-            )}
-
-            <Pressable style={styles.engagementButton}>
-              <Text style={styles.engagementIcon}>💬</Text>
-              <Text style={styles.engagementLabel}>Comment</Text>
+              <Text style={styles.actionIcon}>🎁</Text>
+              <Text style={styles.actionLabel}>Gift</Text>
             </Pressable>
           </View>
         </View>
       );
     },
-    [formatDateTime, navigation, styles]
+    [formatDateTime, navigation, styles, likedPostIds, likesLoading, handleLike]
   );
 
   const renderComposer = useMemo(() => {
@@ -1010,6 +1135,59 @@ function createStyles(theme: ThemeDefinition) {
       width: '100%',
       height: 220,
     },
+    
+    // Modern Stats Bar (like Facebook/Instagram)
+    statsBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+      paddingVertical: 8,
+      gap: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      marginTop: 8,
+    },
+    statsText: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+
+    // Modern Action Buttons Bar
+    actionsBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      paddingTop: 4,
+      gap: 2,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      borderRadius: 8,
+    },
+    actionIcon: {
+      fontSize: 20,
+      color: theme.colors.textSecondary,
+    },
+    actionIconLiked: {
+      color: '#ff3b5c',
+    },
+    actionLabel: {
+      color: theme.colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    actionLabelLiked: {
+      color: '#ff3b5c',
+    },
+
+    // Legacy - can be removed
     engagementBar: {
       flexDirection: 'row',
       alignItems: 'center',

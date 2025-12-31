@@ -17,6 +17,7 @@ export type FeedPost = {
   author: FeedAuthor;
   comment_count: number;
   gift_total_coins: number;
+  likes_count: number;
 };
 
 type FeedCursor = { before_created_at: string; before_id: string };

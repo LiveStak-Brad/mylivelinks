@@ -14,6 +14,7 @@ type FeedPost = {
   };
   comment_count: number;
   gift_total_coins: number;
+  likes_count: number;
 };
 
 export async function GET(request: NextRequest) {
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest) {
       },
       comment_count: Number(r.comment_count ?? 0),
       gift_total_coins: Number(r.gift_total_coins ?? 0),
+      likes_count: Number(r.likes_count ?? 0),
     }));
 
     const last = posts[posts.length - 1];

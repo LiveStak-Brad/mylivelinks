@@ -134,6 +134,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
     }
   }, [nextCursor, username]);
 
+  // Load current user info
   useEffect(() => {
     let canceled = false;
     const loadMe = async () => {
@@ -168,9 +169,11 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
     };
   }, []);
 
+  // Load feed only once on mount or when username changes
   useEffect(() => {
     void loadFeed('replace');
-  }, [loadFeed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username]);
 
   const exportFilteredImage = useCallback(
     async (file: File, cssFilter: string, filterId: PhotoFilterId): Promise<File> => {
