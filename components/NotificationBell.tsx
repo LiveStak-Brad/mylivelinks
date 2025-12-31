@@ -66,7 +66,9 @@ export function NotificationBell() {
     loadNotifications();
     loadUnreadCount();
 
-    const { data: { user } } = supabase.auth.getUser().then(({ data }) => {
+    let cleanup: (() => void) | undefined;
+
+    supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return;
 
       const channel = supabase
@@ -86,10 +88,14 @@ export function NotificationBell() {
         )
         .subscribe();
 
-      return () => {
+      cleanup = () => {
         supabase.removeChannel(channel);
       };
     });
+
+    return () => {
+      if (cleanup) cleanup();
+    };
   }, [supabase]);
 
   // Click outside to close
