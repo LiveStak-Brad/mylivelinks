@@ -49,8 +49,8 @@ export const VIDEO_PRESETS = {
  */
 export const DEFAULT_VIDEO_CAPTURE = VIDEO_PRESETS.HD;
 
-export const LIVE_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818'] as const;
-export const LIVE_OWNER_EMAILS = ['wcba.mo@gmail.com'] as const;
+export const LIVE_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'] as const;
+export const LIVE_OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'] as const;
 
 export function isLiveOwnerUser(user: { id?: string; email?: string | null } | null | undefined) {
   const id = user?.id ? String(user.id) : '';

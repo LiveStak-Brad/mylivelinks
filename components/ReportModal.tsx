@@ -151,7 +151,7 @@ export default function ReportModal({
       onClick={handleClose}
     >
       <div
-        className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-scale-in"
+        className="bg-card border border-border rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-scale-in flex flex-col modal-fullscreen-mobile"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Success State */}
@@ -170,7 +170,7 @@ export default function ReportModal({
         ) : (
           <>
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0 mobile-safe-top">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
                   <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
@@ -181,7 +181,7 @@ export default function ReportModal({
               </div>
               <button
                 onClick={handleClose}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition mobile-touch-target"
                 disabled={submitting}
                 aria-label="Close"
               >
@@ -190,7 +190,7 @@ export default function ReportModal({
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4">
+            <div className="modal-body p-6 space-y-4">
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Reports are reviewed by our moderation team. False reports may result in account restrictions.
               </p>
@@ -244,7 +244,7 @@ export default function ReportModal({
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3">
+            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex gap-3 flex-shrink-0 mobile-safe-bottom">
               <button
                 onClick={handleClose}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"

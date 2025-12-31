@@ -5,12 +5,13 @@ import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
-import { getAvatarUrl } from '@/lib/defaultAvatar';
+import LiveAvatar from '@/components/LiveAvatar';
 
 interface LeaderboardEntry {
   profile_id: string;
   username: string;
   avatar_url?: string;
+  is_live?: boolean;
   gifter_level: number;
   badge_name?: string;
   badge_color?: string;
@@ -152,6 +153,7 @@ export default function Leaderboard() {
           profile_id: row.profile_id,
           username: row.username,
           avatar_url: row.avatar_url,
+          is_live: Boolean(row.is_live ?? false),
           gifter_level: row.gifter_level || 0,
           metric_value: Number(row.metric_value ?? 0),
           rank: Number(row.rank ?? 0),
@@ -178,40 +180,40 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-      <h2 className="text-2xl font-bold mb-6">Leaderboards</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-3 sm:p-4 lg:p-6">
+      <h2 className="text-lg font-semibold mb-2">Leaderboards</h2>
 
       {/* Type Tabs */}
-      <div className="flex gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-[2px] mb-1">
         <button
           onClick={() => setType('top_streamers')}
-          className={`px-4 py-2 rounded-lg font-medium transition ${
+          className={`w-full min-w-0 h-5 px-0 inline-flex items-center justify-center rounded-md text-[11px] font-semibold leading-none transition ${
             type === 'top_streamers'
               ? 'bg-blue-500 text-white'
               : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
           }`}
         >
-          Top Streamers
+          Streamers
         </button>
         <button
           onClick={() => setType('top_gifters')}
-          className={`px-4 py-2 rounded-lg font-medium transition ${
+          className={`w-full min-w-0 h-5 px-0 inline-flex items-center justify-center rounded-md text-[11px] font-semibold leading-none transition ${
             type === 'top_gifters'
               ? 'bg-blue-500 text-white'
               : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
           }`}
         >
-          Top Gifters
+          Gifters
         </button>
       </div>
 
       {/* Period Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="grid grid-cols-4 gap-[2px] mb-2 sm:mb-3">
         {(['daily', 'weekly', 'monthly', 'alltime'] as Period[]).map((p) => (
           <button
             key={p}
             onClick={() => setPeriod(p)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+            className={`w-full min-w-0 h-5 inline-flex items-center justify-center px-0 rounded-md text-[10px] font-semibold leading-none whitespace-nowrap transition ${
               period === p
                 ? 'bg-purple-500 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
@@ -234,11 +236,11 @@ export default function Leaderboard() {
           No entries yet. Be the first!
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5 sm:space-y-2">
           {entries.map((entry, index) => (
             <div
               key={entry.profile_id}
-              className="flex items-center gap-1.5 sm:gap-2 p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all group"
+              className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-all group"
               style={{
                 animation: `fadeIn 0.3s ease-out ${index * 0.05}s both`,
               }}
@@ -262,25 +264,25 @@ export default function Leaderboard() {
 
               {/* Avatar with Badge Overlay */}
               <div className="flex-shrink-0 relative">
-                <img
-                  src={getAvatarUrl(entry.avatar_url)}
-                  alt={entry.username}
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-gray-200 dark:border-gray-700"
-                  onError={(e) => {
-                    e.currentTarget.src = '/no-profile-pic.png';
-                  }}
+                <LiveAvatar
+                  avatarUrl={entry.avatar_url}
+                  username={entry.username}
+                  isLive={entry.is_live}
+                  size="sm"
+                  showLiveBadge={false}
+                  className="border border-gray-200 dark:border-gray-700 scale-[0.85] sm:scale-95 lg:scale-100 origin-left"
                 />
               </div>
 
               {/* User Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-medium text-xs sm:text-sm truncate">{entry.username}</span>
+                  <span className="font-medium text-[11px] sm:text-sm truncate">{entry.username}</span>
                   {(() => {
                     const status = gifterStatusMap[entry.profile_id];
                     if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
                     return (
-                      <div className="flex items-center">
+                      <div className="flex items-center scale-[0.85] sm:scale-95 lg:scale-100 origin-left">
                         <TierBadge
                           tier_key={status.tier_key}
                           level={status.level_in_tier}
@@ -294,10 +296,10 @@ export default function Leaderboard() {
 
               {/* Metric Value */}
               <div className="flex-shrink-0 text-center">
-                <div className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
+                <div className="text-[11px] sm:text-sm font-bold text-gray-900 dark:text-white">
                   {formatMetric(entry.metric_value)}
                 </div>
-                <div className="text-[9px] sm:text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                <div className="text-[8px] sm:text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                   {type === 'top_streamers' ? 'diamonds' : 'coins'}
                 </div>
               </div>

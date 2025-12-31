@@ -15,6 +15,16 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'www.mylivelinks.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'mylivelinks.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'ui-avatars.com',
         pathname: '/api/**',
       },

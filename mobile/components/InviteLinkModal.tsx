@@ -152,7 +152,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="close" size={28} color={textMuted} />
+              <Ionicons name="close" size={28} color={theme.colors.textMuted} />
             </Pressable>
           </View>
 
@@ -183,7 +183,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
             ) : (
               <View style={styles.linkCard}>
                 <View style={styles.linkHeader}>
-                  <Ionicons name="link" size={14} color={accent} />
+                  <Ionicons name="link" size={14} color={theme.colors.accent} />
                   <Text style={styles.linkLabel}>Your Referral Link</Text>
                 </View>
                 <Text style={styles.linkUrl} numberOfLines={2}>
@@ -220,7 +220,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
                 onPress={handleShare}
                 disabled={loading}
               >
-                <Ionicons name="share-outline" size={18} color={textPrimary} />
+                <Ionicons name="share-outline" size={18} color={theme.colors.textPrimary} />
                 <Text style={styles.secondaryButtonText}>Share</Text>
               </Pressable>
             </View>
@@ -228,7 +228,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
             {/* Quality Note */}
             <View style={styles.qualityNote}>
               <View style={styles.qualityNoteHeader}>
-                <Ionicons name="diamond" size={14} color={isLight ? '#2563eb' : '#60a5fa'} />
+                <Ionicons name="diamond" size={14} color={theme.mode === 'light' ? '#2563eb' : '#60a5fa'} />
                 <Text style={styles.qualityNoteBold}>Quality matters:</Text>
               </View>
               <Text style={styles.qualityNoteText}>
@@ -239,7 +239,7 @@ export function InviteLinkModal({ visible, onClose }: InviteLinkModalProps) {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Ionicons name="rocket" size={14} color={textMuted} style={{ marginRight: 4 }} />
+            <Ionicons name="rocket" size={14} color={theme.colors.textMuted} style={{ marginRight: 4 }} />
             <Text style={styles.footerText}>
               Build your network. Grow together.
             </Text>

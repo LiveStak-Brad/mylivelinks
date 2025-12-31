@@ -10,27 +10,41 @@
  * - Minimal UI (streamer-focused)
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
   Text,
   TouchableOpacity,
-  Dimensions,
   Alert,
+  Share,
+  ScrollView,
+  Image,
+  useWindowDimensions,
 } from 'react-native';
-import { Camera, CameraType } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLiveRoomParticipants } from '../hooks/useLiveRoomParticipants';
+import { useChatMessages } from '../hooks/useChatMessages';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../contexts/ThemeContext';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { useAuthContext } from '../contexts/AuthContext';
+import { Tile } from '../components/live/Tile';
+import type { Participant } from '../types/live';
+import { canUserGoLive } from '../lib/livekit-constants';
+import { Modal, Input } from '../components/ui';
 
 type SoloHostStreamScreenProps = {
   onExit?: () => void;
+};
+
+type TopGifter = {
+  profile_id: string;
+  username: string;
+  avatar_url?: string | null;
+  total_coins: number;
 };
 
 export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
@@ -38,30 +52,38 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
   
   const insets = useSafeAreaInsets();
   const { theme } = useThemeMode();
+  const { user } = useAuthContext();
+  const { height: windowHeight } = useWindowDimensions();
+
+  const isOwner = useMemo(() => canUserGoLive(user ? { id: user.id, email: user.email } : null), [user?.email, user?.id]);
   
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [cameraType, setCameraType] = useState(CameraType.front);
-  const [currentUser, setCurrentUser] = useState<{ id: string; username: string } | null>(null);
-  const [viewerCount, setViewerCount] = useState(0);
-  const cameraRef = useRef<Camera>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; username: string; display_name?: string | null; avatar_url?: string | null } | null>(null);
+  const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
+  const [myLiveStreamId, setMyLiveStreamId] = useState<number | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const [showSetupModal, setShowSetupModal] = useState(true);
+  const [showAlreadyLiveModal, setShowAlreadyLiveModal] = useState(false);
+  const [streamTitle, setStreamTitle] = useState('');
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [requestingPermissions, setRequestingPermissions] = useState(false);
+  const [permissionsRequested, setPermissionsRequested] = useState(false);
   
   // LiveKit streaming
   const {
     goLive,
     stopLive,
+    endOtherStream,
+    resumeOnThisDevice,
     isLive,
-    isPublishing,
     isConnected,
     room,
+    participants,
   } = useLiveRoomParticipants({ enabled: true });
 
-  // Request camera permissions
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
+  const { messages, loading: loadingMessages, retryMessage } = useChatMessages({
+    liveStreamId: myLiveStreamId || undefined,
+  });
 
   // Load current user
   useEffect(() => {
@@ -70,51 +92,273 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, display_name, avatar_url')
           .eq('id', user.id)
           .single();
         
         if (profile) {
-          setCurrentUser({ id: user.id, username: profile.username });
+          setCurrentUser({
+            id: user.id,
+            username: profile.username,
+            display_name: (profile as any).display_name ?? null,
+            avatar_url: (profile as any).avatar_url ?? null,
+          });
         }
       }
     };
     loadUser();
   }, []);
 
-  // Mock viewer count (replace with real-time subscription)
   useEffect(() => {
-    if (isLive) {
-      const interval = setInterval(() => {
-        setViewerCount(prev => Math.max(0, prev + Math.floor(Math.random() * 3) - 1));
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [isLive]);
+    if (!showSetupModal) return;
+    if (permissionsGranted || requestingPermissions || permissionsRequested) return;
 
-  const handleToggleGoLive = useCallback(async () => {
+    let cancelled = false;
+    const requestPermissions = async () => {
+      setRequestingPermissions(true);
+      setPermissionsRequested(true);
+      try {
+        const expoCamera = require('expo-camera') as any;
+        const Camera = expoCamera?.Camera;
+        const camera = await Camera.requestCameraPermissionsAsync();
+        const mic = await Camera.requestMicrophonePermissionsAsync();
+        if (cancelled) return;
+        setPermissionsGranted(camera.status === 'granted' && mic.status === 'granted');
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('[SoloHostStreamScreen] Permission request failed:', err);
+        setPermissionsGranted(false);
+      } finally {
+        if (!cancelled) setRequestingPermissions(false);
+      }
+    };
+
+    requestPermissions();
+    return () => {
+      cancelled = true;
+    };
+  }, [permissionsGranted, permissionsRequested, requestingPermissions, showSetupModal]);
+
+  useEffect(() => {
+    if (!showSetupModal) return;
+    setPermissionsRequested(false);
+  }, [showSetupModal]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    let cancelled = false;
+    const loadTopGifters = async () => {
+      try {
+        const { data: giftersData } = await supabase
+          .from('gifts')
+          .select(
+            `
+              sender_id,
+              coin_value,
+              profiles!gifts_sender_id_fkey (
+                username,
+                avatar_url
+              )
+            `
+          )
+          .eq('recipient_id', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (cancelled) return;
+
+        if (giftersData && giftersData.length > 0) {
+          const gifterTotals = (giftersData as any[]).reduce((acc: Record<string, TopGifter>, gift) => {
+            const senderId = gift.sender_id as string;
+            if (!acc[senderId]) {
+              acc[senderId] = {
+                profile_id: senderId,
+                username: gift.profiles?.username || 'Unknown',
+                avatar_url: gift.profiles?.avatar_url ?? null,
+                total_coins: 0,
+              };
+            }
+            acc[senderId].total_coins += gift.coin_value || 0;
+            return acc;
+          }, {});
+
+          const top3 = Object.values(gifterTotals)
+            .sort((a, b) => b.total_coins - a.total_coins)
+            .slice(0, 3);
+
+          setTopGifters(top3);
+          return;
+        }
+
+        setTopGifters([
+          { profile_id: 'mock1', username: 'TopSupporter', avatar_url: null, total_coins: 5000 },
+          { profile_id: 'mock2', username: 'MegaFan', avatar_url: null, total_coins: 3500 },
+          { profile_id: 'mock3', username: 'GiftKing', avatar_url: null, total_coins: 2000 },
+        ]);
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('[SoloHostStreamScreen] Failed to load top gifters:', err);
+        setTopGifters([
+          { profile_id: 'mock1', username: 'TopSupporter', avatar_url: null, total_coins: 5000 },
+          { profile_id: 'mock2', username: 'MegaFan', avatar_url: null, total_coins: 3500 },
+          { profile_id: 'mock3', username: 'GiftKing', avatar_url: null, total_coins: 2000 },
+        ]);
+      }
+    };
+
+    loadTopGifters();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
+
+  // Load my live_stream_id when going live (chat scoping)
+  useEffect(() => {
+    if (!isLive || !currentUser?.id) {
+      setMyLiveStreamId(null);
+      return;
+    }
+
+    let cancelled = false;
+    const loadStreamId = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('live_streams')
+          .select('id')
+          .eq('profile_id', currentUser.id)
+          .maybeSingle();
+
+        if (cancelled) return;
+        if (error) {
+          console.warn('[SoloHostStreamScreen] Failed to load live_stream_id:', error);
+          setMyLiveStreamId(null);
+          return;
+        }
+        setMyLiveStreamId((data as any)?.id ?? null);
+      } catch (err) {
+        if (cancelled) return;
+        console.warn('[SoloHostStreamScreen] Failed to load live_stream_id:', err);
+        setMyLiveStreamId(null);
+      }
+    };
+
+    loadStreamId();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, isLive]);
+
+  const handleStartStream = useCallback(async () => {
     if (!currentUser?.id) {
       Alert.alert('Login required', 'Please log in to go live.');
       return;
     }
 
-    try {
-      if (isLive) {
-        await stopLive();
-        setViewerCount(0);
-      } else {
-        await goLive();
-      }
-    } catch (err: any) {
-      Alert.alert('Live error', err?.message || 'Failed to toggle live');
+    if (!permissionsGranted) {
+      Alert.alert('Permissions required', 'Camera and microphone access is required to go live.');
+      return;
     }
-  }, [currentUser?.id, goLive, isLive, stopLive]);
 
-  const handleFlipCamera = () => {
-    setCameraType(current =>
-      current === CameraType.back ? CameraType.front : CameraType.back
-    );
+    if (!streamTitle.trim()) {
+      Alert.alert('Stream title required', 'Please enter a stream title.');
+      return;
+    }
+
+    if (!isConnected) {
+      Alert.alert('Connecting…', 'Please wait for LiveKit to connect, then try again.');
+      return;
+    }
+
+    try {
+      setShowSetupModal(false);
+      await goLive();
+    } catch (err: any) {
+      if (err?.message === 'ALREADY_LIVE_ELSEWHERE') {
+        // Show modal to choose resume or end other stream
+        setShowAlreadyLiveModal(true);
+        setShowSetupModal(false);
+      } else {
+        Alert.alert('Live error', err?.message || 'Failed to start stream');
+      }
+    }
+  }, [currentUser?.id, goLive, isConnected, permissionsGranted, streamTitle]);
+
+  const handleEndOtherAndStartHere = useCallback(async () => {
+    setShowAlreadyLiveModal(false);
+    try {
+      await endOtherStream();
+      // Wait a moment then start on this device
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await goLive();
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to end other stream and start here');
+      setShowSetupModal(true);
+    }
+  }, [endOtherStream, goLive]);
+
+  const handleResumeHere = useCallback(async () => {
+    setShowAlreadyLiveModal(false);
+    try {
+      await resumeOnThisDevice();
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to resume stream on this device');
+      setShowSetupModal(true);
+    }
+  }, [resumeOnThisDevice]);
+
+  const viewerCount = room?.remoteParticipants?.size ?? 0;
+
+  const localParticipant = participants.find((p) => p.isLocal) || null;
+
+  const tileParticipant: Participant = {
+    identity: localParticipant?.identity || currentUser?.id || 'local',
+    username: currentUser?.display_name || currentUser?.username || 'You',
+    isSpeaking: false,
+    isCameraEnabled: true,
+    isMicEnabled: true,
+    isLocal: true,
+    viewerCount: undefined,
   };
+
+  const formatTime = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
+
+  const getFallbackBubbleColor = (profileId: string) => {
+    const colors = [
+      'rgba(168, 85, 247, 0.28)',
+      'rgba(236, 72, 153, 0.28)',
+      'rgba(59, 130, 246, 0.28)',
+      'rgba(99, 102, 241, 0.28)',
+      'rgba(139, 92, 246, 0.28)',
+      'rgba(217, 70, 239, 0.28)',
+      'rgba(244, 63, 94, 0.28)',
+      'rgba(34, 211, 238, 0.24)',
+    ];
+    let hash = 0;
+    for (let i = 0; i < profileId.length; i++) {
+      hash = profileId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  const toHexWithAlpha = (hex: string, alphaHex: string) => {
+    const raw = (hex || '').trim();
+    if (!raw) return null;
+    if (!raw.startsWith('#')) return null;
+    const body = raw.slice(1);
+    if (body.length !== 6) return null;
+    return `#${body}${alphaHex}`;
+  };
+
+  const canChat = !!isLive && !!myLiveStreamId;
 
   const handleExit = useCallback(async () => {
     if (isLive) {
@@ -138,112 +382,413 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
     }
   }, [isLive, onExit, stopLive]);
 
-  if (hasPermission === null) {
-    return (
-      <View style={styles.centered}>
-        <Text style={{ color: theme.colors.text }}>Requesting camera permission...</Text>
-      </View>
-    );
-  }
+  const headerName = currentUser?.display_name || currentUser?.username || 'Streamer';
+  const optionsBottom = Math.max(12, (insets.bottom || 0) + 12);
+  const chatBottom = optionsBottom + 72;
+  const chatHeight = Math.max(190, Math.min(windowHeight * 0.3, 320));
 
-  if (hasPermission === false) {
+  const handleShare = useCallback(async () => {
+    try {
+      const handle = currentUser?.username ? `@${currentUser.username}` : 'MyLiveLinks';
+      const url = currentUser?.username
+        ? `https://www.mylivelinks.com/live/${encodeURIComponent(currentUser.username)}`
+        : 'https://www.mylivelinks.com';
+
+      await Share.share({
+        message: `${handle} is live on MyLiveLinks. Join: ${url}`,
+        url,
+        title: `${handle} • Live`,
+      });
+    } catch (err: any) {
+      Alert.alert('Share failed', err?.message || 'Could not open share sheet');
+    }
+  }, [currentUser?.username]);
+
+  if (!isOwner) {
     return (
-      <View style={styles.centered}>
-        <Text style={{ color: theme.colors.text, marginBottom: 16 }}>
-          Camera permission not granted
-        </Text>
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.colors.accent }]}
-          onPress={handleExit}
-        >
-          <Text style={styles.buttonText}>Go Back</Text>
-        </TouchableOpacity>
+      <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: (insets.top || 0) + 24 }]}> 
+        <View style={styles.centered}>
+          <Text style={[styles.subtleText, { color: theme.colors.textSecondary, textAlign: 'center' }]}> 
+            Go Live is currently limited to the owner account.
+          </Text>
+          <TouchableOpacity
+            style={[styles.goLiveButton, { backgroundColor: theme.colors.accent }]}
+            onPress={() => {
+              onExit?.();
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.goLiveButtonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Full-screen camera preview */}
-      <Camera
-        ref={cameraRef}
-        style={styles.camera}
-        type={cameraType}
-      >
-        {/* Top Bar - Status */}
-        <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-          {/* Back/Exit Button */}
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={handleExit}
-          >
-            <Ionicons name="close" size={28} color="#fff" />
-          </TouchableOpacity>
-
-          {/* Live Status Badge */}
-          {isLive && (
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>LIVE</Text>
-              <View style={styles.viewerBadge}>
-                <Ionicons name="eye" size={14} color="#fff" />
-                <Text style={styles.viewerText}>{viewerCount}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Connection Status */}
-          {!isConnected && (
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>Connecting...</Text>
-            </View>
-          )}
-
-          <View style={{ flex: 1 }} />
-
-          {/* Flip Camera Button */}
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={handleFlipCamera}
-          >
-            <Ionicons name="camera-reverse" size={28} color="#fff" />
-          </TouchableOpacity>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.videoStage}>
+        <View style={styles.videoStageInner}>
+          <Tile
+            item={{ id: tileParticipant.identity, participant: tileParticipant, isAutofill: false }}
+            isEditMode={false}
+            isFocused={false}
+            isMinimized={false}
+            room={room as any}
+          />
         </View>
 
-        {/* Semi-transparent Chat Overlay (1/3 of screen, bottom) */}
-        <View style={[styles.chatOverlay, { paddingBottom: insets.bottom + 80 }]}>
-          <View style={styles.chatContent}>
-            <Text style={styles.chatTitle}>Live Chat</Text>
-            {/* Chat messages will go here */}
-            <View style={styles.chatPlaceholder}>
-              <Text style={styles.chatPlaceholderText}>
-                Chat will appear here when viewers join
-              </Text>
-            </View>
+        <View pointerEvents="none" style={styles.videoTopShade} />
+        <View pointerEvents="none" style={styles.videoBottomShade} />
+
+        <View style={[styles.topOverlayRow, { top: (insets.top || 0) + 10, left: 12, right: 12 }]}>
+          <BlurView intensity={22} tint="dark" style={styles.streamerPill}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => Alert.alert('Coming Soon', 'Mini profile coming soon.')}
+              style={styles.streamerPillInner}
+            >
+              <View style={styles.streamerAvatarWrap}>
+                {currentUser?.avatar_url ? (
+                  <Image source={{ uri: currentUser.avatar_url }} style={styles.streamerAvatar} />
+                ) : (
+                  <View style={[styles.streamerAvatarFallback, { backgroundColor: theme.colors.cardSurface }]} />
+                )}
+              </View>
+              <View style={styles.streamerTextWrap}>
+                <Text style={styles.streamerName} numberOfLines={1}>
+                  {headerName}
+                </Text>
+                <View style={styles.streamerStatsRow}>
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('Coming Soon', 'Trending coming soon.')}
+                    activeOpacity={0.8}
+                    style={styles.streamerStatButton}
+                  >
+                    <Ionicons name="flame" size={14} color="#f97316" />
+                    <Text style={styles.streamerStatValue}>12</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.dotSep}>•</Text>
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('Coming Soon', 'Leaderboard coming soon.')}
+                    activeOpacity={0.8}
+                    style={styles.streamerStatButton}
+                  >
+                    <Ionicons name="trophy" size={14} color="#eab308" />
+                    <Text style={styles.streamerStatValue}>8</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </BlurView>
+
+          <View style={styles.topOverlayRight}>
+            {topGifters.length > 0 && (
+              <View style={styles.gifterRow}>
+                {topGifters.slice(0, 3).map((gifter, index) => {
+                  const ringColors = ['#fbbf24', '#d1d5db', '#c2410c'];
+                  const ringColor = ringColors[index] || ringColors[2];
+                  return (
+                    <TouchableOpacity
+                      key={gifter.profile_id}
+                      onPress={() => Alert.alert('Top Supporters', 'Stream gifters coming soon.')}
+                      activeOpacity={0.85}
+                      style={[styles.gifterBubble, { borderColor: ringColor }]}
+                    >
+                      {gifter.avatar_url ? (
+                        <Image source={{ uri: gifter.avatar_url }} style={styles.gifterAvatar} />
+                      ) : (
+                        <View style={[styles.gifterAvatarFallback, { backgroundColor: theme.colors.cardSurface }]} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            <BlurView intensity={18} tint="dark" style={styles.closeButtonWrap}>
+              <TouchableOpacity onPress={handleExit} activeOpacity={0.85} style={styles.iconButton}>
+                <Ionicons name="close" size={22} color="#fff" />
+              </TouchableOpacity>
+            </BlurView>
+
+            <BlurView intensity={18} tint="dark" style={styles.shareButtonWrap}>
+              <TouchableOpacity onPress={handleShare} activeOpacity={0.85} style={styles.iconButton}>
+                <Ionicons name="share-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+            </BlurView>
+          </View>
+
+          <View style={styles.topOverlayCenter}>
+            <TouchableOpacity
+              onPress={() => Alert.alert('Viewers', `${viewerCount} watching`)}
+              activeOpacity={0.85}
+            >
+              <BlurView intensity={22} tint="dark" style={styles.viewerCountPill}>
+                <Ionicons name="eye" size={14} color="#fff" />
+                <Text style={styles.viewerCountText}>{viewerCount}</Text>
+              </BlurView>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Bottom Controls */}
-        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
-          {/* Go Live / Stop Live Button */}
-          <TouchableOpacity
-            style={[
-              styles.goLiveButton,
-              isLive && isPublishing && styles.goLiveButtonActive,
-            ]}
-            onPress={handleToggleGoLive}
+        <View style={[styles.chatOverlay, { height: chatHeight, bottom: chatBottom }]}>
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.messageList}
+            contentContainerStyle={styles.messageContent}
+            onContentSizeChange={() => {
+              scrollViewRef.current?.scrollToEnd({ animated: true });
+            }}
           >
-            <Ionicons
-              name="videocam"
-              size={32}
-              color={isLive && isPublishing ? '#ef4444' : '#fff'}
-            />
-            <Text style={styles.goLiveButtonText}>
-              {isLive && isPublishing ? 'LIVE' : 'Go Live'}
-            </Text>
-          </TouchableOpacity>
+            {loadingMessages ? (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>Loading messages…</Text>
+              </View>
+            ) : !canChat ? (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>Go live to enable chat</Text>
+              </View>
+            ) : messages.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptySubtitle, { color: theme.colors.textSecondary }]}>No messages yet. Be the first to chat!</Text>
+              </View>
+            ) : (
+              messages.map((msg) => {
+                const isSystem = msg.profile_id == null || msg.message_type === 'system';
+                const bubbleColor = msg.profile_id
+                  ? (toHexWithAlpha(msg.chat_bubble_color || '', '66') || getFallbackBubbleColor(msg.profile_id))
+                  : 'rgba(0,0,0,0.2)';
+
+                if (isSystem) {
+                  return (
+                    <View key={String(msg.id)} style={styles.systemMessageWrap}>
+                      <Text style={[styles.systemMessageText, { color: theme.colors.textSecondary }]}>{msg.content}</Text>
+                    </View>
+                  );
+                }
+
+                return (
+                  <View key={String(msg.id)} style={styles.messageRow}>
+                    <View style={[styles.bubble, { backgroundColor: bubbleColor }]}
+                    >
+                      <View style={styles.bubbleAvatarWrap}>
+                        {msg.avatar_url ? (
+                          <Image source={{ uri: msg.avatar_url }} style={styles.messageAvatar} />
+                        ) : (
+                          <View style={[styles.messageAvatarFallback, { backgroundColor: theme.colors.cardSurface }]} />
+                        )}
+                      </View>
+
+                      <View style={styles.bubbleContent}>
+                        <View style={styles.bubbleHeaderRow}>
+                          <Text
+                            style={[styles.messageUsername, msg.chat_font ? { fontFamily: msg.chat_font } : null]}
+                            numberOfLines={1}
+                          >
+                            {msg.username || 'Unknown'}
+                          </Text>
+                          <Text style={styles.messageTime}>{formatTime(msg.created_at)}</Text>
+                          {msg.client_status === 'failed' && (
+                            <TouchableOpacity
+                              onPress={() => {
+                                if (typeof msg.id === 'string') retryMessage(msg.id);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.messageStatusFailed}>Failed • Tap to retry</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+
+                        {typeof msg.gifter_level === 'number' && msg.gifter_level > 0 ? (
+                          <View style={styles.levelRow}>
+                            <View style={styles.levelPill}>
+                              <Text style={styles.levelPillText}>Lv {msg.gifter_level}</Text>
+                            </View>
+                            <Text
+                              style={[styles.messageTextInline, msg.chat_font ? { fontFamily: msg.chat_font } : null]}
+                            >
+                              {msg.content}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={[styles.messageText, msg.chat_font ? { fontFamily: msg.chat_font } : null]}>
+                            {msg.content}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
         </View>
-      </Camera>
+
+        <View style={[styles.optionsOverlay, { bottom: optionsBottom, left: 12, right: 12 }]}>
+          <View style={styles.streamerOptionsBar}>
+            <TouchableOpacity
+              style={styles.streamerOptionButton}
+              onPress={() => Alert.alert('Coming Soon', 'Battle mode coming soon.')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="flash-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.streamerOptionButton}
+              onPress={() => Alert.alert('Coming Soon', 'Co-host coming soon.')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="person-add-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.streamerOptionButton}
+              onPress={() => Alert.alert('Coming Soon', 'Guests coming soon.')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="people-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.streamerOptionButton}
+              onPress={() => Alert.alert('Coming Soon', 'Options coming soon.')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="settings-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.streamerOptionButton}
+              onPress={() => Alert.alert('Coming Soon', 'Filters coming soon.')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="funnel-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      <Modal
+        visible={showSetupModal}
+        onRequestClose={() => {
+          setShowSetupModal(false);
+          onExit?.();
+        }}
+      >
+        <View style={styles.setupModalBody}>
+          <Text style={[styles.setupTitle, { color: theme.colors.textPrimary }]}>Ready to Go Live?</Text>
+          <Text style={[styles.setupSubtitle, { color: theme.colors.textSecondary }]}>Set up your stream</Text>
+
+          <Input
+            placeholder="Stream title"
+            value={streamTitle}
+            onChangeText={setStreamTitle}
+            autoCapitalize="sentences"
+          />
+
+          {!permissionsGranted && (
+            <Text style={[styles.setupHint, { color: theme.colors.textSecondary }]}>Camera and mic permissions are required.</Text>
+          )}
+
+          <View style={styles.setupButtonsRow}>
+            <TouchableOpacity
+              style={[styles.setupButton, { backgroundColor: theme.colors.cardSurface }]}
+              onPress={() => {
+                setShowSetupModal(false);
+                onExit?.();
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.setupButtonText, { color: theme.colors.textPrimary }]}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.setupButton,
+                { backgroundColor: theme.colors.danger },
+                (!permissionsGranted || !streamTitle.trim() || !isConnected || requestingPermissions) ? { opacity: 0.5 } : null,
+              ]}
+              onPress={handleStartStream}
+              activeOpacity={0.85}
+              disabled={!permissionsGranted || !streamTitle.trim() || !isConnected || requestingPermissions}
+            >
+              <Text style={[styles.setupButtonText, { color: '#fff' }]}>Go Live</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Already Live Modal */}
+      <Modal
+        visible={showAlreadyLiveModal}
+        onRequestClose={() => setShowAlreadyLiveModal(false)}
+      >
+        <View style={styles.setupModalBody}>
+          <View style={styles.alreadyLiveHeader}>
+            <Text style={styles.alreadyLiveIcon}>📡</Text>
+            <Text style={[styles.setupTitle, { color: theme.colors.textPrimary, marginTop: 12 }]}>Already Streaming</Text>
+            <Text style={[styles.setupSubtitle, { color: theme.colors.textSecondary }]}>
+              You're already live on another device or browser
+            </Text>
+          </View>
+
+          <View style={styles.alreadyLiveOptions}>
+            <View style={[styles.optionCard, { backgroundColor: theme.colors.accent + '20' }]}>
+              <Text style={styles.optionIcon}>📱</Text>
+              <View style={styles.optionText}>
+                <Text style={[styles.optionTitle, { color: theme.colors.textPrimary }]}>Resume on This Device</Text>
+                <Text style={[styles.optionSubtitle, { color: theme.colors.textSecondary }]}>
+                  Continue your stream from this device
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.optionCard, { backgroundColor: '#FCD34D20' }]}>
+              <Text style={styles.optionIcon}>⚠️</Text>
+              <View style={styles.optionText}>
+                <Text style={[styles.optionTitle, { color: theme.colors.textPrimary }]}>End Other Stream</Text>
+                <Text style={[styles.optionSubtitle, { color: theme.colors.textSecondary }]}>
+                  Stop streaming on the other device and start here
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.alreadyLiveButtons}>
+            <TouchableOpacity
+              style={[styles.alreadyLiveButton, { backgroundColor: theme.colors.accent }]}
+              onPress={handleResumeHere}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.alreadyLiveButtonIcon}>📱</Text>
+              <Text style={styles.alreadyLiveButtonText}>Resume on This Device</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.alreadyLiveButton, { backgroundColor: theme.colors.danger }]}
+              onPress={handleEndOtherAndStartHere}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.alreadyLiveButtonIcon}>🛑</Text>
+              <Text style={styles.alreadyLiveButtonText}>End Other & Start Here</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.alreadyLiveCancelButton, { backgroundColor: theme.colors.cardSurface }]}
+              onPress={() => {
+                setShowAlreadyLiveModal(false);
+                setShowSetupModal(true);
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.alreadyLiveCancelButtonText, { color: theme.colors.textPrimary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -251,12 +796,6 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-  },
-  camera: {
-    flex: 1,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
   },
   centered: {
     flex: 1,
@@ -274,117 +813,452 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 12,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#fff',
-  },
-  liveText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  viewerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 4,
-  },
-  viewerText: {
-    color: '#fff',
+  subtleText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  statusBadge: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  chatOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT / 3,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)', // Semi-transparent
-  },
-  chatContent: {
-    flex: 1,
-    padding: 16,
-  },
-  chatTitle: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  chatPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chatPlaceholderText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
   goLiveButton: {
-    flexDirection: 'row',
+    backgroundColor: 'rgba(139, 92, 246, 0.92)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    minWidth: 90,
     alignItems: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.9)',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 30,
-    gap: 8,
-  },
-  goLiveButtonActive: {
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    justifyContent: 'center',
   },
   goLiveButtonText: {
     color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  videoStage: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  chatOverlay: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    zIndex: 18,
+  },
+  optionsOverlay: {
+    position: 'absolute',
+    zIndex: 19,
+  },
+  videoTopShade: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 112,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  videoBottomShade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 180,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  topOverlayRow: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 20,
+  },
+  topOverlayCenter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streamerPill: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  streamerPillInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: 210,
+  },
+  streamerAvatarWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  streamerAvatar: {
+    width: 28,
+    height: 28,
+  },
+  streamerAvatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  streamerTextWrap: {
+    minWidth: 0,
+  },
+  streamerName: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+    maxWidth: 160,
+  },
+  streamerStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  streamerStatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  streamerStatValue: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  dotSep: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: -1,
+  },
+  viewerCountPill: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  viewerCountText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  topOverlayRight: {
+    alignItems: 'flex-end',
+    position: 'relative',
+    minWidth: 96,
+  },
+  gifterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  gifterBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gifterAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
+  gifterAvatarFallback: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
+  closeButtonWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  shareButtonWrap: {
+    position: 'absolute',
+    top: 46,
+    right: 0,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setupModalBody: {
+    gap: 12,
+  },
+  setupTitle: {
     fontSize: 18,
+    fontWeight: '900',
+  },
+  setupSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  setupHint: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  setupButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  setupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setupButtonText: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  videoStageInner: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  streamerOptionsBar: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  streamerOptionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  messageList: {
+    flex: 1,
+  },
+  messageContent: {
+    paddingBottom: 10,
+    gap: 10,
+  },
+  emptyState: {
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  systemMessageWrap: {
+    paddingHorizontal: 12,
+  },
+  systemMessageText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  messageRow: {
+    width: '100%',
+  },
+  bubbleAvatarWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  messageAvatar: {
+    width: 28,
+    height: 28,
+  },
+  messageAvatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  bubble: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  bubbleContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  bubbleHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  messageUsername: {
+    flex: 1,
+    minWidth: 0,
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  messageTime: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  messageStatusFailed: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  messageText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  levelPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  levelPillText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  messageTextInline: {
+    flex: 1,
+    minWidth: 0,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  input: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sendButton: {
+    backgroundColor: 'rgba(139, 92, 246, 0.92)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  sendButtonDisabled: {
+    opacity: 0.4,
+  },
+  sendButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  // Already Live Modal Styles
+  alreadyLiveHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  alreadyLiveIcon: {
+    fontSize: 48,
+  },
+  alreadyLiveOptions: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  optionCard: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  optionIcon: {
+    fontSize: 24,
+  },
+  optionText: {
+    flex: 1,
+  },
+  optionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  optionSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  alreadyLiveButtons: {
+    gap: 12,
+  },
+  alreadyLiveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  alreadyLiveButtonIcon: {
+    fontSize: 18,
+  },
+  alreadyLiveButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  alreadyLiveCancelButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  alreadyLiveCancelButtonText: {
+    fontSize: 15,
     fontWeight: '700',
   },
 });

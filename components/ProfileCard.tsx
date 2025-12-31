@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { UserPlus, Check, ExternalLink, Users } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { StatusBadge, LiveDot } from '@/components/ui';
@@ -28,7 +29,11 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
   const [followsYou, setFollowsYou] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
+  const router = useRouter();
   const supabase = createClient();
+
+  const normalizedUsername = String(profile?.username || '').trim().toLowerCase();
+  const isTestStreamerUsername = normalizedUsername === 'cannastreams' || normalizedUsername === 'mylivelinksofficial';
 
   // Check follow status on mount
   useEffect(() => {
@@ -134,7 +139,23 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
             {/* Live indicator on avatar */}
             {profile.is_live && (
               <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-card border-2 border-red-500 flex items-center justify-center">
-                <LiveDot />
+                {isTestStreamerUsername ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push(`/live/${profile.username}`);
+                    }}
+                    className="inline-flex items-center justify-center"
+                    aria-label={`Watch ${profile.username} live`}
+                    title={`Watch ${profile.username} live`}
+                  >
+                    <LiveDot />
+                  </button>
+                ) : (
+                  <LiveDot />
+                )}
               </div>
             )}
           </div>

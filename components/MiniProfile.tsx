@@ -6,8 +6,7 @@ import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { useIM } from '@/components/im';
-import Image from 'next/image';
-import { getAvatarUrl } from '@/lib/defaultAvatar';
+import LiveAvatar from '@/components/LiveAvatar';
 import ReportModal from './ReportModal';
 
 type UserRole = 'viewer' | 'moderator' | 'admin' | 'owner';
@@ -381,23 +380,15 @@ export default function MiniProfile({
         {/* Profile Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
-              <Image
-                src={getAvatarUrl(avatarUrl)}
-                alt={username}
-                fill
-                className="object-cover"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.src = '/no-profile-pic.png';
-                }}
-              />
-              {isLive && (
-                <div className="absolute bottom-0 right-0 w-4 h-4 bg-red-500 rounded-full border-2 border-white dark:border-gray-800">
-                  <span className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75" />
-                </div>
-              )}
-            </div>
+            <LiveAvatar
+              avatarUrl={avatarUrl}
+              username={username}
+              displayName={displayName || username}
+              isLive={isLive}
+              size="xl"
+              showLiveBadge={true}
+              clickable={false}
+            />
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">

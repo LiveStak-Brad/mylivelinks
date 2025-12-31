@@ -173,6 +173,21 @@ export async function POST(request: NextRequest) {
 
       const wantsPublish = canPublish === true || body?.role === 'publisher';
       const canGoLive = await runStage('can_user_go_live', 1_000, async () => {
+        try {
+          const supabase = auth.supabase;
+
+          const [{ data: isOwner, error: ownerErr }, { data: isTester, error: testerErr }] = await Promise.all([
+            (supabase as any).rpc('is_owner', { p_profile_id: user.id }),
+            (supabase as any).rpc('is_live_tester', { p_profile_id: user.id }),
+          ]);
+
+          if (!ownerErr && isOwner === true) return true;
+          if (!testerErr && isTester === true) return true;
+        } catch {
+          // Fall through
+        }
+
+        // Fallback: hardcoded bootstrap list
         return canUserGoLive({ id: user.id, email: user.email });
       });
       const effectiveCanPublish = wantsPublish && canGoLive;

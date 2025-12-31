@@ -23,9 +23,8 @@ export interface BattleSupporter {
   username: string;
   avatar_url?: string;
   total_coins_sent: number;
-  gifter_level: number;
-  badge_name?: string;
-  badge_color?: string;
+  // Note: gifter_level, badge_name, badge_color removed - legacy system
+  // TODO: Add gifterStatus: GifterStatus when battles are updated to use proper tier system
 }
 
 export interface BattleTeam {

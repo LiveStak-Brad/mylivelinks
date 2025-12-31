@@ -168,11 +168,6 @@ export const Tile: React.FC<TileProps> = ({
           </View>
         )}
 
-      {/* LIVE badge - top left */}
-      <View style={styles.liveBadge}>
-        <Text style={styles.liveBadgeText}>LIVE</Text>
-      </View>
-
         {/* Username - bottom left */}
         <View style={styles.bottomLeft}>
           <Text style={styles.username} numberOfLines={1}>

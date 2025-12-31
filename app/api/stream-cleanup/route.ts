@@ -99,6 +99,34 @@ export async function POST(request: Request) {
       console.error('[STREAM-CLEANUP] Error removing room presence:', presenceError);
     }
 
+    // Remove from active_viewers (service role) so viewer counts/tiles don't stick
+    try {
+      const { data: streamIds } = await admin
+        .from('live_streams')
+        .select('id')
+        .eq('profile_id', profile_id)
+        .limit(25);
+
+      const ids = (streamIds || [])
+        .map((r: any) => Number(r?.id))
+        .filter((v: any) => Number.isFinite(v));
+
+      // Best-effort: schema may support streamer_id and/or live_stream_id
+      await admin.from('active_viewers').delete().eq('streamer_id', profile_id);
+      if (ids.length > 0) {
+        await admin.from('active_viewers').delete().in('live_stream_id', ids);
+      }
+
+      // Best-effort: update publish flags based on current viewers
+      try {
+        await (admin.rpc as any)('update_publish_state_from_viewers');
+      } catch {
+        // ignore
+      }
+    } catch (avErr) {
+      console.error('[STREAM-CLEANUP] Error removing active viewers:', avErr);
+    }
+
     console.log('[STREAM-CLEANUP] Successfully cleaned up stream for:', profile_id);
 
     return NextResponse.json({ success: true });

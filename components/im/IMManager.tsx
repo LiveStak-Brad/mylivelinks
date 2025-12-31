@@ -278,8 +278,24 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
                   : c
               );
             }
-            // New chat from unknown sender - could open window automatically
-            // For now, just ignore until user opens chat
+            
+            // New chat from unknown sender - auto-open window
+            console.log('[IM] New message from unknown sender, fetching sender info:', senderId);
+            
+            // Fetch sender profile info
+            supabase
+              .from('profiles')
+              .select('username, avatar_url')
+              .eq('id', senderId)
+              .single()
+              .then(({ data: profile }) => {
+                if (profile) {
+                  console.log('[IM] Auto-opening chat for:', profile.username);
+                  // Use the openChat function which handles window creation properly
+                  openChat(senderId, profile.username, profile.avatar_url);
+                }
+              }, (err) => console.error('[IM] Error fetching sender profile:', err));
+            
             return prev;
           });
         }

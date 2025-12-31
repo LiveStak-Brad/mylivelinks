@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -13,9 +14,10 @@ import {
   LogOut, 
   ChevronDown,
   ExternalLink,
-  Film 
+  Film,
+  Sparkles
 } from 'lucide-react';
-import { getAvatarUrl } from '@/lib/defaultAvatar';
+import LiveAvatar from './LiveAvatar';
 import ThemeToggle from './ThemeToggle';
 
 interface UserMenuProps {
@@ -144,7 +146,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
         // Load profile - use maybeSingle() to avoid error if no profile
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('username, avatar_url, display_name')
+          .select('username, avatar_url, display_name, is_live')
           .eq('id', authUser.id)
           .maybeSingle();
         
@@ -206,7 +208,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
         ref={buttonRef}
         onClick={() => setShowMenu(!showMenu)}
         className={`
-          flex items-center gap-2 p-1 pr-2 rounded-full
+          flex items-center gap-1 sm:gap-2 p-0.5 pr-1 sm:p-1 sm:pr-2 md:p-1 md:pr-2 lg:p-1.5 lg:pr-3 xl:p-2 xl:pr-4 rounded-full
           transition-all duration-200
           hover:bg-muted/70
           focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
@@ -216,22 +218,20 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
         aria-haspopup="menu"
         aria-label={`User menu for ${displayName}`}
       >
-        {/* Avatar */}
-        <Image
-          src={getAvatarUrl(profile?.avatar_url)}
-          alt={displayName}
-          width={36}
-          height={36}
-          className="w-8 h-8 lg:w-9 lg:h-9 rounded-full object-cover ring-2 ring-primary/20"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = '/no-profile-pic.png';
-          }}
+        {/* Avatar with live indicator */}
+        <LiveAvatar
+          avatarUrl={profile?.avatar_url}
+          username={profile?.username || 'user'}
+          displayName={displayName}
+          isLive={profile?.is_live || false}
+          size="md"
+          showLiveBadge={false}
+          clickable={false}
         />
         
         {/* Chevron indicator */}
         <ChevronDown 
-          className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showMenu ? 'rotate-180' : ''}`} 
+          className={`w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 text-muted-foreground transition-transform duration-200 ${showMenu ? 'rotate-180' : ''}`} 
         />
       </button>
 
@@ -305,6 +305,14 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
               icon={BarChart3}
               iconColor="text-purple-500"
               label="Analytics"
+            />
+
+            <MenuItem
+              href="/gifter-levels"
+              onClick={closeMenu}
+              icon={Sparkles}
+              iconColor="text-cyan-500"
+              label="Gifter Levels"
             />
             
             <MenuItem

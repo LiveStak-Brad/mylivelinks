@@ -10,6 +10,8 @@ export interface RoomBannerProps {
   presentedBy?: string | null;
   bannerStyle?: 'default' | 'minimal' | 'card' | 'gradient';
   className?: string;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
 /**
@@ -24,6 +26,8 @@ export default function RoomBanner({
   presentedBy = 'MyLiveLinks Official',
   bannerStyle = 'default',
   className = '',
+  collapsed = false,
+  onToggle,
 }: RoomBannerProps) {
   const [mounted, setMounted] = useState(false);
 
@@ -68,27 +72,47 @@ export default function RoomBanner({
 
   const currentStyle = styles[bannerStyle] || styles.default;
 
+  // If collapsed, show only a small arrow tab
+  if (collapsed) {
+    return (
+      <div 
+        className={`w-full ${currentStyle.container} py-0.5 px-4 z-50 flex-shrink-0 flex items-center justify-center cursor-pointer hover:opacity-80 transition ${className}`}
+        onClick={onToggle}
+        title="Click to expand banner"
+      >
+        {/* Down arrow to expand */}
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M6 9l6 6 6-6"/>
+        </svg>
+      </div>
+    );
+  }
+
   return (
     <div 
-      className={`w-full ${currentStyle.container} ${currentStyle.padding} ${currentStyle.fontSize} z-50 flex-shrink-0 flex items-center justify-between ${className}`}
+      className={`w-full ${currentStyle.container} py-1 px-4 text-sm z-50 flex-shrink-0 flex items-center justify-between ${className}`}
     >
-      {/* Left: Logo Only - Large and slightly overflowing */}
-      {roomLogoUrl && (
-        <div className={`${currentStyle.logoSize} flex-shrink-0 relative -my-1`}>
-          <Image
-            src={roomLogoUrl}
-            alt={`${roomName} logo`}
-            width={80}
-            height={80}
-            className="object-contain"
-            unoptimized
-          />
+      {/* Left: Room Name */}
+      <div className="font-semibold">
+        {roomName}
+      </div>
+      
+      {/* Right: Presented By + Collapse Button */}
+      <div className="flex items-center gap-2">
+        <div className="font-semibold">
+          {presentedBy}
         </div>
-      )}
-
-      {/* Right: All Text */}
-      <div className="flex-1 text-right font-semibold ml-4">
-        {roomName} by {presentedBy}
+        {onToggle && (
+          <button
+            onClick={onToggle}
+            className="text-white/60 hover:text-white transition"
+            title="Collapse banner"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 15l-6-6-6 6"/>
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

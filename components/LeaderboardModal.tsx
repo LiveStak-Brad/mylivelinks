@@ -114,9 +114,9 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-lg max-h-[60vh] bg-gradient-to-br from-orange-500 to-yellow-600 rounded-b-2xl shadow-2xl overflow-hidden animate-slideDown">
+      <div className="relative w-full max-w-lg max-h-[60vh] bg-gradient-to-br from-orange-500 to-yellow-600 rounded-b-2xl shadow-2xl overflow-hidden animate-slideDown flex flex-col modal-fullscreen-mobile">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 p-4">
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 p-4 flex-shrink-0 mobile-safe-top">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -129,7 +129,8 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition text-white"
+              className="p-2 hover:bg-white/20 rounded-full transition text-white mobile-touch-target"
+              aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
@@ -178,7 +179,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(100vh-16rem)] md:max-h-[calc(100vh-18rem)] lg:max-h-[calc(100vh-20rem)] p-4">
+        <div className="modal-body overflow-y-auto max-h-[calc(100vh-16rem)] md:max-h-[calc(100vh-18rem)] lg:max-h-[calc(100vh-20rem)] p-4">
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 10 }).map((_, i) => (

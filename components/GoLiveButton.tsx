@@ -36,6 +36,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [showAlreadyLiveModal, setShowAlreadyLiveModal] = useState(false);
   const [devices, setDevices] = useState<{ video: DeviceInfo[]; audio: DeviceInfo[] }>({ video: [], audio: [] });
   const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>('');
   const [selectedAudioDevice, setSelectedAudioDevice] = useState<string>('');
@@ -76,9 +77,11 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
 
       const { data } = await supabase
         .from('live_streams')
-        .select('id, live_available')
+        .select('id, live_available, started_at')
         .eq('profile_id', user.id)
-        .single();
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (data) {
         const d = data as any;
@@ -524,6 +527,37 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     isPublishingRef.current = isPublishing;
   }, [isPublishing]);
 
+  // Host heartbeat: keep live_streams.updated_at fresh while publishing.
+  // This enables server-side stale detection to reliably end stuck streams.
+  useEffect(() => {
+    if (!isLive || !liveStreamId) return;
+    if (!(isPublishing || isPublishingState)) return;
+
+    let cancelled = false;
+    const interval = setInterval(() => {
+      void (async () => {
+        try {
+          if (cancelled) return;
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          await supabase
+            .from('live_streams')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', liveStreamId)
+            .eq('profile_id', user.id);
+        } catch {
+          // ignore
+        }
+      })();
+    }, 20000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isLive, isPublishing, isPublishingState, liveStreamId, supabase]);
+
   // Store stopPublishing function in ref so realtime handler can access it
   // CRITICAL: This must be AFTER useLiveKitPublisher hook call
   // Store stopPublishing without extra params (hook signature expects none)
@@ -584,9 +618,33 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         try {
           await stopPublishing();
           console.log('LiveKit publishing stopped');
+          
+          // CRITICAL: Ensure all local tracks are stopped
+          if (sharedRoom?.localParticipant) {
+            const localTracks = Array.from(sharedRoom.localParticipant.trackPublications.values());
+            for (const pub of localTracks) {
+              if (pub.track) {
+                pub.track.stop();
+                console.log('Stopped local track:', pub.kind);
+              }
+            }
+          }
         } catch (err) {
           console.error('Error stopping publishing:', err);
           // Continue even if stopPublishing fails - database is already updated
+          // But still try to stop local tracks
+          try {
+            if (sharedRoom?.localParticipant) {
+              const localTracks = Array.from(sharedRoom.localParticipant.trackPublications.values());
+              for (const pub of localTracks) {
+                if (pub.track) {
+                  pub.track.stop();
+                }
+              }
+            }
+          } catch (trackErr) {
+            console.error('Error stopping local tracks:', trackErr);
+          }
         }
 
         // Update local state (bypass debounce for manual stop)
@@ -616,6 +674,30 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         setLoading(false);
       }
     } else {
+      // Check if already live (not publishing on this device)
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+
+        const { data: existingStream } = await supabase
+          .from('live_streams')
+          .select('id, live_available')
+          .eq('profile_id', user.id)
+          .eq('live_available', true)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingStream) {
+          // Already live somewhere else - show modal
+          console.log('Already live on another device, showing options modal');
+          setShowAlreadyLiveModal(true);
+          return;
+        }
+      } catch (err) {
+        console.error('Error checking live status:', err);
+      }
+
       // Show device selection modal
       setShowDeviceModal(true);
       setPermissionError(null);
@@ -656,6 +738,108 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       setShowDeviceModal(false);
       stopPreview();
     }, 3000);
+  };
+
+  // Handle ending stream on other device to start here
+  const handleEndOtherStream = async () => {
+    setLoading(true);
+    setShowAlreadyLiveModal(false);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      console.log('Ending stream on other device...');
+
+      // End the existing stream
+      const { error: updateError } = await (supabase.from('live_streams') as any)
+        .update({ live_available: false, ended_at: new Date().toISOString() })
+        .eq('profile_id', user.id);
+
+      if (updateError) {
+        console.error('Database update error:', updateError);
+        throw updateError;
+      }
+
+      // Remove from grid slots
+      await supabase
+        .from('user_grid_slots')
+        .delete()
+        .eq('streamer_id', user.id);
+
+      // Call cleanup API
+      try {
+        await fetch('/api/stream-cleanup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ action: 'end_stream', reason: 'device_switch' }),
+        });
+      } catch (cleanupErr) {
+        console.warn('[GO_LIVE] Failed to call stream-cleanup API:', cleanupErr);
+      }
+
+      console.log('Other stream ended, starting on this device...');
+
+      // Wait a moment for cleanup to propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Now show device modal to start streaming on this device
+      setShowDeviceModal(true);
+      setPermissionError(null);
+    } catch (err: any) {
+      console.error('Error ending other stream:', err);
+      alert('Failed to end stream on other device: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle resuming stream on this device
+  const handleResumeOnThisDevice = async () => {
+    setLoading(true);
+    setShowAlreadyLiveModal(false);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get the existing stream ID
+      const { data: existingStream } = await supabase
+        .from('live_streams')
+        .select('id')
+        .eq('profile_id', user.id)
+        .eq('live_available', true)
+        .single();
+
+      if (!existingStream) {
+        throw new Error('No active stream found');
+      }
+
+      console.log('Resuming stream on this device with ID:', existingStream.id);
+
+      // Set the stream as active locally
+      setLiveStreamId(existingStream.id);
+      lastLiveStateRef.current = true;
+      isLiveRef.current = true;
+      setIsLive(true);
+      onLiveStatusChange?.(true);
+
+      // Notify parent to add user to slot 1
+      if (onGoLive && existingStream.id) {
+        onGoLive(existingStream.id, user.id);
+      }
+
+      // Show device modal to select devices and start publishing
+      setShowDeviceModal(true);
+      setPermissionError(null);
+    } catch (err: any) {
+      console.error('Error resuming stream:', err);
+      alert('Failed to resume stream on this device: ' + err.message);
+      setShowAlreadyLiveModal(true); // Show modal again
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStartLive = async () => {
@@ -714,25 +898,34 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         console.log('Profile created successfully');
       }
 
-      // Upsert live_stream record (profile should exist now)
+      // End any existing live streams for this user (cleanup old sessions)
+      await supabase
+        .from('live_streams')
+        .update({ 
+          live_available: false, 
+          ended_at: new Date().toISOString() 
+        })
+        .eq('profile_id', user.id)
+        .eq('live_available', true);
+
+      // INSERT a new live_stream record (each stream = new row with new chat)
       const { data, error } = await supabase
         .from('live_streams')
-        .upsert({
+        .insert({
           profile_id: user.id,
           live_available: true,
           started_at: new Date().toISOString(),
           ended_at: null,
-        }, {
-          onConflict: 'profile_id',
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Error upserting live_stream:', error);
+        console.error('Error inserting live_stream:', error);
         throw new Error(`Failed to start live stream: ${error.message}`);
       }
 
+      console.log('✅ Created NEW live_stream with ID:', data.id);
       setLiveStreamId(data.id);
       
       // CRITICAL: Update participant metadata in LiveKit room when going live
@@ -1107,6 +1300,92 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
             </div>
           </div>
         </div>
+      )}
+
+      {/* Already Live Modal - Choose to Resume or End Other Stream */}
+      {showAlreadyLiveModal && typeof document !== 'undefined' && createPortal(
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-[99999]"
+          onClick={() => !loading && setShowAlreadyLiveModal(false)}
+        >
+          <div 
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-3xl">📡</span>
+              </div>
+              <h2 className="text-xl font-bold mb-2">Already Streaming</h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                You're already live on another device or browser
+              </p>
+            </div>
+            
+            <div className="space-y-3 mb-6">
+              <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <span className="text-xl">📱</span>
+                <div>
+                  <p className="font-medium text-sm">Resume on This Device</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Continue your stream from this device
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-start gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <p className="font-medium text-sm">End Other Stream</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Stop streaming on the other device and start here
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={handleResumeOnThisDevice}
+                disabled={loading}
+                className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <>
+                    <span>📱</span>
+                    <span>Resume on This Device</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={handleEndOtherStream}
+                disabled={loading}
+                className="w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:from-orange-600 hover:to-red-700 transition font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <>
+                    <span>🛑</span>
+                    <span>End Other Stream & Start Here</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={() => setShowAlreadyLiveModal(false)}
+                disabled={loading}
+                className="w-full px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </>
   );

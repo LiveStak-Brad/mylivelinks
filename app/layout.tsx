@@ -5,6 +5,7 @@ import ClientThemeProvider from '@/components/ClientThemeProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AgeVerificationModal from '@/components/AgeVerificationModal';
 import NavigationWrapper from '@/components/NavigationWrapper';
+import { GlobalLiveFloatingButton } from '@/components/LiveFloatingButton';
 import { IMProvider } from '@/components/im';
 import { NotiesProvider } from '@/components/noties';
 import { MessagesProvider } from '@/components/messages';
@@ -60,6 +61,7 @@ export default function RootLayout({
             <NotiesProvider>
               <MessagesProvider>
                 <NavigationWrapper />
+                <GlobalLiveFloatingButton />
                 <AgeVerificationModal />
                 <IMProvider />
                 {/* Note: Pages should wrap content in PageShell which provides <main id="main">

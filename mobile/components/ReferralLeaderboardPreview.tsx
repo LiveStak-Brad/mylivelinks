@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeDefinition } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
+import { getAvatarSource } from '../lib/defaultAvatar';
 
 type LeaderboardEntry = {
   rank: number;

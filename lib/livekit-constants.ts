@@ -54,18 +54,18 @@ export const ROOM_OPTIONS = {
   videoCaptureDefaults: DEFAULT_VIDEO_CAPTURE,
 } as const;
 
- export const LIVE_LAUNCH_ENABLED = process.env.NEXT_PUBLIC_LIVE_LAUNCH_ENABLED === 'true';
+export const LIVE_LAUNCH_ENABLED = process.env.NEXT_PUBLIC_LIVE_LAUNCH_ENABLED === 'true';
 
- export const LIVE_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818'] as const;
- export const LIVE_OWNER_EMAILS = ['wcba.mo@gmail.com'] as const;
+export const LIVE_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'] as const;
+export const LIVE_OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'] as const;
 
- export function isLiveOwnerUser(user: { id?: string; email?: string | null } | null | undefined) {
-   const id = user?.id ? String(user.id) : '';
-   const email = user?.email ? String(user.email).toLowerCase() : '';
-   const isOwnerById = !!id && (LIVE_OWNER_IDS as readonly string[]).includes(id);
-   const isOwnerByEmail = !!email && (LIVE_OWNER_EMAILS as readonly string[]).includes(email);
-   return isOwnerById || isOwnerByEmail;
- }
+export function isLiveOwnerUser(user: { id?: string; email?: string | null } | null | undefined) {
+  const id = user?.id ? String(user.id) : '';
+  const email = user?.email ? String(user.email).toLowerCase() : '';
+  const isOwnerById = !!id && (LIVE_OWNER_IDS as readonly string[]).includes(id);
+  const isOwnerByEmail = !!email && (LIVE_OWNER_EMAILS as readonly string[]).includes(email);
+  return isOwnerById || isOwnerByEmail;
+}
 
  export function canUserGoLive(user: { id?: string; email?: string | null } | null | undefined) {
    return isLiveOwnerUser(user);

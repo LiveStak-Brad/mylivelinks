@@ -21,7 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
-import type { GifterStatus } from '../lib/gifter-status';
+import type { GifterStatus } from '../../lib/gifter-status';
 
 type UserRole = 'viewer' | 'moderator' | 'admin' | 'owner';
 
@@ -67,7 +67,7 @@ export const UserActionCardV2: React.FC<UserActionCardV2Props> = ({
   onOpenIM,
 }) => {
   const { theme } = useThemeMode();
-  const isDark = theme === 'dark';
+  const isDark = theme.mode === 'dark';
   const navigation = useNavigation<any>();
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);

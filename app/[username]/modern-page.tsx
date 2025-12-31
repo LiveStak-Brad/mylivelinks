@@ -75,7 +75,6 @@ interface ProfileData {
     follower_count: number;
     total_gifts_received: number;
     total_gifts_sent: number;
-    gifter_level: number;
     created_at: string;
     profile_type?: ProfileType;
     enabled_modules?: string[] | null; // Optional modules only
@@ -146,7 +145,6 @@ interface ProfileData {
     username: string;
     display_name?: string;
     avatar_url?: string;
-    gifter_level: number;
     total_gifted: number;
   }>;
   top_streamers: Array<{
@@ -925,8 +923,8 @@ export default function ModernProfilePage() {
       
       {/* Content - Scrollable */}
       <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20 md:pb-8">
-        {/* Login to See Live Banner (if not logged in and profile is live) */}
-        {profile.is_live && !currentUser && (
+        {/* Live Indicator Banner - Click avatar to watch */}
+        {profile.is_live && (
           <div className="mb-4 sm:mb-6">
             <div className="bg-gradient-to-r from-red-500 to-pink-500 rounded-lg p-4 shadow-lg flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -939,24 +937,12 @@ export default function ModernProfilePage() {
                 </p>
               </div>
               <Link
-                href={`/login?returnTo=/${profile.username}`}
+                href={`/live/${profile.username}`}
                 className="bg-white text-red-500 font-bold px-4 py-2 rounded-full hover:bg-gray-100 transition-all transform hover:scale-105 shadow-lg whitespace-nowrap"
               >
-                Login to Watch
+                {!currentUser ? 'Login to Watch' : 'Watch Live'}
               </Link>
             </div>
-          </div>
-        )}
-        
-        {/* Live Video Player (if live and logged in) */}
-        {profile.is_live && currentUser && (
-          <div className={`${borderRadiusClass} overflow-hidden shadow-2xl mb-4 sm:mb-6`}>
-            <ProfileLivePlayer
-              profileId={profile.id}
-              username={profile.username}
-              liveStreamId={liveStreamId}
-              className="w-full aspect-video"
-            />
           </div>
         )}
         
@@ -1002,30 +988,63 @@ export default function ModernProfilePage() {
           
           <div className="p-4 sm:p-8">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6">
-              {/* Avatar */}
+              {/* Avatar - Clickable when live */}
               <div className="relative flex-shrink-0">
-                {profile.avatar_url ? (
-                  <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden ring-4 ring-white/50 shadow-lg">
-                    <Image
-                      src={profile.avatar_url}
-                      alt={profile.username}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 96px, 128px"
-                    />
-                  </div>
-                ) : (
-                  <div 
-                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center text-white text-3xl sm:text-4xl font-bold ring-4 ring-white/50 shadow-lg"
-                    style={{ backgroundColor: accentColor }}
+                {profile.is_live ? (
+                  <Link 
+                    href={`/live/${profile.username}`}
+                    className="block relative group"
+                    title={`Watch ${profile.display_name || profile.username} live`}
                   >
-                    {profile.username[0].toUpperCase()}
-                  </div>
-                )}
-                {profile.is_live && (
-                  <div className="absolute -bottom-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 sm:px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
-                    <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                    LIVE
+                    {/* Pulsing red ring for live status */}
+                    <div className="absolute inset-0 rounded-full animate-pulse">
+                      <div className="w-full h-full rounded-full ring-4 ring-red-500"></div>
+                    </div>
+                    {/* Avatar with stronger red ring */}
+                    {profile.avatar_url ? (
+                      <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden ring-[6px] ring-red-500 shadow-lg transition-transform group-hover:scale-105">
+                        <Image
+                          src={profile.avatar_url}
+                          alt={profile.username}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 96px, 128px"
+                        />
+                      </div>
+                    ) : (
+                      <div 
+                        className="w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center text-white text-3xl sm:text-4xl font-bold ring-[6px] ring-red-500 shadow-lg transition-transform group-hover:scale-105"
+                        style={{ backgroundColor: accentColor }}
+                      >
+                        {profile.username[0].toUpperCase()}
+                      </div>
+                    )}
+                    {/* Small LIVE badge */}
+                    <div className="absolute -bottom-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 sm:px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
+                      <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                      LIVE
+                    </div>
+                  </Link>
+                ) : (
+                  <div>
+                    {profile.avatar_url ? (
+                      <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden ring-4 ring-white/50 shadow-lg">
+                        <Image
+                          src={profile.avatar_url}
+                          alt={profile.username}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 96px, 128px"
+                        />
+                      </div>
+                    ) : (
+                      <div 
+                        className="w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center text-white text-3xl sm:text-4xl font-bold ring-4 ring-white/50 shadow-lg"
+                        style={{ backgroundColor: accentColor }}
+                      >
+                        {profile.username[0].toUpperCase()}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1350,7 +1369,6 @@ export default function ModernProfilePage() {
             {!profile.hide_streaming_stats && (isSectionEnabled('profile_stats', profile.profile_type as ConfigProfileType, profile.enabled_modules as any) || isSectionEnabled('streaming_stats', profile.profile_type as ConfigProfileType, profile.enabled_modules as any)) && (
               <StatsCard
                 streamStats={profileData.stream_stats}
-                gifterLevel={profile.gifter_level}
                 gifterStatus={(profileData as any)?.gifter_statuses?.[profile.id] ?? null}
                 totalGiftsSent={profile.total_gifts_sent}
                 totalGiftsReceived={profile.total_gifts_received}
@@ -1360,37 +1378,39 @@ export default function ModernProfilePage() {
               />
             )}
             
-            {/* Premium Branding Footer - Powered by MyLiveLinks */}
-            <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 sm:p-8 text-center`} style={cardStyle}>
-              <div className="space-y-4">
-                <div className="flex items-center justify-center">
-                  <Image
-                    src="/branding/mylivelinkstransparent.png"
-                    alt="MyLiveLinks"
-                    width={240}
-                    height={60}
-                    className="h-12 sm:h-16 w-auto"
-                    priority
-                  />
+            {/* Premium Branding Footer - Powered by MyLiveLinks (Only show for visitors, not own profile) */}
+            {!isOwnProfile && (
+              <div className={`${borderRadiusClass} overflow-hidden shadow-lg mt-6 p-6 sm:p-8 text-center`} style={cardStyle}>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center">
+                    <Image
+                      src="/branding/mylivelinkstransparent.png"
+                      alt="MyLiveLinks"
+                      width={240}
+                      height={60}
+                      className="h-12 sm:h-16 w-auto"
+                      priority
+                    />
+                  </div>
+                  
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                    Create your own stunning profile, go live, and connect with your audience.
+                  </p>
+                  
+                  <Link
+                    href="/signup"
+                    className="inline-block px-8 py-3 rounded-lg font-semibold text-white text-base transition shadow-lg hover:shadow-xl transform hover:scale-105"
+                    style={{ backgroundColor: accentColor }}
+                  >
+                    Create Your Free Profile
+                  </Link>
+                  
+                  <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-500">
+                    All-in-one platform: Live streaming • Links • Social • Monetization
+                  </p>
                 </div>
-                
-                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                  Create your own stunning profile, go live, and connect with your audience.
-                </p>
-                
-                <Link
-                  href="/signup"
-                  className="inline-block px-8 py-3 rounded-lg font-semibold text-white text-base transition shadow-lg hover:shadow-xl transform hover:scale-105"
-                  style={{ backgroundColor: accentColor }}
-                >
-                  Create Your Free Profile
-                </Link>
-                
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-500">
-                  All-in-one platform: Live streaming • Links • Social • Monetization
-                </p>
               </div>
-            </div>
+            )}
           </>
         )}
         

@@ -16,6 +16,7 @@ type FeedAuthor = {
   id: string;
   username: string;
   avatar_url: string | null;
+  is_live?: boolean;
 };
 
 type FeedPost = {
@@ -738,6 +739,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                   authorName={post.author.username}
                   authorUsername={post.author.username}
                   authorAvatarUrl={post.author.avatar_url}
+                  authorIsLive={post.author.is_live}
                   content={post.text_content}
                   timestamp={post.created_at}
                   media={

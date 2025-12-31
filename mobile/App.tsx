@@ -17,12 +17,12 @@
 // Mobile Owner Panel Parity: Revenue + Feature Flags
 // Mobile Owner Panel: Reports Parity (canonical commit)
 
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Linking } from 'react-native';
 
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AuthProvider } from './contexts/AuthContext';
@@ -58,6 +58,8 @@ import { AdminGiftsScreen } from './screens/AdminGiftsScreen';
 import { ComposerListScreen } from './screens/ComposerListScreen';
 import { ComposerEditorScreen } from './screens/ComposerEditorScreen';
 import { ApplyForRoomScreen } from './screens/ApplyForRoomScreen';
+import { SoloStreamViewerScreen } from './screens/SoloStreamViewerScreen';
+import { SoloHostStreamScreen } from './screens/SoloHostStreamScreen';
 import { setPendingReferralCode } from './lib/referrals';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -78,41 +80,61 @@ function extractReferralCode(url: string): string | null {
 function AppNavigation() {
   const { navigationTheme, mode } = useThemeMode();
 
-  useEffect(() => {
-    const handleUrl = async (url: string | null | undefined) => {
-      if (!url) return;
-      const ref = extractReferralCode(url);
-      if (!ref) return;
-      try {
-        await setPendingReferralCode(ref);
-      } catch (e) {
-        console.warn('[referrals] Failed to store pending referral code:', e);
-      }
-    };
+  const handleReferralFromUrl = useCallback(async (url: string | null | undefined) => {
+    if (!url) return;
 
-    void Linking.getInitialURL().then(handleUrl);
-
-    const sub = Linking.addEventListener('url', (evt: any) => {
-      void handleUrl(evt?.url);
-    });
-
-    return () => {
-      // RN compatibility: newer versions return subscription with remove()
-      (sub as any)?.remove?.();
-    };
+    const ref = extractReferralCode(url);
+    if (!ref) return;
+    try {
+      await setPendingReferralCode(ref);
+    } catch (e) {
+      console.warn('[referrals] Failed to store pending referral code:', e);
+    }
   }, []);
+
+  const linking = React.useMemo((): LinkingOptions<RootStackParamList> => {
+    return {
+      prefixes: ['mylivelinks://', 'https://www.mylivelinks.com', 'https://mylivelinks.com'],
+      config: {
+        screens: {
+          SoloHostStream: 'live/host',
+          SoloStreamViewer: 'live/:username',
+        },
+      },
+      getInitialURL: async () => {
+        const url = await Linking.getInitialURL();
+        await handleReferralFromUrl(url);
+        return url;
+      },
+      subscribe: (listener) => {
+        const onReceiveURL = (evt: any) => {
+          const url = evt?.url;
+          void handleReferralFromUrl(url);
+          listener(url);
+        };
+
+        const sub = Linking.addEventListener('url', onReceiveURL);
+
+        return () => {
+          (sub as any)?.remove?.();
+        };
+      },
+    };
+  }, [handleReferralFromUrl]);
 
   return (
     <>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <AuthProvider>
-        <NavigationContainer theme={navigationTheme}>
+        <NavigationContainer theme={navigationTheme} linking={linking}>
           <Stack.Navigator initialRouteName="Gate" screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Gate" component={GateScreen} />
             <Stack.Screen name="Auth" component={AuthScreen} />
             <Stack.Screen name="CreateProfile" component={CreateProfileScreen} />
             <Stack.Screen name="Rooms" component={LiveTVScreen} />
             <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen name="SoloStreamViewer" component={SoloStreamViewerScreen} />
+            <Stack.Screen name="SoloHostStream" component={SoloHostStreamScreen} />
             <Stack.Screen name="Wallet" component={WalletScreen} />
             <Stack.Screen name="Transactions" component={TransactionsScreen} />
             <Stack.Screen name="MyAnalytics" component={MyAnalyticsScreen} />

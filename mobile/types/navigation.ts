@@ -8,6 +8,8 @@ export type RootStackParamList = {
   CreateProfile: undefined;
   MainTabs: NavigatorScreenParams<MainTabsParamList> | undefined;
   Rooms: undefined;
+  SoloStreamViewer: { username: string };
+  SoloHostStream: undefined;
   Wallet: undefined;
   Transactions: undefined;
   MyAnalytics: undefined;
@@ -41,6 +43,7 @@ export type MainTabsParamList = {
   Home: undefined;
   Feed: undefined;
   GoLive: undefined;
+  Profile: { username?: string } | undefined;
   Messages: { openUserId?: string; openUsername?: string } | undefined;
   Noties: undefined;
 };

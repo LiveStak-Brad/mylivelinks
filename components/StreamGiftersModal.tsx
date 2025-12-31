@@ -81,7 +81,7 @@ export default function StreamGiftersModal({
         });
 
         // Sort by total diamonds and get top 20
-        const sortedGifters = Array.from(gifterMap.entries())
+        const sortedGifters: TopGifter[] = Array.from(gifterMap.entries())
           .sort((a, b) => b[1].total - a[1].total)
           .slice(0, 20)
           .map(([senderId, data], index) => ({
@@ -90,6 +90,7 @@ export default function StreamGiftersModal({
             display_name: data.profile.display_name,
             avatar_url: data.profile.avatar_url,
             total_diamonds: data.total,
+            gifter_status: null,
             rank: index + 1,
           }));
 
@@ -148,11 +149,11 @@ export default function StreamGiftersModal({
       onClick={onClose}
     >
       <div
-        className="bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 rounded-2xl shadow-2xl max-w-md w-full mt-4 animate-slide-down"
+        className="bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 rounded-2xl shadow-2xl max-w-md w-full mt-4 animate-slide-down overflow-hidden flex flex-col modal-fullscreen-mobile"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="relative px-6 py-4 border-b border-white/20">
+        <div className="relative px-6 py-4 border-b border-white/20 flex-shrink-0 mobile-safe-top">
           <div className="flex items-center justify-center gap-2">
             <Gift className="w-6 h-6 text-white" />
             <h2 className="text-2xl font-bold text-white">Top Gifters</h2>
@@ -162,14 +163,15 @@ export default function StreamGiftersModal({
           </p>
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition text-white"
+            className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition text-white mobile-touch-target"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 max-h-[60vh] overflow-y-auto">
+        <div className="modal-body p-4 max-h-[60vh] overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>

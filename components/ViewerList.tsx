@@ -7,13 +7,12 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import UserActionCardV2 from './UserActionCardV2';
-import { getAvatarUrl } from '@/lib/defaultAvatar';
+import LiveAvatar from './LiveAvatar';
 
 interface Viewer {
   profile_id: string;
   username: string;
   avatar_url: string | undefined;
-  gifter_level: number;
   is_active: boolean;
   last_active_at: string;
   is_live_available: boolean; // Whether they're live streaming/available
@@ -119,10 +118,10 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
 
       const profileIds = [...new Set((presenceData || []).map((item: any) => item.profile_id))];
       
-      // Get profile info (avatar, gifter_level) and live stream info
+      // Get profile info (avatar) and live stream info
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, username, avatar_url, gifter_level')
+        .select('id, username, avatar_url')
         .in('id', profileIds);
 
       const { data: liveStreams } = await supabase
@@ -148,7 +147,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       // Build viewers list from room_presence
       const viewersWithBadges = await Promise.all(
         (presenceData || []).map(async (presence: any) => {
-          const profile = profileMap.get(presence.profile_id) as { id: string; username: string; avatar_url?: string; gifter_level: number | null } | undefined;
+          const profile = profileMap.get(presence.profile_id) as { id: string; username: string; avatar_url?: string } | undefined;
           if (!profile) return null;
 
           const liveInfo = liveStreamMap.get(presence.profile_id) as { 
@@ -160,7 +159,6 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
             profile_id: presence.profile_id,
             username: presence.username || profile.username,
             avatar_url: profile.avatar_url ?? undefined,
-            gifter_level: profile.gifter_level || 0,
             is_active: true,
             last_active_at: presence.last_seen_at,
             is_live_available: presence.is_live_available || liveInfo?.isLiveAvailable || false,
@@ -238,7 +236,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                   }
                 `}
               >
-                {/* Webcam Icon for Live Viewers, Avatar for Others */}
+                {/* Webcam Icon for Live Viewers, Avatar with live indicator for Others */}
                 {viewer.is_live_available ? (
                   // Show red webcam icon for all live viewers (published or preview mode)
                   <div className="relative flex-shrink-0">
@@ -266,25 +264,13 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
                       <span className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-75" />
                     </div>
                   </div>
-                ) : viewer.avatar_url ? (
-                  // Regular avatar if not live
-                  <img
-                    src={getAvatarUrl(viewer.avatar_url)}
-                    alt={viewer.username}
-                    className="w-8 h-8 rounded-full flex-shrink-0"
-                    onError={(e) => {
-                      e.currentTarget.src = '/no-profile-pic.png';
-                    }}
-                  />
                 ) : (
-                  // Default avatar if no image
-                  <img
-                    src={getAvatarUrl(null)}
-                    alt={viewer.username}
-                    className="w-8 h-8 rounded-full flex-shrink-0"
-                    onError={(e) => {
-                      e.currentTarget.src = '/no-profile-pic.png';
-                    }}
+                  <LiveAvatar
+                    avatarUrl={viewer.avatar_url}
+                    username={viewer.username}
+                    isLive={viewer.is_live_available}
+                    size="sm"
+                    showLiveBadge={false}
                   />
                 )}
 

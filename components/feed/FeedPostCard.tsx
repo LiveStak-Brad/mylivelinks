@@ -3,7 +3,7 @@
 import { memo } from 'react';
 import { Heart, MessageCircle, Gift, MoreHorizontal, Coins } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
-import { getAvatarUrl } from '@/lib/defaultAvatar';
+import LiveAvatar from '@/components/LiveAvatar';
 import ClipActions from '@/components/ClipActions';
 import SafeRichText from '@/components/SafeRichText';
 
@@ -33,6 +33,8 @@ export interface FeedPostCardProps {
   authorUsername: string;
   /** Author's avatar URL */
   authorAvatarUrl?: string | null;
+  /** Is author currently live */
+  authorIsLive?: boolean;
   /** Post text content */
   content?: string;
   /** Timestamp as Date or ISO string */
@@ -94,22 +96,20 @@ function formatTimestamp(timestamp?: string | Date): string {
 }
 
 /* -----------------------------------------------------------------------------
-   Default Avatar Placeholder
+   Default Avatar Placeholder - NOW USES LIVE AVATAR
    
    Shown when no avatar is provided.
 ----------------------------------------------------------------------------- */
-function DefaultAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
-  const imgSrc = getAvatarUrl(avatarUrl);
-  
+function DefaultAvatar({ name, avatarUrl, isLive, username }: { name: string; avatarUrl?: string | null; isLive?: boolean; username: string }) {
   return (
-    <div 
-      className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity ring-1 ring-gray-200 dark:ring-gray-700"
-      aria-hidden="true"
-    >
-      <img 
-        src={imgSrc} 
-        alt={`${name}'s avatar`} 
-        className="w-full h-full object-cover"
+    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      <LiveAvatar
+        avatarUrl={avatarUrl}
+        username={username}
+        displayName={name}
+        isLive={isLive}
+        size="md"
+        showLiveBadge={false}
       />
     </div>
   );
@@ -172,6 +172,7 @@ const FeedPostCard = memo(function FeedPostCard({
   authorName,
   authorUsername,
   authorAvatarUrl,
+  authorIsLive = false,
   content,
   timestamp,
   media,
@@ -200,7 +201,7 @@ const FeedPostCard = memo(function FeedPostCard({
           role={onProfileClick ? 'button' : undefined}
           tabIndex={onProfileClick ? 0 : undefined}
         >
-          <DefaultAvatar name={authorName} avatarUrl={authorAvatarUrl} />
+          <DefaultAvatar name={authorName} avatarUrl={authorAvatarUrl} isLive={authorIsLive} username={authorUsername} />
         </div>
         
         <div className="flex-1 min-w-0 leading-tight">

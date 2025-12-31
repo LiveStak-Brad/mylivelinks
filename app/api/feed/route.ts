@@ -10,6 +10,7 @@ type FeedPost = {
     id: string;
     username: string;
     avatar_url: string | null;
+    is_live?: boolean;
   };
   comment_count: number;
   gift_total_coins: number;
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
         id: String(r.author_id),
         username: String(r.author_username ?? ''),
         avatar_url: r.author_avatar_url ? String(r.author_avatar_url) : null,
+        is_live: Boolean(r.author_is_live ?? false),
       },
       comment_count: Number(r.comment_count ?? 0),
       gift_total_coins: Number(r.gift_total_coins ?? 0),

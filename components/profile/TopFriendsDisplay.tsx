@@ -80,14 +80,18 @@ export default function TopFriendsDisplay({
   // Limit friends to maxCount
   const displayedFriends = topFriends.slice(0, topFriendsMaxCount);
   const friendCount = displayedFriends.length;
+  
+  // For non-owners, only consider actual friends. For owners, consider max slots
+  const gridItemCount = isOwner ? topFriendsMaxCount : friendCount;
 
-  // Calculate dynamic grid classes based on friend count
+  // Calculate dynamic grid classes based on friend count (or slot count for owners)
   const getGridClasses = () => {
-    if (friendCount === 1) return 'grid-cols-1 max-w-[200px] mx-auto';
-    if (friendCount === 2) return 'grid-cols-2 max-w-[400px] mx-auto';
-    if (friendCount === 3) return 'grid-cols-3 max-w-[600px] mx-auto';
-    if (friendCount <= 4) return 'grid-cols-2 sm:grid-cols-4 max-w-[800px] mx-auto';
-    if (friendCount <= 6) return 'grid-cols-3 sm:grid-cols-3';
+    const count = gridItemCount;
+    if (count === 1) return 'grid-cols-1 max-w-[200px] mx-auto';
+    if (count === 2) return 'grid-cols-2 max-w-[400px] mx-auto';
+    if (count === 3) return 'grid-cols-3 max-w-[600px] mx-auto';
+    if (count <= 4) return 'grid-cols-2 sm:grid-cols-4 max-w-[800px] mx-auto';
+    if (count <= 6) return 'grid-cols-3 sm:grid-cols-3';
     return 'grid-cols-2 sm:grid-cols-4'; // 7-8 friends
   };
 
@@ -131,7 +135,7 @@ export default function TopFriendsDisplay({
       {/* Loading State */}
       {loading && (
         <div className={`grid gap-4 ${getGridClasses()}`}>
-          {[...Array(topFriendsMaxCount)].map((_, i) => (
+          {[...Array(isOwner ? topFriendsMaxCount : 3)].map((_, i) => (
             <div key={i} className="animate-pulse">
               <div className={`aspect-square bg-gray-300 dark:bg-gray-700 ${avatarShapeClass} mb-2`} />
               <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-3/4 mx-auto" />
@@ -218,7 +222,7 @@ export default function TopFriendsDisplay({
             </Link>
           ))}
 
-          {/* Empty Slots (Owner Only) - Only show if under max count */}
+          {/* Empty Slots (Owner Only) - Only show if under max count and owner is viewing */}
           {isOwner &&
             displayedFriends.length < topFriendsMaxCount &&
             [...Array(topFriendsMaxCount - displayedFriends.length)].map((_, i) => (

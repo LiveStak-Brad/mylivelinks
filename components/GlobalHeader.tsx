@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy, Tv } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy, Tv, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import LeaderboardModal from './LeaderboardModal';
+import OptionsMenu from './OptionsMenu';
 import { createClient } from '@/lib/supabase';
 import { LIVE_LAUNCH_ENABLED } from '@/lib/livekit-constants';
 import { isRouteActive, MAIN_NAV_ITEMS, type NavItem } from '@/lib/navigation';
@@ -16,8 +17,8 @@ import NotiesModal from './noties/NotiesModal';
 import MessagesModal from './messages/MessagesModal';
 
 // Owner credentials
-const OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
-const OWNER_EMAILS = ['wcba.mo@gmail.com'];
+const OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'];
+const OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'];
 
 // Notification badge component
 function NotificationBadge({ count }: { count: number }) {
@@ -55,13 +56,13 @@ function NavLink({
     <Link
       href={item.href}
       onClick={onClick}
-      className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110 ${
+      className={`group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 ${
         isActive ? 'scale-110' : 'opacity-70 hover:opacity-100'
       }`}
       aria-current={isActive ? 'page' : undefined}
       title={item.label}
     >
-      {Icon && <Icon className={`w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 ${getIconColor(item.label)}`} strokeWidth={2} />}
+      {Icon && <Icon className={`w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 ${getIconColor(item.label)}`} strokeWidth={2} />}
       
       {/* Hover tooltip for desktop */}
       <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
@@ -127,7 +128,7 @@ function HeaderIcons() {
   }, []);
 
   return (
-    <div className="flex items-center gap-1" onKeyDown={handleKeyDown}>
+    <div className="flex items-center gap-0.5 sm:gap-1" onKeyDown={handleKeyDown}>
       {/* Messages Icon */}
       <div className="relative z-[70]">
         <button
@@ -136,7 +137,7 @@ function HeaderIcons() {
             setShowMessagesModal(!showMessagesModal);
             setShowNotiesModal(false);
           }}
-          className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110 ${
+          className={`group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 ${
             showMessagesModal ? 'scale-110' : 'opacity-70 hover:opacity-100'
           }`}
           aria-label={`Messages${unreadMessages > 0 ? `, ${unreadMessages} unread` : ''}`}
@@ -144,7 +145,7 @@ function HeaderIcons() {
           aria-haspopup="dialog"
           title="Messages"
         >
-          <MessageCircle className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-emerald-500 dark:text-emerald-400" strokeWidth={2} />
+          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-emerald-500 dark:text-emerald-400" strokeWidth={2} />
           {unreadMessages > 0 && (
             <span className="notification-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>
           )}
@@ -170,7 +171,7 @@ function HeaderIcons() {
             setShowNotiesModal(!showNotiesModal);
             setShowMessagesModal(false);
           }}
-          className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110 ${
+          className={`group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 ${
             showNotiesModal ? 'scale-110' : 'opacity-70 hover:opacity-100'
           }`}
           aria-label={`Noties${unreadNoties > 0 ? `, ${unreadNoties} unread` : ''}`}
@@ -178,7 +179,7 @@ function HeaderIcons() {
           aria-haspopup="dialog"
           title="Noties"
         >
-          <Bell className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 text-amber-500 dark:text-amber-400" strokeWidth={2} />
+          <Bell className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-amber-500 dark:text-amber-400" strokeWidth={2} />
           {unreadNoties > 0 && (
             <span className="notification-badge">{unreadNoties > 99 ? '99+' : unreadNoties}</span>
           )}
@@ -247,6 +248,7 @@ export default function GlobalHeader() {
   }
 
   const canOpenLive = LIVE_LAUNCH_ENABLED || isOwner;
+  const isLiveRoom = pathname === '/live'; // Check if we're on the live room page
 
   return (
     <>
@@ -259,86 +261,131 @@ export default function GlobalHeader() {
         className="sticky top-0 z-[60] bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
         role="banner"
       >
+        {/* FAR LEFT - 4 nav icons (ONLY when on live room) - Fixed to viewport edge */}
+        {isLiveRoom && (
+          <div className="fixed left-0 top-0 flex items-center gap-0.5 sm:gap-1 md:gap-1 z-[70] h-16 lg:h-[72px] pl-1 sm:pl-2 md:pl-4 lg:pl-6 xl:pl-8 2xl:pl-[60px]">
+            <button
+              onClick={() => setShowLeaderboard(true)}
+              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+              aria-label="View Leaderboards"
+              title="Leaderboards"
+            >
+              <Trophy className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-amber-500" strokeWidth={2} />
+            </button>
+            <Link href="/rooms" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
+              <Tv className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
+            </Link>
+            <Link href="/" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Home">
+              <Home className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-purple-500" strokeWidth={2} />
+            </Link>
+            <Link href="/feed" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Feed">
+              <Rss className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-blue-500" strokeWidth={2} />
+            </Link>
+          </div>
+        )}
+
+        {/* FAR LEFT - Non-live room nav (Trophy, Rooms, Nav) - Fixed to viewport edge */}
+        {!isLiveRoom && (
+          <div className="fixed left-0 top-0 flex items-center gap-0.5 sm:gap-1 md:gap-1 z-[70] h-16 lg:h-[72px] pl-1 sm:pl-2 md:pl-4 lg:pl-6 xl:pl-8 2xl:pl-[60px]">
+            <button
+              onClick={() => setShowLeaderboard(true)}
+              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+              aria-label="View Leaderboards"
+              title="Leaderboards"
+            >
+              <Trophy className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-amber-500" strokeWidth={2} />
+            </button>
+            <Link href="/rooms" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
+              <Tv className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
+            </Link>
+            
+            {/* Navigation items - Hide on mobile */}
+            <nav className="hidden md:flex items-center gap-1 ml-2" role="navigation" aria-label="Main navigation">
+              {MAIN_NAV_ITEMS.map((item) => (
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  isActive={isRouteActive(pathname, item.href, { 
+                    matchType: item.matchType,
+                    excludePaths: item.excludePaths,
+                  })}
+                  disabled={item.requiresLive && !canOpenLive}
+                />
+              ))}
+            </nav>
+          </div>
+        )}
+
+        {/* FAR RIGHT - User menu + icons - Fixed to viewport edge */}
+        <div className="fixed right-0 top-0 flex items-center gap-0.5 sm:gap-1 md:gap-1 z-[70] h-16 lg:h-[72px] pr-1 sm:pr-2 md:pr-4 lg:pr-6 xl:pr-8 2xl:pr-[60px]">
+          {/* Messages & Noties - Hide on mobile */}
+          {isLoggedIn && (
+            <div className="hidden md:flex items-center gap-0.5 sm:gap-1">
+              <HeaderIcons />
+            </div>
+          )}
+
+          {/* Settings (Options) - only needed on live room */}
+          {isLiveRoom && <OptionsMenu />}
+
+          {/* Owner Panel */}
+          {isOwner && (
+            <Link
+              href="/owner"
+              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+              title="Owner Panel"
+            >
+              <Crown className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-violet-500 dark:text-violet-400" strokeWidth={2} />
+            </Link>
+          )}
+
+          {/* User Menu (Photo) */}
+          <UserMenu />
+        </div>
+        
         <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16 lg:h-[72px]">
-            {/* Left section: Logo + Nav */}
-            <div className="flex items-center gap-0">
-              {/* Logo/Brand */}
+          <div className={`flex items-center h-16 lg:h-[72px] relative ${isLiveRoom ? 'justify-center' : 'justify-center'}`}>
+            
+            {/* Center Logo (ALL pages) */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 pointer-events-none z-10">
               <Link 
                 href="/" 
-                className="flex items-center gap-2 hover:opacity-90 transition-opacity focus-visible-ring rounded-lg"
+                className="flex items-center pointer-events-auto hover:opacity-90 transition-opacity"
                 aria-label="MyLiveLinks Home"
               >
-                <SmartBrandLogo size={110} />
+                <SmartBrandLogo size={120} />
               </Link>
-              
-              {/* Trophy - Leaderboard Button - Right next to logo */}
-              <button
-                onClick={() => setShowLeaderboard(true)}
-                className="-ml-2 p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
-                aria-label="View Leaderboards"
-              >
-                <Trophy className="w-7 h-7 text-amber-500" />
-              </button>
-
-              {/* Rooms Button - Right next to Leaderboard */}
-              <Link
-                href="/rooms"
-                className="p-2 rounded-lg hover:bg-muted/50 transition-colors focus-visible-ring"
-                aria-label="View Rooms"
-                title="Rooms"
-              >
-                <Tv className="w-7 h-7 text-pink-500 dark:text-pink-400" />
-              </Link>
-
-              {/* Navigation - Desktop */}
-              <nav 
-                className="hidden md:flex items-center gap-1" 
-                role="navigation" 
-                aria-label="Main navigation"
-              >
-                {MAIN_NAV_ITEMS.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    isActive={isRouteActive(pathname, item.href, { 
-                      matchType: item.matchType,
-                      excludePaths: item.excludePaths,
-                    })}
-                    disabled={item.requiresLive && !canOpenLive}
-                  />
-                ))}
-              </nav>
             </div>
 
-            {/* Right section: Actions + User */}
-            <div className="flex items-center gap-2 lg:gap-3">
-              {/* Messages & Noties Icons - Only show when logged in and on desktop */}
-              {isLoggedIn && (
-                <div className="hidden md:flex">
-                  <HeaderIcons />
-                </div>
-              )}
+            {/* LEFT MIDDLE - Sort buttons (ONLY on live room page) - Fixed distance from left edge */}
+            {isLiveRoom && (
+              <div className="hidden md:flex absolute items-center gap-0.5 md:gap-1 left-[120px] md:left-[160px] lg:left-[200px] xl:left-[260px] 2xl:left-[340px]">
+                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Randomize">
+                  <Shuffle className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-purple-500" strokeWidth={2} />
+                </button>
+                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Most Viewed">
+                  <Eye className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-cyan-500" strokeWidth={2} />
+                </button>
+                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Most Gifted">
+                  <GiftIcon className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
+                </button>
+                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Newest">
+                  <Sparkles className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-yellow-500" strokeWidth={2} />
+                </button>
+              </div>
+            )}
 
-              {/* Owner Panel Quick Access */}
-              {isOwner && (
-                <Link
-                  href="/owner"
-                  className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
-                  title="Owner Panel"
-                >
-                  <Crown className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-violet-500 dark:text-violet-400" strokeWidth={2} />
-                  
-                  {/* Hover tooltip */}
-                  <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                    Owner Panel
-                  </span>
-                </Link>
-              )}
-
-              {/* User Menu */}
-              <UserMenu />
-            </div>
+            {/* RIGHT MIDDLE - Live controls (ONLY on live room page) - Fixed distance from right edge, closer to center */}
+            {isLiveRoom && (
+              <div className="hidden md:flex absolute items-center gap-0.5 md:gap-1 right-[200px] md:right-[240px] lg:right-[280px] xl:right-[340px] 2xl:right-[420px]">
+                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Unmute All">
+                  <Volume2 className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-green-500" strokeWidth={2} />
+                </button>
+                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Focus Mode">
+                  <Focus className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-indigo-500" strokeWidth={2} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>

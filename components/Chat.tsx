@@ -2,21 +2,20 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
-import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
+import { GifterBadge as TierBadge } from '@/components/gifter';
 import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
+import LiveAvatar from '@/components/LiveAvatar';
 
 interface ChatMessage {
   id: number | string;
   profile_id: string | null;
   username?: string;
   avatar_url?: string;
-  gifter_level?: number;
-  badge_name?: string;
-  badge_color?: string;
+  is_live?: boolean;
   message_type: string;
   content: string;
   created_at: string;
@@ -30,9 +29,12 @@ interface ChatProps {
   onGiftClick?: () => void;
   onShareClick?: () => void;
   onSettingsClick?: () => void;
+  readOnly?: boolean; // If true, hide input box
 }
 
-export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, onSettingsClick }: ChatProps) {
+export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, onSettingsClick, readOnly = false }: ChatProps) {
+  console.log('[CHAT] 🎬 Component rendered with:', { roomId, liveStreamId, readOnly });
+  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -41,7 +43,6 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     username: string;
     avatar_url?: string;
-    gifter_level?: number;
   } | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<{
     profileId: string;
@@ -67,7 +68,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
         // Load user profile immediately for optimistic messages
         supabase
           .from('profiles')
-          .select('username, avatar_url, gifter_level')
+          .select('username, avatar_url')
           .eq('id', user.id)
           .single()
           .then(({ data: profile }: { data: any }) => {
@@ -75,7 +76,6 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
               setCurrentUserProfile({
                 username: profile.username,
                 avatar_url: profile.avatar_url,
-                gifter_level: profile.gifter_level || 0,
               });
             }
           });
@@ -128,7 +128,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
           profiles (
             username,
             avatar_url,
-            gifter_level,
+            is_live,
             chat_bubble_color,
             chat_font
           )
@@ -154,7 +154,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
           profile_id: msg.profile_id,
           username: profile?.username || 'Unknown',
           avatar_url: profile?.avatar_url,
-          gifter_level: profile?.gifter_level || 0,
+          is_live: profile?.is_live || false,
           message_type: msg.message_type,
           content: msg.content,
           created_at: msg.created_at,
@@ -200,7 +200,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
           profiles (
             username,
             avatar_url,
-            gifter_level,
+            is_live,
             chat_bubble_color,
             chat_font
           )
@@ -226,6 +226,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
             profile_id: msg.profile_id,
             username: profile?.username || 'Unknown',
             avatar_url: profile?.avatar_url,
+            is_live: profile?.is_live || false,
             gifter_level: profile?.gifter_level || 0,
             message_type: msg.message_type,
             content: msg.content,
@@ -291,7 +292,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
     Promise.all([
       supabase
         .from('profiles')
-        .select('username, avatar_url, gifter_level, chat_bubble_color, chat_font')
+        .select('username, avatar_url, is_live, chat_bubble_color, chat_font')
         .eq('id', message.profile_id)
         .single(),
       fetchGifterStatuses([message.profile_id]).then((m) => m[message.profile_id] || null),
@@ -303,7 +304,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
         profile_id: message.profile_id,
         username: (profile as any)?.username || 'Unknown',
         avatar_url: (profile as any)?.avatar_url,
-        gifter_level: (profile as any)?.gifter_level || 0,
+        is_live: (profile as any)?.is_live || false,
         message_type: message.message_type,
         content: message.content,
         created_at: message.created_at,
@@ -345,24 +346,23 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
       if (shouldAutoScrollRef.current) {
         requestAnimationFrame(() => scrollToBottom('smooth'));
       }
+      
+      console.log('[CHAT] 📊 Current messages count:', messages.length + 1);
     }).catch((error) => {
       console.error('Error loading message profile:', error);
       // Add message without profile data if query fails
-      setMessages((prev) => {
-        if (prev.some(m => m.id === message.id)) return prev;
-        return [...prev, {
-          id: message.id,
-          profile_id: message.profile_id,
-          username: 'Unknown',
-          avatar_url: undefined,
-          gifter_level: 0,
-          badge_name: undefined,
-          badge_color: undefined,
-          message_type: message.message_type,
-          content: message.content,
-          created_at: message.created_at,
-        }];
-      });
+        setMessages((prev) => {
+          if (prev.some(m => m.id === message.id)) return prev;
+          return [...prev, {
+            id: message.id,
+            profile_id: message.profile_id,
+            username: 'Unknown',
+            avatar_url: undefined,
+            message_type: message.message_type,
+            content: message.content,
+            created_at: message.created_at,
+          }];
+        });
     });
   }, [supabase, scrollToBottom]); // Only depend on stable references
 
@@ -407,33 +407,56 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
     };
   }, [supabase]);
 
-  // CRITICAL: Create realtime subscription ONCE on mount, never recreate
+  // CRITICAL: Create realtime subscription, recreate if room/stream changes
   useEffect(() => {
-    // Prevent duplicate subscriptions
-    if (subscriptionRef.current?.subscribed) {
-      console.warn('[CHAT] ⚠️ Subscription already exists, skipping duplicate');
+    // Don't subscribe if we don't have a room or stream ID
+    if (!roomId && !liveStreamId) {
+      console.warn('[CHAT] ⚠️ No roomId or liveStreamId, skipping subscription');
       return;
     }
 
-    console.log('[CHAT] 🔌 Creating realtime subscription');
+    // Prevent duplicate subscriptions
+    if (subscriptionRef.current?.subscribed) {
+      console.log('[CHAT] 🧹 Removing old subscription before creating new one');
+      supabase.removeChannel(subscriptionRef.current.channel);
+      subscriptionRef.current = null;
+    }
+
+    const filterString = roomId 
+      ? `room_id=eq.${roomId}`
+      : `live_stream_id=eq.${liveStreamId}`;
+    
+    console.log('[CHAT] 🔌 Creating realtime subscription', { 
+      roomId, 
+      liveStreamId, 
+      channelName: `chat-messages-${roomId || liveStreamId}`,
+      filter: filterString 
+    });
     
     // Subscribe to new messages (realtime) with scope filter
     const channel = supabase
-      .channel('chat-messages-realtime')
+      .channel(`chat-messages-${roomId || liveStreamId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'chat_messages',
-          filter: roomId 
-            ? `room_id=eq.${roomId}`
-            : `live_stream_id=eq.${liveStreamId}`,
+          filter: filterString,
         },
         (payload: any) => {
+          console.log('[CHAT] 📨 Realtime event triggered!', { 
+            hasPayload: !!payload, 
+            hasNew: !!payload?.new,
+            payload: payload?.new 
+          });
+          
           // Add new message immediately via realtime - use ref to avoid stale closure
           if (payload?.new) {
+            console.log('[CHAT] ✅ Loading message with profile...');
             loadMessageWithProfileRef.current(payload.new as any);
+          } else {
+            console.warn('[CHAT] ⚠️ Received event but no payload.new');
           }
         }
       )
@@ -456,34 +479,51 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
         subscriptionRef.current = null;
       }
     };
-  }, [supabase]); // Only depend on supabase (memoized, stable)
+  }, [supabase, roomId, liveStreamId]); // Depend on roomId and liveStreamId to recreate subscription
 
   // CRITICAL: Load messages when currentUserId changes, but don't recreate subscription
   useEffect(() => {
     loadMessages();
   }, [currentUserId, loadMessages]); // Include loadMessages in deps since it's memoized
 
+  // Auto-scroll when messages change
+  useEffect(() => {
+    if (messages.length > 0 && shouldAutoScrollRef.current) {
+      requestAnimationFrame(() => scrollToBottom('smooth'));
+    }
+  }, [messages.length, scrollToBottom]);
+
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
+    console.log('[CHAT] 🚀 sendMessage triggered');
+    
     const messageToSend = newMessage.trim();
-    if (!messageToSend) return;
+    if (!messageToSend) {
+      console.log('[CHAT] ⚠️ Empty message, ignoring');
+      return;
+    }
+
+    console.log('[CHAT] 📝 Message to send:', messageToSend);
 
     // Clear input IMMEDIATELY (before any async operations)
     setNewMessage('');
 
     // Send message to database (non-blocking)
     if (!currentUserId) {
+      console.error('[CHAT] ❌ No currentUserId - user not logged in');
       alert('Please log in to send messages');
       setNewMessage(messageToSend);
       return;
     }
 
+    console.log('[CHAT] 👤 Current user ID:', currentUserId);
+    console.log('[CHAT] 🏠 Chat scope:', { roomId, liveStreamId });
+
     // Use current user's profile for optimistic message (or fallback)
     const optimisticUsername = currentUserProfile?.username || 'You';
     const optimisticAvatar = currentUserProfile?.avatar_url;
-    const optimisticGifterLevel = currentUserProfile?.gifter_level || 0;
     
     // Create a unique temp ID based on timestamp and content hash
     const tempId = `temp-${Date.now()}-${messageToSend.slice(0, 10)}`;
@@ -492,13 +532,12 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
       profile_id: currentUserId,
       username: optimisticUsername,
       avatar_url: optimisticAvatar,
-      gifter_level: optimisticGifterLevel,
-      badge_name: undefined, // Will be loaded if needed
-      badge_color: undefined,
       message_type: 'text',
       content: messageToSend,
       created_at: new Date().toISOString(),
     };
+    
+    console.log('[CHAT] ⚡ Adding optimistic message:', optimisticMsg);
     
     // Add optimistic message immediately (synchronous)
     setMessages((prev) => {
@@ -512,6 +551,8 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
     // Ensure profile exists before sending message
     // This prevents foreign key constraint violations
     const ensureProfileExists = async () => {
+      console.log('[CHAT] 🔍 Checking if profile exists...');
+      
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id')
@@ -519,6 +560,8 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
         .single();
 
       if (!existingProfile) {
+        console.warn('[CHAT] ⚠️ Profile does not exist, creating...');
+        
         // Profile doesn't exist - try to create it
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
@@ -534,34 +577,63 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
             display_name: defaultUsername,
             coin_balance: 0,
             earnings_balance: 0,
-            gifter_level: 0,
           });
 
         if (createError) {
-          console.error('Failed to create profile for chat:', createError);
+          console.error('[CHAT] ❌ Failed to create profile:', createError);
           throw new Error(`Profile not found. Please contact support.`);
         }
+        
+        console.log('[CHAT] ✅ Profile created successfully');
+      } else {
+        console.log('[CHAT] ✅ Profile exists');
       }
     };
 
     // Send to database in background (realtime will replace optimistic with real message)
     ensureProfileExists()
       .then(() => {
-        return (supabase.from('chat_messages') as any).insert({
+        console.log('[CHAT] 💾 Preparing to insert message into database...');
+        
+        // CRITICAL: For solo streams, use ONLY live_stream_id. For group streams, use ONLY room_id.
+        const insertData: any = {
           profile_id: currentUserId,
           message_type: 'text',
           content: messageToSend,
-          room_id: roomId || null,
-          live_stream_id: liveStreamId || null,
-        });
+        };
+        
+        // Set ONLY the appropriate scope field (don't set both!)
+        if (liveStreamId) {
+          insertData.live_stream_id = liveStreamId;
+          insertData.room_id = null;
+          console.log('[CHAT] 🎥 Solo stream message - live_stream_id:', liveStreamId);
+        } else if (roomId) {
+          insertData.room_id = roomId;
+          insertData.live_stream_id = null;
+          console.log('[CHAT] 👥 Room message - room_id:', roomId);
+        } else {
+          console.error('[CHAT] ❌ CRITICAL: Neither roomId nor liveStreamId is set!');
+        }
+        
+        console.log('[CHAT] 💬 Final insert data:', insertData);
+        return (supabase.from('chat_messages') as any).insert(insertData);
       })
       .then(({ error, data }: { error: any; data: any }) => {
         if (error) {
-          console.error('Error sending message:', error);
+          console.error('[CHAT] ❌ Database insert error:', error);
+          console.error('[CHAT] ❌ Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          });
           // Remove optimistic message on error
           setMessages((prev) => prev.filter(m => m.id !== tempId));
           setNewMessage(messageToSend); // Restore input
           alert(`Failed to send message: ${error.message || 'Unknown error'}`);
+        } else {
+          console.log('[CHAT] ✅ Message inserted successfully!');
+          console.log('[CHAT] 📊 Insert response data:', data);
         }
         // If success, realtime subscription will receive the new message
         // and replace the optimistic one (matched by profile_id + content + recent timestamp)
@@ -606,22 +678,17 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-transparent lg:bg-white lg:dark:bg-gray-800">
-      {/* Chat Header */}
-      <div className="px-3 pb-3 pt-2 border-b border-white/20 lg:border-gray-200 lg:dark:border-gray-700 flex-shrink-0 hidden lg:block">
-        <h2 className="text-base font-semibold">Global Chat</h2>
-      </div>
-
-      {/* Messages - Flexible height with scroll */}
+    <div className="flex flex-col h-full min-h-0 bg-white dark:bg-gray-900">
+      {/* Messages - Flexible height with scroll, no header */}
       <div
         ref={messagesContainerRef}
         onScroll={updateAutoScrollFlag}
-        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar flex flex-col justify-end"
+        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar flex flex-col justify-end bg-gray-50 dark:bg-gray-800"
       >
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-12 bg-gray-100/50 lg:bg-gray-100 dark:bg-gray-700/50 lg:dark:bg-gray-700 rounded animate-pulse" />
+              <div key={i} className="h-12 bg-gray-100/50 dark:bg-gray-700/50 rounded animate-pulse" />
             ))}
           </div>
         ) : messages.length === 0 ? (
@@ -634,69 +701,79 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
               key={msg.id}
               className={`flex gap-2 items-start ${
                 msg.message_type === 'system' ? 'justify-center' : ''
-              }`}
+              } w-full`}
             >
-              {msg.message_type !== 'system' && msg.profile_id && (
-                <>
-                  <img
-                    src={getAvatarUrl(msg.avatar_url)}
-                    alt={msg.username}
-                    className="w-8 h-8 rounded-full flex-shrink-0"
-                    onError={(e) => {
-                      e.currentTarget.src = '/no-profile-pic.png';
-                    }}
-                  />
-                </>
-              )}
-
-              <div className="flex-1 min-w-0">
+              <div className="flex gap-2 items-start w-full">
                 {msg.message_type === 'system' ? (
-                  <div className="text-center text-sm text-white/70 lg:text-gray-500 lg:dark:text-gray-400 italic">
+                  <div className="text-center text-sm text-gray-500 dark:text-gray-400 italic">
                     {msg.content}
                   </div>
                 ) : (
-                  <div 
-                    className={`flex flex-col ${msg.chat_bubble_color ? '' : (msg.profile_id ? getUserBubbleColor(msg.profile_id) : 'bg-black/20')} lg:bg-transparent backdrop-blur-sm lg:backdrop-blur-none rounded-lg px-2 py-1 lg:px-0 lg:py-0`}
-                    style={msg.chat_bubble_color ? { backgroundColor: `${msg.chat_bubble_color}66` } : undefined}
+                  <div
+                    className="flex w-full items-start gap-2 px-2 py-1.5"
                   >
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => {
-                        if (msg.profile_id && msg.username) {
-                          setSelectedProfile({
-                            profileId: msg.profile_id,
-                            username: msg.username,
-                            avatarUrl: msg.avatar_url,
-                            gifterStatus: gifterStatusMap[msg.profile_id] || null,
-                          });
-                        }
-                      }}
-                      className="font-semibold text-xs text-white lg:text-gray-900 lg:dark:text-white hover:text-blue-300 lg:hover:text-blue-500 lg:dark:hover:text-blue-400 transition cursor-pointer leading-tight"
-                      style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                    >
-                      {msg.username}
-                    </button>
+                    <LiveAvatar
+                      avatarUrl={msg.avatar_url}
+                      username={msg.username || 'Unknown'}
+                      isLive={msg.is_live}
+                      size="sm"
+                      showLiveBadge={false}
+                    />
+
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (msg.profile_id && msg.username) {
+                              setSelectedProfile({
+                                profileId: msg.profile_id,
+                                username: msg.username,
+                                avatarUrl: msg.avatar_url,
+                                gifterStatus: gifterStatusMap[msg.profile_id] || null,
+                                isLive: msg.is_live,
+                              });
+                            }
+                          }}
+                          className="font-semibold text-xs text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer leading-tight"
+                          style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                        >
+                          {msg.username}
+                        </button>
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                          {formatTime(msg.created_at)}
+                        </span>
+                      </div>
+
                       {(() => {
-                        if (!msg.profile_id) return null;
-                        const status = gifterStatusMap[msg.profile_id];
-                        if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
+                        const status = msg.profile_id ? gifterStatusMap[msg.profile_id] : null;
+                        if (!status || Number(status.lifetime_coins ?? 0) <= 0) {
+                          // No badge - just show message
+                          return (
+                            <div
+                              className="text-sm text-gray-900 dark:text-white break-words leading-snug"
+                              style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                            >
+                              <SafeRichText text={msg.content} />
+                            </div>
+                          );
+                        }
+                        // Show tier badge + message
                         return (
-                          <TierBadge
-                            tier_key={status.tier_key}
-                            level={status.level_in_tier}
-                            size="sm"
-                          />
+                          <div className="flex items-start gap-2">
+                            <TierBadge
+                              tier_key={status.tier_key}
+                              level={status.level_in_tier}
+                              size="sm"
+                            />
+                            <div
+                              className="text-sm text-gray-900 dark:text-white break-words leading-snug flex-1 min-w-0"
+                              style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                            >
+                              <SafeRichText text={msg.content} />
+                            </div>
+                          </div>
                         );
                       })()}
-                      <span className="text-[10px] text-white/50 lg:text-gray-500 lg:dark:text-gray-400 leading-tight">
-                        {formatTime(msg.created_at)}
-                      </span>
-                    </div>
-                    <div 
-                      className="text-sm text-white/90 lg:text-gray-700 lg:dark:text-gray-300 break-words leading-snug"
-                      style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                    >
-                      <SafeRichText text={msg.content} />
                     </div>
                   </div>
                 )}
@@ -708,19 +785,21 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
       </div>
 
       {/* Message Input - Sticky at bottom */}
-      <form 
-        onSubmit={sendMessage} 
-        className="sticky bottom-0 p-3 border-t border-white/20 lg:border-gray-200 lg:dark:border-gray-700 bg-transparent lg:bg-white lg:dark:bg-gray-800 shadow-lg z-40 flex-shrink-0"
-      >
-        <div className="w-full">
+      {/* Chat Input - only show if not readOnly */}
+      {!readOnly && (
+        <form 
+          onSubmit={sendMessage} 
+          className="sticky bottom-0 px-3 py-2.5 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg z-40 flex-shrink-0"
+        >
           <div className="flex gap-2 items-center">
-            {/* Settings Button - Mobile/Tablet only */}
+            {/* Settings Button */}
             {onSettingsClick && (
               <button
                 type="button"
                 onClick={onSettingsClick}
-                className="lg:hidden p-2 text-white/70 hover:text-white transition flex-shrink-0"
+                className="p-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
                 title="Chat Settings"
+                aria-label="Chat Settings"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
@@ -728,6 +807,30 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
                 </svg>
               </button>
             )}
+            
+            {/* GIF Button */}
+            <button
+              type="button"
+              onClick={() => {
+                // TODO: Implement GIF picker
+                alert('GIF picker coming soon!');
+              }}
+              className="p-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+              title="Send GIF"
+              aria-label="Send GIF"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                <line x1="7" y1="2" x2="7" y2="22"></line>
+                <line x1="17" y1="2" x2="17" y2="22"></line>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <line x1="2" y1="7" x2="7" y2="7"></line>
+                <line x1="2" y1="17" x2="7" y2="17"></line>
+                <line x1="17" y1="17" x2="22" y2="17"></line>
+                <line x1="17" y1="7" x2="22" y2="7"></line>
+              </svg>
+            </button>
+            
             <input
               type="text"
               value={newMessage}
@@ -739,16 +842,28 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
                 }
               }}
               placeholder="Type a message..."
-              className="flex-1 px-3 py-2 text-sm border border-white/30 lg:border-gray-300 lg:dark:border-gray-600 rounded-full lg:rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 lg:bg-white lg:dark:bg-gray-700 text-white lg:text-gray-900 lg:dark:text-white placeholder-white/60 lg:placeholder-gray-500 min-w-0"
+              className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-w-0"
               maxLength={500}
             />
-            {/* Gift Button - Mobile/Tablet only */}
+            
+            {/* Send Button */}
+            <button
+              type="submit"
+              disabled={!newMessage.trim()}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              title="Send Message"
+            >
+              Send
+            </button>
+            
+            {/* Gift Button */}
             {onGiftClick && (
               <button
                 type="button"
                 onClick={onGiftClick}
-                className="lg:hidden p-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:from-purple-600 hover:to-pink-600 transition flex-shrink-0"
+                className="p-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:from-purple-600 hover:to-pink-600 transition flex-shrink-0 mobile-touch-target"
                 title="Send Gift"
+                aria-label="Send Gift"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 12 20 22 4 22 4 12"></polyline>
@@ -759,13 +874,14 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
                 </svg>
               </button>
             )}
-            {/* Share Button - Mobile/Tablet only */}
+            {/* Share Button */}
             {onShareClick && (
               <button
                 type="button"
                 onClick={onShareClick}
-                className="lg:hidden p-2 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/30 transition flex-shrink-0"
+                className="p-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
                 title="Share"
+                aria-label="Share"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="18" cy="5" r="3"></circle>
@@ -776,16 +892,9 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
                 </svg>
               </button>
             )}
-            {/* Send Button - Desktop only */}
-            <button
-              type="submit"
-              className="hidden lg:block px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-semibold hover:bg-blue-600 transition flex-shrink-0 whitespace-nowrap"
-            >
-              Send
-            </button>
           </div>
-        </div>
       </form>
+      )}
 
       {/* User Action Card V2 */}
       {selectedProfile && (

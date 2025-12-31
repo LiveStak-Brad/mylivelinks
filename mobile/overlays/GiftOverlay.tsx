@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Animated, {
   useAnimatedStyle,
@@ -9,6 +9,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { Participant } from '../types/live';
+import { useAuthContext } from '../contexts/AuthContext';
+import { fetchAuthed } from '../lib/api';
+import { generateSessionId } from '../lib/deviceId';
 
 interface GiftOverlayProps {
   visible: boolean;
@@ -25,6 +28,9 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
   targetRecipientId,
   onSelectRecipientId,
 }) => {
+  const { user, getAccessToken } = useAuthContext();
+  const [coinsAmount, setCoinsAmount] = useState<number>(50);
+  const [sending, setSending] = useState(false);
   const translateX = useSharedValue(0);
 
   const panGesture = Gesture.Pan()
@@ -48,6 +54,88 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
     return participants.filter((p) => !p.isLocal);
   }, [participants]);
 
+  const parseProfileIdFromIdentity = useCallback((identityRaw: string | null): string | null => {
+    const identity = typeof identityRaw === 'string' ? identityRaw : '';
+    if (!identity) return null;
+    if (identity.startsWith('u_')) {
+      const rest = identity.slice('u_'.length);
+      const profileId = rest.split(':')[0];
+      return profileId || null;
+    }
+    // Backward compatibility: some environments may still provide UUID identity
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identity)) {
+      return identity;
+    }
+    return null;
+  }, []);
+
+  const recipientProfileId = useMemo(() => {
+    return parseProfileIdFromIdentity(targetRecipientId);
+  }, [parseProfileIdFromIdentity, targetRecipientId]);
+
+  const recipientLabel = useMemo(() => {
+    if (!targetRecipientId) return null;
+    const p = participants.find((x) => x.identity === targetRecipientId);
+    return p?.username || targetRecipientId;
+  }, [participants, targetRecipientId]);
+
+  const handleSendGift = useCallback(async () => {
+    if (sending) return;
+
+    if (!user?.id) {
+      Alert.alert('Login required', 'Please log in to send gifts.');
+      return;
+    }
+
+    if (!recipientProfileId) {
+      Alert.alert('Select a recipient', 'Choose someone in the room to send a gift to.');
+      return;
+    }
+
+    if (recipientProfileId === user.id) {
+      Alert.alert('Not allowed', 'You cannot send a gift to yourself.');
+      return;
+    }
+
+    if (!coinsAmount || coinsAmount <= 0) {
+      Alert.alert('Invalid amount', 'Choose a valid coin amount.');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const accessToken = await getAccessToken();
+      const requestId = generateSessionId();
+
+      const res = await fetchAuthed(
+        '/api/gifts/send',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toUserId: recipientProfileId,
+            coinsAmount,
+            requestId,
+            context: 'live_room',
+          }),
+        },
+        accessToken
+      );
+
+      if (!res.ok) {
+        const msg = res.status === 403 ? 'Gifting is temporarily disabled.' : (res.message || 'Failed to send gift');
+        throw new Error(msg);
+      }
+
+      Alert.alert('Gift sent', `Sent ${coinsAmount} coins to ${recipientLabel || 'recipient'}.`);
+      onClose();
+    } catch (err: any) {
+      Alert.alert('Gift failed', err?.message || 'Failed to send gift');
+    } finally {
+      setSending(false);
+    }
+  }, [coinsAmount, getAccessToken, onClose, recipientLabel, recipientProfileId, sending, user?.id]);
+
   if (!visible) return null;
 
   return (
@@ -66,8 +154,8 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
               </View>
 
               <View style={styles.noteBox}>
-                <Text style={styles.noteText}>Coming soon</Text>
-                <Text style={styles.noteSubtext}>Recipient selection is wired. Purchase + send flow will be enabled later.</Text>
+                <Text style={styles.noteText}>Send a gift</Text>
+                <Text style={styles.noteSubtext}>Choose a recipient and a coin amount.</Text>
               </View>
 
               <View style={styles.section}>
@@ -85,7 +173,6 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
                         onPress={() => {
                           try {
                             onSelectRecipientId(p.identity);
-                            onClose();
                           } catch (err) {
                             console.error('[GiftOverlay] Selection error:', err);
                           }
@@ -98,6 +185,37 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
                   })
                 )}
               </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Amount</Text>
+                <View style={styles.amountRow}>
+                  {[10, 50, 100, 500].map((amt) => {
+                    const active = coinsAmount === amt;
+                    return (
+                      <TouchableOpacity
+                        key={amt}
+                        style={[styles.amountPill, active && styles.amountPillActive]}
+                        onPress={() => setCoinsAmount(amt)}
+                        disabled={sending}
+                      >
+                        <Text style={[styles.amountText, active && styles.amountTextActive]}>{amt}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.sendButton, (!recipientProfileId || sending) && styles.sendButtonDisabled]}
+                onPress={handleSendGift}
+                disabled={!recipientProfileId || sending}
+              >
+                {sending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.sendButtonText}>Send Gift</Text>
+                )}
+              </TouchableOpacity>
             </ScrollView>
           </BlurView>
         </Animated.View>
@@ -210,5 +328,49 @@ const styles = StyleSheet.create({
     color: '#ff6b9d',
     fontSize: 12,
     fontWeight: '800',
+  },
+  amountRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  amountPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    minWidth: 56,
+    alignItems: 'center',
+  },
+  amountPillActive: {
+    borderColor: '#ff6b9d',
+    backgroundColor: 'rgba(255, 107, 157, 0.14)',
+  },
+  amountText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  amountTextActive: {
+    color: '#ff6b9d',
+  },
+  sendButton: {
+    marginTop: 18,
+    backgroundColor: '#f59e0b',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  sendButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.4,
   },
 });

@@ -7,6 +7,7 @@ import GiftPickerMini from './GiftPickerMini';
 import { useIM } from '@/components/im';
 import SafeRichText from '@/components/SafeRichText';
 import SafeOutboundLink from '@/components/SafeOutboundLink';
+import LiveAvatar from '@/components/LiveAvatar';
 
 interface MessageThreadProps {
   conversation: Conversation;
@@ -213,22 +214,15 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
         )}
         
         {/* Avatar */}
-        <div className="relative flex-shrink-0">
-          {conversation.recipientAvatar ? (
-            <img
-              src={conversation.recipientAvatar}
-              alt={conversation.recipientUsername}
-              className="w-10 h-10 rounded-full object-cover"
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
-              {(conversation.recipientDisplayName || conversation.recipientUsername).charAt(0).toUpperCase()}
-            </div>
-          )}
-          {conversation.isOnline && (
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-card" />
-          )}
-        </div>
+        <LiveAvatar
+          avatarUrl={conversation.recipientAvatar}
+          username={conversation.recipientUsername}
+          displayName={conversation.recipientDisplayName || conversation.recipientUsername}
+          isLive={conversation.recipientIsLive}
+          size="md"
+          showLiveBadge={false}
+          clickable={true}
+        />
 
         {/* Name & Status */}
         <div className="flex-1 min-w-0">

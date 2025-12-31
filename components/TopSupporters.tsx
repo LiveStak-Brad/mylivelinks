@@ -5,12 +5,13 @@ import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
-import { getAvatarUrl } from '@/lib/defaultAvatar';
+import LiveAvatar from '@/components/LiveAvatar';
 
 interface Supporter {
   profile_id: string;
   username: string;
   avatar_url?: string;
+  is_live?: boolean;
   total_gifted: number; // Total coins gifted to current user
   gift_count: number; // Number of gifts sent
 }
@@ -96,7 +97,8 @@ export default function TopSupporters() {
           sender:profiles!gifts_sender_id_fkey (
             id,
             username,
-            avatar_url
+            avatar_url,
+            is_live
           )
         `)
         .eq('recipient_id', user.id)
@@ -127,6 +129,7 @@ export default function TopSupporters() {
             profile_id: senderId,
             username: profile.username || 'Unknown',
             avatar_url: profile.avatar_url,
+            is_live: Boolean(profile.is_live ?? false),
             total_gifted: gift.coin_amount || 0,
             gift_count: 1,
           });
@@ -152,7 +155,7 @@ export default function TopSupporters() {
   if (loading) {
     return (
       <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-        <h3 className="text-base font-semibold mb-3">Your Top Supporters</h3>
+        <h3 className="text-lg font-semibold mb-2">Your Top Supporters</h3>
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
             <div key={i} className="animate-pulse flex items-center gap-2 p-2 bg-gray-200 dark:bg-gray-700 rounded">
@@ -168,7 +171,7 @@ export default function TopSupporters() {
   if (supporters.length === 0) {
     return (
       <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-        <h3 className="text-base font-semibold mb-3">Your Top Supporters</h3>
+        <h3 className="text-lg font-semibold mb-2">Your Top Supporters</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
           No supporters yet. Start streaming to receive gifts!
         </p>
@@ -178,7 +181,7 @@ export default function TopSupporters() {
 
   return (
     <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-      <h3 className="text-base font-semibold mb-3">Your Top Supporters</h3>
+      <h3 className="text-lg font-semibold mb-2">Your Top Supporters</h3>
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {supporters.map((supporter, index) => (
           <div
@@ -191,13 +194,12 @@ export default function TopSupporters() {
             </div>
 
             {/* Avatar */}
-            <img
-              src={getAvatarUrl(supporter.avatar_url)}
-              alt={supporter.username}
-              className="w-8 h-8 rounded-full flex-shrink-0"
-              onError={(e) => {
-                e.currentTarget.src = '/no-profile-pic.png';
-              }}
+            <LiveAvatar
+              avatarUrl={supporter.avatar_url}
+              username={supporter.username}
+              isLive={supporter.is_live}
+              size="sm"
+              showLiveBadge={false}
             />
 
             {/* Username & Badge */}

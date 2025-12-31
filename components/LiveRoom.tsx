@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ReactNode, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { Volume2, Focus, Shuffle, Eye, Gift as GiftIcon, Sparkles, FileText } from 'lucide-react';
@@ -24,12 +25,11 @@ import Image from 'next/image';
 import { useRoomPresence } from '@/hooks/useRoomPresence';
 import { Room, RoomEvent } from 'livekit-client';
 import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
-import { useOrientation } from '@/hooks/useOrientation';
 import MobileWebWatchLayout from './mobile/MobileWebWatchLayout';
-import RotatePhoneOverlay from './mobile/RotatePhoneOverlay';
 import RoomBanner from './RoomBanner';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
+import Drawer from '@/components/owner/ui-kit/Drawer';
 
 interface LiveStreamer {
   id: string;
@@ -58,6 +58,39 @@ type UiPanels = {
   viewersOpen: boolean;
   rightStackOpen: boolean; // supporters/stats/coins block
 };
+
+type PanelShellProps = {
+  title: ReactNode;
+  children: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+};
+
+function PanelShell({ title, children, className = '', bodyClassName = '' }: PanelShellProps) {
+  return (
+    <div className={`flex flex-col min-h-0 overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}> 
+      <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</div>
+      </div>
+      <div className={`flex-1 min-h-0 overflow-y-auto ${bodyClassName}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function LiveRoomStatsStack() {
+  return (
+    <div className="p-4 space-y-4">
+      <TopSupporters />
+      <UserStatsSection />
+      <CoinPurchaseSection />
+      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+        <DiamondConversion />
+      </div>
+    </div>
+  );
+}
 
 interface LiveRoomProps {
   mode?: 'solo' | 'battle';
@@ -134,18 +167,24 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
     viewersOpen: true,
     rightStackOpen: true,
   });
+  const [panelMode, setPanelMode] = useState<'inline' | 'drawer'>('inline');
+  const [drawerOpen, setDrawerOpen] = useState<'leaderboard' | 'viewers' | 'stats' | null>(null);
+  useEffect(() => {
+    const updatePanelMode = () => {
+      const isDrawer = window.innerWidth < 1280; // below xl switch to drawer overlay
+      setPanelMode(isDrawer ? 'drawer' : 'inline');
+      if (!isDrawer) setDrawerOpen(null);
+    };
+    updatePanelMode();
+    window.addEventListener('resize', updatePanelMode);
+    return () => window.removeEventListener('resize', updatePanelMode);
+  }, []);
+  const [bannerCollapsed, setBannerCollapsed] = useState(true); // Room banner starts collapsed
+  const [headerCollapsed, setHeaderCollapsed] = useState(true); // Main header starts collapsed
 
   // MOBILE WEB: Detect mobile web browser and orientation
   const isMobileWeb = useIsMobileWeb();
-  const { isLandscape, isPortrait } = useOrientation();
-  const [mobilePortraitDismissed, setMobilePortraitDismissed] = useState(false);
   
-  // Reset dismiss state when orientation changes to landscape (user rotated)
-  useEffect(() => {
-    if (isLandscape) {
-      setMobilePortraitDismissed(false);
-    }
-  }, [isLandscape]);
 
   // CRITICAL: Memoize Supabase client to prevent recreation on every render
   // This prevents effects from re-running and causing LiveKit disconnect/reconnect loops
@@ -2666,16 +2705,6 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
   // Landscape mode: Show MobileWebWatchLayout
   
   if (isMobileWeb) {
-    // Portrait mode on mobile web: show rotate overlay
-    if (isPortrait && !mobilePortraitDismissed) {
-      return (
-        <RotatePhoneOverlay 
-          onContinue={() => setMobilePortraitDismissed(true)} 
-        />
-      );
-    }
-    
-    // Landscape mode (or portrait dismissed): show mobile watch layout
     return (
       <MobileWebWatchLayout
         mode={mode}
@@ -2702,143 +2731,13 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
   // ============================================
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col">
+    <div className="h-[100dvh] w-[100dvw] bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col fixed inset-0 pt-0 min-h-0">
       {/* Testing Mode Banner (if auth disabled) */}
       {authDisabled && (
         <div className="w-full bg-yellow-500 dark:bg-yellow-600 text-black dark:text-white text-center py-2 px-4 text-sm font-semibold">
           ⚠️ TESTING MODE: Authentication Disabled - Anyone can access
         </div>
       )}
-      
-      {/* Room Banner */}
-      <RoomBanner
-        roomKey="live-central"
-        roomName="Live Central Room"
-        roomLogoUrl="/livecentral.png"
-        presentedBy="MyLiveLinks Official"
-        bannerStyle="default"
-      />
-      
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-50 relative pb-1 lg:pb-4">
-        <div className="w-full px-1 md:px-3 lg:px-6 flex items-center justify-between relative min-h-[56px] md:min-h-[70px] lg:min-h-[100px] xl:min-h-[120px]">
-          {/* Left Section - Apply for a Room */}
-          <div className="flex items-center flex-shrink-0 z-10">
-            <a
-              href="/apply"
-              className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
-              title="Apply for a Room"
-            >
-              <FileText className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-blue-500 dark:text-blue-400" strokeWidth={2} />
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                Apply for a Room
-              </span>
-            </a>
-          </div>
-
-          {/* Sort Buttons Group - Positioned halfway between Apply and Logo */}
-          <div className="flex items-center gap-2 md:gap-3 lg:gap-4 flex-shrink-0 z-10 absolute left-[22%] md:left-[25%] transform -translate-x-1/2">
-            <button
-              onClick={handleRandomize}
-              className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
-                sortMode === 'random' ? 'scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'
-              }`}
-              title="Randomize"
-            >
-              <Shuffle className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-purple-500 dark:text-purple-400" strokeWidth={2} />
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                Randomize
-              </span>
-            </button>
-            
-            <button
-              onClick={() => handleSortModeChange('most_viewed')}
-              className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
-                sortMode === 'most_viewed' ? 'scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'
-              }`}
-              title="Most Viewed"
-            >
-              <Eye className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-cyan-500 dark:text-cyan-400" strokeWidth={2} />
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                Most Viewed
-              </span>
-            </button>
-            
-            <button
-              onClick={() => handleSortModeChange('most_gifted')}
-              className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
-                sortMode === 'most_gifted' ? 'scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'
-              }`}
-              title="Most Gifted"
-            >
-              <GiftIcon className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-pink-500 dark:text-pink-400" strokeWidth={2} />
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                Most Gifted
-              </span>
-            </button>
-            
-            <button
-              onClick={() => handleSortModeChange('newest')}
-              className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
-                sortMode === 'newest' ? 'scale-110' : 'hover:scale-110 opacity-70 hover:opacity-100'
-              }`}
-              title="Newest"
-            >
-              <Sparkles className="w-5 h-5 md:w-7 md:h-7 lg:w-9 lg:h-9 text-yellow-500 dark:text-yellow-400" strokeWidth={2} />
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                Newest
-              </span>
-            </button>
-          </div>
-
-          {/* Center Logo - Absolutely centered, sized to fit header perfectly */}
-          <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-0">
-            <a href="/live" className="flex items-center pointer-events-auto">
-              <Image
-                src="/branding/mylivelinkstransparent.png"
-                alt="MyLiveLinks"
-                width={400}
-                height={160}
-                className="h-10 md:h-14 lg:h-24 xl:h-36 2xl:h-44 w-auto object-contain"
-                priority
-              />
-            </a>
-          </div>
-
-          {/* Right Section - Go Live, Unmute All, Focus Mode, Options and Login grouped together */}
-          <div className="flex items-center gap-2 md:gap-3 lg:gap-4 flex-shrink-0 z-10">
-            <GoLiveButton 
-              sharedRoom={sharedRoom} 
-              isRoomConnected={isRoomConnected} 
-              onGoLive={handleGoLive}
-              onPublishingChange={setIsCurrentUserPublishing}
-              publishAllowed={publishAllowed}
-            />
-            <button
-              onClick={handleUnmuteAll}
-              className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
-              title="Unmute all tiles to enable sound"
-            >
-              <Volume2 className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-green-500 dark:text-green-400" strokeWidth={2} />
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                Unmute All
-              </span>
-            </button>
-            <button
-              onClick={toggleFocusMode}
-              className="group relative p-2 md:p-3 lg:p-4 transition-all duration-200 hover:scale-110"
-              title={uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}
-            >
-              <Focus className="w-6 h-6 md:w-8 md:h-8 lg:w-10 lg:h-10 text-indigo-500 dark:text-indigo-400" strokeWidth={2} />
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                {uiPanels.focusMode ? 'Show UI' : 'Focus Mode'}
-              </span>
-            </button>
-            <OptionsMenu />
-            <UserMenu />
-          </div>
-        </div>
-      </header>
 
       {/* Main Content - Vertical Layout: Cameras on top, then Chat/Viewers/Leaderboard below */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -2856,7 +2755,6 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
                   streamerAvatar={expandedSlot.streamer.avatar_url}
                   isLive={expandedSlot.streamer.live_available}
                   viewerCount={expandedSlot.streamer.viewer_count}
-                  gifterLevel={expandedSlot.streamer.gifter_level}
                   gifterStatus={expandedSlot.streamer.gifter_status}
                   slotIndex={expandedSlot.slotIndex}
                   liveStreamId={expandedSlot.streamer.id && expandedSlot.streamer.live_available ? (() => {
@@ -2886,11 +2784,13 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
         {/* Normal Grid Mode */}
         {expandedTileId === null && (
           <>
-            {/* Video Grid - Top (Full Width, Bigger) */}
-            <div className={`${uiPanels.focusMode ? 'flex-1' : 'flex-shrink-0'} px-2 ${uiPanels.focusMode ? 'py-2 pb-2' : 'pt-8 pb-0'} overflow-hidden`}>
-              <div className="max-w-full mx-auto w-full h-full flex items-center justify-center">
+            {/* Video Grid - Top (Full Width, Bigger) - Full screen on mobile */}
+            <div
+              className={`${uiPanels.focusMode ? 'flex-1' : 'md:flex-shrink-0 flex-1 md:flex-initial'} px-2 ${uiPanels.focusMode ? 'py-0 pb-0' : 'pt-0 pb-0'} pt-[var(--header-height)] lg:pt-[var(--header-height-lg)] overflow-x-hidden overflow-y-auto lg:overflow-hidden`}
+            >
+              <div className="max-w-full mx-auto w-full h-full flex items-start lg:items-center justify-center">
                 {/* 12-Tile Grid - 4/4/4 layout in Focus Mode, 6/6 otherwise */}
-                <div className={`grid ${uiPanels.focusMode ? 'grid-cols-4' : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6'} ${uiPanels.focusMode ? 'gap-1.5 max-w-[90%]' : 'gap-2'} w-full ${uiPanels.focusMode ? 'h-auto' : 'h-full'}`}>
+                <div className={`grid ${uiPanels.focusMode ? 'grid-cols-4' : 'grid-cols-4 lg:grid-cols-6'} ${uiPanels.focusMode ? 'gap-1 max-w-[90%]' : 'gap-1'} w-full ${uiPanels.focusMode ? 'h-auto' : 'h-full'}`}>
                 {(() => {
                   // DEBUG: Log grid rendering (only in debug mode to avoid performance issues)
                   if (process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1') {
@@ -3207,7 +3107,6 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
                               streamerAvatar={typeof streamer.avatar_url === 'string' ? streamer.avatar_url : undefined}
                               isLive={!!streamer.live_available}
                               viewerCount={typeof streamer.viewer_count === 'number' ? streamer.viewer_count : 0}
-                              gifterLevel={typeof streamer.gifter_level === 'number' ? streamer.gifter_level : 0}
                               gifterStatus={(streamer as any).gifter_status || null}
                               slotIndex={slot.slotIndex}
                               liveStreamId={liveStreamId}
@@ -3265,61 +3164,144 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
           currentUserId={currentUserId}
         />
 
-            {/* Bottom Section - Leaderboard, Chat, Viewers + Stats side by side */}
-            {!uiPanels.focusMode && (
-              <div className="flex-1 flex flex-row min-h-0 overflow-hidden border-t border-gray-200 dark:border-gray-700">
-                {/* Leaderboards - Left */}
-                {uiPanels.leaderboardsOpen && (
-                  <div className="hidden lg:flex lg:w-80 xl:w-96 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
-                    <Leaderboard />
+        {/* Bottom Section - Leaderboard, Chat, Viewers + Stats side by side - HIDE ON MOBILE */}
+        {!uiPanels.focusMode && (
+          <>
+            <div className="hidden 2xl:flex flex-1 min-h-0 overflow-hidden border-t border-gray-200 dark:border-gray-700 2xl:flex-row xl:flex-row lg:flex-col">
+              {/* Leaderboards - Left */}
+              {uiPanels.leaderboardsOpen && (
+                <div className="hidden lg:flex flex-col 2xl:w-[330px] xl:w-[300px] lg:w-[280px] flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 h-[540px] xl:h-[620px] 2xl:h-[700px] max-h-full overflow-y-auto transition-all">
+                  <div className="flex flex-col h-full w-full">
+                    <div className="flex-1 min-h-0 w-full overflow-x-auto overflow-y-auto flex flex-col p-0">
+                      <Leaderboard />
+                    </div>
                   </div>
-                )}
-
-                {/* Chat - Middle (fills remaining space) */}
-                <div className={`flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
-                  <Chat roomId="live_central" />
                 </div>
+              )}
 
-                {/* Viewers + Stats - Right */}
-                {(uiPanels.viewersOpen || uiPanels.rightStackOpen) && (
-                  <div className="hidden lg:flex flex-shrink-0 bg-white dark:bg-gray-800 overflow-hidden flex flex-row">
-                    {/* Viewer List - Left side */}
-                    {uiPanels.viewersOpen && (
-                      <div className="w-64 xl:w-80 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
-                        <ViewerList onDragStart={(viewer) => {
-                          // Viewer drag started - can add visual feedback if needed
-                        }} />
-                      </div>
-                    )}
-                    
-                    {/* Stats - Right side */}
-                    {uiPanels.rightStackOpen && (
-                      <div className="w-80 xl:w-96 flex-shrink-0 overflow-y-auto">
-                        <div className="p-4 space-y-4">
-                          {/* Top Supporters - At the top */}
-                          <TopSupporters />
-                          
-                          {/* User Stats Section */}
-                          <UserStatsSection />
-                          
-                          {/* Coin Purchase Section */}
-                          <CoinPurchaseSection />
-                          
-                          {/* Diamond Conversion - At the bottom */}
-                          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
-                            <DiamondConversion />
-                          </div>
+              {/* Chat - Middle (fills remaining space) */}
+              <div className={`flex-1 min-h-0 h-full overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-w-[350px] md:min-w-[360px] lg:min-w-[400px] xl:min-w-[420px] ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
+                <Chat roomId="live_central" />
+              </div>
+
+              {/* Viewers + Stats - Right */}
+              {(uiPanels.viewersOpen || uiPanels.rightStackOpen) && (
+                <div className="hidden lg:flex flex-shrink-0 bg-white dark:bg-gray-800 overflow-hidden flex flex-row">
+                  {/* Viewer List - Left side */}
+                  {uiPanels.viewersOpen && (
+                    <div className="2xl:w-80 xl:w-full lg:w-full flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto transition-all">
+                      <ViewerList onDragStart={(viewer) => {
+                        // Viewer drag started - can add visual feedback if needed
+                      }} />
+                    </div>
+                  )}
+                  
+                  {/* Stats - Right side */}
+                  {uiPanels.rightStackOpen && (
+                    <div className="2xl:w-80 xl:w-72 lg:w-full flex-shrink-0 overflow-y-auto transition-all">
+                      <div className="space-y-4">
+                        {/* Top Supporters - At the top */}
+                        <TopSupporters />
+                        
+                        {/* User Stats Section */}
+                        <UserStatsSection />
+                        
+                        {/* Coin Purchase Section */}
+                        <CoinPurchaseSection />
+                        
+                        {/* Diamond Conversion - At the bottom */}
+                        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                          <DiamondConversion />
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="hidden xl:grid 2xl:hidden flex-1 min-h-0 overflow-hidden border-t border-gray-200 dark:border-gray-700 h-[clamp(420px,52vh,720px)] grid-cols-[minmax(320px,380px)_minmax(460px,1fr)_minmax(320px,400px)]">
+              <div className="min-h-0 overflow-hidden border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <div className="flex flex-col min-h-0 h-full">
+                  <PanelShell title="Leaderboards" className="flex-1 min-h-0 border-0" bodyClassName="px-5 py-4">
+                    <Leaderboard />
+                  </PanelShell>
+                  <PanelShell title="Viewers" className="flex-1 min-h-0 border-0 border-t border-gray-200 dark:border-gray-700" bodyClassName="p-0">
+                    <ViewerList onDragStart={(viewer) => {
+                      // Viewer drag started - can add visual feedback if needed
+                    }} />
+                  </PanelShell>
+                </div>
               </div>
-            )}
+
+              <div className={`min-h-0 overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
+                <div className="min-h-0 h-full min-w-[460px]">
+                  <Chat roomId="live_central" />
+                </div>
+              </div>
+
+              <div className="min-h-0 overflow-hidden bg-white dark:bg-gray-800">
+                <PanelShell title="Your Stats" className="h-full border-0" bodyClassName="p-0">
+                  <LiveRoomStatsStack />
+                </PanelShell>
+              </div>
+            </div>
+
+            <div className="hidden lg:flex xl:hidden flex-1 min-h-0 overflow-hidden border-t border-gray-200 dark:border-gray-700 flex-col">
+              <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen((prev) => (prev === 'leaderboard' ? null : 'leaderboard'))}
+                    className={`px-3 py-2 rounded-md text-sm font-medium border ${drawerOpen === 'leaderboard' ? 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600' : 'bg-transparent border-transparent hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    aria-pressed={drawerOpen === 'leaderboard'}
+                  >
+                    Leaderboards
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen((prev) => (prev === 'viewers' ? null : 'viewers'))}
+                    className={`px-3 py-2 rounded-md text-sm font-medium border ${drawerOpen === 'viewers' ? 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600' : 'bg-transparent border-transparent hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    aria-pressed={drawerOpen === 'viewers'}
+                  >
+                    Viewers
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDrawerOpen((prev) => (prev === 'stats' ? null : 'stats'))}
+                    className={`px-3 py-2 rounded-md text-sm font-medium border ${drawerOpen === 'stats' ? 'bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600' : 'bg-transparent border-transparent hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    aria-pressed={drawerOpen === 'stats'}
+                  >
+                    Stats
+                  </button>
+                </div>
+              </div>
+
+              <div className={`flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-800 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
+                <Chat roomId="live_central" />
+              </div>
+
+              <Drawer
+                isOpen={drawerOpen !== null}
+                onClose={() => setDrawerOpen(null)}
+                title={drawerOpen === 'leaderboard' ? 'Leaderboards' : drawerOpen === 'viewers' ? 'Viewers' : drawerOpen === 'stats' ? 'Your Stats' : ''}
+                position="right"
+                size="lg"
+              >
+                {drawerOpen === 'leaderboard' && <Leaderboard />}
+                {drawerOpen === 'viewers' && (
+                  <ViewerList onDragStart={(viewer) => {
+                    // Viewer drag started - can add visual feedback if needed
+                  }} />
+                )}
+                {drawerOpen === 'stats' && <LiveRoomStatsStack />}
+              </Drawer>
+            </div>
           </>
+        )}
+        </>
         )}
       </div>
     </div>
   );
 }
-

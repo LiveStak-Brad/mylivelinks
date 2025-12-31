@@ -199,76 +199,78 @@ export default function GiftModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl overflow-hidden flex flex-col modal-fullscreen-mobile" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-4 flex-shrink-0">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">🎁 Send Gift to {recipientUsername}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xl">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xl mobile-touch-target" aria-label="Close">
             ✕
           </button>
         </div>
 
-        <div className="mb-4 p-3 bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30 rounded-lg">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            Your Coins: <span className="font-bold text-yellow-600 dark:text-yellow-400">💰 {userCoinBalance.toLocaleString()}</span>
-          </p>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg">
-            ⚠️ {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-4 gap-3 mb-4 max-h-72 overflow-y-auto p-1 custom-scrollbar">
-          {giftTypes.map((gift) => (
-            <button
-              key={gift.id}
-              onClick={() => setSelectedGift(gift)}
-              className={`p-3 border-2 rounded-lg transition ${
-                selectedGift?.id === gift.id
-                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 shadow-lg scale-105'
-                  : 'border-gray-200 dark:border-gray-600 hover:border-purple-300 hover:bg-purple-50/50 dark:hover:bg-purple-900/20'
-              }`}
-            >
-              {gift.icon_url ? (
-                <img src={gift.icon_url} alt={gift.name} className="w-12 h-12 mx-auto mb-1 drop-shadow-lg" />
-              ) : (
-                <div className="w-12 h-12 mx-auto mb-1 flex items-center justify-center text-4xl drop-shadow-lg">
-                  {gift.emoji || getGiftEmoji(gift.name)}
-                </div>
-              )}
-              <p className="text-xs font-medium truncate">{gift.name}</p>
-              <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold">{gift.coin_cost} 💰</p>
-            </button>
-          ))}
-        </div>
-
-        {selectedGift && (
-          <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg border border-purple-200 dark:border-purple-700">
-            <div className="flex items-center gap-3">
-              <div className="text-3xl">
-                {selectedGift.icon_url ? (
-                  <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-10 h-10" />
-                ) : (
-                  selectedGift.emoji || getGiftEmoji(selectedGift.name)
-                )}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {selectedGift.name}
-                </p>
-                <p className="text-sm text-purple-600 dark:text-purple-400 font-bold">
-                  💰 {selectedGift.coin_cost} coins
-                </p>
-              </div>
-            </div>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-              ✨ Recipient will earn {selectedGift.coin_cost} diamonds
+        <div className="modal-body flex-1 overflow-y-auto">
+          <div className="mb-4 p-3 bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30 rounded-lg">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Your Coins: <span className="font-bold text-yellow-600 dark:text-yellow-400">💰 {userCoinBalance.toLocaleString()}</span>
             </p>
           </div>
-        )}
 
-        <div className="flex gap-3">
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-4 gap-3 mb-4 max-h-72 overflow-y-auto p-1 custom-scrollbar">
+            {giftTypes.map((gift) => (
+              <button
+                key={gift.id}
+                onClick={() => setSelectedGift(gift)}
+                className={`p-3 border-2 rounded-lg transition ${
+                  selectedGift?.id === gift.id
+                    ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 shadow-lg scale-105'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-purple-300 hover:bg-purple-50/50 dark:hover:bg-purple-900/20'
+                }`}
+              >
+                {gift.icon_url ? (
+                  <img src={gift.icon_url} alt={gift.name} className="w-12 h-12 mx-auto mb-1 drop-shadow-lg" />
+                ) : (
+                  <div className="w-12 h-12 mx-auto mb-1 flex items-center justify-center text-4xl drop-shadow-lg">
+                    {gift.emoji || getGiftEmoji(gift.name)}
+                  </div>
+                )}
+                <p className="text-xs font-medium truncate">{gift.name}</p>
+                <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold">{gift.coin_cost} 💰</p>
+              </button>
+            ))}
+          </div>
+
+          {selectedGift && (
+            <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg border border-purple-200 dark:border-purple-700">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl">
+                  {selectedGift.icon_url ? (
+                    <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-10 h-10" />
+                  ) : (
+                    selectedGift.emoji || getGiftEmoji(selectedGift.name)
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {selectedGift.name}
+                  </p>
+                  <p className="text-sm text-purple-600 dark:text-purple-400 font-bold">
+                    💰 {selectedGift.coin_cost} coins
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                ✨ Recipient will earn {selectedGift.coin_cost} diamonds
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 flex-shrink-0 pt-2 mobile-safe-bottom">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium transition"

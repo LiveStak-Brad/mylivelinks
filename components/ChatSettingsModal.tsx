@@ -29,15 +29,32 @@ export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: Ch
 
     const loadSettings = async () => {
       const supabase = createClient();
-      const { data } = await supabase
-        .from('profiles')
+      const { data, error } = await supabase
+        .from('chat_settings')
         .select('chat_bubble_color, chat_font')
-        .eq('id', currentUserId)
-        .single();
+        .eq('profile_id', currentUserId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) return;
 
       if (data) {
         if (data.chat_bubble_color) setSelectedColor(data.chat_bubble_color);
         if (data.chat_font) setSelectedFont(data.chat_font);
+      } else {
+        await supabase
+          .from('chat_settings')
+          .upsert(
+            {
+              profile_id: currentUserId,
+              chat_bubble_color: '#a855f7',
+              chat_font: 'Inter',
+            },
+            {
+              onConflict: 'profile_id',
+            }
+          );
       }
     };
 
@@ -50,17 +67,41 @@ export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: Ch
     setSaving(true);
     const supabase = createClient();
     
-    const { error } = await supabase
-      .from('profiles')
-      .update({
+    console.log('[ChatSettings] 💾 Saving settings:', {
+      profile_id: currentUserId,
+      chat_bubble_color: selectedColor,
+      chat_font: selectedFont,
+    });
+    
+    const { error, data } = await supabase
+      .from('chat_settings')
+      .upsert({
+        profile_id: currentUserId,
         chat_bubble_color: selectedColor,
         chat_font: selectedFont,
+      }, {
+        onConflict: 'profile_id',
       })
-      .eq('id', currentUserId);
+      .select();
 
     if (error) {
-      console.error('[ChatSettings] Error saving:', error);
-      alert('Failed to save settings');
+      console.error('[ChatSettings] ❌ Error saving:', error);
+      alert('Failed to save settings: ' + error.message);
+    } else {
+      console.log('[ChatSettings] ✅ Saved to chat_settings table:', data);
+      
+      // BROADCAST to all open tabs/windows to reload settings
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel('chat-settings-updates');
+        channel.postMessage({
+          type: 'settings-updated',
+          profile_id: currentUserId,
+          chat_bubble_color: selectedColor,
+          chat_font: selectedFont,
+        });
+        channel.close();
+        console.log('[ChatSettings] 📻 Broadcasted settings update');
+      }
     }
 
     setSaving(false);
@@ -71,20 +112,21 @@ export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: Ch
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col modal-fullscreen-mobile">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 mobile-safe-top">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Chat Settings</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors mobile-touch-target"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="modal-body p-6 space-y-6">
           {/* Color Picker */}
           <div>
             <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
@@ -167,7 +209,7 @@ export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: Ch
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 mobile-safe-bottom">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"

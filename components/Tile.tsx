@@ -25,9 +25,6 @@ interface TileProps {
   streamerAvatar?: string;
   isLive: boolean; // Derived from track publications only (no preview mode)
   viewerCount: number;
-  gifterLevel: number;
-  badgeName?: string;
-  badgeColor?: string;
   gifterStatus?: GifterStatus | null;
   slotIndex: number;
   liveStreamId?: number;
@@ -52,9 +49,6 @@ export default function Tile({
   streamerAvatar,
   isLive,
   viewerCount,
-  gifterLevel,
-  badgeName,
-  badgeColor,
   gifterStatus,
   slotIndex,
   liveStreamId,
@@ -931,6 +925,39 @@ export default function Tile({
       }
     };
   }, [slotIndex]);
+
+  // Subscribe to stream status changes (detect when stream ends)
+  useEffect(() => {
+    if (!liveStreamId) return;
+
+    const streamChannel = supabase
+      .channel(`stream-status:${liveStreamId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'live_streams',
+          filter: `id=eq.${liveStreamId}`,
+        },
+        (payload: any) => {
+          const newData = payload.new as any;
+          
+          // Stream ended - close tile and let LiveRoom replace with new streamer
+          if (newData.live_available === false || newData.status === 'ended') {
+            console.log('[Tile] Stream ended, closing tile:', { liveStreamId, streamerId, streamerUsername });
+            
+            // Just close this tile - LiveRoom will auto-replace with another active streamer
+            onClose();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      streamChannel.unsubscribe();
+    };
+  }, [liveStreamId, streamerId, streamerUsername, supabase, onClose]);
 
   // Subscribe to gift animations for this streamer (realtime)
   useEffect(() => {

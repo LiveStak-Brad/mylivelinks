@@ -27,7 +27,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
     {
       profile_id: '1',
       username: 'CannaStreams',
-      avatar_url: null,
+      avatar_url: undefined,
       trending_score: 9850,
       rank: 1,
       change: 5,
@@ -36,7 +36,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
     {
       profile_id: '2',
       username: 'TechGuru',
-      avatar_url: null,
+      avatar_url: undefined,
       trending_score: 8920,
       rank: 2,
       change: 3,
@@ -45,7 +45,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
     {
       profile_id: '3',
       username: 'GamingPro',
-      avatar_url: null,
+      avatar_url: undefined,
       trending_score: 8450,
       rank: 3,
       change: -1,
@@ -54,7 +54,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
     {
       profile_id: '4',
       username: 'MusicVibes',
-      avatar_url: null,
+      avatar_url: undefined,
       trending_score: 7890,
       rank: 4,
       change: 2,
@@ -63,7 +63,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
     {
       profile_id: '5',
       username: 'ArtistryLive',
-      avatar_url: null,
+      avatar_url: undefined,
       trending_score: 7320,
       rank: 5,
       change: 0,
@@ -72,7 +72,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
     {
       profile_id: '6',
       username: 'FitnessFlow',
-      avatar_url: null,
+      avatar_url: undefined,
       trending_score: 6890,
       rank: 6,
       change: 4,
@@ -81,7 +81,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
     {
       profile_id: '7',
       username: 'CookingShow',
-      avatar_url: null,
+      avatar_url: undefined,
       trending_score: 6420,
       rank: 7,
       change: -2,
@@ -90,7 +90,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
     {
       profile_id: '8',
       username: 'TravelVlog',
-      avatar_url: null,
+      avatar_url: undefined,
       trending_score: 5980,
       rank: 8,
       change: 1,
@@ -139,9 +139,9 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-lg max-h-[60vh] bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 rounded-b-2xl shadow-2xl overflow-hidden animate-slideDown">
+      <div className="relative w-full max-w-lg max-h-[60vh] bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 rounded-b-2xl shadow-2xl overflow-hidden animate-slideDown flex flex-col modal-fullscreen-mobile">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 p-4">
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 p-4 flex-shrink-0 mobile-safe-top">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -154,7 +154,8 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition text-white"
+              className="p-2 hover:bg-white/20 rounded-full transition text-white mobile-touch-target"
+              aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
@@ -162,7 +163,7 @@ export default function TrendingModal({ isOpen, onClose }: TrendingModalProps) {
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(60vh-5rem)] p-4">
+        <div className="modal-body overflow-y-auto max-h-[calc(60vh-5rem)] p-4">
           <div className="space-y-2">
             {entries.map((entry, index) => (
               <Link

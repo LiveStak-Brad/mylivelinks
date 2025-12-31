@@ -6,7 +6,8 @@
 'use client';
 
 import type { BattleSupporter, BattleSide } from '@/types/battle';
-import GifterBadge from '@/components/GifterBadge';
+import { GifterBadge as TierBadge } from '@/components/gifter';
+import type { GifterStatus } from '@/lib/gifter-status';
 
 interface BattleTopSupportersProps {
   supporters: BattleSupporter[];
@@ -72,14 +73,10 @@ export default function BattleTopSupporters({
                 <span className="text-white text-sm font-medium truncate">
                   {supporter.username}
                 </span>
-                {supporter.gifter_level > 0 && (
-                  <GifterBadge 
-                    level={supporter.gifter_level}
-                    badgeName={supporter.badge_name}
-                    badgeColor={supporter.badge_color}
-                    size="sm"
-                  />
-                )}
+                {/* NOTE: Battles currently use legacy gifter_level field.
+                    This component will be updated when battles migrate to gifterStatus.
+                    For now, we don't show the gifter badge in battles to avoid showing
+                    the wrong legacy system. */}
               </div>
             </div>
 

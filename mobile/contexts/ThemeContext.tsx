@@ -36,7 +36,9 @@ type ThemeColors = {
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
-  // legacy aliases
+  primary: string;
+  warning: string;
+  error: string;
   text: string;
   mutedText: string;
   icon: string;
@@ -157,6 +159,9 @@ const buildTheme = (mode: ThemeMode, tokens: ThemeTokens, cardOpacity: number = 
       textPrimary: tokens.textPrimary,
       textSecondary: tokens.textSecondary,
       textMuted: tokens.textMuted,
+      primary: tokens.accentPrimary,
+      warning: '#F59E0B',
+      error: '#EF4444',
       text: tokens.textPrimary,
       mutedText: tokens.textMuted,
       icon: mode === 'light' ? '#0F172A' : '#E2E8F0',

@@ -32,6 +32,7 @@ export interface Conversation {
   recipientUsername: string;
   recipientAvatar?: string;
   recipientDisplayName?: string;
+  recipientIsLive?: boolean;
   isOnline: boolean;
   lastMessage?: string;
   lastMessageAt: Date;
@@ -265,12 +266,12 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       const { data: profiles } = otherUserIds.length
         ? await supabase
             .from('profiles')
-            .select('id, username, avatar_url, display_name')
+            .select('id, username, avatar_url, display_name, is_live')
             .in('id', otherUserIds)
         : { data: [] as ProfileRow[] };
-      const profileById = new Map<string, ProfileRow>();
+      const profileById = new Map<string, ProfileRow & { is_live?: boolean }>();
       for (const p of Array.isArray(profiles) ? profiles : []) {
-        if (p?.id) profileById.set(String(p.id), p);
+        if (p?.id) profileById.set(String(p.id), p as any);
       }
 
       const onlineMap = await loadOnlineMap(otherUserIds);
@@ -285,6 +286,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             recipientUsername: String(p?.username ?? 'Unknown'),
             recipientDisplayName: p?.display_name ?? undefined,
             recipientAvatar: p?.avatar_url ?? undefined,
+            recipientIsLive: Boolean((p as any)?.is_live ?? false),
             isOnline: onlineMap.get(otherId) ?? false,
             lastMessage: meta?.last_message ?? undefined,
             lastMessageAt: meta?.last_message_at ? new Date(meta.last_message_at) : new Date(),
@@ -331,12 +333,14 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
       const { data: profiles } = otherUserIds.length
         ? await supabase
             .from('profiles')
-            .select('id, display_name')
+            .select('id, display_name, is_live')
             .in('id', otherUserIds)
-        : { data: [] as Array<{ id: string; display_name?: string | null }> };
+        : { data: [] as Array<{ id: string; display_name?: string | null; is_live?: boolean }> };
       const displayNameById = new Map<string, string>();
+      const isLiveById = new Map<string, boolean>();
       for (const p of Array.isArray(profiles) ? profiles : []) {
         if (p?.id && p?.display_name) displayNameById.set(String(p.id), String(p.display_name));
+        if (p?.id) isLiveById.set(String(p.id), Boolean(p.is_live ?? false));
       }
 
       // Need to fetch last message read status for each conversation
@@ -383,6 +387,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           recipientUsername: String(r.other_username ?? 'Unknown'),
           recipientAvatar: r.other_avatar_url ?? undefined,
           recipientDisplayName: displayNameById.get(otherId),
+          recipientIsLive: isLiveById.get(otherId) ?? false,
           isOnline: onlineMap.get(otherId) ?? false,
           lastMessage: lastMessageText || undefined,
           lastMessageAt: r.last_message_at ? new Date(r.last_message_at) : new Date(),

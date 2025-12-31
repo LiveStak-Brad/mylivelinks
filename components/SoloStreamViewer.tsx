@@ -1,12 +1,19 @@
 'use client';
 
+/**
+ * ⚠️ CRITICAL: DO NOT MODIFY LAYOUT OR ADD UI ELEMENTS WITHOUT EXPLICIT REQUEST ⚠️
+ * 
+ * This is the SOLO STREAM VIEWER component. The layout and UI are finalized.
+ * DO NOT add buttons, overlays, or modify the layout structure without being explicitly asked.
+ * All UI modifications must be approved first.
+ */
+
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { 
   Share2, 
-  MessageCircle, 
   Gift as GiftIcon, 
   Flag,
   UserPlus,
@@ -14,10 +21,11 @@ import {
   ChevronRight,
   ChevronLeft,
   Eye,
-  Sparkles,
+  Flame,
   Volume2,
   VolumeX,
-  Trophy
+  Trophy,
+  Star
 } from 'lucide-react';
 import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication } from 'livekit-client';
@@ -27,6 +35,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import Chat from './Chat';
+import StreamChat from './StreamChat';
 import GiftModal from './GiftModal';
 import ReportModal from './ReportModal';
 import GoLiveButton from './GoLiveButton';
@@ -83,6 +92,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -96,6 +106,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [showMiniProfile, setShowMiniProfile] = useState(false);
   const [recommendedStreams, setRecommendedStreams] = useState<RecommendedStream[]>([]);
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
+  const [streamEnded, setStreamEnded] = useState(false);
+  const [countdown, setCountdown] = useState(5);
   
   // LiveKit room connection - SINGLE connection per mount
   const roomRef = useRef<Room | null>(null);
@@ -141,12 +153,15 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           return;
         }
 
-        // Fetch live stream data
-        const { data: liveStream } = await supabase
+        // Fetch live stream data - get the most recent active stream
+        const { data: liveStreams } = await supabase
           .from('live_streams')
-          .select('id, live_available, stream_title')
+          .select('id, live_available')
           .eq('profile_id', profile.id)
-          .single();
+          .order('started_at', { ascending: false })
+          .limit(1);
+
+        const liveStream = liveStreams?.[0] || null;
 
         // Fetch gifter status
         const gifterStatuses = await fetchGifterStatuses([profile.id]);
@@ -163,7 +178,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           viewer_count: 0, // Will be updated via realtime
           gifter_level: profile.gifter_level || 0,
           gifter_status: gifterStatus,
-          stream_title: liveStream?.stream_title,
+          stream_title: undefined, // Column doesn't exist yet
           live_stream_id: liveStream?.id,
         };
 
@@ -218,19 +233,19 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             {
               profile_id: 'mock1',
               username: 'TopSupporter',
-              avatar_url: null,
+              avatar_url: undefined,
               total_coins: 5000,
             },
             {
               profile_id: 'mock2',
               username: 'MegaFan',
-              avatar_url: null,
+              avatar_url: undefined,
               total_coins: 3500,
             },
             {
               profile_id: 'mock3',
               username: 'GiftKing',
-              avatar_url: null,
+              avatar_url: undefined,
               total_coins: 2000,
             },
           ]);
@@ -261,13 +276,12 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   // Connect to LiveKit room - SINGLE CONNECTION GUARD
   // CRITICAL: Minimal stable deps to prevent reconnection loops
   useEffect(() => {
-    if (!streamer?.live_available || !streamer.profile_id || !streamer.username) return;
+    // Connect only if streamer is live (avoid token calls / LiveKit connect when offline)
+    if (!streamer?.profile_id || !streamer.username || !streamer.live_available) return;
 
     // Guard: Only one connect per mount, and only if username changed
-    if (isConnectingRef.current || connectedUsernameRef.current === streamer.username) {
-      if (DEBUG_LIVEKIT) {
-        console.log('[SoloStreamViewer] Skipping connect - already connecting or connected to:', streamer.username);
-      }
+    const targetUsername = streamer.username;
+    if (isConnectingRef.current || connectedUsernameRef.current === targetUsername) {
       return;
     }
 
@@ -298,7 +312,19 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
         // Get LiveKit token - VIEWER MODE ONLY
         // (Hosts use /live/host route instead)
-        const viewerIdentity = currentUserId || `anon_${Date.now()}`;
+        // CRITICAL: If viewing your own stream, use a separate viewer identity to avoid conflicts
+        const isOwnStream = currentUserId === streamer.profile_id;
+        const viewerIdentity = isOwnStream 
+          ? `${currentUserId}_viewer_${Date.now()}` 
+          : (currentUserId || `anon_${Date.now()}`);
+        
+        console.log('[SoloStreamViewer] Connecting as viewer:', { 
+          viewerIdentity, 
+          isOwnStream, 
+          currentUserId, 
+          streamerProfileId: streamer.profile_id 
+        });
+
         const tokenResponse = await fetch(TOKEN_ENDPOINT, {
           method: 'POST',
           headers: {
@@ -308,11 +334,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           body: JSON.stringify({
             roomName: LIVEKIT_ROOM_NAME,
             participantName: `viewer_${viewerIdentity}`,
-            canPublish: false,  // VIEWER MODE
+            canPublish: false,  // VIEWER MODE - never publish
             canSubscribe: true,
             deviceType: 'web',
             deviceId: `solo_viewer_${Date.now()}`,
-            sessionId: `solo_${Date.now()}`,
+            sessionId: `solo_viewer_${Date.now()}`,
             role: 'viewer',
           }),
         });
@@ -330,12 +356,63 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         await room.connect(url, token);
         setIsRoomConnected(true);
 
+        console.log('[SoloStreamViewer] ✅ Connected! Room participants:', room.remoteParticipants.size);
+        console.log('[SoloStreamViewer] 🎥 Local participant:', room.localParticipant.identity);
+        console.log('[SoloStreamViewer] 👥 Remote participants:', Array.from(room.remoteParticipants.values()).map(p => ({
+          identity: p.identity,
+          isSpeaking: p.isSpeaking,
+          trackCount: p.trackPublications.size,
+          tracks: Array.from(p.trackPublications.values()).map(pub => ({
+            kind: pub.kind,
+            source: pub.source,
+            subscribed: pub.isSubscribed,
+          }))
+        })));
+
+        // CRITICAL: Manually attach existing tracks (for when we join AFTER host is already live)
+        room.remoteParticipants.forEach((participant) => {
+          console.log('[SoloStreamViewer] 🔍 Checking existing participant:', participant.identity);
+          participant.trackPublications.forEach((publication) => {
+            console.log('[SoloStreamViewer] 📹 Found existing track publication:', {
+              kind: publication.kind,
+              source: publication.source,
+              subscribed: publication.isSubscribed,
+              track: publication.track,
+            });
+            
+            if (publication.track && publication.kind === Track.Kind.Video && videoRef.current) {
+              console.log('[SoloStreamViewer] 🎥 Attaching EXISTING video track to video element');
+              publication.track.attach(videoRef.current);
+              
+              // Detect aspect ratio
+              const video = videoRef.current;
+              const detectAspectRatio = () => {
+                if (video.videoWidth && video.videoHeight) {
+                  const ratio = video.videoWidth / video.videoHeight;
+                  setVideoAspectRatio(ratio);
+                  console.log('[SoloStreamViewer] Video aspect ratio:', ratio);
+                }
+              };
+              
+              video.addEventListener('loadedmetadata', detectAspectRatio);
+              detectAspectRatio();
+            }
+          });
+        });
+
         if (DEBUG_LIVEKIT) {
           console.log('[SoloStreamViewer] Connected to room, participants:', room.remoteParticipants.size);
         }
 
         // Handle track subscriptions - subscribe to streamer's tracks
         room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication: TrackPublication, participant: RemoteParticipant) => {
+          console.log('[SoloStreamViewer] 🎬 Track subscribed!', {
+            kind: track.kind,
+            participant: participant.identity,
+            source: (publication as any)?.source,
+            sid: track.sid,
+          });
+
           if (DEBUG_LIVEKIT) {
             console.log('[SoloStreamViewer] Track subscribed:', {
               kind: track.kind,
@@ -346,6 +423,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
           // Only attach video tracks (audio is handled separately)
           if (track.kind === Track.Kind.Video && videoRef.current) {
+            console.log('[SoloStreamViewer] 🎥 Attaching VIDEO track to video element');
             track.attach(videoRef.current);
             
             // Detect aspect ratio
@@ -367,6 +445,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
         room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
           track.detach();
+        });
+
+        room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+          console.log('[SoloStreamViewer] 👋 Participant joined:', {
+            identity: participant.identity,
+            trackCount: participant.trackPublications.size,
+          });
         });
 
         room.on(RoomEvent.Disconnected, () => {
@@ -416,6 +501,65 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     };
   }, [streamer?.live_available, streamer?.profile_id, streamer?.username]); // STABLE DEPS: only reconnect if these change
 
+  // Subscribe to stream status changes (detect when stream ends)
+  useEffect(() => {
+    if (!streamer?.live_stream_id) return;
+
+    const streamChannel = supabase
+      .channel(`stream-status:${streamer.live_stream_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'live_streams',
+          filter: `id=eq.${streamer.live_stream_id}`,
+        },
+        (payload: any) => {
+          const newData = payload.new as any;
+          
+          // Stream ended - show UI and redirect
+          if (newData.live_available === false) {
+            console.log('[SoloStreamViewer] Stream ended, showing end screen');
+            setStreamEnded(true);
+            
+            // Disconnect LiveKit room
+            if (roomRef.current) {
+              roomRef.current.disconnect();
+              roomRef.current = null;
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      streamChannel.unsubscribe();
+    };
+  }, [streamer?.live_stream_id, supabase]);
+
+  // Countdown timer for auto-redirect after stream ends
+  useEffect(() => {
+    if (!streamEnded) return;
+
+    // Start countdown from 5 seconds
+    setCountdown(5);
+    
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          // Redirect to LiveTV main page
+          router.push('/live-tv');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [streamEnded, router]);
+
   // Load recommended streams
   useEffect(() => {
     const loadRecommended = async () => {
@@ -450,7 +594,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   // Handle follow/unfollow
   const handleFollow = async () => {
     if (!currentUserId || !streamer) return;
-
+    
+    setIsFollowLoading(true);
     try {
       if (isFollowing) {
         await supabase
@@ -469,24 +614,28 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         setIsFollowing(true);
       }
     } catch (err) {
-      console.error('[SoloStreamViewer] Error toggling follow:', err);
+      console.error('Error toggling follow:', err);
+    } finally {
+      setIsFollowLoading(false);
     }
   };
 
   // Handle share
   const handleShare = () => {
-    if (navigator.share && streamer) {
-      navigator.share({
-        title: `${streamer.display_name || streamer.username}'s Live Stream`,
-        text: `Watch ${streamer.display_name || streamer.username} live on MyLiveLinks!`,
-        url: window.location.href,
-      }).catch(() => {
-        // Fallback: copy to clipboard
-        navigator.clipboard.writeText(window.location.href);
-      });
+    if (!streamer) return;
+    const shareUrl = `https://www.mylivelinks.com/live/${encodeURIComponent(streamer.username)}`;
+    if (navigator.share) {
+      navigator
+        .share({
+          title: `${streamer.display_name || streamer.username}'s Live Stream`,
+          text: `Watch ${streamer.display_name || streamer.username} live on MyLiveLinks!`,
+          url: shareUrl,
+        })
+        .catch(() => {
+          navigator.clipboard.writeText(shareUrl);
+        });
     } else {
-      // Copy to clipboard
-      navigator.clipboard.writeText(window.location.href);
+      navigator.clipboard.writeText(shareUrl);
     }
   };
 
@@ -545,101 +694,20 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const isPortraitVideo = videoAspectRatio < 1;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 lg:bg-gray-50 lg:dark:bg-gray-900 overflow-hidden lg:overflow-auto">
-      <div className="hidden lg:flex bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push('/live')}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            title="Back to Browse"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Image
-                src={getAvatarUrl(streamer.avatar_url)}
-                alt={streamer.username}
-                width={40}
-                height={40}
-                className="rounded-full"
-              />
-              {streamer.live_available && (
-                <div className="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-                  LIVE
-                </div>
-              )}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-bold text-gray-900 dark:text-white">
-                  {streamer.display_name || streamer.username}
-                </h2>
-                {streamer.gifter_status && (
-                  <TierBadge 
-                    tier_key={streamer.gifter_status.tier_key}
-                    level={streamer.gifter_status.level_in_tier}
-                    size="sm"
-                  />
-                )}
-              </div>
-              {streamer.stream_title && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {streamer.stream_title}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons - Desktop only */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-700 dark:text-gray-300">
-            <Eye className="w-4 h-4" />
-            <span>{streamer.viewer_count.toLocaleString()}</span>
-          </div>
-          
-          {currentUserId && currentUserId !== streamer.profile_id && (
-            <button
-              onClick={handleFollow}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                isFollowing
-                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-gray-600'
-                  : 'bg-purple-500 text-white hover:bg-purple-600'
-              }`}
-            >
-              {isFollowing ? (
-                <>
-                  <UserMinus className="w-4 h-4" />
-                  Following
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4" />
-                  Follow
-                </>
-              )}
-            </button>
-          )}
-          
-          <button
-            onClick={() => setShowReportModal(true)}
-            className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            title="Report"
-          >
-            <Flag className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content Area - Desktop: normal layout with header, Mobile/Tablet: full screen */}
-      <div className="flex relative h-screen lg:h-[calc(100vh-73px)] pt-0 lg:pt-0 overflow-hidden">
+    <div className="min-h-screen bg-black overflow-hidden">
+      {/* Main Content Area - Fullscreen on all screen sizes */}
+      <div className="flex relative h-screen pt-0 overflow-hidden">
         {/* Left/Center: Video Player */}
-        <div className="flex-1 flex flex-col bg-black">
+        <div 
+          className="flex-1 flex flex-col bg-black"
+        >
           <div className="flex-1 flex items-center justify-center relative">
-            {/* Mobile/Tablet: Viewers - Top center */}
-            <div className="lg:hidden absolute top-4 left-1/2 -translate-x-1/2 z-50">
+            {/* Black gradient overlays - darker/taller at top for status bar, strong at bottom covering chat */}
+            <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-black via-black/70 to-transparent z-[15] pointer-events-none" />
+            <div className="absolute bottom-0 left-0 right-0 h-56 bg-gradient-to-t from-black via-black/90 to-transparent z-[15] pointer-events-none" />
+            
+            {/* Viewers count - Top center (with safe area support on mobile) */}
+            <div className="absolute left-1/2 -translate-x-1/2 z-50 lg:top-4" style={{ top: 'max(1rem, env(safe-area-inset-top))' }}>
               <button
                 onClick={() => {
                   console.log('[ViewerButton] Clicked! Opening viewers modal');
@@ -653,13 +721,20 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               </button>
             </div>
 
-            {/* Mobile/Tablet: Back button + Streamer info overlay at top */}
-            <div className="lg:hidden absolute top-4 left-0 right-4 z-20 flex items-center justify-between">
+            {/* Top row - all screen sizes (with safe area support on mobile) */}
+            <div
+              className="absolute z-20 flex items-center justify-between w-full"
+              style={{ 
+                top: 'max(1rem, env(safe-area-inset-top))',
+                paddingLeft: '0', // ALL THE WAY LEFT - NO PADDING
+                paddingRight: '1rem'
+              }}
+            >
               <div className="flex items-center gap-1">
-                {/* Back Button */}
+                {/* Back Button - ALL THE WAY LEFT */}
                 <button
                   onClick={() => router.push('/live')}
-                  className="text-white hover:opacity-80 transition-opacity"
+                  className="lg:hidden text-white hover:opacity-80 transition-opacity"
                   title="Back to Browse"
                 >
                   <ChevronLeft className="w-7 h-7" />
@@ -683,11 +758,6 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                         <span className="font-bold text-white text-sm">
                           {streamer.display_name || streamer.username}
                         </span>
-                        {streamer.live_available && (
-                          <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded font-bold">
-                            LIVE
-                          </span>
-                        )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-white/80">
                         <button 
@@ -697,8 +767,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                           }}
                           className="flex items-center gap-1 hover:text-white transition-colors"
                         >
-                          <Sparkles className="w-3 h-3 text-yellow-400" />
-                          <span className="font-semibold">12</span>
+                          <Flame className="w-4 h-4 text-orange-500" />
+                          <span className="font-semibold text-sm">12</span>
                         </button>
                         <span className="text-white/40">•</span>
                         <button 
@@ -708,12 +778,33 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                           }}
                           className="flex items-center gap-1 hover:text-white transition-colors"
                         >
-                          <Trophy className="w-3 h-3 text-yellow-500" />
-                          <span className="font-semibold">8</span>
+                          <Trophy className="w-4 h-4 text-yellow-500" />
+                          <span className="font-semibold text-sm">8</span>
                         </button>
                       </div>
                     </div>
                   </button>
+                  
+                  {/* Follow Star Button - Centered with profile photo */}
+                  {currentUserId && currentUserId !== streamer.profile_id && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFollow();
+                      }}
+                      disabled={isFollowLoading}
+                      className="transition-all hover:scale-110 self-center"
+                      title={isFollowing ? 'Unfollow' : 'Follow'}
+                    >
+                      <Star 
+                        className={`w-5 h-5 transition-all ${
+                          isFollowing 
+                            ? 'fill-yellow-400 text-yellow-400' 
+                            : 'text-yellow-400 hover:fill-yellow-400'
+                        }`}
+                      />
+                    </button>
+                  )}
                 </div>
               </div>
               
@@ -750,24 +841,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                   </div>
                 )}
                 
-                {currentUserId && currentUserId !== streamer.profile_id && (
-                  <button
-                    onClick={handleFollow}
-                    className={`
-                      p-2 rounded-full backdrop-blur-md transition-colors
-                      ${isFollowing 
-                        ? 'bg-white/20 text-white' 
-                        : 'bg-purple-500 text-white'
-                      }
-                    `}
-                  >
-                    {isFollowing ? (
-                      <UserMinus className="w-5 h-5" />
-                    ) : (
-                      <UserPlus className="w-5 h-5" />
-                    )}
-                  </button>
-                )}
+                {/* Report button only - Follow button moved to bottom action bar */}
                 <button
                   onClick={() => setShowReportModal(true)}
                   className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
@@ -784,9 +858,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                 autoPlay
                 playsInline
                 muted={isMuted}
-                className={`max-w-full max-h-full ${
-                  isPortraitVideo ? 'h-full w-auto' : 'w-full h-auto'
-                }`}
+                className={`
+                  w-full h-full object-cover
+                  lg:max-w-full lg:max-h-full lg:object-contain
+                  ${isPortraitVideo ? 'lg:h-full lg:w-auto' : 'lg:w-full lg:h-auto'}
+                `}
               />
             ) : (
               <>
@@ -822,6 +898,62 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               </>
             )}
 
+            {/* Stream Ended Overlay */}
+            {streamEnded && (
+              <div className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center z-50">
+                <div className="text-white text-center px-6 py-8 max-w-md">
+                  {/* Icon */}
+                  <div className="text-7xl mb-6 animate-bounce">
+                    📺
+                  </div>
+                  
+                  {/* Title */}
+                  <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-red-400 to-pink-500 bg-clip-text text-transparent">
+                    Stream Has Ended
+                  </h2>
+                  
+                  {/* Subtitle */}
+                  <p className="text-gray-300 text-lg mb-2">
+                    <span className="font-semibold text-white">{streamer.display_name || streamer.username}</span> is no longer live
+                  </p>
+                  
+                  {/* Countdown */}
+                  <div className="mb-6">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-2xl font-bold mb-3 animate-pulse">
+                      {countdown}
+                    </div>
+                    <p className="text-gray-400 text-sm">
+                      Returning to LiveTV...
+                    </p>
+                  </div>
+                  
+                  {/* Action Button */}
+                  <button
+                    onClick={() => router.push('/live-tv')}
+                    className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                  >
+                    Return to LiveTV Now
+                  </button>
+                  
+                  {/* Secondary Actions */}
+                  <div className="mt-4 flex gap-3 justify-center">
+                    <button
+                      onClick={() => router.push(`/profile/${streamer.username}`)}
+                      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-all duration-200"
+                    >
+                      View Profile
+                    </button>
+                    <button
+                      onClick={() => router.push('/live')}
+                      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-all duration-200"
+                    >
+                      Browse Streams
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Volume Control Overlay - Hidden on mobile (tap to unmute instead) */}
             {streamer.live_available && (
               <div className="hidden md:flex absolute bottom-4 left-4 items-center gap-2 bg-black/50 backdrop-blur-sm rounded-lg px-3 py-2">
@@ -848,140 +980,44 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             )}
           </div>
 
-          {/* Bottom Action Bar - Desktop only */}
-          <div className="hidden lg:flex bg-gray-900 border-t border-gray-800 px-4 py-3 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowGiftModal(true)}
-                disabled={!streamer.live_available}
-                className={`px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all flex items-center gap-2 font-medium ${
-                  !streamer.live_available ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                <GiftIcon className="w-5 h-5" />
-                Send Gift
-              </button>
-              
-              <button
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                title="React"
-                disabled
-              >
-                <Sparkles className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {currentUserId && currentUserId !== streamer.profile_id && (
-                <button
-                  onClick={() => openIM(streamer.profile_id, streamer.username)}
-                  className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  Message
-                </button>
-              )}
-              
-              <button
-                onClick={handleShare}
-                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-                title="Share"
-              >
-                <Share2 className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Recommended Streams Carousel - Desktop only */}
-          {recommendedStreams.length > 0 && (
-            <div className="hidden md:block bg-gray-900 border-t border-gray-800 px-4 py-4">
-              <h3 className="text-white font-semibold mb-3">Recommended Live Streams</h3>
-              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800">
-                {recommendedStreams.map((stream) => (
-                  <button
-                    key={stream.id}
-                    onClick={() => router.push(`/live/${stream.username}`)}
-                    className="flex-shrink-0 group"
-                  >
-                    <div className="relative">
-                      <Image
-                        src={getAvatarUrl(stream.avatar_url)}
-                        alt={stream.username}
-                        width={80}
-                        height={80}
-                        className="rounded-lg group-hover:opacity-80 transition-opacity"
-                      />
-                      <div className="absolute top-1 right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-                        LIVE
-                      </div>
-                    </div>
-                    <p className="text-sm text-white mt-1 text-center truncate w-20">
-                      {stream.username}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Right: Chat Panel - Desktop: sidebar, Mobile: full-width overlay at bottom */}
+        {/* Right: Chat Panel - All screen sizes: overlay at bottom, no header/border */}
         <div className={`
           transition-all duration-300
-          
-          /* Mobile/Tablet: Fixed full-width overlay at bottom */
-          ${isChatOpen ? 'fixed' : 'hidden'}
-          lg:block
-          bottom-4 left-0 right-0 w-full
+          fixed
+          ${isChatOpen ? 'block' : 'hidden'}
+          bottom-0 left-0 right-0
+          w-full
           h-[40vh]
-          bg-transparent lg:bg-white lg:dark:bg-gray-800
-          backdrop-blur-none lg:backdrop-blur-none
-          border-t border-transparent lg:border-white/10 dark:border-transparent lg:dark:border-white/10
+          bg-transparent
+          backdrop-blur-none
+          border-0
           z-20
-          
           pb-0
-          
-          /* Desktop: Sidebar on right */
-          lg:relative
-          lg:bottom-auto lg:left-auto lg:right-0
-          lg:h-full
-          ${isChatOpen ? 'lg:w-96' : 'lg:w-0'}
-          lg:bg-white lg:dark:bg-gray-800
-          lg:backdrop-blur-none
-          lg:border-t-0 lg:border-l lg:border-gray-200 lg:dark:border-gray-700
-          overflow-hidden
         `}>
-          <div className="h-full flex flex-col">
-            {/* Header - Desktop only */}
-            <div className="hidden lg:flex items-center justify-between px-4 py-3 border-b border-gray-200 lg:dark:border-gray-700 bg-transparent">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Live Chat</h3>
-              <button
-                onClick={() => setIsChatOpen(false)}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <Chat 
-                liveStreamId={streamer.live_stream_id} 
-                onGiftClick={() => setShowGiftModal(true)}
-                onShareClick={handleShare}
-                onSettingsClick={() => setShowChatSettings(true)}
-              />
+          <div className="h-full flex flex-col mobile-safe-bottom min-h-0">
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {streamer.live_stream_id ? (
+                <StreamChat 
+                  liveStreamId={streamer.live_stream_id} 
+                  onGiftClick={() => setShowGiftModal(true)}
+                  onShareClick={handleShare}
+                  onSettingsClick={() => setShowChatSettings(true)}
+                  onRequestGuestClick={() => {
+                    // TODO: Implement guest request functionality
+                    alert('Guest request feature coming soon! This will send a request to the host to join as a guest.');
+                  }}
+                  showRequestGuestButton={currentUserId !== null && currentUserId !== streamer.profile_id}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-white/60">
+                  <p>Stream is offline</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
-
-        {/* Chat Toggle (when closed) - Desktop only */}
-        {!isChatOpen && (
-          <button
-            onClick={() => setIsChatOpen(true)}
-            className="hidden lg:block fixed right-0 top-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-l-lg p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors z-20"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          </button>
-        )}
       </div>
 
       {/* Modals */}

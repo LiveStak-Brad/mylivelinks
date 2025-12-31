@@ -51,7 +51,7 @@ export function ApplyForRoomScreen() {
 
   return (
     <PageShell>
-      <PageHeader icon="document-text" iconColor="#3b82f6" title="Apply for a Room" />
+      <PageHeader icon="file-text" iconColor="#3b82f6" title="Apply for a Room" />
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Coming Soon Notice */}

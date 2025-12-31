@@ -48,8 +48,8 @@ interface MobileWebWatchLayoutProps {
 }
 
 // Grid configurations for different orientations
-const PORTRAIT_ROWS = 4;
-const PORTRAIT_COLS = 3;
+const PORTRAIT_ROWS = 3;
+const PORTRAIT_COLS = 4;
 const LANDSCAPE_ROWS = 3;
 const LANDSCAPE_COLS = 4;
 
@@ -309,7 +309,6 @@ export default function MobileWebWatchLayout({
               streamerAvatar={focusedSlot.streamer.avatar_url}
               isLive={focusedSlot.streamer.live_available}
               viewerCount={focusedSlot.streamer.viewer_count}
-              gifterLevel={focusedSlot.streamer.gifter_level}
               gifterStatus={focusedSlot.streamer.gifter_status}
               slotIndex={focusedSlot.slotIndex}
               liveStreamId={focusedSlot.streamer.id && focusedSlot.streamer.live_available ? (() => {
@@ -358,7 +357,6 @@ export default function MobileWebWatchLayout({
                       streamerAvatar={slot.streamer.avatar_url}
                       isLive={slot.streamer.live_available}
                       viewerCount={slot.streamer.viewer_count}
-                      gifterLevel={slot.streamer.gifter_level}
                       gifterStatus={slot.streamer.gifter_status}
                       slotIndex={slot.slotIndex}
                       liveStreamId={slot.streamer.id && slot.streamer.live_available 

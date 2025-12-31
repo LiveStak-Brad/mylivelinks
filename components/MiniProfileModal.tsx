@@ -214,7 +214,7 @@ export default function MiniProfileModal({
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-scale-in"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-scale-in flex flex-col modal-fullscreen-mobile"
         onClick={(e) => e.stopPropagation()}
       >
         {loading ? (
@@ -224,10 +224,11 @@ export default function MiniProfileModal({
         ) : profile ? (
           <>
             {/* Compact Header */}
-            <div className="bg-gradient-to-br from-indigo-600 to-purple-600 px-4 py-3">
+            <div className="bg-gradient-to-br from-indigo-600 to-purple-600 px-4 py-3 flex-shrink-0 mobile-safe-top">
               <button
                 onClick={onClose}
-                className="absolute top-3 right-3 p-1.5 hover:bg-white/20 rounded-full transition text-white z-10"
+                className="absolute top-3 right-3 p-1.5 hover:bg-white/20 rounded-full transition text-white z-10 mobile-touch-target"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -274,7 +275,7 @@ export default function MiniProfileModal({
             </div>
 
             {/* Profile Content */}
-            <div className="px-4 py-3">
+            <div className="modal-body px-4 py-3">
               {/* Stats - Different for streamers vs chat viewers */}
               {isStreamerProfile ? (
                 // Streamer Profile: Show stream-related stats

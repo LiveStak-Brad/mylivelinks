@@ -17,7 +17,6 @@ interface StreamStats {
 
 interface StatsCardProps {
   streamStats: StreamStats;
-  gifterLevel: number;
   gifterStatus?: GifterStatus | null;
   totalGiftsSent: number;
   totalGiftsReceived: number;
@@ -28,7 +27,6 @@ interface StatsCardProps {
 
 export default function StatsCard({
   streamStats,
-  gifterLevel,
   gifterStatus,
   totalGiftsSent,
   totalGiftsReceived,
@@ -140,8 +138,7 @@ export default function StatsCard({
                 </div>
               ) : (
                 <>
-                  <div className="text-2xl font-bold">{gifterLevel}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Gifter Level</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">No gifter level</div>
                 </>
               )}
             </div>

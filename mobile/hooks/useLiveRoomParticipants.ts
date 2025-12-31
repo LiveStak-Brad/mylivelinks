@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { AppState } from 'react-native';
 import type { LocalParticipant, Room, RemoteParticipant } from 'livekit-client';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
@@ -20,7 +21,7 @@ import { selectGridParticipants, type ParticipantLite, type SortMode } from '../
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 
-import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT } from '../lib/livekit-constants';
+import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT, canUserGoLive } from '../lib/livekit-constants';
 
 const DEBUG = DEBUG_LIVEKIT;
 const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
@@ -73,6 +74,8 @@ interface UseLiveRoomParticipantsReturn {
   isConnected: boolean;
   goLive: () => Promise<void>;
   stopLive: () => Promise<void>;
+  endOtherStream: () => Promise<void>;
+  resumeOnThisDevice: () => Promise<void>;
   isLive: boolean;
   isPublishing: boolean;
   tileCount: number;
@@ -129,6 +132,14 @@ export function useLiveRoomParticipants(
   const goLiveInFlightRef = useRef(false);
   const stopLiveInFlightRef = useRef(false);
   const myProfileIdRef = useRef<string | null>(null);
+
+  const [appState, setAppState] = useState(() => {
+    try {
+      return AppState.currentState;
+    } catch {
+      return 'active';
+    }
+  });
 
   // Refs to prevent reconnect on rerender
   const roomRef = useRef<Room | null>(null);
@@ -642,6 +653,36 @@ export function useLiveRoomParticipants(
     setAllParticipants([localParticipant, ...remoteParticipants].filter(Boolean) as LiveKitParticipant[]);
   }, []);
 
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      setAppState(nextState);
+
+      if (nextState === 'active') return;
+
+      try {
+        if (roomRef.current) {
+          if (DEBUG) {
+            console.log('[ROOM] AppState disconnect', { nextState });
+          }
+          roomRef.current.disconnect();
+          roomRef.current = null;
+        }
+      } catch {
+        // ignore
+      }
+
+      setIsConnected(false);
+      setAllParticipants([]);
+      hasConnectedRef.current = false;
+      isConnectingRef.current = false;
+      reachedConnectedRef.current = false;
+    });
+
+    return () => {
+      (sub as any)?.remove?.();
+    };
+  }, []);
+
   /**
    * Connect to LiveKit room (ONCE on mount)
    */
@@ -655,7 +696,8 @@ export function useLiveRoomParticipants(
     }
 
     // Gate connection until explicitly enabled (after login/device/env ready)
-    if (!enabled) {
+    const enabledForConnect = enabled && appState === 'active';
+    if (!enabledForConnect) {
       if (DEBUG) {
         console.log('[ROOM] Skipping connect (not enabled yet; wait for login/device/env)');
       }
@@ -700,15 +742,17 @@ export function useLiveRoomParticipants(
         const participantName = authContext.profileId;
         setMyIdentity(participantName);
 
-        // Fetch token (viewer)
+        const publishEligible = canUserGoLive(user ? { id: user.id, email: user.email } : null);
+
+        // Fetch token
         let token: string;
         let url: string;
         try {
           const tokenResult = await fetchToken({
             participantName,
-            canPublish: true,
+            canPublish: publishEligible,
             canSubscribe: true,
-            role: 'viewer',
+            role: publishEligible ? 'publisher' : 'viewer',
             participantMetadata: authContext.isAuthed
               ? { profile_id: authContext.profileId, platform: 'mobile' }
               : { platform: 'mobile' },
@@ -772,6 +816,7 @@ export function useLiveRoomParticipants(
           }
           setIsConnected(false);
           isConnectingRef.current = false;
+          hasConnectedRef.current = false;
         });
 
         room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
@@ -868,7 +913,7 @@ export function useLiveRoomParticipants(
     };
 
     connectToRoom();
-  }, [enabled, getAccessToken, getAuthContext, updateParticipants]);
+  }, [appState, enabled, getAccessToken, getAuthContext, updateParticipants, user?.email, user?.id]);
 
   useEffect(() => {
     return () => {
@@ -967,6 +1012,19 @@ export function useLiveRoomParticipants(
         throw new Error('Not authenticated');
       }
 
+      // Check if already live elsewhere
+      const { data: existingActiveStream } = await supabase
+        .from('live_streams')
+        .select('id, live_available')
+        .eq('profile_id', authContext.profileId)
+        .eq('live_available', true)
+        .maybeSingle();
+
+      if (existingActiveStream) {
+        // Already live - return special error that UI can handle
+        throw new Error('ALREADY_LIVE_ELSEWHERE');
+      }
+
       const room = roomRef.current;
       if (!room || room.state !== 'connected') {
         throw new Error(connectionError || 'LiveKit room not connected');
@@ -975,22 +1033,59 @@ export function useLiveRoomParticipants(
       setIsLive(true);
       isLiveRef.current = true;
 
-      // Upsert live_streams as live
-      const { data: liveStream, error: liveStreamError } = await supabase
+      // Bring live_streams online (avoid upsert onConflict unless DB has a unique constraint)
+      const startedAt = new Date().toISOString();
+      const { data: existingRows, error: existingError } = await supabase
         .from('live_streams')
-        .upsert(
-          {
-            profile_id: authContext.profileId,
-            live_available: true,
-            started_at: new Date().toISOString(),
-          },
-          { onConflict: 'profile_id' }
-        )
         .select('id')
-        .single();
+        .eq('profile_id', authContext.profileId)
+        .limit(10);
 
-      if (liveStreamError || !liveStream) {
-        throw new Error(liveStreamError?.message || 'Failed to start live stream');
+      if (existingError) {
+        throw new Error(existingError?.message || 'Failed to check existing live stream');
+      }
+
+      const existingIds = (existingRows || [])
+        .map((r: any) => r?.id)
+        .filter((id: any) => id != null);
+
+      const primaryId = existingIds.length > 0 ? existingIds[0] : null;
+      let liveStreamId: string | number;
+
+      if (primaryId) {
+        const { data: updated, error: updateError } = await supabase
+          .from('live_streams')
+          .update({ live_available: true, started_at: startedAt, ended_at: null })
+          .eq('id', primaryId)
+          .select('id')
+          .single();
+
+        if (updateError || updated?.id == null) {
+          throw new Error(updateError?.message || 'Failed to start live stream');
+        }
+        liveStreamId = updated.id;
+
+        if (existingIds.length > 1) {
+          try {
+            await supabase
+              .from('live_streams')
+              .update({ live_available: false })
+              .in('id', existingIds.slice(1));
+          } catch {
+            // ignore
+          }
+        }
+      } else {
+        const { data: inserted, error: insertError } = await supabase
+          .from('live_streams')
+          .insert({ profile_id: authContext.profileId, live_available: true, started_at: startedAt })
+          .select('id')
+          .single();
+
+        if (insertError || inserted?.id == null) {
+          throw new Error(insertError?.message || 'Failed to start live stream');
+        }
+        liveStreamId = inserted.id;
       }
 
       // Ensure user appears in slot 1 for themselves (same schema as web saveGridLayout)
@@ -999,7 +1094,7 @@ export function useLiveRoomParticipants(
         viewer_id: authContext.profileId,
         slot_index: 1,
         streamer_id: authContext.profileId,
-        live_stream_id: liveStream.id,
+        live_stream_id: liveStreamId,
         is_pinned: false,
         is_muted: false,
         volume: 0.5,
@@ -1019,7 +1114,7 @@ export function useLiveRoomParticipants(
             username: profile?.username || 'Anonymous',
             display_name: profile?.display_name || profile?.username || 'Anonymous',
             avatar_url: profile?.avatar_url || null,
-            live_stream_id: liveStream.id,
+            live_stream_id: liveStreamId,
             platform: 'mobile',
           })
         );
@@ -1138,12 +1233,138 @@ export function useLiveRoomParticipants(
     }
   };
 
+  // Helper: End stream on other device
+  const endOtherStream = async () => {
+    try {
+      const authContext = await getAuthContext();
+      if (!authContext.isAuthed || !authContext.profileId) {
+        throw new Error('Not authenticated');
+      }
+
+      // End the existing stream
+      await supabase
+        .from('live_streams')
+        .update({ live_available: false, ended_at: new Date().toISOString() })
+        .eq('profile_id', authContext.profileId);
+
+      // Remove from grid slots
+      await supabase.from('user_grid_slots').delete().eq('streamer_id', authContext.profileId);
+
+      // Call cleanup API
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token || null;
+        const cleanupUrl = process.env.EXPO_PUBLIC_API_URL
+          ? `${process.env.EXPO_PUBLIC_API_URL}/api/stream-cleanup`
+          : 'https://www.mylivelinks.com/api/stream-cleanup';
+
+        await fetch(cleanupUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: JSON.stringify({ action: 'end_stream', reason: 'device_switch' }),
+        });
+      } catch {
+        // ignore
+      }
+
+      // Wait for cleanup to propagate
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (err) {
+      throw new Error('Failed to end stream on other device');
+    }
+  };
+
+  // Helper: Resume stream on this device
+  const resumeOnThisDevice = async () => {
+    try {
+      const authContext = await getAuthContext();
+      if (!authContext.isAuthed || !authContext.profileId) {
+        throw new Error('Not authenticated');
+      }
+
+      // Get the existing stream ID
+      const { data: existingStream } = await supabase
+        .from('live_streams')
+        .select('id')
+        .eq('profile_id', authContext.profileId)
+        .eq('live_available', true)
+        .single();
+
+      if (!existingStream) {
+        throw new Error('No active stream found');
+      }
+
+      const room = roomRef.current;
+      if (!room || room.state !== 'connected') {
+        throw new Error(connectionError || 'LiveKit room not connected');
+      }
+
+      // Set the stream as active locally
+      setIsLive(true);
+      isLiveRef.current = true;
+
+      // Update LiveKit participant metadata
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username, display_name, avatar_url')
+          .eq('id', authContext.profileId)
+          .single();
+
+        await room.localParticipant.setMetadata(
+          JSON.stringify({
+            profile_id: authContext.profileId,
+            username: profile?.username || 'Anonymous',
+            display_name: profile?.display_name || profile?.username || 'Anonymous',
+            avatar_url: profile?.avatar_url || null,
+            live_stream_id: existingStream.id,
+            platform: 'mobile',
+          })
+        );
+      } catch {
+        // ignore
+      }
+
+      // Enable camera + mic (publishing)
+      setIsPublishing(true);
+      isPublishingRef.current = true;
+      try {
+        await room.localParticipant.setCameraEnabled(true, {
+          resolution: {
+            width: 1920,
+            height: 1080,
+            frameRate: 30,
+          },
+        });
+        
+        await room.localParticipant.setMicrophoneEnabled(true);
+        updateParticipants(room);
+      } catch (err: any) {
+        setIsPublishing(false);
+        isPublishingRef.current = false;
+        throw new Error(err?.message || 'Failed to publish');
+      }
+    } catch (err) {
+      // rollback local state on failure
+      setIsLive(false);
+      setIsPublishing(false);
+      isLiveRef.current = false;
+      isPublishingRef.current = false;
+      throw err;
+    }
+  };
+
   return {
     participants: selectedParticipants,
     myIdentity,
     isConnected,
     goLive,
     stopLive,
+    endOtherStream,
+    resumeOnThisDevice,
     isLive,
     isPublishing,
     tileCount: selectedParticipants.length,

@@ -10,7 +10,6 @@ interface Supporter {
   username: string;
   display_name?: string;
   avatar_url?: string;
-  gifter_level: number;
   total_gifted: number;
 }
 
@@ -64,7 +63,7 @@ export default function TopSupportersWidget({
               const status = gifterStatuses?.[supporter.id];
               const level = status && Number(status.lifetime_coins ?? 0) > 0
                 ? Number(status.level_in_tier ?? 0)
-                : Number(supporter.gifter_level ?? 0);
+                : 0;
 
               return (
             <Link

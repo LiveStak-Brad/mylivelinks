@@ -53,6 +53,7 @@ export function ReferralProgress({
   theme,
 }: ReferralProgressProps) {
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const isDark = theme.mode === 'dark';
   const { session, getAccessToken } = useAuthContext();
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState(true);

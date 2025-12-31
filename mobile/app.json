@@ -3,6 +3,7 @@
     "name": "MyLiveLinks",
     "slug": "mylivelinks-mobile",
     "version": "1.0.1",
+    "scheme": "mylivelinks",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -15,6 +16,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.mylivelinks.app",
       "buildNumber": "16",
+      "associatedDomains": [
+        "applinks:www.mylivelinks.com"
+      ],
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs camera access for live streaming (future feature).",
         "NSMicrophoneUsageDescription": "This app needs microphone access for live streaming (future feature).",
@@ -35,6 +39,28 @@
     "android": {
       "package": "com.mylivelinks.app",
       "versionCode": 16,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "www.mylivelinks.com",
+              "pathPrefix": "/live"
+            },
+            {
+              "scheme": "https",
+              "host": "mylivelinks.com",
+              "pathPrefix": "/live"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",

@@ -13,11 +13,12 @@
  * - battle: Cameras-only TikTok battle layout (minimal UI, portrait preferred)
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, useWindowDimensions, Share, Alert } from 'react-native';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Grid12 } from '../components/live/Grid12';
 import { ChatOverlay } from '../overlays/ChatOverlay';
@@ -48,6 +49,8 @@ type LiveRoomScreenProps = {
 export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', enabled = false, onExitLive, onNavigateToRooms, onNavigateWallet }) => {
   // 🔒 KEEP SCREEN AWAKE (prevent screen timeout)
   useKeepAwake();
+
+  const navigation = useNavigation<any>();
   
   // Get safe area insets for proper button placement
   const insets = useSafeAreaInsets();
@@ -55,6 +58,9 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
   // Track current user for room presence
   const [currentUser, setCurrentUser] = useState<{ id: string; username: string } | null>(null);
   const [targetRecipientId, setTargetRecipientId] = useState<string | null>(null);
+  const [localMicEnabled, setLocalMicEnabled] = useState<boolean>(false);
+  const [localCamEnabled, setLocalCamEnabled] = useState<boolean>(false);
+  const likePressCooldownRef = useRef<number>(0);
   const goLivePressInFlightRef = useRef(false);
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -125,6 +131,35 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
   const { theme } = useThemeMode();
 
   const liveError = connectionError || lastConnectError || lastTokenError?.message || null;
+
+  const canPublish = useMemo(() => {
+    try {
+      return room?.localParticipant?.permissions?.canPublish === true;
+    } catch {
+      return false;
+    }
+  }, [room]);
+
+  useEffect(() => {
+    const local = participants.find((p) => p.isLocal);
+    if (!local) return;
+    setLocalMicEnabled(!!local.isMicEnabled);
+    setLocalCamEnabled(!!local.isCameraEnabled);
+  }, [participants]);
+
+  const parseProfileIdFromIdentity = useCallback((identityRaw: string | null): string | null => {
+    const identity = typeof identityRaw === 'string' ? identityRaw : '';
+    if (!identity) return null;
+    if (identity.startsWith('u_')) {
+      const rest = identity.slice('u_'.length);
+      const profileId = rest.split(':')[0];
+      return profileId || null;
+    }
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identity)) {
+      return identity;
+    }
+    return null;
+  }, []);
 
   const setRemoteAudioMuted = useCallback((muted: boolean, focusedIdentity?: string) => {
     if (!room) return;
@@ -288,6 +323,11 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
         return;
       }
 
+      if (!canPublish) {
+        Alert.alert('Not allowed', 'This account is not allowed to publish live streams.');
+        return;
+      }
+
       if (isLive) {
         await stopLive();
       } else {
@@ -298,27 +338,113 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
     } finally {
       goLivePressInFlightRef.current = false;
     }
-  }, [currentUser?.id, goLive, isConnected, isLive, lastConnectError, lastTokenEndpoint, lastTokenError?.bodySnippet, lastTokenError?.status, lastWsUrl, stopLive]);
+  }, [canPublish, currentUser?.id, goLive, isConnected, isLive, lastConnectError, lastTokenEndpoint, lastTokenError?.bodySnippet, lastTokenError?.status, lastWsUrl, stopLive]);
+
+  const handleToggleMic = useCallback(async () => {
+    if (!room || room.state !== 'connected') return;
+    if (!canPublish) return;
+    try {
+      const next = !localMicEnabled;
+      setLocalMicEnabled(next);
+      await room.localParticipant.setMicrophoneEnabled(next);
+    } catch (err: any) {
+      setLocalMicEnabled((prev) => !prev);
+      Alert.alert('Mic error', err?.message || 'Failed to toggle microphone');
+    }
+  }, [canPublish, localMicEnabled, room]);
+
+  const handleToggleCam = useCallback(async () => {
+    if (!room || room.state !== 'connected') return;
+    if (!canPublish) return;
+    try {
+      const next = !localCamEnabled;
+      setLocalCamEnabled(next);
+      await room.localParticipant.setCameraEnabled(next);
+    } catch (err: any) {
+      setLocalCamEnabled((prev) => !prev);
+      Alert.alert('Camera error', err?.message || 'Failed to toggle camera');
+    }
+  }, [canPublish, localCamEnabled, room]);
+
+  const handleEndStreamPress = useCallback(() => {
+    if (!isLive) return;
+    Alert.alert('End stream', 'End your live stream now?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'End',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await stopLive();
+          } catch (err: any) {
+            Alert.alert('End failed', err?.message || 'Failed to end stream');
+          }
+        },
+      },
+    ]);
+  }, [isLive, stopLive]);
+
+  const handleReportPress = useCallback(() => {
+    const identity = state.focusedIdentity || targetRecipientId;
+    const profileId = parseProfileIdFromIdentity(identity);
+    if (!profileId) {
+      Alert.alert('Select someone', 'Select a participant to report (pick a gift recipient or focus a tile).');
+      return;
+    }
+
+    const p = participants.find((x) => x.identity === identity);
+    const reportedUsername = p?.username || undefined;
+
+    try {
+      navigation.getParent?.()?.navigate?.('ReportUser', {
+        reportedUserId: profileId,
+        reportedUsername,
+      });
+    } catch {
+      try {
+        navigation.navigate?.('ReportUser', {
+          reportedUserId: profileId,
+          reportedUsername,
+        });
+      } catch {
+        Alert.alert('Navigation error', 'Could not open report screen.');
+      }
+    }
+  }, [navigation, participants, parseProfileIdFromIdentity, state.focusedIdentity, targetRecipientId]);
 
   const handleGiftPress = useCallback(() => {
     openOverlay('gift');
   }, [openOverlay]);
 
-  const handlePiPPress = useCallback(() => {
+  const handleLikePress = useCallback(async () => {
+    const now = Date.now();
+    if (now - likePressCooldownRef.current < 600) return;
+    likePressCooldownRef.current = now;
+
     try {
-      if (state.focusedIdentity) {
-        setFocusedIdentity(null);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Login required', 'Please log in to like.');
         return;
       }
-      if (participants.length > 0) {
-        setFocusedIdentity(participants[0].identity);
-        return;
+
+      const { error } = await supabase
+        .from('chat_messages')
+        .insert({
+          profile_id: user.id,
+          message_type: 'emoji',
+          content: '❤️',
+          room_id: ROOM_NAME,
+          live_stream_id: null,
+        } as any);
+
+      if (error) {
+        console.error('[LIKE] insert failed', error);
       }
-      Alert.alert('Coming soon', 'Picture-in-Picture mode will be available in a future update.');
-    } catch (err: any) {
-      if (DEBUG) console.error('[PiP] Error:', err);
+    } catch (err) {
+      console.error('[LIKE] failed', err);
     }
-  }, [participants, setFocusedIdentity, state.focusedIdentity]);
+  }, []);
 
   const handleSharePress = useCallback(async () => {
     try {
@@ -439,11 +565,25 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
             <Ionicons name="arrow-back" size={28} color="#10b981" />
           </TouchableOpacity>
           
-          {/* Empty space - Position 2 (aligns with Gift) */}
-          <View style={styles.vectorButton} />
+          {/* Mic toggle - Position 2 */}
+          <TouchableOpacity
+            style={styles.vectorButton}
+            onPress={handleToggleMic}
+            activeOpacity={0.7}
+            disabled={!canPublish}
+          >
+            <Ionicons name={localMicEnabled ? 'mic' : 'mic-off'} size={26} color={canPublish ? '#10b981' : '#6b7280'} />
+          </TouchableOpacity>
           
-          {/* Empty space - Position 3 (aligns with PiP) */}
-          <View style={styles.vectorButton} />
+          {/* Cam toggle - Position 3 */}
+          <TouchableOpacity
+            style={styles.vectorButton}
+            onPress={handleToggleCam}
+            activeOpacity={0.7}
+            disabled={!canPublish}
+          >
+            <Ionicons name={localCamEnabled ? 'videocam' : 'videocam-off'} size={26} color={canPublish ? '#ec4899' : '#6b7280'} />
+          </TouchableOpacity>
           
           {/* FILTER BUTTON - Position 4 (aligns with Mixer) */}
           <TouchableOpacity
@@ -454,16 +594,17 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
             <Ionicons name="color-wand" size={26} color="#ec4899" />
           </TouchableOpacity>
 
-          {/* GO LIVE CAMERA ICON - Position 5 (aligns with Share) */}
+          {/* GO LIVE / END STREAM - Position 5 */}
           <TouchableOpacity
             style={styles.vectorButton}
-            onPress={handleToggleGoLive}
+            onPress={isLive ? handleEndStreamPress : handleToggleGoLive}
             activeOpacity={0.7}
+            disabled={!isLive && !canPublish}
           >
-            <Ionicons 
-              name="videocam" 
-              size={28} 
-              color={(isLive && isPublishing) ? "#ef4444" : "#ec4899"} 
+            <Ionicons
+              name={isLive ? 'stop-circle' : 'radio'}
+              size={28}
+              color={!canPublish ? '#6b7280' : (isLive ? '#ef4444' : '#ec4899')}
             />
           </TouchableOpacity>
         </View>
@@ -506,14 +647,19 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
             <Ionicons name="settings-sharp" size={26} color="#6366f1" />
           </TouchableOpacity>
 
+          {/* Report */}
+          <TouchableOpacity style={styles.vectorButton} onPress={handleReportPress} activeOpacity={0.7}>
+            <Ionicons name="flag" size={24} color="#ef4444" />
+          </TouchableOpacity>
+
           {/* Gift */}
           <TouchableOpacity style={styles.vectorButton} onPress={handleGiftPress} activeOpacity={0.7}>
             <Ionicons name="gift" size={26} color="#f59e0b" />
           </TouchableOpacity>
 
-          {/* PiP */}
-          <TouchableOpacity style={styles.vectorButton} onPress={handlePiPPress} activeOpacity={0.7}>
-            <Ionicons name="contract" size={26} color={state.focusedIdentity ? "#a855f7" : "#a855f7"} />
+          {/* Like */}
+          <TouchableOpacity style={styles.vectorButton} onPress={handleLikePress} activeOpacity={0.7}>
+            <Ionicons name="heart" size={24} color="#ec4899" />
           </TouchableOpacity>
 
           {/* Mixer */}
@@ -531,7 +677,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
       {/* Overlays - Slide over entire screen */}
       {!state.isEditMode && !state.focusedIdentity && (
         <>
-          <ChatOverlay visible={state.activeOverlay === 'chat'} onClose={handleCloseOverlay} />
+          <ChatOverlay visible={state.activeOverlay === 'chat'} onClose={handleCloseOverlay} roomId={ROOM_NAME} />
           <ViewersLeaderboardsOverlay visible={state.activeOverlay === 'viewers'} onClose={handleCloseOverlay} />
           <OptionsMenu
             visible={state.activeOverlay === 'menu'}
