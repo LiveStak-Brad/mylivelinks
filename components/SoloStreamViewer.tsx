@@ -46,6 +46,7 @@ import TrendingModal from './TrendingModal';
 import MiniProfileModal from './MiniProfileModal';
 import StreamGiftersModal from './StreamGiftersModal';
 import { useIM } from '@/components/im';
+import { useViewerHeartbeat } from '@/hooks/useViewerHeartbeat';
 
 interface SoloStreamViewerProps {
   username: string;
@@ -118,6 +119,123 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
 
+  const resumePlayback = useCallback(
+    async (source: string) => {
+      const v = videoRef.current;
+      const a = audioRef.current;
+
+      try {
+        if (v) {
+          v.muted = isMuted;
+          v.volume = Math.max(0, Math.min(1, volume));
+        }
+        if (a) {
+          a.muted = isMuted;
+          a.volume = Math.max(0, Math.min(1, volume));
+        }
+
+        const vp = v ? v.play() : null;
+        const ap = a ? a.play() : null;
+
+        if (vp && typeof (vp as any).catch === 'function') {
+          (vp as any).catch((err: any) => {
+            if (DEBUG_LIVEKIT) {
+              console.log('[SoloStreamViewer] play() rejected', { source, kind: 'video', err: String(err) });
+            }
+          });
+        }
+        if (ap && typeof (ap as any).catch === 'function') {
+          (ap as any).catch((err: any) => {
+            if (DEBUG_LIVEKIT) {
+              console.log('[SoloStreamViewer] play() rejected', { source, kind: 'audio', err: String(err) });
+            }
+          });
+        }
+      } catch (err: any) {
+        if (DEBUG_LIVEKIT) {
+          console.log('[SoloStreamViewer] resumePlayback error', { source, err: String(err) });
+        }
+      }
+    },
+    [isMuted, volume]
+  );
+
+  const lastVideoTimeRef = useRef<number>(0);
+  const lastVideoProgressAtRef = useRef<number>(0);
+
+  // Viewer heartbeat + live viewer count updates
+  const watchSessionKey = useMemo(() => {
+    if (!streamer?.live_stream_id || !currentUserId) return null;
+    return `solo:${currentUserId}:${streamer.live_stream_id}`;
+  }, [currentUserId, streamer?.live_stream_id]);
+
+  useViewerHeartbeat({
+    liveStreamId: streamer?.live_stream_id || 0,
+    isActive: !!(streamer?.live_available && isRoomConnected && !streamEnded),
+    isUnmuted: !isMuted,
+    isVisible: true,
+    isSubscribed: !!isRoomConnected,
+    enabled: !!(streamer?.live_stream_id && streamer?.live_available),
+    slotIndex: 0,
+    watchSessionKey: watchSessionKey || undefined,
+  });
+
+  useEffect(() => {
+    if (!streamer?.live_stream_id) return;
+
+    let cancelled = false;
+
+    const loadViewerCount = async () => {
+      try {
+        const { count } = await supabase
+          .from('active_viewers')
+          .select('*', { count: 'exact', head: true })
+          .eq('live_stream_id', streamer.live_stream_id)
+          .eq('is_active', true)
+          .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
+
+        if (!cancelled) {
+          setStreamer((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  viewer_count: count || 0,
+                }
+              : prev
+          );
+        }
+      } catch (err) {
+        console.error('[SoloStreamViewer] Error loading viewer count:', err);
+      }
+    };
+
+    loadViewerCount();
+
+    const channel = supabase
+      .channel(`active-viewers:${streamer.live_stream_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'active_viewers',
+          filter: `live_stream_id=eq.${streamer.live_stream_id}`,
+        },
+        () => {
+          void loadViewerCount();
+        }
+      )
+      .subscribe();
+
+    const interval = setInterval(loadViewerCount, 15000);
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
+  }, [supabase, streamer?.live_stream_id]);
+
   // Get current user
   useEffect(() => {
     const initUser = async () => {
@@ -154,11 +272,12 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           return;
         }
 
-        // Fetch live stream data - get the most recent active stream
+        // Fetch live stream data - get the most recent active solo stream
         const { data: liveStreams } = await supabase
           .from('live_streams')
           .select('id, live_available')
           .eq('profile_id', profile.id)
+          .eq('streaming_mode', 'solo') // Only solo mode streams
           .order('started_at', { ascending: false })
           .limit(1);
 
@@ -403,6 +522,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               console.log('[SoloStreamViewer] 🔊 Attaching EXISTING audio track to audio element');
               publication.track.attach(audioRef.current);
             }
+
+            void resumePlayback('existing_track_attach');
           });
         });
 
@@ -452,6 +573,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             console.log('[SoloStreamViewer] 🔊 Attaching AUDIO track to audio element');
             track.attach(audioRef.current);
           }
+
+          void resumePlayback('track_subscribed');
         });
 
         room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
@@ -484,6 +607,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             console.log('[SoloStreamViewer] Reconnected to room');
           }
           setIsRoomConnected(true);
+          void resumePlayback('room_reconnected');
         });
 
         isConnectingRef.current = false;
@@ -510,7 +634,50 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       connectedUsernameRef.current = null;
       setIsRoomConnected(false);
     };
-  }, [streamer?.live_available, streamer?.profile_id, streamer?.username]); // STABLE DEPS: only reconnect if these change
+  }, [resumePlayback, streamer?.live_available, streamer?.profile_id, streamer?.username]); // STABLE DEPS: only reconnect if these change
+
+  useEffect(() => {
+    if (!streamer?.live_available) return;
+
+    const v = videoRef.current;
+    if (!v) return;
+
+    const onWaiting = () => {
+      void resumePlayback('video_waiting');
+    };
+    const onStalled = () => {
+      void resumePlayback('video_stalled');
+    };
+
+    v.addEventListener('waiting', onWaiting);
+    v.addEventListener('stalled', onStalled);
+
+    lastVideoTimeRef.current = Number.isFinite(v.currentTime) ? v.currentTime : 0;
+    lastVideoProgressAtRef.current = Date.now();
+
+    const interval = setInterval(() => {
+      const el = videoRef.current;
+      if (!el) return;
+      const t = Number(el.currentTime);
+      if (Number.isFinite(t) && t > lastVideoTimeRef.current + 0.02) {
+        lastVideoTimeRef.current = t;
+        lastVideoProgressAtRef.current = Date.now();
+        return;
+      }
+
+      const stalledForMs = Date.now() - lastVideoProgressAtRef.current;
+      if (stalledForMs >= 6000) {
+        lastVideoProgressAtRef.current = Date.now();
+        void resumePlayback('watchdog');
+      }
+    }, 2000);
+
+    return () => {
+      clearInterval(interval);
+      v.removeEventListener('waiting', onWaiting);
+      v.removeEventListener('stalled', onStalled);
+    };
+  }, [resumePlayback, streamer?.live_available, streamer?.username]);
 
   // Subscribe to stream status changes (detect when stream ends)
   useEffect(() => {
@@ -561,7 +728,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         if (prev <= 1) {
           clearInterval(interval);
           // Redirect to LiveTV main page
-          router.push('/live-tv');
+          router.push('/liveTV');
           return 0;
         }
         return prev - 1;
@@ -584,6 +751,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           profiles!inner(username, avatar_url)
         `)
         .eq('live_available', true)
+        .eq('streaming_mode', 'solo') // Only solo mode streams
         .neq('profile_id', streamer.profile_id)
         .limit(10);
 
@@ -698,7 +866,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             This streamer does not exist or their profile is not available.
           </p>
           <button
-            onClick={() => router.push('/live')}
+            onClick={() => router.push('/liveTV')}
             className="mt-4 px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
           >
             Browse Live Streams
@@ -781,7 +949,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               <div className="flex items-center gap-1">
                 {/* Back Button - ALL THE WAY LEFT */}
                 <button
-                  onClick={() => router.push('/live')}
+                  onClick={() => router.push('/liveTV')}
                   className="lg:hidden text-white hover:opacity-80 transition-opacity"
                   title="Back to Browse"
                 >
@@ -980,7 +1148,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                   
                   {/* Action Button */}
                   <button
-                    onClick={() => router.push('/live-tv')}
+                    onClick={() => router.push('/liveTV')}
                     className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
                   >
                     Return to LiveTV Now
@@ -995,7 +1163,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                       View Profile
                     </button>
                     <button
-                      onClick={() => router.push('/live')}
+                      onClick={() => router.push('/liveTV')}
                       className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm rounded-lg transition-all duration-200"
                     >
                       Browse Streams
