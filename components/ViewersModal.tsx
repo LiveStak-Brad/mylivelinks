@@ -133,13 +133,15 @@ export default function ViewersModal({ isOpen, onClose, liveStreamId, roomId }: 
                         className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
                       >
                         <div className="relative">
-                          <Image
-                            src={getAvatarUrl(viewer.avatar_url)}
-                            alt={viewer.username}
-                            width={40}
-                            height={40}
-                            className="rounded-full"
-                          />
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                            <Image
+                              src={getAvatarUrl(viewer.avatar_url)}
+                              alt={viewer.username}
+                              width={40}
+                              height={40}
+                              className="object-cover w-full h-full"
+                            />
+                          </div>
                           {/* Purple dot for active */}
                           <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-purple-500 border-2 border-white dark:border-gray-700 rounded-full"></div>
                         </div>
@@ -167,13 +169,15 @@ export default function ViewersModal({ isOpen, onClose, liveStreamId, roomId }: 
                         key={viewer.profile_id}
                         className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg opacity-60"
                       >
-                        <Image
-                          src={getAvatarUrl(viewer.avatar_url)}
-                          alt={viewer.username}
-                          width={40}
-                          height={40}
-                          className="rounded-full"
-                        />
+                        <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                          <Image
+                            src={getAvatarUrl(viewer.avatar_url)}
+                            alt={viewer.username}
+                            width={40}
+                            height={40}
+                            className="object-cover w-full h-full"
+                          />
+                        </div>
                         <div className="flex-1">
                           <p className="font-semibold text-gray-900 dark:text-white">
                             {viewer.username}
