@@ -379,7 +379,7 @@ export default function ReferralsPage() {
                   <p className="text-muted-foreground mb-4">
                     See how you rank against other top referrers and compete for exclusive prizes.
                   </p>
-                  <Link href="/leaderboards">
+                  <Link href="/leaderboards?type=referrals">
                     <Button
                       variant="primary"
                       leftIcon={<Award className="w-4 h-4" />}

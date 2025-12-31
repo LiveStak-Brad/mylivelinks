@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Video } from 'lucide-react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { Video, Users } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { createClient } from '@/lib/supabase';
 import { isRouteActive } from '@/lib/navigation';
@@ -14,16 +14,27 @@ interface Room {
   display_name: string;
 }
 
+type LeaderboardType = 'gifts' | 'referrals';
+
 /**
  * LEADERBOARDS PAGE
  * 
  * Dedicated page for leaderboards (moved from modal).
  * Better for mobile navigation and discoverability.
  * 
- * Route: /leaderboards
+ * Route: /leaderboards?type=gifts (default) or /leaderboards?type=referrals
  */
 export default function LeaderboardsPage() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const typeParam = searchParams.get('type') as LeaderboardType | null;
+  const [activeTab, setActiveTab] = useState<LeaderboardType>(typeParam || 'gifts');
+
+  useEffect(() => {
+    if (typeParam === 'referrals' || typeParam === 'gifts') {
+      setActiveTab(typeParam);
+    }
+  }, [typeParam]);
   
   return (
     <main 
@@ -41,23 +52,54 @@ export default function LeaderboardsPage() {
             Leaderboards
           </h1>
           <p className="text-base text-muted-foreground">
-            Top gifters and earners across MyLiveLinks
+            {activeTab === 'gifts' 
+              ? 'Top gifters and earners across MyLiveLinks'
+              : 'Top referrers and influencers'}
           </p>
         </header>
 
-        {/* Leaderboard content will go here */}
-        {/* For now, we'll import the Leaderboard component */}
+        {/* Tabs */}
+        <div className="flex justify-center gap-2 mb-6">
+          <Link href="/leaderboards?type=gifts" className="flex-1 max-w-xs">
+            <button
+              onClick={() => setActiveTab('gifts')}
+              className={`w-full px-6 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'gifts'
+                  ? 'bg-primary text-primary-foreground shadow-lg'
+                  : 'bg-card text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <Video className="w-4 h-4" />
+              Gifts & Earnings
+            </button>
+          </Link>
+          <Link href="/leaderboards?type=referrals" className="flex-1 max-w-xs">
+            <button
+              onClick={() => setActiveTab('referrals')}
+              className={`w-full px-6 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                activeTab === 'referrals'
+                  ? 'bg-primary text-primary-foreground shadow-lg'
+                  : 'bg-card text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Referrals
+            </button>
+          </Link>
+        </div>
+
+        {/* Leaderboard content */}
         <div className="animate-slide-up">
-          <LeaderboardContent />
+          {activeTab === 'gifts' && <GiftsLeaderboardContent />}
+          {activeTab === 'referrals' && <ReferralsLeaderboardContent />}
         </div>
       </div>
     </main>
   );
 }
 
-// Temporary wrapper for the existing Leaderboard component
-function LeaderboardContent() {
-  // We'll dynamically import the Leaderboard component to avoid circular dependencies
+// Gifts & Earnings Leaderboard
+function GiftsLeaderboardContent() {
   const [LeaderboardComponent, setLeaderboardComponent] = useState<any>(null);
 
   useEffect(() => {
@@ -77,3 +119,23 @@ function LeaderboardContent() {
   return <LeaderboardComponent />;
 }
 
+// Referrals Leaderboard
+function ReferralsLeaderboardContent() {
+  const [ReferralLeaderboardComponent, setReferralLeaderboardComponent] = useState<any>(null);
+
+  useEffect(() => {
+    import('@/components/ReferralLeaderboardPreview').then((mod) => {
+      setReferralLeaderboardComponent(() => mod.default);
+    });
+  }, []);
+
+  if (!ReferralLeaderboardComponent) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return <ReferralLeaderboardComponent showCurrentUser={false} />;
+}
