@@ -119,7 +119,7 @@ export default function TrendingPage() {
 
 interface TrendingStreamCardProps {
   stream: {
-    stream_id: string;
+    stream_id: number;
     profile_id: string;
     username: string;
     display_name: string | null;
