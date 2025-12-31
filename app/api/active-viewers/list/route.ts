@@ -56,26 +56,17 @@ export async function GET(req: Request) {
       (profiles || []).map((p: any) => [String(p.id), { username: p.username, avatar_url: p.avatar_url }])
     );
 
-    const viewers = (rows || [])
-      .map((row) => {
-        const profile = profileMap.get(row.viewer_id);
-        if (!profile) return null;
-        const is_active = Boolean(row.is_active) && row.last_active_at > cutoffIso;
-        return {
-          profile_id: row.viewer_id,
-          username: profile.username || 'Unknown',
-          avatar_url: profile.avatar_url || null,
-          is_active,
-          last_seen: row.last_active_at,
-        };
-      })
-      .filter(Boolean) as Array<{
-        profile_id: string;
-        username: string;
-        avatar_url: string | null;
-        is_active: boolean;
-        last_seen: string;
-      }>;
+    const viewers = (rows || []).map((row) => {
+      const profile = profileMap.get(row.viewer_id);
+      const is_active = Boolean(row.is_active) && row.last_active_at > cutoffIso;
+      return {
+        profile_id: row.viewer_id,
+        username: profile?.username || 'Unknown viewer',
+        avatar_url: profile?.avatar_url || null,
+        is_active,
+        last_seen: row.last_active_at,
+      };
+    });
 
     // Sort: active first (by last_seen desc), then inactive by last_seen desc
     viewers.sort((a, b) => {
