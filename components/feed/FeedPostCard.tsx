@@ -49,6 +49,8 @@ export interface FeedPostCardProps {
   coinCount?: number;
   /** Whether current user liked this post */
   isLiked?: boolean;
+  /** Number of likes on this post */
+  likesCount?: number;
   /** Callback when like button clicked */
   onLike?: () => void;
   /** Callback when comment button clicked */
@@ -180,6 +182,7 @@ const FeedPostCard = memo(function FeedPostCard({
   clipId,
   coinCount = 0,
   isLiked = false,
+  likesCount = 0,
   onLike,
   onComment,
   onGift,
@@ -261,6 +264,7 @@ const FeedPostCard = memo(function FeedPostCard({
             <ActionButton
               icon={Heart}
               label="Like"
+              count={likesCount}
               onClick={onLike}
               isActive={isLiked}
             />

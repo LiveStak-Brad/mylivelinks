@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RefreshCw, Upload, X, Globe, Users, Lock, Heart } from 'lucide-react';
 import { Button, Card, Modal, Textarea } from '@/components/ui';
-import { FeedPostCard } from './FeedPostCard';
+import { FeedPostWithLikes } from './FeedPostWithLikes';
 import PostMedia from './PostMedia';
 import SafeRichText from '@/components/SafeRichText';
 import GiftModal from '@/components/GiftModal';
 import { createClient } from '@/lib/supabase';
 import { uploadPostMedia } from '@/lib/storage';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
+import { usePostLike } from '@/hooks/useFeedLikes';
 
 type FeedAuthor = {
   id: string;
@@ -27,6 +28,7 @@ type FeedPost = {
   author: FeedAuthor;
   comment_count: number;
   gift_total_coins: number;
+  likes_count: number;
 };
 
 type FeedComment = {
@@ -670,8 +672,8 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                 </div>
               )}
 
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -680,16 +682,15 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                     onChange={(e) => onComposerFileChange(e.target.files?.[0] ?? null)}
                     disabled={isPosting}
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isPosting}
-                    leftIcon={<Upload className="w-4 h-4" />}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50"
                   >
-                    Add photo/video
-                  </Button>
+                    <Upload className="w-4 h-4" />
+                    <span className="hidden sm:inline">Photo/Video</span>
+                  </button>
 
                   {/* Visibility Selector */}
                   <div className="relative">
@@ -697,10 +698,10 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                       value={composerVisibility}
                       onChange={(e) => setComposerVisibility(e.target.value as 'public' | 'friends' | 'private')}
                       disabled={isPosting}
-                      className="appearance-none pl-8 pr-8 py-1.5 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="appearance-none pl-8 pr-3 py-1.5 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="public">Public</option>
-                      <option value="friends">Friends Only</option>
+                      <option value="friends">Friends</option>
                       <option value="private">Private</option>
                     </select>
                     <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
@@ -710,7 +711,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                     </div>
                   </div>
                 </div>
-                <Button onClick={createPost} disabled={isPosting || (!composerText.trim() && !composerMediaFile)} isLoading={isPosting}>
+                <Button onClick={createPost} disabled={isPosting || (!composerText.trim() && !composerMediaFile)} isLoading={isPosting} size="sm">
                   Post
                 </Button>
               </div>
@@ -735,7 +736,9 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
 
             return (
               <div key={post.id} className="space-y-0">
-                <FeedPostCard
+                <FeedPostWithLikes
+                  postId={post.id}
+                  initialLikesCount={post.likes_count}
                   authorName={post.author.username}
                   authorUsername={post.author.username}
                   authorAvatarUrl={post.author.avatar_url}
@@ -750,9 +753,6 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                     ) : undefined
                   }
                   coinCount={post.gift_total_coins}
-                  onLike={() => {
-                    // TODO: Implement like functionality when backend is ready
-                  }}
                   onComment={() => void toggleComments(post.id)}
                   onGift={() => openGiftModal(post)}
                   onProfileClick={() => {
