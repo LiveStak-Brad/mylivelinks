@@ -187,19 +187,18 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
     const loadViewerCount = async () => {
       try {
-        const { count } = await supabase
-          .from('active_viewers')
-          .select('*', { count: 'exact', head: true })
-          .eq('live_stream_id', streamer.live_stream_id)
-          .eq('is_active', true)
-          .gt('last_active_at', new Date(Date.now() - 60000).toISOString());
-
-        if (!cancelled) {
+        const res = await fetch(`/api/active-viewers?live_stream_id=${streamer.live_stream_id}`);
+        if (!res.ok) {
+          console.error('[SoloStreamViewer] Viewer count fetch failed:', res.status);
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled && typeof data.viewer_count === 'number') {
           setStreamer((prev) =>
             prev
               ? {
                   ...prev,
-                  viewer_count: count || 0,
+                  viewer_count: data.viewer_count,
                 }
               : prev
           );
@@ -210,31 +209,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     };
 
     loadViewerCount();
-
-    const channel = supabase
-      .channel(`active-viewers:${streamer.live_stream_id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'active_viewers',
-          filter: `live_stream_id=eq.${streamer.live_stream_id}`,
-        },
-        () => {
-          void loadViewerCount();
-        }
-      )
-      .subscribe();
-
     const interval = setInterval(loadViewerCount, 15000);
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [supabase, streamer?.live_stream_id]);
+  }, [streamer?.live_stream_id]);
 
   // Get current user
   useEffect(() => {
