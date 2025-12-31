@@ -612,6 +612,28 @@ export default function ProfileSettingsPage() {
             <Link href={`/${username}`} className="text-blue-500 hover:text-blue-600">
               View Profile
             </Link>
+            <Link
+              href="/settings/password"
+              className="text-sm text-blue-500 hover:text-blue-600 underline"
+            >
+              Change password
+            </Link>
+          </div>
+        </div>
+
+        {/* Account & Security quick link */}
+        <div className="mb-6">
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="font-semibold text-blue-900 dark:text-blue-100">Need to change your email or password?</p>
+              <p className="text-sm text-blue-800/90 dark:text-blue-200/80">Go to Account & Security to update login details.</p>
+            </div>
+            <Link
+              href="/settings/account"
+              className="inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              Account & Security
+            </Link>
           </div>
         </div>
 
