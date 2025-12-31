@@ -669,6 +669,37 @@ export default function SoloHostStream() {
             
             {/* Top row - all screen sizes (with safe area support on mobile) */}
             <div className="absolute z-20 flex items-center justify-between lg:top-4 lg:left-4 lg:right-4" style={{ top: 'max(1rem, env(safe-area-inset-top))', left: '1rem', right: '1rem' }}>
+              {/* Mobile: Top gifters vertical stack on the left */}
+              {topGifters.length > 0 && (
+                <div className="md:hidden absolute left-2 top-16 flex flex-col gap-2 z-30">
+                  {topGifters.slice(0, 3).map((gifter, index) => {
+                    const colors = [
+                      { border: 'ring-yellow-400', bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600' },
+                      { border: 'ring-gray-300', bg: 'bg-gradient-to-br from-gray-300 to-gray-400' },
+                      { border: 'ring-orange-600', bg: 'bg-gradient-to-br from-orange-600 to-orange-800' },
+                    ];
+                    const color = colors[index];
+
+                    return (
+                      <button
+                        key={gifter.profile_id}
+                        onClick={() => setShowStreamGifters(true)}
+                        className={`flex items-center justify-center ${color.bg} rounded-full p-[2px] w-9 h-9 hover:scale-110 transition-transform cursor-pointer`}
+                        title={`${gifter.username} - ${gifter.total_coins.toLocaleString()} coins`}
+                      >
+                        <Image
+                          src={getAvatarUrl(gifter.avatar_url)}
+                          alt={gifter.username}
+                          width={28}
+                          height={28}
+                          className="rounded-full"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Left: Streamer name bubble */}
               <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5">
                 <div className="flex items-center gap-2">
@@ -725,7 +756,7 @@ export default function SoloHostStream() {
               <div className="flex items-center gap-2">
                 {/* Top 3 Gifters - small bubbles */}
                 {topGifters.length > 0 && (
-                  <div className="flex items-center gap-1">
+                  <div className="hidden md:flex items-center gap-1">
                     {topGifters.map((gifter, index) => {
                       const colors = [
                         { border: 'ring-yellow-400', bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600' }, // Gold
