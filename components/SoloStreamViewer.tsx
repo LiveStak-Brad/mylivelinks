@@ -217,6 +217,45 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     };
   }, [streamer?.live_stream_id]);
 
+  // Service-role heartbeat to ensure viewers are counted even if RLS blocks client RPC
+  useEffect(() => {
+    if (!streamer?.live_stream_id || !currentUserId) return;
+
+    let cancelled = false;
+
+    const ping = async (is_active = true) => {
+      try {
+        await fetch('/api/active-viewers/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            live_stream_id: streamer.live_stream_id,
+            viewer_id: currentUserId,
+            is_active,
+            is_unmuted: !isMuted,
+            is_visible: true,
+            is_subscribed: true,
+          }),
+        });
+      } catch (err) {
+        console.error('[SoloStreamViewer] Service heartbeat failed:', err);
+      }
+    };
+
+    // initial and interval
+    ping(true);
+    const interval = setInterval(() => {
+      if (!cancelled) ping(true);
+    }, 12000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      // Best effort cleanup
+      void ping(false);
+    };
+  }, [streamer?.live_stream_id, currentUserId, isMuted]);
+
   // Get current user
   useEffect(() => {
     const initUser = async () => {
