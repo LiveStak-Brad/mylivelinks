@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase';
+import { trackLiveGift } from '@/lib/trending-hooks';
 
 interface GiftType {
   id: number;
