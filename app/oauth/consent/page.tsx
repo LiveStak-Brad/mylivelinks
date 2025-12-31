@@ -7,9 +7,10 @@ import SmartBrandLogo from '@/components/SmartBrandLogo';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Badge } from '@/components/ui';
 import { createClient } from '@/lib/supabase';
 
-// Force dynamic rendering; this page needs the client session and URL params at runtime.
+// Force dynamic rendering; this page needs live auth/session + URL params.
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = false;
+export const fetchCache = 'force-no-store';
 export const runtime = 'nodejs';
 
 type ConsentStatus = 'idle' | 'loading';
