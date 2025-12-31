@@ -45,6 +45,7 @@ interface MobileWebWatchLayoutProps {
   onMuteTile: (slotIndex: number) => void;
   onVolumeChange: (slotIndex: number, volume: number) => void;
   onCloseTile: (slotIndex: number) => void;
+  streamingMode?: 'solo' | 'group'; // Streaming mode for database
 }
 
 // Grid configurations for different orientations
@@ -84,6 +85,7 @@ export default function MobileWebWatchLayout({
   onMuteTile,
   onVolumeChange,
   onCloseTile,
+  streamingMode = 'group', // Default to group mode for backward compat
 }: MobileWebWatchLayoutProps) {
   // Focus mode state - which tile is focused (null = grid view)
   const [focusedSlotIndex, setFocusedSlotIndex] = useState<number | null>(null);
@@ -231,7 +233,7 @@ export default function MobileWebWatchLayout({
   // Handle share
   const handleSharePress = useCallback(async () => {
     try {
-      const url = `${window.location.origin}/rooms`;
+      const url = `${window.location.origin}/liveTV`;
       await navigator.share({
         title: 'Join Live Central',
         text: 'Watch live streamers on MyLiveLinks!',
@@ -292,6 +294,7 @@ export default function MobileWebWatchLayout({
               onGoLive={onGoLive}
               onPublishingChange={onPublishingChange}
               publishAllowed={publishAllowed}
+              mode={streamingMode}
             />
           </div>
         )}

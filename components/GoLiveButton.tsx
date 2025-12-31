@@ -14,6 +14,7 @@ interface GoLiveButtonProps {
   onPublishingChange?: (isPublishing: boolean) => void; // NEW: Report publishing state
   onGoLive?: (liveStreamId: number, profileId: string) => void;
   publishAllowed?: boolean;
+  mode?: 'solo' | 'group'; // Streaming mode: 'solo' for 1:1 streams, 'group' for multi-user grid
 }
 
 interface DeviceInfo {
@@ -31,7 +32,7 @@ function isScreenShareSupported(): boolean {
          'getDisplayMedia' in navigator.mediaDevices;
 }
 
-export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, publishAllowed = true }: GoLiveButtonProps) {
+export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, publishAllowed = true, mode = 'group' }: GoLiveButtonProps) {
   const [isLive, setIsLive] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -914,6 +915,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         .insert({
           profile_id: user.id,
           live_available: true,
+          streaming_mode: mode, // 'solo' or 'group' - prevents cross-contamination
           started_at: new Date().toISOString(),
           ended_at: null,
         })

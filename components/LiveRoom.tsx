@@ -922,6 +922,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
           .select('id, live_available')
           .eq('profile_id', currentUserId)
           .eq('live_available', true)
+          .eq('streaming_mode', 'group') // Only check group mode streams
           .limit(1);
 
         const userLiveStream = userLiveStreams?.[0] ?? null;
@@ -1256,11 +1257,12 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
       
       // CRITICAL: If authDisabled or RPCs failed, use direct query fallback
       if (authDisabled || error || data.length === 0) {
-        // Final fallback: direct query from live_streams
+        // Final fallback: direct query from live_streams (filter by group mode)
         const directResult = await supabase
           .from('live_streams')
           .select('id, profile_id, live_available')
           .eq('live_available', true)
+          .eq('streaming_mode', 'group') // Only group live streams
           .order('id', { ascending: false }) // Order by id DESC (newest first) since published_at not selected
           .limit(50);
         
@@ -1340,11 +1342,13 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
 
       // Also fetch streamers who are live_available but not yet published (waiting for viewers)
       // This ensures all "waiting" cameras are available to new viewers
+      // FILTER: Only fetch group mode streams
       if (user) {
         const { data: waitingStreams } = await supabase
           .from('live_streams')
           .select('id, profile_id, live_available')
-          .eq('live_available', true);
+          .eq('live_available', true)
+          .eq('streaming_mode', 'group'); // Only group live streams
 
         if (waitingStreams && waitingStreams.length > 0) {
           const waitingProfileIds = waitingStreams.map((s: any) => s.profile_id);
@@ -2718,6 +2722,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
         onGoLive={handleGoLive}
         onPublishingChange={setIsCurrentUserPublishing}
         publishAllowed={publishAllowed}
+        streamingMode="group"
         onLeave={handleLeaveRoom}
         onMuteTile={handleMuteTile}
         onVolumeChange={handleVolumeChange}

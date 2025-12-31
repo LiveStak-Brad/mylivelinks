@@ -169,6 +169,7 @@ export default function SoloHostStream() {
           .from('live_streams')
           .select('id, live_available, started_at')
           .eq('profile_id', profile.id)
+          .eq('streaming_mode', 'solo') // Only solo mode streams
           .order('started_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -906,6 +907,7 @@ export default function SoloHostStream() {
                 sharedRoom={roomRef.current}
                 isRoomConnected={isRoomConnected}
                 publishAllowed={true}
+                mode="solo"
                 onPublishingChange={(publishing) => {
                   console.log('[SoloHostStream] GoLiveButton publishing state changed:', publishing);
                   setIsPublishing(publishing);
@@ -929,6 +931,7 @@ export default function SoloHostStream() {
                       .select('id')
                       .eq('profile_id', profileId)
                       .eq('live_available', true)
+                      .eq('streaming_mode', 'solo') // Only solo mode streams
                       .single()
                       .then(({ data, error }) => {
                         if (data && !error) {
