@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { DatingProfile } from '@/lib/link/api';
+import type { DatingProfile } from '@/lib/link/types';
 import * as linkApi from '@/lib/link/api';
 import { uploadLinkPhoto } from '@/lib/link/storage';
 import { SafetyModal } from '@/components/link/SafetyModal';

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { DatingMatch } from '@/lib/link/api';
+import type { DatingMatch } from '@/lib/link/types';
 import * as linkApi from '@/lib/link/api';
 
 export default function DatingMatchesPage() {

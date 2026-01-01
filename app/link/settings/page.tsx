@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LinkSettings } from '@/lib/link/api';
+import type { LinkSettings } from '@/lib/link/types';
 import * as linkApi from '@/lib/link/api';
 
 export default function LinkSettingsPage() {

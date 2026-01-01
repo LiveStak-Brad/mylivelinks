@@ -110,6 +110,16 @@ export async function getAutoLinkCandidates(
   return getLinkCandidates(limit, offset);
 }
 
+export type {
+  LinkProfile,
+  LinkSettings,
+  LinkMutual,
+  DatingProfile,
+  DatingMatch,
+  LinkDecisionResult,
+  DatingDecisionResult,
+} from './types';
+
 /**
  * Submit a link decision (link or nah)
  */
