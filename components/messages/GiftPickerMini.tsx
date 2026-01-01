@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Gift, Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 
 interface GiftType {
@@ -125,36 +125,41 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
   if (!isOpen) return null;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-slide-up z-50 min-w-[320px] max-w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-purple-500/10 to-pink-500/10">
-        <div>
-          <h4 className="font-semibold text-sm text-foreground">Send a Gift</h4>
-          <p className="text-xs text-muted-foreground">to {recipientUsername}</p>
+    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl overflow-hidden z-[100]">
+      {/* Header - Compact with vector icon */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500">
+            <Gift className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h4 className="font-semibold text-xs text-foreground">Send Gift</h4>
+            <p className="text-[10px] text-muted-foreground">to {recipientUsername}</p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400">
-            💰 {userCoinBalance.toLocaleString()}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400">
+            {userCoinBalance.toLocaleString()} 💰
           </span>
           <button
             onClick={onClose}
-            className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition"
+            className="p-1 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted/50 transition"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Gift Grid */}
-      <div className="p-3 max-h-48 overflow-y-auto custom-scrollbar">
+      {/* Gift Grid - Compact items */}
+      <div className="p-2 max-h-40 overflow-y-auto custom-scrollbar">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="w-5 h-5 text-primary animate-spin" />
           </div>
         ) : giftTypes.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-4">No gifts available</p>
+          <p className="text-center text-xs text-muted-foreground py-4">No gifts available</p>
         ) : (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-5 gap-1">
             {giftTypes.map(gift => {
               const canAfford = userCoinBalance >= gift.coin_cost;
               const isSelected = selectedGift?.id === gift.id;
@@ -164,25 +169,24 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
                   key={gift.id}
                   onClick={() => canAfford && setSelectedGift(gift)}
                   disabled={!canAfford}
-                  className={`p-2 rounded-lg border-2 transition ${
+                  className={`flex flex-col items-center p-1.5 rounded-xl transition-all duration-150 ${
                     isSelected
-                      ? 'border-primary bg-primary/10 scale-105'
+                      ? 'bg-primary/15 scale-110 shadow-lg ring-2 ring-primary/50'
                       : canAfford
-                        ? 'border-border hover:border-primary/50 hover:bg-muted/50'
-                        : 'border-border/50 opacity-50 cursor-not-allowed'
+                        ? 'hover:bg-muted/60 hover:scale-105 active:scale-95'
+                        : 'opacity-40 cursor-not-allowed'
                   }`}
                 >
-                  <div className="text-2xl mb-1 text-center">
+                  <span className={`text-xl transition-transform ${isSelected ? 'scale-125' : ''}`}>
                     {gift.icon_url ? (
-                      <img src={gift.icon_url} alt={gift.name} className="w-8 h-8 mx-auto" />
+                      <img src={gift.icon_url} alt={gift.name} className="w-6 h-6" />
                     ) : (
                       gift.emoji || getGiftEmoji(gift.name)
                     )}
-                  </div>
-                  <p className="text-[10px] font-medium text-foreground truncate text-center">{gift.name}</p>
-                  <p className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold text-center">
-                    {gift.coin_cost} 💰
-                  </p>
+                  </span>
+                  <span className="text-[8px] font-medium text-muted-foreground mt-0.5">
+                    {gift.coin_cost}
+                  </span>
                 </button>
               );
             })}
@@ -190,31 +194,39 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
         )}
       </div>
 
-      {/* Selected Gift Preview & Send Button */}
+      {/* Selected Gift - Compact send bar */}
       {selectedGift && (
-        <div className="px-4 py-3 border-t border-border bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-            <span className="text-xl">
-              {selectedGift.icon_url ? (
-                <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-6 h-6" />
-              ) : (
-                selectedGift.emoji || getGiftEmoji(selectedGift.name)
-              )}
-            </span>
-              <div>
-                <p className="text-xs font-medium text-foreground">{selectedGift.name}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {selectedGift.coin_cost} 💎 to recipient
-                </p>
+        <div className="px-2 py-1.5 border-t border-border/50 bg-muted/30">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-lg flex-shrink-0">
+                {selectedGift.icon_url ? (
+                  <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-5 h-5" />
+                ) : (
+                  selectedGift.emoji || getGiftEmoji(selectedGift.name)
+                )}
+              </span>
+              <div className="min-w-0">
+                <span className="text-[10px] font-medium text-foreground truncate block">{selectedGift.name}</span>
+                <span className="text-[9px] text-muted-foreground">{selectedGift.coin_cost} coins</span>
               </div>
             </div>
-            <button
-              onClick={handleConfirm}
-              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold rounded-lg hover:from-purple-600 hover:to-pink-600 transition shadow-md"
-            >
-              Send {selectedGift.coin_cost} 💰
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition active:scale-95"
+                title="Cancel"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="p-1.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md transition active:scale-95"
+                title="Send Gift"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       )}
