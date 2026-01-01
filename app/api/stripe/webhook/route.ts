@@ -97,32 +97,32 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutCompleted(session, requestId);
+        await handleCheckoutCompleted(session, event.id, requestId);
         break;
       }
 
       case 'checkout.session.async_payment_succeeded': {
         const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutCompleted(session, requestId);
+        await handleCheckoutCompleted(session, event.id, requestId);
         break;
       }
 
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        await handlePaymentIntentSucceeded(paymentIntent, requestId);
+        await handlePaymentIntentSucceeded(paymentIntent, event.id, requestId);
         break;
       }
 
       case 'charge.refunded': {
         const charge = event.data.object as Stripe.Charge;
-        await handleChargeRefunded(charge, requestId);
+        await handleChargeRefunded(charge, event.id, requestId);
         break;
       }
 
       case 'charge.dispute.created':
       case 'charge.dispute.updated': {
         const dispute = event.data.object as Stripe.Dispute;
-        await handleDisputeUpdated(dispute, requestId);
+        await handleDisputeUpdated(dispute, event.id, requestId);
         break;
       }
 
