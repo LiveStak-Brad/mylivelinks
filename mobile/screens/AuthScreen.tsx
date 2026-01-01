@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Button, Input } from '../components/ui';
 import { BrandLogo } from '../components/ui/BrandLogo';
+import { LegalFooter } from '../components/LegalFooter';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import type { RootStackParamList } from '../types/navigation';
@@ -57,71 +58,51 @@ export function AuthScreen({ navigation }: Props) {
       imageStyle={styles.backgroundImageStyle}
     >
       <View style={styles.container}>
-        <View style={styles.card}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <BrandLogo size={120} />
-          </View>
+        <View style={styles.cardWrap}>
+          <View style={styles.card}>
+            {/* Logo */}
+            <View style={styles.logoContainer}>
+              <BrandLogo size={120} />
+            </View>
 
-          <Text style={styles.title}>{mode === 'signIn' ? 'Welcome Back' : 'Create Account'}</Text>
-          <Text style={styles.subtitle}>{mode === 'signIn' ? 'Sign in to continue' : 'Sign up to get started'}</Text>
+            <Text style={styles.title}>{mode === 'signIn' ? 'Welcome Back' : 'Create Account'}</Text>
+            <Text style={styles.subtitle}>{mode === 'signIn' ? 'Sign in to continue' : 'Sign up to get started'}</Text>
 
-        {mode === 'signUp' ? (
+          {mode === 'signUp' ? (
+            <View style={styles.field}>
+              <Input placeholder="Username (optional)" value={username} onChangeText={setUsername} />
+            </View>
+          ) : null}
+
           <View style={styles.field}>
-            <Input placeholder="Username (optional)" value={username} onChangeText={setUsername} />
+            <Input
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
           </View>
-        ) : null}
 
-        <View style={styles.field}>
-          <Input
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+          <View style={styles.field}>
+            <Input placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
+          </View>
 
-        <View style={styles.field}>
-          <Input placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
-        </View>
+          <View style={styles.actions}>
+            <Button title={primaryCtaTitle} onPress={submit} loading={submitting} />
+          </View>
 
-        <View style={styles.actions}>
-          <Button title={primaryCtaTitle} onPress={submit} loading={submitting} />
-        </View>
-
-        <Button
-          title={secondaryCtaTitle}
-          variant="secondary"
-          onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
-          disabled={submitting}
-        />
-
-        <View style={styles.linksRow}>
           <Button
-            title="Safety & Policies"
+            title={secondaryCtaTitle}
             variant="secondary"
-            onPress={() => navigation.navigate('SafetyPolicies')}
-            disabled={submitting}
-          />
-        </View>
-
-        <View style={styles.linksRow}>
-          <Button
-            title="Terms"
-            variant="secondary"
-            onPress={() => navigation.navigate('PolicyDetail', { id: 'terms-of-service' })}
-            disabled={submitting}
-          />
-          <Button
-            title="Privacy"
-            variant="secondary"
-            onPress={() => navigation.navigate('PolicyDetail', { id: 'privacy-policy' })}
+            onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
             disabled={submitting}
           />
         </View>
       </View>
+
+      <LegalFooter />
       </View>
     </ImageBackground>
   );
@@ -139,8 +120,11 @@ function createStyles(theme: ThemeDefinition) {
     container: {
       flex: 1,
       backgroundColor: 'transparent',
-      justifyContent: 'center',
       padding: 20,
+    },
+    cardWrap: {
+      flex: 1,
+      justifyContent: 'center',
     },
     card: {
       width: '100%',

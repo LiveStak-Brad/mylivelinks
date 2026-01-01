@@ -386,30 +386,98 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
 
   const handleReportPress = useCallback(() => {
     const identity = state.focusedIdentity || targetRecipientId;
-    const profileId = parseProfileIdFromIdentity(identity);
-    if (!profileId) {
-      Alert.alert('Select someone', 'Select a participant to report (pick a gift recipient or focus a tile).');
-      return;
-    }
 
-    const p = participants.find((x) => x.identity === identity);
-    const reportedUsername = p?.username || undefined;
-
-    try {
-      navigation.getParent?.()?.navigate?.('ReportUser', {
-        reportedUserId: profileId,
-        reportedUsername,
-      });
-    } catch {
+    const reportRoom = () => {
+      const profileId = parseProfileIdFromIdentity(identity);
+      const p = participants.find((x) => x.identity === identity);
+      const reportedUsername = p?.username || undefined;
       try {
-        navigation.navigate?.('ReportUser', {
-          reportedUserId: profileId,
+        navigation.getParent?.()?.navigate?.('ReportUser', {
+          reportedUserId: profileId || undefined,
           reportedUsername,
+          reportType: 'stream',
+          contextDetails: JSON.stringify({
+            content_kind: 'live_room',
+            room_id: ROOM_NAME,
+            focused_identity: identity ?? null,
+            focused_profile_id: profileId || null,
+            focused_username: reportedUsername ?? null,
+            participant_count: participants.length,
+            surface: 'mobile_native_live_room',
+          }),
         });
       } catch {
-        Alert.alert('Navigation error', 'Could not open report screen.');
+        try {
+          navigation.navigate?.('ReportUser', {
+            reportedUserId: profileId || undefined,
+            reportedUsername,
+            reportType: 'stream',
+            contextDetails: JSON.stringify({
+              content_kind: 'live_room',
+              room_id: ROOM_NAME,
+              focused_identity: identity ?? null,
+              focused_profile_id: profileId || null,
+              focused_username: reportedUsername ?? null,
+              participant_count: participants.length,
+              surface: 'mobile_native_live_room',
+            }),
+          });
+        } catch {
+          Alert.alert('Navigation error', 'Could not open report screen.');
+        }
       }
-    }
+    };
+
+    const reportUser = () => {
+      const profileId = parseProfileIdFromIdentity(identity);
+      if (!profileId) {
+        Alert.alert('Select someone', 'Select a participant to report (pick a gift recipient or focus a tile).');
+        return;
+      }
+
+      const p = participants.find((x) => x.identity === identity);
+      const reportedUsername = p?.username || undefined;
+
+      try {
+        navigation.getParent?.()?.navigate?.('ReportUser', {
+          reportedUserId: profileId,
+          reportedUsername,
+          reportType: 'user',
+          contextDetails: JSON.stringify({
+            content_kind: 'profile',
+            profile_id: profileId,
+            username: reportedUsername ?? null,
+            room_id: ROOM_NAME,
+            focused_identity: identity ?? null,
+            surface: 'mobile_native_live_room',
+          }),
+        });
+      } catch {
+        try {
+          navigation.navigate?.('ReportUser', {
+            reportedUserId: profileId,
+            reportedUsername,
+            reportType: 'user',
+            contextDetails: JSON.stringify({
+              content_kind: 'profile',
+              profile_id: profileId,
+              username: reportedUsername ?? null,
+              room_id: ROOM_NAME,
+              focused_identity: identity ?? null,
+              surface: 'mobile_native_live_room',
+            }),
+          });
+        } catch {
+          Alert.alert('Navigation error', 'Could not open report screen.');
+        }
+      }
+    };
+
+    Alert.alert('Report', 'What would you like to report?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Report room', style: 'destructive', onPress: reportRoom },
+      { text: 'Report user', onPress: reportUser },
+    ]);
   }, [navigation, participants, parseProfileIdFromIdentity, state.focusedIdentity, targetRecipientId]);
 
   const handleGiftPress = useCallback(() => {

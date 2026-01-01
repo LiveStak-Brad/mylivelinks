@@ -87,6 +87,29 @@ export function MessagesScreen({ navigation: _navigation, route }: Props) {
     ? conversations.find((c) => c.id === activeConversationId)
     : undefined;
 
+  const openReportDmMessage = useMemo(() => {
+    return (params: { messageId: string; senderId: string; content: string; createdAt: string | null }) => {
+      if (!activeConversation) return;
+      if (!activeConversationId) return;
+      _navigation.getParent?.()?.navigate?.('ReportUser', {
+        reportedUserId: params.senderId,
+        reportedUsername: activeConversation.recipientUsername,
+        reportType: 'chat',
+        contextDetails: JSON.stringify({
+          content_kind: 'dm_message',
+          message_id: params.messageId,
+          dm_conversation_id: activeConversationId,
+          recipient_id: activeConversation.recipientId,
+          recipient_username: activeConversation.recipientUsername,
+          sender_id: params.senderId,
+          created_at: params.createdAt,
+          snippet: String(params.content || '').slice(0, 160) || null,
+          surface: 'mobile_native_messages',
+        }),
+      });
+    };
+  }, [activeConversation, activeConversationId, _navigation]);
+
   // Filter conversations by search query (matches web logic)
   const filteredConversations = conversations.filter(conv => {
     if (!searchQuery) return true;
@@ -198,17 +221,31 @@ export function MessagesScreen({ navigation: _navigation, route }: Props) {
                 );
               }
 
+              const createdAt = m.timestamp ? m.timestamp.toISOString() : null;
               return (
-                <View
+                <Pressable
                   key={m.id}
+                  onLongPress={() => {
+                    if (isMe) return;
+                    openReportDmMessage({
+                      messageId: String(m.id),
+                      senderId: m.senderId,
+                      content: m.content,
+                      createdAt,
+                    });
+                  }}
+                  delayLongPress={350}
                   style={[styles.messageRow, isMe ? styles.messageRowMe : styles.messageRowOther]}
                 >
                   <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleOther]}>
                     <Text style={[styles.messageText, isMe ? styles.messageTextMe : styles.messageTextOther]}>
                       {m.content}
                     </Text>
+                    {!isMe && (
+                      <Text style={styles.messageHint}>Long-press to report</Text>
+                    )}
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </ScrollView>
@@ -497,6 +534,13 @@ function createStyles(theme: ThemeDefinition) {
     messageTextOther: {
       color: theme.colors.text,
       fontWeight: '500',
+    },
+    messageHint: {
+      marginTop: 6,
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.colors.mutedText,
+      opacity: 0.8,
     },
     giftBubble: {
       maxWidth: '80%',

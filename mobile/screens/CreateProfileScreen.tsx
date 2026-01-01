@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { supabase } from '../lib/supabase';
 import { Button, Checkbox, Input, PageShell } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import { useAuthContext } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -218,8 +219,9 @@ export function CreateProfileScreen({ navigation }: Props) {
   };
 
   return (
-    <PageShell title="Create Profile" contentStyle={styles.page}>
-      <View style={styles.card}>
+    <PageShell title="Create Profile" contentStyle={styles.pageShell}>
+      <View style={styles.page}>
+        <View style={styles.card}>
         <Text style={styles.stepTitle}>{stepTitle}</Text>
         <Text style={styles.stepSubtitle}>Step {step} of 4</Text>
 
@@ -320,13 +322,21 @@ export function CreateProfileScreen({ navigation }: Props) {
             <Text style={styles.help}>Saving…</Text>
           </View>
         ) : null}
+        </View>
       </View>
+
+      <LegalFooter />
     </PageShell>
   );
 }
 
 const styles = StyleSheet.create({
+  pageShell: {
+    flex: 1,
+    padding: 0,
+  },
   page: {
+    flex: 1,
     padding: 20,
     justifyContent: 'center',
   },

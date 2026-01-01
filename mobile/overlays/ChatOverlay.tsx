@@ -17,6 +17,7 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Animated, {
@@ -47,6 +48,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
   onSharePress,
   giftingEnabled = false,
 }) => {
+  const navigation = useNavigation<any>();
   const { messages, loading, sendMessage, retryMessage } = useChatMessages({ roomId, liveStreamId });
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
@@ -181,7 +183,31 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
                   }
 
                   return (
-                    <View key={msg.id} style={styles.messageRow}>
+                    <TouchableOpacity
+                      key={msg.id}
+                      style={styles.messageRow}
+                      activeOpacity={0.9}
+                      onLongPress={() => {
+                        if (!msg.profile_id) return;
+                        navigation.getParent?.()?.navigate?.('ReportUser', {
+                          reportedUserId: msg.profile_id,
+                          reportedUsername: msg.username,
+                          reportType: 'chat',
+                          contextDetails: JSON.stringify({
+                            content_kind: 'stream_chat_message',
+                            message_id: String(msg.id),
+                            room_id: roomId ?? null,
+                            live_stream_id: typeof liveStreamId === 'number' ? liveStreamId : null,
+                            sender_id: msg.profile_id,
+                            sender_username: msg.username ?? null,
+                            snippet: String(msg.content || '').slice(0, 160) || null,
+                            created_at: msg.created_at,
+                            surface: 'mobile_native_live_chat_overlay',
+                          }),
+                        });
+                      }}
+                      delayLongPress={350}
+                    >
                       <View style={[styles.bubble, { backgroundColor: bubbleColor }]}>
                         <View style={styles.bubbleAvatarWrap}>
                           {msg.avatar_url ? (
@@ -246,7 +272,7 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
                           )}
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })
               )}

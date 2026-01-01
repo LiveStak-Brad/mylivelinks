@@ -27,6 +27,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Button, Input, PageShell, PageHeader } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import { useAuthContext } from '../contexts/AuthContext';
 import { ProfileCarousel } from '../components/ProfileCarousel';
 import { RoomsCarousel } from '../components/RoomsCarousel';
@@ -174,6 +175,8 @@ export function HomeDashboardScreen({ navigation }: Props) {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.accentSecondary} />
         </View>
+
+        <LegalFooter extraBottomPadding={68} />
       </PageShell>
     );
   }
@@ -388,6 +391,8 @@ export function HomeDashboardScreen({ navigation }: Props) {
           <Text style={styles.footerText}>© 2025 MyLiveLinks. All rights reserved.          </Text>
         </View>
       </ScrollView>
+
+      <LegalFooter extraBottomPadding={68} />
     </PageShell>
   );
 }

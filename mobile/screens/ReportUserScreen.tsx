@@ -27,6 +27,8 @@ const REPORT_REASONS: Reason[] = [
   { value: 'harassment_hate', label: 'Harassment / hate' },
   { value: 'spam', label: 'Spam' },
   { value: 'inappropriate_content', label: 'Inappropriate content' },
+  { value: 'violence_threats', label: 'Violence / threats' },
+  { value: 'copyright', label: 'Copyright (stream)' },
   { value: 'impersonation', label: 'Impersonation' },
   { value: 'other', label: 'Other' },
 ];
@@ -39,6 +41,8 @@ export function ReportUserScreen({ navigation, route }: Props) {
 
   const reportedUserId = route.params?.reportedUserId;
   const reportedUsername = route.params?.reportedUsername;
+  const reportType = route.params?.reportType ?? 'user';
+  const contextDetails = route.params?.contextDetails ?? null;
 
   const [selectedReason, setSelectedReason] = useState('');
   const [details, setDetails] = useState('');
@@ -55,10 +59,13 @@ export function ReportUserScreen({ navigation, route }: Props) {
   );
 
   const title = useMemo(() => {
+    if (reportType === 'chat') return 'Report Message';
+    if (reportType === 'stream') return 'Report Stream';
+    if (reportType === 'profile') return reportedUsername ? `Report ${reportedUsername}'s Profile` : 'Report Profile';
     if (selectedUser?.username) return `Report ${selectedUser.username}`;
     if (reportedUsername) return `Report ${reportedUsername}`;
     return 'Report a User';
-  }, [reportedUsername, selectedUser]);
+  }, [reportType, reportedUsername, selectedUser]);
 
   const searchUsers = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {
@@ -117,12 +124,12 @@ export function ReportUserScreen({ navigation, route }: Props) {
     // Determine the target user ID - prioritize selectedUser, fall back to route params
     const targetUserId = selectedUser?.id || reportedUserId;
 
-    if (!targetUserId) {
+    if (!targetUserId && reportType !== 'stream') {
       Alert.alert('Missing user', 'Please select a user to report.');
       return;
     }
 
-    if (targetUserId === userId) {
+    if (targetUserId && targetUserId === userId) {
       Alert.alert('Not allowed', 'You cannot report yourself.');
       return;
     }
@@ -140,15 +147,22 @@ export function ReportUserScreen({ navigation, route }: Props) {
         // ignore rate limit RPC failure; continue submit
       }
 
-      const insert = await client.from('content_reports').insert({
+      const payload = {
         reporter_id: userId,
-        reported_user_id: targetUserId,
-        report_type: 'user',
+        reported_user_id: targetUserId || null,
+        report_type: reportType,
         report_reason: selectedReason,
         report_details: details.trim() || null,
-        context_details: null,
+        context_details: contextDetails,
         status: 'pending',
-      } as any);
+      } as any;
+
+      console.log('[REPORT_MOBILE] submit', {
+        ...payload,
+        reported_user_id: payload.reported_user_id ? '<redacted>' : null,
+      });
+
+      const insert = await client.from('content_reports').insert(payload);
 
       if (insert.error) {
         throw insert.error;
@@ -165,7 +179,7 @@ export function ReportUserScreen({ navigation, route }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [details, navigation, reportedUserId, selectedReason, userId, selectedUser]);
+  }, [contextDetails, details, navigation, reportType, reportedUserId, selectedReason, userId, selectedUser]);
 
   return (
     <PageShell
@@ -179,7 +193,7 @@ export function ReportUserScreen({ navigation, route }: Props) {
         </Text>
 
         {/* User Selection (only shown if no user was pre-selected) */}
-        {!reportedUserId && (
+        {!reportedUserId && reportType !== 'stream' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Who are you reporting? *</Text>
             {selectedUser ? (
@@ -266,7 +280,7 @@ export function ReportUserScreen({ navigation, route }: Props) {
         <Button
           title={submitting ? 'Submitting…' : 'Submit Report'}
           onPress={submit}
-          disabled={submitting || !selectedReason || (!reportedUserId && !selectedUser)}
+          disabled={submitting || !selectedReason || (reportType !== 'stream' && !reportedUserId && !selectedUser)}
           loading={submitting}
         />
       </ScrollView>

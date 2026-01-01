@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../types/navigation';
 import { PageShell } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 const WEB_BASE_URL = 'https://www.mylivelinks.com';
@@ -13,7 +14,7 @@ const POLICY_LINKS = [
   { id: 'privacy-policy', title: 'Privacy Policy', path: '/policies/privacy-policy' },
   { id: 'community-guidelines', title: 'Community Guidelines', path: '/policies/community-guidelines' },
   { id: 'payments-virtual-currency', title: 'Payments & Virtual Currency', path: '/policies/payments-virtual-currency' },
-  { id: 'fraud-chargeback', title: 'Fraud & Chargebacks', path: '/policies/fraud-chargeback' },
+  { id: 'fraud-chargeback', title: 'Fraud & Chargeback', path: '/policies/fraud-chargeback' },
 ] as const;
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SafetyPolicies'>;
@@ -39,42 +40,49 @@ export function SafetyPoliciesScreen({ navigation }: Props) {
         </Pressable>
       }
     >
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.subtitle}>Review our Terms, Privacy, and Community Guidelines.</Text>
+      <View style={styles.body}>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.subtitle}>Review our Terms, Privacy, and Community Guidelines.</Text>
 
-        <View style={styles.list}>
-          {POLICY_LINKS.map((policy) => (
-            <Pressable
-              key={policy.id}
-              onPress={() => openUrl(policy.path)}
-              style={styles.item}
-            >
+          <View style={styles.list}>
+            {POLICY_LINKS.map((policy) => (
+              <Pressable
+                key={policy.id}
+                onPress={() => openUrl(policy.path)}
+                style={styles.item}
+              >
+                <View style={styles.itemRow}>
+                  <Text style={styles.itemTitle}>{policy.title}</Text>
+                  <Text style={styles.chevron} accessibilityLabel="Open">›</Text>
+                </View>
+              </Pressable>
+            ))}
+
+            <Pressable onPress={() => openUrl('/policies')} style={[styles.item, styles.itemSecondary]}>
               <View style={styles.itemRow}>
-                <Text style={styles.itemTitle}>{policy.title}</Text>
-                <Text style={styles.chevron} accessibilityLabel="Open">›</Text>
+                <Text style={[styles.itemTitle, styles.itemTitleSecondary]}>All Policies (hub)</Text>
+                <Text style={[styles.chevron, styles.chevronSecondary]} accessibilityLabel="Open">›</Text>
               </View>
             </Pressable>
-          ))}
+          </View>
 
-          <Pressable onPress={() => openUrl('/policies')} style={[styles.item, styles.itemSecondary]}>
-            <View style={styles.itemRow}>
-              <Text style={[styles.itemTitle, styles.itemTitleSecondary]}>All Policies</Text>
-              <Text style={[styles.chevron, styles.chevronSecondary]} accessibilityLabel="Open">›</Text>
-            </View>
-          </Pressable>
-        </View>
+          <View style={styles.contactBox}>
+            <Text style={styles.contactTitle}>Contact</Text>
+            <Text style={styles.contactText}>Policy questions: brad@mylivelinks.com</Text>
+          </View>
+        </ScrollView>
+      </View>
 
-        <View style={styles.contactBox}>
-          <Text style={styles.contactTitle}>Contact</Text>
-          <Text style={styles.contactText}>Policy questions: brad@mylivelinks.com</Text>
-        </View>
-      </ScrollView>
+      <LegalFooter />
     </PageShell>
   );
 }
 
 function createStyles(theme: ThemeDefinition) {
   return StyleSheet.create({
+    body: {
+      flex: 1,
+    },
     container: {
       padding: 16,
       paddingBottom: 28,

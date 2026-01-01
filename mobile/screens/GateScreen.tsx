@@ -6,6 +6,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { useProfile } from '../hooks/useProfile';
 import type { RootStackParamList } from '../types/navigation';
 import { BrandLogo } from '../components/ui/BrandLogo';
+import { LegalFooter } from '../components/LegalFooter';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Gate'>;
@@ -53,11 +54,15 @@ export function GateScreen({ navigation }: Props) {
       imageStyle={styles.backgroundImageStyle}
     >
       <View style={styles.container}>
-        <View style={styles.center}>
-          <BrandLogo size={150} />
-          <ActivityIndicator size="large" color="#8B5CF6" style={styles.spinner} />
-          <Text style={styles.text}>Loading…</Text>
+        <View style={styles.centerWrap}>
+          <View style={styles.center}>
+            <BrandLogo size={150} />
+            <ActivityIndicator size="large" color="#8B5CF6" style={styles.spinner} />
+            <Text style={styles.text}>Loading…</Text>
+          </View>
         </View>
+
+        <LegalFooter />
       </View>
     </ImageBackground>
   );
@@ -74,9 +79,12 @@ function createStyles(theme: ThemeDefinition) {
     },
     container: {
       flex: 1,
-      justifyContent: 'center',
       padding: 20,
       backgroundColor: 'transparent',
+    },
+    centerWrap: {
+      flex: 1,
+      justifyContent: 'center',
     },
     center: {
       alignItems: 'center',

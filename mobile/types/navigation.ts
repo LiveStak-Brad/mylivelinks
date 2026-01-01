@@ -20,7 +20,14 @@ export type RootStackParamList = {
   RoomRules: undefined;
   HelpFAQ: undefined;
   BlockedUsers: undefined;
-  ReportUser: { reportedUserId?: string; reportedUsername?: string } | undefined;
+  ReportUser:
+    | {
+        reportedUserId?: string;
+        reportedUsername?: string;
+        reportType?: 'user' | 'stream' | 'profile' | 'chat';
+        contextDetails?: string;
+      }
+    | undefined;
   Theme: undefined;
   Referrals: undefined;
   ReferralsLeaderboard: undefined;

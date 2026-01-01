@@ -61,10 +61,10 @@ export const BattleTopSupporters: React.FC<BattleTopSupportersProps> = ({
               <Text style={styles.username} numberOfLines={1}>
                 {supporter.username}
               </Text>
-              {supporter.gifter_level > 0 && (
+              {((supporter as { gifter_level?: number }).gifter_level ?? 0) > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
-                    Lvl {supporter.gifter_level}
+                    Lvl {(supporter as { gifter_level?: number }).gifter_level}
                   </Text>
                 </View>
               )}

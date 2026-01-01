@@ -24,6 +24,7 @@ import { supabase, supabaseConfigured } from '../lib/supabase';
 import { assertRouteExists } from '../lib/routeAssert';
 import { useTopBarState } from '../hooks/topbar/useTopBarState';
 import { useThemeMode, ThemeDefinition } from '../contexts/ThemeContext';
+import { LegalFooter } from './LegalFooter';
 
 interface OptionsMenuProps {
   visible?: boolean;
@@ -390,6 +391,8 @@ export function OptionsMenu({
                 </>
               )}
             </ScrollView>
+
+            <LegalFooter />
           </View>
         </View>
       </Modal>

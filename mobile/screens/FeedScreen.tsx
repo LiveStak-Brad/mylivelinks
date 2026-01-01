@@ -4,6 +4,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import * as ImagePicker from 'expo-image-picker';
 
 import { Button, Input, PageShell, PageHeader, Modal } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import { useFeed, type FeedPost } from '../hooks/useFeed';
 import type { MainTabsParamList } from '../types/navigation';
 import { resolveMediaUrl } from '../lib/mediaUrl';
@@ -89,7 +90,7 @@ export function FeedScreen({ navigation }: Props) {
         const likedIds = data.map((row: { post_id: string }) => row.post_id);
         setLikedPostIds((prev) => {
           const updated = new Set(prev);
-          likedIds.forEach((id) => updated.add(id));
+          likedIds.forEach((id: string) => updated.add(id));
           return updated;
         });
       }
@@ -774,6 +775,8 @@ export function FeedScreen({ navigation }: Props) {
           )
         }
       />
+
+      <LegalFooter extraBottomPadding={68} />
       
       {/* Gift Modal */}
       <Modal

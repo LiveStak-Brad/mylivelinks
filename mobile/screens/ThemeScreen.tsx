@@ -4,6 +4,7 @@ import Slider from '@react-native-community/slider';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { Button, PageShell } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -27,51 +28,55 @@ export function ThemeScreen({ navigation }: Props) {
       left={<Button title="Back" variant="secondary" onPress={() => navigation.goBack()} style={styles.headerButton} />}
       contentStyle={styles.container}
     >
-      {/* Theme Mode Selection */}
-      <Text style={styles.sectionTitle}>Color Mode</Text>
-      <View style={styles.card}>
-        {options.map((o) => {
-          const active = mode === o.key;
-          return (
-            <Pressable
-              key={o.key}
-              style={({ pressed }) => [styles.row, pressed ? styles.pressed : null, active ? styles.activeRow : null]}
-              onPress={() => setMode(o.key)}
-            >
-              <Text style={[styles.rowLabel, active ? styles.activeLabel : null]}>{o.label}</Text>
-              <Text style={[styles.check, active ? styles.activeLabel : styles.muted]}>{active ? '✓' : ''}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <View style={styles.body}>
+        {/* Theme Mode Selection */}
+        <Text style={styles.sectionTitle}>Color Mode</Text>
+        <View style={styles.card}>
+          {options.map((o) => {
+            const active = mode === o.key;
+            return (
+              <Pressable
+                key={o.key}
+                style={({ pressed }) => [styles.row, pressed ? styles.pressed : null, active ? styles.activeRow : null]}
+                onPress={() => setMode(o.key)}
+              >
+                <Text style={[styles.rowLabel, active ? styles.activeLabel : null]}>{o.label}</Text>
+                <Text style={[styles.check, active ? styles.activeLabel : styles.muted]}>{active ? '✓' : ''}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-      {/* Card Opacity Slider */}
-      <Text style={styles.sectionTitle}>Card Opacity</Text>
-      <View style={styles.card}>
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>
-            Transparency: {Math.round(cardOpacity * 100)}%
-          </Text>
-          <Text style={styles.sliderHint}>
-            Adjust how see-through cards and panels appear
-          </Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={0.3}
-            maximumValue={1}
-            step={0.05}
-            value={cardOpacity}
-            onValueChange={setCardOpacity}
-            minimumTrackTintColor={theme.colors.accent}
-            maximumTrackTintColor={theme.colors.border}
-            thumbTintColor={theme.colors.accent}
-          />
-          <View style={styles.sliderLabels}>
-            <Text style={styles.sliderEndLabel}>30% (See-through)</Text>
-            <Text style={styles.sliderEndLabel}>100% (Solid)</Text>
+        {/* Card Opacity Slider */}
+        <Text style={styles.sectionTitle}>Card Opacity</Text>
+        <View style={styles.card}>
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>
+              Transparency: {Math.round(cardOpacity * 100)}%
+            </Text>
+            <Text style={styles.sliderHint}>
+              Adjust how see-through cards and panels appear
+            </Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={0.3}
+              maximumValue={1}
+              step={0.05}
+              value={cardOpacity}
+              onValueChange={setCardOpacity}
+              minimumTrackTintColor={theme.colors.accent}
+              maximumTrackTintColor={theme.colors.border}
+              thumbTintColor={theme.colors.accent}
+            />
+            <View style={styles.sliderLabels}>
+              <Text style={styles.sliderEndLabel}>30% (See-through)</Text>
+              <Text style={styles.sliderEndLabel}>100% (Solid)</Text>
+            </View>
           </View>
         </View>
       </View>
+
+      <LegalFooter />
     </PageShell>
   );
 }
@@ -83,6 +88,9 @@ function createStyles(theme: ThemeDefinition) {
       paddingHorizontal: 12,
     },
     container: {
+      flex: 1,
+    },
+    body: {
       flex: 1,
       padding: 16,
     },

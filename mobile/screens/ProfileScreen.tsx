@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button, Input, Modal, PageShell, BottomNav } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useThemeMode } from '../contexts/ThemeContext';
@@ -2948,6 +2949,8 @@ export function ProfileScreen({
           </>
         )}
       </ScrollView>
+
+      <LegalFooter extraBottomPadding={68} />
     </PageShell>
   );
 }

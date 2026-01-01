@@ -10,9 +10,8 @@ import type { RootStackParamList } from '../types/navigation';
 type Props = NativeStackScreenProps<RootStackParamList, 'BlockedUsers'>;
 
 type BlockedUser = {
-  id: string;
   blocked_id: string;
-  blocked_at: string;
+  created_at: string;
   reason: string | null;
   blocked_profile: {
     username: string;
@@ -51,15 +50,14 @@ export function BlockedUsersScreen({ navigation }: Props) {
         .from('blocks')
         .select(
           `
-          id,
           blocked_id,
-          blocked_at,
+          created_at,
           reason,
           blocked_profile:profiles!blocks_blocked_id_fkey(username, display_name, avatar_url)
         `
         )
         .eq('blocker_id', userId)
-        .order('blocked_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (e) throw e;
 
@@ -164,13 +162,16 @@ export function BlockedUsersScreen({ navigation }: Props) {
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {rows.map((r) => (
-            <View key={r.id} style={styles.row}>
+            <View key={r.blocked_id} style={styles.row}>
               <View style={styles.rowLeft}>
                 <Text style={styles.rowTitle} numberOfLines={1}>
                   {r.blocked_profile?.display_name || r.blocked_profile?.username || 'Unknown'}
                 </Text>
                 <Text style={styles.rowSubtitle} numberOfLines={1}>
                   @{r.blocked_profile?.username || 'unknown'}
+                </Text>
+                <Text style={styles.rowMeta} numberOfLines={1}>
+                  Blocked on {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </Text>
               </View>
               <Button
@@ -243,6 +244,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginTop: 2,
+  },
+  rowMeta: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 6,
   },
   unblockButton: {
     height: 36,

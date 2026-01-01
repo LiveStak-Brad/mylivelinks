@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button, PageShell } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
@@ -124,52 +125,56 @@ export function HelpFAQScreen({ navigation }: Props) {
       left={<Button title="Back" variant="secondary" onPress={() => navigation.goBack()} style={styles.headerButton} />}
       contentStyle={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {sections.map((section) => {
-          const isExpanded = expandedCategory === section.category;
-          return (
-            <View key={section.category} style={styles.section}>
-              <Pressable
-                style={({ pressed }) => [styles.sectionHeader, pressed ? styles.pressed : null]}
-                onPress={() => setExpandedCategory(isExpanded ? '' : section.category)}
-              >
-                <View style={styles.sectionHeaderContent}>
-                  <Ionicons name={section.iconName as any} size={18} color={theme.colors.accent} style={styles.sectionIcon} />
-                  <Text style={styles.sectionHeaderText}>
-                    {section.category}
-                  </Text>
-                </View>
-                <Text style={styles.sectionCount}>{section.questions.length} questions</Text>
-              </Pressable>
+      <View style={styles.body}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {sections.map((section) => {
+            const isExpanded = expandedCategory === section.category;
+            return (
+              <View key={section.category} style={styles.section}>
+                <Pressable
+                  style={({ pressed }) => [styles.sectionHeader, pressed ? styles.pressed : null]}
+                  onPress={() => setExpandedCategory(isExpanded ? '' : section.category)}
+                >
+                  <View style={styles.sectionHeaderContent}>
+                    <Ionicons name={section.iconName as any} size={18} color={theme.colors.accent} style={styles.sectionIcon} />
+                    <Text style={styles.sectionHeaderText}>
+                      {section.category}
+                    </Text>
+                  </View>
+                  <Text style={styles.sectionCount}>{section.questions.length} questions</Text>
+                </Pressable>
 
-              {isExpanded ? (
-                <View style={styles.sectionBody}>
-                  {section.questions.map((qa, idx) => {
-                    const key = `${section.category}:${idx}`;
-                    const isQExpanded = expandedQuestion === key;
-                    return (
-                      <View key={key} style={styles.qaItem}>
-                        <Pressable
-                          style={({ pressed }) => [styles.qaHeader, pressed ? styles.pressed : null]}
-                          onPress={() => setExpandedQuestion(isQExpanded ? null : key)}
-                        >
-                          <Text style={styles.qaQ}>{qa.q}</Text>
-                          <Text style={styles.qaChevron}>{isQExpanded ? '▲' : '▼'}</Text>
-                        </Pressable>
-                        {isQExpanded ? <Text style={styles.qaA}>{qa.a}</Text> : null}
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-          );
-        })}
+                {isExpanded ? (
+                  <View style={styles.sectionBody}>
+                    {section.questions.map((qa, idx) => {
+                      const key = `${section.category}:${idx}`;
+                      const isQExpanded = expandedQuestion === key;
+                      return (
+                        <View key={key} style={styles.qaItem}>
+                          <Pressable
+                            style={({ pressed }) => [styles.qaHeader, pressed ? styles.pressed : null]}
+                            onPress={() => setExpandedQuestion(isQExpanded ? null : key)}
+                          >
+                            <Text style={styles.qaQ}>{qa.q}</Text>
+                            <Text style={styles.qaChevron}>{isQExpanded ? '▲' : '▼'}</Text>
+                          </Pressable>
+                          {isQExpanded ? <Text style={styles.qaA}>{qa.a}</Text> : null}
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Still need help? Contact support@mylivelinks.com</Text>
-        </View>
-      </ScrollView>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Still need help? Contact support@mylivelinks.com</Text>
+          </View>
+        </ScrollView>
+      </View>
+
+      <LegalFooter />
     </PageShell>
   );
 }
@@ -183,8 +188,11 @@ function createStyles(theme: ThemeDefinition) {
     },
     container: {
       flex: 1,
-      padding: 16,
       backgroundColor: theme.tokens.backgroundSecondary,
+    },
+    body: {
+      flex: 1,
+      padding: 16,
     },
     scroll: {
       paddingBottom: 24,

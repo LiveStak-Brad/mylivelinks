@@ -349,6 +349,10 @@ export function UserMenu({
               <MenuDivider styles={styles} />
 
               {/* Safety */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionHeaderText}>Safety</Text>
+              </View>
+
               <MenuItem
                 icon="document-text-outline"
                 iconColor="#3b82f6"
@@ -683,8 +687,20 @@ function createStyles(theme: ThemeDefinition) {
     },
     divider: {
       height: 1,
-      backgroundColor: theme.colors.menuBorder,
-      marginVertical: 4,
+      backgroundColor: theme.colors.border,
+      marginVertical: 8,
+    },
+    sectionHeader: {
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 6,
+    },
+    sectionHeaderText: {
+      color: theme.colors.mutedText,
+      fontSize: 11,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
     themeRow: {
       flexDirection: 'row',

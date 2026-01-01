@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
 import { Button, Input, PageShell } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import { ProfileTypePickerModal, type ProfileType } from '../components/ProfileTypePickerModal';
 import ProfileModulePicker from '../components/ProfileModulePicker';
 import ProfileTabPicker from '../components/ProfileTabPicker';
@@ -152,34 +153,35 @@ export function EditProfileScreen({ navigation }: Props) {
       left={<Button title="Back" variant="secondary" onPress={() => navigation.goBack()} style={styles.headerButton} />}
       contentStyle={styles.container}
     >
-      {!userId ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>Please log in to edit your profile.</Text>
-          <Button title="Go to Login" onPress={() => navigation.getParent()?.navigate?.('Auth')} />
-        </View>
-      ) : loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#5E9BFF" />
-          <Text style={styles.mutedText}>Loading…</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Button title="Retry" onPress={() => void load()} />
-        </View>
-      ) : !profile ? (
-        <View style={styles.center}>
-          <Text style={styles.mutedText}>No profile data.</Text>
-          <Button title="Retry" onPress={() => void load()} />
-        </View>
-      ) : (
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
-          {/* Basic Info Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Feather name="user" size={18} color={theme.colors.accent} />
-              <Text style={styles.sectionTitle}>Basic Information</Text>
-            </View>
+      <View style={styles.body}>
+        {!userId ? (
+          <View style={styles.center}>
+            <Text style={styles.errorText}>Please log in to edit your profile.</Text>
+            <Button title="Go to Login" onPress={() => navigation.getParent()?.navigate?.('Auth')} />
+          </View>
+        ) : loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#5E9BFF" />
+            <Text style={styles.mutedText}>Loading…</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.center}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Button title="Retry" onPress={() => void load()} />
+          </View>
+        ) : !profile ? (
+          <View style={styles.center}>
+            <Text style={styles.mutedText}>No profile data.</Text>
+            <Button title="Retry" onPress={() => void load()} />
+          </View>
+        ) : (
+          <ScrollView style={styles.scrollView} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
+            {/* Basic Info Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Feather name="user" size={18} color={theme.colors.accent} />
+                <Text style={styles.sectionTitle}>Basic Information</Text>
+              </View>
 
             <View style={styles.field}>
               <Text style={styles.label}>Username</Text>
@@ -206,14 +208,14 @@ export function EditProfileScreen({ navigation }: Props) {
               />
               <Text style={styles.fieldHint}>A brief description for your profile</Text>
             </View>
-          </View>
-
-          {/* Profile Type Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Feather name="star" size={18} color={theme.colors.accent} />
-              <Text style={styles.sectionTitle}>Profile Type</Text>
             </View>
+
+            {/* Profile Type Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Feather name="star" size={18} color={theme.colors.accent} />
+                <Text style={styles.sectionTitle}>Profile Type</Text>
+              </View>
             
             <View style={styles.field}>
               <Text style={styles.label}>Current Type</Text>
@@ -276,8 +278,9 @@ export function EditProfileScreen({ navigation }: Props) {
 
           <Button title={saving ? 'Saving…' : 'Save Changes'} onPress={save} disabled={!canSave} loading={saving} />
           <View style={{ height: 20 }} />
-        </ScrollView>
-      )}
+          </ScrollView>
+        )}
+      </View>
 
       {/* Profile Type Picker Modal */}
       <ProfileTypePickerModal
@@ -289,8 +292,11 @@ export function EditProfileScreen({ navigation }: Props) {
           // TODO: Save to backend when field is added
         }}
       />
+
+      <LegalFooter />
     </PageShell>
   );
+
 }
 
 function formatProfileType(type: ProfileType): string {
@@ -315,6 +321,9 @@ function createStyles(theme: ThemeDefinition) {
     container: {
       flex: 1,
       backgroundColor: theme.tokens.backgroundSecondary,
+    },
+    body: {
+      flex: 1,
     },
     scrollView: {
       flex: 1,

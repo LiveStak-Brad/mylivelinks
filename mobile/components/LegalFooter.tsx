@@ -13,11 +13,25 @@ const LINKS = {
   guidelines: `${WEB_BASE_URL}/policies/community-guidelines`,
 } as const;
 
-export function LegalFooter() {
+export function LegalFooter({ extraBottomPadding = 0 }: { extraBottomPadding?: number }) {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { theme } = useThemeMode();
-  const styles = useMemo(() => createStyles(theme, insets.bottom), [insets.bottom, theme]);
+  const styles = useMemo(() => createStyles(theme, insets.bottom, extraBottomPadding), [extraBottomPadding, insets.bottom, theme]);
+
+  const navigateSafetyPolicies = useCallback(() => {
+    try {
+      navigation.getParent?.()?.navigate?.('SafetyPolicies');
+      return;
+    } catch {
+      // ignore
+    }
+    try {
+      navigation.navigate?.('SafetyPolicies');
+    } catch {
+      // ignore
+    }
+  }, [navigation]);
 
   const openUrl = useCallback(async (url: string) => {
     try {
@@ -33,7 +47,7 @@ export function LegalFooter() {
       <View style={styles.row}>
         <FooterLink
           label="Safety & Policies"
-          onPress={() => navigation.navigate('SafetyPolicies')}
+          onPress={navigateSafetyPolicies}
           styles={styles}
         />
         <FooterLink label="Terms" onPress={() => void openUrl(LINKS.terms)} styles={styles} />
@@ -56,11 +70,11 @@ function FooterLink({ label, onPress, styles }: { label: string; onPress: () => 
   );
 }
 
-function createStyles(theme: ThemeDefinition, safeBottom: number) {
+function createStyles(theme: ThemeDefinition, safeBottom: number, extraBottomPadding: number) {
   return StyleSheet.create({
     container: {
       backgroundColor: theme.colors.cardSurface,
-      paddingBottom: Math.max(safeBottom, 8),
+      paddingBottom: Math.max(safeBottom, 8) + Math.max(extraBottomPadding, 0),
     },
     divider: {
       height: 1,

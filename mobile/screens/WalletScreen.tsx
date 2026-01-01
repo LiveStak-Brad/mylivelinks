@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 
 import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { Button, Modal, PageShell } from '../components/ui';
+import { LegalFooter } from '../components/LegalFooter';
 import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
 
@@ -226,23 +227,24 @@ export function WalletScreen({ navigation }: Props) {
       left={<Button title="Back" variant="secondary" onPress={() => navigation.goBack()} style={styles.headerButton} />}
       contentStyle={styles.container}
     >
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={theme.colors.accent} />
-          <Text style={styles.mutedText}>Loading wallet…</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Button title="Retry" onPress={() => void load()} />
-        </View>
-      ) : !wallet ? (
-        <View style={styles.center}>
-          <Text style={styles.mutedText}>No wallet data.</Text>
-          <Button title="Retry" onPress={() => void load()} />
-        </View>
-      ) : (
-        <View style={styles.content}>
+      <View style={styles.body}>
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={theme.colors.accent} />
+            <Text style={styles.mutedText}>Loading wallet…</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.center}>
+            <Text style={styles.errorText}>{error}</Text>
+            <Button title="Retry" onPress={() => void load()} />
+          </View>
+        ) : !wallet ? (
+          <View style={styles.center}>
+            <Text style={styles.mutedText}>No wallet data.</Text>
+            <Button title="Retry" onPress={() => void load()} />
+          </View>
+        ) : (
+          <View style={styles.content}>
           {/* Coins Card */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -355,8 +357,11 @@ export function WalletScreen({ navigation }: Props) {
               </ScrollView>
             )}
           </Modal>
-        </View>
-      )}
+          </View>
+        )}
+      </View>
+
+      <LegalFooter />
     </PageShell>
   );
 }
@@ -366,8 +371,11 @@ function createStyles(theme: ThemeDefinition) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      padding: 16,
       backgroundColor: theme.tokens.backgroundSecondary,
+    },
+    body: {
+      flex: 1,
+      padding: 16,
     },
     headerButton: {
       height: 32,
