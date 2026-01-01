@@ -23,6 +23,7 @@ import {
   Music,
   Calendar,
   ShoppingCart,
+  Flag,
 } from 'lucide-react';
 import SocialCountsWidget from '@/components/profile/SocialCountsWidget';
 import TopSupportersWidget from '@/components/profile/TopSupportersWidget';
@@ -63,6 +64,7 @@ import PublicFeedClient from '@/components/feed/PublicFeedClient';
 import ProfilePhotosClient from '@/components/photos/ProfilePhotosClient';
 import VlogReelsClient from '@/components/profile/VlogReelsClient';
 import { ReferralProgressModule } from '@/components/referral';
+import ReportModal from '@/components/ReportModal';
 
 interface ProfileData {
   profile: {
@@ -192,6 +194,8 @@ export default function ModernProfilePage() {
   const [activeTab, setActiveTab] = useState<string>('info');
   const [topFriendsManagerOpen, setTopFriendsManagerOpen] = useState(false);
   const [topFriendsReloadKey, setTopFriendsReloadKey] = useState(0);
+
+  const [reportProfileOpen, setReportProfileOpen] = useState(false);
 
   // Profile-type modules (real data; no mocks for visitors)
   const [musicTracks, setMusicTracks] = useState<MusicTrackRow[]>([]);
@@ -902,7 +906,17 @@ export default function ModernProfilePage() {
   
   const followBtnConfig = getFollowButtonConfig();
   const FollowIcon = followBtnConfig.icon;
-  const showGenderReminder = isOwnProfile && (profile.gender == null || profile.gender === '');
+  const normalizedGender = (profile.gender ?? '') as string;
+  const showGenderReminder =
+    isOwnProfile && normalizedGender.trim().length === 0;
+  const profileUrl = typeof window !== 'undefined' ? `${window.location.origin}/${encodeURIComponent(profile.username)}` : null;
+  const reportProfileContextDetails = JSON.stringify({
+    content_kind: 'profile',
+    profile_id: profile.id,
+    username: profile.username,
+    url: profileUrl,
+    surface: 'profile_page',
+  });
   
   return (
     <div className={`min-h-screen overflow-y-auto overflow-x-hidden ${fontClass}`}>
@@ -1094,6 +1108,16 @@ export default function ModernProfilePage() {
                       >
                         <MessageCircle size={18} className="sm:w-5 sm:h-5" />
                         Message
+                      </button>
+
+                      <button
+                        onClick={() => setReportProfileOpen(true)}
+                        className="px-4 sm:px-6 py-2 rounded-lg font-semibold transition bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center gap-2 text-sm sm:text-base"
+                        aria-label={`Report ${profile.username}`}
+                        title="Report"
+                      >
+                        <Flag size={18} className="sm:w-5 sm:h-5" />
+                        Report
                       </button>
                     </>
                   )}
@@ -1709,6 +1733,17 @@ export default function ModernProfilePage() {
             onSubmit={saveSchedule}
           />
         </>
+      )}
+
+      {reportProfileOpen && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportProfileOpen(false)}
+          reportType="profile"
+          reportedUserId={profile.id}
+          reportedUsername={profile.username}
+          contextDetails={reportProfileContextDetails}
+        />
       )}
     </div>
   );
