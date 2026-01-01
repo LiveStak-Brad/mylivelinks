@@ -145,7 +145,7 @@ function ActionButton({
   isActive?: boolean;
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
   variant?: 'default' | 'gift' | 'coins';
-  buttonRef?: React.RefObject<HTMLButtonElement | null>;
+  buttonRef?: React.RefObject<HTMLButtonElement>;
   onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
   reactionEmoji?: string | null;
 }) {
@@ -216,7 +216,7 @@ const FeedPostCard = memo(function FeedPostCard({
 }: FeedPostCardProps) {
   const formattedTimestamp = formatTimestamp(timestamp);
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
-  const likeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const likeButtonRef = useRef<HTMLButtonElement>(null);
 
   const activeReaction = useMemo(
     () => (userReaction ? REACTIONS.find((reaction) => reaction.type === userReaction) ?? null : null),
@@ -230,7 +230,7 @@ const FeedPostCard = memo(function FeedPostCard({
       event.preventDefault();
       if (!onLike) return;
 
-      const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+      const rect = event.currentTarget.getBoundingClientRect();
       setPickerAnchor(rect);
     },
     [onLike]
@@ -242,6 +242,7 @@ const FeedPostCard = memo(function FeedPostCard({
       if (event.key !== 'Enter' && event.key !== ' ') return;
 
       event.preventDefault();
+
       const target = event.currentTarget as HTMLButtonElement;
       setPickerAnchor(target.getBoundingClientRect());
     },
