@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy, Tv, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy, Tv, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video, Link2 } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import LeaderboardModal from './LeaderboardModal';
@@ -284,7 +284,7 @@ export default function GlobalHeader() {
           </div>
         )}
 
-        {/* FAR LEFT - Non-live room nav (Trophy, Rooms, Nav) - Fixed to viewport edge */}
+        {/* FAR LEFT - Non-live room nav (Trophy, Rooms, Link, Nav) - Fixed to viewport edge */}
         {!isLiveRoom && (
           <div className="fixed left-0 top-0 flex items-center gap-0.5 sm:gap-1 md:gap-1 z-[70] h-16 lg:h-[72px] pl-1 sm:pl-2 md:pl-4 lg:pl-6 xl:pl-8 2xl:pl-[60px]">
             <button
@@ -297,6 +297,32 @@ export default function GlobalHeader() {
             </button>
             <Link href="/liveTV" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
               <Tv className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
+            </Link>
+            
+            {/* Link or Nah Icon with gradient */}
+            <Link 
+              href="/link" 
+              className="group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 opacity-70 hover:opacity-100"
+              title="Link or Nah"
+            >
+              <div className="relative">
+                <Link2 className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10" strokeWidth={2} style={{
+                  stroke: 'url(#link-gradient)',
+                }} />
+                <svg width="0" height="0" style={{ position: 'absolute' }}>
+                  <defs>
+                    <linearGradient id="link-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="rgb(168, 85, 247)" />
+                      <stop offset="100%" stopColor="rgb(59, 130, 246)" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              
+              {/* Hover tooltip */}
+              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                Link or Nah
+              </span>
             </Link>
             
             {/* Navigation items - Hide on mobile */}
