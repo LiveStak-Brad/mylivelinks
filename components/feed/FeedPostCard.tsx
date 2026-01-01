@@ -1,11 +1,13 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { Heart, MessageCircle, Gift, MoreHorizontal, Coins } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import LiveAvatar from '@/components/LiveAvatar';
 import ClipActions from '@/components/ClipActions';
 import SafeRichText from '@/components/SafeRichText';
+import { PostReactions } from './PostReactions';
+import { ReactionPicker, REACTIONS, type ReactionType } from './ReactionPicker';
 
 /* =============================================================================
    FEED POST CARD COMPONENT
@@ -49,10 +51,14 @@ export interface FeedPostCardProps {
   coinCount?: number;
   /** Whether current user liked this post */
   isLiked?: boolean;
+  /** The reaction emoji selected by the current user */
+  userReaction?: ReactionType | null;
   /** Number of likes on this post */
   likesCount?: number;
+  /** Unique identifier of the post (for reactions modal) */
+  postId?: string;
   /** Callback when like button clicked */
-  onLike?: () => void;
+  onLike?: (reactionType?: ReactionType) => void;
   /** Callback when comment button clicked */
   onComment?: () => void;
   /** Callback when gift button clicked */
@@ -129,13 +135,21 @@ function ActionButton({
   isActive,
   onClick,
   variant = 'default',
+  buttonRef,
+  onMouseDown,
+  onKeyDown,
+  reactionEmoji,
 }: {
   icon: React.ElementType;
   label: string;
   count?: number;
   isActive?: boolean;
-  onClick?: () => void;
+  onClick?: React.MouseEventHandler<HTMLButtonElement>;
   variant?: 'default' | 'gift' | 'coins';
+  buttonRef?: React.RefObject<HTMLButtonElement>;
+  onMouseDown?: React.MouseEventHandler<HTMLButtonElement>;
+  onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
+  reactionEmoji?: string | null;
 }) {
   const getStyles = () => {
     if (variant === 'gift') {
@@ -152,7 +166,10 @@ function ActionButton({
 
   return (
     <button
+      ref={buttonRef}
       onClick={onClick}
+      onMouseDown={onMouseDown}
+      onKeyDown={onKeyDown}
       className={`
         flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg
         font-semibold text-[15px] transition-all duration-150
@@ -161,7 +178,13 @@ function ActionButton({
       `}
       aria-label={label}
     >
-      <Icon className={`w-[22px] h-[22px] ${isActive ? 'fill-current' : ''}`} aria-hidden="true" />
+      {reactionEmoji ? (
+        <span className="text-2xl" aria-hidden="true">
+          {reactionEmoji}
+        </span>
+      ) : (
+        <Icon className={`w-[22px] h-[22px] ${isActive ? 'fill-current' : ''}`} aria-hidden="true" />
+      )}
       {count !== undefined && count > 0 && (
         <span className={`${variant === 'coins' ? 'font-bold' : 'font-medium'}`}>{count}</span>
       )}
@@ -183,6 +206,8 @@ const FeedPostCard = memo(function FeedPostCard({
   coinCount = 0,
   isLiked = false,
   likesCount = 0,
+  userReaction = null,
+  postId,
   onLike,
   onComment,
   onGift,
@@ -193,7 +218,47 @@ const FeedPostCard = memo(function FeedPostCard({
   style,
 }: FeedPostCardProps) {
   const formattedTimestamp = formatTimestamp(timestamp);
-  
+  const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
+  const likeButtonRef = useRef<HTMLButtonElement>(null);
+
+  const activeReaction = useMemo(
+    () => (userReaction ? REACTIONS.find((reaction) => reaction.type === userReaction) ?? null : null),
+    [userReaction]
+  );
+
+  const closeReactionPicker = useCallback(() => setPickerAnchor(null), []);
+
+  const handleLikeButtonClick = useCallback<React.MouseEventHandler<HTMLButtonElement>>(
+    (event) => {
+      event.preventDefault();
+      if (!onLike) return;
+
+      const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+      setPickerAnchor(rect);
+    },
+    [onLike]
+  );
+
+  const handleLikeKeyDown = useCallback<React.KeyboardEventHandler<HTMLButtonElement>>(
+    (event) => {
+      if (!onLike) return;
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+
+      event.preventDefault();
+      const target = event.currentTarget as HTMLButtonElement;
+      setPickerAnchor(target.getBoundingClientRect());
+    },
+    [onLike]
+  );
+
+  const handleReactionSelect = useCallback(
+    (reaction: ReactionType) => {
+      onLike?.(reaction);
+      closeReactionPicker();
+    },
+    [closeReactionPicker, onLike]
+  );
+
   return (
     <Card className={`overflow-hidden hover:shadow-md transition-shadow ${className}`} style={style}>
       {/* Header - Instagram/Facebook Style */}
@@ -265,8 +330,12 @@ const FeedPostCard = memo(function FeedPostCard({
               icon={Heart}
               label="Like"
               count={likesCount}
-              onClick={onLike}
-              isActive={isLiked}
+              onClick={handleLikeButtonClick}
+              onMouseDown={handleLikeButtonClick}
+              onKeyDown={handleLikeKeyDown}
+              isActive={isLiked || !!userReaction}
+              buttonRef={likeButtonRef}
+              reactionEmoji={activeReaction?.emoji ?? null}
             />
             <ActionButton
               icon={MessageCircle}
@@ -289,8 +358,22 @@ const FeedPostCard = memo(function FeedPostCard({
             )}
           </div>
         </div>
+        {postId ? (
+          <div className="border-t border-border">
+            <PostReactions postId={postId} totalCount={likesCount ?? 0} />
+          </div>
+        ) : null}
       )}
     </Card>
+
+    {pickerAnchor ? (
+      <ReactionPicker
+        anchorRect={pickerAnchor}
+        selectedReaction={userReaction}
+        onSelect={handleReactionSelect}
+        onClose={closeReactionPicker}
+      />
+    ) : null}
   );
 });
 
