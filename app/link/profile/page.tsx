@@ -35,10 +35,23 @@ export default function LinkProfilePage() {
         setLocation(profile.location_text || '');
         setPhotos(profile.photos || []);
         setTags(profile.tags || []);
+      } else {
+        // Initialize with defaults for new profile
+        setEnabled(false);
+        setBio('');
+        setLocation('');
+        setPhotos([]);
+        setTags([]);
       }
     } catch (err: any) {
-      console.error('Failed to load profile:', err);
-      setError(`Failed to load profile: ${err.message || 'Unknown error'}`);
+      console.error('Failed to load profile:', {
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        code: err?.code,
+        fullError: err,
+      });
+      setError(`Failed to load profile: ${err?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -64,8 +77,14 @@ export default function LinkProfilePage() {
       setSavedRecently(true);
       setTimeout(() => setSavedRecently(false), 3000);
     } catch (err: any) {
-      console.error('Failed to save profile:', err);
-      setError(`Failed to save: ${err.message || 'Unknown error'}`);
+      console.error('Failed to save profile:', {
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        code: err?.code,
+        fullError: err,
+      });
+      setError(`Failed to save: ${err?.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -86,9 +105,15 @@ export default function LinkProfilePage() {
       
       const url = await uploadLinkPhoto(file);
       setPhotos([...photos, url]);
+      
+      // Clear the input so the same file can be selected again if needed
+      e.target.value = '';
     } catch (err: any) {
-      console.error('Failed to upload photo:', err);
-      setError(`Failed to upload photo: ${err.message || 'Unknown error'}`);
+      console.error('Failed to upload photo:', {
+        message: err?.message,
+        fullError: err,
+      });
+      setError(`Failed to upload photo: ${err?.message || 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -135,7 +160,7 @@ export default function LinkProfilePage() {
 
       {/* Enable Toggle */}
       <div className="mb-6">
-        <label className="flex items-center space-x-3">
+        <label className="flex items-center space-x-3 cursor-pointer">
           <input
             type="checkbox"
             checked={enabled}
@@ -156,7 +181,7 @@ export default function LinkProfilePage() {
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           placeholder="Tell people about yourself..."
-          className="w-full px-3 py-2 border rounded-lg h-24 resize-none"
+          className="w-full px-3 py-2 border rounded-lg h-24 resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           maxLength={240}
         />
         <p className="text-sm text-gray-600 mt-1">{bio.length}/240</p>
@@ -170,7 +195,7 @@ export default function LinkProfilePage() {
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="City, State/Country"
-          className="w-full px-3 py-2 border rounded-lg"
+          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
 
@@ -189,7 +214,8 @@ export default function LinkProfilePage() {
               />
               <button
                 onClick={() => removePhoto(index)}
-                className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm"
+                className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 transition-colors"
+                aria-label="Remove photo"
               >
                 ×
               </button>
@@ -203,9 +229,19 @@ export default function LinkProfilePage() {
               accept="image/*"
               onChange={handleFileSelect}
               disabled={uploading}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              className="block w-full text-sm text-gray-500 
+                file:mr-4 file:py-2 file:px-4 
+                file:rounded-lg file:border-0 
+                file:text-sm file:font-semibold 
+                file:bg-blue-50 file:text-blue-700 
+                hover:file:bg-blue-100
+                disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            {uploading && <p className="text-sm text-gray-600 mt-2">Uploading...</p>}
+            {uploading && (
+              <p className="text-sm text-gray-600 mt-2">
+                Uploading...
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -218,7 +254,7 @@ export default function LinkProfilePage() {
             <button
               key={tag}
               onClick={() => toggleTag(tag)}
-              className={`px-3 py-1 rounded-full text-sm ${
+              className={`px-3 py-1 rounded-full text-sm transition-colors ${
                 tags.includes(tag)
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -228,13 +264,18 @@ export default function LinkProfilePage() {
             </button>
           ))}
         </div>
+        {tags.length > 0 && (
+          <p className="text-sm text-gray-600 mt-2">
+            {tags.length} {tags.length === 1 ? 'interest' : 'interests'} selected
+          </p>
+        )}
       </div>
 
       {/* Save Button */}
       <button
         onClick={handleSave}
         disabled={saving}
-        className="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+        className="w-full bg-blue-500 text-white py-3 rounded-lg font-medium hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
       >
         {saving ? 'Saving...' : 'Save Profile'}
       </button>
