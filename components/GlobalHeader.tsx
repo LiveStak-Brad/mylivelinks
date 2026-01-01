@@ -299,7 +299,7 @@ export default function GlobalHeader() {
               <Tv className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-pink-500" strokeWidth={2} />
             </Link>
             
-            {/* Link or Nah Icon with gradient - Upright chainlink */}
+            {/* Link or Nah Icon with gradient - Upright chainlink like app icon */}
             <Link 
               href="/link" 
               className="group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 opacity-70 hover:opacity-100"
@@ -318,25 +318,47 @@ export default function GlobalHeader() {
                       <stop offset="100%" stopColor="rgb(59, 130, 246)" />
                     </linearGradient>
                   </defs>
-                  {/* Top arc */}
-                  <path 
-                    d="M9 7C9 5.34315 10.3431 4 12 4C13.6569 4 15 5.34315 15 7V10H9V7Z" 
+                  {/* Top link - rounded rectangle */}
+                  <rect 
+                    x="7" 
+                    y="3" 
+                    width="10" 
+                    height="7" 
+                    rx="3.5" 
                     stroke="url(#link-gradient-upright)" 
-                    strokeWidth="2" 
-                    strokeLinecap="round"
+                    strokeWidth="2.5" 
                     fill="none"
                   />
-                  {/* Bottom arc */}
-                  <path 
-                    d="M9 17C9 18.6569 10.3431 20 12 20C13.6569 20 15 18.6569 15 17V14H9V17Z" 
+                  {/* Bottom link - rounded rectangle */}
+                  <rect 
+                    x="7" 
+                    y="14" 
+                    width="10" 
+                    height="7" 
+                    rx="3.5" 
                     stroke="url(#link-gradient-upright)" 
-                    strokeWidth="2" 
-                    strokeLinecap="round"
+                    strokeWidth="2.5" 
                     fill="none"
                   />
-                  {/* Connecting lines */}
-                  <line x1="9" y1="10" x2="9" y2="14" stroke="url(#link-gradient-upright)" strokeWidth="2" strokeLinecap="round" />
-                  <line x1="15" y1="10" x2="15" y2="14" stroke="url(#link-gradient-upright)" strokeWidth="2" strokeLinecap="round" />
+                  {/* Connecting vertical bars */}
+                  <line 
+                    x1="9" 
+                    y1="10" 
+                    x2="9" 
+                    y2="14" 
+                    stroke="url(#link-gradient-upright)" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round"
+                  />
+                  <line 
+                    x1="15" 
+                    y1="10" 
+                    x2="15" 
+                    y2="14" 
+                    stroke="url(#link-gradient-upright)" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round"
+                  />
                 </svg>
               </div>
               
