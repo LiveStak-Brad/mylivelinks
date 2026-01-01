@@ -6,6 +6,16 @@ SET provider_order_id = provider_payment_id
 WHERE provider_order_id IS NULL
   AND provider_payment_id IS NOT NULL;
 
+UPDATE public.coin_purchases
+SET idempotency_key = 'stripe:pi:' || provider_payment_id
+WHERE idempotency_key IS NULL
+  AND provider_payment_id IS NOT NULL;
+
+UPDATE public.coin_purchases
+SET idempotency_key = provider_payment_id
+WHERE idempotency_key IS NULL
+  AND provider_payment_id IS NOT NULL;
+
 -- Recreate finalize_coin_purchase_v2 to guarantee provider_order_id is always set
 CREATE OR REPLACE FUNCTION public.finalize_coin_purchase_v2(
   p_payment_intent_id TEXT,
@@ -110,6 +120,7 @@ BEGIN
     UPDATE public.coin_purchases
     SET user_id = p_profile_id,
         profile_id = p_profile_id,
+        idempotency_key = COALESCE(idempotency_key, v_idempotency_key),
         provider_order_id = COALESCE(provider_order_id, p_payment_intent_id),
         provider = COALESCE(provider, 'stripe'),
         platform = COALESCE(platform, v_platform),
@@ -128,6 +139,7 @@ BEGIN
     INSERT INTO public.coin_purchases (
       profile_id,
       user_id,
+      idempotency_key,
       provider,
       platform,
       payment_provider,
@@ -143,6 +155,7 @@ BEGIN
     ) VALUES (
       p_profile_id,
       p_profile_id,
+      v_idempotency_key,
       'stripe',
       v_platform,
       'stripe',

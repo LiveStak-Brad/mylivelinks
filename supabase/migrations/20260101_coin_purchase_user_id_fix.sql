@@ -65,6 +65,29 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'coin_purchases'
+      AND column_name = 'idempotency_key'
+  ) THEN
+    ALTER TABLE public.coin_purchases
+      ADD COLUMN idempotency_key text;
+  END IF;
+END;
+$$;
+
+UPDATE public.coin_purchases
+SET idempotency_key = provider_payment_id
+WHERE idempotency_key IS NULL
+  AND provider_payment_id IS NOT NULL;
+
+ALTER TABLE public.coin_purchases
+  ALTER COLUMN idempotency_key SET NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
     FROM pg_constraint
     WHERE conname = 'coin_purchases_user_id_fkey'
       AND conrelid = 'public.coin_purchases'::regclass
@@ -182,6 +205,7 @@ BEGIN
     UPDATE public.coin_purchases
     SET user_id = p_profile_id,
         profile_id = p_profile_id,
+        idempotency_key = COALESCE(idempotency_key, v_idempotency_key),
         provider_order_id = COALESCE(provider_order_id, p_payment_intent_id),
         provider = COALESCE(provider, 'stripe'),
         platform = COALESCE(platform, v_platform),
@@ -200,6 +224,7 @@ BEGIN
     INSERT INTO public.coin_purchases (
       profile_id,
       user_id,
+      idempotency_key,
       provider,
       platform,
       payment_provider,
@@ -215,6 +240,7 @@ BEGIN
     ) VALUES (
       p_profile_id,
       p_profile_id,
+      v_idempotency_key,
       'stripe',
       v_platform,
       'stripe',
