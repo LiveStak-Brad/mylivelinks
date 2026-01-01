@@ -2,7 +2,22 @@
 // PHASE 2 GENDER FILTERING - UI QUICK REFERENCE
 // ============================================================================
 
+import { useState } from 'react';
+import { createClient } from '@/lib/supabase';
+import { upsertDatingProfile } from '@/lib/link/api';
+import type { DatingCandidate } from '@/lib/link/dating-types';
 import { GenderEnum, genderToDisplay } from '@/lib/link/dating-types';
+
+const supabase = createClient();
+
+async function getCurrentUserId() {
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user?.id;
+  if (!userId) {
+    throw new Error('You must be signed in');
+  }
+  return userId;
+}
 
 // ============================================================================
 // 1. GENDER SELECTOR COMPONENT (For Profile Edit)
@@ -85,6 +100,7 @@ async function updateProfileGender(gender: GenderEnum | null) {
   // You'll need an RPC or direct table update
   
   // Option A: Via Supabase client (if RLS allows)
+  const userId = await getCurrentUserId();
   const { error } = await supabase
     .from('profiles')
     .update({ gender })
@@ -122,6 +138,7 @@ async function updateProfileDOB(dateOfBirth: Date | null) {
     ? dateOfBirth.toISOString().split('T')[0] 
     : null;
   
+  const userId = await getCurrentUserId();
   const { error } = await supabase
     .from('profiles')
     .update({ date_of_birth: dobString })
@@ -171,6 +188,7 @@ function ProfileSetupPage() {
   const handleSave = async () => {
     try {
       // Step 1: Save gender and DOB to profiles table
+      const userId = await getCurrentUserId();
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
