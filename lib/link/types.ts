@@ -39,42 +39,16 @@ export interface LinkMutual {
   source: 'manual' | 'auto_follow';
 }
 
-export interface DatingProfile {
-  profile_id: string;
-  enabled: boolean;
-  bio?: string;
-  location_text?: string;
-  photos?: string[];
-  prefs?: any;
-  created_at: string;
-  updated_at: string;
-  // Joined from profiles
-  username?: string;
-  display_name?: string;
-  avatar_url?: string;
-}
-
-export interface DatingMatch {
-  profile_id: string;
-  username: string;
-  display_name: string;
-  avatar_url?: string;
-  bio?: string;
-  location_text?: string;
-  photos?: string[];
-  prefs?: any;
-  matched_at: string;
-}
-
 export interface LinkDecisionResult {
   success: boolean;
   mutual: boolean;
 }
 
-export interface DatingDecisionResult {
-  success: boolean;
-  match: boolean;
-}
+export type {
+  DatingProfile,
+  DatingMatch,
+  DatingDecisionResult,
+} from './dating-types';
 
 // Interest tags for UI
 export const INTEREST_TAGS = [

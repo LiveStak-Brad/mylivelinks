@@ -8,12 +8,14 @@ import type {
   LinkProfile,
   LinkSettings,
   LinkMutual,
-  DatingProfile,
-  DatingMatch,
   LinkDecisionResult,
-  DatingDecisionResult,
 } from './types';
-import type { DatingCandidate } from './dating-types';
+import type {
+  DatingProfile,
+  DatingCandidate,
+  DatingMatch,
+  DatingDecisionResult,
+} from './dating-types';
 
 const supabase = createClient();
 
@@ -115,11 +117,14 @@ export type {
   LinkProfile,
   LinkSettings,
   LinkMutual,
+  LinkDecisionResult,
+} from './types';
+
+export type {
   DatingProfile,
   DatingMatch,
-  LinkDecisionResult,
   DatingDecisionResult,
-} from './types';
+} from './dating-types';
 
 /**
  * Submit a link decision (link or nah)
