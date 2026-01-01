@@ -92,7 +92,8 @@ function getIconColor(label: string) {
 function HeaderIcons() {
   const [showNotiesModal, setShowNotiesModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
-  const pathname = usePathname() ?? '';
+  const rawPathname = usePathname();
+  const pathname = rawPathname ?? '';
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams ?? new URLSearchParams();
@@ -202,7 +203,8 @@ function HeaderIcons() {
 }
 
 export default function GlobalHeader() {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname ?? '';
   const [isOwner, setIsOwner] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
