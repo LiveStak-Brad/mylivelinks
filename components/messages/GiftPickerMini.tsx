@@ -125,7 +125,7 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
   if (!isOpen) return null;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl overflow-hidden z-[100]">
+    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-2xl overflow-hidden" style={{ zIndex: 99999 }}>
       {/* Header - Compact with vector icon */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
         <div className="flex items-center gap-2">

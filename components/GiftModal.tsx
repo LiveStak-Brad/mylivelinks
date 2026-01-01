@@ -243,39 +243,49 @@ export default function GiftModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-card/95 backdrop-blur-md rounded-2xl max-w-sm w-full mx-4 shadow-2xl overflow-hidden flex flex-col modal-fullscreen-mobile border border-border" onClick={(e) => e.stopPropagation()}>
-        {/* Header with vector icon */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg">
-              <Gift className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="font-bold text-foreground">Send Gift</h2>
-              <p className="text-xs text-muted-foreground">to {recipientUsername}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition" aria-label="Close">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" style={{ zIndex: 99999 }} onClick={onClose}>
+      <div 
+        className="bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 rounded-[2rem] w-full max-w-md max-h-[85vh] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col border border-white/20 dark:border-white/10 animate-in zoom-in-95 duration-200" 
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Premium Header */}
+        <div className="relative px-6 pt-6 pb-4">
+          <button 
+            onClick={onClose} 
+            className="absolute top-4 right-4 p-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all" 
+            aria-label="Close"
+          >
             <X className="w-5 h-5" />
           </button>
+          
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 shadow-lg shadow-purple-500/30">
+              <Gift className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Send Gift</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">to <span className="font-medium text-gray-700 dark:text-gray-300">{recipientUsername}</span></p>
+            </div>
+          </div>
         </div>
 
-        {/* Balance bar */}
-        <div className="px-4 py-2 bg-yellow-500/10 flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Your Balance</span>
-          <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{userCoinBalance.toLocaleString()} 💰</span>
+        {/* Balance Banner */}
+        <div className="mx-6 mb-4 px-4 py-3 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/50 dark:to-yellow-950/50 rounded-2xl border border-amber-200/50 dark:border-amber-800/30">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-amber-700 dark:text-amber-300 font-medium">Your Balance</span>
+            <span className="text-lg font-bold text-amber-600 dark:text-amber-400">{userCoinBalance.toLocaleString()} 💰</span>
+          </div>
         </div>
 
         {error && (
-          <div className="mx-4 mt-3 p-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-xs">
+          <div className="mx-6 mb-4 px-4 py-3 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 rounded-2xl text-sm border border-red-200/50 dark:border-red-800/30">
             {error}
           </div>
         )}
 
-        {/* Gift Grid - Compact */}
-        <div className="p-3 max-h-52 overflow-y-auto custom-scrollbar">
-          <div className="grid grid-cols-5 gap-1.5">
+        {/* Gift Grid - Premium */}
+        <div className="px-6 pb-4 max-h-64 overflow-y-auto custom-scrollbar">
+          <div className="grid grid-cols-4 gap-3">
             {giftTypes.map((gift) => {
               const canAfford = userCoinBalance >= gift.coin_cost;
               const isSelected = selectedGift?.id === gift.id;
@@ -284,70 +294,64 @@ export default function GiftModal({
                   key={gift.id}
                   onClick={() => canAfford && setSelectedGift(gift)}
                   disabled={!canAfford}
-                  className={`flex flex-col items-center p-2 rounded-xl transition-all duration-150 ${
+                  className={`relative flex flex-col items-center p-3 rounded-2xl transition-all duration-200 ${
                     isSelected
-                      ? 'bg-primary/15 scale-110 shadow-lg ring-2 ring-primary/50'
+                      ? 'bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/50 dark:to-pink-900/50 scale-105 shadow-lg ring-2 ring-purple-400 dark:ring-purple-500'
                       : canAfford
-                        ? 'hover:bg-muted/60 hover:scale-105 active:scale-95'
-                        : 'opacity-40 cursor-not-allowed'
+                        ? 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:scale-105 hover:shadow-md active:scale-95'
+                        : 'bg-gray-50/50 dark:bg-gray-800/30 opacity-40 cursor-not-allowed'
                   }`}
                 >
-                  <span className={`text-2xl transition-transform ${isSelected ? 'scale-125' : ''}`}>
+                  <span className={`text-3xl mb-1 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`}>
                     {gift.icon_url ? (
-                      <img src={gift.icon_url} alt={gift.name} className="w-7 h-7" />
+                      <img src={gift.icon_url} alt={gift.name} className="w-10 h-10 drop-shadow-md" />
                     ) : (
                       gift.emoji || getGiftEmoji(gift.name)
                     )}
                   </span>
-                  <span className="text-[9px] font-medium text-muted-foreground mt-0.5">{gift.coin_cost}</span>
+                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{gift.coin_cost}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Selected Gift & Send */}
-        <div className="px-3 py-2 border-t border-border/50 bg-muted/30">
+        {/* Selected Gift & Send - Premium Footer */}
+        <div className="px-6 py-5 bg-gray-50 dark:bg-gray-900/80 border-t border-gray-200 dark:border-gray-800">
           {selectedGift ? (
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="text-xl flex-shrink-0">
-                  {selectedGift.icon_url ? (
-                    <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-6 h-6" />
-                  ) : (
-                    selectedGift.emoji || getGiftEmoji(selectedGift.name)
-                  )}
-                </span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/50 dark:to-pink-900/50 flex items-center justify-center">
+                  <span className="text-2xl">
+                    {selectedGift.icon_url ? (
+                      <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-8 h-8" />
+                    ) : (
+                      selectedGift.emoji || getGiftEmoji(selectedGift.name)
+                    )}
+                  </span>
+                </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-foreground truncate">{selectedGift.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{selectedGift.coin_cost} coins</p>
+                  <p className="font-bold text-gray-900 dark:text-white truncate">{selectedGift.name}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{selectedGift.coin_cost} coins → 💎 {selectedGift.coin_cost}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  onClick={onClose}
-                  disabled={loading}
-                  className="p-2 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition active:scale-95"
-                  title="Cancel"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleSendGift}
-                  disabled={loading || userCoinBalance < selectedGift.coin_cost}
-                  className="p-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition active:scale-95"
-                  title="Send Gift"
-                >
-                  {loading ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
+              <button
+                onClick={handleSendGift}
+                disabled={loading || userCoinBalance < selectedGift.coin_cost}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-2xl shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>Send</span>
+                  </>
+                )}
+              </button>
             </div>
           ) : (
-            <p className="text-center text-[10px] text-muted-foreground">Tap a gift to select</p>
+            <p className="text-center text-gray-400 dark:text-gray-500 py-2">Tap a gift to select</p>
           )}
         </div>
       </div>
