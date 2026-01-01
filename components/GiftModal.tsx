@@ -18,6 +18,7 @@ interface GiftModalProps {
   recipientUsername: string;
   slotIndex?: number;
   liveStreamId?: number;
+  commentId?: string;
   onGiftSent: () => void;
   onClose: () => void;
 }
@@ -27,6 +28,7 @@ export default function GiftModal({
   recipientUsername,
   slotIndex,
   liveStreamId,
+  commentId,
   onGiftSent,
   onClose,
 }: GiftModalProps) {
@@ -141,17 +143,22 @@ export default function GiftModal({
 
       const requestId = crypto.randomUUID();
 
-      // Call API endpoint (gifts are 1:1 coins -> diamonds, no platform fee on gifts)
-      const response = await fetch('/api/gifts/send', {
+      // Call appropriate API endpoint based on gift type
+      const endpoint = commentId ? `/api/comments/${commentId}/gift` : '/api/gifts/send';
+      const body = commentId
+        ? { coins: selectedGift.coin_cost, request_id: requestId }
+        : {
+            toUserId: recipientId,
+            coinsAmount: selectedGift.coin_cost,
+            giftTypeId: selectedGift.id,
+            streamId: liveStreamId || null,
+            requestId,
+          };
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          toUserId: recipientId,
-          coinsAmount: selectedGift.coin_cost,
-          giftTypeId: selectedGift.id,
-          streamId: liveStreamId || null,
-          requestId,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();

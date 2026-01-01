@@ -115,6 +115,7 @@ export default function PublicFeedClient({
 
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftTargetPost, setGiftTargetPost] = useState<FeedPost | null>(null);
+  const [giftTargetComment, setGiftTargetComment] = useState<FeedComment | null>(null);
 
   const [reportTarget, setReportTarget] = useState<{
     reportType: 'user' | 'stream' | 'profile' | 'chat';
@@ -666,6 +667,13 @@ export default function PublicFeedClient({
 
   const openGiftModal = useCallback((post: FeedPost) => {
     setGiftTargetPost(post);
+    setGiftTargetComment(null);
+    setGiftModalOpen(true);
+  }, []);
+
+  const openGiftCommentModal = useCallback((comment: FeedComment) => {
+    setGiftTargetComment(comment);
+    setGiftTargetPost(null);
     setGiftModalOpen(true);
   }, []);
 
@@ -901,6 +909,13 @@ export default function PublicFeedClient({
                                     </button>
                                     <span className="text-muted-foreground">·</span>
                                     <button
+                                      className="text-purple-500 hover:underline transition"
+                                      onClick={() => openGiftCommentModal(c)}
+                                    >
+                                      Gift
+                                    </button>
+                                    <span className="text-muted-foreground">·</span>
+                                    <button
                                       className="text-muted-foreground hover:underline transition"
                                       onClick={() => openReportComment({ post, comment: c })}
                                     >
@@ -1110,6 +1125,19 @@ export default function PublicFeedClient({
           onClose={() => {
             setGiftModalOpen(false);
             setGiftTargetPost(null);
+          }}
+        />
+      )}
+
+      {giftModalOpen && giftTargetComment && (
+        <GiftModal
+          recipientId={giftTargetComment.author.id}
+          recipientUsername={giftTargetComment.author.username}
+          commentId={giftTargetComment.id}
+          onGiftSent={() => void loadFeed('replace')}
+          onClose={() => {
+            setGiftModalOpen(false);
+            setGiftTargetComment(null);
           }}
         />
       )}

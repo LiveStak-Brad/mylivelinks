@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { MessageCircle, Search } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { MessageCircle, Search, Gift, Send } from 'lucide-react';
+import GiftPickerMini from '@/components/messages/GiftPickerMini';
 import { Input, EmptyState } from '@/components/ui';
 import { useMessages } from '@/components/messages';
 import SafeRichText from '@/components/SafeRichText';
@@ -252,31 +253,12 @@ function MessagesPageContent() {
               </div>
 
               {/* Input */}
-              <div className="p-4 border-t border-border">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const input = e.currentTarget.elements.namedItem('message') as HTMLInputElement;
-                    if (input.value.trim()) {
-                      sendMessage(activeConversation.recipientId, input.value);
-                      input.value = '';
-                    }
-                  }}
-                  className="flex gap-2"
-                >
-                  <Input
-                    name="message"
-                    placeholder="Type a message..."
-                    className="flex-1"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    Send
-                  </button>
-                </form>
-              </div>
+              <MessageInputWithGift
+                recipientId={activeConversation.recipientId}
+                recipientUsername={activeConversation.recipientUsername}
+                onSendMessage={sendMessage}
+                onSendGift={sendGift}
+              />
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center p-6">
@@ -304,6 +286,80 @@ function MessagesPageContent() {
         />
       )}
     </main>
+  );
+}
+
+// Message input with gift button
+function MessageInputWithGift({
+  recipientId,
+  recipientUsername,
+  onSendMessage,
+  onSendGift,
+}: {
+  recipientId: string;
+  recipientUsername: string;
+  onSendMessage: (recipientId: string, content: string) => Promise<boolean>;
+  onSendGift: (recipientId: string, giftTypeId: number, giftName: string, coinCost: number, iconUrl?: string) => Promise<boolean>;
+}) {
+  const [message, setMessage] = useState('');
+  const [showGiftPicker, setShowGiftPicker] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSend = async () => {
+    if (!message.trim() || isSending) return;
+    setIsSending(true);
+    await onSendMessage(recipientId, message);
+    setMessage('');
+    setIsSending(false);
+    inputRef.current?.focus();
+  };
+
+  const handleGiftSelect = async (gift: { id: number; name: string; coin_cost: number; icon_url?: string }) => {
+    setIsSending(true);
+    await onSendGift(recipientId, gift.id, gift.name, gift.coin_cost, gift.icon_url);
+    setShowGiftPicker(false);
+    setIsSending(false);
+  };
+
+  return (
+    <div className="relative p-4 border-t border-border">
+      <GiftPickerMini
+        isOpen={showGiftPicker}
+        onClose={() => setShowGiftPicker(false)}
+        onSelectGift={handleGiftSelect}
+        recipientUsername={recipientUsername}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setShowGiftPicker(!showGiftPicker)}
+          className={`p-2.5 rounded-full transition ${
+            showGiftPicker 
+              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' 
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+          }`}
+          title="Send a gift"
+        >
+          <Gift className="w-5 h-5" />
+        </button>
+        <Input
+          ref={inputRef}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+          placeholder="Type a message..."
+          className="flex-1"
+          disabled={isSending}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!message.trim() || isSending}
+          className="p-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:opacity-90 transition disabled:opacity-50"
+        >
+          <Send className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
   );
 }
 
