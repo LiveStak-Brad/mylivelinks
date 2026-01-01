@@ -1121,6 +1121,7 @@ export default function PublicFeedClient({
         <GiftModal
           recipientId={giftTargetPost.author.id}
           recipientUsername={giftTargetPost.author.username}
+          postId={giftTargetPost.id}
           onGiftSent={handleGiftSent}
           onClose={() => {
             setGiftModalOpen(false);

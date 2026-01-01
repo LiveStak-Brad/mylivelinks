@@ -72,7 +72,7 @@ function MessagesPageContent() {
   return (
     <main 
       id="main"
-      className="h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] bg-background"
+      className="h-[calc(100dvh-4rem)] md:h-[calc(100vh-5rem)] bg-background overflow-hidden fixed inset-x-0 top-16 md:relative md:inset-auto md:top-auto"
     >
       <div className="h-full grid grid-cols-1 md:grid-cols-[480px_1fr]">
         
@@ -272,9 +272,7 @@ function MessagesPageContent() {
         </div>
       </div>
 
-      {/* Bottom padding for mobile nav */}
-      <div className="h-20 md:hidden" aria-hidden="true" />
-
+      
       {reportTarget && (
         <ReportModal
           isOpen={true}

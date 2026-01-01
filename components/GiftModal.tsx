@@ -19,6 +19,7 @@ interface GiftModalProps {
   slotIndex?: number;
   liveStreamId?: number;
   commentId?: string;
+  postId?: string;
   onGiftSent: () => void;
   onClose: () => void;
 }
@@ -29,6 +30,7 @@ export default function GiftModal({
   slotIndex,
   liveStreamId,
   commentId,
+  postId,
   onGiftSent,
   onClose,
 }: GiftModalProps) {
@@ -188,11 +190,22 @@ export default function GiftModal({
             : (typeof data?.diamonds_awarded === 'number' ? data.diamonds_awarded : null);
 
         const diamondsSuffix = typeof diamondsAwarded === 'number' ? ` 💎+${diamondsAwarded}` : '';
-        await supabase.from('chat_messages').insert({
-          profile_id: user.id,
-          content: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername}${diamondsSuffix}`,
-          message_type: 'gift',
-        });
+        
+        // If this is a post gift, create a comment on the post
+        if (postId) {
+          await supabase.from('post_comments').insert({
+            post_id: postId,
+            author_id: user.id,
+            text_content: `🎁 Sent a ${selectedGift.name} (${selectedGift.coin_cost} coins)${diamondsSuffix}`,
+          });
+        } else {
+          // Otherwise post to chat messages (for live streams)
+          await supabase.from('chat_messages').insert({
+            profile_id: user.id,
+            content: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername}${diamondsSuffix}`,
+            message_type: 'gift',
+          });
+        }
       }
 
       // Track gift for trending (after successful send, fire-and-forget)
