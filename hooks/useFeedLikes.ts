@@ -1,13 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 
+export type ReactionType = 'love' | 'haha' | 'wow' | 'sad' | 'fire';
+
 /**
- * Hook for liking a feed post
- * User can only like once per post (no unlike)
+ * Hook for reacting to a feed post with multiple reaction types.
+ * Toggle behavior: clicking the same reaction removes it, selecting another swaps it.
  */
 export function usePostLike(postId: string | null) {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [userReaction, setUserReaction] = useState<ReactionType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const supabase = createClient();
 
@@ -17,18 +20,23 @@ export function usePostLike(postId: string | null) {
 
     const loadLikeState = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Check if user has liked this post
+        // Check if user has reacted to this post
         const { data: like } = await supabase
           .from('post_likes')
-          .select('profile_id')
+          .select('profile_id, reaction_type')
           .eq('post_id', postId)
           .eq('profile_id', user.id)
           .single();
 
-        setIsLiked(!!like);
+        if (like) {
+          setIsLiked(true);
+          setUserReaction(like.reaction_type as ReactionType);
+        }
 
         // Get likes count
         const { data: post } = await supabase
@@ -48,34 +56,79 @@ export function usePostLike(postId: string | null) {
     loadLikeState();
   }, [postId, supabase]);
 
-  const toggleLike = useCallback(async () => {
-    if (!postId || isLoading || isLiked) return; // Already liked = no action
+  const toggleLike = useCallback(
+    async (reactionType: ReactionType = 'love') => {
+      if (!postId || isLoading) return;
 
-    setIsLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      setIsLoading(true);
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          console.warn('User must be logged in to react to posts');
+          return;
+        }
 
-      const { data, error } = await supabase.rpc('rpc_like_post', {
-        p_post_id: postId,
-        p_profile_id: user.id
-      });
+        // Optimistic update
+        const wasLiked = isLiked;
+        const previousReaction = userReaction;
+        const isSameReaction = userReaction === reactionType;
 
-      if (error) throw error;
+        if (isSameReaction) {
+          // Removing reaction
+          setIsLiked(false);
+          setUserReaction(null);
+          setLikesCount(Math.max(0, likesCount - 1));
+        } else if (wasLiked) {
+          // Changing reaction (count stays the same)
+          setUserReaction(reactionType);
+        } else {
+          // Adding new reaction
+          setIsLiked(true);
+          setUserReaction(reactionType);
+          setLikesCount(likesCount + 1);
+        }
 
-      if (data && data.length > 0) {
-        const result = data[0];
-        setIsLiked(result.is_liked);
-        setLikesCount(result.likes_count);
+        const { data, error } = await supabase.rpc('rpc_post_like_toggle', {
+          p_post_id: postId,
+          p_profile_id: user.id,
+          p_reaction_type: reactionType,
+        });
+
+        if (error) {
+          console.error('❌ Post reaction RPC failed:', {
+            error: error.message,
+            details: error,
+            postId,
+            userId: user.id,
+            reactionType,
+            hint: error.hint,
+            code: error.code,
+          });
+          setIsLiked(wasLiked);
+          setUserReaction(previousReaction ?? null);
+          setLikesCount(likesCount);
+          throw error;
+        }
+
+        if (data && data.length > 0) {
+          const result = data[0];
+          setIsLiked(result.is_liked);
+          setLikesCount(result.likes_count);
+          setUserReaction((result.user_reaction as ReactionType | null) ?? null);
+        }
+      } catch (err) {
+        console.error('❌ Failed to toggle post reaction:', err);
+        alert('Failed to react to post. Check console for details.');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      console.error('Failed to like post:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [postId, isLoading, isLiked, supabase]);
+    },
+    [postId, isLoading, isLiked, userReaction, likesCount, supabase]
+  );
 
-  return { isLiked, likesCount, toggleLike, isLoading };
+  return { isLiked, likesCount, userReaction, toggleLike, isLoading };
 }
 
 /**

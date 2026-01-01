@@ -218,6 +218,7 @@ export async function POST(request: NextRequest) {
  */
  async function handleCheckoutCompleted(
   session: Stripe.Checkout.Session,
+  eventId: string,
   requestId: string
 ) {
   const creditStartMs = Date.now();
@@ -284,132 +285,48 @@ export async function POST(request: NextRequest) {
   }
 
   const providerRef = String(paymentIntentId);
-  const idempotencyKey = `stripe:pi:${providerRef}`;
-
   const supabase = getSupabaseAdmin();
-  let coins: number | null = null;
-
   const priceId = session.metadata?.price_id ? String(session.metadata.price_id) : null;
-  if (priceId) {
-    const { data, error } = await supabase
-      .from('coin_packs')
-      .select('coins_amount')
-      .eq('stripe_price_id', priceId)
-      .eq('active', true)
-      .maybeSingle();
-
-    if (!error && data?.coins_amount != null) {
-      const parsed = Number(data.coins_amount);
-      coins = Number.isFinite(parsed) ? parsed : null;
-    }
-  }
-
-  if (!coins && usdCents > 0) {
-    const { data, error } = await supabase
-      .from('coin_packs')
-      .select('coins_amount')
-      .eq('price_cents', usdCents)
-      .eq('active', true)
-      .order('display_order', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (!error && data?.coins_amount != null) {
-      const parsed = Number(data.coins_amount);
-      coins = Number.isFinite(parsed) ? parsed : null;
-    }
-  }
-
-  if (!coins && coinsStr) {
-    const parsed = parseInt(String(coinsStr), 10);
-    coins = Number.isFinite(parsed) ? parsed : null;
-  }
-
-  if (!coins || coins <= 0) {
-    logStripeAction('checkout-invalid-coins', {
-      requestId,
-      sessionId: session.id,
-      userId,
-      coins_awarded: coinsStr,
-      usdCents,
-      priceId,
-    });
-    throw new Error('Invalid coins for checkout.session.* purchase event');
-  }
+  const packSku = session.metadata?.pack_sku ? String(session.metadata.pack_sku) : null;
 
   logStripeAction('checkout-processing', {
     requestId,
     sessionId: session.id,
     userId,
-    coins,
     usdCents,
     providerRef,
-    idempotencyKey,
   });
 
-  // Pre-flight guard against double-crediting:
-  // If we previously finalized with stripe:pi:<paymentIntentId>, skip calling finalize_coin_purchase again.
-  try {
-    const existing = await supabase
-      .from('ledger_entries')
-      .select('id')
-      .or(
-        [
-          `idempotency_key.eq.${idempotencyKey}`,
-          `provider_ref.eq.${String(paymentIntentId)}`,
-        ]
-          .filter(Boolean)
-          .join(',')
-      )
-      .limit(1)
-      .maybeSingle();
-
-    if (!existing.error && existing.data?.id) {
-      logStripeAction('checkout-skip-existing-finalization', {
-        requestId,
-        sessionId: session.id,
-        paymentIntentId,
-        providerRef,
-        idempotencyKey,
-        ledgerId: existing.data.id,
-      });
-      return;
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown';
-    logStripeAction('checkout-finalization-guard-error', {
-      requestId,
-      sessionId: session.id,
-      paymentIntentId,
-      error: message,
-    });
-  }
-
-  // Call RPC to finalize purchase (coins only)
-  const { data: ledgerId, error } = await supabase.rpc('finalize_coin_purchase', {
-    p_idempotency_key: idempotencyKey,
-    p_user_id: userId,
-    p_coins_amount: coins,
-    p_amount_usd_cents: usdCents,
-    p_provider_ref: providerRef,
+  const { data: finalizeResult, error: finalizeError } = await supabase.rpc('finalize_coin_purchase_v2', {
+    p_payment_intent_id: paymentIntentId,
+    p_profile_id: userId,
+    p_stripe_price_id: priceId,
+    p_platform: session.metadata?.platform || 'web',
+    p_metadata: {
+      stripe_event_id: eventId,
+      checkout_session_id: session.id,
+      payment_intent_id: paymentIntentId,
+      stripe_price_id: priceId,
+      pack_sku: packSku,
+    },
   });
 
-  if (error) {
+  if (finalizeError) {
     logStripeAction('checkout-rpc-error', {
       requestId,
       sessionId: session.id,
       userId,
-      error: error.message,
+      error: finalizeError.message,
     });
-    throw new Error(`finalize_coin_purchase failed (checkout.session.*): ${error.message}`);
+    throw new Error(`finalize_coin_purchase_v2 failed (checkout.session.*): ${finalizeError.message}`);
   }
 
   logStripeAction('checkout-finalized', {
     requestId,
     sessionId: session.id,
     userId,
-    coinsAwarded: coins,
-    ledgerId,
+    purchaseId: finalizeResult?.purchase_id,
+    ledgerId: finalizeResult?.ledger_entry_id,
     creditLatencyMs: Date.now() - creditStartMs,
   });
 
@@ -491,6 +408,7 @@ export async function POST(request: NextRequest) {
 
 async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
+  eventId: string,
   requestId: string
 ) {
   const creditStartMs = Date.now();
@@ -545,87 +463,40 @@ async function handlePaymentIntentSucceeded(
     throw new Error('Missing userId on payment_intent.succeeded purchase event');
   }
 
-  // Guard against double-crediting:
-  // If checkout.session.* already finalized using stripe:pi:<paymentIntentId>, this call will be idempotent.
-
   const supabase = getSupabaseAdmin();
-  let coins: number | null = null;
-
-  if (priceId) {
-    const { data, error } = await supabase
-      .from('coin_packs')
-      .select('coins_amount')
-      .eq('stripe_price_id', String(priceId))
-      .eq('active', true)
-      .maybeSingle();
-
-    if (!error && data?.coins_amount != null) {
-      const parsed = Number(data.coins_amount);
-      coins = Number.isFinite(parsed) ? parsed : null;
-    }
-  }
-
-  if (!coins && usdCents > 0) {
-    const { data, error } = await supabase
-      .from('coin_packs')
-      .select('coins_amount')
-      .eq('price_cents', usdCents)
-      .eq('active', true)
-      .order('display_order', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (!error && data?.coins_amount != null) {
-      const parsed = Number(data.coins_amount);
-      coins = Number.isFinite(parsed) ? parsed : null;
-    }
-  }
-
-  if (!coins && coinsStr) {
-    const parsed = parseInt(String(coinsStr), 10);
-    coins = Number.isFinite(parsed) ? parsed : null;
-  }
-
-  if (!coins || coins <= 0) {
-    logStripeAction('payment-intent-invalid-coins', {
-      requestId,
-      paymentIntentId: providerRef,
-      sessionId,
-      userId,
-      coins_awarded: coinsStr,
-      usdCents,
-      priceId,
-    });
-    throw new Error('Invalid coins for payment_intent.succeeded purchase event');
-  }
+  const packSku = paymentIntent.metadata?.pack_sku ?? null;
 
   logStripeAction('payment-intent-processing', {
     requestId,
     paymentIntentId: providerRef,
     sessionId,
     userId,
-    coins,
     usdCents,
-    idempotencyKey,
   });
 
-  const { data: ledgerId, error } = await supabase.rpc('finalize_coin_purchase', {
-    p_idempotency_key: idempotencyKey,
-    p_user_id: userId,
-    p_coins_amount: coins,
-    p_amount_usd_cents: usdCents,
-    p_provider_ref: providerRef,
+  const { data: finalizeResult, error: finalizeError } = await supabase.rpc('finalize_coin_purchase_v2', {
+    p_payment_intent_id: providerRef,
+    p_profile_id: userId,
+    p_stripe_price_id: priceId,
+    p_platform: paymentIntent.metadata?.platform || 'web',
+    p_metadata: {
+      stripe_event_id: eventId,
+      stripe_price_id: priceId,
+      pack_sku: packSku,
+      checkout_session_id: sessionId,
+      payment_intent_id: providerRef,
+    },
   });
 
-  if (error) {
+  if (finalizeError) {
     logStripeAction('payment-intent-rpc-error', {
       requestId,
       paymentIntentId: providerRef,
       sessionId,
       userId,
-      error: error.message,
+      error: finalizeError.message,
     });
-    throw new Error(`finalize_coin_purchase failed (payment_intent.succeeded): ${error.message}`);
+    throw new Error(`finalize_coin_purchase_v2 failed (payment_intent.succeeded): ${finalizeError.message}`);
   }
 
   logStripeAction('payment-intent-finalized', {
@@ -633,49 +504,126 @@ async function handlePaymentIntentSucceeded(
     paymentIntentId: providerRef,
     sessionId,
     userId,
-    coinsAwarded: coins,
-    ledgerId,
+    purchaseId: finalizeResult?.purchase_id,
+    ledgerId: finalizeResult?.ledger_entry_id,
     creditLatencyMs: Date.now() - creditStartMs,
   });
 }
 
-async function handleChargeRefunded(charge: Stripe.Charge, requestId: string) {
+async function handleChargeRefunded(
+  charge: Stripe.Charge,
+  eventId: string,
+  requestId: string
+) {
   const supabase = getSupabaseAdmin();
   const chargeId = String(charge.id);
-  const paymentIntentId = charge.payment_intent ? String(charge.payment_intent) : null;
-  const refundedCents = charge.amount_refunded ?? 0;
+  let paymentIntentId = charge.payment_intent ? String(charge.payment_intent) : null;
+  const refunds = Array.isArray(charge.refunds?.data) ? charge.refunds.data : [];
 
-  const orClauses = [`stripe_charge_id.eq.${chargeId}`];
-  if (paymentIntentId) orClauses.push(`provider_payment_id.eq.${paymentIntentId}`);
+  if (!paymentIntentId) {
+    try {
+      const stripe = getStripe();
+      const refreshedCharge = await stripe.charges.retrieve(chargeId);
+      if (refreshedCharge.payment_intent) {
+        paymentIntentId = String(refreshedCharge.payment_intent);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown';
+      logStripeAction('charge-refunded-charge-lookup-failed', {
+        requestId,
+        chargeId,
+        error: message,
+      });
+    }
+  }
 
-  const update: Record<string, unknown> = {
-    refunded_cents: refundedCents,
-    refunded_at: new Date().toISOString(),
-  };
-  if (refundedCents > 0) update.status = 'refunded';
+  if (!paymentIntentId) {
+    logStripeAction('charge-refunded-missing-payment-intent', {
+      requestId,
+      chargeId,
+      refundCount: refunds.length,
+    });
+    throw new Error('Missing payment_intent on charge.refunded event');
+  }
 
-  const { error } = await supabase.from('coin_purchases').update(update).or(orClauses.join(','));
-
-  if (error) {
-    logStripeAction('charge-refunded-update-failed', {
+  if (refunds.length === 0) {
+    logStripeAction('charge-refunded-no-refund-objects', {
       requestId,
       chargeId,
       paymentIntentId,
-      refundedCents,
-      error: error.message,
     });
-    return;
+    throw new Error('No refund objects on charge.refunded event');
   }
 
-  logStripeAction('charge-refunded-updated', {
-    requestId,
-    chargeId,
-    paymentIntentId,
-    refundedCents,
-  });
+  let processedAny = false;
+
+  for (const refund of refunds) {
+    const refundId = refund.id ? String(refund.id) : null;
+    const refundAmount = refund.amount ?? null;
+
+    if (!refundId || refundAmount == null) {
+      logStripeAction('charge-refunded-missing-amount', {
+        requestId,
+        chargeId,
+        paymentIntentId,
+        refundId,
+        refundAmount,
+      });
+      throw new Error('Refund object missing id or amount');
+    }
+
+    const { error: refundError } = await supabase.rpc('process_coin_refund', {
+      p_payment_intent_id: paymentIntentId,
+      p_refund_event_id: refundId,
+      p_refund_cents: refundAmount,
+      p_reason: 'refund',
+      p_metadata: {
+        stripe_event_id: eventId,
+        stripe_charge_id: chargeId,
+        stripe_refund_id: refundId,
+        refund_status: refund.status ?? null,
+      },
+    });
+
+    if (refundError) {
+      logStripeAction('charge-refund-rpc-error', {
+        requestId,
+        chargeId,
+        paymentIntentId,
+        refundId,
+        refundAmount,
+        error: refundError.message,
+      });
+      throw new Error(`process_coin_refund failed for refund ${refundId}: ${refundError.message}`);
+    }
+
+    logStripeAction('charge-refund-processed', {
+      requestId,
+      chargeId,
+      paymentIntentId,
+      refundId,
+      refundAmount,
+    });
+
+    processedAny = true;
+  }
+
+  if (processedAny) {
+    await enforceMonetizationHold({
+      paymentIntentId,
+      requestId,
+      eventId,
+      chargeId,
+      trigger: 'refund',
+    });
+  }
 }
 
-async function handleDisputeUpdated(dispute: Stripe.Dispute, requestId: string) {
+async function handleDisputeUpdated(
+  dispute: Stripe.Dispute,
+  eventId: string,
+  requestId: string
+) {
   const supabase = getSupabaseAdmin();
   const stripe = getStripe();
 
@@ -687,49 +635,174 @@ async function handleDisputeUpdated(dispute: Stripe.Dispute, requestId: string) 
   }
 
   let paymentIntentId: string | null = null;
+  let chargeAmount: number | null = null;
   try {
     const charge = await stripe.charges.retrieve(String(chargeId));
     paymentIntentId = charge.payment_intent ? String(charge.payment_intent) : null;
+    chargeAmount = typeof charge.amount === 'number' ? charge.amount : null;
   } catch {
     paymentIntentId = null;
   }
 
-  const disputedCents = dispute.amount ?? 0;
-  const disputeStatus = dispute.status ? String(dispute.status) : null;
+  if (!paymentIntentId) {
+    logStripeAction('dispute-missing-payment-intent', {
+      requestId,
+      disputeId,
+      chargeId,
+    });
+    throw new Error('Missing payment_intent on dispute event');
+  }
 
-  const orClauses = [`stripe_charge_id.eq.${String(chargeId)}`];
-  if (paymentIntentId) orClauses.push(`provider_payment_id.eq.${paymentIntentId}`);
+  let disputeAmount = typeof dispute.amount === 'number' ? dispute.amount : null;
 
-  const { error } = await supabase
-    .from('coin_purchases')
-    .update({
-      disputed_cents: disputedCents,
-      dispute_id: disputeId,
-      dispute_status: disputeStatus,
-      status: 'disputed',
-    })
-    .or(orClauses.join(','));
+  if (!disputeAmount && chargeAmount) {
+    disputeAmount = chargeAmount;
+  }
 
-  if (error) {
-    logStripeAction('dispute-update-failed', {
+  if (!disputeAmount) {
+    logStripeAction('dispute-missing-amount', {
       requestId,
       disputeId,
       chargeId,
       paymentIntentId,
-      disputedCents,
-      disputeStatus,
-      error: error.message,
+      chargeAmount,
     });
-    return;
+    throw new Error('Dispute missing amount');
   }
 
-  logStripeAction('dispute-updated', {
+  const { data: refundResult, error: refundError } = await supabase.rpc('process_coin_refund', {
+    p_payment_intent_id: paymentIntentId,
+    p_refund_event_id: disputeId,
+    p_refund_cents: disputeAmount,
+    p_reason: 'dispute',
+    p_metadata: {
+      stripe_event_id: eventId,
+      stripe_dispute_id: disputeId,
+      stripe_charge_id: chargeId,
+      dispute_status: dispute.status,
+      dispute_reason: dispute.reason,
+    },
+  });
+
+  if (refundError) {
+    logStripeAction('dispute-rpc-error', {
+      requestId,
+      disputeId,
+      chargeId,
+      paymentIntentId,
+      amount_cents: disputeAmount,
+      error: refundError.message,
+    });
+    throw new Error(`process_coin_refund failed for dispute ${disputeId}: ${refundError.message}`);
+  }
+
+  await enforceMonetizationHold({
+    paymentIntentId,
+    requestId,
+    eventId,
+    chargeId,
+    trigger: 'dispute',
+  });
+
+  logStripeAction('dispute-processed', {
     requestId,
     disputeId,
     chargeId,
     paymentIntentId,
-    disputedCents,
-    disputeStatus,
+    amount_cents: disputeAmount,
+    result: refundResult,
+  });
+}
+
+type MonetizationHoldTrigger = 'refund' | 'dispute';
+
+async function enforceMonetizationHold(params: {
+  paymentIntentId: string;
+  requestId: string;
+  eventId: string;
+  chargeId?: string | null;
+  trigger: MonetizationHoldTrigger;
+}) {
+  const { paymentIntentId, requestId, eventId, chargeId, trigger } = params;
+  const supabase = getSupabaseAdmin();
+  const { data: purchaseRow, error: purchaseError } = await supabase
+    .from('coin_purchases')
+    .select('profile_id')
+    .eq('provider_payment_id', paymentIntentId)
+    .maybeSingle();
+
+  if (purchaseError) {
+    logStripeAction('monetization-enforce-lookup-error', {
+      requestId,
+      eventId,
+      paymentIntentId,
+      chargeId,
+      trigger,
+      error: purchaseError.message,
+    });
+    return;
+  }
+
+  const profileId = purchaseRow?.profile_id ? String(purchaseRow.profile_id) : null;
+
+  if (!profileId) {
+    logStripeAction('monetization-enforce-missing-profile', {
+      requestId,
+      chargeId,
+      paymentIntentId,
+      eventId,
+      trigger,
+    });
+    return;
+  }
+
+  const timestamp = new Date().toISOString();
+  const { data: updatedRows, error: updateError } = await supabase
+    .from('user_sanctions')
+    .update({ monetization_disabled: true, updated_at: timestamp })
+    .eq('target_profile_id', profileId)
+    .select('target_profile_id');
+
+  if (updateError) {
+    logStripeAction('monetization-enforce-update-error', {
+      requestId,
+      eventId,
+      paymentIntentId,
+      chargeId,
+      trigger,
+      profileId,
+      error: updateError.message,
+    });
+    return;
+  }
+
+  if (!updatedRows || updatedRows.length === 0) {
+    const { error: insertError } = await supabase.from('user_sanctions').insert({
+      target_profile_id: profileId,
+      monetization_disabled: true,
+    });
+
+    if (insertError) {
+      logStripeAction('monetization-enforce-insert-error', {
+        requestId,
+        eventId,
+        paymentIntentId,
+        chargeId,
+        trigger,
+        profileId,
+        error: insertError.message,
+      });
+      return;
+    }
+  }
+
+  logStripeAction('monetization-enforce-applied', {
+    requestId,
+    eventId,
+    paymentIntentId,
+    chargeId,
+    trigger,
+    profileId,
   });
 }
 
