@@ -161,6 +161,8 @@ BEGIN
   v_coins_awarded := v_pack.coins;
   v_amount_usd_cents := COALESCE(
     v_pack.price_cents,
+    NULLIF(v_metadata->>'payment_amount_cents', '')::int,
+    NULLIF(v_metadata->>'usd_cents', '')::int,
     CASE WHEN v_pack.price_usd IS NOT NULL THEN round(v_pack.price_usd * 100)::int ELSE NULL END
   );
 

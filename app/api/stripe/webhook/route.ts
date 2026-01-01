@@ -308,6 +308,7 @@ export async function POST(request: NextRequest) {
       payment_intent_id: paymentIntentId,
       stripe_price_id: priceId,
       pack_sku: packSku,
+      payment_amount_cents: usdCents,
     },
   });
 
@@ -485,6 +486,7 @@ async function handlePaymentIntentSucceeded(
       pack_sku: packSku,
       checkout_session_id: sessionId,
       payment_intent_id: providerRef,
+      payment_amount_cents: usdCents,
     },
   });
 
