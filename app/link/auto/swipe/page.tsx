@@ -11,6 +11,7 @@ import * as linkApi from '@/lib/link/api';
 import { SwipeCard } from '@/components/link/SwipeCard';
 import { ProfileInfoModal } from '@/components/link/ProfileInfoModal';
 import { ConnectionModal } from '@/components/link/ConnectionModal';
+import { SwipeActionBar } from '@/components/link/SwipeActionBar';
 
 export default function AutoLinkSwipePage() {
   const router = useRouter();
@@ -27,12 +28,13 @@ export default function AutoLinkSwipePage() {
     loadCandidates();
   }, []);
 
-  const loadCandidates = async () => {
-    setLoading(true);
+  const loadCandidates = async (offset?: number) => {
+    const startFrom = typeof offset === 'number' ? offset : 0;
+    setLoading(startFrom === 0);
     setError(null);
     try {
-      const data = await linkApi.getAutoLinkCandidates(20, currentIndex);
-      setCandidates((prev) => [...prev, ...data]);
+      const data = await linkApi.getAutoLinkCandidates(20, startFrom);
+      setCandidates((prev) => (startFrom === 0 ? data : [...prev, ...data]));
     } catch (err) {
       console.error('Failed to load auto-link candidates:', err);
       setError('Failed to load profiles. Please try again.');
@@ -51,7 +53,7 @@ export default function AutoLinkSwipePage() {
     setCurrentIndex((prev) => prev + 1);
     
     if (currentIndex >= candidates.length - 3) {
-      loadCandidates();
+      loadCandidates(candidates.length);
     }
     
     try {
@@ -80,7 +82,7 @@ export default function AutoLinkSwipePage() {
 
   if (loading && candidates.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10 flex items-center justify-center">
+      <div className="min-h-svh bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400">Loading Auto-Link users...</p>
@@ -92,7 +94,7 @@ export default function AutoLinkSwipePage() {
   // Show error ONLY if there was an actual error (not just empty results)
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10 flex items-center justify-center px-4">
+      <div className="min-h-svh bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -120,7 +122,7 @@ export default function AutoLinkSwipePage() {
   // Show "no profiles" message if loaded but empty
   if (!loading && candidates.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10 flex items-center justify-center px-4">
+      <div className="min-h-svh bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <div className="w-32 h-32 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-8">
             <svg className="w-16 h-16 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -156,9 +158,14 @@ export default function AutoLinkSwipePage() {
     );
   }
 
+  const canSwipe = hasMore && Boolean(currentCandidate);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10">
-      <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="min-h-svh bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10">
+      <div
+        className="mx-auto flex min-h-svh max-w-2xl flex-col px-4 pt-6"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 1rem) + 200px)' }}
+      >
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => router.push('/link')}
@@ -196,7 +203,7 @@ export default function AutoLinkSwipePage() {
           </div>
         )}
 
-        <div className="relative" style={{ height: 'calc(100vh - 250px)', minHeight: '550px' }}>
+        <div className="relative flex-1 min-h-[360px]">
           {!hasMore ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center max-w-md">
@@ -233,16 +240,12 @@ export default function AutoLinkSwipePage() {
                     photos={candidate.photos || []}
                     location={candidate.location_text}
                     tags={candidate.tags}
-                    onSwipe={idx === 0 ? handleSwipe : () => {}}
-                    onShowInfo={idx === 0 ? () => setInfoModalOpen(true) : () => {}}
                     style={{
                       transform: `translateY(${offset}px) scale(${scale})`,
                       opacity,
                       zIndex: 10 - idx,
                       pointerEvents: idx === 0 ? 'auto' : 'none',
                     }}
-                    primaryActionLabel="Link"
-                    secondaryActionLabel="Nah"
                   />
                 );
               })}
@@ -256,6 +259,18 @@ export default function AutoLinkSwipePage() {
               {currentIndex + 1} of {candidates.length}
             </p>
           </div>
+        )}
+
+        {canSwipe && (
+          <SwipeActionBar
+            primaryLabel="Link"
+            secondaryLabel="Nah"
+            onPrimary={() => handleSwipe('right')}
+            onSecondary={() => handleSwipe('left')}
+            onInfo={() => setInfoModalOpen(true)}
+            disabled={submitting}
+            variant="auto"
+          />
         )}
       </div>
 

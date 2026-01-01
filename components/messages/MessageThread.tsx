@@ -8,6 +8,7 @@ import { useIM } from '@/components/im';
 import SafeRichText from '@/components/SafeRichText';
 import SafeOutboundLink from '@/components/SafeOutboundLink';
 import LiveAvatar from '@/components/LiveAvatar';
+import ReportModal from '@/components/ReportModal';
 
 interface MessageThreadProps {
   conversation: Conversation;
@@ -76,10 +77,33 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
   const [isSending, setIsSending] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    reportedUserId?: string;
+    reportedUsername?: string;
+    contextDetails: string;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputAreaRef = useRef<HTMLDivElement>(null);
+
+  const openReportDmMessage = (message: Message) => {
+    setReportTarget({
+      reportedUserId: message.senderId,
+      reportedUsername: conversation.recipientUsername,
+      contextDetails: JSON.stringify({
+        content_kind: 'dm_message',
+        message_id: String(message.id),
+        dm_conversation_id: conversation.id,
+        recipient_id: conversation.recipientId,
+        recipient_username: conversation.recipientUsername,
+        sender_id: message.senderId,
+        created_at: message.timestamp?.toISOString?.() ?? null,
+        snippet: String(message.content || '').slice(0, 160) || null,
+        surface: showBackButton ? 'messages_modal_thread' : 'messages_thread',
+      }),
+    });
+  };
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -283,6 +307,7 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
                         isOwn={isOwn}
                         time={formatTime(msg.timestamp)}
                         senderUsername={conversation.recipientUsername}
+                        onReport={!isOwn ? () => openReportDmMessage(msg) : undefined}
                       />
                       {isLastReadMessage && (
                         <p className="text-[10px] text-right text-blue-400 mt-1 mr-1 font-medium">
@@ -394,6 +419,17 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
           </button>
         </div>
       </div>
+
+      {reportTarget && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportTarget(null)}
+          reportType="chat"
+          reportedUserId={reportTarget.reportedUserId}
+          reportedUsername={reportTarget.reportedUsername}
+          contextDetails={reportTarget.contextDetails}
+        />
+      )}
     </div>
   );
 }
@@ -404,11 +440,13 @@ function MessageBubble({
   isOwn,
   time,
   senderUsername,
+  onReport,
 }: {
   message: Message;
   isOwn: boolean;
   time: string;
   senderUsername: string;
+  onReport?: () => void;
 }) {
   // Gift message bubble
   if (message.type === 'gift') {
@@ -449,6 +487,17 @@ function MessageBubble({
                 {message.status === 'failed' && <span className="text-red-500">⚠️</span>}
               </span>
             )}
+            {!isOwn && onReport && (
+              <button
+                type="button"
+                onClick={onReport}
+                className="ml-2 underline underline-offset-2 hover:opacity-80"
+                title="Report message"
+                aria-label="Report message"
+              >
+                Report
+              </button>
+            )}
           </p>
           {message.status === 'failed' && typeof (message as any)?.error === 'string' && (message as any).error.length > 0 && (
             <p className={`text-[11px] mt-1 ${isOwn ? 'text-right' : 'text-left'} text-red-600 dark:text-red-400`}>
@@ -487,6 +536,17 @@ function MessageBubble({
                 {message.status === 'failed' && <span className="text-red-500">⚠️</span>}
               </span>
             )}
+            {!isOwn && onReport && (
+              <button
+                type="button"
+                onClick={onReport}
+                className="ml-2 underline underline-offset-2 hover:opacity-80"
+                title="Report message"
+                aria-label="Report message"
+              >
+                Report
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -520,6 +580,17 @@ function MessageBubble({
               {message.status === 'read' && <span className="text-blue-300 font-medium">✓✓</span>}
               {message.status === 'failed' && <span className="text-red-300">⚠️</span>}
             </span>
+          )}
+          {!isOwn && onReport && (
+            <button
+              type="button"
+              onClick={onReport}
+              className="ml-2 underline underline-offset-2 hover:opacity-80"
+              title="Report message"
+              aria-label="Report message"
+            >
+              Report
+            </button>
           )}
         </p>
       </div>

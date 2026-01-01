@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import type { DatingProfile, DatingProfilePrefs } from '@/lib/link/dating-types';
+import type { DatingProfile, DatingProfilePrefs, ReligionEnum, BuildEnum } from '@/lib/link/dating-types';
 import * as linkApi from '@/lib/link/api';
 import { uploadLinkPhoto } from '@/lib/link/storage';
 import { SafetyModal } from '@/components/link/SafetyModal';
@@ -585,9 +585,9 @@ export default function DatingProfileEditor() {
               <label className="block text-sm font-bold mb-2">Religion Preference</label>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => updatePrefs('religion_pref', [])}
+                  onClick={() => updatePrefs('religion_pref', 'doesnt_matter')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    !profile.prefs?.religion_pref || profile.prefs.religion_pref.length === 0
+                    !Array.isArray(profile.prefs?.religion_pref) || profile.prefs.religion_pref.length === 0
                       ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
                       : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
@@ -595,16 +595,19 @@ export default function DatingProfileEditor() {
                   Doesn't matter
                 </button>
                 {['Christian', 'Muslim', 'Jewish', 'Hindu', 'Buddhist', 'Spiritual', 'Agnostic', 'Atheist', 'Other'].map((religion) => {
-                  const isSelected = profile.prefs?.religion_pref?.includes(religion.toLowerCase());
+                  const religionValue = religion.toLowerCase() as ReligionEnum;
+                  const currentReligions = Array.isArray(profile.prefs?.religion_pref)
+                    ? profile.prefs.religion_pref
+                    : [];
+                  const isSelected = currentReligions.includes(religionValue);
                   return (
                     <button
                       key={religion}
                       onClick={() => {
-                        const currentReligions = profile.prefs?.religion_pref || [];
                         const newReligions = isSelected
-                          ? currentReligions.filter((r: string) => r !== religion.toLowerCase())
-                          : [...currentReligions, religion.toLowerCase()];
-                        updatePrefs('religion_pref', newReligions);
+                          ? currentReligions.filter((r) => r !== religionValue)
+                          : [...currentReligions, religionValue];
+                        updatePrefs('religion_pref', newReligions.length ? newReligions : 'doesnt_matter');
                       }}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                         isSelected
@@ -652,9 +655,9 @@ export default function DatingProfileEditor() {
               <label className="block text-sm font-bold mb-2">Build Preference</label>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => updatePrefs('build_pref', [])}
+                  onClick={() => updatePrefs('build_pref', 'doesnt_matter')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    !profile.prefs?.build_pref || profile.prefs.build_pref.length === 0
+                    !Array.isArray(profile.prefs?.build_pref) || profile.prefs.build_pref.length === 0
                       ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
                       : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
@@ -662,16 +665,17 @@ export default function DatingProfileEditor() {
                   Doesn't matter
                 </button>
                 {['Slim', 'Average', 'Athletic', 'Curvy', 'Heavyset'].map((build) => {
-                  const isSelected = profile.prefs?.build_pref?.includes(build.toLowerCase());
+                  const buildValue = build.toLowerCase() as BuildEnum;
+                  const currentBuilds = Array.isArray(profile.prefs?.build_pref) ? profile.prefs.build_pref : [];
+                  const isSelected = currentBuilds.includes(buildValue);
                   return (
                     <button
                       key={build}
                       onClick={() => {
-                        const currentBuilds = profile.prefs?.build_pref || [];
                         const newBuilds = isSelected
-                          ? currentBuilds.filter((b: string) => b !== build.toLowerCase())
-                          : [...currentBuilds, build.toLowerCase()];
-                        updatePrefs('build_pref', newBuilds);
+                          ? currentBuilds.filter((b) => b !== buildValue)
+                          : [...currentBuilds, buildValue];
+                        updatePrefs('build_pref', newBuilds.length ? newBuilds : 'doesnt_matter');
                       }}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                         isSelected
@@ -690,9 +694,9 @@ export default function DatingProfileEditor() {
               <label className="block text-sm font-bold mb-2">Interests Preference</label>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => updatePrefs('interests_pref', [])}
+                  onClick={() => updatePrefs('interests_pref', 'doesnt_matter')}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    !profile.prefs?.interests_pref || profile.prefs.interests_pref.length === 0
+                    !Array.isArray(profile.prefs?.interests_pref) || profile.prefs.interests_pref.length === 0
                       ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
                       : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
@@ -700,16 +704,16 @@ export default function DatingProfileEditor() {
                   Doesn't matter
                 </button>
                 {INTEREST_TAGS.map((tag) => {
-                  const isSelected = profile.prefs?.interests_pref?.includes(tag);
+                  const currentInterests = Array.isArray(profile.prefs?.interests_pref) ? profile.prefs.interests_pref : [];
+                  const isSelected = currentInterests.includes(tag);
                   return (
                     <button
                       key={tag}
                       onClick={() => {
-                        const currentInterests = profile.prefs?.interests_pref || [];
                         const newInterests = isSelected
-                          ? currentInterests.filter((t: string) => t !== tag)
+                          ? currentInterests.filter((t) => t !== tag)
                           : [...currentInterests, tag];
-                        updatePrefs('interests_pref', newInterests);
+                        updatePrefs('interests_pref', newInterests.length ? newInterests : 'doesnt_matter');
                       }}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                         isSelected

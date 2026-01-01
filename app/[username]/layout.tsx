@@ -17,8 +17,10 @@ import { useParams } from 'next/navigation';
 ============================================================================= */
 
 export default function ProfileLayout({ children }: { children: ReactNode }) {
-  const params = useParams();
-  const username = params.username as string;
+  const params = useParams<{ username?: string }>();
+  const username = params?.username ?? '';
+
+  if (!username) return null;
 
   return (
     <main id="main" tabIndex={-1} className="outline-none">

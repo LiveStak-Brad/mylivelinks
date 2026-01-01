@@ -144,8 +144,12 @@ const tabs: { id: AnalyticsTab; label: string; icon: any }[] = [
 
 export default function AdminUserAnalyticsPage() {
   const router = useRouter();
-  const params = useParams();
-  const profileId = params?.profileId as string;
+  const params = useParams<{ profileId?: string }>();
+  const profileId = params?.profileId ?? '';
+
+  if (!profileId) {
+    return null;
+  }
   
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [dateRange, setDateRange] = useState<DateRange>(getDateRangeFromPreset('30d'));

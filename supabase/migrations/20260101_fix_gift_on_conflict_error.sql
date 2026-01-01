@@ -39,7 +39,7 @@ DECLARE
   v_diamonds_awarded BIGINT;
 BEGIN
   IF public.is_blocked(p_sender_id, p_recipient_id) THEN
-    RAISE EXCEPTION 'blocked';
+    RAISE EXCEPTION 'Gifting unavailable.';
   END IF;
 
   v_request_id := COALESCE(p_request_id, gen_random_uuid()::text);

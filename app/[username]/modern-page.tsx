@@ -178,9 +178,13 @@ interface ProfileData {
 }
 
 export default function ModernProfilePage() {
-  const params = useParams();
+  const params = useParams<{ username?: string }>();
   const router = useRouter();
-  const username = params.username as string;
+  const username = params?.username ?? '';
+
+  if (!username) {
+    return null;
+  }
   
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);

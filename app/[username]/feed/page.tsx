@@ -26,8 +26,12 @@ import PublicFeedClient from '@/components/feed/PublicFeedClient';
    Feed Page Component
 ----------------------------------------------------------------------------- */
 export default function FeedPage() {
-  const params = useParams();
-  const username = params.username as string;
+  const params = useParams<{ username?: string }>();
+  const username = params?.username ?? '';
+
+  if (!username) {
+    return null;
+  }
 
   return (
     <div className="min-h-[calc(100vh-7rem)] bg-background">

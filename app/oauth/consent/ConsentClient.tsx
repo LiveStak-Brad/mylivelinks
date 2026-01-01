@@ -23,6 +23,7 @@ function getSafeRedirectUri(raw: string | null) {
 
 function ConsentContent() {
   const searchParams = useSearchParams();
+  const query = searchParams ?? new URLSearchParams();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
@@ -31,14 +32,14 @@ function ConsentContent() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
 
-  const clientId = searchParams.get('client_id');
-  const redirectUri = getSafeRedirectUri(searchParams.get('redirect_uri'));
-  const state = searchParams.get('state');
-  const scope = searchParams.get('scope') || '';
-  const responseType = searchParams.get('response_type') || 'code';
-  const codeChallenge = searchParams.get('code_challenge');
-  const codeChallengeMethod = searchParams.get('code_challenge_method');
-  const appName = searchParams.get('app_name') || 'This application';
+  const clientId = query.get('client_id');
+  const redirectUri = getSafeRedirectUri(query.get('redirect_uri'));
+  const state = query.get('state');
+  const scope = query.get('scope') || '';
+  const responseType = query.get('response_type') || 'code';
+  const codeChallenge = query.get('code_challenge');
+  const codeChallengeMethod = query.get('code_challenge_method');
+  const appName = query.get('app_name') || 'This application';
 
   const missingParams = !clientId || !redirectUri || !state || !responseType;
 
@@ -155,7 +156,7 @@ function ConsentContent() {
                 You need to sign in before approving.{' '}
                 <Link
                   className="font-semibold underline"
-                  href={`/login?returnUrl=${encodeURIComponent('/oauth/consent?' + searchParams.toString())}`}
+                  href={`/login?returnUrl=${encodeURIComponent('/oauth/consent?' + query.toString())}`}
                 >
                   Sign in to continue
                 </Link>

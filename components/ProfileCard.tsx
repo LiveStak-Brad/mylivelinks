@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Check, ExternalLink, Users } from 'lucide-react';
+import { UserPlus, Check, ExternalLink, Users, Flag } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { StatusBadge, LiveDot } from '@/components/ui';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import ReportModal from '@/components/ReportModal';
 
 interface ProfileCardProps {
   profile: {
@@ -29,6 +30,7 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
   const [followsYou, setFollowsYou] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -101,6 +103,15 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
 
   const displayName = profile.display_name || profile.username;
   const truncatedBio = profile.bio ? (profile.bio.length > 80 ? profile.bio.substring(0, 80) + '...' : profile.bio) : 'No bio yet';
+
+  const profileUrl = typeof window !== 'undefined' ? `${window.location.origin}/${encodeURIComponent(profile.username)}` : null;
+  const reportContextDetails = JSON.stringify({
+    content_kind: 'profile',
+    profile_id: profile.id,
+    username: profile.username,
+    url: profileUrl,
+    surface: 'profile_card',
+  });
 
   return (
     <div 
@@ -231,9 +242,38 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
                 )}
               </button>
             )}
+
+            {currentUserId && currentUserId !== profile.id && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowReportModal(true);
+                }}
+                className="ml-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold bg-muted text-foreground hover:bg-muted/80 transition"
+                aria-label={`Report ${profile.username}`}
+                title="Report"
+              >
+                <Flag className="w-3.5 h-3.5" />
+                Report
+              </button>
+            )}
           </div>
         </div>
       </Link>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setShowReportModal(false)}
+          reportType="profile"
+          reportedUserId={profile.id}
+          reportedUsername={profile.username}
+          contextDetails={reportContextDetails}
+        />
+      )}
 
       {/* Hover Popup - Desktop Only */}
       {showPopup && (

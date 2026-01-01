@@ -7,6 +7,7 @@ import * as linkApi from '@/lib/link/api';
 import { SwipeCard } from '@/components/link/SwipeCard';
 import { ProfileInfoModal } from '@/components/link/ProfileInfoModal';
 import { ConnectionModal } from '@/components/link/ConnectionModal';
+import { SwipeActionBar } from '@/components/link/SwipeActionBar';
 
 export default function DatingSwipePage() {
   const router = useRouter();
@@ -23,12 +24,13 @@ export default function DatingSwipePage() {
     loadCandidates();
   }, []);
 
-  const loadCandidates = async () => {
-    setLoading(true);
+  const loadCandidates = async (offset?: number) => {
+    const startFrom = typeof offset === 'number' ? offset : 0;
+    setLoading(startFrom === 0);
     setError(null);
     try {
-      const data = await linkApi.getDatingCandidates(20, currentIndex);
-      setCandidates((prev) => [...prev, ...data]);
+      const data = await linkApi.getDatingCandidates(20, startFrom);
+      setCandidates((prev) => (startFrom === 0 ? data : [...prev, ...data]));
     } catch (err) {
       console.error('Failed to load dating candidates:', err);
       setError('Failed to load profiles. Please try again.');
@@ -47,7 +49,7 @@ export default function DatingSwipePage() {
     setCurrentIndex((prev) => prev + 1);
     
     if (currentIndex >= candidates.length - 3) {
-      loadCandidates();
+      loadCandidates(candidates.length);
     }
     
     try {
@@ -76,7 +78,7 @@ export default function DatingSwipePage() {
 
   if (loading && candidates.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-rose-50 dark:from-gray-950 dark:to-pink-900/10 flex items-center justify-center">
+      <div className="min-h-svh bg-gradient-to-br from-pink-50 to-rose-50 dark:from-gray-950 dark:to-pink-900/10 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-pink-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400">Loading profiles...</p>
@@ -87,7 +89,7 @@ export default function DatingSwipePage() {
 
   if (error && candidates.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-50 to-rose-50 dark:from-gray-950 dark:to-pink-900/10 flex items-center justify-center px-4">
+      <div className="min-h-svh bg-gradient-to-br from-pink-50 to-rose-50 dark:from-gray-950 dark:to-pink-900/10 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -111,9 +113,14 @@ export default function DatingSwipePage() {
     );
   }
 
+  const canSwipe = hasMore && Boolean(currentCandidate);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 to-rose-50 dark:from-gray-950 dark:to-pink-900/10">
-      <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="min-h-svh bg-gradient-to-br from-pink-50 to-rose-50 dark:from-gray-950 dark:to-pink-900/10">
+      <div
+        className="mx-auto flex min-h-svh max-w-2xl flex-col px-4 pt-6"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 1rem) + 200px)' }}
+      >
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => router.push('/link')}
@@ -150,7 +157,7 @@ export default function DatingSwipePage() {
           </div>
         )}
 
-        <div className="relative" style={{ height: 'calc(100vh - 250px)', minHeight: '550px' }}>
+        <div className="relative flex-1 min-h-[360px]">
           {!hasMore ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center max-w-md">
@@ -187,16 +194,12 @@ export default function DatingSwipePage() {
                     photos={candidate.photos || []}
                     location={candidate.location_text}
                     tags={[]}
-                    onSwipe={idx === 0 ? handleSwipe : () => {}}
-                    onShowInfo={idx === 0 ? () => setInfoModalOpen(true) : () => {}}
                     style={{
                       transform: `translateY(${offset}px) scale(${scale})`,
                       opacity,
                       zIndex: 10 - idx,
                       pointerEvents: idx === 0 ? 'auto' : 'none',
                     }}
-                    primaryActionLabel="Like"
-                    secondaryActionLabel="Nah"
                   />
                 );
               })}
@@ -211,6 +214,18 @@ export default function DatingSwipePage() {
             </p>
           </div>
         )}
+
+        {canSwipe && (
+          <SwipeActionBar
+            primaryLabel="Like"
+            secondaryLabel="Nah"
+            onPrimary={() => handleSwipe('right')}
+            onSecondary={() => handleSwipe('left')}
+            onInfo={() => setInfoModalOpen(true)}
+            disabled={submitting}
+            variant="dating"
+          />
+        )}
       </div>
 
       {currentCandidate && (
@@ -218,6 +233,7 @@ export default function DatingSwipePage() {
           open={infoModalOpen}
           onClose={() => setInfoModalOpen(false)}
           displayName={currentCandidate.display_name || currentCandidate.username || 'Unknown'}
+          profileId={currentCandidate.profile_id}
           username={currentCandidate.username}
           bio={currentCandidate.bio || 'No bio yet'}
           photos={currentCandidate.photos || []}

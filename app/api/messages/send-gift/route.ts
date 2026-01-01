@@ -107,7 +107,8 @@ export async function POST(request: NextRequest) {
     );
 
     if (giftMessageError) {
-      if ((giftMessageError as any)?.message === 'blocked') {
+      const msg = (giftMessageError as any)?.message;
+      if (msg === 'Gifting unavailable.' || msg === 'blocked') {
         return NextResponse.json({ error: 'Gifting unavailable.' }, { status: 403 });
       }
       return NextResponse.json({ error: giftMessageError.message }, { status: 400 });

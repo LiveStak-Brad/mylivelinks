@@ -126,8 +126,9 @@ interface ProfileData {
 
 export default function UserAnalyticsPage() {
   const router = useRouter();
-  const params = useParams();
-  const username = params?.username as string;
+  const params = useParams<{ username?: string }>();
+  const username = params?.username ?? '';
+  if (!username) return null;
   
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [dateRange, setDateRange] = useState<DateRange>(getDateRangeFromPreset('30d'));

@@ -18,7 +18,16 @@ export async function GET(request: NextRequest) {
     try {
       const { data, error } = await supabase.rpc('get_blocked_users', { p_user_id: user.id });
       if (!error) {
-        return NextResponse.json({ blocked_users: data ?? [] });
+        const normalized = (data ?? []).map((row: any) => ({
+          blocked_id: row.blocked_id,
+          created_at: row.created_at ?? null,
+          blocked_at: row.created_at ?? null,
+          blocked_username: row.blocked_username ?? null,
+          blocked_display_name: row.blocked_display_name ?? null,
+          blocked_avatar_url: row.blocked_avatar_url ?? null,
+        }));
+
+        return NextResponse.json({ blocked_users: normalized });
       }
     } catch {
       // ignore
@@ -26,9 +35,9 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('blocks')
-      .select('blocked_id, blocked_at, blocked_profile:profiles!blocks_blocked_id_fkey(id, username, display_name, avatar_url)')
+      .select('blocked_id, created_at, blocked_profile:profiles!blocks_blocked_id_fkey(id, username, display_name, avatar_url)')
       .eq('blocker_id', user.id)
-      .order('blocked_at', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
@@ -36,7 +45,8 @@ export async function GET(request: NextRequest) {
 
     const normalized = (data ?? []).map((row: any) => ({
       blocked_id: row.blocked_id,
-      blocked_at: row.blocked_at,
+      created_at: row.created_at,
+      blocked_at: row.created_at,
       blocked_username: row.blocked_profile?.username ?? null,
       blocked_display_name: row.blocked_profile?.display_name ?? null,
       blocked_avatar_url: row.blocked_profile?.avatar_url ?? null,

@@ -5,9 +5,8 @@ import { X, UserX, AlertTriangle, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 
 interface BlockedUser {
-  id: string;
   blocked_id: string;
-  blocked_at: string;
+  created_at: string;
   reason: string | null;
   blocked_profile: {
     username: string;
@@ -41,14 +40,13 @@ export default function BlockedUsersModal({ isOpen, onClose }: BlockedUsersModal
       const { data, error } = await supabase
         .from('blocks')
         .select(`
-          id,
           blocked_id,
-          blocked_at,
+          created_at,
           reason,
           blocked_profile:profiles!blocks_blocked_id_fkey(username, display_name, avatar_url)
         `)
         .eq('blocker_id', user.id)
-        .order('blocked_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading blocked users:', error);
@@ -167,7 +165,7 @@ export default function BlockedUsersModal({ isOpen, onClose }: BlockedUsersModal
             <div className="space-y-3">
               {blockedUsers.map((blocked) => (
                 <div
-                  key={blocked.id}
+                  key={blocked.blocked_id}
                   className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl"
                 >
                   {/* Avatar */}
@@ -194,7 +192,7 @@ export default function BlockedUsersModal({ isOpen, onClose }: BlockedUsersModal
                       @{blocked.blocked_profile?.username || 'unknown'}
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      Blocked {formatDate(blocked.blocked_at)}
+                      Blocked {formatDate(blocked.created_at)}
                     </p>
                   </div>
 

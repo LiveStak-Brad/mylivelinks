@@ -5,10 +5,9 @@ BEGIN;
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS public.blocks (
-  id bigserial PRIMARY KEY,
   blocker_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   blocked_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  blocked_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
   reason text NULL,
   CONSTRAINT blocks_no_self_block CHECK (blocker_id <> blocked_id),
   CONSTRAINT blocks_unique_pair UNIQUE (blocker_id, blocked_id)
@@ -16,14 +15,14 @@ CREATE TABLE IF NOT EXISTS public.blocks (
 
 CREATE INDEX IF NOT EXISTS idx_blocks_blocker_id ON public.blocks(blocker_id);
 CREATE INDEX IF NOT EXISTS idx_blocks_blocked_id ON public.blocks(blocked_id);
-CREATE INDEX IF NOT EXISTS idx_blocks_blocked_at_desc ON public.blocks(blocked_at DESC);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocker_blocked ON public.blocks(blocker_id, blocked_id);
 
 ALTER TABLE public.blocks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view own blocks" ON public.blocks;
 CREATE POLICY "Users can view own blocks"
   ON public.blocks FOR SELECT
-  USING (auth.uid() = blocker_id OR auth.uid() = blocked_id);
+  USING (auth.uid() = blocker_id);
 
 DROP POLICY IF EXISTS "Users can insert own blocks" ON public.blocks;
 CREATE POLICY "Users can insert own blocks"
@@ -36,7 +35,6 @@ CREATE POLICY "Users can delete own blocks"
   USING (auth.uid() = blocker_id);
 
 GRANT SELECT, INSERT, DELETE ON TABLE public.blocks TO authenticated;
-GRANT USAGE, SELECT ON SEQUENCE public.blocks_id_seq TO authenticated;
 
 -- -----------------------------------------------------------------------------
 -- RPCs
@@ -119,7 +117,6 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.is_blocked(uuid, uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_blocked(uuid, uuid) TO anon;
 
 CREATE OR REPLACE FUNCTION public.get_blocked_users(
   p_user_id uuid
@@ -129,7 +126,7 @@ RETURNS TABLE (
   blocked_username varchar,
   blocked_display_name varchar,
   blocked_avatar_url text,
-  blocked_at timestamptz
+  created_at timestamptz
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -146,11 +143,11 @@ BEGIN
     p.username,
     p.display_name,
     p.avatar_url,
-    b.blocked_at
+    b.created_at
   FROM public.blocks b
   JOIN public.profiles p ON p.id = b.blocked_id
   WHERE b.blocker_id = p_user_id
-  ORDER BY b.blocked_at DESC;
+  ORDER BY b.created_at DESC;
 END;
 $$;
 
@@ -315,7 +312,7 @@ BEGIN
         v_diamonds_awarded BIGINT;
       BEGIN
         IF public.is_blocked(p_sender_id, p_recipient_id) THEN
-          RAISE EXCEPTION 'blocked';
+          RAISE EXCEPTION 'Gifting unavailable.';
         END IF;
 
         v_request_id := COALESCE(p_request_id, gen_random_uuid()::text);
@@ -492,7 +489,7 @@ BEGIN
         v_request_id varchar;
       BEGIN
         IF public.is_blocked(p_sender_id, p_recipient_id) THEN
-          RAISE EXCEPTION 'blocked';
+          RAISE EXCEPTION 'Gifting unavailable.';
         END IF;
 
         v_request_id := COALESCE(p_request_id, gen_random_uuid()::text);

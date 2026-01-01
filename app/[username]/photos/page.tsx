@@ -17,8 +17,12 @@ import type { MediaItem } from '@/components/photos';
 ============================================================================= */
 
 export default function PhotosPage() {
-  const params = useParams();
-  const username = params.username as string;
+  const params = useParams<{ username?: string }>();
+  const username = params?.username ?? '';
+  
+  if (!username) {
+    return null;
+  }
   
   const [activeTab, setActiveTab] = useState('all');
   

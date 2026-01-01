@@ -92,9 +92,10 @@ function getIconColor(label: string) {
 function HeaderIcons() {
   const [showNotiesModal, setShowNotiesModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const router = useRouter();
   const searchParams = useSearchParams();
+  const query = searchParams ?? new URLSearchParams();
   
   const notiesButtonRef = useRef<HTMLButtonElement>(null);
   const messagesButtonRef = useRef<HTMLButtonElement>(null);
@@ -104,7 +105,7 @@ function HeaderIcons() {
 
   // Handle ?dm= query param to open messages
   useEffect(() => {
-    const dm = searchParams?.get('dm');
+    const dm = query.get('dm');
     if (!dm) return;
 
     void (async () => {
@@ -112,7 +113,7 @@ function HeaderIcons() {
       setShowNotiesModal(false);
       await openConversationWith(dm);
 
-      const next = new URLSearchParams(searchParams.toString());
+      const next = new URLSearchParams(query.toString());
       next.delete('dm');
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);

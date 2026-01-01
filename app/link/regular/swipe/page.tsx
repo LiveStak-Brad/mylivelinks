@@ -7,6 +7,7 @@ import * as linkApi from '@/lib/link/api';
 import { SwipeCard } from '@/components/link/SwipeCard';
 import { ProfileInfoModal } from '@/components/link/ProfileInfoModal';
 import { ConnectionModal } from '@/components/link/ConnectionModal';
+import { SwipeActionBar } from '@/components/link/SwipeActionBar';
 
 export default function RegularSwipePage() {
   const router = useRouter();
@@ -23,12 +24,13 @@ export default function RegularSwipePage() {
     loadCandidates();
   }, []);
 
-  const loadCandidates = async () => {
-    setLoading(true);
+  const loadCandidates = async (offset?: number) => {
+    const startFrom = typeof offset === 'number' ? offset : 0;
+    setLoading(startFrom === 0);
     setError(null);
     try {
-      const data = await linkApi.getLinkCandidates(20, currentIndex);
-      setCandidates((prev) => [...prev, ...data]);
+      const data = await linkApi.getLinkCandidates(20, startFrom);
+      setCandidates((prev) => (startFrom === 0 ? data : [...prev, ...data]));
       // Empty array is not an error - it just means no profiles available
     } catch (err) {
       console.error('Failed to load candidates:', err);
@@ -48,7 +50,7 @@ export default function RegularSwipePage() {
     setCurrentIndex((prev) => prev + 1);
     
     if (currentIndex >= candidates.length - 3) {
-      loadCandidates();
+      loadCandidates(candidates.length);
     }
     
     try {
@@ -77,7 +79,7 @@ export default function RegularSwipePage() {
 
   if (loading && candidates.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10 flex items-center justify-center">
+      <div className="min-h-svh bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400">Loading profiles...</p>
@@ -89,7 +91,7 @@ export default function RegularSwipePage() {
   // Show error ONLY if there was an actual error (not just empty results)
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10 flex items-center justify-center px-4">
+      <div className="min-h-svh bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -117,7 +119,7 @@ export default function RegularSwipePage() {
   // Show "no profiles" message if loaded but empty
   if (!loading && candidates.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10 flex items-center justify-center px-4">
+      <div className="min-h-svh bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-8">
             <svg className="w-16 h-16 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -147,9 +149,14 @@ export default function RegularSwipePage() {
     );
   }
 
+  const canSwipe = hasMore && Boolean(currentCandidate);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10">
-      <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="min-h-svh bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10">
+      <div
+        className="mx-auto flex min-h-svh max-w-2xl flex-col px-4 pt-6"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 1rem) + 200px)' }}
+      >
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => router.push('/link')}
@@ -182,7 +189,7 @@ export default function RegularSwipePage() {
           </div>
         )}
 
-        <div className="relative" style={{ height: 'calc(100vh - 250px)', minHeight: '550px' }}>
+        <div className="relative flex-1 min-h-[360px]">
           {!hasMore ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center max-w-md">
@@ -219,16 +226,12 @@ export default function RegularSwipePage() {
                     photos={candidate.photos || []}
                     location={candidate.location_text}
                     tags={candidate.tags}
-                    onSwipe={idx === 0 ? handleSwipe : () => {}}
-                    onShowInfo={idx === 0 ? () => setInfoModalOpen(true) : () => {}}
                     style={{
                       transform: `translateY(${offset}px) scale(${scale})`,
                       opacity,
                       zIndex: 10 - idx,
                       pointerEvents: idx === 0 ? 'auto' : 'none',
                     }}
-                    primaryActionLabel="Link"
-                    secondaryActionLabel="Nah"
                   />
                 );
               })}
@@ -243,6 +246,18 @@ export default function RegularSwipePage() {
             </p>
           </div>
         )}
+
+        {canSwipe && (
+          <SwipeActionBar
+            primaryLabel="Link"
+            secondaryLabel="Nah"
+            onPrimary={() => handleSwipe('right')}
+            onSecondary={() => handleSwipe('left')}
+            onInfo={() => setInfoModalOpen(true)}
+            disabled={submitting}
+            variant="regular"
+          />
+        )}
       </div>
 
       {currentCandidate && (
@@ -250,6 +265,7 @@ export default function RegularSwipePage() {
           open={infoModalOpen}
           onClose={() => setInfoModalOpen(false)}
           displayName={currentCandidate.display_name || currentCandidate.username || 'Unknown'}
+          profileId={currentCandidate.profile_id}
           username={currentCandidate.username}
           bio={currentCandidate.bio || 'No bio yet'}
           photos={currentCandidate.photos || []}

@@ -78,8 +78,9 @@ const gradients = [
 
 export default function EditRoomPage() {
   const router = useRouter();
-  const params = useParams();
-  const roomId = params.roomId as string;
+  const params = useParams<{ roomId?: string }>();
+  const roomId = params?.roomId ?? '';
+  if (!roomId) return null;
   const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState<TabId>('settings');

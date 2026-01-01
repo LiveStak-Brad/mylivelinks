@@ -1,9 +1,14 @@
 'use client';
 
+import { useMemo, useState } from 'react';
+import { Flag } from 'lucide-react';
+import ReportModal from '@/components/ReportModal';
+
 interface ProfileInfoModalProps {
   open: boolean;
   onClose: () => void;
   displayName: string;
+  profileId?: string;
   username?: string;
   bio: string;
   photos?: string[];
@@ -15,12 +20,30 @@ export function ProfileInfoModal({
   open,
   onClose,
   displayName,
+  profileId,
   username,
   bio,
   photos = [],
   location,
   tags = [],
 }: ProfileInfoModalProps) {
+  const [reportOpen, setReportOpen] = useState(false);
+  const profileUrl = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    if (!username) return null;
+    return `${window.location.origin}/${encodeURIComponent(username)}`;
+  }, [username]);
+
+  const reportContextDetails = useMemo(() => {
+    return JSON.stringify({
+      content_kind: 'profile',
+      profile_id: profileId || null,
+      username: username || null,
+      url: profileUrl,
+      surface: 'link_profile_info_modal',
+    });
+  }, [profileId, profileUrl, username]);
+
   if (!open) return null;
 
   return (
@@ -31,11 +54,25 @@ export function ProfileInfoModal({
       >
         <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
           <h2 className="text-xl font-bold">Profile</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {username && (
+              <button
+                type="button"
+                onClick={() => setReportOpen(true)}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 font-semibold text-sm"
+                aria-label="Report"
+                title="Report"
+              >
+                <Flag className="w-4 h-4" />
+                Report
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="p-6 space-y-6">
@@ -66,6 +103,17 @@ export function ProfileInfoModal({
           )}
         </div>
       </div>
+
+      {reportOpen && username && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportOpen(false)}
+          reportType="profile"
+          reportedUserId={profileId}
+          reportedUsername={username}
+          contextDetails={reportContextDetails}
+        />
+      )}
     </div>
   );
 }

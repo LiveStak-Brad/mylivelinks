@@ -20,7 +20,7 @@ export type LinkOrNahPromoCardProps = {
   microCopy?: string;
 };
 
-const CTA_ROUTE = '/link/regular/swipe';
+const CTA_ROUTE = '/link';
 const DEFAULT_TOOLTIP = "Link only if it's mutual.";
 const DEFAULT_MICRO_COPY = 'No messages unless you both link';
 
@@ -63,7 +63,7 @@ export function LinkOrNahPromoCard({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e40af] via-[#4338ca] to-[#9333ea] p-5 sm:p-6 text-white shadow-[0_15px_40px_rgba(79,70,229,0.35)]',
+        'relative overflow-hidden rounded-3xl bg-gradient-to-br from-accent via-[#f472b6] to-primary p-5 sm:p-6 text-white shadow-[0_15px_40px_rgba(79,70,229,0.35)]',
         className
       )}
     >
@@ -106,9 +106,6 @@ export function LinkOrNahPromoCard({
               <path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
             </svg>
           </div>
-          <div className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-xl bg-black/30 backdrop-blur border border-white/20 shadow-lg shadow-black/30">
-            <ArrowRight className="h-5 w-5 text-white" />
-          </div>
           <span className="absolute -top-2 -left-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-white shadow">
             <Sparkles className="h-4 w-4" />
           </span>
@@ -116,7 +113,6 @@ export function LinkOrNahPromoCard({
 
         <div className="flex-1 space-y-3">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-white/70">Feature highlight</p>
             <h2 className="text-2xl font-bold leading-tight">Link or Nah</h2>
           </div>
           <p className="text-base text-white/90">
@@ -126,7 +122,7 @@ export function LinkOrNahPromoCard({
             <Button
               variant="gradient"
               size="lg"
-              className="min-w-[140px] shadow-lg shadow-black/25"
+              className="min-w-[140px] bg-gradient-to-r from-[#1e40af] via-[#4338ca] to-[#9333ea] shadow-lg shadow-black/25 hover:opacity-95"
               onClick={handleCta}
             >
               Try It

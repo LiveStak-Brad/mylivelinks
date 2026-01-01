@@ -2,19 +2,20 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export async function isBlockedBidirectional(
   supabase: SupabaseClient,
-  userId: string,
-  otherUserId: string
+  userId: string | null | undefined,
+  otherUserId: string | null | undefined
 ): Promise<boolean> {
   if (!userId || !otherUserId || userId === otherUserId) return false;
 
-  const { data, error } = await supabase.rpc('is_blocked', {
-    p_user_id: userId,
-    p_other_user_id: otherUserId,
-  });
+  try {
+    const { data, error } = await supabase.rpc('is_blocked', {
+      p_user_id: userId,
+      p_other_user_id: otherUserId,
+    });
 
-  if (error) {
-    throw error;
+    if (error) return false;
+    return data === true;
+  } catch {
+    return false;
   }
-
-  return data === true;
 }

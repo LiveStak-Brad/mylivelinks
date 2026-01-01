@@ -283,6 +283,28 @@ export default function MobileWebWatchLayout({
         surface: 'mobile_web_watch_layout',
       }),
     });
+  }, [focusedSlotIndex, getPrimaryReportTarget]);
+
+  const handleReportUser = useCallback(() => {
+    const streamer = getPrimaryReportTarget();
+    if (!streamer) return;
+
+    const reportUrl = typeof window !== 'undefined' ? `${window.location.origin}/liveTV` : null;
+
+    setShowOptionsSheet(false);
+    setReportModalTarget({
+      reportType: 'user',
+      reportedUserId: streamer.profile_id,
+      reportedUsername: streamer.username,
+      contextDetails: JSON.stringify({
+        content_kind: 'profile',
+        profile_id: streamer.profile_id,
+        username: streamer.username,
+        slot_index: focusedSlotIndex ?? null,
+        url: reportUrl,
+        surface: 'mobile_web_watch_layout',
+      }),
+    });
   }, [getPrimaryReportTarget]);
 
   // Handle filter (placeholder)
@@ -528,6 +550,14 @@ export default function MobileWebWatchLayout({
               className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
             >
               Report stream
+            </button>
+
+            <button
+              onClick={handleReportUser}
+              disabled={activeCount === 0}
+              className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50 mt-2"
+            >
+              Report user
             </button>
           </div>
         </div>

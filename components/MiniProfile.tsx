@@ -616,7 +616,13 @@ export default function MiniProfile({
           reportType="user"
           reportedUserId={profileId}
           reportedUsername={username}
-          contextDetails={inLiveRoom ? `live_room:${roomId}` : undefined}
+          contextDetails={JSON.stringify({
+            content_kind: 'profile',
+            profile_id: profileId,
+            username,
+            surface: inLiveRoom ? 'mini_profile_live' : 'mini_profile',
+            live_room_id: inLiveRoom ? roomId ?? null : null,
+          })}
         />
       )}
     </div>

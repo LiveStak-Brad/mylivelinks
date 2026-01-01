@@ -5,6 +5,7 @@ import { MessageCircle, Search } from 'lucide-react';
 import { Input, EmptyState } from '@/components/ui';
 import { useMessages } from '@/components/messages';
 import SafeRichText from '@/components/SafeRichText';
+import ReportModal from '@/components/ReportModal';
 
 /**
  * MESSAGES PAGE
@@ -29,8 +30,33 @@ function MessagesPageContent() {
 
   const [searchQuery, setSearchQuery] = useState('');
 
+  const [reportTarget, setReportTarget] = useState<{
+    reportedUserId?: string;
+    reportedUsername?: string;
+    contextDetails: string;
+  } | null>(null);
+
   // Find the active conversation object
   const activeConversation = conversations.find(c => c.id === activeConversationId);
+
+  const openReportDmMessage = (msg: any) => {
+    if (!activeConversation) return;
+    setReportTarget({
+      reportedUserId: msg.senderId,
+      reportedUsername: activeConversation.recipientUsername,
+      contextDetails: JSON.stringify({
+        content_kind: 'dm_message',
+        message_id: String(msg.id),
+        dm_conversation_id: activeConversation.id,
+        recipient_id: activeConversation.recipientId,
+        recipient_username: activeConversation.recipientUsername,
+        sender_id: msg.senderId,
+        created_at: msg.timestamp?.toISOString?.() ?? null,
+        snippet: String(msg.content || '').slice(0, 160) || null,
+        surface: 'messages_page',
+      }),
+    });
+  };
 
   const filteredConversations = conversations.filter(conv => {
     if (!searchQuery) return true;
@@ -185,6 +211,19 @@ function MessagesPageContent() {
                             : 'bg-primary text-primary-foreground'
                         }`}
                       >
+                        {msg.senderId === activeConversation.recipientId && (
+                          <div className="flex justify-end -mt-1 mb-1">
+                            <button
+                              type="button"
+                              onClick={() => openReportDmMessage(msg)}
+                              className="text-[11px] underline underline-offset-2 opacity-80 hover:opacity-100"
+                              aria-label="Report message"
+                              title="Report message"
+                            >
+                              Report
+                            </button>
+                          </div>
+                        )}
                         {msg.type === 'text' && (
                           <p className="whitespace-pre-wrap">
                             <SafeRichText
@@ -253,6 +292,17 @@ function MessagesPageContent() {
 
       {/* Bottom padding for mobile nav */}
       <div className="h-20 md:hidden" aria-hidden="true" />
+
+      {reportTarget && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportTarget(null)}
+          reportType="chat"
+          reportedUserId={reportTarget.reportedUserId}
+          reportedUsername={reportTarget.reportedUsername}
+          contextDetails={reportTarget.contextDetails}
+        />
+      )}
     </main>
   );
 }

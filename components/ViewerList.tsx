@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
+import { isBlockedBidirectional } from '@/lib/blocks';
 import { Eye } from 'lucide-react';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
@@ -131,7 +132,22 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
 
       if (error) throw error;
 
-      const filteredPresence = (presenceData || []).filter((p: any) => !blockedPeerIds.has(p.profile_id));
+      const presenceRows = presenceData || [];
+
+      const blockChecks = await Promise.all(
+        presenceRows.map(async (p: any) => {
+          const pid = p?.profile_id as string | null | undefined;
+          if (!pid || pid === userId) return false;
+          return isBlockedBidirectional(supabase as any, userId, pid);
+        })
+      );
+
+      presenceRows.forEach((p: any, idx: number) => {
+        const pid = p?.profile_id as string | null | undefined;
+        if (pid && blockChecks[idx]) blockedPeerIds.add(pid);
+      });
+
+      const filteredPresence = presenceRows.filter((p: any) => !blockedPeerIds.has(p.profile_id));
 
       const profileIds = [...new Set(filteredPresence.map((item: any) => item.profile_id))];
       

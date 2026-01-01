@@ -33,7 +33,7 @@ interface NavItem {
  * - Safe area padding for mobile devices
  */
 export default function BottomNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isOwner, setIsOwner] = useState(false);

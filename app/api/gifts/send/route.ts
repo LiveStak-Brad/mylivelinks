@@ -89,7 +89,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (rpcError) {
-      if ((rpcError as any)?.message === 'blocked') {
+      const msg = (rpcError as any)?.message;
+      if (msg === 'Gifting unavailable.' || msg === 'blocked') {
         return NextResponse.json({ error: 'Gifting unavailable.' }, { status: 403 });
       }
       console.error('[GIFT] RPC error', {

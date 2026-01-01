@@ -43,6 +43,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const currentUserIdRef = useRef<string | null>(null);
   const [blockedPeerIds, setBlockedPeerIds] = useState<Set<string>>(new Set());
   const blockedPeerIdsRef = useRef<Set<string>>(new Set());
   const [blockedWithStreamOwner, setBlockedWithStreamOwner] = useState(false);
@@ -154,6 +155,10 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   }, [supabase]);
 
   useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  useEffect(() => {
     if (!currentUserId) {
       const empty = new Set<string>();
       blockedPeerIdsRef.current = empty;
@@ -166,12 +171,12 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       try {
         const { data: rows } = await supabase
           .from('blocks')
-          .select('blocker_id, blocked_id')
-          .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+          .select('blocked_id')
+          .eq('blocker_id', currentUserId);
 
         const next = new Set<string>();
         (rows ?? []).forEach((r: any) => {
-          const other = r.blocker_id === currentUserId ? r.blocked_id : r.blocker_id;
+          const other = r?.blocked_id;
           if (typeof other === 'string') next.add(other);
         });
         blockedPeerIdsRef.current = next;
@@ -250,6 +255,26 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         .limit(50);
 
       if (error) throw error;
+
+      const me = currentUserIdRef.current;
+      const uniqueProfileIds = Array.from(
+        new Set<string>((data || []).map((m: any) => m?.profile_id).filter((id: any): id is string => typeof id === 'string'))
+      ).filter((id) => (me ? id !== me : true));
+
+      const blockedChecks = await Promise.all(
+        uniqueProfileIds.map(async (pid) => {
+          const meNow = currentUserIdRef.current;
+          if (!meNow) return false;
+          if (blockedPeerIdsRef.current.has(pid)) return true;
+          const blocked = await isBlockedBidirectional(supabase as any, meNow, pid);
+          if (blocked) blockedPeerIdsRef.current.add(pid);
+          return blocked;
+        })
+      );
+
+      uniqueProfileIds.forEach((pid, idx) => {
+        if (blockedChecks[idx]) blockedPeerIdsRef.current.add(pid);
+      });
 
       console.log('[STREAMCHAT] 📊 Raw data from database:', data);
       console.log('[STREAMCHAT] 📊 Number of messages loaded:', data?.length || 0);
@@ -612,9 +637,25 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
             payload.new.live_stream_id === liveStreamId &&
             (payload.new.room_id === null || payload.new.room_id === undefined)
           ) {
-            if (payload?.new?.profile_id && blockedPeerIdsRef.current.has(payload.new.profile_id)) {
+            const pid = payload?.new?.profile_id as string | null | undefined;
+            if (pid && blockedPeerIdsRef.current.has(pid)) {
               return;
             }
+
+            if (pid) {
+              const meNow = currentUserIdRef.current;
+              if (!meNow) return;
+              void isBlockedBidirectional(supabase as any, meNow, pid).then((blocked) => {
+                if (blocked) {
+                  blockedPeerIdsRef.current.add(pid);
+                  return;
+                }
+                console.log('[STREAMCHAT] ✅ Calling loadMessageWithProfile for realtime message...');
+                loadMessageWithProfileRef.current(payload.new as any);
+              });
+              return;
+            }
+
             console.log('[STREAMCHAT] ✅ Calling loadMessageWithProfile for realtime message...');
             loadMessageWithProfileRef.current(payload.new as any);
           } else if (payload?.new) {

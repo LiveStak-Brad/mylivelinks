@@ -48,9 +48,13 @@ interface Project {
 
 export default function ProjectEditorPage() {
   const router = useRouter();
-  const params = useParams();
+  const params = useParams<{ projectId?: string }>();
   const searchParams = useSearchParams();
-  const projectId = params?.projectId as string;
+  const projectId = params?.projectId ?? '';
+
+  if (!projectId) {
+    return null;
+  }
 
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);

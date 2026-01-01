@@ -40,8 +40,8 @@ export interface DatingProfilePrefs extends DatingAboutYou, DatingPreferences {
   looking_for_text?: string;
   looking_for?: string;
   hobbies?: string[];
-  smoker_pref?: PreferenceEnum;
-  drinker_pref?: PreferenceEnum;
+  smoker_pref?: PreferenceEnum | 'doesnt_matter';
+  drinker_pref?: PreferenceEnum | 'doesnt_matter';
   height_pref_min?: HeightEnum;
   height_pref_max?: HeightEnum;
 }

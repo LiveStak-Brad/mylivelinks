@@ -50,7 +50,7 @@ function LoadingFallback() {
 function LeaderboardsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const typeParam = searchParams.get('type') as LeaderboardType | null;
+  const typeParam = (searchParams?.get('type') as LeaderboardType | null) ?? null;
   const [activeTab, setActiveTab] = useState<LeaderboardType>(typeParam || 'gifts');
 
   useEffect(() => {

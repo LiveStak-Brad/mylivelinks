@@ -560,7 +560,14 @@ export default function UserActionCardV2({
           reportType="user"
           reportedUserId={profileId}
           reportedUsername={username}
-          contextDetails={inLiveRoom ? `live_room:${roomId}` : undefined}
+          contextDetails={JSON.stringify({
+            content_kind: 'profile',
+            profile_id: profileId,
+            username,
+            surface: inLiveRoom ? 'user_action_card_live' : 'user_action_card',
+            live_room_id: inLiveRoom ? roomId ?? null : null,
+            live_stream_id: typeof liveStreamId === 'number' ? liveStreamId : null,
+          })}
         />
       )}
     </div>

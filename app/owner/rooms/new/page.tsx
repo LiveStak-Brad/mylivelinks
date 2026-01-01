@@ -12,8 +12,9 @@ import { RoomTemplate } from '@/components/owner/TemplateCard';
 export default function CreateRoomPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const query = searchParams ?? new URLSearchParams();
   const { toast } = useToast();
-  const templateId = searchParams.get('template');
+  const templateId = query.get('template');
   
   const [templates, setTemplates] = useState<RoomTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<RoomTemplate | null>(null);

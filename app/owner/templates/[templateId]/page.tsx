@@ -65,8 +65,11 @@ const gradients = [
 
 export default function EditTemplatePage() {
   const router = useRouter();
-  const params = useParams();
-  const templateId = params.templateId as string;
+  const params = useParams<{ templateId?: string }>();
+  const templateId = params?.templateId ?? '';
+  if (!templateId) {
+    return null;
+  }
   const isNew = templateId === 'new';
   const { toast } = useToast();
   
