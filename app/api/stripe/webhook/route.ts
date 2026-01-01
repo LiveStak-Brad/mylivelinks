@@ -297,6 +297,12 @@ export async function POST(request: NextRequest) {
     providerRef,
   });
 
+  await supabase
+    .from('coin_purchases')
+    .update({ user_id: userId, profile_id: userId })
+    .is('user_id', null)
+    .eq('provider_payment_id', paymentIntentId);
+
   const { data: finalizeResult, error: finalizeError } = await supabase.rpc('finalize_coin_purchase_v2', {
     p_payment_intent_id: paymentIntentId,
     p_profile_id: userId,
@@ -474,6 +480,12 @@ async function handlePaymentIntentSucceeded(
     userId,
     usdCents,
   });
+
+  // Add defensive update for user_id before payment intent finalize RPC
+  await supabase
+    .from('coin_purchases')
+    .update({ user_id: userId, profile_id: userId })
+    .eq('provider_payment_id', providerRef);
 
   const { data: finalizeResult, error: finalizeError } = await supabase.rpc('finalize_coin_purchase_v2', {
     p_payment_intent_id: providerRef,
