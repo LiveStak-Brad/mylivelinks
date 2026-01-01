@@ -299,7 +299,7 @@ export default function GlobalHeader() {
               <Tv className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-pink-500" strokeWidth={2} />
             </Link>
             
-            {/* Link or Nah Icon with gradient - Upright chainlink like app icon */}
+            {/* Link or Nah Icon - Same as used in Link module pages */}
             <Link 
               href="/link" 
               className="group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 opacity-70 hover:opacity-100"
@@ -308,56 +308,21 @@ export default function GlobalHeader() {
               <div className="relative">
                 <svg 
                   className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14" 
-                  viewBox="0 0 24 24" 
                   fill="none" 
-                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24" 
+                  stroke="url(#link-gradient-header)"
                 >
                   <defs>
-                    <linearGradient id="link-gradient-upright" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="rgb(168, 85, 247)" />
-                      <stop offset="100%" stopColor="rgb(59, 130, 246)" />
+                    <linearGradient id="link-gradient-header" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="rgb(37, 99, 235)" />
+                      <stop offset="100%" stopColor="rgb(168, 85, 247)" />
                     </linearGradient>
                   </defs>
-                  {/* Top link - rounded rectangle */}
-                  <rect 
-                    x="7" 
-                    y="3" 
-                    width="10" 
-                    height="7" 
-                    rx="3.5" 
-                    stroke="url(#link-gradient-upright)" 
-                    strokeWidth="2.5" 
-                    fill="none"
-                  />
-                  {/* Bottom link - rounded rectangle */}
-                  <rect 
-                    x="7" 
-                    y="14" 
-                    width="10" 
-                    height="7" 
-                    rx="3.5" 
-                    stroke="url(#link-gradient-upright)" 
-                    strokeWidth="2.5" 
-                    fill="none"
-                  />
-                  {/* Connecting vertical bars */}
-                  <line 
-                    x1="9" 
-                    y1="10" 
-                    x2="9" 
-                    y2="14" 
-                    stroke="url(#link-gradient-upright)" 
-                    strokeWidth="2.5" 
-                    strokeLinecap="round"
-                  />
-                  <line 
-                    x1="15" 
-                    y1="10" 
-                    x2="15" 
-                    y2="14" 
-                    stroke="url(#link-gradient-upright)" 
-                    strokeWidth="2.5" 
-                    strokeLinecap="round"
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" 
                   />
                 </svg>
               </div>
