@@ -28,6 +28,13 @@ import { ReactionPicker, REACTIONS, type ReactionType } from './ReactionPicker';
    />
 ============================================================================= */
 
+export type TopGifter = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  total_coins: number;
+};
+
 export interface FeedPostCardProps {
   /** Author's display name */
   authorName: string;
@@ -49,6 +56,10 @@ export interface FeedPostCardProps {
   clipId?: string;
   /** Total coins gifted to this post */
   coinCount?: number;
+  /** Total diamonds earned from gifts */
+  diamondCount?: number;
+  /** Top 3 gifters for this post */
+  topGifters?: TopGifter[];
   /** Whether current user liked this post */
   isLiked?: boolean;
   /** The reaction emoji selected by the current user */
@@ -201,6 +212,8 @@ const FeedPostCard = memo(function FeedPostCard({
   isClipCompletion = false,
   clipId,
   coinCount = 0,
+  diamondCount = 0,
+  topGifters = [],
   isLiked = false,
   likesCount = 0,
   userReaction = null,
@@ -348,13 +361,38 @@ const FeedPostCard = memo(function FeedPostCard({
                   onClick={onGift}
                   variant="gift"
                 />
-                {coinCount > 0 && (
-                  <ActionButton
-                    icon={Coins}
-                    label="Coins"
-                    count={coinCount}
-                    variant="coins"
-                  />
+                {(coinCount > 0 || diamondCount > 0 || topGifters.length > 0) && (
+                  <div className="flex items-center gap-2 px-2">
+                    {/* Top Gifters Avatars */}
+                    {topGifters.length > 0 && (
+                      <div className="flex items-center -space-x-2">
+                        {topGifters.slice(0, 3).map((gifter, idx) => {
+                          const ringColor = idx === 0 ? 'ring-yellow-400' : idx === 1 ? 'ring-gray-300' : 'ring-amber-600';
+                          return (
+                            <div
+                              key={gifter.id}
+                              className={`w-7 h-7 rounded-full overflow-hidden ring-2 ${ringColor} bg-muted`}
+                              style={{ zIndex: 3 - idx }}
+                              title={`${gifter.username}: ${gifter.total_coins} coins`}
+                            >
+                              <img
+                                src={gifter.avatar_url || '/no-profile-pic.png'}
+                                alt={gifter.username}
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.currentTarget.src = '/no-profile-pic.png'; }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* Diamond Count */}
+                    {diamondCount > 0 && (
+                      <span className="text-sm font-semibold text-purple-500 flex items-center gap-1">
+                        💎 {diamondCount.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

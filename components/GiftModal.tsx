@@ -176,30 +176,33 @@ export default function GiftModal({
         await loadUserBalance();
       }
 
-      // Post chat message: "sender sent 'gift' to recipient"
-      const { data: senderProfile } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
-      
-      if (senderProfile) {
-        const diamondsAwarded =
-          typeof data?.diamondsAwarded === 'number'
-            ? data.diamondsAwarded
-            : (typeof data?.diamonds_awarded === 'number' ? data.diamonds_awarded : null);
+      // Get diamonds awarded from response
+      const diamondsAwarded =
+        typeof data?.diamondsAwarded === 'number'
+          ? data.diamondsAwarded
+          : (typeof data?.diamonds_awarded === 'number' ? data.diamonds_awarded : selectedGift.coin_cost);
 
-        const diamondsSuffix = typeof diamondsAwarded === 'number' ? ` 💎+${diamondsAwarded}` : '';
+      const diamondsSuffix = typeof diamondsAwarded === 'number' ? ` 💎+${diamondsAwarded}` : '';
+      
+      // If this is a post gift, create a comment on the post
+      if (postId) {
+        const { error: commentError } = await supabase.from('post_comments').insert({
+          post_id: postId,
+          author_id: user.id,
+          text_content: `🎁 Sent a ${selectedGift.name} (${selectedGift.coin_cost} coins)${diamondsSuffix}`,
+        });
+        if (commentError) {
+          console.error('[GiftModal] Failed to create gift comment:', commentError);
+        }
+      } else {
+        // Otherwise post to chat messages (for live streams)
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
         
-        // If this is a post gift, create a comment on the post
-        if (postId) {
-          await supabase.from('post_comments').insert({
-            post_id: postId,
-            author_id: user.id,
-            text_content: `🎁 Sent a ${selectedGift.name} (${selectedGift.coin_cost} coins)${diamondsSuffix}`,
-          });
-        } else {
-          // Otherwise post to chat messages (for live streams)
+        if (senderProfile) {
           await supabase.from('chat_messages').insert({
             profile_id: user.id,
             content: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername}${diamondsSuffix}`,

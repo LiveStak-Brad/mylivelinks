@@ -22,6 +22,13 @@ type FeedAuthor = {
   is_live?: boolean;
 };
 
+type TopGifter = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  total_coins: number;
+};
+
 type FeedPost = {
   id: string;
   text_content: string;
@@ -30,6 +37,8 @@ type FeedPost = {
   author: FeedAuthor;
   comment_count: number;
   gift_total_coins: number;
+  gift_total_diamonds: number;
+  top_gifters: TopGifter[];
   likes_count: number;
 };
 
@@ -842,6 +851,8 @@ export default function PublicFeedClient({
                     ) : undefined
                   }
                   coinCount={post.gift_total_coins}
+                  diamondCount={post.gift_total_diamonds || post.gift_total_coins}
+                  topGifters={post.top_gifters || []}
                   onComment={() => void toggleComments(post.id)}
                   onGift={() => openGiftModal(post)}
                   onMore={() => openReportPost(post)}
