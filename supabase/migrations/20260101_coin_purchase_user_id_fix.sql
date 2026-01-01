@@ -56,6 +56,11 @@ WHERE user_id IS NULL
 ALTER TABLE public.coin_purchases
   ALTER COLUMN user_id SET NOT NULL;
 
+UPDATE public.coin_purchases
+SET provider_order_id = provider_payment_id
+WHERE provider_order_id IS NULL
+  AND provider_payment_id IS NOT NULL;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -177,6 +182,7 @@ BEGIN
     UPDATE public.coin_purchases
     SET user_id = p_profile_id,
         profile_id = p_profile_id,
+        provider_order_id = COALESCE(provider_order_id, p_payment_intent_id),
         provider = COALESCE(provider, 'stripe'),
         platform = COALESCE(platform, v_platform),
         coin_amount = COALESCE(coin_amount, v_coins_awarded),
@@ -198,6 +204,7 @@ BEGIN
       platform,
       payment_provider,
       provider_payment_id,
+      provider_order_id,
       coin_amount,
       coins_awarded,
       amount_usd_cents,
@@ -211,6 +218,7 @@ BEGIN
       'stripe',
       v_platform,
       'stripe',
+      p_payment_intent_id,
       p_payment_intent_id,
       v_coins_awarded,
       v_coins_awarded,
