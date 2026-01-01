@@ -62,7 +62,7 @@ function NavLink({
       aria-current={isActive ? 'page' : undefined}
       title={item.label}
     >
-      {Icon && <Icon className={`w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 ${getIconColor(item.label)}`} strokeWidth={2} />}
+      {Icon && <Icon className={`w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 ${getIconColor(item.label)}`} strokeWidth={2} />}
       
       {/* Hover tooltip for desktop */}
       <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
@@ -145,7 +145,7 @@ function HeaderIcons() {
           aria-haspopup="dialog"
           title="Messages"
         >
-          <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-emerald-500 dark:text-emerald-400" strokeWidth={2} />
+          <MessageCircle className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-emerald-500 dark:text-emerald-400" strokeWidth={2} />
           {unreadMessages > 0 && (
             <span className="notification-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>
           )}
@@ -179,7 +179,7 @@ function HeaderIcons() {
           aria-haspopup="dialog"
           title="Noties"
         >
-          <Bell className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-amber-500 dark:text-amber-400" strokeWidth={2} />
+          <Bell className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-amber-500 dark:text-amber-400" strokeWidth={2} />
           {unreadNoties > 0 && (
             <span className="notification-badge">{unreadNoties > 99 ? '99+' : unreadNoties}</span>
           )}
@@ -270,16 +270,16 @@ export default function GlobalHeader() {
               aria-label="View Leaderboards"
               title="Leaderboards"
             >
-              <Trophy className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-amber-500" strokeWidth={2} />
+              <Trophy className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-amber-500" strokeWidth={2} />
             </button>
             <Link href="/liveTV" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
-              <Tv className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
+              <Tv className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-pink-500" strokeWidth={2} />
             </Link>
             <Link href="/" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Home">
-              <Home className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-purple-500" strokeWidth={2} />
+              <Home className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-purple-500" strokeWidth={2} />
             </Link>
             <Link href="/feed" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Feed">
-              <Rss className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-blue-500" strokeWidth={2} />
+              <Rss className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-blue-500" strokeWidth={2} />
             </Link>
           </div>
         )}
@@ -293,29 +293,50 @@ export default function GlobalHeader() {
               aria-label="View Leaderboards"
               title="Leaderboards"
             >
-              <Trophy className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-amber-500" strokeWidth={2} />
+              <Trophy className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-amber-500" strokeWidth={2} />
             </button>
             <Link href="/liveTV" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
-              <Tv className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
+              <Tv className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-pink-500" strokeWidth={2} />
             </Link>
             
-            {/* Link or Nah Icon with gradient */}
+            {/* Link or Nah Icon with gradient - Upright chainlink */}
             <Link 
               href="/link" 
               className="group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 opacity-70 hover:opacity-100"
               title="Link or Nah"
             >
               <div className="relative">
-                <Link2 className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10" strokeWidth={2} style={{
-                  stroke: 'url(#link-gradient)',
-                }} />
-                <svg width="0" height="0" style={{ position: 'absolute' }}>
+                <svg 
+                  className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
                   <defs>
-                    <linearGradient id="link-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <linearGradient id="link-gradient-upright" x1="0%" y1="0%" x2="100%" y2="100%">
                       <stop offset="0%" stopColor="rgb(168, 85, 247)" />
                       <stop offset="100%" stopColor="rgb(59, 130, 246)" />
                     </linearGradient>
                   </defs>
+                  {/* Top arc */}
+                  <path 
+                    d="M9 7C9 5.34315 10.3431 4 12 4C13.6569 4 15 5.34315 15 7V10H9V7Z" 
+                    stroke="url(#link-gradient-upright)" 
+                    strokeWidth="2" 
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  {/* Bottom arc */}
+                  <path 
+                    d="M9 17C9 18.6569 10.3431 20 12 20C13.6569 20 15 18.6569 15 17V14H9V17Z" 
+                    stroke="url(#link-gradient-upright)" 
+                    strokeWidth="2" 
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                  {/* Connecting lines */}
+                  <line x1="9" y1="10" x2="9" y2="14" stroke="url(#link-gradient-upright)" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="15" y1="10" x2="15" y2="14" stroke="url(#link-gradient-upright)" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </div>
               
@@ -361,7 +382,7 @@ export default function GlobalHeader() {
               title="Go Live"
               aria-label="Go Live in Room"
             >
-              <Video className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-red-500 dark:text-red-400" strokeWidth={2} />
+              <Video className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-red-500 dark:text-red-400" strokeWidth={2} />
             </button>
           )}
           
@@ -382,7 +403,7 @@ export default function GlobalHeader() {
               className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
               title="Owner Panel"
             >
-              <Crown className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-violet-500 dark:text-violet-400" strokeWidth={2} />
+              <Crown className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-violet-500 dark:text-violet-400" strokeWidth={2} />
             </Link>
           )}
 
@@ -408,16 +429,16 @@ export default function GlobalHeader() {
             {isLiveRoom && (
               <div className="hidden md:flex absolute items-center gap-0.5 md:gap-1 left-[120px] md:left-[160px] lg:left-[200px] xl:left-[260px] 2xl:left-[340px]">
                 <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Randomize">
-                  <Shuffle className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-purple-500" strokeWidth={2} />
+                  <Shuffle className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-purple-500" strokeWidth={2} />
                 </button>
                 <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Most Viewed">
-                  <Eye className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-cyan-500" strokeWidth={2} />
+                  <Eye className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-cyan-500" strokeWidth={2} />
                 </button>
                 <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Most Gifted">
-                  <GiftIcon className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-pink-500" strokeWidth={2} />
+                  <GiftIcon className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-pink-500" strokeWidth={2} />
                 </button>
                 <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Newest">
-                  <Sparkles className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-yellow-500" strokeWidth={2} />
+                  <Sparkles className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-yellow-500" strokeWidth={2} />
                 </button>
               </div>
             )}
@@ -426,10 +447,10 @@ export default function GlobalHeader() {
             {isLiveRoom && (
               <div className="hidden md:flex absolute items-center gap-0.5 md:gap-1 right-[200px] md:right-[240px] lg:right-[280px] xl:right-[340px] 2xl:right-[420px]">
                 <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Unmute All">
-                  <Volume2 className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-green-500" strokeWidth={2} />
+                  <Volume2 className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-green-500" strokeWidth={2} />
                 </button>
                 <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Focus Mode">
-                  <Focus className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 xl:w-8 xl:h-8 2xl:w-10 2xl:h-10 text-indigo-500" strokeWidth={2} />
+                  <Focus className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-indigo-500" strokeWidth={2} />
                 </button>
               </div>
             )}
