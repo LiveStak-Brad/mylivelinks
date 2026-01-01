@@ -125,7 +125,7 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
   if (!isOpen) return null;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-slide-up z-50">
+    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-slide-up z-50 min-w-[320px] max-w-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-purple-500/10 to-pink-500/10">
         <div>

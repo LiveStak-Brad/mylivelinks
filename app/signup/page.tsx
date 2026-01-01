@@ -7,6 +7,7 @@ import Link from 'next/link';
 import SmartBrandLogo from '@/components/SmartBrandLogo';
 import { Button, Input, Card, CardContent } from '@/components/ui';
 import { AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { PolicyFooter } from '@/components/PolicyFooter';
 
 function SignUpPageInner() {
   const router = useRouter();
@@ -137,7 +138,7 @@ function SignUpPageInner() {
   };
 
   return (
-    <main id="main" className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center p-4">
+    <main id="main" className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Card className="shadow-xl border-0">
           <CardContent className="p-8">
@@ -238,9 +239,9 @@ function SignUpPageInner() {
             <div className="mt-6 text-center">
               <p className="text-xs text-muted-foreground">
                 By signing up, you agree to our{' '}
-                <Link href="#" className="text-primary hover:underline">Terms of Service</Link>
+                <Link href="/policies/terms-of-service" className="text-primary hover:underline">Terms of Service</Link>
                 {' '}and{' '}
-                <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>
+                <Link href="/policies/privacy-policy" className="text-primary hover:underline">Privacy Policy</Link>
               </p>
             </div>
           </CardContent>
@@ -256,6 +257,10 @@ function SignUpPageInner() {
             Back to Home
           </Link>
         </div>
+      </div>
+
+      <div className="mt-10 w-full">
+        <PolicyFooter />
       </div>
     </main>
   );

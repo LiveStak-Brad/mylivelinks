@@ -40,18 +40,6 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAuthedRouteHandlerClient(request);
 
-    const purchasesOwnerOnly = (process.env.PURCHASES_OWNER_ONLY ?? 'true').toLowerCase() !== 'false';
-    const { data: ownerOk } = await supabase.rpc('is_owner', { p_profile_id: user.id });
-    const isOwner = ownerOk === true;
-
-    if (purchasesOwnerOnly && !isOwner) {
-      logStripeAction('create-checkout-disabled-non-owner', { requestId, userId: user.id });
-      return NextResponse.json(
-        { error: 'Purchases are temporarily disabled' },
-        { status: 403 }
-      );
-    }
-
     // Get coin pack from database (prefer priceId, back-compat packSku)
     const pack = priceId
       ? await getCoinPackByPriceId(priceId)
@@ -70,6 +58,9 @@ export async function POST(request: NextRequest) {
     const looksValidPriceId = /^price_[A-Za-z0-9]+$/.test(rawStripePriceId);
     const effectiveStripePriceId =
       rawStripePriceId && looksValidPriceId && !looksLikePlaceholder ? rawStripePriceId : undefined;
+
+    const { data: ownerOk } = await supabase.rpc('is_owner', { p_profile_id: user.id });
+    const isOwner = ownerOk === true;
 
     if (!isOwner && (pack.vip_tier ?? 0) > 0) {
       const { data: profile, error: profileError } = await supabase

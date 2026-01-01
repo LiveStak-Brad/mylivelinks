@@ -47,12 +47,12 @@ function MessagesPageContent() {
       id="main"
       className="h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] bg-background"
     >
-      <div className="h-full flex flex-col md:flex-row">
+      <div className="h-full grid grid-cols-1 md:grid-cols-[480px_1fr]">
         
         {/* Conversations List - Left Panel */}
         <div className={`
           ${activeConversation ? 'hidden md:flex' : 'flex'}
-          flex-col w-full md:w-96 border-r border-border bg-card
+          flex-col border-r border-border bg-card overflow-hidden
         `}>
           {/* Header */}
           <header className="p-4 border-b border-border bg-background/50 backdrop-blur-sm">
@@ -141,7 +141,7 @@ function MessagesPageContent() {
         {/* Message Thread - Right Panel */}
         <div className={`
           ${activeConversation ? 'flex' : 'hidden md:flex'}
-          flex-1 flex flex-col bg-background
+          flex-col bg-background overflow-hidden
         `}>
           {activeConversation ? (
             <div className="flex flex-col h-full">

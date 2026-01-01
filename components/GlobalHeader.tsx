@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy, Tv, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy, Tv, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import LeaderboardModal from './LeaderboardModal';
@@ -318,6 +318,27 @@ export default function GlobalHeader() {
 
         {/* FAR RIGHT - User menu + icons - Fixed to viewport edge */}
         <div className="fixed right-0 top-0 flex items-center gap-0.5 sm:gap-1 md:gap-1 z-[70] h-16 lg:h-[72px] pr-1 sm:pr-2 md:pr-4 lg:pr-6 xl:pr-8 2xl:pr-[60px]">
+          {/* Camera/Go Live button - only on live room */}
+          {isLiveRoom && isLoggedIn && (
+            <button
+              onClick={() => {
+                // Trigger the hidden GoLiveButton in LiveRoom
+                const goLiveContainer = document.getElementById('liveroom-go-live-button');
+                const goLiveBtn = goLiveContainer?.querySelector('button');
+                if (goLiveBtn) {
+                  goLiveBtn.click();
+                } else {
+                  console.error('GoLiveButton not found in LiveRoom');
+                }
+              }}
+              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+              title="Go Live"
+              aria-label="Go Live in Room"
+            >
+              <Video className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-red-500 dark:text-red-400" strokeWidth={2} />
+            </button>
+          )}
+          
           {/* Messages & Noties - Hide on mobile */}
           {isLoggedIn && (
             <div className="hidden md:flex items-center gap-0.5 sm:gap-1">

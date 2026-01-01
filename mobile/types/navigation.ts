@@ -1,5 +1,6 @@
 // Mobile Owner Panel: Reports Parity (canonical commit)
 import type { NavigatorScreenParams } from '@react-navigation/native';
+ import type { PolicyId } from '../../shared/policies';
 
 // Root stack for authentication and initial flow
 export type RootStackParamList = {
@@ -10,6 +11,8 @@ export type RootStackParamList = {
   Rooms: undefined;
   SoloStreamViewer: { username: string };
   SoloHostStream: undefined;
+  SafetyPolicies: undefined;
+  PolicyDetail: { id: PolicyId };
   Wallet: undefined;
   Transactions: undefined;
   MyAnalytics: undefined;

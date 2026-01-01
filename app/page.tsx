@@ -11,6 +11,7 @@ import { RoomsCarousel } from '@/components/rooms';
 import { LIVE_LAUNCH_ENABLED, isLiveOwnerUser } from '@/lib/livekit-constants';
 import { Input, Button, Badge, Card, CardContent, Skeleton } from '@/components/ui';
 import { ReferralCard } from '@/components/referral';
+import { PolicyFooter } from '@/components/PolicyFooter';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -324,9 +325,7 @@ export default function LandingPage() {
       </div>
 
       {/* Footer */}
-      <footer className="container mx-auto px-4 py-8 text-center text-white/60 text-sm">
-        <p>© 2025 MyLiveLinks. All rights reserved.</p>
-      </footer>
+      <PolicyFooter />
     </main>
   );
 }

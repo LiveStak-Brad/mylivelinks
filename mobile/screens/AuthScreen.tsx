@@ -97,6 +97,30 @@ export function AuthScreen({ navigation }: Props) {
           onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
           disabled={submitting}
         />
+
+        <View style={styles.linksRow}>
+          <Button
+            title="Safety & Policies"
+            variant="secondary"
+            onPress={() => navigation.navigate('SafetyPolicies')}
+            disabled={submitting}
+          />
+        </View>
+
+        <View style={styles.linksRow}>
+          <Button
+            title="Terms"
+            variant="secondary"
+            onPress={() => navigation.navigate('PolicyDetail', { id: 'terms-of-service' })}
+            disabled={submitting}
+          />
+          <Button
+            title="Privacy"
+            variant="secondary"
+            onPress={() => navigation.navigate('PolicyDetail', { id: 'privacy-policy' })}
+            disabled={submitting}
+          />
+        </View>
       </View>
       </View>
     </ImageBackground>
@@ -154,6 +178,10 @@ function createStyles(theme: ThemeDefinition) {
     actions: {
       marginTop: 4,
       marginBottom: 12,
+    },
+    linksRow: {
+      marginTop: 10,
+      gap: 10,
     },
   });
 }

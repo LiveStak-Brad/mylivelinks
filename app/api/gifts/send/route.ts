@@ -54,14 +54,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const purchasesOwnerOnly = (process.env.PURCHASES_OWNER_ONLY ?? 'true').toLowerCase() !== 'false';
-    const { data: ownerOk } = await supabase.rpc('is_owner', { p_profile_id: user.id });
-    const isOwner = ownerOk === true;
-
-    if (purchasesOwnerOnly && !isOwner) {
-      return NextResponse.json({ error: 'Purchases are temporarily disabled' }, { status: 403 });
-    }
-
     // Prevent self-gifting
     if (user.id === toUserId) {
       return NextResponse.json(

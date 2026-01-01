@@ -218,6 +218,62 @@ export async function GET(
         // ignore
       }
 
+      try {
+        const { data: postRows, error: postErr } = await supabase
+          .from('posts')
+          .select('created_at')
+          .eq('author_id', profileId)
+          .gte('created_at', sinceIso)
+          .limit(2000);
+        if (!postErr && Array.isArray(postRows)) {
+          for (const r of postRows) pushTs((r as any)?.created_at);
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const { data: commentRows, error: commentErr } = await supabase
+          .from('post_comments')
+          .select('created_at')
+          .eq('author_id', profileId)
+          .gte('created_at', sinceIso)
+          .limit(2000);
+        if (!commentErr && Array.isArray(commentRows)) {
+          for (const r of commentRows) pushTs((r as any)?.created_at);
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const { data: likeRows, error: likeErr } = await supabase
+          .from('post_likes')
+          .select('created_at')
+          .eq('profile_id', profileId)
+          .gte('created_at', sinceIso)
+          .limit(2000);
+        if (!likeErr && Array.isArray(likeRows)) {
+          for (const r of likeRows) pushTs((r as any)?.created_at);
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        const { data: followRows, error: followErr } = await supabase
+          .from('follows')
+          .select('followed_at')
+          .eq('follower_id', profileId)
+          .gte('followed_at', sinceIso)
+          .limit(2000);
+        if (!followErr && Array.isArray(followRows)) {
+          for (const r of followRows) pushTs((r as any)?.followed_at);
+        }
+      } catch {
+        // ignore
+      }
+
       let count = 0;
       for (let i = 0; i < 60; i++) {
         const day = new Date(todayUtc.getTime() - i * 24 * 60 * 60 * 1000);

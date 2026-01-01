@@ -4,7 +4,7 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { supabase } from '../lib/supabase';
-import { Button, Checkbox, Input, Modal, PageShell } from '../components/ui';
+import { Button, Checkbox, Input, PageShell } from '../components/ui';
 import { useAuthContext } from '../contexts/AuthContext';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -44,7 +44,6 @@ export function CreateProfileScreen({ navigation }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDobPicker, setShowDobPicker] = useState(false);
-  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const dobISO = useMemo(() => (dob ? formatISODateOnly(dob) : null), [dob]);
   const age = useMemo(() => (dobISO ? calculateAge(dobISO) : null), [dobISO]);
@@ -287,7 +286,11 @@ export function CreateProfileScreen({ navigation }: Props) {
             <Checkbox value={acceptTerms} onValueChange={setAcceptTerms} label="I accept the Terms of Service" />
 
             <View style={styles.linkRow}>
-              <Button title="View Terms" onPress={() => setShowTermsModal(true)} variant="secondary" />
+              <Button
+                title="View Terms"
+                onPress={() => navigation.navigate('PolicyDetail', { id: 'terms-of-service' })}
+                variant="secondary"
+              />
             </View>
 
             {canShowAdultOptIn ? (
@@ -318,17 +321,6 @@ export function CreateProfileScreen({ navigation }: Props) {
           </View>
         ) : null}
       </View>
-
-      <Modal visible={showTermsModal} onRequestClose={() => setShowTermsModal(false)}>
-        <Text style={styles.modalTitle}>Terms of Service</Text>
-        <Text style={styles.modalText}>
-          By using MyLiveLinks, you agree to behave respectfully and follow all applicable laws. This is a simplified mobile
-          summary.
-        </Text>
-        <View style={styles.modalActions}>
-          <Button title="Close" onPress={() => setShowTermsModal(false)} />
-        </View>
-      </Modal>
     </PageShell>
   );
 }

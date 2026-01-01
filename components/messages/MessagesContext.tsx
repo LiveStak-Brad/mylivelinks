@@ -50,7 +50,7 @@ interface MessagesContextType {
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
   messages: Message[];
-  loadMessages: (conversationId: string) => Promise<void>;
+  loadMessages: (conversationId: string, forceRefresh?: boolean) => Promise<void>;
   openConversationWith: (recipientId: string) => Promise<boolean>;
   sendMessage: (recipientId: string, content: string) => Promise<boolean>;
   sendGift: (recipientId: string, giftId: number, giftName: string, giftCoins: number, giftIcon?: string) => Promise<boolean>;
@@ -165,6 +165,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const supabase = createClient();
 
+  // Cache messages per conversation to prevent reloading
+  const messagesCacheRef = useRef<Map<string, Message[]>>(new Map());
   const sendGiftInFlightRef = useRef(false);
 
   const totalUnreadCount = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
@@ -472,8 +474,19 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   );
 
   const loadMessages = useCallback(
-    async (conversationId: string) => {
+    async (conversationId: string, forceRefresh = false) => {
       if (!currentUserId) return;
+      
+      // Check cache first unless force refresh
+      if (!forceRefresh && messagesCacheRef.current.has(conversationId)) {
+        const cached = messagesCacheRef.current.get(conversationId);
+        if (cached) {
+          // Don't re-set messages if they're already from cache
+          // The useEffect will have already set them synchronously
+          return;
+        }
+      }
+
       const otherUserId = conversationId;
       try {
         const { data, error } = await supabase.rpc('get_conversation', {
@@ -540,12 +553,21 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
           };
         });
-        setMessages(mapped);
+        
+        // Cache the messages
+        messagesCacheRef.current.set(conversationId, mapped);
+        
+        // Only update state if this is still the active conversation
+        setMessages((prev) => {
+          // If we're viewing a different conversation now, don't update
+          if (conversationId !== activeConversationId) return prev;
+          return mapped;
+        });
       } catch (error) {
         console.error('[Messages] Error loading messages:', error);
       }
     },
-    [currentUserId, supabase]
+    [activeConversationId, currentUserId, supabase]
   );
 
   const sendMessage = useCallback(
@@ -563,7 +585,14 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         status: 'sending',
       };
 
-      setMessages((prev) => [...prev, newMessage]);
+      setMessages((prev) => {
+        const updated = [...prev, newMessage];
+        // Update cache immediately for active conversation
+        if (recipientId === activeConversationId) {
+          messagesCacheRef.current.set(recipientId, updated);
+        }
+        return updated;
+      });
 
       try {
         const { data, error } = await supabase
@@ -593,6 +622,14 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
               : m
           )
         );
+
+        // Update cache after successful send
+        if (recipientId === activeConversationId) {
+          setMessages((prev) => {
+            messagesCacheRef.current.set(recipientId, prev);
+            return prev;
+          });
+        }
 
         setConversations((prev) => {
           const existing = prev.find((c) => c.recipientId === recipientId);
@@ -656,7 +693,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [currentUserId, supabase]
+    [activeConversationId, currentUserId, supabase]
   );
 
   const sendGift = useCallback(
@@ -958,8 +995,19 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   // Load messages when active conversation changes
   useEffect(() => {
     if (activeConversationId) {
-      loadMessages(activeConversationId);
-      markConversationRead(activeConversationId);
+      // Check cache FIRST synchronously to prevent flash
+      const cached = messagesCacheRef.current.get(activeConversationId);
+      if (cached) {
+        // HAS CACHE: Set immediately and DON'T call database
+        setMessages(cached);
+        // Still mark as read though
+        markConversationRead(activeConversationId);
+      } else {
+        // NO CACHE: Set empty and load from database
+        setMessages([]);
+        loadMessages(activeConversationId);
+        markConversationRead(activeConversationId);
+      }
     } else {
       setMessages([]);
     }
@@ -986,7 +1034,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           if (activeConversationId) {
             const otherId = activeConversationId;
             if (senderId === otherId || recipientId === otherId) {
-              void loadMessages(activeConversationId);
+              // Force refresh when new message arrives from other user
+              void loadMessages(activeConversationId, true);
             }
           }
         }

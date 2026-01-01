@@ -201,7 +201,7 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
   });
 
   return (
-    <div className="flex flex-col h-full pwa-messages-container">
+    <div className="flex flex-col h-full pwa-messages-container pb-16 md:pb-0">
       {/* Header - iOS notch aware */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card flex-shrink-0 pwa-header">
         {showBackButton && (
@@ -299,9 +299,9 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - iOS keyboard and safe area aware */}
+      {/* Input Area - iOS keyboard and safe area aware, with bottom nav clearance */}
       <div className="relative border-t border-border p-3 bg-card flex-shrink-0 pwa-input-area">
-        {/* Gift Picker */}
+        {/* Gift Picker - positioned above input */}
         <GiftPickerMini
           isOpen={showGiftPicker}
           onClose={() => setShowGiftPicker(false)}

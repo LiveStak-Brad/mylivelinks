@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase';
 import SmartBrandLogo from '@/components/SmartBrandLogo';
 import { Button, Input, Card, CardContent } from '@/components/ui';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { PolicyFooter } from '@/components/PolicyFooter';
 
 function LoginPageInner() {
   const router = useRouter();
@@ -245,7 +246,7 @@ function LoginPageInner() {
   };
 
   return (
-    <main id="main" className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center p-4">
+    <main id="main" className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Card className="shadow-xl border-0">
           <CardContent className="p-8">
@@ -381,6 +382,10 @@ function LoginPageInner() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mt-10 w-full">
+        <PolicyFooter />
       </div>
     </main>
   );

@@ -50,7 +50,7 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
 
     const calculatePosition = () => {
       const buttonRect = anchorRef.current!.getBoundingClientRect();
-      const modalWidth = 900;
+      const modalWidth = 1100; // Increased from 900
       const modalHeight = 550;
       const gap = 12; // Gap between button and modal
       const viewportPadding = 16; // Minimum distance from viewport edge
@@ -215,7 +215,7 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
   const desktopContent = (
     <div
       ref={modalRef}
-      className="fixed w-[900px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[9999]"
+      className="fixed w-[1100px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[9999]"
       style={{ 
         top: `${modalPosition.top}px`,
         left: `${modalPosition.left}px`,
@@ -223,14 +223,14 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
         maxHeight: 'calc(100vh - 120px)' 
       }}
     >
-      <div className="flex h-full">
-        {/* Left Pane: Friends List (vertical) */}
-        <div className="w-52 border-r border-border flex flex-col bg-muted/20">
+      <div className="grid grid-cols-[220px_400px_1fr] h-full">
+        {/* Left Pane: Friends List (vertical) - FIXED WIDTH */}
+        <div className="border-r border-border flex flex-col bg-muted/20 overflow-hidden">
           <FriendsList onSelectFriend={() => {}} layout="vertical" />
         </div>
 
-        {/* Middle Pane: Messages List */}
-        <div className="w-72 border-r border-border flex flex-col">
+        {/* Middle Pane: Messages List - FIXED WIDTH */}
+        <div className="border-r border-border flex flex-col overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-gradient-to-r from-purple-500/10 to-pink-500/10">
             <div className="flex items-center gap-2">
@@ -253,8 +253,8 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
           </div>
         </div>
 
-        {/* Right Pane: Message Thread */}
-        <div className="flex-1 flex flex-col">
+        {/* Right Pane: Message Thread - FILLS REMAINING SPACE */}
+        <div className="flex flex-col overflow-hidden">
           {activeConversation ? (
             <MessageThread conversation={activeConversation} />
           ) : (

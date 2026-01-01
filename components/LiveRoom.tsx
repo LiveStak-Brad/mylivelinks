@@ -2751,6 +2751,18 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
 
   return (
     <div className="h-[100dvh] w-[100dvw] bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col fixed inset-0 pt-0 min-h-0">
+      {/* Hidden Go Live Button - triggered by camera button in header */}
+      <div className="fixed -left-[9999px]" id="liveroom-go-live-button">
+        <GoLiveButton
+          sharedRoom={sharedRoom}
+          isRoomConnected={isRoomConnected}
+          onGoLive={handleGoLive}
+          onPublishingChange={setIsCurrentUserPublishing}
+          publishAllowed={publishAllowed}
+          mode="group"
+        />
+      </div>
+      
       {/* Testing Mode Banner (if auth disabled) */}
       {authDisabled && (
         <div className="w-full bg-yellow-500 dark:bg-yellow-600 text-black dark:text-white text-center py-2 px-4 text-sm font-semibold">
