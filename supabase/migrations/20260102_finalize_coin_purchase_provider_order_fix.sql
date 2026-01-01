@@ -125,8 +125,8 @@ DECLARE
   v_now TIMESTAMPTZ := now();
   v_platform TEXT := COALESCE(p_platform, v_metadata->>'platform', 'web');
   v_purchase_id BIGINT;
-  v_existing_ledger_id BIGINT;
-  v_ledger_id BIGINT;
+  v_existing_ledger_id UUID;
+  v_ledger_id UUID;
   v_existing_purchase coin_purchases%ROWTYPE;
 BEGIN
   IF p_payment_intent_id IS NULL OR length(trim(p_payment_intent_id)) = 0 THEN
@@ -221,7 +221,7 @@ BEGIN
         confirmed_at = COALESCE(confirmed_at, v_now),
         metadata = COALESCE(metadata, '{}'::jsonb) || v_metadata
     WHERE id = v_purchase_id
-    RETURNING ledger_entry_id INTO v_existing_ledger_id;
+    RETURNING ledger_entry_id::uuid INTO v_existing_ledger_id;
 
   ELSE
     INSERT INTO public.coin_purchases (
@@ -290,7 +290,7 @@ BEGIN
       ) || v_metadata
     )
     ON CONFLICT (idempotency_key) DO NOTHING
-    RETURNING id INTO v_ledger_id;
+    RETURNING id::uuid INTO v_ledger_id;
 
     IF v_ledger_id IS NULL THEN
       SELECT id
