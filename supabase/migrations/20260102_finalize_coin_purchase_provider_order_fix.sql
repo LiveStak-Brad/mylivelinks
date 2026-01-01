@@ -1,22 +1,107 @@
 BEGIN;
 
--- Ensure legacy rows have provider_order_id populated
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'coin_purchases'
+      AND column_name = 'user_id'
+  ) THEN
+    ALTER TABLE public.coin_purchases
+      ADD COLUMN user_id uuid;
+  END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'coin_purchases'
+      AND column_name = 'provider'
+  ) THEN
+    ALTER TABLE public.coin_purchases
+      ADD COLUMN provider text;
+  END IF;
+END;
+$$;
+
+UPDATE public.coin_purchases
+SET provider = COALESCE(provider, 'stripe')
+WHERE provider IS NULL;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'coin_purchases'
+      AND column_name = 'provider'
+  ) THEN
+    EXECUTE 'ALTER TABLE public.coin_purchases ALTER COLUMN provider SET NOT NULL';
+  END IF;
+END;
+$$;
+
+UPDATE public.coin_purchases
+SET user_id = profile_id
+WHERE user_id IS NULL
+  AND profile_id IS NOT NULL;
+
+ALTER TABLE public.coin_purchases
+  ALTER COLUMN user_id SET NOT NULL;
+
 UPDATE public.coin_purchases
 SET provider_order_id = provider_payment_id
 WHERE provider_order_id IS NULL
   AND provider_payment_id IS NOT NULL;
 
-UPDATE public.coin_purchases
-SET idempotency_key = 'stripe:pi:' || provider_payment_id
-WHERE idempotency_key IS NULL
-  AND provider_payment_id IS NOT NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'coin_purchases'
+      AND column_name = 'idempotency_key'
+  ) THEN
+    ALTER TABLE public.coin_purchases
+      ADD COLUMN idempotency_key text;
+  END IF;
+END;
+$$;
 
 UPDATE public.coin_purchases
 SET idempotency_key = provider_payment_id
 WHERE idempotency_key IS NULL
   AND provider_payment_id IS NOT NULL;
 
--- Recreate finalize_coin_purchase_v2 to guarantee provider_order_id is always set
+ALTER TABLE public.coin_purchases
+  ALTER COLUMN idempotency_key SET NOT NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'coin_purchases_user_id_fkey'
+      AND conrelid = 'public.coin_purchases'::regclass
+  ) THEN
+    ALTER TABLE public.coin_purchases
+      ADD CONSTRAINT coin_purchases_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+  END IF;
+END;
+$$;
+
+CREATE INDEX IF NOT EXISTS idx_coin_purchases_user_id
+  ON public.coin_purchases(user_id);
+
 CREATE OR REPLACE FUNCTION public.finalize_coin_purchase_v2(
   p_payment_intent_id TEXT,
   p_profile_id UUID,

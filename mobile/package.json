@@ -39,6 +39,7 @@
     "livekit-client": "^2.0.0",
     "react": "18.2.0",
     "react-native": "0.73.6",
+    "react-native-iap": "13.0.4",
     "react-native-gesture-handler": "~2.14.0",
     "react-native-get-random-values": "~1.8.0",
     "react-native-image-filter-kit": "^0.7.3",
