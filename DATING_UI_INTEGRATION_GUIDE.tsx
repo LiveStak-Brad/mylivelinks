@@ -17,6 +17,7 @@ import type {
   DatingCandidate,
   DatingMatch 
 } from '@/lib/link/dating-types';
+import { heightToDisplay, buildToDisplay } from '@/lib/link/dating-types';
 
 // ============================================================================
 // EXAMPLE 1: Dating Profile Setup Page
