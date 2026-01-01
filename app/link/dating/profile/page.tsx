@@ -6,7 +6,11 @@ import { DatingProfile } from '@/lib/link/api';
 import * as linkApi from '@/lib/link/api';
 import { uploadLinkPhoto } from '@/lib/link/storage';
 
-const INTEREST_TAGS = ['Music', 'Gaming', 'Fitness', 'Business', 'Art', 'Tech', 'Travel', 'Food', 'Sports', 'Fashion', 'Photography', 'Reading'];
+const INTEREST_TAGS = [
+  'Music', 'Gaming', 'Fitness', 'Business', 'Art', 'Tech',
+  'Travel', 'Food', 'Sports', 'Fashion', 'Photography', 'Reading',
+  'Movies', 'Cooking', 'Dancing', 'Yoga', 'Hiking', 'Pets'
+];
 
 export default function DatingProfileEditor() {
   const router = useRouter();
