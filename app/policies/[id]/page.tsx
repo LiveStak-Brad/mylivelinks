@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { PolicyFooter } from '@/components/PolicyFooter';
-import { getPolicyById } from '@/shared/policies';
+import { getWebPolicyById } from '@/lib/policies.web';
 
 export default function PolicyPage({ params }: { params: { id: string } }) {
-  const policy = getPolicyById(params.id);
+  const policy = getWebPolicyById(params.id);
   if (!policy) return notFound();
 
   return (
@@ -19,9 +19,7 @@ export default function PolicyPage({ params }: { params: { id: string } }) {
           </div>
 
           <h1 className="text-3xl font-bold text-foreground">{policy.title}</h1>
-          <div className="mt-2 text-sm text-muted-foreground">
-            Effective {policy.effectiveDate} · Last updated {policy.lastUpdated}
-          </div>
+          <div className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap">{policy.meta}</div>
 
           <div className="mt-8 space-y-8">
             {policy.sections.map((section) => (

@@ -106,7 +106,10 @@ export default function MobileWebWatchLayout({
     reportedUserId: string;
     reportType: 'user' | 'stream' | 'profile' | 'chat';
     reportedUsername?: string;
+    contextDetails?: string;
   } | null>(null);
+
+  const [showOptionsSheet, setShowOptionsSheet] = useState(false);
   
   // Global mute state
   const [globalMuted, setGlobalMuted] = useState(false);
@@ -245,11 +248,42 @@ export default function MobileWebWatchLayout({
     }
   }, []);
 
-  // Handle options (placeholder)
+  const getPrimaryReportTarget = useCallback(() => {
+    const targetSlot = focusedSlot || activeSlots[0];
+    if (!targetSlot?.streamer) return null;
+    return targetSlot.streamer;
+  }, [activeSlots, focusedSlot]);
+
+  // Handle options
   const handleOptionsPress = useCallback(() => {
-    // TODO: Open options overlay/modal
-    alert('Options menu coming soon');
+    setShowOptionsSheet(true);
   }, []);
+
+  const handleReportStream = useCallback(() => {
+    const streamer = getPrimaryReportTarget();
+    if (!streamer) return;
+
+    const rawId = streamer.id ? String(streamer.id) : '';
+    const parsedLiveStreamId = rawId && !rawId.startsWith('stream-') && !rawId.startsWith('seed-') ? Number(rawId) : null;
+    const liveStreamId = Number.isFinite(parsedLiveStreamId) && parsedLiveStreamId && parsedLiveStreamId > 0 ? parsedLiveStreamId : null;
+    const reportUrl = typeof window !== 'undefined' ? `${window.location.origin}/liveTV` : null;
+
+    setShowOptionsSheet(false);
+    setReportModalTarget({
+      reportType: 'stream',
+      reportedUserId: streamer.profile_id,
+      reportedUsername: streamer.username,
+      contextDetails: JSON.stringify({
+        content_kind: 'live_stream',
+        stream_profile_id: streamer.profile_id,
+        stream_username: streamer.username,
+        live_stream_id: liveStreamId,
+        slot_index: focusedSlotIndex ?? null,
+        url: reportUrl,
+        surface: 'mobile_web_watch_layout',
+      }),
+    });
+  }, [getPrimaryReportTarget]);
 
   // Handle filter (placeholder)
   const handleFilterPress = useCallback(() => {
@@ -464,8 +498,39 @@ export default function MobileWebWatchLayout({
           reportType={reportModalTarget.reportType}
           reportedUserId={reportModalTarget.reportedUserId}
           reportedUsername={reportModalTarget.reportedUsername}
+          contextDetails={reportModalTarget.contextDetails}
           onClose={() => setReportModalTarget(null)}
         />
+      )}
+
+      {showOptionsSheet && (
+        <div
+          className="fixed inset-0 z-[210] flex items-end justify-center bg-black/50"
+          onClick={() => setShowOptionsSheet(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-bold text-gray-900 dark:text-gray-100">Options</div>
+              <button
+                onClick={() => setShowOptionsSheet(false)}
+                className="px-3 py-1 text-sm font-semibold text-gray-700 dark:text-gray-200"
+              >
+                Close
+              </button>
+            </div>
+
+            <button
+              onClick={handleReportStream}
+              disabled={activeCount === 0}
+              className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
+            >
+              Report stream
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

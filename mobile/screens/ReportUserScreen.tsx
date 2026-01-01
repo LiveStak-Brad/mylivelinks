@@ -20,10 +20,13 @@ type UserSearchResult = {
 };
 
 const REPORT_REASONS: Reason[] = [
-  { value: 'harassment', label: 'Harassment or Bullying' },
-  { value: 'inappropriate', label: 'Inappropriate Behavior' },
-  { value: 'spam', label: 'Spam or Scam' },
-  { value: 'underage', label: 'Underage User (Under 18)' },
+  { value: 'sexual_services', label: 'Sexual services / solicitation (prostitution, escorting, sugaring)' },
+  { value: 'grooming_exploitation', label: 'Grooming / exploitation' },
+  { value: 'minor_safety', label: 'Minor safety (under 18)' },
+  { value: 'fraud_scams', label: 'Fraud / scams' },
+  { value: 'harassment_hate', label: 'Harassment / hate' },
+  { value: 'spam', label: 'Spam' },
+  { value: 'inappropriate_content', label: 'Inappropriate content' },
   { value: 'impersonation', label: 'Impersonation' },
   { value: 'other', label: 'Other' },
 ];

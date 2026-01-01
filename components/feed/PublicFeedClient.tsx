@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { RefreshCw, Upload, X, Globe, Users, Lock, Heart } from 'lucide-react';
-import { Button, Card, Modal, Textarea } from '@/components/ui';
+import { Button, Card, Textarea } from '@/components/ui';
 import { FeedPostWithLikes } from './FeedPostWithLikes';
 import PostMedia from './PostMedia';
 import SafeRichText from '@/components/SafeRichText';
 import GiftModal from '@/components/GiftModal';
+import ReportModal from '@/components/ReportModal';
 import { createClient } from '@/lib/supabase';
 import { uploadPostMedia } from '@/lib/storage';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
@@ -102,6 +103,67 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
 
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftTargetPost, setGiftTargetPost] = useState<FeedPost | null>(null);
+
+  const [reportTarget, setReportTarget] = useState<{
+    reportType: 'user' | 'stream' | 'profile' | 'chat';
+    reportedUserId?: string;
+    reportedUsername?: string;
+    contextDetails?: string;
+  } | null>(null);
+
+  const openReportPost = useCallback(
+    (post: FeedPost) => {
+      const postUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}${username ? `/${encodeURIComponent(username)}` : '/'}#post-${post.id}`
+          : null;
+
+      setReportTarget({
+        reportType: 'profile',
+        reportedUserId: post.author.id,
+        reportedUsername: post.author.username,
+        contextDetails: JSON.stringify({
+          content_kind: 'post',
+          post_id: post.id,
+          post_author_id: post.author.id,
+          post_author_username: post.author.username,
+          post_url: postUrl,
+          snippet: String(post.text_content || '').slice(0, 160) || null,
+          surface: username ? 'profile_feed' : 'global_feed',
+        }),
+      });
+    },
+    [username]
+  );
+
+  const openReportComment = useCallback(
+    (params: { post: FeedPost; comment: FeedComment }) => {
+      const { post, comment } = params;
+
+      const postUrl =
+        typeof window !== 'undefined'
+          ? `${window.location.origin}${username ? `/${encodeURIComponent(username)}` : '/'}#post-${post.id}`
+          : null;
+
+      setReportTarget({
+        reportType: 'profile',
+        reportedUserId: comment.author?.id || undefined,
+        reportedUsername: comment.author?.username,
+        contextDetails: JSON.stringify({
+          content_kind: 'comment',
+          comment_id: comment.id,
+          post_id: post.id,
+          comment_author_id: comment.author?.id || null,
+          comment_author_username: comment.author?.username || null,
+          post_author_id: post.author.id,
+          post_url: postUrl,
+          snippet: String(comment.text_content || '').slice(0, 160) || null,
+          surface: username ? 'profile_feed' : 'global_feed',
+        }),
+      });
+    },
+    [username]
+  );
 
   const loadFeed = useCallback(async (mode: 'replace' | 'append') => {
     setIsLoading(true);
@@ -758,6 +820,7 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                   coinCount={post.gift_total_coins}
                   onComment={() => void toggleComments(post.id)}
                   onGift={() => openGiftModal(post)}
+                  onMore={() => openReportPost(post)}
                   onProfileClick={() => {
                     window.location.href = `/${post.author.username}`;
                   }}
@@ -819,6 +882,13 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                                       onClick={() => setActiveReplyTo(activeReplyTo === c.id ? null : c.id)}
                                     >
                                       Reply
+                                    </button>
+                                    <span className="text-muted-foreground">·</span>
+                                    <button
+                                      className="text-muted-foreground hover:underline transition"
+                                      onClick={() => openReportComment({ post, comment: c })}
+                                    >
+                                      Report
                                     </button>
                                     <span className="text-muted-foreground">·</span>
                                     <span className="text-muted-foreground text-[11px]">
@@ -940,6 +1010,13 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
                                                 {reply.like_count > 0 ? `Like (${reply.like_count})` : 'Like'}
                                               </button>
                                               <span className="text-muted-foreground">·</span>
+                                              <button
+                                                className="text-muted-foreground hover:underline transition"
+                                                onClick={() => openReportComment({ post, comment: reply })}
+                                              >
+                                                Report
+                                              </button>
+                                              <span className="text-muted-foreground">·</span>
                                               <span className="text-muted-foreground text-[11px]">
                                                 {formatDateTime(reply.created_at)}
                                               </span>
@@ -1018,6 +1095,17 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
             setGiftModalOpen(false);
             setGiftTargetPost(null);
           }}
+        />
+      )}
+
+      {reportTarget && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportTarget(null)}
+          reportType={reportTarget.reportType}
+          reportedUserId={reportTarget.reportedUserId}
+          reportedUsername={reportTarget.reportedUsername}
+          contextDetails={reportTarget.contextDetails}
         />
       )}
     </div>

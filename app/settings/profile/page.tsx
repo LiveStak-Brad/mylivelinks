@@ -14,6 +14,7 @@ import ProfileTabPicker from '@/components/profile/ProfileTabPicker';
 import TopFriendsSettings from '@/components/profile/TopFriendsSettings';
 import { PHOTO_FILTER_PRESETS, PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
 import { ProfileSection, ProfileTab } from '@/lib/profileTypeConfig';
+import type { GenderEnum } from '@/lib/link/dating-types';
 
 interface UserLink {
   id?: number;
@@ -22,6 +23,14 @@ interface UserLink {
   display_order: number;
   is_active: boolean;
 }
+
+const GENDER_OPTIONS: { value: GenderEnum; label: string }[] = [
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'nonbinary', label: 'Non-binary' },
+  { value: 'other', label: 'Other' },
+];
 
 export default function ProfileSettingsPage() {
   const router = useRouter();
@@ -40,6 +49,7 @@ export default function ProfileSettingsPage() {
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [username, setUsername] = useState('');
+  const [gender, setGender] = useState<GenderEnum | null>(null);
   
   // Social media fields
   const [socialInstagram, setSocialInstagram] = useState('');
@@ -212,6 +222,7 @@ export default function ProfileSettingsPage() {
         setDisplayName(p.display_name || '');
         setBio(p.bio || '');
         setUsername(p.username || '');
+        setGender((p.gender ?? null) as GenderEnum | null);
         
         // Load social media fields (strip @ if present)
         setSocialInstagram((p.social_instagram || '').replace(/^@/, ''));
@@ -344,6 +355,7 @@ export default function ProfileSettingsPage() {
           display_name: displayName,
           bio: bio,
           avatar_url: avatarUrl, // Will be updated if avatar changed
+          gender: gender || null,
           // Enabled modules (optional modules only)
           enabled_modules: Array.isArray(enabledModules) ? enabledModules : null,
           // Enabled tabs (optional tabs only)
@@ -602,6 +614,14 @@ export default function ProfileSettingsPage() {
     );
   }
 
+  const selectedGenderLabel = gender
+    ? GENDER_OPTIONS.find((opt) => opt.value === gender)?.label || 'Not set'
+    : 'Not set';
+
+  const handleGenderSelect = (value: GenderEnum) => {
+    setGender((prev) => (prev === value ? null : value));
+  };
+
   return (
     <div className="min-h-screen max-h-screen bg-gray-50 dark:bg-gray-900 py-8 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-4 pb-20">
@@ -751,6 +771,44 @@ export default function ProfileSettingsPage() {
                 maxLength={500}
               />
               <p className="text-xs text-gray-500 mt-1">{bio.length}/500</p>
+            </div>
+          </div>
+        </div>
+
+        {/* About */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">About</h2>
+          <div className="space-y-4">
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
+                <label className="block text-sm font-medium">Gender (Optional)</label>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {selectedGenderLabel || 'Not set'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Used for Dating filters. You can leave this blank.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {GENDER_OPTIONS.map((option) => {
+                  const isSelected = gender === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => handleGenderSelect(option.value)}
+                      className={`flex-1 min-w-[150px] px-4 py-2 text-sm font-medium rounded-xl border transition-all ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/30 dark:text-blue-200 shadow-sm'
+                          : 'border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-blue-200 dark:hover:border-blue-500/60'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

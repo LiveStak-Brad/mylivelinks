@@ -8,6 +8,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
+import ReportModal from '@/components/ReportModal';
 
 interface ChatMessage {
   id: number | string;
@@ -53,6 +54,11 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
     avatarUrl?: string;
     gifterStatus?: GifterStatus | null;
     isLive?: boolean;
+  } | null>(null);
+  const [reportMessageTarget, setReportMessageTarget] = useState<{
+    reportedUserId?: string;
+    reportedUsername?: string;
+    contextDetails: string;
   } | null>(null);
   const [broadcastChannel, setBroadcastChannel] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -893,6 +899,25 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
     return colors[index];
   };
 
+  const openReportMessage = useCallback(
+    (msg: ChatMessage) => {
+      setReportMessageTarget({
+        reportedUserId: msg.profile_id || undefined,
+        reportedUsername: msg.username,
+        contextDetails: JSON.stringify({
+          content_kind: 'stream_chat_message',
+          message_id: String(msg.id),
+          live_stream_id: liveStreamId,
+          sender_id: msg.profile_id || null,
+          sender_username: msg.username || null,
+          snippet: String(msg.content || '').slice(0, 160) || null,
+          created_at: msg.created_at,
+        }),
+      });
+    },
+    [liveStreamId]
+  );
+
   return (
     <div className="flex flex-col h-full min-h-0 bg-transparent">
       {/* Messages - Flexible height with scroll, no header */}
@@ -959,6 +984,17 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                         <span className="text-[10px] text-white/50 leading-tight">
                           {formatTime(msg.created_at)}
                         </span>
+                        {msg.message_type !== 'system' && msg.profile_id && (
+                          <button
+                            type="button"
+                            onClick={() => openReportMessage(msg)}
+                            className="text-[10px] text-white/60 hover:text-white transition"
+                            title="Report message"
+                            aria-label="Report message"
+                          >
+                            Report
+                          </button>
+                        )}
                       </div>
 
                       {(() => {
@@ -1109,6 +1145,17 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           onClose={() => setSelectedProfile(null)}
           inLiveRoom={true}
           currentUserRole="viewer"
+        />
+      )}
+
+      {reportMessageTarget && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportMessageTarget(null)}
+          reportType="chat"
+          reportedUserId={reportMessageTarget.reportedUserId}
+          reportedUsername={reportMessageTarget.reportedUsername}
+          contextDetails={reportMessageTarget.contextDetails}
         />
       )}
     </div>

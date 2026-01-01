@@ -42,6 +42,7 @@ import {
   type ProfileTab as ConfigProfileTab,
   type ProfileType as ConfigProfileType,
 } from '@/lib/profileTypeConfig';
+import type { GenderEnum } from '@/lib/link/dating-types';
 import {
   MusicShowcase,
   MusicVideos,
@@ -77,6 +78,7 @@ interface ProfileData {
     total_gifts_sent: number;
     created_at: string;
     profile_type?: ProfileType;
+    gender?: GenderEnum | null;
     enabled_modules?: string[] | null; // Optional modules only
     enabled_tabs?: string[] | null; // Optional tabs only
     // Customization
@@ -900,6 +902,7 @@ export default function ModernProfilePage() {
   
   const followBtnConfig = getFollowButtonConfig();
   const FollowIcon = followBtnConfig.icon;
+  const showGenderReminder = isOwnProfile && (profile.gender == null || profile.gender === '');
   
   return (
     <div className={`min-h-screen overflow-y-auto overflow-x-hidden ${fontClass}`}>
@@ -1160,6 +1163,29 @@ export default function ModernProfilePage() {
             </div>
           </div>
         </div>
+
+        {showGenderReminder && (
+          <div className="mb-4 sm:mb-6">
+            <div
+              className={`${borderRadiusClass} bg-white/95 dark:bg-gray-900/70 border border-purple-100 dark:border-purple-900/40 shadow-lg px-4 py-4 sm:px-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3`}
+            >
+              <div>
+                <p className="text-sm font-semibold text-purple-900 dark:text-purple-200">
+                  Tip: Add your gender to improve Dating matches.
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-300">
+                  Sharing your gender keeps Dating filters accurate, but it&apos;s still optional.
+                </p>
+              </div>
+              <Link
+                href="/settings/profile"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-purple-600 text-white font-semibold text-sm shadow hover:bg-purple-700 transition"
+              >
+                Edit Profile
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Top Friends Section - MySpace Style */}
         <TopFriendsDisplay

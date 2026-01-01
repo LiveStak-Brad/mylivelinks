@@ -157,6 +157,11 @@ export function UserMenu({
     navigateRoot('HelpFAQ');
   };
 
+  const handleSafetyPolicies = () => {
+    closeMenu();
+    navigateRoot('SafetyPolicies');
+  };
+
   const handleReportUser = () => {
     closeMenu();
     navigateRoot('ReportUser');
@@ -344,6 +349,14 @@ export function UserMenu({
               <MenuDivider styles={styles} />
 
               {/* Safety */}
+              <MenuItem
+                icon="document-text-outline"
+                iconColor="#3b82f6"
+                label="Safety & Policies"
+                onPress={handleSafetyPolicies}
+                styles={styles}
+              />
+
               <MenuItem
                 icon="warning-outline"
                 iconColor="#f472b6"

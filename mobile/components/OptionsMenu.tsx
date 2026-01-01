@@ -314,6 +314,14 @@ export function OptionsMenu({
               <SectionHeader title="Safety" styles={styles} />
               <MenuItem
                 styles={styles}
+                label="Safety & Policies"
+                onPress={() => {
+                  closeMenu();
+                  navigateRoot('SafetyPolicies');
+                }}
+              />
+              <MenuItem
+                styles={styles}
                 label="Report a User"
                 onPress={() => {
                   closeMenu();

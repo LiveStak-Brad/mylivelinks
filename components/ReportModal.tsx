@@ -14,33 +14,48 @@ interface ReportModalProps {
 
 const REPORT_REASONS = {
   user: [
-    { value: 'harassment', label: 'Harassment or Bullying' },
-    { value: 'inappropriate', label: 'Inappropriate Behavior' },
-    { value: 'spam', label: 'Spam or Scam' },
-    { value: 'underage', label: 'Underage User (Under 18)' },
+    { value: 'sexual_services', label: 'Sexual services / solicitation (prostitution, escorting, sugaring)' },
+    { value: 'grooming_exploitation', label: 'Grooming / exploitation' },
+    { value: 'minor_safety', label: 'Minor safety (under 18)' },
+    { value: 'fraud_scams', label: 'Fraud / scams' },
+    { value: 'harassment_hate', label: 'Harassment / hate' },
+    { value: 'spam', label: 'Spam' },
+    { value: 'inappropriate_content', label: 'Inappropriate content' },
     { value: 'impersonation', label: 'Impersonation' },
     { value: 'other', label: 'Other' },
   ],
   stream: [
-    { value: 'inappropriate_content', label: 'Inappropriate Content' },
-    { value: 'harassment', label: 'Harassment' },
+    { value: 'sexual_services', label: 'Sexual services / solicitation (prostitution, escorting, sugaring)' },
+    { value: 'grooming_exploitation', label: 'Grooming / exploitation' },
+    { value: 'minor_safety', label: 'Minor safety (under 18)' },
+    { value: 'fraud_scams', label: 'Fraud / scams' },
+    { value: 'harassment_hate', label: 'Harassment / hate' },
     { value: 'spam', label: 'Spam' },
-    { value: 'violence', label: 'Violence or Dangerous Behavior' },
+    { value: 'inappropriate_content', label: 'Inappropriate content' },
+    { value: 'violence_threats', label: 'Violence / threats' },
     { value: 'copyright', label: 'Copyright Violation' },
     { value: 'other', label: 'Other' },
   ],
   profile: [
-    { value: 'inappropriate_content', label: 'Inappropriate Content' },
+    { value: 'sexual_services', label: 'Sexual services / solicitation (prostitution, escorting, sugaring)' },
+    { value: 'grooming_exploitation', label: 'Grooming / exploitation' },
+    { value: 'minor_safety', label: 'Minor safety (under 18)' },
+    { value: 'fraud_scams', label: 'Fraud / scams' },
+    { value: 'harassment_hate', label: 'Harassment / hate' },
+    { value: 'spam', label: 'Spam' },
+    { value: 'inappropriate_content', label: 'Inappropriate content' },
     { value: 'impersonation', label: 'Impersonation' },
-    { value: 'spam', label: 'Spam Links' },
-    { value: 'underage', label: 'Underage User (Under 18)' },
     { value: 'other', label: 'Other' },
   ],
   chat: [
-    { value: 'harassment', label: 'Harassment or Hate Speech' },
+    { value: 'sexual_services', label: 'Sexual services / solicitation (prostitution, escorting, sugaring)' },
+    { value: 'grooming_exploitation', label: 'Grooming / exploitation' },
+    { value: 'minor_safety', label: 'Minor safety (under 18)' },
+    { value: 'fraud_scams', label: 'Fraud / scams' },
+    { value: 'harassment_hate', label: 'Harassment / hate' },
     { value: 'spam', label: 'Spam' },
-    { value: 'inappropriate', label: 'Inappropriate Content' },
-    { value: 'threats', label: 'Threats or Violence' },
+    { value: 'inappropriate_content', label: 'Inappropriate content' },
+    { value: 'violence_threats', label: 'Violence / threats' },
     { value: 'other', label: 'Other' },
   ],
 };
@@ -70,19 +85,26 @@ export default function ReportModal({
 
     setSubmitting(true);
     try {
+      const payload = {
+        report_type: reportType,
+        reported_user_id: reportedUserId,
+        report_reason: selectedReason,
+        report_details: details.trim() || null,
+        context_details: contextDetails || null,
+      };
+
+      console.log('[REPORT_MODAL] submit', {
+        ...payload,
+        reported_user_id: payload.reported_user_id ? '<redacted>' : null,
+      });
+
       const response = await fetch('/api/reports/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({
-          report_type: reportType,
-          reported_user_id: reportedUserId,
-          report_reason: selectedReason,
-          report_details: details.trim() || null,
-          context_details: contextDetails || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();

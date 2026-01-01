@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { PolicyFooter } from '@/components/PolicyFooter';
-import { POLICIES } from '@/shared/policies';
+import { WEB_POLICIES } from '@/lib/policies.web';
 
 export default function PoliciesIndexPage() {
   return (
@@ -14,7 +14,7 @@ export default function PoliciesIndexPage() {
           </p>
 
           <div className="mt-8 space-y-4">
-            {POLICIES.map((policy) => (
+            {WEB_POLICIES.map((policy) => (
               <Link
                 key={policy.id}
                 href={`/policies/${policy.id}`}
