@@ -687,11 +687,12 @@ export default function PublicFeedClient({
   }, []);
 
   const handleGiftSent = useCallback(() => {
-    if (giftTargetPost) {
-      // Refresh feed to show updated coin count
-      void loadFeed('replace');
-    }
-  }, [giftTargetPost, loadFeed]);
+    // Don't refresh entire feed - just close modal
+    // The gift count will update on next natural refresh
+    setGiftModalOpen(false);
+    setGiftTargetPost(null);
+    setGiftTargetComment(null);
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -1146,7 +1147,7 @@ export default function PublicFeedClient({
           recipientId={giftTargetComment.author.id}
           recipientUsername={giftTargetComment.author.username}
           commentId={giftTargetComment.id}
-          onGiftSent={() => void loadFeed('replace')}
+          onGiftSent={handleGiftSent}
           onClose={() => {
             setGiftModalOpen(false);
             setGiftTargetComment(null);
