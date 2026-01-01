@@ -3,7 +3,9 @@
  * Upload and manage photos for Link and Dating profiles
  */
 
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase';
+
+const supabase = createClient();
 
 const LINK_PHOTOS_BUCKET = 'link-photos';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB

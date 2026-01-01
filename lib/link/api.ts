@@ -3,7 +3,7 @@
  * Wrappers for Supabase Link/Dating RPCs
  */
 
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase';
 import type {
   LinkProfile,
   LinkSettings,
@@ -13,6 +13,8 @@ import type {
   LinkDecisionResult,
   DatingDecisionResult,
 } from './types';
+
+const supabase = createClient();
 
 // ============================================================================
 // LINK PROFILE API
