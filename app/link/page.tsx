@@ -9,7 +9,22 @@ export default function LinkLandingPage() {
   const [safetyModalOpen, setSafetyModalOpen] = useState(false);
   const [safetyModalMode, setSafetyModalMode] = useState<'link' | 'dating'>('link');
 
-  const modes = [
+  type LinkMode = {
+    id: string;
+    title: string;
+    subtitle: string;
+    description: string;
+    icon: JSX.Element;
+    gradient: string;
+    bgGradient: string;
+    borderColor: string;
+    startRoute: string;
+    profileRoute: string;
+    settingsRoute: string;
+    badge?: string;
+  };
+
+  const modes: LinkMode[] = [
     {
       id: 'regular',
       title: 'Link or Nah',
