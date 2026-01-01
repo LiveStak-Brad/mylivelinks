@@ -5,6 +5,23 @@ import { X, Minus, Send, MoreHorizontal, Phone, Video, Smile } from 'lucide-reac
 import Image from 'next/image';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 
+// Map gift names to emojis
+const getGiftEmoji = (name: string) => {
+  const emojiMap: { [key: string]: string } = {
+    'Poo': '💩', 'Rose': '🌹', 'Heart': '❤️', 'Star': '⭐', 'Diamond': '💎',
+    'Super Star': '🌟', 'Crown': '👑', 'Platinum': '💠', 'Legendary': '🏆',
+    'Fire': '🔥', 'Rocket': '🚀', 'Rainbow': '🌈', 'Unicorn': '🦄',
+    'Party': '🎉', 'Confetti': '🎊', 'Champagne': '🍾', 'Money': '💰',
+    'Cash': '💵', 'Gold': '🥇', 'Silver': '🥈', 'Bronze': '🥉',
+    'Kiss': '💋', 'Hug': '🤗', 'Love': '💕', 'Sparkle': '✨',
+    'Gem': '💎', 'Crystal': '🔮', 'Music': '🎵', 'Microphone': '🎤',
+    'Camera': '📸', 'Clap': '👏', 'Thumbs Up': '👍', 'Wave': '👋',
+    'Flex': '💪', 'Cool': '😎', 'Hot': '🥵', 'VIP': '🎯',
+    'King': '🤴', 'Queen': '👸', 'Angel': '😇', 'Devil': '😈',
+  };
+  return emojiMap[name] || '🎁';
+};
+
 export interface IMMessage {
   id: string;
   senderId: string;
@@ -304,7 +321,7 @@ export default function IMChatWindow({
                         {msg.giftIcon?.startsWith('http') || msg.giftIcon?.startsWith('/') ? (
                           <img src={msg.giftIcon} alt={msg.giftName || 'Gift'} className="w-8 h-8" />
                         ) : (
-                          msg.giftIcon || '🎁'
+                          msg.giftIcon || getGiftEmoji(msg.giftName || '')
                         )}
                       </span>
                       <div>

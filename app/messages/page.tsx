@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Search, Gift, Send } from 'lucide-react';
 import GiftPickerMini from '@/components/messages/GiftPickerMini';
 import { Input, EmptyState } from '@/components/ui';
@@ -69,10 +69,22 @@ function MessagesPageContent() {
     );
   });
 
+  // Prevent body scroll on mobile when messages page is active
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+      };
+    }
+  }, []);
+
   return (
     <main 
       id="main"
-      className="h-[calc(100dvh-4rem)] md:h-[calc(100vh-5rem)] bg-background overflow-hidden fixed inset-x-0 top-16 md:relative md:inset-auto md:top-auto"
+      className="h-[calc(100dvh-4rem-4rem)] md:h-[calc(100vh-5rem)] bg-background overflow-hidden fixed top-16 bottom-16 inset-x-0 md:relative md:inset-auto md:top-auto md:bottom-auto"
     >
       <div className="h-full grid grid-cols-1 md:grid-cols-[480px_1fr]">
         
@@ -168,10 +180,10 @@ function MessagesPageContent() {
         {/* Message Thread - Right Panel */}
         <div className={`
           ${activeConversation ? 'flex' : 'hidden md:flex'}
-          flex-col bg-background overflow-hidden
+          flex-col bg-background overflow-hidden h-full
         `}>
           {activeConversation ? (
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full min-h-0">
               {/* Thread Header */}
               <div className="flex items-center gap-3 p-4 border-b border-border bg-card">
                 <button
@@ -194,7 +206,7 @@ function MessagesPageContent() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
                 {messages.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
