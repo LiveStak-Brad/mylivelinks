@@ -34,8 +34,17 @@ export interface DatingPreferences {
 
 /**
  * Full dating profile prefs object (stored in dating_profiles.prefs jsonb)
+ * Includes optional UI metadata fields for convenience.
  */
-export interface DatingProfilePrefs extends DatingAboutYou, DatingPreferences {}
+export interface DatingProfilePrefs extends DatingAboutYou, DatingPreferences {
+  looking_for_text?: string;
+  looking_for?: string;
+  hobbies?: string[];
+  smoker_pref?: PreferenceEnum;
+  drinker_pref?: PreferenceEnum;
+  height_pref_min?: HeightEnum;
+  height_pref_max?: HeightEnum;
+}
 
 /**
  * Dating profile (complete object from database)

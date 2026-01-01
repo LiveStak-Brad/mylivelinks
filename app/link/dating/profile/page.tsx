@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import type { DatingProfile } from '@/lib/link/types';
+import type { DatingProfile, DatingProfilePrefs } from '@/lib/link/dating-types';
 import * as linkApi from '@/lib/link/api';
 import { uploadLinkPhoto } from '@/lib/link/storage';
 import { SafetyModal } from '@/components/link/SafetyModal';
@@ -15,6 +15,23 @@ const INTEREST_TAGS = [
 
 const DATING_GUIDELINES_KEY = 'mll_link_dating_guidelines_accepted';
 
+const INITIAL_PREFS: DatingProfilePrefs = {
+  show_me: 'everyone',
+  age_min: 18,
+  age_max: 99,
+  smoker_ok: 'doesnt_matter',
+  drinker_ok: 'doesnt_matter',
+  religion_pref: 'doesnt_matter',
+  height_pref: 'doesnt_matter',
+  build_pref: 'doesnt_matter',
+  interests_pref: 'doesnt_matter',
+};
+
+const mergePrefs = (prefs?: Partial<DatingProfilePrefs> | null): DatingProfilePrefs => ({
+  ...INITIAL_PREFS,
+  ...(prefs || {}),
+});
+
 export default function DatingProfileEditor() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,7 +40,7 @@ export default function DatingProfileEditor() {
     bio: '',
     location_text: '',
     photos: [],
-    prefs: {},
+    prefs: { ...INITIAL_PREFS },
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,7 +60,7 @@ export default function DatingProfileEditor() {
     try {
       const data = await linkApi.getMyDatingProfile();
       if (data) {
-        setProfile(data);
+        setProfile({ ...data, prefs: mergePrefs(data.prefs) });
       }
     } catch (err: any) {
       console.error('Failed to load dating profile:', err);
@@ -82,7 +99,7 @@ export default function DatingProfileEditor() {
         bio: profile.bio || undefined,
         location_text: profile.location_text || undefined,
         photos: profile.photos || [],
-        prefs: profile.prefs || {},
+        prefs: mergePrefs(profile.prefs as Partial<DatingProfilePrefs> | undefined),
       });
       
       await loadProfile();
@@ -123,11 +140,14 @@ export default function DatingProfileEditor() {
     setSafetyModalOpen(false);
   };
 
-  const updatePrefs = (key: string, value: any) => {
-    setProfile({
-      ...profile,
-      prefs: { ...(profile.prefs || {}), [key]: value },
-    });
+  const updatePrefs = (key: keyof DatingProfilePrefs, value: any) => {
+    setProfile((prev) => ({
+      ...prev,
+      prefs: {
+        ...mergePrefs(prev.prefs as Partial<DatingProfilePrefs> | undefined),
+        [key]: value,
+      },
+    }));
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
