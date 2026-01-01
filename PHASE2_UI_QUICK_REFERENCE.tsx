@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase';
-import { upsertDatingProfile } from '@/lib/link/api';
+import { upsertDatingProfile, getDatingCandidates } from '@/lib/link/api';
 import type { DatingCandidate } from '@/lib/link/dating-types';
 import { GenderEnum, genderToDisplay } from '@/lib/link/dating-types';
 
