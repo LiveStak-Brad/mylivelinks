@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation';
 import { DatingProfile } from '@/lib/link/api';
 import * as linkApi from '@/lib/link/api';
 import { uploadLinkPhoto } from '@/lib/link/storage';
+import { SafetyModal } from '@/components/link/SafetyModal';
 
 const INTEREST_TAGS = [
   'Music', 'Gaming', 'Fitness', 'Business', 'Art', 'Tech',
   'Travel', 'Food', 'Sports', 'Fashion', 'Photography', 'Reading',
   'Movies', 'Cooking', 'Dancing', 'Yoga', 'Hiking', 'Pets'
 ];
+
+const DATING_GUIDELINES_KEY = 'mll_link_dating_guidelines_accepted';
 
 export default function DatingProfileEditor() {
   const router = useRouter();
@@ -27,6 +30,8 @@ export default function DatingProfileEditor() {
   const [savedRecently, setSavedRecently] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean[]>([]);
+  const [safetyModalOpen, setSafetyModalOpen] = useState(false);
+  const [pendingEnable, setPendingEnable] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -54,6 +59,20 @@ export default function DatingProfileEditor() {
       return;
     }
 
+    // Check if trying to enable dating without accepting guidelines
+    if (profile.enabled) {
+      const hasAccepted = localStorage.getItem(DATING_GUIDELINES_KEY) === '1';
+      if (!hasAccepted) {
+        setPendingEnable(true);
+        setSafetyModalOpen(true);
+        return;
+      }
+    }
+
+    await saveDatingProfile();
+  };
+
+  const saveDatingProfile = async () => {
     setSaving(true);
     setError(null);
     setSavedRecently(false);
@@ -76,6 +95,32 @@ export default function DatingProfileEditor() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleToggleDating = (newValue: boolean) => {
+    if (newValue) {
+      // Trying to enable dating
+      const hasAccepted = localStorage.getItem(DATING_GUIDELINES_KEY) === '1';
+      if (!hasAccepted) {
+        setPendingEnable(true);
+        setSafetyModalOpen(true);
+        return;
+      }
+    }
+    setProfile({ ...profile, enabled: newValue });
+  };
+
+  const handleAcceptGuidelines = () => {
+    localStorage.setItem(DATING_GUIDELINES_KEY, '1');
+    setProfile({ ...profile, enabled: true });
+    setPendingEnable(false);
+    setSafetyModalOpen(false);
+  };
+
+  const handleDeclineGuidelines = () => {
+    setProfile({ ...profile, enabled: false });
+    setPendingEnable(false);
+    setSafetyModalOpen(false);
   };
 
   const updatePrefs = (key: string, value: any) => {
@@ -218,7 +263,7 @@ export default function DatingProfileEditor() {
               </p>
             </div>
             <button
-              onClick={() => setProfile({ ...profile, enabled: !profile.enabled })}
+              onClick={() => handleToggleDating(!profile.enabled)}
               className={`relative w-14 h-8 rounded-full transition-colors flex-shrink-0 ${
                 profile.enabled ? 'bg-gradient-to-r from-pink-600 to-rose-600' : 'bg-gray-300 dark:bg-gray-700'
               }`}
@@ -661,6 +706,22 @@ export default function DatingProfileEditor() {
           </div>
         </div>
       </div>
+
+      {/* Safety Modal */}
+      <SafetyModal
+        open={safetyModalOpen}
+        onClose={() => {
+          if (pendingEnable) {
+            handleDeclineGuidelines();
+          } else {
+            setSafetyModalOpen(false);
+          }
+        }}
+        mode="dating"
+        requireCheckbox={pendingEnable}
+        onAccept={pendingEnable ? handleAcceptGuidelines : undefined}
+        onDecline={pendingEnable ? handleDeclineGuidelines : undefined}
+      />
     </div>
   );
 }

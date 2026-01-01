@@ -1,9 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { SafetyModal } from '@/components/link/SafetyModal';
 
 export default function LinkLandingPage() {
   const router = useRouter();
+  const [safetyModalOpen, setSafetyModalOpen] = useState(false);
+  const [safetyModalMode, setSafetyModalMode] = useState<'link' | 'dating'>('link');
 
   const modes = [
     {
@@ -103,6 +107,23 @@ export default function LinkLandingPage() {
                 {mode.subtitle}
               </p>
 
+              {/* Add Safety link for Dating mode */}
+              {mode.id === 'dating' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSafetyModalMode('dating');
+                    setSafetyModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400 hover:text-pink-600 dark:hover:text-pink-400 transition-colors mb-3"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  Safety
+                </button>
+              )}
+
               <p className="text-gray-700 dark:text-gray-300 text-sm sm:text-base leading-relaxed mb-6 sm:mb-8 min-h-[2.5rem] sm:min-h-[3rem]">
                 {mode.description}
               </p>
@@ -135,7 +156,21 @@ export default function LinkLandingPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-2xl sm:rounded-3xl p-6 sm:p-8 border border-gray-200 dark:border-gray-800 shadow-lg">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">How It Works</h2>
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-2xl sm:text-3xl font-bold">How It Works</h2>
+            <button
+              onClick={() => {
+                setSafetyModalMode('link');
+                setSafetyModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors font-medium"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Safety
+            </button>
+          </div>
           
           <div className="grid sm:grid-cols-3 gap-4 sm:gap-6">
             <div className="text-center">
@@ -164,6 +199,13 @@ export default function LinkLandingPage() {
           </div>
         </div>
       </div>
+
+      {/* Safety Modal */}
+      <SafetyModal
+        open={safetyModalOpen}
+        onClose={() => setSafetyModalOpen(false)}
+        mode={safetyModalMode}
+      />
     </div>
   );
 }
