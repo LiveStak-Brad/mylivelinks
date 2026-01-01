@@ -136,7 +136,6 @@ function ActionButton({
   onClick,
   variant = 'default',
   buttonRef,
-  onMouseDown,
   onKeyDown,
   reactionEmoji,
 }: {
@@ -146,8 +145,7 @@ function ActionButton({
   isActive?: boolean;
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
   variant?: 'default' | 'gift' | 'coins';
-  buttonRef?: React.RefObject<HTMLButtonElement>;
-  onMouseDown?: React.MouseEventHandler<HTMLButtonElement>;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
   onKeyDown?: React.KeyboardEventHandler<HTMLButtonElement>;
   reactionEmoji?: string | null;
 }) {
@@ -168,7 +166,6 @@ function ActionButton({
     <button
       ref={buttonRef}
       onClick={onClick}
-      onMouseDown={onMouseDown}
       onKeyDown={onKeyDown}
       className={`
         flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg
@@ -219,7 +216,7 @@ const FeedPostCard = memo(function FeedPostCard({
 }: FeedPostCardProps) {
   const formattedTimestamp = formatTimestamp(timestamp);
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
-  const likeButtonRef = useRef<HTMLButtonElement>(null);
+  const likeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const activeReaction = useMemo(
     () => (userReaction ? REACTIONS.find((reaction) => reaction.type === userReaction) ?? null : null),
@@ -260,120 +257,123 @@ const FeedPostCard = memo(function FeedPostCard({
   );
 
   return (
-    <Card className={`overflow-hidden hover:shadow-md transition-shadow ${className}`} style={style}>
-      {/* Header - Instagram/Facebook Style */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div 
-          className="flex-shrink-0"
-          onClick={onProfileClick}
-          role={onProfileClick ? 'button' : undefined}
-          tabIndex={onProfileClick ? 0 : undefined}
-        >
-          <DefaultAvatar name={authorName} avatarUrl={authorAvatarUrl} isLive={authorIsLive} username={authorUsername} />
-        </div>
-        
-        <div className="flex-1 min-w-0 leading-tight">
+    <>
+      <Card className={`overflow-hidden hover:shadow-md transition-shadow ${className}`} style={style}>
+        {/* Header - Instagram/Facebook Style */}
+        <div className="flex items-center gap-3 px-4 py-3">
           <div 
-            className={`font-semibold text-[15px] text-foreground truncate ${onProfileClick ? 'cursor-pointer hover:underline' : ''}`}
+            className="flex-shrink-0"
             onClick={onProfileClick}
             role={onProfileClick ? 'button' : undefined}
             tabIndex={onProfileClick ? 0 : undefined}
           >
-            {authorName}
+            <DefaultAvatar name={authorName} avatarUrl={authorAvatarUrl} isLive={authorIsLive} username={authorUsername} />
           </div>
-          <time className="text-[13px] text-muted-foreground">{formattedTimestamp}</time>
+          
+          <div className="flex-1 min-w-0 leading-tight">
+            <div 
+              className={`font-semibold text-[15px] text-foreground truncate ${onProfileClick ? 'cursor-pointer hover:underline' : ''}`}
+              onClick={onProfileClick}
+              role={onProfileClick ? 'button' : undefined}
+              tabIndex={onProfileClick ? 0 : undefined}
+            >
+              {authorName}
+            </div>
+            <time className="text-[13px] text-muted-foreground">{formattedTimestamp}</time>
+          </div>
+          
+          {typeof onMore === 'function' ? (
+            <button
+              onClick={onMore}
+              className="flex-shrink-0 p-2 -mr-2 rounded-full hover:bg-muted/60 transition-colors"
+              aria-label="More options"
+            >
+              <MoreHorizontal className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
         
-        {typeof onMore === 'function' ? (
-          <button
-            onClick={onMore}
-            className="flex-shrink-0 p-2 -mr-2 rounded-full hover:bg-muted/60 transition-colors"
-            aria-label="More options"
-          >
-            <MoreHorizontal className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
-          </button>
-        ) : null}
-      </div>
-      
-      {/* Content - Larger Font Like Facebook/Instagram */}
-      {content && (
-        <div className="px-4 pb-3">
-          <div className="text-[15px] leading-[1.5] text-foreground whitespace-pre-wrap">
-            <SafeRichText text={content} className="whitespace-pre-wrap" showLinkPreview={true} />
+        {/* Content - Larger Font Like Facebook/Instagram */}
+        {content && (
+          <div className="px-4 pb-3">
+            <div className="text-[15px] leading-[1.5] text-foreground whitespace-pre-wrap">
+              <SafeRichText text={content} className="whitespace-pre-wrap" showLinkPreview={true} />
+            </div>
           </div>
-        </div>
-      )}
-      
-      {/* Media - Full Width No Padding */}
-      {media && (
-        <div className="relative w-full">
-          {media}
-        </div>
-      )}
-      
-      {/* Actions - Clean Facebook/Instagram Style */}
-      {isClipCompletion ? (
-        // Clip Completion Actions
-        <div className="px-4 py-3 border-t border-border">
-          <ClipActions
-            clipId={clipId}
-            onAction={onClipAction}
-            variant="horizontal"
-            compact={false}
-          />
-        </div>
-      ) : (
-        // Standard Post Actions
-        <div className="border-t border-border">
-          <div className="flex items-center px-2 py-1">
-            <ActionButton
-              icon={Heart}
-              label="Like"
-              count={likesCount}
-              onClick={handleLikeButtonClick}
-              onMouseDown={handleLikeButtonClick}
-              onKeyDown={handleLikeKeyDown}
-              isActive={isLiked || !!userReaction}
-              buttonRef={likeButtonRef}
-              reactionEmoji={activeReaction?.emoji ?? null}
-            />
-            <ActionButton
-              icon={MessageCircle}
-              label="Comment"
-              onClick={onComment}
-            />
-            <ActionButton
-              icon={Gift}
-              label="Gift"
-              onClick={onGift}
-              variant="gift"
-            />
-            {coinCount > 0 && (
-              <ActionButton
-                icon={Coins}
-                label="Coins"
-                count={coinCount}
-                variant="coins"
-              />
-            )}
+        )}
+        
+        {/* Media - Full Width No Padding */}
+        {media && (
+          <div className="relative w-full">
+            {media}
           </div>
-        </div>
-        {postId ? (
-          <div className="border-t border-border">
-            <PostReactions postId={postId} totalCount={likesCount ?? 0} />
+        )}
+        
+        {/* Actions - Clean Facebook/Instagram Style */}
+        {isClipCompletion ? (
+          // Clip Completion Actions
+          <div className="px-4 py-3 border-t border-border">
+            <ClipActions
+              clipId={clipId}
+              onAction={onClipAction}
+              variant="horizontal"
+              compact={false}
+            />
           </div>
-        ) : null}
-      )}
-    </Card>
+        ) : (
+          // Standard Post Actions
+          <>
+            <div className="border-t border-border">
+              <div className="flex items-center px-2 py-1">
+                <ActionButton
+                  icon={Heart}
+                  label="Like"
+                  count={likesCount}
+                  onClick={handleLikeButtonClick}
+                  onKeyDown={handleLikeKeyDown}
+                  isActive={isLiked || !!userReaction}
+                  buttonRef={likeButtonRef}
+                  reactionEmoji={activeReaction?.emoji ?? null}
+                />
+                <ActionButton
+                  icon={MessageCircle}
+                  label="Comment"
+                  onClick={onComment}
+                />
+                <ActionButton
+                  icon={Gift}
+                  label="Gift"
+                  onClick={onGift}
+                  variant="gift"
+                />
+                {coinCount > 0 && (
+                  <ActionButton
+                    icon={Coins}
+                    label="Coins"
+                    count={coinCount}
+                    variant="coins"
+                  />
+                )}
+              </div>
+            </div>
+            {postId ? (
+              <div className="border-t border-border">
+                <PostReactions postId={postId} totalCount={likesCount ?? 0} />
+              </div>
+            ) : null}
+          </>
+        )}
+      </Card>
 
-    {pickerAnchor ? (
-      <ReactionPicker
-        anchorRect={pickerAnchor}
-        selectedReaction={userReaction}
-        onSelect={handleReactionSelect}
-        onClose={closeReactionPicker}
-      />
-    ) : null}
+      {pickerAnchor !== null ? (
+        <ReactionPicker
+          anchorRect={pickerAnchor}
+          selectedReaction={userReaction}
+          onSelect={handleReactionSelect}
+          onClose={closeReactionPicker}
+        />
+      ) : null}
+    </>
   );
 });
 
