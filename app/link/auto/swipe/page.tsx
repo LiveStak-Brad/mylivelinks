@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LinkProfile, LinkDecisionResult } from '@/lib/link/api';
+import type { LinkProfile, LinkDecisionResult } from '@/lib/link/types';
 import * as linkApi from '@/lib/link/api';
 import { SwipeCard } from '@/components/link/SwipeCard';
 import { ProfileInfoModal } from '@/components/link/ProfileInfoModal';
