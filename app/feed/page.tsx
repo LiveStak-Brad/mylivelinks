@@ -2,6 +2,7 @@
 
 import { Rss } from 'lucide-react';
 import PublicFeedClient from '@/components/feed/PublicFeedClient';
+import { LinkOrNahPromoCard } from '@/components/link/LinkOrNahPromoCard';
 
 /* =============================================================================
    PUBLIC FEED PAGE
@@ -42,6 +43,10 @@ export default function FeedPage() {
             Discover posts from the community
           </p>
         </header>
+
+        <div className="animate-slide-up" style={{ animationDelay: '25ms' }}>
+          <LinkOrNahPromoCard />
+        </div>
 
         <div className="animate-slide-up" style={{ animationDelay: '50ms' }}>
           <PublicFeedClient />

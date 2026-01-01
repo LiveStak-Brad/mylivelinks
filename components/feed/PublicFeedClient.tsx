@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase';
 import { uploadPostMedia } from '@/lib/storage';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
 import { usePostLike } from '@/hooks/useFeedLikes';
+import { LinkOrNahPromoCard, type LinkOrNahPromoCardProps } from '@/components/link/LinkOrNahPromoCard';
 
 type FeedAuthor = {
   id: string;
@@ -51,10 +52,16 @@ type FeedResponse = {
   limit: number;
 };
 
+type InlineLinkPromoConfig = {
+  enabled?: boolean;
+  props?: LinkOrNahPromoCardProps;
+};
+
 type PublicFeedClientProps = {
   username?: string;
   cardStyle?: React.CSSProperties;
   borderRadiusClass?: string;
+  linkPromoConfig?: InlineLinkPromoConfig;
 };
 
 function formatDateTime(value: string) {
@@ -67,7 +74,12 @@ function formatDateTime(value: string) {
   }
 }
 
-export default function PublicFeedClient({ username, cardStyle, borderRadiusClass = 'rounded-xl' }: PublicFeedClientProps) {
+export default function PublicFeedClient({
+  username,
+  cardStyle,
+  borderRadiusClass = 'rounded-xl',
+  linkPromoConfig,
+}: PublicFeedClientProps) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [nextCursor, setNextCursor] = useState<FeedResponse['nextCursor']>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -786,6 +798,10 @@ export default function PublicFeedClient({ username, cardStyle, borderRadiusClas
           )}
         </div>
       </Card>
+
+      {linkPromoConfig?.enabled && (
+        <LinkOrNahPromoCard {...((linkPromoConfig.props ?? {}) as LinkOrNahPromoCardProps)} />
+      )}
 
       {posts.length === 0 && !isLoading ? (
         <Card className={`p-6 backdrop-blur-sm ${borderRadiusClass}`} style={cardStyle}>

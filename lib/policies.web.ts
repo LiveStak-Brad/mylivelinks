@@ -21,6 +21,8 @@ export interface WebPolicy {
   title: string;
   effectiveDate: string;
   lastUpdated: string;
+  legalEntity: string;
+  contactEmail: string;
   meta: string;
   summary?: string;
   sections: WebPolicySection[];
@@ -31,12 +33,31 @@ const LAST_UPDATED = 'January 1, 2026';
 const LEGAL_ENTITY = 'MyLiveLinks LLC';
 const CONTACT_EMAIL = 'brad@mylivelinks.com';
 
+export const WEB_REQUIRED_POLICY_IDS: ReadonlyArray<WebPolicyId> = [
+  'terms-of-service',
+  'privacy-policy',
+  'community-guidelines',
+  'payments-virtual-currency',
+  'fraud-chargeback',
+  'creator-earnings-payout',
+  'dispute-arbitration',
+  'account-enforcement-termination',
+];
+
+export const WEB_RECOMMENDED_POLICY_IDS: ReadonlyArray<WebPolicyId> = [
+  'aml-summary',
+  'law-enforcement-cooperation',
+  'transparency-enforcement-overview',
+];
+
 export const WEB_POLICIES: WebPolicy[] = [
   {
     id: 'terms-of-service',
     title: 'Terms of Service (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'Rules for using MyLiveLinks, including user responsibilities and prohibited conduct.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nLegal Entity: ${LEGAL_ENTITY} (United States)\nContact: ${CONTACT_EMAIL}\nBusiness Description: Social networking and live content platform for user discovery, connections, and digital engagement.`,
     sections: [
@@ -107,6 +128,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: 'Privacy Policy (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'How we collect, use, share, and protect information.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nLegal Entity: ${LEGAL_ENTITY} (United States)\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -166,6 +189,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: 'Community Guidelines (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'Standards for safe and respectful use of MyLiveLinks.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -225,6 +250,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: 'Payments & Virtual Currency Policy (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'Payments and virtual currency rules, including final-sale policy and teen payment restrictions.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -265,6 +292,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: 'Fraud & Chargeback Policy (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'Strict rules for fraud, disputes, reversals, and related enforcement consequences.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -305,6 +334,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: 'Creator Earnings & Payout Policy (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'Creator payout eligibility, holds, and enforcement related to fraud and disputes.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -344,6 +375,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: 'Dispute Resolution & Arbitration (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'Dispute resolution requirements, including binding arbitration and class action waiver.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nGoverning Law: Missouri, USA\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -384,6 +417,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: 'Account Enforcement & Termination Policy (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'How we enforce rules and terminate accounts; includes strict no-appeals posture and teen-linked enforcement.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -419,6 +454,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: '(Recommended) Anti-Money Laundering (AML) Summary (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'Summary of AML-oriented risk controls for monetization features.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -434,6 +471,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: '(Recommended) Law Enforcement Cooperation Statement (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'How we respond to lawful requests and preserve records.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -449,6 +488,8 @@ export const WEB_POLICIES: WebPolicy[] = [
     title: '(Recommended) Transparency & Enforcement Overview (MyLiveLinks)',
     effectiveDate: EFFECTIVE_DATE,
     lastUpdated: LAST_UPDATED,
+    legalEntity: LEGAL_ENTITY,
+    contactEmail: CONTACT_EMAIL,
     summary: 'High-level overview of enforcement and reporting posture.',
     meta: `Effective Date: ${EFFECTIVE_DATE}\nLast Updated: ${LAST_UPDATED}\nContact: ${CONTACT_EMAIL}`,
     sections: [
@@ -465,11 +506,13 @@ export function getWebPolicyById(id: string): WebPolicy | null {
   return WEB_POLICIES.find((p) => p.id === id) ?? null;
 }
 
-export const WEB_POLICY_FOOTER_LINKS: ReadonlyArray<WebPolicyId> = [
+export const WEB_REQUIRED_FOOTER_POLICY_IDS: ReadonlyArray<WebPolicyId> = [
   'terms-of-service',
   'privacy-policy',
   'community-guidelines',
   'payments-virtual-currency',
   'fraud-chargeback',
   'creator-earnings-payout',
+  'dispute-arbitration',
+  'account-enforcement-termination',
 ];

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { isBlockedBidirectional } from '@/lib/blocks';
 
 function isString(v: unknown): v is string {
   return typeof v === 'string';
@@ -33,6 +34,28 @@ export async function POST(request: NextRequest) {
     const otherProfileId = isString(body?.otherProfileId) ? body.otherProfileId : null;
     let conversationId = isString(body?.conversationId) ? body.conversationId : null;
 
+    if (otherProfileId && (await isBlockedBidirectional(supabase as any, user.id, otherProfileId))) {
+      return NextResponse.json({ error: 'Messaging unavailable.' }, { status: 403 });
+    }
+
+    if (conversationId && !otherProfileId) {
+      const { data: participants, error: participantsError } = await supabase
+        .from('conversation_participants')
+        .select('profile_id')
+        .eq('conversation_id', conversationId)
+        .neq('profile_id', user.id)
+        .limit(1);
+
+      if (participantsError) {
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+
+      const peerId = (participants ?? [])[0]?.profile_id ?? null;
+      if (peerId && (await isBlockedBidirectional(supabase as any, user.id, peerId))) {
+        return NextResponse.json({ error: 'Messaging unavailable.' }, { status: 403 });
+      }
+    }
+
     if (!conversationId) {
       if (!otherProfileId) {
         return NextResponse.json({ error: 'conversationId or otherProfileId is required' }, { status: 400 });
@@ -43,6 +66,9 @@ export async function POST(request: NextRequest) {
       });
 
       if (error) {
+        if ((error as any)?.message === 'blocked') {
+          return NextResponse.json({ error: 'Messaging unavailable.' }, { status: 403 });
+        }
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
 

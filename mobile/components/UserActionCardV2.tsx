@@ -361,7 +361,7 @@ export const UserActionCardV2: React.FC<UserActionCardV2Props> = ({
 
     Alert.alert(
       'Block User',
-      `Block ${username}? They won't be able to see your content.`,
+      `Block ${username}? Messaging and gifting between you will be disabled.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

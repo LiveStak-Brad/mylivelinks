@@ -105,6 +105,21 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
         setCurrentUserId(userId);
       }
 
+      const blockedPeerIds = new Set<string>();
+      try {
+        const { data: blockRows } = await supabase
+          .from('blocks')
+          .select('blocker_id, blocked_id')
+          .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`);
+
+        (blockRows ?? []).forEach((r: any) => {
+          const other = r.blocker_id === userId ? r.blocked_id : r.blocker_id;
+          if (typeof other === 'string') blockedPeerIds.add(other);
+        });
+      } catch {
+        // ignore
+      }
+
       // Get viewers from room_presence (global room presence, NOT tile watching)
       // This shows everyone currently on /live page, regardless of what tiles they're watching
       const { data: presenceData, error } = await supabase
@@ -116,7 +131,9 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
 
       if (error) throw error;
 
-      const profileIds = [...new Set((presenceData || []).map((item: any) => item.profile_id))];
+      const filteredPresence = (presenceData || []).filter((p: any) => !blockedPeerIds.has(p.profile_id));
+
+      const profileIds = [...new Set(filteredPresence.map((item: any) => item.profile_id))];
       
       // Get profile info (avatar) and live stream info
       const { data: profiles } = await supabase
@@ -147,6 +164,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       // Build viewers list from room_presence
       const viewersWithBadges = await Promise.all(
         (presenceData || []).map(async (presence: any) => {
+          if (blockedPeerIds.has(presence.profile_id)) return null;
           const profile = profileMap.get(presence.profile_id) as { id: string; username: string; avatar_url?: string } | undefined;
           if (!profile) return null;
 

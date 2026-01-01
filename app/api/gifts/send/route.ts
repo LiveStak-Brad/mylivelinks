@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthedRouteHandlerClient } from '@/lib/admin';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { isBlockedBidirectional } from '@/lib/blocks';
 
 /**
  * POST /api/gifts/send
@@ -62,6 +63,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (await isBlockedBidirectional(supabase as any, user.id, toUserId)) {
+      return NextResponse.json({ error: 'Gifting unavailable.' }, { status: 403 });
+    }
+
     // Use admin client for RPC call
     const adminSupabase = getSupabaseAdmin();
 
@@ -84,6 +89,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (rpcError) {
+      if ((rpcError as any)?.message === 'blocked') {
+        return NextResponse.json({ error: 'Gifting unavailable.' }, { status: 403 });
+      }
       console.error('[GIFT] RPC error', {
         requestId,
         error: rpcError.message,

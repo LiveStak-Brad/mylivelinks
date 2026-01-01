@@ -315,7 +315,7 @@ export default function UserActionCardV2({
   const handleBlock = async () => {
     if (!currentUserId || currentUserId === profileId) return;
 
-    const confirmed = confirm(`Block ${username}? They won't be able to see your content.`);
+    const confirmed = confirm(`Block ${username}? Messaging and gifting between you will be disabled.`);
     if (!confirmed) return;
 
     setIsBlocking(true);

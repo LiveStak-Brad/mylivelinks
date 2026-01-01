@@ -1,5 +1,6 @@
 import { createAuthedRouteHandlerClient } from '@/lib/admin';
 import { NextRequest, NextResponse } from 'next/server';
+import { isBlockedBidirectional } from '@/lib/blocks';
 
  function normalizeUsername(input: string) {
    let username = input ?? '';
@@ -31,6 +32,23 @@ export async function GET(
 
     const { data: { user } } = await supabase.auth.getUser();
     const viewerId = user?.id || null;
+
+    if (viewerId) {
+      const { data: targetProfile, error: targetError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .maybeSingle();
+
+      if (targetError) {
+        return NextResponse.json({ error: 'Failed to fetch profile bundle' }, { status: 500 });
+      }
+
+      const targetId = (targetProfile as any)?.id ?? null;
+      if (targetId && (await isBlockedBidirectional(supabase as any, viewerId, targetId))) {
+        return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+      }
+    }
 
     const userAgent = request.headers.get('user-agent') || '';
     const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);

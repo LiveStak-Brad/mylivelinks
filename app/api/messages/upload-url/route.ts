@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthedRouteHandlerClient } from '@/lib/admin';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { isBlockedBidirectional } from '@/lib/blocks';
 
 function extFromMime(mime: string) {
   const m = mime.toLowerCase();
@@ -45,9 +46,31 @@ export async function POST(request: NextRequest) {
     const otherProfileId = typeof body?.otherProfileId === 'string' ? body.otherProfileId : null;
     let conversationId = typeof body?.conversationId === 'string' ? body.conversationId : null;
 
+    if (conversationId && !otherProfileId) {
+      const { data: participants, error: participantsError } = await supabase
+        .from('conversation_participants')
+        .select('profile_id')
+        .eq('conversation_id', conversationId)
+        .neq('profile_id', user.id)
+        .limit(1);
+
+      if (participantsError) {
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+      }
+
+      const peerId = (participants ?? [])[0]?.profile_id ?? null;
+      if (peerId && (await isBlockedBidirectional(supabase as any, user.id, peerId))) {
+        return NextResponse.json({ error: 'Messaging unavailable.' }, { status: 403 });
+      }
+    }
+
     if (!conversationId) {
       if (!otherProfileId) {
         return NextResponse.json({ error: 'conversationId or otherProfileId is required' }, { status: 400 });
+      }
+
+      if (await isBlockedBidirectional(supabase as any, user.id, otherProfileId)) {
+        return NextResponse.json({ error: 'Messaging unavailable.' }, { status: 403 });
       }
 
       const { data, error } = await supabase.rpc('get_or_create_dm_conversation', {
@@ -55,6 +78,9 @@ export async function POST(request: NextRequest) {
       });
 
       if (error) {
+        if ((error as any)?.message === 'blocked') {
+          return NextResponse.json({ error: 'Messaging unavailable.' }, { status: 403 });
+        }
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
 

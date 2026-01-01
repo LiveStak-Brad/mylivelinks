@@ -222,7 +222,7 @@ export default function BlockedUsersModal({ isOpen, onClose }: BlockedUsersModal
             <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
               <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
               <p>
-                Blocked users cannot see your streams, and you won't see their streams or chat messages.
+                Blocking prevents direct messages and gifting between you and blocked users.
               </p>
             </div>
           </div>

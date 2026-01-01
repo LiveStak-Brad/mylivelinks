@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 
-import { getWebPolicyById, WEB_POLICY_FOOTER_LINKS, type WebPolicyId } from '@/lib/policies.web';
+import { getWebPolicyById, WEB_REQUIRED_FOOTER_POLICY_IDS, type WebPolicyId } from '@/lib/policies.web';
 
 export function PolicyFooter() {
-  const footerPolicies = WEB_POLICY_FOOTER_LINKS
+  const footerPolicies = WEB_REQUIRED_FOOTER_POLICY_IDS
     .map((id: WebPolicyId) => {
       const policy = getWebPolicyById(id);
       if (!policy) return null;
@@ -17,10 +17,12 @@ export function PolicyFooter() {
       if (policy.id === 'payments-virtual-currency') label = 'Payments & Virtual Currency Policy';
       if (policy.id === 'fraud-chargeback') label = 'Fraud & Chargeback Policy';
       if (policy.id === 'creator-earnings-payout') label = 'Creator Earnings & Payout Policy';
+      if (policy.id === 'dispute-arbitration') label = 'Dispute Resolution & Arbitration';
+      if (policy.id === 'account-enforcement-termination') label = 'Account Enforcement & Termination Policy';
 
       return { id: policy.id, label };
     })
-    .filter((p): p is { id: WebPolicyId; label: string } => p !== null);
+    .filter((p: { id: WebPolicyId; label: string } | null): p is { id: WebPolicyId; label: string } => p !== null);
 
   return (
     <footer className="w-full border-t border-border bg-background">
@@ -29,7 +31,7 @@ export function PolicyFooter() {
           <Link href="/policies" className="hover:text-foreground">
             Safety &amp; Policies
           </Link>
-          {footerPolicies.map((policy) => (
+          {footerPolicies.map((policy: { id: WebPolicyId; label: string }) => (
             <Link key={policy.id} href={`/policies/${policy.id}`} className="hover:text-foreground">
               {policy.label}
             </Link>

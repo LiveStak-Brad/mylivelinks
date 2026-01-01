@@ -40,7 +40,7 @@ export function SafetyPoliciesScreen({ navigation }: Props) {
       }
     >
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.subtitle}>Read our policies any time. No login required.</Text>
+        <Text style={styles.subtitle}>Review our Terms, Privacy, and Community Guidelines.</Text>
 
         <View style={styles.list}>
           {POLICY_LINKS.map((policy) => (
@@ -49,12 +49,18 @@ export function SafetyPoliciesScreen({ navigation }: Props) {
               onPress={() => openUrl(policy.path)}
               style={styles.item}
             >
-              <Text style={styles.itemTitle}>{policy.title}</Text>
+              <View style={styles.itemRow}>
+                <Text style={styles.itemTitle}>{policy.title}</Text>
+                <Text style={styles.chevron} accessibilityLabel="Open">›</Text>
+              </View>
             </Pressable>
           ))}
 
-          <Pressable onPress={() => openUrl('/policies')} style={styles.item}>
-            <Text style={styles.itemTitle}>All Policies</Text>
+          <Pressable onPress={() => openUrl('/policies')} style={[styles.item, styles.itemSecondary]}>
+            <View style={styles.itemRow}>
+              <Text style={[styles.itemTitle, styles.itemTitleSecondary]}>All Policies</Text>
+              <Text style={[styles.chevron, styles.chevronSecondary]} accessibilityLabel="Open">›</Text>
+            </View>
           </Pressable>
         </View>
 
@@ -96,13 +102,40 @@ function createStyles(theme: ThemeDefinition) {
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.card,
       borderRadius: 14,
-      padding: 14,
-      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+      minHeight: 56,
+      justifyContent: 'center',
+    },
+    itemSecondary: {
+      backgroundColor: theme.colors.cardAlt,
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
     },
     itemTitle: {
       color: theme.colors.text,
       fontSize: 16,
       fontWeight: '900',
+      flex: 1,
+    },
+    itemTitleSecondary: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: '800',
+    },
+    chevron: {
+      color: theme.colors.mutedText,
+      fontSize: 22,
+      fontWeight: '900',
+      marginTop: -1,
+    },
+    chevronSecondary: {
+      color: theme.colors.mutedText,
+      opacity: 0.9,
     },
     itemSummary: {
       color: theme.colors.mutedText,

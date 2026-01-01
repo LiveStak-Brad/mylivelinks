@@ -355,7 +355,8 @@ export default function ProfileSettingsPage() {
           display_name: displayName,
           bio: bio,
           avatar_url: avatarUrl, // Will be updated if avatar changed
-          gender: gender || null,
+          // TODO(profile-logic): include gender once profiles.gender is available in Supabase
+          // gender: gender || null,
           // Enabled modules (optional modules only)
           enabled_modules: Array.isArray(enabledModules) ? enabledModules : null,
           // Enabled tabs (optional tabs only)

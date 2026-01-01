@@ -15,7 +15,8 @@ import {
   ChevronDown,
   ExternalLink,
   Film,
-  Sparkles
+  Sparkles,
+  Shield
 } from 'lucide-react';
 import LiveAvatar from './LiveAvatar';
 import ThemeToggle from './ThemeToggle';
@@ -322,6 +323,40 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
               iconColor="text-pink-500"
               label="Composer"
             />
+
+            <MenuDivider />
+
+            <MenuItem
+              href="/policies"
+              onClick={closeMenu}
+              icon={Shield}
+              iconColor="text-emerald-500"
+              label="Safety & Policies"
+            />
+
+            <div className="mt-1 ml-7 space-y-1">
+              <Link
+                href="/policies/community-guidelines"
+                className="block px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition"
+                onClick={closeMenu}
+              >
+                Community Guidelines
+              </Link>
+              <Link
+                href="/policies/terms-of-service"
+                className="block px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition"
+                onClick={closeMenu}
+              >
+                Terms of Service
+              </Link>
+              <Link
+                href="/policies/privacy-policy"
+                className="block px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition"
+                onClick={closeMenu}
+              >
+                Privacy Policy
+              </Link>
+            </div>
             
             <MenuDivider />
             

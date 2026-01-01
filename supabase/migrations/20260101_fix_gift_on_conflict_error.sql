@@ -38,6 +38,10 @@ DECLARE
   v_gift_rate NUMERIC;
   v_diamonds_awarded BIGINT;
 BEGIN
+  IF public.is_blocked(p_sender_id, p_recipient_id) THEN
+    RAISE EXCEPTION 'blocked';
+  END IF;
+
   v_request_id := COALESCE(p_request_id, gen_random_uuid()::text);
   v_sender_idempotency_key := 'gift:sender:' || v_request_id;
   v_recipient_idempotency_key := 'gift:recipient:' || v_request_id;

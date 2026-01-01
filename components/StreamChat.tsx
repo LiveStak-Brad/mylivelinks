@@ -8,6 +8,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
+import { isBlockedBidirectional } from '@/lib/blocks';
 import ReportModal from '@/components/ReportModal';
 
 interface ChatMessage {
@@ -42,6 +43,9 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [blockedPeerIds, setBlockedPeerIds] = useState<Set<string>>(new Set());
+  const blockedPeerIdsRef = useRef<Set<string>>(new Set());
+  const [blockedWithStreamOwner, setBlockedWithStreamOwner] = useState(false);
   const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatus>>({});
   const [currentUserProfile, setCurrentUserProfile] = useState<{
     username: string;
@@ -149,6 +153,55 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
     });
   }, [supabase]);
 
+  useEffect(() => {
+    if (!currentUserId) {
+      const empty = new Set<string>();
+      blockedPeerIdsRef.current = empty;
+      setBlockedPeerIds(empty);
+      setBlockedWithStreamOwner(false);
+      return;
+    }
+
+    const loadBlocks = async () => {
+      try {
+        const { data: rows } = await supabase
+          .from('blocks')
+          .select('blocker_id, blocked_id')
+          .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+
+        const next = new Set<string>();
+        (rows ?? []).forEach((r: any) => {
+          const other = r.blocker_id === currentUserId ? r.blocked_id : r.blocker_id;
+          if (typeof other === 'string') next.add(other);
+        });
+        blockedPeerIdsRef.current = next;
+        setBlockedPeerIds(next);
+      } catch {
+        // ignore
+      }
+
+      try {
+        const { data: stream } = await supabase
+          .from('live_streams')
+          .select('profile_id')
+          .eq('id', liveStreamId)
+          .maybeSingle();
+
+        const ownerId = (stream as any)?.profile_id ?? null;
+        if (ownerId && typeof ownerId === 'string') {
+          const blocked = await isBlockedBidirectional(supabase as any, currentUserId, ownerId);
+          setBlockedWithStreamOwner(blocked);
+        } else {
+          setBlockedWithStreamOwner(false);
+        }
+      } catch {
+        setBlockedWithStreamOwner(false);
+      }
+    };
+
+    void loadBlocks();
+  }, [currentUserId, liveStreamId, supabase]);
+
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
@@ -223,7 +276,10 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         chatSettingsMap,
       });
 
-      const messagesWithBadges = (data || []).map((msg: any) => {
+      const messagesWithBadges: Array<ChatMessage | null> = (data || []).map((msg: any) => {
+        if (msg?.profile_id && blockedPeerIdsRef.current.has(msg.profile_id)) {
+          return null;
+        }
         const profile = msg.profiles;
         const chatSettings = chatSettingsMap[msg.profile_id];
         
@@ -236,7 +292,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           FINAL_font: chatSettings?.chat_font,
         });
         
-        return {
+        const mapped: ChatMessage = {
           id: msg.id,
           profile_id: msg.profile_id,
           username: profile?.username || 'Unknown',
@@ -247,23 +303,18 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           chat_bubble_color: chatSettings?.chat_bubble_color,
           chat_font: chatSettings?.chat_font,
         };
+
+        return mapped;
       });
 
-      const ordered = [...messagesWithBadges].reverse();
-      setMessages(ordered);
+      const visibleMessages = messagesWithBadges.filter((m: ChatMessage | null): m is ChatMessage => m !== null);
 
-      const gifterProfileIds = Array.from(
-        new Set<string>(
-          messagesWithBadges
-            .map((m: any) => m.profile_id)
-            .filter((id: any): id is string => typeof id === 'string')
-        )
-      );
+      const gifterProfileIds = Array.from(new Set<string>(visibleMessages.map((m: any) => m.profile_id).filter((id: any): id is string => typeof id === 'string')));
       const statusMap = await fetchGifterStatuses(gifterProfileIds);
       setGifterStatusMap(statusMap);
 
-      console.log('[STREAMCHAT] ✅ Setting messages state with', messagesWithBadges.length, 'messages');
-      setMessages(messagesWithBadges);
+      console.log('[STREAMCHAT] ✅ Setting messages state with', visibleMessages.length, 'messages');
+      setMessages(visibleMessages);
 
       if (isInitialLoad) {
         requestAnimationFrame(() => scrollToBottom('auto'));
@@ -557,19 +608,13 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         },
         (payload: any) => {
           console.log('[STREAMCHAT] 📨 RAW REALTIME EVENT:', payload);
-          console.log('[STREAMCHAT] 📨 Event type:', payload?.eventType);
-          console.log('[STREAMCHAT] 📨 Has new data?:', !!payload?.new);
-          console.log('[STREAMCHAT] 📨 New message data:', payload?.new);
-          console.log('[STREAMCHAT] 📨 Message profile_id:', payload?.new?.profile_id);
-          console.log('[STREAMCHAT] 📨 Message live_stream_id:', payload?.new?.live_stream_id);
-          console.log('[STREAMCHAT] 📨 Message room_id:', payload?.new?.room_id);
-          console.log('[STREAMCHAT] 📨 Message content:', payload?.new?.content);
-
           if (
-            payload?.new &&
             payload.new.live_stream_id === liveStreamId &&
             (payload.new.room_id === null || payload.new.room_id === undefined)
           ) {
+            if (payload?.new?.profile_id && blockedPeerIdsRef.current.has(payload.new.profile_id)) {
+              return;
+            }
             console.log('[STREAMCHAT] ✅ Calling loadMessageWithProfile for realtime message...');
             loadMessageWithProfileRef.current(payload.new as any);
           } else if (payload?.new) {
@@ -707,6 +752,12 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
     }
 
     console.log('[STREAMCHAT] 👤 Current user ID:', currentUserId);
+
+    if (blockedWithStreamOwner) {
+      alert('Messaging unavailable.');
+      setNewMessage(messageToSend);
+      return;
+    }
 
     // Use current user's profile for optimistic message (or fallback)
     const optimisticUsername = currentUserProfile?.username || 'You';

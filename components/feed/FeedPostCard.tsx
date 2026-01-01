@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { Heart, MessageCircle, Gift, MoreHorizontal, Coins } from 'lucide-react';
+import { Heart, MessageCircle, Gift, Flag, Coins } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import LiveAvatar from '@/components/LiveAvatar';
 import ClipActions from '@/components/ClipActions';
@@ -286,10 +286,11 @@ const FeedPostCard = memo(function FeedPostCard({
           {typeof onMore === 'function' ? (
             <button
               onClick={onMore}
-              className="flex-shrink-0 p-2 -mr-2 rounded-full hover:bg-muted/60 transition-colors"
-              aria-label="More options"
+              className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 -mr-1 rounded-lg hover:bg-muted/60 transition-colors text-sm font-semibold text-muted-foreground"
+              aria-label="Report post"
             >
-              <MoreHorizontal className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+              <Flag className="w-4 h-4" aria-hidden="true" />
+              <span>Report</span>
             </button>
           ) : null}
         </div>

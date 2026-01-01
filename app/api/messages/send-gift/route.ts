@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { isBlockedBidirectional } from '@/lib/blocks';
 
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID();
@@ -86,6 +87,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cannot send gift to yourself' }, { status: 400 });
     }
 
+    if (await isBlockedBidirectional(supabase as any, user.id, otherProfileId)) {
+      return NextResponse.json({ error: 'Gifting unavailable.' }, { status: 403 });
+    }
+
     const adminSupabase = getSupabaseAdmin();
 
     const { data: giftMessageResult, error: giftMessageError } = await adminSupabase.rpc(
@@ -102,6 +107,9 @@ export async function POST(request: NextRequest) {
     );
 
     if (giftMessageError) {
+      if ((giftMessageError as any)?.message === 'blocked') {
+        return NextResponse.json({ error: 'Gifting unavailable.' }, { status: 403 });
+      }
       return NextResponse.json({ error: giftMessageError.message }, { status: 400 });
     }
 
