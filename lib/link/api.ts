@@ -98,6 +98,19 @@ export async function getLinkCandidates(
 }
 
 /**
+ * Get Auto-Link candidates (users with auto_link_on_follow enabled)
+ * NOTE: This will be its own RPC once implemented. For now, uses regular candidates.
+ */
+export async function getAutoLinkCandidates(
+  limit: number = 20,
+  offset: number = 0
+): Promise<LinkProfile[]> {
+  // TODO: Once rpc_get_auto_link_candidates is implemented, use it
+  // For now, fallback to regular candidates
+  return getLinkCandidates(limit, offset);
+}
+
+/**
  * Submit a link decision (link or nah)
  */
 export async function submitLinkDecision(

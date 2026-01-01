@@ -89,7 +89,8 @@ export default function AutoLinkSwipePage() {
     );
   }
 
-  if (error && candidates.length === 0) {
+  // Show error ONLY if there was an actual error (not just empty results)
+  if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10 flex items-center justify-center px-4">
         <div className="text-center max-w-md">
@@ -102,6 +103,7 @@ export default function AutoLinkSwipePage() {
           <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
           <button
             onClick={() => {
+              setError(null);
               setCurrentIndex(0);
               setCandidates([]);
               loadCandidates();
@@ -110,6 +112,45 @@ export default function AutoLinkSwipePage() {
           >
             Try Again
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show "no profiles" message if loaded but empty
+  if (!loading && candidates.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-950 dark:to-emerald-900/10 flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <div className="w-32 h-32 bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30 rounded-full flex items-center justify-center mx-auto mb-8">
+            <svg className="w-16 h-16 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <h2 className="text-3xl font-bold mb-4">No Auto-Link Users Yet</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">
+            No one has Auto-Link enabled right now. Check back later or try Regular Link!
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={() => router.push('/link/regular/swipe')}
+              className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold transition-colors"
+            >
+              Try Regular Link
+            </button>
+            <button
+              onClick={() => router.push('/link/settings')}
+              className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl font-semibold transition-colors"
+            >
+              Enable My Auto-Link
+            </button>
+            <button
+              onClick={() => router.push('/link')}
+              className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 dark:bg-gray-900 dark:hover:bg-gray-800 rounded-xl font-semibold transition-colors"
+            >
+              Back to Link
+            </button>
+          </div>
         </div>
       </div>
     );

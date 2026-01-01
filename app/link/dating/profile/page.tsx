@@ -284,46 +284,179 @@ export default function DatingProfileEditor() {
           </div>
         </div>
 
-        {/* Bio & Location */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 mb-4 border border-pink-200 dark:border-pink-800">
-          <h2 className="text-lg font-semibold mb-4">About</h2>
+        {/* About You */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-6 border border-pink-200 dark:border-pink-800">
+          <h2 className="text-xl font-bold mb-6">About You</h2>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold mb-2">Age</label>
+                <input
+                  type="number"
+                  value={profile.prefs?.age || ''}
+                  onChange={(e) => updatePrefs('age', parseInt(e.target.value) || undefined)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">Height</label>
+                <select
+                  value={profile.prefs?.height || ''}
+                  onChange={(e) => updatePrefs('height', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="short">Under 5'4"</option>
+                  <option value="average">5'4" - 5'9"</option>
+                  <option value="tall">5'10" - 6'2"</option>
+                  <option value="very-tall">Over 6'2"</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold mb-2">Build</label>
+                <select
+                  value={profile.prefs?.build || ''}
+                  onChange={(e) => updatePrefs('build', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="slim">Slim</option>
+                  <option value="average">Average</option>
+                  <option value="athletic">Athletic</option>
+                  <option value="curvy">Curvy</option>
+                  <option value="heavyset">Heavyset</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">Religion</label>
+                <select
+                  value={profile.prefs?.religion || ''}
+                  onChange={(e) => updatePrefs('religion', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="christian">Christian</option>
+                  <option value="muslim">Muslim</option>
+                  <option value="jewish">Jewish</option>
+                  <option value="hindu">Hindu</option>
+                  <option value="buddhist">Buddhist</option>
+                  <option value="spiritual">Spiritual</option>
+                  <option value="agnostic">Agnostic</option>
+                  <option value="atheist">Atheist</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold mb-2">Smoker</label>
+                <select
+                  value={profile.prefs?.smoker || ''}
+                  onChange={(e) => updatePrefs('smoker', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                  <option value="sometimes">Sometimes</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold mb-2">Drinker</label>
+                <select
+                  value={profile.prefs?.drinker || ''}
+                  onChange={(e) => updatePrefs('drinker', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Prefer not to say</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                  <option value="socially">Socially</option>
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium mb-1.5">Dating Bio</label>
+              <label className="block text-sm font-bold mb-2">Dating Bio</label>
               <textarea
                 value={profile.bio || ''}
                 onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
                 placeholder="What are you looking for?"
                 rows={4}
-                className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none transition-all"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5">Location (Optional)</label>
+              <label className="block text-sm font-bold mb-2">Looking For (short text)</label>
+              <input
+                type="text"
+                value={profile.prefs?.looking_for_text || ''}
+                onChange={(e) => updatePrefs('looking_for_text', e.target.value)}
+                placeholder="e.g., Long-term relationship, casual dating, friends first..."
+                maxLength={100}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+              />
+              <p className="text-xs text-gray-500 mt-1.5">Max 100 characters</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Hobbies / Interests</label>
+              <div className="flex flex-wrap gap-2">
+                {INTEREST_TAGS.map((tag) => {
+                  const isSelected = profile.prefs?.hobbies?.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => {
+                        const currentHobbies = profile.prefs?.hobbies || [];
+                        const newHobbies = isSelected
+                          ? currentHobbies.filter((t: string) => t !== tag)
+                          : [...currentHobbies, tag];
+                        updatePrefs('hobbies', newHobbies);
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Location (Optional)</label>
               <input
                 type="text"
                 value={profile.location_text || ''}
                 onChange={(e) => setProfile({ ...profile, location_text: e.target.value })}
                 placeholder="e.g., Los Angeles, CA"
-                className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
               />
             </div>
           </div>
         </div>
 
-        {/* Preferences */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-5 mb-4 border border-pink-200 dark:border-pink-800">
-          <h2 className="text-lg font-semibold mb-4">Dating Preferences</h2>
+        {/* Who You're Looking For */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 mb-6 border border-pink-200 dark:border-pink-800">
+          <h2 className="text-xl font-bold mb-6">Who You're Looking For</h2>
 
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium mb-1.5">Show Me</label>
+              <label className="block text-sm font-bold mb-2">Show Me</label>
               <select
                 value={profile.prefs?.looking_for || 'all'}
                 onChange={(e) => updatePrefs('looking_for', e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
               >
                 <option value="all">Everyone</option>
                 <option value="men">Men</option>
@@ -332,23 +465,197 @@ export default function DatingProfileEditor() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1.5">Age Range</label>
+              <label className="block text-sm font-bold mb-2">Age Range</label>
               <div className="flex items-center gap-3">
                 <input
                   type="number"
                   value={profile.prefs?.age_min || ''}
                   onChange={(e) => updatePrefs('age_min', parseInt(e.target.value) || undefined)}
                   placeholder="Min"
-                  className="flex-1 px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                  min="18"
+                  max="99"
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
                 />
-                <span className="text-gray-500">—</span>
+                <span className="text-gray-500 font-semibold">—</span>
                 <input
                   type="number"
                   value={profile.prefs?.age_max || ''}
                   onChange={(e) => updatePrefs('age_max', parseInt(e.target.value) || undefined)}
                   placeholder="Max"
-                  className="flex-1 px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                  min="18"
+                  max="99"
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
                 />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Smoker Preference</label>
+              <select
+                value={profile.prefs?.smoker_pref || ''}
+                onChange={(e) => updatePrefs('smoker_pref', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+              >
+                <option value="">Doesn't matter</option>
+                <option value="yes">Okay with smoker</option>
+                <option value="no">Not okay with smoker</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Drinker Preference</label>
+              <select
+                value={profile.prefs?.drinker_pref || ''}
+                onChange={(e) => updatePrefs('drinker_pref', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+              >
+                <option value="">Doesn't matter</option>
+                <option value="yes">Okay with drinker</option>
+                <option value="no">Not okay with drinker</option>
+                <option value="socially">Socially only</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Religion Preference</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => updatePrefs('religion_pref', [])}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    !profile.prefs?.religion_pref || profile.prefs.religion_pref.length === 0
+                      ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                      : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Doesn't matter
+                </button>
+                {['Christian', 'Muslim', 'Jewish', 'Hindu', 'Buddhist', 'Spiritual', 'Agnostic', 'Atheist', 'Other'].map((religion) => {
+                  const isSelected = profile.prefs?.religion_pref?.includes(religion.toLowerCase());
+                  return (
+                    <button
+                      key={religion}
+                      onClick={() => {
+                        const currentReligions = profile.prefs?.religion_pref || [];
+                        const newReligions = isSelected
+                          ? currentReligions.filter((r: string) => r !== religion.toLowerCase())
+                          : [...currentReligions, religion.toLowerCase()];
+                        updatePrefs('religion_pref', newReligions);
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {religion}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Height Preference</label>
+              <div className="flex items-center gap-3">
+                <select
+                  value={profile.prefs?.height_pref_min || ''}
+                  onChange={(e) => updatePrefs('height_pref_min', e.target.value)}
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Min (Any)</option>
+                  <option value="short">Under 5'4"</option>
+                  <option value="average">5'4"</option>
+                  <option value="tall">5'10"</option>
+                  <option value="very-tall">6'3"</option>
+                </select>
+                <span className="text-gray-500 font-semibold">—</span>
+                <select
+                  value={profile.prefs?.height_pref_max || ''}
+                  onChange={(e) => updatePrefs('height_pref_max', e.target.value)}
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Max (Any)</option>
+                  <option value="short">5'4"</option>
+                  <option value="average">5'9"</option>
+                  <option value="tall">6'2"</option>
+                  <option value="very-tall">Over 6'2"</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Build Preference</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => updatePrefs('build_pref', [])}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    !profile.prefs?.build_pref || profile.prefs.build_pref.length === 0
+                      ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                      : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Doesn't matter
+                </button>
+                {['Slim', 'Average', 'Athletic', 'Curvy', 'Heavyset'].map((build) => {
+                  const isSelected = profile.prefs?.build_pref?.includes(build.toLowerCase());
+                  return (
+                    <button
+                      key={build}
+                      onClick={() => {
+                        const currentBuilds = profile.prefs?.build_pref || [];
+                        const newBuilds = isSelected
+                          ? currentBuilds.filter((b: string) => b !== build.toLowerCase())
+                          : [...currentBuilds, build.toLowerCase()];
+                        updatePrefs('build_pref', newBuilds);
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {build}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Interests Preference</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => updatePrefs('interests_pref', [])}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    !profile.prefs?.interests_pref || profile.prefs.interests_pref.length === 0
+                      ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                      : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Doesn't matter
+                </button>
+                {INTEREST_TAGS.map((tag) => {
+                  const isSelected = profile.prefs?.interests_pref?.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => {
+                        const currentInterests = profile.prefs?.interests_pref || [];
+                        const newInterests = isSelected
+                          ? currentInterests.filter((t: string) => t !== tag)
+                          : [...currentInterests, tag];
+                        updatePrefs('interests_pref', newInterests);
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
