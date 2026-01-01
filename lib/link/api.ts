@@ -13,6 +13,7 @@ import type {
   LinkDecisionResult,
   DatingDecisionResult,
 } from './types';
+import type { DatingCandidate } from './dating-types';
 
 const supabase = createClient();
 
@@ -279,7 +280,7 @@ export async function getMyDatingProfile(): Promise<DatingProfile | null> {
 export async function getDatingCandidates(
   limit: number = 20,
   offset: number = 0
-): Promise<DatingProfile[]> {
+): Promise<DatingCandidate[]> {
   const { data, error } = await supabase.rpc('rpc_get_dating_candidates', {
     p_limit: limit,
     p_offset: offset,
@@ -290,7 +291,7 @@ export async function getDatingCandidates(
     throw error;
   }
 
-  return (data || []) as DatingProfile[];
+  return (data || []) as DatingCandidate[];
 }
 
 /**
