@@ -4,6 +4,45 @@ import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import IMChatWindow, { IMMessage } from './IMChatWindow';
 
+// Decode message content to extract type and data
+function decodeIMContent(
+  content: string
+):
+  | { type: 'text'; text: string }
+  | { type: 'gift'; giftId?: number; giftName?: string; giftCoins?: number; giftIcon?: string }
+  | { type: 'image'; url?: string; mime?: string; width?: number; height?: number } {
+  if (typeof content !== 'string') return { type: 'text', text: '' };
+  if (content.startsWith('__img__:')) {
+    try {
+      const raw = content.slice('__img__:'.length);
+      const parsed = JSON.parse(raw);
+      return {
+        type: 'image',
+        url: typeof parsed?.url === 'string' ? parsed.url : undefined,
+        mime: typeof parsed?.mime === 'string' ? parsed.mime : undefined,
+        width: typeof parsed?.width === 'number' ? parsed.width : undefined,
+        height: typeof parsed?.height === 'number' ? parsed.height : undefined,
+      };
+    } catch {
+      return { type: 'text', text: '' };
+    }
+  }
+  if (!content.startsWith('__gift__:')) return { type: 'text', text: content };
+  try {
+    const raw = content.slice('__gift__:'.length);
+    const parsed = JSON.parse(raw);
+    return {
+      type: 'gift',
+      giftId: typeof parsed?.giftId === 'number' ? parsed.giftId : undefined,
+      giftName: typeof parsed?.giftName === 'string' ? parsed.giftName : undefined,
+      giftCoins: typeof parsed?.giftCoins === 'number' ? parsed.giftCoins : undefined,
+      giftIcon: typeof parsed?.giftIcon === 'string' ? parsed.giftIcon : undefined,
+    };
+  } catch {
+    return { type: 'text', text: content };
+  }
+}
+
 interface ChatWindow {
   chatId: string;
   recipientId: string;
@@ -135,13 +174,35 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
       }
 
       const rows = [...(data || [])].reverse();
-      const messages: IMMessage[] = rows.map((m: any) => ({
-        id: m.id.toString(),
-        senderId: m.sender_id,
-        content: m.content,
-        timestamp: new Date(m.created_at),
-        status: m.read_at ? 'read' : 'delivered',
-      }));
+      const messages: IMMessage[] = rows.map((m: any) => {
+        const decoded = decodeIMContent(m.content);
+        const status: 'read' | 'delivered' = m.read_at ? 'read' : 'delivered';
+        const base = {
+          id: m.id.toString(),
+          senderId: m.sender_id,
+          content: decoded.type === 'text' ? decoded.text : '',
+          timestamp: new Date(m.created_at),
+          status,
+        };
+        
+        if (decoded.type === 'gift') {
+          return {
+            ...base,
+            type: 'gift' as const,
+            giftName: decoded.giftName,
+            giftCoins: decoded.giftCoins,
+            giftIcon: decoded.giftIcon,
+          };
+        }
+        if (decoded.type === 'image') {
+          return {
+            ...base,
+            type: 'image' as const,
+            imageUrl: decoded.url,
+          };
+        }
+        return { ...base, type: 'text' as const };
+      });
 
       setChatWindows(prev => prev.map(c => 
         c.chatId === chatId ? { ...c, messages } : c
@@ -260,21 +321,27 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
             const existingChat = prev.find(c => c.recipientId === senderId);
             if (existingChat) {
               // Add message to existing chat
+              const decoded = decodeIMContent(msg.content);
+              const newMsg: IMMessage = {
+                id: msg.id.toString(),
+                senderId: msg.sender_id,
+                content: decoded.type === 'text' ? decoded.text : '',
+                timestamp: new Date(msg.created_at),
+                status: 'delivered' as const,
+                type: decoded.type,
+                ...(decoded.type === 'gift' && {
+                  giftName: decoded.giftName,
+                  giftCoins: decoded.giftCoins,
+                  giftIcon: decoded.giftIcon,
+                }),
+                ...(decoded.type === 'image' && {
+                  imageUrl: decoded.url,
+                }),
+              };
+              
               return prev.map(c =>
                 c.recipientId === senderId
-                  ? {
-                      ...c,
-                      messages: [
-                        ...c.messages,
-                        {
-                          id: msg.id.toString(),
-                          senderId: msg.sender_id,
-                          content: msg.content,
-                          timestamp: new Date(msg.created_at),
-                          status: 'delivered' as const,
-                        },
-                      ],
-                    }
+                  ? { ...c, messages: [...c.messages, newMsg] }
                   : c
               );
             }

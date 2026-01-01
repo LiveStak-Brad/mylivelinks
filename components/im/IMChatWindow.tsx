@@ -11,6 +11,11 @@ export interface IMMessage {
   content: string;
   timestamp: Date;
   status: 'sending' | 'sent' | 'delivered' | 'read';
+  type?: 'text' | 'gift' | 'image';
+  giftName?: string;
+  giftCoins?: number;
+  giftIcon?: string;
+  imageUrl?: string;
 }
 
 export interface IMChatWindowProps {
@@ -285,6 +290,58 @@ export default function IMChatWindow({
         ) : (
           messages.map((msg) => {
             const isOwn = msg.senderId === currentUserId;
+            
+            // Gift message rendering
+            if (msg.type === 'gift') {
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className="max-w-[80%] px-3 py-2 rounded-2xl bg-gradient-to-r from-yellow-100 to-amber-100 dark:from-yellow-900/30 dark:to-amber-900/30 border border-yellow-200 dark:border-yellow-800">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">
+                        {msg.giftIcon?.startsWith('http') || msg.giftIcon?.startsWith('/') ? (
+                          <img src={msg.giftIcon} alt={msg.giftName || 'Gift'} className="w-8 h-8" />
+                        ) : (
+                          msg.giftIcon || '🎁'
+                        )}
+                      </span>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">
+                          {isOwn ? 'You' : recipientUsername} sent a gift!
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {msg.giftName} • {msg.giftCoins} 💰
+                        </p>
+                      </div>
+                    </div>
+                    <p className={`text-[10px] mt-1 ${isOwn ? 'text-right' : 'text-left'} text-muted-foreground`}>
+                      {formatTime(msg.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+
+            // Image message rendering
+            if (msg.type === 'image' && msg.imageUrl) {
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className="max-w-[75%] rounded-2xl overflow-hidden border border-border">
+                    <img src={msg.imageUrl} alt="Photo" className="max-h-48 w-auto object-contain" />
+                    <p className={`text-[10px] px-2 py-1 ${isOwn ? 'text-right' : 'text-left'} text-muted-foreground`}>
+                      {formatTime(msg.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+            
+            // Default text message rendering
             return (
               <div
                 key={msg.id}
