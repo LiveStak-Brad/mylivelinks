@@ -10,6 +10,7 @@ import RoomRulesModal from './RoomRulesModal';
 import HelpFAQModal from './HelpFAQModal';
 import BlockedUsersModal from './BlockedUsersModal';
 import ReportModal from './ReportModal';
+import PwaInstallButton from '@/components/PwaInstallButton';
 
 interface OptionsMenuProps {
   className?: string;
@@ -139,10 +140,10 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
       <div className={`relative ${className}`} ref={menuRef}>
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+          className="nav-icon-button"
           title="Options"
         >
-          <Settings className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 xl:w-9 xl:h-9 2xl:w-10 2xl:h-10 text-orange-500 dark:text-orange-400" strokeWidth={2} />
+          <Settings className="global-header-icon text-orange-500 dark:text-orange-400" strokeWidth={2} />
           <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
             Options
           </span>
@@ -168,6 +169,18 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
                 >
                   Edit Profile
                 </a>
+                <PwaInstallButton onBeforePrompt={() => setShowMenu(false)}>
+                  {({ onClick, disabled, label }) => (
+                    <button
+                      type="button"
+                      onClick={onClick}
+                      disabled={disabled}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition disabled:opacity-40"
+                    >
+                      {label}
+                    </button>
+                  )}
+                </PwaInstallButton>
                 <button
                   onClick={() => {
                     setShowMenu(false);

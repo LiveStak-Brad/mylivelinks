@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video, Users } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video, Tv, Users, Search, Camera } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import LeaderboardModal from './LeaderboardModal';
@@ -15,6 +15,8 @@ import { useNoties } from './noties';
 import { useMessages } from './messages';
 import NotiesModal from './noties/NotiesModal';
 import MessagesModal from './messages/MessagesModal';
+
+const HEADER_ICON_CLASS = 'global-header-icon';
 
 // Owner credentials
 const OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'];
@@ -56,13 +58,13 @@ function NavLink({
     <Link
       href={item.href}
       onClick={onClick}
-      className={`group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 ${
-        isActive ? 'scale-110' : 'opacity-70 hover:opacity-100'
+      className={`group relative nav-icon-button ${
+        isActive ? 'nav-icon-button-active' : ''
       }`}
       aria-current={isActive ? 'page' : undefined}
       title={item.label}
     >
-      {Icon && <Icon className={`w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 ${getIconColor(item.label)}`} strokeWidth={2} />}
+      {Icon && <Icon className={`${HEADER_ICON_CLASS} ${getIconColor(item.label)}`} strokeWidth={2} />}
       
       {/* Hover tooltip for desktop */}
       <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
@@ -86,6 +88,43 @@ function getIconColor(label: string) {
     default:
       return 'text-gray-700 dark:text-white';
   }
+}
+
+function LinkOrNahIconLink({ className = '' }: { className?: string }) {
+  const gradientId = useId();
+  return (
+    <Link 
+      href="/link" 
+      className={`group relative nav-icon-button ${className}`.trim()}
+      title="Link or Nah"
+    >
+      <div className="relative">
+        <svg 
+          className={HEADER_ICON_CLASS} 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke={`url(#${gradientId})`}
+        >
+          <defs>
+            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="rgb(37, 99, 235)" />
+              <stop offset="100%" stopColor="rgb(168, 85, 247)" />
+            </linearGradient>
+          </defs>
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" 
+          />
+        </svg>
+      </div>
+      
+      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+        Link or Nah
+      </span>
+    </Link>
+  );
 }
 
 // Header icons component that uses the contexts
@@ -130,7 +169,7 @@ function HeaderIcons() {
   }, []);
 
   return (
-    <div className="flex items-center gap-0.5 sm:gap-1" onKeyDown={handleKeyDown}>
+    <div className="header-icon-cluster flex items-center" onKeyDown={handleKeyDown}>
       {/* Messages Icon */}
       <div className="relative z-[70]">
         <button
@@ -139,15 +178,13 @@ function HeaderIcons() {
             setShowMessagesModal(!showMessagesModal);
             setShowNotiesModal(false);
           }}
-          className={`group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 ${
-            showMessagesModal ? 'scale-110' : 'opacity-70 hover:opacity-100'
-          }`}
+          className={`group relative nav-icon-button ${showMessagesModal ? 'nav-icon-button-active' : ''}`}
           aria-label={`Messages${unreadMessages > 0 ? `, ${unreadMessages} unread` : ''}`}
           aria-expanded={showMessagesModal}
           aria-haspopup="dialog"
           title="Messages"
         >
-          <MessageCircle className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-emerald-500 dark:text-emerald-400" strokeWidth={2} />
+          <MessageCircle className={`${HEADER_ICON_CLASS} text-emerald-500 dark:text-emerald-400`} strokeWidth={2} />
           {unreadMessages > 0 && (
             <span className="notification-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>
           )}
@@ -173,15 +210,13 @@ function HeaderIcons() {
             setShowNotiesModal(!showNotiesModal);
             setShowMessagesModal(false);
           }}
-          className={`group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 ${
-            showNotiesModal ? 'scale-110' : 'opacity-70 hover:opacity-100'
-          }`}
+          className={`group relative nav-icon-button ${showNotiesModal ? 'nav-icon-button-active' : ''}`}
           aria-label={`Noties${unreadNoties > 0 ? `, ${unreadNoties} unread` : ''}`}
           aria-expanded={showNotiesModal}
           aria-haspopup="dialog"
           title="Noties"
         >
-          <Bell className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-amber-500 dark:text-amber-400" strokeWidth={2} />
+          <Bell className={`${HEADER_ICON_CLASS} text-amber-500 dark:text-amber-400`} strokeWidth={2} />
           {unreadNoties > 0 && (
             <span className="notification-badge">{unreadNoties > 99 ? '99+' : unreadNoties}</span>
           )}
@@ -252,25 +287,43 @@ export default function GlobalHeader() {
   }
 
   const canOpenLive = LIVE_LAUNCH_ENABLED || isOwner;
-  const isLiveRoom = pathname === '/live'; // Check if we're on the live room page
+  const isLiveRoom = pathname === '/live' || pathname?.startsWith('/room/'); // Check if we're on a live room page
 
   const handleTeamsShortcut = useCallback(() => {
     if (typeof window === 'undefined') {
       return;
     }
 
+    // If already on teams pages, just scroll to top
     if (pathname === '/teams' || pathname.startsWith('/teams/')) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       window.dispatchEvent(new Event('teams:focusSearch'));
       return;
     }
 
-    router.push('/teams');
-    window.setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      window.dispatchEvent(new Event('teams:focusSearch'));
-    }, 250);
+    // Check if teams onboarding is completed
+    const onboardingCompleted = localStorage.getItem('mylivelinks_teams_onboarding_completed') === 'true';
+    
+    if (!onboardingCompleted) {
+      // First time - route to setup
+      router.push('/teams/setup');
+    } else {
+      // Onboarding done - route to main teams page
+      router.push('/teams');
+      window.setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        window.dispatchEvent(new Event('teams:focusSearch'));
+      }, 250);
+    }
   }, [pathname, router]);
+
+  const handleSoloGoLive = useCallback(() => {
+    if (!isLoggedIn) {
+      router.push('/login');
+      return;
+    }
+    router.push('/live/host');
+  }, [isLoggedIn, router]);
 
   return (
     <>
@@ -280,156 +333,224 @@ export default function GlobalHeader() {
       </a>
 
       <header 
-        className="sticky top-0 z-[60] bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
+        className="global-header-bar sticky top-0 z-[60] bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
         role="banner"
       >
         {/* FAR LEFT - 4 nav icons (ONLY when on live room) - Fixed to viewport edge */}
         {isLiveRoom && (
-          <div className="fixed left-0 top-0 flex items-center gap-0.5 sm:gap-1 md:gap-1 z-[70] h-16 lg:h-[72px] pl-1 sm:pl-2 md:pl-4 lg:pl-6 xl:pl-8 2xl:pl-[60px]">
+          <div className="fixed left-0 top-0 flex items-center header-icon-cluster z-[70] h-16 lg:h-[72px] pl-1 sm:pl-2 md:pl-4 lg:pl-6 xl:pl-8 2xl:pl-[60px]">
             <button
               onClick={() => setShowLeaderboard(true)}
-              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+              className="nav-icon-button"
               aria-label="View Leaderboards"
               title="Leaderboards"
             >
-              <Trophy className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-amber-500" strokeWidth={2} />
+              <Trophy className={`${HEADER_ICON_CLASS} text-amber-500`} strokeWidth={2} />
             </button>
             <button
               onClick={handleTeamsShortcut}
-              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+              className="nav-icon-button"
               aria-label="Teams"
               title="Teams"
               type="button"
             >
-              <Users className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-cyan-500" strokeWidth={2} />
+              <Users className={`${HEADER_ICON_CLASS} text-cyan-500`} strokeWidth={2} />
             </button>
-            <Link href="/" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Home">
-              <Home className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-purple-500" strokeWidth={2} />
+            <Link href="/" className="nav-icon-button" title="Home">
+              <Home className={`${HEADER_ICON_CLASS} text-purple-500`} strokeWidth={2} />
             </Link>
-            <Link href="/feed" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Feed">
-              <Rss className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-blue-500" strokeWidth={2} />
+            <Link href="/feed" className="nav-icon-button" title="Feed">
+              <Rss className={`${HEADER_ICON_CLASS} text-blue-500`} strokeWidth={2} />
             </Link>
           </div>
         )}
 
-        {/* FAR LEFT - Non-live room nav (Trophy, Rooms, Link, Nav) - Fixed to viewport edge */}
+        {/* FAR LEFT - Non-live room nav */}
         {!isLiveRoom && (
-          <div className="fixed left-0 top-0 flex items-center gap-0.5 sm:gap-1 md:gap-1 z-[70] h-16 lg:h-[72px] pl-1 sm:pl-2 md:pl-4 lg:pl-6 xl:pl-8 2xl:pl-[60px]">
-            <button
-              onClick={() => setShowLeaderboard(true)}
-              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
-              aria-label="View Leaderboards"
-              title="Leaderboards"
-            >
-              <Trophy className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-amber-500" strokeWidth={2} />
-            </button>
-            <button
-              onClick={handleTeamsShortcut}
-              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
-              aria-label="Teams"
-              title="Teams"
-              type="button"
-            >
-              <Users className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-cyan-500" strokeWidth={2} />
-            </button>
-            
-            {/* Link or Nah Icon - Same as used in Link module pages */}
-            <Link 
-              href="/link" 
-              className="group relative p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 transition-all duration-200 hover:scale-110 opacity-70 hover:opacity-100"
-              title="Link or Nah"
-            >
-              <div className="relative">
-                <svg 
-                  className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="url(#link-gradient-header)"
-                >
-                  <defs>
-                    <linearGradient id="link-gradient-header" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="rgb(37, 99, 235)" />
-                      <stop offset="100%" stopColor="rgb(168, 85, 247)" />
-                    </linearGradient>
-                  </defs>
-                  <path 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    strokeWidth={2} 
-                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" 
-                  />
-                </svg>
-              </div>
+          <>
+            {/* Desktop: Leaderboards, Home, Feed, LiveTV, Link or Nah, Teams */}
+            <div className="fixed left-0 top-0 hidden lg:flex items-center header-icon-cluster z-[70] h-16 lg:h-[72px] pl-1 sm:pl-2 md:pl-4 lg:pl-6 xl:pl-8 2xl:pl-[60px]">
+              <button
+                onClick={() => setShowLeaderboard(true)}
+                className="nav-icon-button"
+                aria-label="View Leaderboards"
+                title="Leaderboards"
+              >
+                <Trophy className={`${HEADER_ICON_CLASS} text-amber-500`} strokeWidth={2} />
+              </button>
+              <Link
+                href="/"
+                className="nav-icon-button"
+                title="Home"
+              >
+                <Home className={`${HEADER_ICON_CLASS} text-purple-500`} strokeWidth={2} />
+              </Link>
+              <Link
+                href="/feed"
+                className="nav-icon-button"
+                title="Feed"
+              >
+                <Rss className={`${HEADER_ICON_CLASS} text-blue-500`} strokeWidth={2} />
+              </Link>
+              <Link
+                href="/liveTV"
+                className="nav-icon-button"
+                title="LiveTV"
+              >
+                <Tv className={`${HEADER_ICON_CLASS} text-rose-500`} strokeWidth={2} />
+              </Link>
+              <LinkOrNahIconLink />
+              <button
+                onClick={handleTeamsShortcut}
+                className="nav-icon-button"
+                aria-label="Teams"
+                title="Teams"
+                type="button"
+              >
+                <Users className={`${HEADER_ICON_CLASS} text-cyan-500`} strokeWidth={2} />
+              </button>
+            </div>
+
+            {/* Tablet & below: Legacy layout */}
+            <div className="fixed left-0 top-0 flex lg:hidden items-center header-icon-cluster z-[70] h-16 lg:h-[72px] pl-1 sm:pl-2 md:pl-4 lg:pl-6 xl:pl-8 2xl:pl-[60px]">
+              <button
+                onClick={() => setShowLeaderboard(true)}
+                className="nav-icon-button"
+                aria-label="View Leaderboards"
+                title="Leaderboards"
+              >
+                <Trophy className={`${HEADER_ICON_CLASS} text-amber-500`} strokeWidth={2} />
+              </button>
+              <button
+                onClick={handleTeamsShortcut}
+                className="nav-icon-button"
+                aria-label="Teams"
+                title="Teams"
+                type="button"
+              >
+                <Users className={`${HEADER_ICON_CLASS} text-cyan-500`} strokeWidth={2} />
+              </button>
+
+              <LinkOrNahIconLink />
               
-              {/* Hover tooltip */}
-              <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-                Link or Nah
-              </span>
-            </Link>
-            
-            {/* Navigation items - Hide on mobile */}
-            <nav className="hidden md:flex items-center gap-1 ml-2" role="navigation" aria-label="Main navigation">
-              {MAIN_NAV_ITEMS.map((item) => (
-                <NavLink
-                  key={item.href}
-                  item={item}
-                  isActive={isRouteActive(pathname, item.href, { 
-                    matchType: item.matchType,
-                    excludePaths: item.excludePaths,
-                  })}
-                  disabled={item.requiresLive && !canOpenLive}
-                />
-              ))}
-            </nav>
-          </div>
+              <nav className="hidden md:flex header-icon-cluster ml-2" role="navigation" aria-label="Main navigation">
+                {MAIN_NAV_ITEMS.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    isActive={isRouteActive(pathname, item.href, { 
+                      matchType: item.matchType,
+                      excludePaths: item.excludePaths,
+                    })}
+                    disabled={item.requiresLive && !canOpenLive}
+                  />
+                ))}
+              </nav>
+            </div>
+          </>
         )}
 
         {/* FAR RIGHT - User menu + icons - Fixed to viewport edge */}
-        <div className="fixed right-0 top-0 flex items-center gap-0.5 sm:gap-1 md:gap-1 z-[70] h-16 lg:h-[72px] pr-1 sm:pr-2 md:pr-4 lg:pr-6 xl:pr-8 2xl:pr-[60px]">
-          {/* Camera/Go Live button - only on live room */}
-          {isLiveRoom && isLoggedIn && (
-            <button
-              onClick={() => {
-                // Trigger the hidden GoLiveButton in LiveRoom
-                const goLiveContainer = document.getElementById('liveroom-go-live-button');
-                const goLiveBtn = goLiveContainer?.querySelector('button');
-                if (goLiveBtn) {
-                  goLiveBtn.click();
-                } else {
-                  console.error('GoLiveButton not found in LiveRoom');
-                }
-              }}
-              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
-              title="Go Live"
-              aria-label="Go Live in Room"
-            >
-              <Video className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-red-500 dark:text-red-400" strokeWidth={2} />
-            </button>
-          )}
-          
-          {/* Messages & Noties - Hide on mobile */}
-          {isLoggedIn && (
-            <div className="hidden md:flex items-center gap-0.5 sm:gap-1">
-              <HeaderIcons />
-            </div>
-          )}
+        <div className="fixed right-0 top-0 z-[70] h-16 lg:h-[72px] pr-1 sm:pr-2 md:pr-4 lg:pr-6 xl:pr-8 2xl:pr-[60px]">
+          <div className="flex items-center header-icon-cluster justify-end h-full">
+            {isLiveRoom ? (
+              <>
+                {isLoggedIn && (
+                  <button
+                    onClick={() => {
+                      const goLiveContainer = document.getElementById('liveroom-go-live-button');
+                      const goLiveBtn = goLiveContainer?.querySelector('button');
+                      if (goLiveBtn) {
+                        goLiveBtn.click();
+                      } else {
+                        console.error('GoLiveButton not found in LiveRoom');
+                      }
+                    }}
+                    className="nav-icon-button"
+                    title="Go Live"
+                    aria-label="Go Live in Room"
+                  >
+                    <Video className={`${HEADER_ICON_CLASS} text-red-500 dark:text-red-400`} strokeWidth={2} />
+                  </button>
+                )}
 
-          {/* Settings (Options) - only needed on live room */}
-          {isLiveRoom && <OptionsMenu />}
+                {isLoggedIn && (
+                  <div className="hidden md:flex header-icon-cluster">
+                    <HeaderIcons />
+                  </div>
+                )}
 
-          {/* Owner Panel */}
-          {isOwner && (
-            <Link
-              href="/owner"
-              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
-              title="Owner Panel"
-            >
-              <Crown className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-violet-500 dark:text-violet-400" strokeWidth={2} />
-            </Link>
-          )}
+                {isLiveRoom && <OptionsMenu />}
 
-          {/* User Menu (Photo) */}
-          <UserMenu />
+                <Link
+                  href="/search"
+                  className="group relative nav-icon-button"
+                  title="Search"
+                >
+                  <Search className={`${HEADER_ICON_CLASS} text-sky-500 dark:text-sky-400`} strokeWidth={2} />
+                  <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                    Search
+                  </span>
+                </Link>
+
+                {isOwner && (
+                  <Link
+                    href="/owner"
+                    className="nav-icon-button"
+                    title="Owner Panel"
+                  >
+                    <Crown className={`${HEADER_ICON_CLASS} text-violet-500 dark:text-violet-400`} strokeWidth={2} />
+                  </Link>
+                )}
+
+                <UserMenu className="ml-0.5 sm:ml-1 header-profile-trigger" />
+              </>
+            ) : (
+              <>
+                {canOpenLive && isLoggedIn && (
+                  <div className="hidden lg:block">
+                    <button
+                      onClick={handleSoloGoLive}
+                      className="nav-icon-button"
+                      title="Go Live (Solo)"
+                      aria-label="Go Live (Solo)"
+                    >
+                      <Camera className={`${HEADER_ICON_CLASS} text-red-500 dark:text-red-400`} strokeWidth={2} />
+                    </button>
+                  </div>
+                )}
+
+                {isLoggedIn && (
+                  <div className="hidden md:flex header-icon-cluster">
+                    <HeaderIcons />
+                  </div>
+                )}
+
+                <Link
+                  href="/search"
+                  className="group relative nav-icon-button"
+                  title="Search"
+                >
+                  <Search className={`${HEADER_ICON_CLASS} text-sky-500 dark:text-sky-400`} strokeWidth={2} />
+                  <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+                    Search
+                  </span>
+                </Link>
+
+                {isOwner && (
+                  <Link
+                    href="/owner"
+                    className="nav-icon-button"
+                    title="Owner Panel"
+                  >
+                    <Crown className={`${HEADER_ICON_CLASS} text-violet-500 dark:text-violet-400`} strokeWidth={2} />
+                  </Link>
+                )}
+
+                <UserMenu className="ml-0.5 sm:ml-1 header-profile-trigger" />
+              </>
+            )}
+          </div>
         </div>
         
         <div className="container mx-auto px-4">
@@ -446,32 +567,32 @@ export default function GlobalHeader() {
               </Link>
             </div>
 
-            {/* LEFT MIDDLE - Sort buttons (ONLY on live room page) - Fixed distance from left edge */}
+            {/* LEFT MIDDLE - Sort buttons (ONLY on live room page) - Close to logo */}
             {isLiveRoom && (
-              <div className="hidden md:flex absolute items-center gap-0.5 md:gap-1 left-[120px] md:left-[160px] lg:left-[200px] xl:left-[260px] 2xl:left-[340px]">
-                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Randomize">
-                  <Shuffle className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-purple-500" strokeWidth={2} />
+              <div className="hidden md:flex absolute items-center header-icon-cluster header-icon-cluster-tight left-[50%] -translate-x-[200px] md:-translate-x-[240px] lg:-translate-x-[280px] xl:-translate-x-[340px] 2xl:-translate-x-[420px]">
+                <button className="nav-icon-button nav-icon-button-compact" title="Randomize">
+                  <Shuffle className={`${HEADER_ICON_CLASS} text-purple-500`} strokeWidth={2} />
                 </button>
-                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Most Viewed">
-                  <Eye className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-cyan-500" strokeWidth={2} />
+                <button className="nav-icon-button nav-icon-button-compact" title="Most Viewed">
+                  <Eye className={`${HEADER_ICON_CLASS} text-cyan-500`} strokeWidth={2} />
                 </button>
-                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Most Gifted">
-                  <GiftIcon className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-pink-500" strokeWidth={2} />
+                <button className="nav-icon-button nav-icon-button-compact" title="Most Gifted">
+                  <GiftIcon className={`${HEADER_ICON_CLASS} text-pink-500`} strokeWidth={2} />
                 </button>
-                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Newest">
-                  <Sparkles className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-yellow-500" strokeWidth={2} />
+                <button className="nav-icon-button nav-icon-button-compact" title="Newest">
+                  <Sparkles className={`${HEADER_ICON_CLASS} text-yellow-500`} strokeWidth={2} />
                 </button>
               </div>
             )}
 
-            {/* RIGHT MIDDLE - Live controls (ONLY on live room page) - Fixed distance from right edge, closer to center */}
+            {/* RIGHT MIDDLE - Live controls (ONLY on live room page) - Mirror distance from logo */}
             {isLiveRoom && (
-              <div className="hidden md:flex absolute items-center gap-0.5 md:gap-1 right-[200px] md:right-[240px] lg:right-[280px] xl:right-[340px] 2xl:right-[420px]">
-                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Unmute All">
-                  <Volume2 className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-green-500" strokeWidth={2} />
+              <div className="hidden md:flex absolute items-center header-icon-cluster header-icon-cluster-tight left-[50%] translate-x-[80px] md:translate-x-[100px] lg:translate-x-[120px] xl:translate-x-[140px] 2xl:translate-x-[180px]">
+                <button className="nav-icon-button nav-icon-button-compact" title="Unmute All">
+                  <Volume2 className={`${HEADER_ICON_CLASS} text-green-500`} strokeWidth={2} />
                 </button>
-                <button className="p-0.5 md:p-1 lg:p-1.5 xl:p-2 hover:scale-110 transition opacity-70 hover:opacity-100" title="Focus Mode">
-                  <Focus className="w-9 h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 xl:w-12 xl:h-12 2xl:w-14 2xl:h-14 text-indigo-500" strokeWidth={2} />
+                <button className="nav-icon-button nav-icon-button-compact" title="Focus Mode">
+                  <Focus className={`${HEADER_ICON_CLASS} text-indigo-500`} strokeWidth={2} />
                 </button>
               </div>
             )}

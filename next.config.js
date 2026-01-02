@@ -28,6 +28,11 @@ const nextConfig = {
         hostname: 'ui-avatars.com',
         pathname: '/api/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        pathname: '/**',
+      },
     ],
     unoptimized: process.env.NEXT_PUBLIC_PREVIEW_MODE === 'true',
   },

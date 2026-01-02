@@ -189,52 +189,68 @@ export default function EditRoomPage() {
     }
   };
 
-  const handleAddAdmin = async (roomId: string, userId: string) => {
+  const handleAddAdmin = async (targetRoomId: string, userId: string) => {
     try {
-      await fetch(`/api/admin/rooms/${roomId}/admins`, {
+      const res = await fetch(`/api/admin/rooms/${targetRoomId}/roles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: userId }),
+        body: JSON.stringify({ profileId: userId, role: 'room_admin' }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: 'Failed to add admin', description: err?.error || 'Unknown error', variant: 'error' });
+      }
       fetchRoles();
     } catch (err) {
       console.error('Error adding admin:', err);
     }
   };
 
-  const handleAddModerator = async (roomId: string, userId: string) => {
+  const handleAddModerator = async (targetRoomId: string, userId: string) => {
     try {
-      await fetch(`/api/admin/rooms/${roomId}/moderators`, {
+      const res = await fetch(`/api/admin/rooms/${targetRoomId}/roles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: userId }),
+        body: JSON.stringify({ profileId: userId, role: 'room_moderator' }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: 'Failed to add moderator', description: err?.error || 'Unknown error', variant: 'error' });
+      }
       fetchRoles();
     } catch (err) {
       console.error('Error adding moderator:', err);
     }
   };
 
-  const handleRemoveAdmin = async (roomId: string, userId: string) => {
+  const handleRemoveAdmin = async (targetRoomId: string, userId: string) => {
     try {
-      await fetch(`/api/admin/rooms/${roomId}/admins`, {
+      const res = await fetch(`/api/admin/rooms/${targetRoomId}/roles`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: userId }),
+        body: JSON.stringify({ profileId: userId, role: 'room_admin' }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: 'Failed to remove admin', description: err?.error || 'Unknown error', variant: 'error' });
+      }
       fetchRoles();
     } catch (err) {
       console.error('Error removing admin:', err);
     }
   };
 
-  const handleRemoveModerator = async (roomId: string, userId: string) => {
+  const handleRemoveModerator = async (targetRoomId: string, userId: string) => {
     try {
-      await fetch(`/api/admin/rooms/${roomId}/moderators`, {
+      const res = await fetch(`/api/admin/rooms/${targetRoomId}/roles`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: userId }),
+        body: JSON.stringify({ profileId: userId, role: 'room_moderator' }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: 'Failed to remove moderator', description: err?.error || 'Unknown error', variant: 'error' });
+      }
       fetchRoles();
     } catch (err) {
       console.error('Error removing moderator:', err);
@@ -285,7 +301,7 @@ export default function EditRoomPage() {
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-foreground">{room.name}</h1>
                 <a
-                  href={`/${room.room_key}`}
+                  href={`/room/${room.room_key}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground bg-muted rounded transition"
@@ -294,7 +310,7 @@ export default function EditRoomPage() {
                   View
                 </a>
               </div>
-              <p className="text-muted-foreground text-sm">/{room.room_key}</p>
+              <p className="text-muted-foreground text-sm">/room/{room.room_key}</p>
             </div>
           </div>
           

@@ -20,6 +20,7 @@ import { UserActionCardV2 } from '../components/UserActionCardV2';
 interface ViewersLeaderboardsOverlayProps {
   visible: boolean;
   onClose: () => void;
+  roomId?: string;
   onNavigateToProfile?: (username: string) => void;
   onOpenIM?: (profileId: string, username: string, avatarUrl?: string) => void;
 }
@@ -29,6 +30,7 @@ type Tab = 'viewers' | 'streamers' | 'gifters';
 export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProps> = ({
   visible,
   onClose,
+  roomId,
   onNavigateToProfile,
   onOpenIM,
 }) => {
@@ -42,9 +44,11 @@ export const ViewersLeaderboardsOverlay: React.FC<ViewersLeaderboardsOverlayProp
   } | null>(null);
   
   // Fetch real data
-  const { viewers, loading: viewersLoading } = useViewers();
-  const { entries: streamerLeaderboard, loading: streamersLoading } = useLeaderboard('top_streamers', 'daily');
-  const { entries: gifterLeaderboard, loading: giftersLoading } = useLeaderboard('top_gifters', 'daily');
+  const scopeRoomId = roomId || 'live-central';
+
+  const { viewers, loading: viewersLoading } = useViewers(scopeRoomId);
+  const { entries: streamerLeaderboard, loading: streamersLoading } = useLeaderboard('top_streamers', 'daily', scopeRoomId);
+  const { entries: gifterLeaderboard, loading: giftersLoading } = useLeaderboard('top_gifters', 'daily', scopeRoomId);
   
   const translateY = useSharedValue(0);
 

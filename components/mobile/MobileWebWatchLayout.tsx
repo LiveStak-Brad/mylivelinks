@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { ArrowLeft, Gift, Maximize2, Volume2, Share2, Settings, Sparkles, Video as VideoIcon } from 'lucide-react';
+import { useState, useCallback, useEffect, type ReactNode } from 'react';
+import { ArrowLeft, Gift, MessageCircle, Users, Trophy, SlidersHorizontal, Share2, Video as VideoIcon, X, Volume2, Maximize2 } from 'lucide-react';
 import { Room } from 'livekit-client';
 import Tile from '@/components/Tile';
 import GoLiveButton from '@/components/GoLiveButton';
 import GiftModal from '@/components/GiftModal';
 import ReportModal from '@/components/ReportModal';
+import Chat from '@/components/Chat';
+import ViewerList from '@/components/ViewerList';
+import Leaderboard from '@/components/Leaderboard';
 import type { GifterStatus } from '@/lib/gifter-status';
 
 interface LiveStreamer {
@@ -32,6 +35,8 @@ interface GridSlot {
 interface MobileWebWatchLayoutProps {
   mode?: 'solo' | 'battle';
   layoutStyle?: 'tiktok-viewer' | 'twitch-viewer' | 'battle-cameras';
+  roomId?: string;
+  roomName?: string;
   gridSlots: GridSlot[];
   sharedRoom: Room | null;
   isRoomConnected: boolean;
@@ -41,6 +46,9 @@ interface MobileWebWatchLayoutProps {
   onGoLive?: (liveStreamId: number, profileId: string) => void;
   publishAllowed?: boolean;
   onPublishingChange?: (isPublishing: boolean) => void;
+  onGiftClick?: () => void;
+  onShareClick?: () => void;
+  onSettingsClick?: () => void;
   onLeave: () => void;
   onMuteTile: (slotIndex: number) => void;
   onVolumeChange: (slotIndex: number, volume: number) => void;
@@ -49,10 +57,48 @@ interface MobileWebWatchLayoutProps {
 }
 
 // Grid configurations for different orientations
-const PORTRAIT_ROWS = 3;
-const PORTRAIT_COLS = 4;
+const PORTRAIT_ROWS = 4;
+const PORTRAIT_COLS = 3;
 const LANDSCAPE_ROWS = 3;
 const LANDSCAPE_COLS = 4;
+
+type BottomSheetKey = 'chat' | 'viewers' | 'leaderboard' | 'options' | null;
+
+type BottomSheetProps = {
+  isOpen: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+function BottomSheet({ isOpen, title, onClose, children }: BottomSheetProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[220] flex items-end justify-center bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-t-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <div className="text-sm font-bold text-gray-900 dark:text-gray-100">{title}</div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5 text-gray-700 dark:text-gray-200" />
+          </button>
+        </div>
+        <div className="max-h-[70vh] overflow-y-auto p-4">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Mobile Web Watch Layout v2.0 - NATIVE MOBILE PARITY
@@ -72,6 +118,8 @@ const LANDSCAPE_COLS = 4;
 export default function MobileWebWatchLayout({
   mode = 'solo',
   layoutStyle = 'tiktok-viewer',
+  roomId,
+  roomName,
   gridSlots,
   sharedRoom,
   isRoomConnected,
@@ -81,6 +129,9 @@ export default function MobileWebWatchLayout({
   onGoLive,
   publishAllowed = true,
   onPublishingChange,
+  onGiftClick,
+  onShareClick,
+  onSettingsClick,
   onLeave,
   onMuteTile,
   onVolumeChange,
@@ -109,7 +160,7 @@ export default function MobileWebWatchLayout({
     contextDetails?: string;
   } | null>(null);
 
-  const [showOptionsSheet, setShowOptionsSheet] = useState(false);
+  const [activeSheet, setActiveSheet] = useState<BottomSheetKey>(null);
   
   // Global mute state
   const [globalMuted, setGlobalMuted] = useState(false);
@@ -236,28 +287,23 @@ export default function MobileWebWatchLayout({
   // Handle share
   const handleSharePress = useCallback(async () => {
     try {
-      const url = `${window.location.origin}/liveTV`;
+      const url = typeof window !== 'undefined' ? window.location.href : '';
       await navigator.share({
-        title: 'Join Live Central',
-        text: 'Watch live streamers on MyLiveLinks!',
+        title: roomName || 'Join Live Room',
+        text: 'Join the live room on MyLiveLinks!',
         url: url,
       });
     } catch (err) {
       // Share failed or cancelled - silent fail
       console.log('Share cancelled or failed');
     }
-  }, []);
+  }, [roomName]);
 
   const getPrimaryReportTarget = useCallback(() => {
     const targetSlot = focusedSlot || activeSlots[0];
     if (!targetSlot?.streamer) return null;
     return targetSlot.streamer;
   }, [activeSlots, focusedSlot]);
-
-  // Handle options
-  const handleOptionsPress = useCallback(() => {
-    setShowOptionsSheet(true);
-  }, []);
 
   const handleReportStream = useCallback(() => {
     const streamer = getPrimaryReportTarget();
@@ -268,7 +314,7 @@ export default function MobileWebWatchLayout({
     const liveStreamId = Number.isFinite(parsedLiveStreamId) && parsedLiveStreamId && parsedLiveStreamId > 0 ? parsedLiveStreamId : null;
     const reportUrl = typeof window !== 'undefined' ? `${window.location.origin}/liveTV` : null;
 
-    setShowOptionsSheet(false);
+    setActiveSheet(null);
     setReportModalTarget({
       reportType: 'stream',
       reportedUserId: streamer.profile_id,
@@ -291,7 +337,7 @@ export default function MobileWebWatchLayout({
 
     const reportUrl = typeof window !== 'undefined' ? `${window.location.origin}/liveTV` : null;
 
-    setShowOptionsSheet(false);
+    setActiveSheet(null);
     setReportModalTarget({
       reportType: 'user',
       reportedUserId: streamer.profile_id,
@@ -307,58 +353,75 @@ export default function MobileWebWatchLayout({
     });
   }, [getPrimaryReportTarget]);
 
-  // Handle filter (placeholder)
-  const handleFilterPress = useCallback(() => {
-    // TODO: Open filter options
-    alert('Filters coming soon');
+  const safeRoomId = roomId || 'live_central';
+
+  const handleGiftAction = useCallback(() => {
+    if (onGiftClick) {
+      onGiftClick();
+      return;
+    }
+    handleGiftPress();
+  }, [handleGiftPress, onGiftClick]);
+
+  const handleShareAction = useCallback(() => {
+    if (onShareClick) {
+      onShareClick();
+      return;
+    }
+    handleSharePress();
+  }, [handleSharePress, onShareClick]);
+
+  const handleOpenSheet = useCallback((key: BottomSheetKey) => {
+    setActiveSheet((prev) => (prev === key ? null : key));
+  }, []);
+
+  const handleCloseSheet = useCallback(() => {
+    setActiveSheet(null);
   }, []);
 
   return (
-    <div className="mobile-live-container">
-      {/* LEFT RAIL - Controller buttons (1/1/1/1/1 distribution) */}
-      <div className="mobile-live-left-rail">
-        {/* 1. Back Button */}
+    <div className="mobile-live-container mobile-live-v3">
+      {/* TOP BAR - Full width */}
+      <div className="mobile-live-topbar">
         <button
           onClick={onLeave}
-          className="mobile-live-button mobile-live-color-back"
+          className="mobile-live-topbar-btn"
           aria-label="Leave"
         >
           <ArrowLeft />
         </button>
 
-        {/* 2. Spacer (maintains even distribution) */}
-        <div className="mobile-live-button-spacer" />
+        <div className="mobile-live-topbar-title">
+          <div className="mobile-live-topbar-roomname">{roomName || 'Live Room'}</div>
+          <div className="mobile-live-topbar-subtitle">{activeCount} Live</div>
+        </div>
 
-        {/* 3. Spacer (maintains even distribution) */}
-        <div className="mobile-live-button-spacer" />
+        <div className="mobile-live-topbar-actions">
+          {currentUserId && (
+            <div className="mobile-live-topbar-golive">
+              <GoLiveButton
+                sharedRoom={sharedRoom}
+                isRoomConnected={isRoomConnected}
+                onGoLive={onGoLive}
+                onPublishingChange={onPublishingChange}
+                publishAllowed={publishAllowed}
+                mode={streamingMode}
+              />
+            </div>
+          )}
 
-        {/* 4. Filter Button */}
-        <button
-          onClick={handleFilterPress}
-          className="mobile-live-button mobile-live-color-filter"
-          aria-label="Filters"
-        >
-          <Sparkles />
-        </button>
-
-        {/* 5. Go Live Camera Button */}
-        {currentUserId && (
-          <div className="mobile-live-button mobile-live-button-primary">
-            <GoLiveButton
-              sharedRoom={sharedRoom}
-              isRoomConnected={isRoomConnected}
-              onGoLive={onGoLive}
-              onPublishingChange={onPublishingChange}
-              publishAllowed={publishAllowed}
-              mode={streamingMode}
-            />
-          </div>
-        )}
-        {!currentUserId && <div className="mobile-live-button-spacer" />}
+          <button
+            onClick={handleSharePress}
+            className="mobile-live-topbar-btn"
+            aria-label="Share"
+          >
+            <Share2 />
+          </button>
+        </div>
       </div>
 
-      {/* CENTER GRID - Camera grid area */}
-      <div className="mobile-live-grid-area">
+      {/* GRID WRAP */}
+      <div className="mobile-live-grid-wrap">
         {/* Focus Mode - Single tile maximized */}
         {focusedSlotIndex !== null && focusedSlot?.streamer ? (
           <div className="mobile-live-focus-tile" key={`${focusedSlot.slotIndex}:${focusedSlot.streamer.profile_id}`}>
@@ -449,56 +512,51 @@ export default function MobileWebWatchLayout({
             })}
           </div>
         )}
-      </div>
 
-      {/* RIGHT RAIL - Controller buttons (1/1/1/1/1 distribution) */}
-      <div className="mobile-live-right-rail">
-        {/* 1. Gift Button */}
-        <button
-          onClick={handleGiftPress}
-          disabled={activeCount === 0}
-          className="mobile-live-button mobile-live-button-primary mobile-live-color-gift"
-          aria-label="Send Gift"
-        >
-          <Gift />
-        </button>
-
-        {/* 2. PiP / Focus Toggle Button */}
-        <button
-          onClick={handlePiPToggle}
-          disabled={activeCount === 0}
-          className={`mobile-live-button mobile-live-color-pip ${focusedSlotIndex !== null ? 'mobile-live-button-active' : ''}`}
-          aria-label={focusedSlotIndex !== null ? 'Exit Focus' : 'Focus Mode'}
-        >
-          <Maximize2 />
-        </button>
-
-        {/* 3. Mixer / Volume Button */}
-        <button
-          onClick={handleMixerPress}
-          className={`mobile-live-button mobile-live-color-mixer ${globalMuted ? 'mobile-live-button-active' : ''}`}
-          aria-label={globalMuted ? 'Unmute All' : 'Mute All'}
-        >
-          <Volume2 />
-        </button>
-
-        {/* 4. Share Button */}
-        <button
-          onClick={handleSharePress}
-          className="mobile-live-button mobile-live-color-share"
-          aria-label="Share"
-        >
-          <Share2 />
-        </button>
-
-        {/* 5. Options Button */}
-        <button
-          onClick={handleOptionsPress}
-          className="mobile-live-button mobile-live-color-options"
-          aria-label="Options"
-        >
-          <Settings />
-        </button>
+        {/* BOTTOM TAB BAR */}
+        <div className="mobile-live-bottombar">
+          <button
+            onClick={() => handleOpenSheet('chat')}
+            className={`mobile-live-tab ${activeSheet === 'chat' ? 'mobile-live-tab-active' : ''}`}
+            aria-label="Chat"
+          >
+            <MessageCircle />
+            <span>Chat</span>
+          </button>
+          <button
+            onClick={() => handleOpenSheet('viewers')}
+            className={`mobile-live-tab ${activeSheet === 'viewers' ? 'mobile-live-tab-active' : ''}`}
+            aria-label="Viewers"
+          >
+            <Users />
+            <span>Viewers</span>
+          </button>
+          <button
+            onClick={() => handleOpenSheet('leaderboard')}
+            className={`mobile-live-tab ${activeSheet === 'leaderboard' ? 'mobile-live-tab-active' : ''}`}
+            aria-label="Leaderboard"
+          >
+            <Trophy />
+            <span>Top</span>
+          </button>
+          <button
+            onClick={handleGiftAction}
+            disabled={activeCount === 0}
+            className="mobile-live-tab mobile-live-tab-gift"
+            aria-label="Gift"
+          >
+            <Gift />
+            <span>Gift</span>
+          </button>
+          <button
+            onClick={() => handleOpenSheet('options')}
+            className={`mobile-live-tab ${activeSheet === 'options' ? 'mobile-live-tab-active' : ''}`}
+            aria-label="Controls"
+          >
+            <SlidersHorizontal />
+            <span>Controls</span>
+          </button>
+        </div>
       </div>
 
       {/* Gift Modal */}
@@ -525,43 +583,99 @@ export default function MobileWebWatchLayout({
         />
       )}
 
-      {showOptionsSheet && (
-        <div
-          className="fixed inset-0 z-[210] flex items-end justify-center bg-black/50"
-          onClick={() => setShowOptionsSheet(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-t-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
-            onClick={(e) => e.stopPropagation()}
+      <BottomSheet
+        isOpen={activeSheet === 'chat'}
+        title="Chat"
+        onClose={handleCloseSheet}
+      >
+        <Chat
+          roomSlug={safeRoomId}
+          readOnly={!currentUserId}
+          onGiftClick={handleGiftAction}
+          onShareClick={handleShareAction}
+          onSettingsClick={onSettingsClick}
+        />
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={activeSheet === 'viewers'}
+        title="Viewers"
+        onClose={handleCloseSheet}
+      >
+        <ViewerList roomId={safeRoomId} />
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={activeSheet === 'leaderboard'}
+        title="Leaderboard"
+        onClose={handleCloseSheet}
+      >
+        <Leaderboard roomSlug={safeRoomId} roomName={roomName} />
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={activeSheet === 'options'}
+        title="Controls"
+        onClose={handleCloseSheet}
+      >
+        <div className="space-y-2">
+          <button
+            onClick={handleGiftAction}
+            disabled={activeCount === 0}
+            className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-bold text-gray-900 dark:text-gray-100">Options</div>
-              <button
-                onClick={() => setShowOptionsSheet(false)}
-                className="px-3 py-1 text-sm font-semibold text-gray-700 dark:text-gray-200"
-              >
-                Close
-              </button>
-            </div>
+            <span>Send gift</span>
+            <Gift className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleShareAction}
+            className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
+          >
+            <span>Share room</span>
+            <Share2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleMixerPress}
+            className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold ${globalMuted ? 'ring-2 ring-purple-500' : ''}`}
+          >
+            <span>{globalMuted ? 'Unmute all' : 'Mute all'}</span>
+            <Volume2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handlePiPToggle}
+            disabled={activeCount === 0}
+            className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50 ${focusedSlotIndex !== null ? 'ring-2 ring-purple-500' : ''}`}
+          >
+            <span>{focusedSlotIndex !== null ? 'Exit focus' : 'Focus mode'}</span>
+            <Maximize2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => {
+              handleCloseSheet();
+              onSettingsClick?.();
+            }}
+            className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
+          >
+            <span>Settings</span>
+            <SlidersHorizontal className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleReportStream}
+            disabled={activeCount === 0}
+            className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
+          >
+            Report stream
+          </button>
 
-            <button
-              onClick={handleReportStream}
-              disabled={activeCount === 0}
-              className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
-            >
-              Report stream
-            </button>
-
-            <button
-              onClick={handleReportUser}
-              disabled={activeCount === 0}
-              className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50 mt-2"
-            >
-              Report user
-            </button>
-          </div>
+          <button
+            onClick={handleReportUser}
+            disabled={activeCount === 0}
+            className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
+          >
+            Report user
+          </button>
         </div>
-      )}
+      </BottomSheet>
     </div>
   );
 }

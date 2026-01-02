@@ -1,11 +1,12 @@
 'use client';
 
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import type { TeamRole } from '@/lib/teamAdmin/types';
 import { getTeamAdminCapabilities } from '@/lib/teamAdmin/permissions';
 import { getMockRoleFromQuery } from '@/lib/teamAdmin/mockService';
+import { createClient } from '@/lib/supabase';
 import { Button, Badge } from '@/components/ui';
 
 export interface TeamAdminGateProps {
@@ -29,6 +30,7 @@ function RoleBadge({ role }: { role: TeamRole }) {
 export default function TeamAdminGate({ children }: TeamAdminGateProps) {
   const sp = useSearchParams();
   const pathname = usePathname();
+  const [isAllowlisted, setIsAllowlisted] = useState<boolean>(false);
   const role = useMemo(() => {
     const q = sp?.get('role') ?? null;
     return getMockRoleFromQuery(q) ?? 'Team_Admin';
@@ -36,7 +38,52 @@ export default function TeamAdminGate({ children }: TeamAdminGateProps) {
 
   const caps = getTeamAdminCapabilities(role);
 
-  if (!caps.canAccessAdminArea) {
+  useEffect(() => {
+    let mounted = true;
+    const supabase = createClient();
+
+    const isAllowed = (userId?: string | null, email?: string | null) => {
+      const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+
+      const hardcodedIds = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
+      const hardcodedEmails = ['wcba.mo@gmail.com'];
+
+      const idMatch = !!(userId && (envIds.includes(userId) || hardcodedIds.includes(userId)));
+      const emailMatch = !!(
+        email && (envEmails.includes(email.toLowerCase()) || hardcodedEmails.includes(email.toLowerCase()))
+      );
+      return idMatch || emailMatch;
+    };
+
+    const run = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!mounted) return;
+        setIsAllowlisted(isAllowed(user?.id, user?.email));
+      } catch {
+        if (!mounted) return;
+        setIsAllowlisted(false);
+      }
+    };
+
+    run();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const canAccess = caps.canAccessAdminArea || isAllowlisted;
+
+  if (!canAccess) {
     return (
       <div className="min-h-[calc(100vh-7rem)] bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">

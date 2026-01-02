@@ -18,11 +18,12 @@ export interface Viewer {
   is_live_available: boolean;
 }
 
-export function useViewers() {
+export function useViewers(roomId: string = 'live-central') {
   const [viewers, setViewers] = useState<Viewer[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const supabase = createClient;
+  const normalizedRoomId = roomId || 'live-central';
 
   const loadViewers = useCallback(async () => {
     try {
@@ -46,7 +47,8 @@ export function useViewers() {
             avatar_url,
             gifter_level
           )
-        `);
+        `)
+        .eq('room_id', normalizedRoomId);
 
       if (error) throw error;
 
@@ -86,20 +88,21 @@ export function useViewers() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, normalizedRoomId]);
 
   useEffect(() => {
     loadViewers();
 
     // Realtime subscriptions for room_presence
     const roomPresenceChannel = supabase
-      .channel('room-presence-mobile')
+      .channel(`room-presence-mobile-${normalizedRoomId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'room_presence',
+          filter: `room_id=eq.${normalizedRoomId}`,
         },
         () => {
           loadViewers();
@@ -126,7 +129,7 @@ export function useViewers() {
       supabase.removeChannel(roomPresenceChannel);
       supabase.removeChannel(liveStreamsChannel);
     };
-  }, [loadViewers, supabase]);
+  }, [loadViewers, supabase, normalizedRoomId]);
 
   return {
     viewers,

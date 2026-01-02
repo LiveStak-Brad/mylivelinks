@@ -22,44 +22,9 @@ export function useIsMobileWeb(): boolean {
       }
 
       const width = window.innerWidth;
-      const height = window.innerHeight;
-      
-      // Width check: phone-sized viewport
-      const isPhoneWidth = width <= 900;
-      
-      // Pointer check: touch device (coarse pointer = finger/stylus)
-      const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
-      
-      // User agent checks
-      const ua = navigator.userAgent.toLowerCase();
-      
-      // Mobile phone indicators
-      const isMobileUA = /mobile|iphone|ipod|android(?!.*tablet)|blackberry|opera mini|iemobile|wpdesktop/i.test(ua);
-      
-      // Tablet exclusion indicators
-      const isTabletUA = /ipad|tablet|playbook|silk/i.test(ua);
-      
-      // iPad detection (newer iPads report as Mac in Safari)
-      const isIPad = 
-        /ipad/i.test(ua) || 
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
-        (/macintosh/i.test(ua) && 'ontouchend' in document);
-      
-      // Android tablet detection (typically > 600px width and "android" but no "mobile")
-      const isAndroidTablet = /android/i.test(ua) && !/mobile/i.test(ua);
-      
-      // Exclude tablets
-      if (isTabletUA || isIPad || isAndroidTablet) {
-        return false;
-      }
-      
-      // Must have phone-sized viewport
-      if (!isPhoneWidth) {
-        return false;
-      }
-      
-      // Must have either coarse pointer OR mobile user agent
-      return hasCoarsePointer || isMobileUA;
+
+      // Treat small screens (phones, tablets, small laptops) as "mobile web" for LIVE layout.
+      return width <= 1024;
     };
 
     // Initial check

@@ -480,8 +480,8 @@ export default function GifterLevelsPage() {
               <Button size="lg">Get Coins</Button>
             </Link>
             {canOpenLive ? (
-              <Link href="/live">
-                <Button variant="secondary" size="lg">Browse Live Streams</Button>
+              <Link href="/room/live-central">
+                <Button variant="secondary" size="lg">Go Live</Button>
               </Link>
             ) : (
               <Button 

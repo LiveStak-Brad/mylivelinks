@@ -103,9 +103,9 @@ export default function RoomRolesPanel({
           ) : (
             roomAdmins.map((admin) => (
               <RoleUserRow
-                key={admin.id}
+                key={admin.profile_id}
                 user={admin}
-                onRemove={() => onRemoveAdmin(room.id, admin.id)}
+                onRemove={() => onRemoveAdmin(room.id, admin.profile_id)}
                 canRemove={canManageAdmins}
                 isLoading={isLoading}
               />
@@ -146,9 +146,9 @@ export default function RoomRolesPanel({
           ) : (
             roomModerators.map((mod) => (
               <RoleUserRow
-                key={mod.id}
+                key={mod.profile_id}
                 user={mod}
-                onRemove={() => onRemoveModerator(room.id, mod.id)}
+                onRemove={() => onRemoveModerator(room.id, mod.profile_id)}
                 canRemove={canManageModerators}
                 isLoading={isLoading}
               />

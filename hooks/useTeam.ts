@@ -1,0 +1,1158 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createClient } from '@/lib/supabase';
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TYPES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export type FeedSort = 'hot' | 'new' | 'top';
+export type MemberFilter = 'all' | 'live' | 'online';
+export type MemberActivity = 'online' | 'live' | 'offline';
+
+export type TeamMembershipStatus = 'requested' | 'approved' | 'rejected' | 'banned' | 'left' | 'none';
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  handle: string;
+  avatar: string;
+  role: 'leader' | 'core' | 'member' | 'guest';
+  activity: MemberActivity;
+  isStreaming?: boolean;
+}
+
+export interface FeedItem {
+  id: string;
+  type: 'post' | 'thread' | 'poll' | 'clip' | 'announcement' | 'event';
+  author: TeamMember;
+  title?: string;
+  body: string;
+  media?: string;
+  createdAt: number;
+  hotScore: number;
+  upvotes: number;
+  downvotes: number;
+  comments: number;
+  isPinned?: boolean;
+  isAnnouncement?: boolean;
+  pollOptions?: { label: string; votes: number }[];
+  topReplies?: { author: TeamMember; text: string }[];
+}
+
+export interface ChatMessage {
+  id: string;
+  author: TeamMember;
+  text: string;
+  timestamp: number;
+  reactions?: { emoji: string; count: number }[];
+  isSystem?: boolean;
+  replyTo?: string;
+}
+
+export interface LiveRoom {
+  id: string;
+  host: TeamMember;
+  title: string;
+  viewers: number;
+  thumbnail: string;
+  isTeamRoom?: boolean;
+  liveStreamId?: number;
+}
+
+export interface TeamHomeData {
+  team: {
+    id: string;
+    name: string;
+    slug: string;
+    team_tag: string;
+    description: string | null;
+    rules: string | null;
+    icon_url: string | null;
+    banner_url: string | null;
+    theme_color: string | null;
+    approved_member_count: number;
+    pending_request_count: number | null;
+  };
+  viewer_state: {
+    is_authenticated: boolean;
+    membership_status: TeamMembershipStatus;
+    role: string | null;
+    can_moderate: boolean;
+  };
+  stats: {
+    posts_last_7d: number;
+    live_now: number;
+  };
+}
+
+export type TeamHookResult<T> = {
+  data: T | null;
+  isLoading: boolean;
+  error: Error | null;
+  notAuthorized: boolean;
+  refetch: () => void;
+};
+
+function isAuthzError(err: unknown): boolean {
+  const message = (err as any)?.message as string | undefined;
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return m.includes('forbidden') || m.includes('unauthorized') || m.includes('permission');
+}
+
+function dbRoleToRoleState(dbRole: string | null | undefined): TeamMember['role'] {
+  switch (dbRole) {
+    case 'Team_Admin':
+      return 'leader';
+    case 'Team_Moderator':
+      return 'core';
+    case 'Team_Member':
+    default:
+      return 'member';
+  }
+}
+
+function roleStateToDbRole(role: TeamMember['role']): 'Team_Admin' | 'Team_Moderator' | 'Team_Member' {
+  switch (role) {
+    case 'leader':
+      return 'Team_Admin';
+    case 'core':
+      return 'Team_Moderator';
+    case 'member':
+    case 'guest':
+    default:
+      return 'Team_Member';
+  }
+}
+
+function stableGradient(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const a = 210 + (h % 90);
+  const b = 120 + ((h >>> 8) % 90);
+  return `linear-gradient(135deg, hsl(${a} 70% 55%), hsl(${b} 70% 55%))`;
+}
+
+const teamSlugCache = new Map<string, string>();
+
+async function getTeamSlugById(teamId: string): Promise<string> {
+  const cached = teamSlugCache.get(teamId);
+  if (cached) return cached;
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from('teams').select('slug').eq('id', teamId).single();
+  if (error) throw error;
+  if (!data?.slug) throw new Error('team_slug_missing');
+  teamSlugCache.set(teamId, data.slug);
+  return data.slug;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   QUERY KEYS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export const teamKeys = {
+  all: ['team'] as const,
+  team: (slug: string) => [...teamKeys.all, 'detail', slug] as const,
+  membership: (teamId: string, userId: string) => [...teamKeys.all, 'membership', teamId, userId] as const,
+  feed: (teamId: string, sort: FeedSort) => [...teamKeys.all, 'feed', teamId, sort] as const,
+  members: (teamId: string, filter: MemberFilter) => [...teamKeys.all, 'members', teamId, filter] as const,
+  presence: (teamId: string) => [...teamKeys.all, 'presence', teamId] as const,
+  liveRooms: (teamId: string) => [...teamKeys.all, 'liveRooms', teamId] as const,
+  chat: (teamId: string) => [...teamKeys.all, 'chat', teamId] as const,
+};
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useTeam — Fetch team home data
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useTeam(slug: string) {
+  const supabase = useMemo(() => createClient(), []);
+  const [data, setData] = useState<TeamHomeData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const refreshKeyRef = useRef(0);
+
+  const refetch = useCallback(() => {
+    refreshKeyRef.current += 1;
+    setIsLoading((v) => v);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!slug) {
+        setData(null);
+        setError(null);
+        setNotAuthorized(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      setNotAuthorized(false);
+
+      try {
+        const { data: res, error: rpcError } = await supabase.rpc('rpc_get_team_home', {
+          p_team_slug: slug,
+        });
+        if (rpcError) throw rpcError;
+        if (!cancelled) setData(res as TeamHomeData);
+      } catch (e) {
+        if (!cancelled) {
+          setData(null);
+          setError(e as Error);
+          setNotAuthorized(isAuthzError(e));
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, supabase, refreshKeyRef.current]);
+
+  return { data, isLoading, error, notAuthorized, refetch } satisfies TeamHookResult<TeamHomeData>;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useTeamMembership — Current user's membership (loaded once, reused)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useTeamMembership(teamId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [data, setData] = useState<
+    | {
+        status: TeamMembershipStatus;
+        role: TeamMember['role'];
+        canModerate: boolean;
+        isBanned: boolean;
+        isMuted: boolean;
+      }
+    | null
+  >(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const refreshKeyRef = useRef(0);
+
+  const refetch = useCallback(() => {
+    refreshKeyRef.current += 1;
+    setIsLoading((v) => v);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!teamId) {
+        setData(null);
+        setError(null);
+        setNotAuthorized(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      setNotAuthorized(false);
+
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth.user?.id ?? null;
+        if (!userId) {
+          if (!cancelled) {
+            setData({ status: 'none', role: 'guest', canModerate: false, isBanned: false, isMuted: false });
+          }
+          return;
+        }
+
+        const { data: m, error: selErr } = await supabase
+          .from('team_memberships')
+          .select('status, role')
+          .eq('team_id', teamId)
+          .eq('profile_id', userId)
+          .maybeSingle();
+
+        if (selErr) throw selErr;
+
+        const status = ((m?.status as TeamMembershipStatus | undefined) ?? 'none') satisfies TeamMembershipStatus;
+        const role = status === 'approved' ? dbRoleToRoleState((m?.role as string | undefined) ?? null) : 'guest';
+
+        const canModerate = role === 'leader' || role === 'core';
+
+        const [{ data: bannedRes }, { data: mutedRes }] = await Promise.all([
+          supabase.rpc('is_team_banned', { p_team_id: teamId, p_profile_id: userId }),
+          supabase.rpc('is_team_muted', { p_team_id: teamId, p_profile_id: userId, p_stream_id: 0 }),
+        ]);
+
+        if (!cancelled) {
+          setData({
+            status,
+            role,
+            canModerate,
+            isBanned: !!bannedRes,
+            isMuted: !!mutedRes,
+          });
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setData(null);
+          setError(e as Error);
+          setNotAuthorized(isAuthzError(e));
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, supabase, refreshKeyRef.current]);
+
+  return { data, isLoading, error, notAuthorized, refetch };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useTeamFeed — Paginated feed with sorting (no duplicate fetches)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
+  const supabase = useMemo(() => createClient(), []);
+  const [rawItems, setRawItems] = useState<FeedItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  const cursorRef = useRef<{ beforeCreatedAt: string | null; beforeId: string | null } | null>(null);
+  const refreshKeyRef = useRef(0);
+
+  const refetch = useCallback(() => {
+    refreshKeyRef.current += 1;
+    cursorRef.current = null;
+    setHasMore(true);
+    setRawItems([]);
+  }, []);
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || isLoadingMore) return;
+    setIsLoadingMore(true);
+  }, [hasMore, isLoadingMore]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async (mode: 'initial' | 'more') => {
+      if (!teamId) {
+        setRawItems([]);
+        setHasMore(true);
+        setError(null);
+        setNotAuthorized(false);
+        return;
+      }
+
+      if (mode === 'initial') setIsLoading(true);
+      setError(null);
+      setNotAuthorized(false);
+
+      try {
+        const teamSlug = await getTeamSlugById(teamId);
+        const cursor = cursorRef.current;
+
+        const { data: rows, error: rpcError } = await supabase.rpc('rpc_get_team_feed', {
+          p_team_slug: teamSlug,
+          p_limit: 20,
+          p_before_created_at: cursor?.beforeCreatedAt ?? null,
+          p_before_id: cursor?.beforeId ?? null,
+        });
+
+        if (rpcError) throw rpcError;
+
+        const mapped = (rows as any[]).map((r) => {
+          const createdAtMs = new Date(r.created_at).getTime();
+          const upvotes = Number(r.reaction_count ?? 0);
+          const comments = Number(r.comment_count ?? 0);
+
+          const author: TeamMember = {
+            id: String(r.author_id),
+            name: String(r.author_username ?? 'Unknown'),
+            handle: `@${String(r.author_username ?? 'unknown')}`,
+            avatar: String(r.author_avatar_url ?? 'https://ui-avatars.com/api/?name=U&background=111827&color=fff'),
+            role: 'member',
+            activity: 'offline',
+          };
+
+          const isPinned = !!r.is_pinned;
+          const hotScore = Math.round((upvotes * 2 + comments * 3) / Math.max(1, (Date.now() - createdAtMs) / 36e5));
+
+          return {
+            id: String(r.post_id),
+            type: isPinned ? 'announcement' : 'post',
+            author,
+            body: String(r.text_content ?? ''),
+            media: r.media_url ? String(r.media_url) : undefined,
+            createdAt: createdAtMs,
+            hotScore,
+            upvotes,
+            downvotes: 0,
+            comments,
+            isPinned,
+            isAnnouncement: isPinned,
+          } satisfies FeedItem;
+        });
+
+        if ((rows as any[])?.length === 0) setHasMore(false);
+
+        const last = (rows as any[])?.[(rows as any[])?.length - 1];
+        if (last?.created_at && last?.post_id) {
+          cursorRef.current = { beforeCreatedAt: last.created_at, beforeId: last.post_id };
+        }
+
+        if (!cancelled) {
+          setRawItems((prev) => (mode === 'initial' ? mapped : [...prev, ...mapped]));
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e as Error);
+          setNotAuthorized(isAuthzError(e));
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+          setIsLoadingMore(false);
+        }
+      }
+    };
+
+    run(cursorRef.current === null ? 'initial' : 'more');
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, supabase, refreshKeyRef.current]);
+
+  useEffect(() => {
+    if (!isLoadingMore) return;
+    if (!teamId) return;
+    let cancelled = false;
+
+    const runMore = async () => {
+      try {
+        const teamSlug = await getTeamSlugById(teamId);
+        const cursor = cursorRef.current;
+        const { data: rows, error: rpcError } = await supabase.rpc('rpc_get_team_feed', {
+          p_team_slug: teamSlug,
+          p_limit: 20,
+          p_before_created_at: cursor?.beforeCreatedAt ?? null,
+          p_before_id: cursor?.beforeId ?? null,
+        });
+        if (rpcError) throw rpcError;
+
+        const mapped = (rows as any[]).map((r) => {
+          const createdAtMs = new Date(r.created_at).getTime();
+          const upvotes = Number(r.reaction_count ?? 0);
+          const comments = Number(r.comment_count ?? 0);
+          const isPinned = !!r.is_pinned;
+          const hotScore = Math.round((upvotes * 2 + comments * 3) / Math.max(1, (Date.now() - createdAtMs) / 36e5));
+          const author: TeamMember = {
+            id: String(r.author_id),
+            name: String(r.author_username ?? 'Unknown'),
+            handle: `@${String(r.author_username ?? 'unknown')}`,
+            avatar: String(r.author_avatar_url ?? 'https://ui-avatars.com/api/?name=U&background=111827&color=fff'),
+            role: 'member',
+            activity: 'offline',
+          };
+          return {
+            id: String(r.post_id),
+            type: isPinned ? 'announcement' : 'post',
+            author,
+            body: String(r.text_content ?? ''),
+            media: r.media_url ? String(r.media_url) : undefined,
+            createdAt: createdAtMs,
+            hotScore,
+            upvotes,
+            downvotes: 0,
+            comments,
+            isPinned,
+            isAnnouncement: isPinned,
+          } satisfies FeedItem;
+        });
+
+        if ((rows as any[])?.length === 0) setHasMore(false);
+        const last = (rows as any[])?.[(rows as any[])?.length - 1];
+        if (last?.created_at && last?.post_id) {
+          cursorRef.current = { beforeCreatedAt: last.created_at, beforeId: last.post_id };
+        }
+
+        if (!cancelled) setRawItems((prev) => [...prev, ...mapped]);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e as Error);
+          setNotAuthorized(isAuthzError(e));
+        }
+      } finally {
+        if (!cancelled) setIsLoadingMore(false);
+      }
+    };
+
+    runMore();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoadingMore, teamId, supabase]);
+
+  const pinnedItems = useMemo(() => rawItems.filter((i) => i.isPinned), [rawItems]);
+  const unpinned = useMemo(() => rawItems.filter((i) => !i.isPinned), [rawItems]);
+
+  const sortedFeedItems = useMemo(() => {
+    if (sort === 'new') return [...unpinned].sort((a, b) => b.createdAt - a.createdAt);
+    if (sort === 'top') return [...unpinned].sort((a, b) => b.upvotes - b.downvotes - (a.upvotes - a.downvotes));
+    return [...unpinned].sort((a, b) => b.hotScore - a.hotScore);
+  }, [sort, unpinned]);
+
+  return {
+    data: { pinnedItems, feedItems: sortedFeedItems },
+    isLoading,
+    error,
+    notAuthorized,
+    loadMore,
+    hasMore,
+    isLoadingMore,
+    refetch,
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useTeamMembers — Roster with filters (no duplicate queries per panel)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useTeamMembers(teamId: string | null, filter: MemberFilter = 'all') {
+  const supabase = useMemo(() => createClient(), []);
+  const [data, setData] = useState<TeamMember[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const refreshKeyRef = useRef(0);
+
+  const refetch = useCallback(() => {
+    refreshKeyRef.current += 1;
+    setIsLoading((v) => v);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!teamId) {
+        setData(null);
+        setError(null);
+        setNotAuthorized(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      setNotAuthorized(false);
+
+      try {
+        const teamSlug = await getTeamSlugById(teamId);
+        const { data: members, error: rpcError } = await supabase.rpc('rpc_get_team_members', {
+          p_team_slug: teamSlug,
+          p_status: 'approved',
+          p_role: null,
+          p_search: null,
+          p_limit: 200,
+        });
+
+        if (rpcError) throw rpcError;
+
+        const mapped: TeamMember[] = (members as any[]).map((m) => {
+          const username = String(m.username ?? 'unknown');
+          return {
+            id: String(m.profile_id),
+            name: username,
+            handle: `@${username}`,
+            avatar: String(m.avatar_url ?? 'https://ui-avatars.com/api/?name=U&background=111827&color=fff'),
+            role: dbRoleToRoleState(String(m.role ?? 'Team_Member')),
+            activity: 'offline',
+          };
+        });
+
+        if (!cancelled) {
+          if (filter === 'all') {
+            setData(mapped);
+          } else {
+            setData(mapped.filter((mm) => mm.activity === filter));
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setData(null);
+          setError(e as Error);
+          setNotAuthorized(isAuthzError(e));
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, filter, supabase, refreshKeyRef.current]);
+
+  return { data, isLoading, error, notAuthorized, refetch };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useTeamPresence — Online/live counts with realtime updates
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useTeamPresence(teamId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [data, setData] = useState<{ onlineCount: number; liveCount: number; activeAvatars: TeamMember[] } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const refreshKeyRef = useRef(0);
+
+  const refetch = useCallback(() => {
+    refreshKeyRef.current += 1;
+    setIsLoading((v) => v);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!teamId) {
+        setData(null);
+        setError(null);
+        setNotAuthorized(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      setNotAuthorized(false);
+
+      try {
+        const { data: summary, error: summaryErr } = await supabase.rpc('rpc_get_presence_summary', {
+          p_team_id: teamId,
+        });
+
+        if (summaryErr) throw summaryErr;
+
+        const onlineCount = Number((summary as any)?.present_total ?? 0);
+        const liveCount = Number((summary as any)?.sources?.live_session ?? 0);
+
+        if (!cancelled) {
+          setData({ onlineCount, liveCount, activeAvatars: [] });
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setData(null);
+          setError(e as Error);
+          setNotAuthorized(isAuthzError(e));
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    run();
+    const interval = setInterval(() => run(), 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [teamId, supabase, refreshKeyRef.current]);
+
+  return { data, isLoading, error, notAuthorized, refetch };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useTeamLiveRooms — Active streams with realtime updates
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useTeamLiveRooms(teamId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [data, setData] = useState<LiveRoom[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [notAuthorized, setNotAuthorized] = useState(false);
+  const refreshKeyRef = useRef(0);
+
+  const refetch = useCallback(() => {
+    refreshKeyRef.current += 1;
+    setIsLoading((v) => v);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!teamId) {
+        setData(null);
+        setError(null);
+        setNotAuthorized(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      setNotAuthorized(false);
+
+      try {
+        const teamSlug = await getTeamSlugById(teamId);
+        const { data: rooms, error: rpcError } = await supabase.rpc('rpc_get_team_live_rooms', {
+          p_team_slug: teamSlug,
+        });
+
+        if (rpcError) throw rpcError;
+
+        const mapped: LiveRoom[] = (rooms as any[]).map((r) => {
+          const username = String(r.host_username ?? 'unknown');
+          const host: TeamMember = {
+            id: String(r.host_profile_id),
+            name: username,
+            handle: `@${username}`,
+            avatar: String(r.host_avatar_url ?? 'https://ui-avatars.com/api/?name=U&background=111827&color=fff'),
+            role: 'member',
+            activity: 'live',
+            isStreaming: true,
+          };
+
+          return {
+            id: String(r.live_stream_id),
+            liveStreamId: Number(r.live_stream_id),
+            host,
+            title: `${username} live`,
+            viewers: 0,
+            thumbnail: stableGradient(String(r.live_stream_id)),
+            isTeamRoom: true,
+          };
+        });
+
+        if (!cancelled) setData(mapped);
+      } catch (e) {
+        if (!cancelled) {
+          setData(null);
+          setError(e as Error);
+          setNotAuthorized(isAuthzError(e));
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, supabase, refreshKeyRef.current]);
+
+  return { data, isLoading, error, notAuthorized, refetch };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useTeamChat — Messages with realtime subscription
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useTeamChat(teamId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const refreshKeyRef = useRef(0);
+
+  const refetch = useCallback(() => {
+    refreshKeyRef.current += 1;
+  }, []);
+
+  // Initial fetch
+  useEffect(() => {
+    if (!teamId) {
+      setMessages([]);
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchMessages = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_get_team_chat_messages', {
+          p_team_id: teamId,
+          p_limit: 100,
+          p_before_created_at: null,
+          p_before_id: null,
+        });
+
+        if (rpcError) throw rpcError;
+
+        const mapped: ChatMessage[] = ((data as any[]) || []).map((m) => ({
+          id: String(m.message_id),
+          author: {
+            id: String(m.author_id),
+            name: m.author_display_name || m.author_username || 'Unknown',
+            handle: `@${m.author_username || 'unknown'}`,
+            avatar: m.author_avatar_url || 'https://ui-avatars.com/api/?name=U&background=111827&color=fff',
+            role: dbRoleToRoleState(m.author_role),
+            activity: 'offline' as MemberActivity,
+          },
+          text: m.content,
+          timestamp: new Date(m.created_at).getTime(),
+          reactions: (m.reactions || []).map((r: any) => ({ emoji: r.emoji, count: r.count })),
+          isSystem: m.is_system,
+          replyTo: m.reply_to_id ? String(m.reply_to_id) : undefined,
+        }));
+
+        if (!cancelled) setMessages(mapped);
+      } catch (e) {
+        if (!cancelled) {
+          console.error('[useTeamChat] Error:', e);
+          setError(e as Error);
+          setMessages([]);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    fetchMessages();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, supabase, refreshKeyRef.current]);
+
+  // Realtime subscription for new messages
+  useEffect(() => {
+    if (!teamId) return;
+
+    const channel = supabase
+      .channel(`team_chat:${teamId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'team_chat_messages',
+          filter: `team_id=eq.${teamId}`,
+        },
+        async (payload) => {
+          // Fetch the full message with author info
+          const newMsg = payload.new as any;
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('username, display_name, avatar_url')
+            .eq('id', newMsg.author_id)
+            .single();
+
+          const mapped: ChatMessage = {
+            id: String(newMsg.id),
+            author: {
+              id: String(newMsg.author_id),
+              name: profiles?.display_name || profiles?.username || 'Unknown',
+              handle: `@${profiles?.username || 'unknown'}`,
+              avatar: profiles?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111827&color=fff',
+              role: 'member',
+              activity: 'offline',
+            },
+            text: newMsg.content,
+            timestamp: new Date(newMsg.created_at).getTime(),
+            reactions: [],
+            isSystem: newMsg.is_system,
+            replyTo: newMsg.reply_to_id ? String(newMsg.reply_to_id) : undefined,
+          };
+
+          setMessages((prev) => [...prev, mapped]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, teamId]);
+
+  return { messages, isLoading, error, refetch };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useSendChatMessage — Send a chat message
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useSendChatMessage(teamId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const mutate = useCallback(
+    async ({ content, replyToId }: { content: string; replyToId?: string }) => {
+      if (!teamId) throw new Error('No team ID');
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_send_team_chat_message', {
+          p_team_id: teamId,
+          p_content: content,
+          p_reply_to_id: replyToId || null,
+        });
+
+        if (rpcError) throw rpcError;
+
+        const result = data as { success: boolean; error?: string; message_id?: string };
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to send message');
+        }
+
+        return result;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase, teamId]
+  );
+
+  return { mutate, isLoading, error };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MUTATIONS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useCreatePost(teamSlug: string) {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const mutate = useCallback(
+    async ({ text, mediaUrl }: { text: string; mediaUrl?: string }) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_create_team_post', {
+          p_team_slug: teamSlug,
+          p_text_content: text,
+          p_media_url: mediaUrl ?? null,
+        });
+
+        if (rpcError) throw rpcError;
+        return data;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase, teamSlug]
+  );
+
+  return { mutate, isLoading, error };
+}
+
+export function useReactToPost(teamId: string) {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const mutate = useCallback(
+    async ({ postId }: { postId: string }) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_react_team_post', {
+          p_post_id: postId,
+          p_reaction_type: 'like',
+        });
+        if (rpcError) throw rpcError;
+        return data;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  return { mutate, isLoading, error };
+}
+
+export function useJoinTeam() {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const mutate = useCallback(
+    async ({ teamSlug }: { teamSlug: string }) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_request_join_team', {
+          p_team_slug: teamSlug,
+        });
+        if (rpcError) throw rpcError;
+        return data;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  return { mutate, isLoading, error };
+}
+
+export function useLeaveTeam(teamId: string) {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const mutate = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data: auth } = await supabase.auth.getUser();
+      const userId = auth.user?.id;
+      if (!userId) throw new Error('unauthorized');
+
+      const { error: updErr } = await supabase
+        .from('team_memberships')
+        .update({ status: 'left', left_at: new Date().toISOString() })
+        .eq('team_id', teamId)
+        .eq('profile_id', userId);
+
+      if (updErr) throw updErr;
+    } catch (e) {
+      setError(e as Error);
+      throw e;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [supabase, teamId]);
+
+  return { mutate, isLoading, error };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   useTeamNotificationPrefs — Get/set notification preferences
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export interface NotificationPrefs {
+  all_activity: boolean;
+  live_alerts: boolean;
+  mentions_only: boolean;
+  feed_posts: boolean;
+  chat_messages: boolean;
+}
+
+export function useTeamNotificationPrefs(teamId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  // Fetch preferences
+  useEffect(() => {
+    if (!teamId) {
+      setPrefs(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchPrefs = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_get_team_notification_prefs', {
+          p_team_id: teamId,
+        });
+
+        if (rpcError) throw rpcError;
+
+        const result = data as { success: boolean; prefs?: NotificationPrefs; error?: string };
+        if (result.success && result.prefs && !cancelled) {
+          setPrefs(result.prefs);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e as Error);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    fetchPrefs();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamId, supabase]);
+
+  // Update a single preference
+  const updatePref = useCallback(
+    async (key: keyof NotificationPrefs, value: boolean) => {
+      if (!teamId || !prefs) return;
+
+      const newPrefs = { ...prefs, [key]: value };
+      setPrefs(newPrefs); // Optimistic update
+      setIsSaving(true);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_update_team_notification_prefs', {
+          p_team_id: teamId,
+          p_prefs: newPrefs,
+        });
+
+        if (rpcError) throw rpcError;
+
+        const result = data as { success: boolean; error?: string };
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update preferences');
+        }
+      } catch (e) {
+        // Revert on error
+        setPrefs(prefs);
+        setError(e as Error);
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [supabase, teamId, prefs]
+  );
+
+  return { prefs, isLoading, isSaving, error, updatePref };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   EXPORTS
+   ════════════════════════════════════════════════════════════════════════════ */
+

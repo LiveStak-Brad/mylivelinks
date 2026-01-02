@@ -1,9 +1,9 @@
 /**
  * Main Bottom Tab Navigator
  * 
- * BOTTOM NAV (5 tabs):
+ * BOTTOM NAV (6 tabs):
  * ====================
- * Home | Feed | Go Live (CENTER) | Messages | Noties
+ * Home | Feed | Go Live (CENTER) | Teams | Messages | Noties
  * 
  * TOP NAV (Global Header on all screens):
  * ========================================
@@ -13,6 +13,7 @@
  * - Home: Home icon (Purple #8b5cf6)
  * - Feed: Rss/Activity icon (Pink #ec4899)
  * - Go Live: Video icon (Purple #8b5cf6, CENTER/LARGER) - Routes to Solo Host Stream
+ * - Teams: Users icon (Green #10b981) - Routes to TeamsSetup (first time) or TeamsHome
  * - Messages: MessageCircle icon (Blue #00a8ff)
  * - Noties: Bell icon (Amber #f59e0b)
  */
@@ -26,6 +27,7 @@ import type { MainTabsParamList } from '../types/navigation';
 import { HomeDashboardScreen } from '../screens/HomeDashboardScreen';
 import { FeedScreen } from '../screens/FeedScreen';
 import { SoloHostStreamScreen } from '../screens/SoloHostStreamScreen';
+import { TeamsTabScreen } from '../screens/TeamsTabScreen';
 import { ProfileTabScreen } from '../screens/ProfileTabScreen';
 import { MessagesScreen } from '../screens/MessagesScreen';
 import { NotiesScreen } from '../screens/NotiesScreen';
@@ -108,6 +110,16 @@ export function MainTabs() {
           tabBarStyle: { display: 'none' },
           tabBarIcon: ({ color, size }) => (
             <Feather name="video" size={size + 4} color={color} style={{ color: '#8b5cf6' }} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Teams"
+        component={TeamsTabScreen}
+        options={{
+          tabBarLabel: 'Teams',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="users" size={size} color={color} style={{ color: '#10b981' }} />
           ),
         }}
       />

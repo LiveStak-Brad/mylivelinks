@@ -626,7 +626,7 @@ export default function MyAnalyticsPage() {
           <p className="text-muted-foreground mb-6">
             Start sending gifts to earn your first tier badge!
           </p>
-          <Button onClick={() => router.push('/live')}>
+          <Button onClick={() => router.push('/room/live-central')}>
             Find Streamers to Support
           </Button>
         </DashboardSection>

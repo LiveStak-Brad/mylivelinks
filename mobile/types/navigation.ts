@@ -53,7 +53,14 @@ export type MainTabsParamList = {
   Home: undefined;
   Feed: undefined;
   GoLive: undefined;
+  Teams: undefined;
   Profile: { username?: string } | undefined;
   Messages: { openUserId?: string; openUsername?: string } | undefined;
   Noties: undefined;
+};
+
+// Teams nested stack navigator
+export type TeamsStackParamList = {
+  TeamsSetup: undefined;
+  TeamsHome: undefined;
 };

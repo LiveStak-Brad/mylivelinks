@@ -209,7 +209,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
         ref={buttonRef}
         onClick={() => setShowMenu(!showMenu)}
         className={`
-          flex items-center gap-1 sm:gap-2 p-0.5 pr-1 sm:p-1 sm:pr-2 md:p-1 md:pr-2 lg:p-1.5 lg:pr-3 xl:p-2 xl:pr-4 rounded-full
+          flex items-center gap-1 sm:gap-2 p-0.5 pr-1 sm:p-1 sm:pr-2 md:p-1 md:pr-2 lg:p-1.5 lg:pr-3 xl:p-2 xl:pr-4 rounded-full header-profile-button
           transition-all duration-200
           hover:bg-muted/70
           focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background
@@ -225,9 +225,10 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
           username={profile?.username || 'user'}
           displayName={displayName}
           isLive={profile?.is_live || false}
-          size="md"
+          size="sm"
           showLiveBadge={false}
           clickable={false}
+          className="global-header-avatar"
         />
         
         {/* Chevron indicator */}

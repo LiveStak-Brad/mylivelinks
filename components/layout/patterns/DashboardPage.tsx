@@ -34,6 +34,8 @@ export interface DashboardPageProps {
   description?: string;
   /** Icon to show next to title */
   icon?: ReactNode;
+  /** Optional premium header content (renders above tabs). */
+  hero?: ReactNode;
   /** Tabs configuration */
   tabs: DashboardTab[];
   /** Default active tab */
@@ -64,6 +66,7 @@ export function DashboardPage({
   title,
   description,
   icon,
+  hero,
   tabs,
   defaultTab,
   showBackButton = true,
@@ -102,91 +105,155 @@ export function DashboardPage({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-sticky bg-card/95 backdrop-blur-md border-b border-border">
-        <div className="px-4 md:px-6 py-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            {/* Left: Back + Title */}
-            <div className="flex items-center gap-4">
-              {showBackButton && (
-                <IconButton
-                  variant="ghost"
-                  size="md"
-                  onClick={handleBack}
-                  aria-label="Go back"
-                  className="mobile-touch-target"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </IconButton>
-              )}
-              <div className="flex items-center gap-3">
-                {icon && (
-                  <div className="hidden sm:flex w-10 h-10 rounded-xl bg-primary/10 items-center justify-center text-primary">
-                    {icon}
-                  </div>
+      {hero ? (
+        <>
+          <header className="relative">
+            {hero}
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10">
+              <div className="pointer-events-auto flex items-center justify-between px-3 pt-3">
+                {showBackButton ? (
+                  <IconButton
+                    variant="ghost"
+                    size="md"
+                    onClick={handleBack}
+                    aria-label="Go back"
+                    className="mobile-touch-target bg-background/70 backdrop-blur border border-border"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </IconButton>
+                ) : (
+                  <span />
                 )}
-                <div>
-                  <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-                    {title}
-                  </h1>
-                  {description && (
-                    <p className="text-sm text-muted-foreground">
-                      {description}
-                    </p>
+                <div className="flex items-center gap-2">
+                  {headerActions}
+                  {showRefresh && onRefresh && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={onRefresh}
+                      disabled={isRefreshing}
+                      leftIcon={<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />}
+                      className="bg-background/70 backdrop-blur border border-border"
+                    >
+                      <span className="hidden sm:inline">Refresh</span>
+                    </Button>
                   )}
                 </div>
               </div>
             </div>
-            
-            {/* Right: Actions */}
-            <div className="flex items-center gap-3">
-              {headerActions}
-              
-              {showRefresh && onRefresh && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={onRefresh}
-                  disabled={isRefreshing}
-                  leftIcon={
-                    <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  }
-                >
-                  <span className="hidden sm:inline">Refresh</span>
-                </Button>
-              )}
-            </div>
-          </div>
-          
-          {/* Tab Navigation */}
+          </header>
+
           {tabs.length > 1 && (
-            <div className="flex gap-1 mt-4 -mb-4 overflow-x-auto scrollbar-hidden">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => !tab.disabled && handleTabChange(tab.id)}
-                  disabled={tab.disabled}
-                  className={`
-                    flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg 
-                    transition whitespace-nowrap mobile-touch-target
-                    ${activeTab === tab.id
-                      ? 'bg-background text-foreground border-t border-l border-r border-border'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                    }
-                    ${tab.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                >
-                  {tab.icon && <span className="w-4 h-4">{tab.icon}</span>}
-                  <span className="hidden sm:inline">{tab.label}</span>
-                </button>
-              ))}
+            <div className="sticky top-0 z-sticky bg-card/95 backdrop-blur-md border-b border-border">
+              <div className="px-4 md:px-6">
+                <div className="flex gap-1 overflow-x-auto scrollbar-hidden">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => !tab.disabled && handleTabChange(tab.id)}
+                      disabled={tab.disabled}
+                      className={`
+                        flex items-center gap-2 px-4 py-3 text-sm font-medium
+                        transition whitespace-nowrap mobile-touch-target
+                        ${activeTab === tab.id
+                          ? 'text-foreground border-b-2 border-primary'
+                          : 'text-muted-foreground hover:text-foreground'
+                        }
+                        ${tab.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                      `}
+                    >
+                      {tab.icon && <span className="w-4 h-4">{tab.icon}</span>}
+                      <span className="hidden sm:inline">{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
-        </div>
-      </header>
+        </>
+      ) : (
+        <header className="sticky top-0 z-sticky bg-card/95 backdrop-blur-md border-b border-border">
+          <div className="px-4 md:px-6 py-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                {showBackButton && (
+                  <IconButton
+                    variant="ghost"
+                    size="md"
+                    onClick={handleBack}
+                    aria-label="Go back"
+                    className="mobile-touch-target"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </IconButton>
+                )}
+                <div className="flex items-center gap-3">
+                  {icon && (
+                    <div className="hidden sm:flex w-10 h-10 rounded-xl bg-primary/10 items-center justify-center text-primary">
+                      {icon}
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+                      {title}
+                    </h1>
+                    {description && (
+                      <p className="text-sm text-muted-foreground">
+                        {description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                {headerActions}
+                
+                {showRefresh && onRefresh && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onRefresh}
+                    disabled={isRefreshing}
+                    leftIcon={
+                      <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    }
+                  >
+                    <span className="hidden sm:inline">Refresh</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            {tabs.length > 1 && (
+              <div className="flex gap-1 mt-4 -mb-4 overflow-x-auto scrollbar-hidden">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => !tab.disabled && handleTabChange(tab.id)}
+                    disabled={tab.disabled}
+                    className={`
+                      flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg 
+                      transition whitespace-nowrap mobile-touch-target
+                      ${activeTab === tab.id
+                        ? 'bg-background text-foreground border-t border-l border-r border-border'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                      }
+                      ${tab.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    `}
+                  >
+                    {tab.icon && <span className="w-4 h-4">{tab.icon}</span>}
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </header>
+      )}
 
       {/* Content */}
-      <main className="p-4 md:p-6 max-w-7xl mx-auto">
+      <main className="px-4 pt-4 md:px-6 md:pt-6 max-w-7xl mx-auto pb-[calc(6rem+env(safe-area-inset-bottom))]">
         {/* Error State */}
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-xl text-destructive">

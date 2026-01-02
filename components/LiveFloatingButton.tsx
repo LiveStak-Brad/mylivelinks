@@ -70,7 +70,7 @@ export function GlobalLiveFloatingButton() {
     };
   }, [topPx]);
 
-  const shouldHide = pathname === '/live' || pathname?.startsWith('/live/');
+  const shouldHide = pathname === '/live' || pathname?.startsWith('/live/') || pathname?.startsWith('/room/');
 
   useEffect(() => {
     if (shouldHide) {

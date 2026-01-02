@@ -230,68 +230,37 @@ export default function RoomsCarousel() {
           {/* Left Padding for edge alignment */}
           <div className="flex-shrink-0 w-0.5 md:w-1" />
           
-          {/* Live Central Featured Card */}
-          {isOwner ? (
-            <Link
-              href="/live"
-              className="
-                group relative flex-shrink-0 w-[320px] md:w-[380px] 
-                rounded-2xl overflow-hidden cursor-pointer
-                transition-all duration-300 ease-out
-                hover:scale-[1.03] hover:shadow-2xl hover:shadow-red-500/30
-                border-2 border-red-500/50 hover:border-red-500
-              "
-            >
-              <div className="relative h-[200px] md:h-[220px]">
-                <Image
-                  src="/livecentralmeta.png"
-                  alt="Live Central"
-                  fill
-                  className="object-cover"
-                  priority
-                />
-                {/* Owner Badge */}
-                <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-red-500 flex items-center gap-1.5 animate-pulse">
-                  <div className="w-2 h-2 rounded-full bg-white" />
-                  <span className="text-xs font-bold text-white">LIVE NOW</span>
-                </div>
+          {/* Live Central Featured Card - NOW OPEN TO EVERYONE */}
+          <Link
+            href="/room/live-central"
+            className="
+              group relative flex-shrink-0 w-[320px] md:w-[380px] 
+              rounded-2xl overflow-hidden cursor-pointer
+              transition-all duration-300 ease-out
+              hover:scale-[1.03] hover:shadow-2xl hover:shadow-red-500/30
+              border-2 border-red-500/50 hover:border-red-500
+            "
+          >
+            <div className="relative h-[200px] md:h-[220px]">
+              <Image
+                src="/livecentralmeta.png"
+                alt="Live Central"
+                fill
+                className="object-cover"
+                priority
+              />
+              {/* Live Badge */}
+              <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-red-500 flex items-center gap-1.5 animate-pulse">
+                <div className="w-2 h-2 rounded-full bg-white" />
+                <span className="text-xs font-bold text-white">LIVE</span>
               </div>
-            </Link>
-          ) : (
-            <div
-              className="
-                relative flex-shrink-0 w-[320px] md:w-[380px] 
-                rounded-2xl overflow-hidden
-                border-2 border-yellow-500/50
-                bg-card
-              "
-            >
-              <div className="relative h-[200px] md:h-[220px]">
-                <Image
-                  src="/livecentralmeta.png"
-                  alt="Live Central - Coming Soon"
-                  fill
-                  className="object-cover opacity-60"
-                  priority
-                />
-                {/* Coming Soon Badge */}
-                <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-yellow-500 flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-white" />
-                  <span className="text-xs font-bold text-white">COMING SOON</span>
-                </div>
-                {/* Overlay Text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 p-4">
-                  <h3 className="text-xl font-bold text-white text-center mb-2">Live Central</h3>
-                  <p className="text-sm text-white/90 text-center">
-                    Watch up to 12 creators streaming live at once!
-                  </p>
-                  <p className="text-xs text-yellow-300 text-center mt-2">
-                    Opening soon for all users
-                  </p>
-                </div>
+              {/* Overlay with CTA */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                <h3 className="text-lg font-bold text-white">Live Central</h3>
+                <p className="text-sm text-white/80">Watch & stream with up to 12 creators!</p>
               </div>
             </div>
-          )}
+          </Link>
           
           {(rooms ?? []).map((room) => (
             <RoomCard

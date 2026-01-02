@@ -92,7 +92,7 @@ export default function BottomNav() {
       matchType: 'exact',
     },
     {
-      href: '/live',
+      href: '/room/live-central',
       ariaLabel: 'Go Live',
       icon: Video,
       matchType: 'prefix',
@@ -134,7 +134,7 @@ export default function BottomNav() {
 
           const effectiveHref = item.requiresAuth && !isLoggedIn ? '/login' : item.href;
 
-          if (item.href === '/live') {
+          if (item.href === '/room/live-central') {
             return (
               <button
                 key={item.href}

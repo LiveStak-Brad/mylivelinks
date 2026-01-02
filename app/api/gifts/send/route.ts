@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request
     const body = await request.json();
-    const { toUserId, coinsAmount, streamId, giftTypeId } = body;
+    const { toUserId, coinsAmount, streamId, giftTypeId, roomId } = body;
 
     const clientRequestId =
       typeof body?.requestId === 'string'
@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       p_gift_type_id: giftTypeId || null,
       p_stream_id: streamId || null,
       p_request_id: requestId,
+      p_room_id: roomId || null, // For room-specific leaderboards
     });
 
     if (rpcError) {

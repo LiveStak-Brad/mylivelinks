@@ -26,6 +26,28 @@ function authErrorToResponse(err: unknown) {
   return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 }
 
+// Helper to resolve room by UUID or room_key and get the actual UUID
+async function resolveRoomId(supabase: any, roomId: string): Promise<{ room: any; error: any }> {
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(roomId);
+  
+  if (isUUID) {
+    const result = await supabase
+      .from('v_rooms_effective')
+      .select('*')
+      .eq('id', roomId)
+      .single();
+    if (result.data) return { room: result.data, error: null };
+  }
+  
+  // Try by room_key
+  const result = await supabase
+    .from('v_rooms_effective')
+    .select('*')
+    .eq('room_key', roomId)
+    .single();
+  return { room: result.data, error: result.error };
+}
+
 // GET /api/admin/rooms/[roomId] - Get single room
 export async function GET(
   request: NextRequest,
@@ -36,23 +58,21 @@ export async function GET(
     const supabase = createRouteHandlerClient(request);
     const user = await requireUser(request);
 
+    // First resolve the room to get the actual UUID
+    const { room, error } = await resolveRoomId(supabase, roomId);
+    
+    if (error || !room) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+    }
+
+    // Now check permissions with the actual UUID
     const { data: canManage } = await supabase.rpc('is_room_admin', {
       p_profile_id: user.id,
-      p_room_id: roomId,
+      p_room_id: room.id,
     });
 
     if (canManage !== true) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { data: room, error } = await supabase
-      .from('v_rooms_effective')
-      .select('*')
-      .eq('id', roomId)
-      .single();
-
-    if (error || !room) {
-      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
     }
 
     return NextResponse.json({ room: normalizeRoomRow(room) });
@@ -71,9 +91,18 @@ export async function PUT(
     const supabase = createRouteHandlerClient(request);
     const user = await requireUser(request);
 
+    // Resolve the room to get the actual UUID
+    const { room: existingRoom, error: resolveError } = await resolveRoomId(supabase, roomId);
+    
+    if (resolveError || !existingRoom) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+    }
+    
+    const actualRoomId = existingRoom.id;
+
     const { data: canManage } = await supabase.rpc('is_room_admin', {
       p_profile_id: user.id,
-      p_room_id: roomId,
+      p_room_id: actualRoomId,
     });
 
     if (canManage !== true) {
@@ -133,7 +162,7 @@ export async function PUT(
       const { data: existing } = await supabase
         .from('rooms')
         .select('feature_flags')
-        .eq('id', roomId)
+        .eq('id', actualRoomId)
         .single();
 
       const merged: Record<string, any> = {
@@ -150,7 +179,7 @@ export async function PUT(
     const { data: room, error } = await supabase
       .from('rooms')
       .update(updates)
-      .eq('id', roomId)
+      .eq('id', actualRoomId)
       .select()
       .single();
 
@@ -162,7 +191,7 @@ export async function PUT(
     const { data: effective } = await supabase
       .from('v_rooms_effective')
       .select('*')
-      .eq('id', roomId)
+      .eq('id', actualRoomId)
       .single();
 
     return NextResponse.json({ room: normalizeRoomRow(effective || room) });
@@ -182,6 +211,15 @@ export async function DELETE(
     const supabase = createRouteHandlerClient(request);
     const user = await requireUser(request);
 
+    // Resolve the room to get the actual UUID
+    const { room: existingRoom, error: resolveError } = await resolveRoomId(supabase, roomId);
+    
+    if (resolveError || !existingRoom) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+    }
+    
+    const actualRoomId = existingRoom.id;
+
     const { data: isOwner } = await supabase.rpc('is_owner', { p_profile_id: user.id });
     if (isOwner !== true) {
       return NextResponse.json({ error: 'Only owners can delete rooms' }, { status: 403 });
@@ -189,7 +227,7 @@ export async function DELETE(
 
     const { data: canManage } = await supabase.rpc('is_room_admin', {
       p_profile_id: user.id,
-      p_room_id: roomId,
+      p_room_id: actualRoomId,
     });
 
     if (canManage !== true) {
@@ -199,7 +237,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('rooms')
       .delete()
-      .eq('id', roomId);
+      .eq('id', actualRoomId);
 
     if (error) {
       console.error('[API /admin/rooms/[id]] Delete error:', error);

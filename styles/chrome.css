@@ -198,6 +198,106 @@
   border-bottom: 1px solid hsl(var(--border) / 0.5);
 }
 
+/* Global header responsive controls */
+.global-header-bar {
+  --global-header-icon-size: clamp(1.35rem, 1.1vw, 1.95rem);
+  --global-header-gap: clamp(0.25rem, 0.55vw, 0.6rem);
+  --global-header-avatar-scale: 0.92;
+}
+
+@media (max-width: 1650px) {
+  .global-header-bar {
+    --global-header-avatar-scale: 0.88;
+  }
+}
+
+@media (max-width: 1450px) {
+  .global-header-bar {
+    --global-header-avatar-scale: 0.84;
+  }
+}
+
+@media (max-width: 1280px) {
+  .global-header-bar {
+    --global-header-avatar-scale: 0.8;
+  }
+}
+
+@media (max-width: 1120px) {
+  .global-header-bar {
+    --global-header-avatar-scale: 0.75;
+  }
+}
+
+.global-header-bar .global-header-icon {
+  width: var(--global-header-icon-size);
+  height: var(--global-header-icon-size);
+  min-width: var(--global-header-icon-size);
+  min-height: var(--global-header-icon-size);
+  transition: width 0.2s ease, height 0.2s ease;
+}
+
+.header-icon-cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--global-header-gap);
+  flex-wrap: nowrap;
+}
+
+.nav-icon-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: clamp(2rem, 2.8vw, 2.75rem);
+  min-height: clamp(2rem, 2.8vw, 2.75rem);
+  padding: clamp(0.25rem, 0.45vw, 0.55rem);
+  border-radius: 999px;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.nav-icon-button:hover,
+.nav-icon-button:focus-visible {
+  opacity: 1;
+  background: hsl(var(--muted) / 0.35);
+}
+
+.nav-icon-button-active {
+  opacity: 1;
+  background: hsl(var(--primary) / 0.12);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.3);
+}
+
+.nav-icon-button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+.global-header-avatar {
+  transform-origin: center;
+  transform: scale(var(--global-header-avatar-scale));
+  transition: transform 0.2s ease;
+}
+
+.header-profile-button {
+  gap: clamp(0.25rem, 0.45vw, 0.65rem);
+  min-height: clamp(2.3rem, 3vw, 2.9rem);
+  padding: clamp(0.2rem, 0.4vw, 0.45rem) clamp(0.3rem, 0.65vw, 0.75rem) !important;
+  flex-shrink: 0;
+}
+
+.header-icon-cluster-tight {
+  gap: clamp(0.2rem, 0.4vw, 0.45rem);
+}
+
+.nav-icon-button-compact {
+  min-width: clamp(1.8rem, 2.2vw, 2.3rem);
+  min-height: clamp(1.8rem, 2.2vw, 2.3rem);
+  padding: clamp(0.2rem, 0.35vw, 0.45rem);
+}
+
 /* =============================================================================
    MOBILE POLISH UTILITIES
 ============================================================================= */

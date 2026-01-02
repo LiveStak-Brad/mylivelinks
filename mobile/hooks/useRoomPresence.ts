@@ -11,12 +11,14 @@ import { supabase } from '../lib/supabase';
 interface UseRoomPresenceOptions {
   userId: string | null;
   username: string | null;
+  roomId?: string | null;
   enabled: boolean;
 }
 
-export function useRoomPresence({ userId, username, enabled }: UseRoomPresenceOptions) {
+export function useRoomPresence({ userId, username, roomId, enabled }: UseRoomPresenceOptions) {
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasJoinedRef = useRef(false);
+  const normalizedRoomId = roomId || 'live_central';
 
   useEffect(() => {
     if (!enabled || !userId || !username) {
@@ -41,6 +43,7 @@ export function useRoomPresence({ userId, username, enabled }: UseRoomPresenceOp
         const { error } = await supabase.rpc('upsert_room_presence', {
           p_profile_id: userId,
           p_username: username,
+          p_room_id: normalizedRoomId,
           p_is_live_available: isLive,
         });
 
@@ -62,6 +65,7 @@ export function useRoomPresence({ userId, username, enabled }: UseRoomPresenceOp
         const { error } = await supabase.rpc('upsert_room_presence', {
           p_profile_id: userId,
           p_username: username,
+          p_room_id: normalizedRoomId,
           p_is_live_available: isLive,
         });
 
@@ -78,7 +82,8 @@ export function useRoomPresence({ userId, username, enabled }: UseRoomPresenceOp
         const { error } = await supabase
           .from('room_presence')
           .delete()
-          .eq('profile_id', userId);
+          .eq('profile_id', userId)
+          .eq('room_id', normalizedRoomId);
 
         if (error) {
           console.error('[ROOM_PRESENCE] Error leaving room:', error);
@@ -109,6 +114,6 @@ export function useRoomPresence({ userId, username, enabled }: UseRoomPresenceOp
         hasJoinedRef.current = false;
       }
     };
-  }, [userId, username, enabled]);
+  }, [userId, username, enabled, normalizedRoomId]);
 }
 

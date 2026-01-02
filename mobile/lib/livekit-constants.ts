@@ -60,8 +60,31 @@ export function isLiveOwnerUser(user: { id?: string; email?: string | null } | n
   return isOwnerById || isOwnerByEmail;
 }
 
-export function canUserGoLive(user: { id?: string; email?: string | null } | null | undefined) {
+/**
+ * Check if user can go live in GROUP mode (LiveRoom/Live Central)
+ * GROUP LIVE IS NOW OPEN TO EVERYONE!
+ */
+export function canUserGoLiveGroup(user: { id?: string; email?: string | null } | null | undefined) {
+  // Group live is open to all authenticated users
+  return !!user?.id;
+}
+
+/**
+ * Check if user can go live in SOLO mode (1:1 streams)
+ * SOLO LIVE IS STILL PAUSED/OWNER-ONLY
+ */
+export function canUserGoLiveSolo(user: { id?: string; email?: string | null } | null | undefined) {
+  // Solo live is still owner-only
   return isLiveOwnerUser(user);
+}
+
+/**
+ * Legacy function - defaults to GROUP permissions now
+ * @deprecated Use canUserGoLiveGroup or canUserGoLiveSolo instead
+ */
+export function canUserGoLive(user: { id?: string; email?: string | null } | null | undefined) {
+  // Default to group permissions (open to everyone)
+  return canUserGoLiveGroup(user);
 }
 
 

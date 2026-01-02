@@ -21,10 +21,17 @@ interface LeaderboardEntry {
 
 type LeaderboardType = 'top_streamers' | 'top_gifters';
 type Period = 'daily' | 'weekly' | 'monthly' | 'alltime';
+type LeaderboardScope = 'room' | 'global';
 
-export default function Leaderboard() {
+interface LeaderboardProps {
+  roomSlug?: string; // If provided, enables room-specific leaderboard (slug-based scope key)
+  roomName?: string; // Display name for the room
+}
+
+export default function Leaderboard({ roomSlug, roomName }: LeaderboardProps = {}) {
   const [type, setType] = useState<LeaderboardType>('top_streamers');
   const [period, setPeriod] = useState<Period>('daily');
+  const [scope, setScope] = useState<LeaderboardScope>(roomSlug ? 'room' : 'global');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [gifterStatusMap, setGifterStatusMap] = useState<Record<string, GifterStatus>>({});
@@ -32,8 +39,8 @@ export default function Leaderboard() {
   const supabase = createClient();
 
   const leaderboardKey = useMemo(
-    () => `top_${type}_${period}`,
-    [type, period]
+    () => `${scope === 'room' && roomSlug ? `room_${roomSlug}_` : ''}top_${type}_${period}`,
+    [type, period, scope, roomSlug]
   );
 
   useEffect(() => {
@@ -71,7 +78,7 @@ export default function Leaderboard() {
       if (reloadTimer) clearTimeout(reloadTimer);
       supabase.removeChannel(ledgerChannel);
     };
-  }, [type, period, leaderboardKey]);
+  }, [type, period, scope, roomSlug, leaderboardKey]);
 
   const loadLeaderboard = async (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -139,13 +146,24 @@ export default function Leaderboard() {
 
   const computeLiveLeaderboard = async () => {
     try {
+      // Note: p_room_id is NULL for global leaderboards
+      const roomIdParam = scope === 'room' ? roomSlug : null;
+      
+      console.log('[Leaderboard] Loading:', { type, period, scope, roomId: roomIdParam });
+      
       const { data, error } = await supabase.rpc('get_leaderboard', {
         p_type: type,
         p_period: period,
         p_limit: 100,
+        p_room_id: roomIdParam,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Leaderboard] RPC error:', error);
+        throw error;
+      }
+
+      console.log('[Leaderboard] Raw data:', data?.length ?? 0, 'entries');
 
       const rows = Array.isArray(data) ? data : [];
       const mapped = rows
@@ -160,12 +178,16 @@ export default function Leaderboard() {
         }))
         .filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
 
+      console.log('[Leaderboard] Mapped entries:', mapped.length);
       setEntries(mapped);
 
-      const statusMap = await fetchGifterStatuses(mapped.map((e: any) => e.profile_id));
-      setGifterStatusMap(statusMap);
+      if (mapped.length > 0) {
+        const statusMap = await fetchGifterStatuses(mapped.map((e: any) => e.profile_id));
+        setGifterStatusMap(statusMap);
+      }
     } catch (error) {
-      console.error('Error computing live leaderboard:', error);
+      console.error('[Leaderboard] Error computing live leaderboard:', error);
+      setEntries([]); // Clear entries on error
     }
   };
 
@@ -223,6 +245,34 @@ export default function Leaderboard() {
           </button>
         ))}
       </div>
+
+      {/* Scope Toggle (Room vs Global) - Only show if roomId is provided */}
+      {roomSlug && (
+        <div className="grid grid-cols-2 gap-[2px] mb-2 sm:mb-3">
+          <button
+            onClick={() => setScope('room')}
+            className={`w-full min-w-0 h-6 inline-flex items-center justify-center gap-1 px-2 rounded-md text-[10px] font-semibold leading-none whitespace-nowrap transition ${
+              scope === 'room'
+                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-sm'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <span>🏠</span>
+            <span>{roomName || 'Room'}</span>
+          </button>
+          <button
+            onClick={() => setScope('global')}
+            className={`w-full min-w-0 h-6 inline-flex items-center justify-center gap-1 px-2 rounded-md text-[10px] font-semibold leading-none whitespace-nowrap transition ${
+              scope === 'global'
+                ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-sm'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <span>🌍</span>
+            <span>Global</span>
+          </button>
+        </div>
+      )}
 
       {/* Leaderboard List */}
       {loading ? (

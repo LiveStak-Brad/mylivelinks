@@ -19,6 +19,7 @@ interface GiftOverlayProps {
   participants: Participant[];
   targetRecipientId: string | null;
   onSelectRecipientId: (recipientId: string) => void;
+  roomId?: string | null;
 }
 
 export const GiftOverlay: React.FC<GiftOverlayProps> = ({
@@ -27,6 +28,7 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
   participants,
   targetRecipientId,
   onSelectRecipientId,
+  roomId,
 }) => {
   const { user, getAccessToken } = useAuthContext();
   const [coinsAmount, setCoinsAmount] = useState<number>(50);
@@ -117,6 +119,7 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
             coinsAmount,
             requestId,
             context: 'live_room',
+            roomId: roomId || null,
           }),
         },
         accessToken

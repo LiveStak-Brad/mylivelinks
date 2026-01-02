@@ -30,7 +30,7 @@ export default function NavigationWrapper() {
   // - /live/[username] and /live: hide on mobile/tablet only
   const shouldHideNav = mounted && (
     pathname === '/live/host' ||      // Host page: hide on all screens
-    ((pathname === '/live' || pathname?.startsWith('/live/')) && isMobile)  // Viewer/live pages: hide on mobile only
+    ((pathname === '/live' || pathname?.startsWith('/live/') || pathname?.startsWith('/room/')) && isMobile)  // Viewer/live pages: hide on mobile only
   );
 
   // Only show debug on /live/[username] pages

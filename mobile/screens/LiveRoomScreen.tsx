@@ -37,6 +37,7 @@ import { MixerModal } from '../components/MixerModal';
 const SWIPE_THRESHOLD = 50;
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 const ROOM_NAME = 'live_central';
+const ROOM_SCOPE_ID = 'live-central';
 
 type LiveRoomScreenProps = {
   mode?: 'solo' | 'battle';
@@ -98,6 +99,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
   useRoomPresence({
     userId: currentUser?.id || null,
     username: currentUser?.username || null,
+    roomId: ROOM_SCOPE_ID,
     enabled: enabled && !!currentUser,
   });
 
@@ -398,7 +400,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
           reportType: 'stream',
           contextDetails: JSON.stringify({
             content_kind: 'live_room',
-            room_id: ROOM_NAME,
+            room_id: ROOM_SCOPE_ID,
             focused_identity: identity ?? null,
             focused_profile_id: profileId || null,
             focused_username: reportedUsername ?? null,
@@ -414,7 +416,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
             reportType: 'stream',
             contextDetails: JSON.stringify({
               content_kind: 'live_room',
-              room_id: ROOM_NAME,
+              room_id: ROOM_SCOPE_ID,
               focused_identity: identity ?? null,
               focused_profile_id: profileId || null,
               focused_username: reportedUsername ?? null,
@@ -447,7 +449,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
             content_kind: 'profile',
             profile_id: profileId,
             username: reportedUsername ?? null,
-            room_id: ROOM_NAME,
+            room_id: ROOM_SCOPE_ID,
             focused_identity: identity ?? null,
             surface: 'mobile_native_live_room',
           }),
@@ -462,7 +464,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
               content_kind: 'profile',
               profile_id: profileId,
               username: reportedUsername ?? null,
-              room_id: ROOM_NAME,
+              room_id: ROOM_SCOPE_ID,
               focused_identity: identity ?? null,
               surface: 'mobile_native_live_room',
             }),
@@ -502,7 +504,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
           profile_id: user.id,
           message_type: 'emoji',
           content: '❤️',
-          room_id: ROOM_NAME,
+          room_id: ROOM_SCOPE_ID,
           live_stream_id: null,
         } as any);
 
@@ -745,8 +747,8 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
       {/* Overlays - Slide over entire screen */}
       {!state.isEditMode && !state.focusedIdentity && (
         <>
-          <ChatOverlay visible={state.activeOverlay === 'chat'} onClose={handleCloseOverlay} roomId={ROOM_NAME} />
-          <ViewersLeaderboardsOverlay visible={state.activeOverlay === 'viewers'} onClose={handleCloseOverlay} />
+          <ChatOverlay visible={state.activeOverlay === 'chat'} onClose={handleCloseOverlay} roomId={ROOM_SCOPE_ID} />
+          <ViewersLeaderboardsOverlay visible={state.activeOverlay === 'viewers'} onClose={handleCloseOverlay} roomId={ROOM_SCOPE_ID} />
           <OptionsMenu
             visible={state.activeOverlay === 'menu'}
             onClose={handleCloseOverlay}
@@ -762,6 +764,7 @@ export const LiveRoomScreen: React.FC<LiveRoomScreenProps> = ({ mode = 'solo', e
             participants={participants}
             targetRecipientId={targetRecipientId}
             onSelectRecipientId={setTargetRecipientId}
+            roomId={ROOM_SCOPE_ID}
           />
         </>
       )}

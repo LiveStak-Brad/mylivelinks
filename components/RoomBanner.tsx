@@ -9,9 +9,16 @@ export interface RoomBannerProps {
   roomLogoUrl?: string | null;
   presentedBy?: string | null;
   bannerStyle?: 'default' | 'minimal' | 'card' | 'gradient';
+  customGradient?: string; // e.g. "from-purple-600 to-pink-600"
   className?: string;
   collapsed?: boolean;
   onToggle?: () => void;
+  onBackClick?: () => void;
+  // Go Live button
+  showGoLiveButton?: boolean;
+  isLive?: boolean;
+  onGoLiveClick?: () => void;
+  canPublish?: boolean;
 }
 
 /**
@@ -25,14 +32,33 @@ export default function RoomBanner({
   roomLogoUrl = '/livecentral.png',
   presentedBy = 'MyLiveLinks Official',
   bannerStyle = 'default',
+  customGradient,
   className = '',
   collapsed = false,
   onToggle,
+  onBackClick,
+  showGoLiveButton = true,
+  isLive = false,
+  onGoLiveClick,
+  canPublish = false,
 }: RoomBannerProps) {
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const update = () => {
+      if (typeof window === 'undefined') return;
+      setIsMobile(window.innerWidth < 1024);
+      setCanGoBack(window.history.length > 1);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   // Don't render until mounted (prevents hydration mismatch)
@@ -43,9 +69,12 @@ export default function RoomBanner({
   }
 
   // Style variants
+  const defaultGradient = 'from-purple-600 to-pink-600';
+  const gradientClass = customGradient || defaultGradient;
+  
   const styles = {
     default: {
-      container: 'bg-gradient-to-r from-purple-600 to-pink-600 text-white',
+      container: `bg-gradient-to-r ${gradientClass} text-white`,
       padding: 'py-2 px-4',
       logoSize: 'w-16 h-16',
       fontSize: 'text-base',
@@ -63,7 +92,7 @@ export default function RoomBanner({
       fontSize: 'text-base',
     },
     gradient: {
-      container: 'bg-gradient-to-r from-blue-600 to-purple-600 text-white',
+      container: `bg-gradient-to-r ${gradientClass} text-white`,
       padding: 'py-2 px-4',
       logoSize: 'w-16 h-16',
       fontSize: 'text-base',
@@ -93,15 +122,62 @@ export default function RoomBanner({
       className={`w-full ${currentStyle.container} py-1 px-4 text-sm z-50 flex-shrink-0 flex items-center justify-between ${className}`}
     >
       {/* Left: Room Name */}
-      <div className="font-semibold">
-        {roomName}
+      <div className="flex items-center gap-2 font-semibold">
+        {isMobile && (onBackClick || canGoBack) && (
+          <button
+            type="button"
+            onClick={() => {
+              if (onBackClick) {
+                onBackClick();
+                return;
+              }
+              if (typeof window !== 'undefined') {
+                window.history.back();
+              }
+            }}
+            className="text-white/90 hover:text-white transition"
+            title="Back"
+            aria-label="Back"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        )}
+        <div>{roomName}</div>
       </div>
       
-      {/* Right: Presented By + Collapse Button */}
-      <div className="flex items-center gap-2">
+      {/* Right: Presented By + Go Live Button + Collapse Button */}
+      <div className="flex items-center gap-3">
         <div className="font-semibold">
           {presentedBy}
         </div>
+        
+        {/* Go Live Camera Button */}
+        {showGoLiveButton && onGoLiveClick && (
+          <button
+            onClick={onGoLiveClick}
+            disabled={!canPublish && !isLive}
+            className={`
+              flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all
+              ${isLive 
+                ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
+                : canPublish
+                  ? 'bg-white/20 hover:bg-white/30 text-white border border-white/30 hover:border-white/50'
+                  : 'bg-white/10 text-white/50 cursor-not-allowed border border-white/10'
+              }
+            `}
+            title={isLive ? 'Click to end live' : canPublish ? 'Go Live' : 'You cannot go live in this room'}
+          >
+            {/* Camera Icon */}
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 7l-7 5 7 5V7z"/>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            {isLive ? 'End Live' : 'Go Live'}
+          </button>
+        )}
+        
         {onToggle && (
           <button
             onClick={onToggle}

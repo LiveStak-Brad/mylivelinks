@@ -9,14 +9,16 @@ import { createClient } from '@/lib/supabase';
 interface UseRoomPresenceOptions {
   userId: string | null;
   username: string | null;
+  roomId?: string | null;
   enabled?: boolean;
 }
 
-export function useRoomPresence({ userId, username, enabled = true }: UseRoomPresenceOptions) {
+export function useRoomPresence({ userId, username, roomId, enabled = true }: UseRoomPresenceOptions) {
   const supabase = createClient();
   const presenceRef = useRef(false);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const normalizedRoomId = roomId || 'live_central';
 
   const updatePresence = useCallback(async (isPresent: boolean, isLiveAvailable: boolean = false) => {
     if (!userId || !username || !enabled) return;
@@ -27,6 +29,7 @@ export function useRoomPresence({ userId, username, enabled = true }: UseRoomPre
         const { error } = await supabase.rpc('upsert_room_presence', {
           p_profile_id: userId,
           p_username: username,
+          p_room_id: normalizedRoomId,
           p_is_live_available: isLiveAvailable,
         });
         if (error) console.error('Error upserting room presence:', error);
@@ -36,14 +39,15 @@ export function useRoomPresence({ userId, username, enabled = true }: UseRoomPre
         const { error } = await supabase
           .from('room_presence')
           .delete()
-          .eq('profile_id', userId);
+          .eq('profile_id', userId)
+          .eq('room_id', normalizedRoomId);
         if (error) console.error('Error deleting room presence:', error);
         presenceRef.current = false;
       }
     } catch (err) {
       console.error('Error managing room presence:', err);
     }
-  }, [userId, username, enabled, supabase]);
+  }, [userId, username, enabled, supabase, normalizedRoomId]);
 
   // Initial presence update and heartbeat setup
   useEffect(() => {
@@ -101,14 +105,14 @@ export function useRoomPresence({ userId, username, enabled = true }: UseRoomPre
         updatePresence(false);
       }, 1000);
     };
-  }, [userId, username, enabled, updatePresence, supabase]);
+  }, [userId, username, enabled, updatePresence, supabase, normalizedRoomId]);
 
   // Handle window/tab closing
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (userId && enabled && presenceRef.current) {
         // Use navigator.sendBeacon for best effort to send data on unload
-        const payload = JSON.stringify({ profile_id: userId });
+        const payload = JSON.stringify({ profile_id: userId, room_id: normalizedRoomId });
         const blob = new Blob([payload], { type: 'application/json' });
         navigator.sendBeacon('/api/room-presence/remove', blob);
       }
@@ -122,7 +126,7 @@ export function useRoomPresence({ userId, username, enabled = true }: UseRoomPre
         clearTimeout(cleanupTimeoutRef.current);
       }
     };
-  }, [userId, enabled]);
+  }, [userId, enabled, normalizedRoomId]);
 
   return null; // This hook doesn't render anything
 }

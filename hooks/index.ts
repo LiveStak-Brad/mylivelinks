@@ -13,6 +13,31 @@ export { useOwnerPanelData } from './useOwnerPanelData';
 export { useOwnerLiveOpsData } from './useOwnerLiveOpsData';
 export { useTeamChatStyle } from './useTeamChatStyle';
 export type { TeamChatStyle } from './useTeamChatStyle';
+
+// Team hooks
+export {
+  useTeam,
+  useTeamMembership,
+  useTeamFeed,
+  useTeamMembers,
+  useTeamPresence,
+  useTeamLiveRooms,
+  useTeamChat,
+  useCreatePost,
+  useReactToPost,
+  useJoinTeam,
+  useLeaveTeam,
+  teamKeys,
+} from './useTeam';
+export type {
+  FeedSort,
+  MemberFilter,
+  MemberActivity,
+  TeamMember,
+  FeedItem,
+  ChatMessage,
+  LiveRoom,
+} from './useTeam';
 export type {
   OwnerPanelData,
   DashboardStats,

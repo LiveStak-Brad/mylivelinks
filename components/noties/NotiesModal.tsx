@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { Bell, Check, CheckCheck, Gift, UserPlus, AtSign, MessageCircle, Trophy, Package, Settings, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, Gift, UserPlus, AtSign, MessageCircle, Trophy, Package, Settings, X, Users, UserCheck } from 'lucide-react';
 import { useNoties, NotieType, Notie } from './NotiesContext';
+import { acceptTeamInvite, declineTeamInvite } from '@/lib/teamInvites';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 
 type TabType = 'all' | 'mentions' | 'gifts' | 'system';
@@ -158,6 +159,8 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
       case 'level_up': return <Trophy className="w-4 h-4 text-yellow-500" />;
       case 'purchase': return <Package className="w-4 h-4 text-emerald-500" />;
       case 'system': return <Settings className="w-4 h-4 text-gray-500" />;
+      case 'team_invite': return <Users className="w-4 h-4 text-teal-500" />;
+      case 'team_invite_accepted': return <UserCheck className="w-4 h-4 text-green-500" />;
       default: return <Bell className="w-4 h-4 text-gray-500" />;
     }
   };
@@ -182,6 +185,20 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
       router.push(notie.actionUrl);
     }
     onClose();
+  };
+
+  const handleAcceptInvite = async (inviteId: number) => {
+    const result = await acceptTeamInvite(inviteId);
+    if (result.success && result.team_slug) {
+      router.push(`/teams/${result.team_slug}`);
+      onClose();
+    }
+  };
+
+  const handleDeclineInvite = async (inviteId: number) => {
+    await declineTeamInvite(inviteId);
+    // Refresh noties to remove the declined invite
+    window.location.reload();
   };
 
   const tabs: { key: TabType; label: string }[] = [
@@ -255,6 +272,8 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
                   icon={getNotieIcon(notie.type)}
                   timeAgo={formatTimeAgo(notie.createdAt)}
                   onClick={() => handleNotieClick(notie)}
+                  onAcceptInvite={handleAcceptInvite}
+                  onDeclineInvite={handleDeclineInvite}
                 />
               ))}
             </div>
@@ -331,6 +350,8 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
                 icon={getNotieIcon(notie.type)}
                 timeAgo={formatTimeAgo(notie.createdAt)}
                 onClick={() => handleNotieClick(notie)}
+                onAcceptInvite={handleAcceptInvite}
+                onDeclineInvite={handleDeclineInvite}
               />
             ))}
           </div>
@@ -351,22 +372,27 @@ function NotieItem({
   notie, 
   icon, 
   timeAgo, 
-  onClick 
+  onClick,
+  onAcceptInvite,
+  onDeclineInvite,
 }: { 
   notie: Notie; 
   icon: React.ReactNode; 
   timeAgo: string; 
   onClick: () => void;
+  onAcceptInvite?: (inviteId: number) => void;
+  onDeclineInvite?: (inviteId: number) => void;
 }) {
+  const isTeamInvite = notie.type === 'team_invite' && notie.metadata?.invite_id;
+
   return (
-    <button
-      onClick={onClick}
+    <div
       className={`w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-muted/50 transition ${
         !notie.isRead ? 'bg-primary/5' : ''
       }`}
     >
-      {/* Avatar */}
-      <div className="relative flex-shrink-0">
+      {/* Avatar - clickable */}
+      <button onClick={onClick} className="relative flex-shrink-0">
         <img 
           src={getAvatarUrl(notie.avatarUrl)} 
           alt="" 
@@ -375,21 +401,47 @@ function NotieItem({
         <div className="absolute -bottom-1 -right-1 p-1 bg-card rounded-full border border-border">
           {icon}
         </div>
-      </div>
+      </button>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className={`text-sm leading-snug ${!notie.isRead ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-          {notie.message}
-        </p>
-        <p className="text-xs text-muted-foreground mt-0.5">{timeAgo}</p>
+        <button onClick={onClick} className="text-left w-full">
+          <p className={`text-sm leading-snug ${!notie.isRead ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+            {notie.message}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{timeAgo}</p>
+        </button>
+
+        {/* Team invite actions */}
+        {isTeamInvite && onAcceptInvite && onDeclineInvite && (
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAcceptInvite(notie.metadata!.invite_id);
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-teal-500 hover:bg-teal-600 text-white rounded-lg transition"
+            >
+              Accept
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeclineInvite(notie.metadata!.invite_id);
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 text-foreground rounded-lg transition"
+            >
+              Decline
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Unread indicator */}
       {!notie.isRead && (
         <div className="flex-shrink-0 w-2.5 h-2.5 bg-primary rounded-full mt-1" />
       )}
-    </button>
+    </div>
   );
 }
 

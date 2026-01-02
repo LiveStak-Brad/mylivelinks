@@ -1,0 +1,1987 @@
+'use client';
+
+import { CSSProperties, ReactNode, useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import Image from 'next/image';
+import {
+  ArrowUp,
+  Bell,
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  FileText,
+  Flame,
+  Gift,
+  Hash,
+  Heart,
+  HelpCircle,
+  Home,
+  Image as ImageIcon,
+  MessageCircle,
+  Mic,
+  MoreHorizontal,
+  PlusCircle,
+  Radio,
+  Search,
+  Send,
+  Settings,
+  Share2,
+  Shield,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Video,
+  Zap,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Input,
+} from '@/components/ui';
+import { Textarea } from '@/components/ui/Textarea';
+import { useTeamContext, Surface } from '@/contexts/TeamContext';
+import {
+  useTeam,
+  useTeamMembership,
+  useTeamFeed,
+  useTeamMembers,
+  useTeamPresence,
+  useTeamLiveRooms,
+  useTeamChat,
+  useCreatePost,
+  useReactToPost,
+  useLeaveTeam,
+  useSendChatMessage,
+  useTeamNotificationPrefs,
+  FeedSort,
+  TeamMember,
+  FeedItem,
+  ChatMessage,
+  LiveRoom,
+  NotificationPrefs,
+} from '@/hooks/useTeam';
+
+/* ════════════════════════════════════════════════════════════════════════════
+   TYPES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+type RoleState = 'leader' | 'core' | 'member' | 'guest';
+type TopRange = '24h' | '7d';
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MAIN PAGE COMPONENT
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export default function TeamPageContent() {
+  const {
+    team,
+    teamId,
+    teamSlug,
+    membership,
+    permissions,
+    presence,
+    currentSurface,
+    setSurface,
+    uiRole,
+    isLoading,
+    isError,
+    errorMessage,
+  } = useTeamContext();
+  
+  const [feedSort, setFeedSort] = useState<FeedSort>('hot');
+  const [topRange, setTopRange] = useState<TopRange>('24h');
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  
+  // Fetch data using shared hooks (cached, no duplicate requests)
+  const { data: feedItemsRaw, isLoading: feedLoading } = useTeamFeed(teamId, feedSort);
+  const { data: membersRaw, isLoading: membersLoading } = useTeamMembers(teamId, 'all');
+  const { data: presenceData } = useTeamPresence(teamId);
+  const { data: liveRoomsRaw, isLoading: liveLoading } = useTeamLiveRooms(teamId);
+  
+  // Ensure arrays are never null/undefined and always iterable
+  const feedItems = Array.isArray(feedItemsRaw) ? feedItemsRaw : [];
+  const members = Array.isArray(membersRaw) ? membersRaw : [];
+  const liveRooms = Array.isArray(liveRoomsRaw) ? liveRoomsRaw : [];
+  
+  // Derive counts
+  const liveMembers = members.filter((m) => m.activity === 'live' || m.isStreaming);
+  const onlineMembers = members.filter((m) => m.activity === 'online');
+  const onlineCount = presenceData?.onlineCount ?? onlineMembers.length;
+  const liveCount = presenceData?.liveCount ?? liveRooms.length;
+  
+  // Sort feed
+  const sortedFeed = useMemo(() => {
+    const items = [...feedItems].filter((i) => !i.isPinned);
+    switch (feedSort) {
+      case 'hot':
+        return items.sort((a, b) => b.hotScore - a.hotScore);
+      case 'new':
+        return items.sort((a, b) => b.createdAt - a.createdAt);
+      case 'top':
+        return items.sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
+      default:
+        return items;
+    }
+  }, [feedItems, feedSort]);
+  
+  const pinnedItems = feedItems.filter((i) => i.isPinned);
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // Loading state
+  // ─────────────────────────────────────────────────────────────────────────
+  if (isLoading) {
+    return <TeamSkeleton />;
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // Error state
+  // ─────────────────────────────────────────────────────────────────────────
+  if (isError || !team) {
+    return <TeamErrorState message={errorMessage ?? 'Failed to load team'} />;
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // Banned user state
+  // ─────────────────────────────────────────────────────────────────────────
+  if (permissions.isBanned) {
+    return <BannedState teamName={team.name} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
+      {/* ══════════════════════════════════════════════════════════════════════
+          STICKY TEAM HEADER WITH BANNER
+          ══════════════════════════════════════════════════════════════════════ */}
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0a0a0f]">
+        {/* Banner Area */}
+        <div className="relative h-20 w-full overflow-hidden">
+          {team.bannerUrl ? (
+            <>
+              <Image
+                src={team.bannerUrl}
+                alt={`${team.name} banner`}
+                fill
+                className="object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/50 to-transparent" />
+            </>
+          ) : (
+            <div className="h-full w-full bg-gradient-to-r from-purple-600/40 via-pink-600/30 to-blue-600/40" />
+          )}
+        </div>
+        
+        {/* Team Info Row */}
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-2 -mt-7 relative">
+          <div className="flex items-center gap-3">
+            {/* Team Icon */}
+            <div className="relative">
+              {team.iconUrl ? (
+                <Image
+                  src={team.iconUrl}
+                  alt={team.name}
+                  width={52}
+                  height={52}
+                  className="rounded-full ring-4 ring-[#0a0a0f]"
+                />
+              ) : (
+                <div className="flex h-13 w-13 items-center justify-center rounded-full bg-purple-500 ring-4 ring-[#0a0a0f]" style={{ width: 52, height: 52 }}>
+                  <span className="text-lg font-bold text-white">{team.teamTag.slice(0, 2)}</span>
+                </div>
+              )}
+            </div>
+            <div className="pt-3">
+              <div className="flex items-center gap-2">
+                <h1 className="font-bold text-white">{team.name}</h1>
+                <Badge className="bg-purple-500/20 text-purple-300 text-[10px] px-1.5">{team.teamTag}</Badge>
+              </div>
+              <p className="text-xs text-white/50">{team.approvedMemberCount} members</p>
+            </div>
+          </div>
+          
+          {/* 3-dot Menu */}
+          <div className="relative pt-3">
+            <button
+              onClick={() => setShowHeaderMenu(!showHeaderMenu)}
+              className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+            
+            {showHeaderMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowHeaderMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 w-52 rounded-xl border border-white/10 bg-[#1a1a24] p-1 shadow-xl">
+                  {permissions.canModerate && (
+                    <button
+                      onClick={() => { setShowInviteModal(true); setShowHeaderMenu(false); }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+                    >
+                      <PlusCircle className="h-4 w-4" /> Invite Members
+                    </button>
+                  )}
+                  {permissions.canAccessSettings && (
+                    <button
+                      onClick={() => { setSurface('settings'); setShowHeaderMenu(false); }}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+                    >
+                      <Settings className="h-4 w-4" /> Team Settings
+                    </button>
+                  )}
+                  {permissions.canModerate && (
+                    <a
+                      href={`/teams/${team.slug}/admin`}
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+                    >
+                      <Shield className="h-4 w-4" /> Admin Panel
+                    </a>
+                  )}
+                  <button
+                    onClick={() => setShowHeaderMenu(false)}
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+                  >
+                    <Share2 className="h-4 w-4" /> Share Team
+                  </button>
+                  <div className="my-1 border-t border-white/10" />
+                  <a
+                    href="/policies"
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+                  >
+                    <FileText className="h-4 w-4" /> Safety Policies
+                  </a>
+                  <a
+                    href="/help"
+                    className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+                  >
+                    <HelpCircle className="h-4 w-4" /> Help & FAQ
+                  </a>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-5xl px-4 pb-40">
+        {/* ══════════════════════════════════════════════════════════════════════
+            NAVIGATION TABS
+            ══════════════════════════════════════════════════════════════════════ */}
+        <nav className="sticky top-[108px] z-40 border-b border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-2xl justify-around py-2">
+            <NavTab icon={<Home className="h-4 w-4" />} label="Home" active={currentSurface === 'home'} onClick={() => setSurface('home')} />
+            <NavTab icon={<Hash className="h-4 w-4" />} label="Feed" active={currentSurface === 'feed'} onClick={() => setSurface('feed')} />
+            <NavTab icon={<MessageCircle className="h-4 w-4" />} label="Chat" active={currentSurface === 'chat'} onClick={() => setSurface('chat')} />
+            <NavTab icon={<Video className="h-4 w-4" />} label="Live" active={currentSurface === 'live'} onClick={() => setSurface('live')} badge={liveCount} variant="live" />
+            <NavTab icon={<Users className="h-4 w-4" />} label="Members" active={currentSurface === 'members'} onClick={() => setSurface('members')} />
+            {permissions.canAccessSettings && (
+              <NavTab icon={<Settings className="h-4 w-4" />} label="Settings" active={currentSurface === 'settings'} onClick={() => setSurface('settings')} />
+            )}
+          </div>
+        </nav>
+
+        {/* ══════════════════════════════════════════════════════════════════════
+            SURFACE CONTENT
+            ══════════════════════════════════════════════════════════════════════ */}
+        <main className="mt-4 space-y-4">
+          {currentSurface === 'home' && (
+            <HomeScreen
+              liveMembers={liveMembers}
+              onlineCount={onlineCount}
+              liveCount={liveCount}
+              pinnedItems={pinnedItems}
+              feedItems={sortedFeed.slice(0, 5)}
+              liveRooms={liveRooms}
+              team={team}
+              onGoToFeed={() => setSurface('feed')}
+              onGoToLive={() => setSurface('live')}
+              onGoToChat={() => setSurface('chat')}
+            />
+          )}
+          {currentSurface === 'feed' && (
+            <FeedScreen
+              pinnedItems={pinnedItems}
+              feedItems={sortedFeed}
+              feedSort={feedSort}
+              onSortChange={setFeedSort}
+              topRange={topRange}
+              onTopRangeChange={setTopRange}
+              teamSlug={teamSlug ?? ''}
+              canPost={permissions.canPost}
+              isMuted={permissions.isMuted}
+            />
+          )}
+          {currentSurface === 'chat' && (
+            <ChatScreen teamId={teamId} members={members} canChat={permissions.canPost && !permissions.isMuted} />
+          )}
+          {currentSurface === 'live' && (
+            <LiveScreen liveRooms={liveRooms} members={members} role={uiRole} isLoading={liveLoading} onGoBack={() => setSurface('home')} />
+          )}
+          {currentSurface === 'members' && (
+            <MembersScreen members={members} isLoading={membersLoading} />
+          )}
+          {currentSurface === 'settings' && permissions.canAccessSettings && (
+            <SettingsScreen role={uiRole} team={team} teamId={teamId || ''} />
+          )}
+        </main>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          DOCKED CHAT BAR (visible on all surfaces except Chat)
+          ══════════════════════════════════════════════════════════════════════ */}
+      {currentSurface !== 'chat' && (
+        <DockedChatBar onOpenChat={() => setSurface('chat')} />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          INVITE MEMBERS MODAL
+          ══════════════════════════════════════════════════════════════════════ */}
+      {showInviteModal && teamId && (
+        <InviteMembersModal
+          teamId={teamId}
+          teamName={team.name}
+          teamSlug={team.slug}
+          onClose={() => setShowInviteModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LOADING / ERROR / EMPTY STATES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function TeamSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+        <p className="text-white/60">Loading team...</p>
+      </div>
+    </div>
+  );
+}
+
+function TeamErrorState({ message }: { message: string }) {
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
+      <div className="text-center max-w-md px-4">
+        <AlertTriangle className="h-12 w-12 text-amber-400 mx-auto mb-4" />
+        <h2 className="text-xl font-bold mb-2">Something went wrong</h2>
+        <p className="text-white/60 mb-4">{message}</p>
+        <Button onClick={() => window.location.reload()}>Try Again</Button>
+      </div>
+    </div>
+  );
+}
+
+function BannedState({ teamName }: { teamName: string }) {
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
+      <div className="text-center max-w-md px-4">
+        <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+        <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+        <p className="text-white/60 mb-4">
+          You have been banned from <span className="text-white font-semibold">{teamName}</span>.
+        </p>
+        <Button variant="outline" onClick={() => window.history.back()}>Go Back</Button>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, description, action }: { 
+  icon: ReactNode; 
+  title: string; 
+  description: string;
+  action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-8 text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/10">
+        {icon}
+      </div>
+      <h3 className="font-semibold text-white mb-1">{title}</h3>
+      <p className="text-sm text-white/50 mb-4">{description}</p>
+      {action && (
+        <Button onClick={action.onClick}>{action.label}</Button>
+      )}
+    </div>
+  );
+}
+
+function MutedBanner() {
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 flex items-center gap-3">
+      <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+      <p className="text-sm text-amber-200">
+        You are muted in this team and cannot post or chat.
+      </p>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   NAV TAB COMPONENT
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function NavTab({
+  icon,
+  label,
+  active,
+  onClick,
+  badge,
+  variant,
+}: {
+  icon: ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  badge?: number;
+  variant?: 'live';
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={`relative flex items-center justify-center rounded-xl p-3 transition ${
+        active
+          ? 'bg-white/10 text-white'
+          : 'text-white/60 hover:bg-white/5 hover:text-white'
+      }`}
+    >
+      {icon}
+      {badge !== undefined && badge > 0 && (
+        <span
+          className={`absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
+            variant === 'live' ? 'bg-red-500 text-white animate-pulse' : 'bg-purple-500 text-white'
+          }`}
+        >
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   HOME SCREEN (Dashboard)
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function HomeScreen({
+  liveMembers,
+  onlineCount,
+  liveCount,
+  pinnedItems,
+  feedItems,
+  liveRooms,
+  team,
+  onGoToFeed,
+  onGoToLive,
+  onGoToChat,
+}: {
+  liveMembers: TeamMember[];
+  onlineCount: number;
+  liveCount: number;
+  pinnedItems: FeedItem[];
+  feedItems: FeedItem[];
+  liveRooms: LiveRoom[];
+  team: { name: string; approvedMemberCount: number };
+  onGoToFeed: () => void;
+  onGoToLive: () => void;
+  onGoToChat: () => void;
+}) {
+  return (
+    <>
+      {/* ══════════ LIVE / PRESENCE STRIP ══════════ */}
+      <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4">
+        {liveCount > 0 ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-white">
+              <span className="text-red-400">{liveCount} live</span> · {onlineCount} online
+            </p>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {liveMembers.slice(0, 5).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={onGoToLive}
+                  className="group flex flex-col items-center gap-1.5 rounded-xl bg-white/5 p-3 transition hover:bg-white/10"
+                >
+                  <div className="relative">
+                    <div className="rounded-full p-0.5 bg-gradient-to-br from-red-500 to-pink-500">
+                      <Image
+                        src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=8B5CF6&color=fff`}
+                        alt={m.name}
+                        width={48}
+                        height={48}
+                        className="h-12 w-12 rounded-full border-2 border-[#0a0a0f] object-cover"
+                      />
+                    </div>
+                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-red-500 px-1.5 py-0.5">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                      <span className="text-[9px] font-bold text-white uppercase">Live</span>
+                    </span>
+                  </div>
+                  <span className="text-xs font-medium text-white/80 group-hover:text-white whitespace-nowrap">
+                    {m.name.split(' ')[0]}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-white">{onlineCount} online</p>
+              <p className="text-xs text-white/50">No one live right now</p>
+            </div>
+            <Button
+              size="sm"
+              onClick={onGoToLive}
+              className="bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600"
+            >
+              Go Live
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* ══════════ PINNED ANNOUNCEMENT ══════════ */}
+      {pinnedItems[0] && (
+        <AnnouncementCard item={pinnedItems[0]} />
+      )}
+
+      {/* ══════════ MOMENTUM + PROGRESS ══════════ */}
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-400" />
+            <span className="text-sm font-medium text-white">Team Momentum</span>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          <MomentumStat icon={<Hash className="h-4 w-4" />} value={String(feedItems.length)} label="posts" />
+          <MomentumStat icon={<Video className="h-4 w-4" />} value={String(liveCount)} label="live now" />
+          <MomentumStat icon={<Users className="h-4 w-4" />} value={String(team.approvedMemberCount)} label="members" />
+        </div>
+      </div>
+
+      {/* ══════════ QUICK ACTIONS (if nothing live) ══════════ */}
+      {liveCount === 0 && (
+        <div className="grid grid-cols-4 gap-2">
+          <QuickAction icon={<Hash className="h-5 w-5" />} label="Post" onClick={onGoToFeed} />
+          <QuickAction icon={<Video className="h-5 w-5" />} label="Go Live" onClick={onGoToLive} variant="live" />
+          <QuickAction icon={<MessageCircle className="h-5 w-5" />} label="Chat" onClick={onGoToChat} />
+          <QuickAction icon={<TrendingUp className="h-5 w-5" />} label="Poll" onClick={onGoToFeed} />
+        </div>
+      )}
+
+      {/* ══════════ PRIMARY CONTENT STACK ══════════ */}
+      {feedItems.length > 0 ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wider text-white/50">What's happening</span>
+            <button onClick={onGoToFeed} className="text-xs text-purple-400 hover:text-purple-300">
+              View all <ChevronRight className="inline h-3 w-3" />
+            </button>
+          </div>
+          {feedItems.slice(0, 4).map((item) => (
+            <FeedCard key={item.id} item={item} compact />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Hash className="h-6 w-6 text-white/50" />}
+          title="No posts yet"
+          description="Be the first to share something with the team!"
+          action={{ label: 'Create Post', onClick: onGoToFeed }}
+        />
+      )}
+    </>
+  );
+}
+
+function MomentumStat({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2">
+      <span className="text-purple-400">{icon}</span>
+      <div>
+        <p className="text-sm font-bold text-white">{value}</p>
+        <p className="text-[10px] text-white/50">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({ icon, label, onClick, variant }: { icon: ReactNode; label: string; onClick: () => void; variant?: 'live' }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 rounded-xl p-3 transition ${
+        variant === 'live'
+          ? 'bg-gradient-to-br from-red-500/20 to-pink-500/20 text-red-400 hover:from-red-500/30 hover:to-pink-500/30'
+          : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+      }`}
+    >
+      {icon}
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
+  );
+}
+
+function AnnouncementCard({ item }: { item: FeedItem }) {
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/20">
+          <Bell className="h-5 w-5 text-amber-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Pinned</span>
+            <span className="text-xs text-white/40">· {formatTime(item.createdAt)}</span>
+          </div>
+          <h3 className="font-semibold text-white mb-1">{item.title}</h3>
+          <p className="text-sm text-white/70">{item.body}</p>
+          <div className="mt-3 flex items-center gap-3">
+            <button className="flex items-center gap-1 text-xs text-white/50 hover:text-white">
+              <Heart className="h-3.5 w-3.5" /> {item.upvotes}
+            </button>
+            <button className="flex items-center gap-1 text-xs text-white/50 hover:text-white">
+              <MessageCircle className="h-3.5 w-3.5" /> {item.comments}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   FEED SCREEN
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function FeedScreen({
+  pinnedItems,
+  feedItems,
+  feedSort,
+  onSortChange,
+  topRange,
+  onTopRangeChange,
+  teamSlug,
+  canPost,
+  isMuted,
+}: {
+  pinnedItems: FeedItem[];
+  feedItems: FeedItem[];
+  feedSort: FeedSort;
+  onSortChange: (sort: FeedSort) => void;
+  topRange: TopRange;
+  onTopRangeChange: (range: TopRange) => void;
+  teamSlug: string;
+  canPost: boolean;
+  isMuted: boolean;
+}) {
+  const [postText, setPostText] = useState('');
+  const createPost = useCreatePost(teamSlug);
+  
+  const handleSubmitPost = async () => {
+    if (!postText.trim() || !canPost) return;
+    try {
+      await createPost.mutate({ text: postText });
+      setPostText('');
+    } catch (err) {
+      console.error('Failed to create post:', err);
+    }
+  };
+  
+  return (
+    <>
+      {/* Muted banner */}
+      {isMuted && <MutedBanner />}
+      
+      {/* Composer */}
+      {canPost && !isMuted && (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-500/20">
+              <Hash className="h-5 w-5 text-purple-400" />
+            </div>
+            <div className="flex-1">
+              <Textarea
+                value={postText}
+                onChange={(e) => setPostText(e.target.value)}
+                placeholder="Share something with the team..."
+                className="min-h-[80px] resize-none border-0 bg-transparent text-white placeholder:text-white/40 focus:ring-0"
+              />
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex gap-2">
+                  <button className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white">
+                    <ImageIcon className="h-5 w-5" />
+                  </button>
+                  <button className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white">
+                    <TrendingUp className="h-5 w-5" />
+                  </button>
+                </div>
+                <Button 
+                  size="sm" 
+                  className="bg-purple-500 hover:bg-purple-600"
+                  onClick={handleSubmitPost}
+                  disabled={!postText.trim() || createPost.isLoading}
+                >
+                  {createPost.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Post'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sort Controls */}
+      <div className="flex items-center gap-2">
+        {(['hot', 'new', 'top'] as FeedSort[]).map((sort) => (
+          <Chip
+            key={sort}
+            size="sm"
+            variant="outline"
+            selected={feedSort === sort}
+            onClick={() => onSortChange(sort)}
+            className={feedSort === sort ? 'border-purple-400 bg-purple-500/20 text-white' : 'border-white/20 text-white/60'}
+            icon={sort === 'hot' ? <Flame className="h-3 w-3" /> : sort === 'new' ? <Clock className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+          >
+            {sort.charAt(0).toUpperCase() + sort.slice(1)}
+          </Chip>
+        ))}
+        {feedSort === 'top' && (
+          <div className="ml-2 flex gap-1">
+            {(['24h', '7d'] as TopRange[]).map((range) => (
+              <button
+                key={range}
+                onClick={() => onTopRangeChange(range)}
+                className={`rounded-lg px-2 py-1 text-xs ${
+                  topRange === range ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white'
+                }`}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Pinned */}
+      {pinnedItems.map((item) => (
+        <AnnouncementCard key={item.id} item={item} />
+      ))}
+
+      {/* Feed Items */}
+      {feedItems.length > 0 ? (
+        <div className="space-y-3">
+          {feedItems.map((item) => (
+            <FeedCard key={item.id} item={item} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Hash className="h-6 w-6 text-white/50" />}
+          title="No posts yet"
+          description="Be the first to share something with the team!"
+        />
+      )}
+    </>
+  );
+}
+
+function FeedCard({ item, compact = false }: { item: FeedItem; compact?: boolean }) {
+  const isThread = item.type === 'thread';
+  const isPoll = item.type === 'poll';
+  const isClip = item.type === 'clip';
+
+  return (
+    <div className={`rounded-2xl border border-white/10 bg-white/5 overflow-hidden transition hover:border-white/20 ${compact ? 'p-3' : 'p-4'}`}>
+      {/* Author Row */}
+      <div className="flex items-start gap-3">
+        <div className="flex flex-col items-center gap-1">
+          <Image
+            src={item.author.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.author.name)}&background=8B5CF6&color=fff`}
+            alt={item.author.name}
+            width={compact ? 36 : 44}
+            height={compact ? 36 : 44}
+            className="rounded-full"
+          />
+          {isThread && (
+            <div className="flex flex-col items-center gap-0.5 text-white/30">
+              <button className="hover:text-green-400"><ArrowUp className="h-4 w-4" /></button>
+              <span className="text-[10px] font-bold text-white/60">{item.upvotes - item.downvotes}</span>
+              <button className="hover:text-red-400 rotate-180"><ArrowUp className="h-4 w-4" /></button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-white text-sm">{item.author.name}</span>
+            <RoleBadge role={item.author.role} />
+            <span className="text-xs text-white/40">{formatTime(item.createdAt)}</span>
+            {item.type !== 'post' && (
+              <Badge className="bg-white/10 text-white/70 text-[10px]">{item.type}</Badge>
+            )}
+          </div>
+
+          {item.title && (
+            <h4 className="mt-1 font-semibold text-white">{item.title}</h4>
+          )}
+          <p className={`mt-1 text-white/80 ${compact ? 'text-sm line-clamp-2' : 'text-sm'}`}>{item.body}</p>
+
+          {/* Poll Options */}
+          {isPoll && item.pollOptions && (
+            <div className="mt-3 space-y-2">
+              {item.pollOptions.map((opt, i) => {
+                const total = item.pollOptions!.reduce((acc, o) => acc + o.votes, 0);
+                const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
+                return (
+                  <button key={i} className="relative w-full rounded-xl bg-white/10 p-3 text-left overflow-hidden hover:bg-white/15">
+                    <div className="absolute inset-0 bg-purple-500/20" style={{ width: `${pct}%` }} />
+                    <div className="relative flex items-center justify-between">
+                      <span className="text-sm text-white">{opt.label}</span>
+                      <span className="text-xs font-bold text-white/70">{pct}%</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Media */}
+          {item.media && (isClip || item.type === 'post') && (
+            <div className="mt-3 relative rounded-xl overflow-hidden">
+              <Image src={item.media} alt="" width={600} height={300} className="w-full object-cover" />
+              {isClip && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur">
+                    <Video className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="mt-3 flex items-center gap-4">
+            <button className="flex items-center gap-1 text-xs text-white/50 hover:text-white">
+              <Heart className="h-4 w-4" /> {item.upvotes}
+            </button>
+            <button className="flex items-center gap-1 text-xs text-white/50 hover:text-white">
+              <MessageCircle className="h-4 w-4" /> {item.comments}
+            </button>
+            <button className="ml-auto text-white/30 hover:text-white">
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CHAT SCREEN
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function ChatScreen({ teamId, members, canChat }: { teamId: string | null; members: TeamMember[]; canChat: boolean }) {
+  const { messages, isLoading, refetch } = useTeamChat(teamId);
+  const { mutate: sendMessage, isLoading: isSending } = useSendChatMessage(teamId);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [inputText, setInputText] = useState('');
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages]);
+
+  const streamingMembers = members.filter((m) => m.isStreaming);
+
+  const handleSend = async () => {
+    if (!inputText.trim() || !canChat || isSending) return;
+
+    const text = inputText.trim();
+    setInputText(''); // Clear immediately for snappy UX
+
+    try {
+      await sendMessage({ content: text });
+      // Message will appear via realtime subscription
+    } catch (err) {
+      // Restore text on error
+      setInputText(text);
+      console.error('Failed to send message:', err);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 200px)' }}>
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 space-y-1 overflow-y-auto pr-2">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+          </div>
+        ) : messages.length > 0 ? (
+          messages.map((msg) => (
+            <ChatMessageRow key={msg.id} message={msg} />
+          ))
+        ) : (
+          <EmptyState
+            icon={<MessageCircle className="h-6 w-6 text-white/50" />}
+            title="No messages yet"
+            description="Start the conversation!"
+          />
+        )}
+      </div>
+
+      {/* Jump to Live */}
+      {streamingMembers.length > 0 && (
+        <div className="my-3 flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-500/30 p-3">
+          <Radio className="h-4 w-4 text-red-400 animate-pulse" />
+          <span className="text-sm text-white">
+            <span className="font-semibold text-red-400">{streamingMembers[0]?.name}</span> is live
+          </span>
+          <Button size="sm" className="ml-auto bg-red-500 hover:bg-red-600 text-white text-xs">
+            Join
+          </Button>
+        </div>
+      )}
+
+      {/* Composer */}
+      <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+        <div className="flex items-center gap-2">
+          <Input
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={canChat ? "Message the team..." : "You cannot chat in this team"}
+            disabled={!canChat || isSending}
+            className="flex-1 border-0 bg-transparent text-white placeholder:text-white/40 focus:ring-0"
+          />
+          <Button 
+            size="sm" 
+            className="bg-purple-500 hover:bg-purple-600" 
+            disabled={!canChat || !inputText.trim() || isSending}
+            onClick={handleSend}
+          >
+            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatMessageRow({ message }: { message: ChatMessage }) {
+  if (message.isSystem) {
+    return (
+      <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+        <Radio className="h-4 w-4 text-purple-400" />
+        <span className="text-sm text-purple-300">{message.text}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group flex items-start gap-3 rounded-xl p-2 hover:bg-white/5">
+      <Image
+        src={message.author.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(message.author.name)}&background=8B5CF6&color=fff`}
+        alt={message.author.name}
+        width={36}
+        height={36}
+        className="rounded-full"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-white text-sm">{message.author.name}</span>
+          <RoleBadge role={message.author.role} />
+          <span className="text-[10px] text-white/40">{formatTime(message.timestamp)}</span>
+        </div>
+        <p className="text-sm text-white/80 mt-0.5">{message.text}</p>
+        {message.reactions && message.reactions.length > 0 && (
+          <div className="mt-1 flex gap-1">
+            {message.reactions.map((r, i) => (
+              <span key={i} className="rounded-full bg-white/10 px-2 py-0.5 text-xs">
+                {r.emoji} {r.count}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   LIVE SCREEN
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function LiveScreen({ liveRooms, members, role, isLoading, onGoBack }: { liveRooms: LiveRoom[]; members: TeamMember[]; role: RoleState; isLoading: boolean; onGoBack?: () => void }) {
+  const [showComingSoon, setShowComingSoon] = useState(false);
+
+  return (
+    <>
+      {/* Go Live CTA */}
+      <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-6 text-center">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-pink-500">
+          <Video className="h-6 w-6 text-white" />
+        </div>
+        <h3 className="font-semibold text-white mb-1">Start a Live Room</h3>
+        <p className="text-sm text-white/50 mb-4">Stream, hang out, or host a team event</p>
+        <Button 
+          onClick={() => setShowComingSoon(true)}
+          className="bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600"
+        >
+          Go Live
+        </Button>
+      </div>
+
+      {/* Coming Soon Modal */}
+      {showComingSoon && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowComingSoon(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="rounded-2xl bg-[#1a1a24] border border-white/10 p-6 max-w-sm mx-4 text-center shadow-2xl pointer-events-auto">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-red-500/20 to-pink-500/20">
+                <Video className="h-8 w-8 text-pink-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Coming Soon!</h3>
+              <p className="text-sm text-white/60 mb-6">
+                Team Live streaming is launching soon. Stream to your team, host events, and go live together!
+              </p>
+              <div className="flex gap-3">
+                {onGoBack && (
+                  <Button 
+                    onClick={() => { setShowComingSoon(false); onGoBack(); }}
+                    variant="ghost"
+                    className="flex-1 text-white/70 hover:text-white hover:bg-white/10"
+                  >
+                    ← Back to Home
+                  </Button>
+                )}
+                <Button 
+                  onClick={() => setShowComingSoon(false)} 
+                  className={`${onGoBack ? 'flex-1' : 'w-full'} bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white`}
+                >
+                  Got it
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Live Grid */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-32">
+          <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+        </div>
+      ) : liveRooms.length > 0 ? (
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium uppercase tracking-wider text-white/50">Live Now</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {liveRooms.map((room) => (
+              <LiveTile key={room.id} room={room} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Video className="h-6 w-6 text-white/50" />}
+          title="No one is live"
+          description="Be the first to start a stream!"
+        />
+      )}
+
+      {/* Scheduled */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-medium uppercase tracking-wider text-white/50">Upcoming</h3>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/20">
+              <Calendar className="h-5 w-5 text-purple-400" />
+            </div>
+            <div>
+              <p className="font-medium text-white">No upcoming events</p>
+              <p className="text-xs text-white/50">Schedule an event for the team</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function LiveTile({ room }: { room: LiveRoom }) {
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-white/10">
+      <div className="h-40" style={{ background: room.thumbnail }} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+      <div className="absolute inset-0 flex flex-col justify-between p-4">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> LIVE
+          </span>
+          <span className="rounded-full bg-black/50 px-2 py-0.5 text-xs text-white">
+            {room.viewers} watching
+          </span>
+        </div>
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Image
+              src={room.host.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(room.host.name)}&background=8B5CF6&color=fff`}
+              alt={room.host.name}
+              width={32}
+              height={32}
+              className="rounded-full ring-2 ring-red-500"
+            />
+            <div>
+              <p className="text-sm font-semibold text-white">{room.host.name}</p>
+              {room.isTeamRoom && (
+                <Badge className="bg-purple-500/50 text-white text-[9px]">Team Room</Badge>
+              )}
+            </div>
+          </div>
+          <p className="text-sm text-white/90 line-clamp-1">{room.title}</p>
+          <Button size="sm" className="mt-2 w-full bg-white/20 backdrop-blur hover:bg-white/30 text-white">
+            Join Room
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   MEMBERS SCREEN
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function MembersScreen({ members, isLoading }: { members: TeamMember[]; isLoading: boolean }) {
+  const [filter, setFilter] = useState<'all' | 'live' | 'online'>('all');
+  const [search, setSearch] = useState('');
+
+  const filtered = members.filter((m) => {
+    if (filter === 'live' && m.activity !== 'live' && !m.isStreaming) return false;
+    if (filter === 'online' && m.activity === 'offline') return false;
+    if (search && !m.name.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const grouped = {
+    leader: filtered.filter((m) => m.role === 'leader'),
+    core: filtered.filter((m) => m.role === 'core'),
+    member: filtered.filter((m) => m.role === 'member'),
+    guest: filtered.filter((m) => m.role === 'guest'),
+  };
+
+  return (
+    <>
+      {/* Search & Filters */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search members..."
+            className="pl-10 border-white/10 bg-white/5 text-white placeholder:text-white/40"
+          />
+        </div>
+        <div className="flex gap-2">
+          {(['all', 'live', 'online'] as const).map((f) => (
+            <Chip
+              key={f}
+              size="sm"
+              variant="outline"
+              selected={filter === f}
+              onClick={() => setFilter(f)}
+              className={filter === f ? 'border-purple-400 bg-purple-500/20 text-white' : 'border-white/20 text-white/60'}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+      {/* Member List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-32">
+          <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+        </div>
+      ) : members.length > 0 ? (
+        <div className="space-y-4">
+          {(['leader', 'core', 'member', 'guest'] as RoleState[]).map((role) => {
+            const group = grouped[role];
+            if (group.length === 0) return null;
+            return (
+              <div key={role}>
+                <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-white/50">
+                  {role === 'leader' ? 'Leaders' : role === 'core' ? 'Core' : role === 'member' ? 'Members' : 'Guests'} — {group.length}
+                </h3>
+                <div className="space-y-2">
+                  {group.map((m) => (
+                    <MemberRow key={m.id} member={m} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Users className="h-6 w-6 text-white/50" />}
+          title="No members found"
+          description="Try adjusting your search or filters."
+        />
+      )}
+    </>
+  );
+}
+
+function MemberRow({ member }: { member: TeamMember }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3 hover:border-white/20">
+      <div className="relative">
+        <Image
+          src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=8B5CF6&color=fff`}
+          alt={member.name}
+          width={44}
+          height={44}
+          className="rounded-full"
+        />
+        <span
+          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-[#0a0a0f] ${
+            member.activity === 'live' || member.isStreaming ? 'bg-red-500' : member.activity === 'online' ? 'bg-green-500' : 'bg-white/30'
+          }`}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-white">{member.name}</span>
+          <RoleBadge role={member.role} />
+        </div>
+        <p className="text-xs text-white/50">{member.handle}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        {member.isStreaming && (
+          <Badge className="bg-red-500/20 text-red-400 text-[10px]">LIVE</Badge>
+        )}
+        <button className="rounded-lg p-2 text-white/30 hover:bg-white/10 hover:text-white">
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SETTINGS SCREEN
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function SettingsScreen({ role, team, teamId }: { role: RoleState; team: { name: string; slug: string; description?: string; themeColor?: string; iconUrl?: string; bannerUrl?: string }; teamId: string }) {
+  const isLeader = role === 'leader';
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const iconInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<'banner' | 'icon' | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  
+  // Edit states
+  const [editingSlug, setEditingSlug] = useState(false);
+  const [newSlug, setNewSlug] = useState(team.slug);
+  const [slugError, setSlugError] = useState<string | null>(null);
+  const [savingSlug, setSavingSlug] = useState(false);
+  
+  // Leave team states
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const { mutate: leaveTeam, isLoading: isLeaving } = useLeaveTeam(teamId);
+  
+  // Notification preferences
+  const { prefs, updatePref, isSaving: isSavingPrefs } = useTeamNotificationPrefs(teamId);
+  
+  const handleLeaveTeam = async () => {
+    try {
+      await leaveTeam();
+      // Redirect to teams discovery
+      window.location.href = '/teams';
+    } catch (err) {
+      console.error('Failed to leave team:', err);
+    }
+  };
+
+  const validateSlug = (slug: string): boolean => {
+    // Slug format: ^[a-z0-9][a-z0-9-]{5,62}[a-z0-9]$
+    return /^[a-z0-9][a-z0-9-]{5,62}[a-z0-9]$/.test(slug);
+  };
+
+  const handleSaveSlug = async () => {
+    const cleanSlug = newSlug.toLowerCase().trim();
+    
+    if (!validateSlug(cleanSlug)) {
+      setSlugError('Slug must be 7-64 characters, lowercase letters, numbers, and hyphens only');
+      return;
+    }
+
+    setSavingSlug(true);
+    setSlugError(null);
+
+    try {
+      const { createClient } = await import('@/lib/supabase');
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('teams')
+        .update({ slug: cleanSlug, updated_at: new Date().toISOString() })
+        .eq('id', teamId);
+
+      if (error) {
+        if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
+          setSlugError('This slug is already taken');
+        } else {
+          setSlugError(error.message);
+        }
+        return;
+      }
+
+      // Redirect to new slug URL
+      window.location.href = `/teams/${cleanSlug}`;
+    } catch (err: any) {
+      setSlugError(err?.message || 'Failed to update slug');
+    } finally {
+      setSavingSlug(false);
+    }
+  };
+
+  const handleBannerUpload = () => {
+    bannerInputRef.current?.click();
+  };
+
+  const handleIconUpload = () => {
+    iconInputRef.current?.click();
+  };
+
+  const handleFileChange = (type: 'banner' | 'icon') => async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !teamId) return;
+
+    // Show preview immediately
+    const previewUrl = URL.createObjectURL(file);
+    if (type === 'banner') {
+      setBannerPreview(previewUrl);
+    } else {
+      setIconPreview(previewUrl);
+    }
+
+    setUploading(type);
+
+    try {
+      // Dynamic import to avoid SSR issues
+      const { uploadTeamAsset } = await import('@/lib/teamAssets');
+      const result = await uploadTeamAsset(teamId, file, type);
+
+      if (!result.success) {
+        alert(`Upload failed: ${result.error}`);
+        // Clear preview on error
+        if (type === 'banner') setBannerPreview(null);
+        else setIconPreview(null);
+      } else {
+        // Refresh the page to show new image
+        window.location.reload();
+      }
+    } catch (err: any) {
+      alert(`Upload failed: ${err?.message || 'Unknown error'}`);
+      if (type === 'banner') setBannerPreview(null);
+      else setIconPreview(null);
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Hidden file inputs */}
+      <input
+        ref={bannerInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange('banner')}
+      />
+      <input
+        ref={iconInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange('icon')}
+      />
+
+      {/* Team Branding */}
+      {isLeader && (
+        <SettingsGroup title="Team Branding">
+          <div className="p-4 space-y-4">
+            {/* Banner Preview & Upload */}
+            <div>
+              <label className="text-sm font-medium text-white/80 mb-2 block">Team Banner</label>
+              <div 
+                onClick={uploading ? undefined : handleBannerUpload}
+                className={`relative h-24 w-full rounded-xl overflow-hidden border border-white/10 transition ${uploading === 'banner' ? 'opacity-50' : 'cursor-pointer group hover:border-purple-500/50'}`}
+              >
+                {bannerPreview || team.bannerUrl ? (
+                  <img src={bannerPreview || team.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-r from-purple-600/30 via-pink-600/20 to-blue-600/30" />
+                )}
+                {uploading === 'banner' ? (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                    <div className="text-center">
+                      <ImageIcon className="h-6 w-6 text-white mx-auto mb-1" />
+                      <span className="text-xs text-white">Upload Banner</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-white/40 mt-1">Recommended: 1200×400px</p>
+            </div>
+
+            {/* Icon Preview & Upload */}
+            <div>
+              <label className="text-sm font-medium text-white/80 mb-2 block">Team Icon</label>
+              <div className="flex items-center gap-4">
+                <div 
+                  onClick={uploading ? undefined : handleIconUpload}
+                  className={`relative h-16 w-16 rounded-full overflow-hidden border-2 border-white/10 transition ${uploading === 'icon' ? 'opacity-50' : 'cursor-pointer group hover:border-purple-500/50'}`}
+                >
+                  {iconPreview || team.iconUrl ? (
+                    <img src={iconPreview || team.iconUrl} alt="Icon" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-purple-500 flex items-center justify-center">
+                      <span className="text-xl font-bold text-white">{team.name.slice(0, 2).toUpperCase()}</span>
+                    </div>
+                  )}
+                  {uploading === 'icon' ? (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <Loader2 className="h-5 w-5 text-white animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                      <ImageIcon className="h-5 w-5 text-white" />
+                    </div>
+                  )}
+                </div>
+                <div className="text-sm text-white/60">
+                  <p>Click to upload a new icon</p>
+                  <p className="text-xs text-white/40">Square image, min 200×200px</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SettingsGroup>
+      )}
+
+      <SettingsGroup title="Team Profile">
+        <SettingsRow label="Team Name" value={team.name} action={isLeader ? "Edit" : undefined} />
+        <SettingsRow label="Bio" value={team.description ?? 'No description'} action={isLeader ? "Edit" : undefined} />
+        <SettingsRow label="Theme Color" value={team.themeColor ?? 'Purple'} action={isLeader ? "Change" : undefined} />
+      </SettingsGroup>
+
+      <SettingsGroup title="Team URL">
+        {isLeader && editingSlug ? (
+          <div className="p-4 space-y-3">
+            <div>
+              <label className="text-sm font-medium text-white/80 mb-2 block">Team Slug</label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-white/50">mylivelinks.com/teams/</span>
+                <Input
+                  value={newSlug}
+                  onChange={(e) => {
+                    setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                    setSlugError(null);
+                  }}
+                  placeholder="your-team-slug"
+                  className="flex-1 bg-white/5 border-white/10 text-white"
+                  disabled={savingSlug}
+                />
+              </div>
+              {slugError && <p className="text-sm text-red-400 mt-1">{slugError}</p>}
+              <p className="text-xs text-white/40 mt-1">7-64 characters, lowercase letters, numbers, and hyphens</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setEditingSlug(false); setNewSlug(team.slug); setSlugError(null); }}
+                disabled={savingSlug}
+                className="text-white/70"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveSlug}
+                disabled={savingSlug || newSlug === team.slug}
+                className="bg-purple-500 hover:bg-purple-600 text-white"
+              >
+                {savingSlug ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <SettingsRow 
+              label="Team URL" 
+              value={`mylivelinks.com/teams/${team.slug}`} 
+              action={isLeader ? "Edit" : undefined}
+              onAction={isLeader ? () => setEditingSlug(true) : undefined}
+            />
+            <SettingsRow label="Share Link" value={`mylivelinks.com/teams/${team.slug}`} action="Copy" />
+          </>
+        )}
+      </SettingsGroup>
+
+      {isLeader && (
+        <SettingsGroup title="Moderation">
+          <SettingsRow label="Pending Requests" value="0" action="Review" />
+          <SettingsRow label="Pinned Posts" value="0" action="Manage" />
+          <SettingsRow label="Banned Members" value="0" action="View" />
+        </SettingsGroup>
+      )}
+
+      <SettingsGroup title="Notifications">
+        <SettingsRow 
+          label="All Activity" 
+          toggle 
+          checked={prefs?.all_activity ?? true}
+          onToggle={(val) => updatePref('all_activity', val)}
+          disabled={isSavingPrefs}
+        />
+        <SettingsRow 
+          label="Live Alerts" 
+          toggle 
+          checked={prefs?.live_alerts ?? true}
+          onToggle={(val) => updatePref('live_alerts', val)}
+          disabled={isSavingPrefs}
+        />
+        <SettingsRow 
+          label="Mentions Only" 
+          toggle 
+          checked={prefs?.mentions_only ?? false}
+          onToggle={(val) => updatePref('mentions_only', val)}
+          disabled={isSavingPrefs}
+        />
+      </SettingsGroup>
+
+      {/* Leave Team */}
+      {role !== 'leader' && (
+        <SettingsGroup title="Danger Zone">
+          <div className="p-4">
+            <p className="text-sm text-white/60 mb-3">
+              Leaving the team will remove you from all team activities. You can request to rejoin later.
+            </p>
+            <Button
+              onClick={() => setShowLeaveModal(true)}
+              variant="ghost"
+              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              Leave Team
+            </Button>
+          </div>
+        </SettingsGroup>
+      )}
+
+      {/* Leave Team Confirmation Modal */}
+      {showLeaveModal && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowLeaveModal(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="rounded-2xl bg-[#1a1a24] border border-white/10 p-6 max-w-sm mx-4 text-center shadow-2xl pointer-events-auto">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
+                <AlertTriangle className="h-8 w-8 text-red-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Leave {team.name}?</h3>
+              <p className="text-sm text-white/60 mb-6">
+                You'll lose access to the team's content and activities. You can request to rejoin later.
+              </p>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => setShowLeaveModal(false)}
+                  variant="ghost"
+                  className="flex-1 text-white/70 hover:text-white hover:bg-white/10"
+                  disabled={isLeaving}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleLeaveTeam}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                  disabled={isLeaving}
+                >
+                  {isLeaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Leave Team'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+      <div className="border-b border-white/10 bg-white/5 px-4 py-3">
+        <h3 className="text-sm font-semibold text-white">{title}</h3>
+      </div>
+      <div className="divide-y divide-white/5">{children}</div>
+    </div>
+  );
+}
+
+function SettingsRow({
+  label,
+  value,
+  action,
+  onAction,
+  toggle,
+  checked: controlledChecked,
+  onToggle,
+  disabled,
+}: {
+  label: string;
+  value?: string;
+  action?: string;
+  onAction?: () => void;
+  toggle?: boolean;
+  checked?: boolean;
+  onToggle?: (value: boolean) => void;
+  disabled?: boolean;
+}) {
+  const [internalChecked, setInternalChecked] = useState(controlledChecked ?? false);
+  const isChecked = controlledChecked !== undefined ? controlledChecked : internalChecked;
+
+  const handleToggle = () => {
+    if (disabled) return;
+    const newValue = !isChecked;
+    if (onToggle) {
+      onToggle(newValue);
+    } else {
+      setInternalChecked(newValue);
+    }
+  };
+
+  const handleAction = () => {
+    if (onAction) {
+      onAction();
+    } else if (action === 'Copy' && value) {
+      navigator.clipboard.writeText(value.startsWith('http') ? value : `https://${value}`);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <div>
+        <p className="text-sm text-white">{label}</p>
+        {value && <p className="text-xs text-white/50">{value}</p>}
+      </div>
+      {toggle ? (
+        <button
+          onClick={handleToggle}
+          disabled={disabled}
+          className={`relative h-6 w-11 rounded-full transition ${isChecked ? 'bg-purple-500' : 'bg-white/20'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+          <span
+            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition ${isChecked ? 'translate-x-5' : ''}`}
+          />
+        </button>
+      ) : action ? (
+        <Button size="sm" variant="ghost" onClick={handleAction} className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10">
+          {action}
+        </Button>
+      ) : (
+        <ChevronRight className="h-4 w-4 text-white/30" />
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DOCKED CHAT BAR
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function DockedChatBar({ onOpenChat }: { onOpenChat: () => void }) {
+  return (
+    <div className="fixed bottom-[68px] inset-x-0 z-40 border-t border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl">
+      <div className="mx-auto max-w-5xl px-4 py-2">
+        <button
+          onClick={onOpenChat}
+          className="flex w-full items-center gap-3 rounded-2xl bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
+        >
+          <MessageCircle className="h-5 w-5 text-purple-400" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white">Team Chat</p>
+            <p className="truncate text-xs text-white/50">Tap to open chat</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   UTILITY COMPONENTS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function RoleBadge({ role }: { role: RoleState }) {
+  const styles: Record<RoleState, string> = {
+    leader: 'bg-amber-500/20 text-amber-400',
+    core: 'bg-purple-500/20 text-purple-400',
+    member: 'bg-white/10 text-white/60',
+    guest: 'bg-white/5 text-white/40',
+  };
+
+  if (role === 'member' || role === 'guest') return null;
+
+  return (
+    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[role]}`}>
+      {role}
+    </span>
+  );
+}
+
+function formatTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   INVITE MEMBERS MODAL
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function InviteMembersModal({
+  teamId,
+  teamName,
+  teamSlug,
+  onClose,
+}: {
+  teamId: string;
+  teamName: string;
+  teamSlug: string;
+  onClose: () => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [users, setUsers] = useState<Array<{ id: string; username: string; display_name: string | null; avatar_url: string | null }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [inviting, setInviting] = useState<string | null>(null);
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+  const [copied, setCopied] = useState(false);
+
+  const shareLink = `https://mylivelinks.com/teams/${teamSlug}`;
+
+  // Load users on mount and search change
+  useEffect(() => {
+    const loadUsers = async () => {
+      setLoading(true);
+      const { searchUsersToInvite } = await import('@/lib/teamInvites');
+      const results = await searchUsersToInvite(teamId, searchQuery);
+      setUsers(results);
+      setLoading(false);
+    };
+
+    const debounce = setTimeout(loadUsers, 300);
+    return () => clearTimeout(debounce);
+  }, [teamId, searchQuery]);
+
+  const handleInvite = async (userId: string) => {
+    setInviting(userId);
+    const { sendTeamInvite } = await import('@/lib/teamInvites');
+    const result = await sendTeamInvite(teamId, userId);
+    if (result.success) {
+      setInvitedIds(prev => new Set([...prev, userId]));
+    }
+    setInviting(null);
+  };
+
+  const handleCopyLink = async () => {
+    await navigator.clipboard.writeText(shareLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Join ${teamName}`,
+          text: `You're invited to join ${teamName} on MyLiveLinks!`,
+          url: shareLink,
+        });
+      } catch {
+        handleCopyLink();
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-50 bg-black/60" onClick={onClose} />
+      
+      {/* Modal */}
+      <div className="fixed inset-x-4 top-20 z-50 mx-auto max-w-md rounded-2xl border border-white/10 bg-[#1a1a24] shadow-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <h2 className="text-lg font-bold text-white">Invite to {teamName}</h2>
+          <button
+            onClick={onClose}
+            className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white"
+          >
+            <span className="sr-only">Close</span>
+            ✕
+          </button>
+        </div>
+
+        {/* Share Link Section */}
+        <div className="border-b border-white/10 p-4">
+          <p className="text-sm text-white/60 mb-2">Share team link</p>
+          <div className="flex gap-2">
+            <div className="flex-1 rounded-lg bg-white/5 px-3 py-2 text-sm text-white/70 truncate">
+              {shareLink}
+            </div>
+            <Button
+              size="sm"
+              onClick={handleCopyLink}
+              className="bg-purple-500 hover:bg-purple-600 text-white"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleShare}
+              className="text-white/70 hover:text-white hover:bg-white/10"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="p-4 border-b border-white/10">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search followers to invite..."
+              className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/40"
+            />
+          </div>
+        </div>
+
+        {/* Users List */}
+        <div className="flex-1 overflow-y-auto p-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-white/50">
+                {searchQuery ? 'No matching users found' : 'No followers to invite yet'}
+              </p>
+              <p className="text-xs text-white/30 mt-1">
+                Share the team link to invite others
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {users.map((user) => {
+                const isInvited = invitedIds.has(user.id);
+                const isInviting = inviting === user.id;
+
+                return (
+                  <div
+                    key={user.id}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-white/5"
+                  >
+                    {/* Avatar */}
+                    <div className="h-10 w-10 rounded-full bg-purple-500/30 flex items-center justify-center overflow-hidden">
+                      {user.avatar_url ? (
+                        <Image
+                          src={user.avatar_url}
+                          alt={user.username}
+                          width={40}
+                          height={40}
+                          className="rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-sm font-bold text-purple-300">
+                          {(user.display_name || user.username)[0].toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">
+                        {user.display_name || user.username}
+                      </p>
+                      <p className="text-xs text-white/50">@{user.username}</p>
+                    </div>
+
+                    {/* Invite Button */}
+                    {isInvited ? (
+                      <span className="text-xs text-green-400 flex items-center gap-1">
+                        <PlusCircle className="h-3 w-3" /> Invited
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => handleInvite(user.id)}
+                        disabled={isInviting}
+                        className="bg-teal-500 hover:bg-teal-600 text-white text-xs"
+                      >
+                        {isInviting ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          'Invite'
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

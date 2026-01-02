@@ -5,17 +5,23 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createClient();
     const body = await request.json();
-    const { profile_id } = body;
+    const { profile_id, room_id } = body;
 
     if (!profile_id) {
       return NextResponse.json({ error: 'profile_id is required' }, { status: 400 });
     }
 
     // Attempt to delete the presence record
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from('room_presence')
       .delete()
       .eq('profile_id', profile_id);
+
+    if (room_id) {
+      deleteQuery = deleteQuery.eq('room_id', room_id);
+    }
+
+    const { error } = await deleteQuery;
 
     if (error) {
       console.error('Error deleting room presence via beacon:', error);

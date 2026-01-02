@@ -139,10 +139,15 @@ export async function POST(request: NextRequest) {
       feature_flags,
       gifts_enabled,
       chat_enabled,
+      // New fields for room type/visibility
+      room_type,
+      visibility,
+      team_id,
+      admin_profile_id,
     } = body;
 
-    if (!room_key || !name || !category) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!room_key || !name) {
+      return NextResponse.json({ error: 'Missing required fields (room_key, name)' }, { status: 400 });
     }
 
     // If template_id not provided, fall back to default template (migration seeds this)
@@ -162,14 +167,18 @@ export async function POST(request: NextRequest) {
     if (typeof gifts_enabled === 'boolean') flags.gifts_enabled = gifts_enabled;
     if (typeof chat_enabled === 'boolean') flags.chat_enabled = chat_enabled;
 
+    // Get current user for admin_profile_id default
+    const { data: { user } } = await supabase.auth.getUser();
+
     const { data: room, error } = await supabase
       .from('rooms')
       .insert({
         room_key,
+        slug: room_key, // Set slug same as room_key
         template_id: resolvedTemplateId,
         name,
         description: description || null,
-        category,
+        category: category || 'entertainment',
         banner_url: banner_url || null,
         image_url: image_url || null,
         fallback_gradient: fallback_gradient || null,
@@ -184,6 +193,14 @@ export async function POST(request: NextRequest) {
         disclaimer_required: typeof disclaimer_required === 'boolean' ? disclaimer_required : null,
         disclaimer_text: disclaimer_text || null,
         feature_flags: Object.keys(flags).length ? flags : null,
+        // New fields
+        room_type: room_type || 'official',
+        visibility: visibility || 'public',
+        team_id: team_id || null,
+        admin_profile_id: admin_profile_id || user?.id || null,
+        grid_size: typeof max_participants === 'number' ? max_participants : 12,
+        chat_enabled: typeof chat_enabled === 'boolean' ? chat_enabled : true,
+        gifting_enabled: typeof gifts_enabled === 'boolean' ? gifts_enabled : true,
       })
       .select()
       .single();
@@ -191,6 +208,18 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('[API /admin/rooms] Insert error:', error);
       return NextResponse.json({ error: 'Failed to create room' }, { status: 500 });
+    }
+
+    // Add the creator (or specified admin) as room_admin in room_roles table
+    const adminToAdd = admin_profile_id || user?.id;
+    if (adminToAdd && room?.id) {
+      const { error: roleError } = await supabase.rpc('grant_room_admin', {
+        p_room_id: room.id,
+        p_target_profile_id: adminToAdd,
+      });
+      if (roleError) {
+        console.warn('[API /admin/rooms] Failed to grant room admin role:', roleError);
+      }
     }
 
     // Return the enriched effective row so the UI has layout_type and effective overrides

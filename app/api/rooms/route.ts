@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
 
-// GET /api/rooms - List all rooms (public, non-draft)
+export const dynamic = 'force-dynamic';
+
+// GET /api/rooms - List rooms for "Coming Soon" carousel (gauging interest only)
+// Live rooms appear in LiveTV, not here
 export async function GET(request: NextRequest) {
   try {
     const supabase = createRouteHandlerClient(request);
 
+    // Only show rooms that are gauging interest (not live, paused, or draft)
+    // Status 'interest' and 'opening_soon' are for the Coming Soon carousel
     const { data: rows, error } = await supabase
       .from('v_rooms_public')
       .select('*')
+      .in('status', ['interest', 'opening_soon'])
       .order('display_order', { ascending: true });
 
     if (error) {

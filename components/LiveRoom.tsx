@@ -7,8 +7,9 @@ import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { Volume2, Focus, Shuffle, Eye, Gift as GiftIcon, Sparkles, FileText } from 'lucide-react';
 import SmartBrandLogo from './SmartBrandLogo';
-import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT } from '@/lib/livekit-constants';
-import { canUserGoLive } from '@/lib/livekit-constants';
+import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT, canUserGoLive } from '@/lib/livekit-constants';
+import type { RoomConfig, RoomUser } from '@/lib/room-config';
+import { createLiveCentralConfig } from '@/lib/room-config';
 import Tile from './Tile';
 import Chat from './Chat';
 import ViewerList from './ViewerList';
@@ -95,9 +96,22 @@ function LiveRoomStatsStack() {
 interface LiveRoomProps {
   mode?: 'solo' | 'battle';
   layoutStyle?: 'tiktok-viewer' | 'twitch-viewer' | 'battle-cameras';
+  /** Room configuration - if not provided, defaults to LiveCentral */
+  roomConfig?: RoomConfig;
 }
 
-export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' }: LiveRoomProps = {}) {
+// Default config for LiveCentral (the original main room)
+const DEFAULT_ROOM_CONFIG = createLiveCentralConfig(canUserGoLive);
+
+export default function LiveRoom({ 
+  mode = 'solo', 
+  layoutStyle = 'twitch-viewer',
+  roomConfig = DEFAULT_ROOM_CONFIG,
+}: LiveRoomProps = {}) {
+  const scopeRoomId = useMemo(
+    () => roomConfig.contentRoomId || roomConfig.roomId || 'live_central',
+    [roomConfig.contentRoomId, roomConfig.roomId]
+  );
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(true); // Start as true to render immediately
   const [initError, setInitError] = useState<string | null>(null); // Track initialization errors
@@ -143,6 +157,39 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isCurrentUserPublishing, setIsCurrentUserPublishing] = useState(false); // Track if current user is publishing
   const [layoutVersion, setLayoutVersion] = useState<number>(0);
+
+  const [canPublishForBanner, setCanPublishForBanner] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    try {
+      const result = roomConfig.permissions.canPublish(currentUserId ? { id: currentUserId } : null);
+      if (result && typeof (result as any).then === 'function') {
+        setCanPublishForBanner(false);
+        void (result as Promise<boolean>)
+          .then((value) => {
+            if (mounted) setCanPublishForBanner(Boolean(value));
+          })
+          .catch(() => {
+            if (mounted) setCanPublishForBanner(false);
+          });
+      } else {
+        setCanPublishForBanner(Boolean(result));
+      }
+    } catch {
+      setCanPublishForBanner(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [currentUserId, roomConfig.permissions]);
+  
+  // Go Live button trigger - ref to programmatically click the hidden GoLiveButton
+  const goLiveButtonRef = useRef<HTMLButtonElement | null>(null);
+  const handleGoLiveClick = useCallback(() => {
+    // Programmatically trigger the hidden GoLiveButton
+    goLiveButtonRef.current?.click();
+  }, []);
   const [pendingSlot1Insert, setPendingSlot1Insert] = useState<LiveStreamer | null>(null);
   const [pendingPublish, setPendingPublish] = useState<boolean>(false);
   const [publishAllowed, setPublishAllowed] = useState<boolean>(true);
@@ -292,12 +339,15 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
         const participantDisplayName = user?.email || user?.id || anonId || 'Viewer';
         const deviceType = 'web';
 
-        const publishEligible = canUserGoLive(user ? { id: user.id, email: user.email } : null);
+        // Use room config for permission check
+        const roomUser: RoomUser | null = user ? { id: user.id, email: user.email } : null;
+        const publishEligible = await Promise.resolve(roomConfig.permissions.canPublish(roomUser));
 
         if (DEBUG_LIVEKIT) {
           console.log('[TOKEN] Requesting token:', {
             endpoint: TOKEN_ENDPOINT,
-            roomName: LIVEKIT_ROOM_NAME,
+            roomName: roomConfig.roomId,
+            roomType: roomConfig.type,
             userId: userId,
             deviceType: deviceType,
             deviceId: deviceId.substring(0, 8) + '...',
@@ -315,7 +365,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
           },
           credentials: 'include',
           body: JSON.stringify({
-            roomName: LIVEKIT_ROOM_NAME,
+            roomName: roomConfig.roomId,
             participantName: participantIdentity,
             canPublish: publishEligible,
             canSubscribe: true,
@@ -338,7 +388,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
         if (DEBUG_LIVEKIT) {
           console.log('[TOKEN] fetched token', {
             identity: participantIdentity,
-            room: LIVEKIT_ROOM_NAME,
+            room: roomConfig.roomId,
             hasToken: !!token,
             hasUrl: !!url,
             tokenLength: token?.length,
@@ -366,7 +416,8 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
         if (DEBUG_LIVEKIT) {
           console.log('[ROOM] created', {
             roomInstanceId: currentInstanceId,
-            room: LIVEKIT_ROOM_NAME,
+            room: roomConfig.roomId,
+            roomType: roomConfig.type,
             timestamp: new Date().toISOString(),
             stackTrace: new Error().stack?.split('\n').slice(0, 5).join('\n'),
           });
@@ -383,7 +434,8 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
           if (isEffectActive) {
             if (DEBUG_LIVEKIT) {
               console.log('[ROOM] connected', {
-                room: LIVEKIT_ROOM_NAME,
+                room: roomConfig.roomId,
+                roomType: roomConfig.type,
                 identity: newRoom.localParticipant.identity,
                 roomState: newRoom.state,
                 localParticipantSid: newRoom.localParticipant.sid,
@@ -782,12 +834,13 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
   useRoomPresence({
     userId: currentUserId,
     username: currentUsername,
+    roomId: scopeRoomId,
     enabled: !authDisabled && !!currentUserId && !!currentUsername,
   });
 
   // ROOM-DEMAND: Track room presence count (excluding self) for publisher enable logic
   useEffect(() => {
-    if (!currentUserId || authDisabled) {
+    if (!currentUserId || authDisabled || !scopeRoomId) {
       setRoomPresenceCountMinusSelf(0);
       return;
     }
@@ -797,7 +850,9 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
     // Initial load
     const loadRoomPresenceCount = async () => {
       try {
-        const { data, error } = await supabase.rpc('get_room_presence_count_minus_self');
+        const { data, error } = await supabase.rpc('get_room_presence_count_minus_self', {
+          p_room_id: scopeRoomId,
+        });
         if (error) {
           console.error('Error getting room presence count:', error);
           return;
@@ -816,13 +871,14 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
 
     // Subscribe to room_presence changes
     const roomPresenceChannel = supabase
-      .channel('room-presence-count-updates')
+      .channel(`room-presence-count-updates-${scopeRoomId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'room_presence',
+          filter: `room_id=eq.${scopeRoomId}`,
         },
         async () => {
           // Debounce rapid updates
@@ -842,7 +898,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
       supabase.removeChannel(roomPresenceChannel);
       clearInterval(pollInterval);
     };
-  }, [currentUserId, authDisabled, supabase]);
+  }, [currentUserId, authDisabled, supabase, scopeRoomId]);
 
   // Auto-enable Focus Mode when tile is expanded
   useEffect(() => {
@@ -2727,6 +2783,8 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
       <MobileWebWatchLayout
         mode={mode}
         layoutStyle={layoutStyle}
+        roomId={scopeRoomId}
+        roomName={roomConfig.branding.name}
         gridSlots={gridSlots}
         sharedRoom={sharedRoom}
         isRoomConnected={isRoomConnected}
@@ -2750,7 +2808,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
   // ============================================
 
   return (
-    <div className="h-[100dvh] w-[100dvw] bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col fixed inset-0 pt-0 min-h-0">
+    <div className="h-[100dvh] w-[100dvw] bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col fixed inset-0 pt-16 lg:pt-[72px] min-h-0">
       {/* Hidden Go Live Button - triggered by camera button in header */}
       <div className="fixed -left-[9999px]" id="liveroom-go-live-button">
         <GoLiveButton
@@ -2760,6 +2818,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
           onPublishingChange={setIsCurrentUserPublishing}
           publishAllowed={publishAllowed}
           mode="group"
+          buttonRef={goLiveButtonRef}
         />
       </div>
       
@@ -2768,6 +2827,32 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
         <div className="w-full bg-yellow-500 dark:bg-yellow-600 text-black dark:text-white text-center py-2 px-4 text-sm font-semibold">
           ⚠️ TESTING MODE: Authentication Disabled - Anyone can access
         </div>
+      )}
+
+      {/* Room Banner with branding */}
+      <RoomBanner
+        roomKey={roomConfig.roomId}
+        roomName={roomConfig.branding.name}
+        presentedBy={roomConfig.teamSlug ? `Team: ${roomConfig.teamSlug}` : 'MyLiveLinks Official'}
+        bannerStyle="default"
+        customGradient={roomConfig.branding.fallbackGradient}
+        showGoLiveButton={true}
+        isLive={isCurrentUserPublishing}
+        onGoLiveClick={handleGoLiveClick}
+        canPublish={canPublishForBanner}
+      />
+
+      {/* Background image layer */}
+      {roomConfig.branding.backgroundUrl && (
+        <div 
+          className="fixed inset-0 z-0 pointer-events-none opacity-20"
+          style={{
+            backgroundImage: `url(${roomConfig.branding.backgroundUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
       )}
 
       {/* Main Content - Vertical Layout: Cameras on top, then Chat/Viewers/Leaderboard below */}
@@ -2788,6 +2873,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
                   viewerCount={expandedSlot.streamer.viewer_count}
                   gifterStatus={expandedSlot.streamer.gifter_status}
                   slotIndex={expandedSlot.slotIndex}
+                  roomId={scopeRoomId}
                   liveStreamId={expandedSlot.streamer.id && expandedSlot.streamer.live_available ? (() => {
                     const idStr = expandedSlot.streamer.id.toString();
                     // Only parse if it's a real stream ID (numeric), not seed data (stream-X or seed-X)
@@ -2817,7 +2903,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
           <>
             {/* Video Grid - Top (Full Width, Bigger) - Full screen on mobile */}
             <div
-              className={`${uiPanels.focusMode ? 'flex-1' : 'md:flex-shrink-0 flex-1 md:flex-initial'} px-2 ${uiPanels.focusMode ? 'py-0 pb-0' : 'pt-0 pb-0'} pt-[var(--header-height)] lg:pt-[var(--header-height-lg)] overflow-x-hidden overflow-y-auto lg:overflow-hidden`}
+              className={`${uiPanels.focusMode ? 'flex-1' : 'md:flex-shrink-0 flex-1 md:flex-initial'} px-2 ${uiPanels.focusMode ? 'py-0 pb-0' : 'pt-0 pb-0'} overflow-x-hidden overflow-y-auto lg:overflow-hidden`}
             >
               <div className="max-w-full mx-auto w-full h-full flex items-start lg:items-center justify-center">
                 {/* 12-Tile Grid - 4/4/4 layout in Focus Mode, 6/6 otherwise */}
@@ -3140,6 +3226,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
                               viewerCount={typeof streamer.viewer_count === 'number' ? streamer.viewer_count : 0}
                               gifterStatus={(streamer as any).gifter_status || null}
                               slotIndex={slot.slotIndex}
+                              roomId={scopeRoomId}
                               liveStreamId={liveStreamId}
                         sharedRoom={sharedRoom}
                         isRoomConnected={isRoomConnected}
@@ -3204,7 +3291,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
                 <div className="hidden lg:flex flex-col 2xl:w-[330px] xl:w-[300px] lg:w-[280px] flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 h-[540px] xl:h-[620px] 2xl:h-[700px] max-h-full overflow-y-auto transition-all">
                   <div className="flex flex-col h-full w-full">
                     <div className="flex-1 min-h-0 w-full overflow-x-auto overflow-y-auto flex flex-col p-0">
-                      <Leaderboard />
+                      <Leaderboard roomSlug={scopeRoomId} roomName={roomConfig.branding.name} />
                     </div>
                   </div>
                 </div>
@@ -3212,7 +3299,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
 
               {/* Chat - Middle (fills remaining space) */}
               <div className={`flex-1 min-h-0 h-full overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-w-[350px] md:min-w-[360px] lg:min-w-[400px] xl:min-w-[420px] ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
-                <Chat roomId="live_central" />
+                <Chat roomSlug={scopeRoomId} />
               </div>
 
               {/* Viewers + Stats - Right */}
@@ -3221,7 +3308,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
                   {/* Viewer List - Left side */}
                   {uiPanels.viewersOpen && (
                     <div className="2xl:w-80 xl:w-full lg:w-full flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto transition-all">
-                      <ViewerList onDragStart={(viewer) => {
+                      <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
                         // Viewer drag started - can add visual feedback if needed
                       }} />
                     </div>
@@ -3255,10 +3342,10 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
               <div className="min-h-0 overflow-hidden border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                 <div className="flex flex-col min-h-0 h-full">
                   <PanelShell title="Leaderboards" className="flex-1 min-h-0 border-0" bodyClassName="px-5 py-4">
-                    <Leaderboard />
+                    <Leaderboard roomSlug={scopeRoomId} roomName={roomConfig.branding.name} />
                   </PanelShell>
                   <PanelShell title="Viewers" className="flex-1 min-h-0 border-0 border-t border-gray-200 dark:border-gray-700" bodyClassName="p-0">
-                    <ViewerList onDragStart={(viewer) => {
+                    <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
                       // Viewer drag started - can add visual feedback if needed
                     }} />
                   </PanelShell>
@@ -3267,7 +3354,7 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
 
               <div className={`min-h-0 overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
                 <div className="min-h-0 h-full min-w-[460px]">
-                  <Chat roomId="live_central" />
+                  <Chat roomSlug={scopeRoomId} />
                 </div>
               </div>
 
@@ -3309,19 +3396,18 @@ export default function LiveRoom({ mode = 'solo', layoutStyle = 'twitch-viewer' 
               </div>
 
               <div className={`flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-800 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
-                <Chat roomId="live_central" />
+                <Chat roomSlug={scopeRoomId} />
               </div>
 
               <Drawer
                 isOpen={drawerOpen !== null}
                 onClose={() => setDrawerOpen(null)}
-                title={drawerOpen === 'leaderboard' ? 'Leaderboards' : drawerOpen === 'viewers' ? 'Viewers' : drawerOpen === 'stats' ? 'Your Stats' : ''}
                 position="right"
                 size="lg"
               >
-                {drawerOpen === 'leaderboard' && <Leaderboard />}
+                {drawerOpen === 'leaderboard' && <Leaderboard roomSlug={scopeRoomId} roomName={roomConfig.branding.name} />}
                 {drawerOpen === 'viewers' && (
-                  <ViewerList onDragStart={(viewer) => {
+                  <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
                     // Viewer drag started - can add visual feedback if needed
                   }} />
                 )}

@@ -35,19 +35,24 @@ type RailItem = {
 
 export default function LiveTVPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeQuickFilter, setActiveQuickFilter] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('livetv_active_filter');
-      if (saved && ALL_FILTERS.includes(saved)) {
-        return saved;
-      }
-    }
-    return 'Trending';
-  });
+  // Initialize with consistent default - will sync from localStorage in useEffect
+  const [activeQuickFilter, setActiveQuickFilter] = useState<string>('Trending');
   const [genderFilter, setGenderFilter] = useState<LiveTVGenderFilter>('All');
   const [uiLoading, setUiLoading] = useState(true);
   const [streams, setStreams] = useState<Stream[]>([]);
   const [streamsLoading, setStreamsLoading] = useState(true);
+  const [rooms, setRooms] = useState<LiveTVRoomChannel[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  // Sync from localStorage after mount to avoid hydration mismatch
+  useEffect(() => {
+    const saved = localStorage.getItem('livetv_active_filter');
+    if (saved && ALL_FILTERS.includes(saved)) {
+      setActiveQuickFilter(saved);
+    }
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     const preventPullToRefresh = (e: TouchEvent) => {
@@ -62,16 +67,17 @@ export default function LiveTVPage() {
     return () => document.removeEventListener('touchmove', preventPullToRefresh);
   }, []);
 
+  // Only save to localStorage after initial mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (hasMounted) {
       localStorage.setItem('livetv_active_filter', activeQuickFilter);
     }
-  }, [activeQuickFilter]);
+  }, [activeQuickFilter, hasMounted]);
 
   useEffect(() => {
     let cancelled = false;
 
-    const load = async () => {
+    const loadStreams = async () => {
       try {
         setStreamsLoading(true);
         const res = await fetch('/api/livetv/streams', { cache: 'no-store' });
@@ -86,14 +92,28 @@ export default function LiveTVPage() {
       }
     };
 
-    void load();
+    const loadRooms = async () => {
+      try {
+        setRoomsLoading(true);
+        const res = await fetch('/api/livetv/rooms', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Failed to load rooms');
+        const json = await res.json();
+        const next = Array.isArray(json?.rooms) ? (json.rooms as LiveTVRoomChannel[]) : [];
+        if (!cancelled) setRooms(next);
+      } catch {
+        if (!cancelled) setRooms([]);
+      } finally {
+        if (!cancelled) setRoomsLoading(false);
+      }
+    };
+
+    void loadStreams();
+    void loadRooms();
 
     return () => {
       cancelled = true;
     };
   }, []);
-
-  const mockRoomChannels: LiveTVRoomChannel[] = [];
 
   const applyGenderFilter = useCallback(
     <T extends { gender?: 'Men' | 'Women' }>(items: T[]) => {
@@ -104,7 +124,7 @@ export default function LiveTVPage() {
   );
 
   const streamsByGender = useMemo(() => applyGenderFilter(streams), [applyGenderFilter, streams]);
-  const roomsByGender = useMemo(() => applyGenderFilter(mockRoomChannels), [applyGenderFilter, mockRoomChannels]);
+  const roomsByGender = useMemo(() => applyGenderFilter(rooms), [applyGenderFilter, rooms]);
 
   const allStreamsSortedByPopularity = useMemo(
     () => streamsByGender.slice().sort((a, b) => b.viewer_count - a.viewer_count),
@@ -124,10 +144,11 @@ export default function LiveTVPage() {
   const roomsByCategory = useCallback(
     (category: string) => {
       return roomsByGender.filter((r) => {
-        if (category === 'Just Chatting') return r.name.toLowerCase().includes('chat');
-        if (category === 'Music') return r.name.toLowerCase().includes('music');
-        if (category === 'Gaming') return r.name.toLowerCase().includes('gaming');
-        if (category === 'Comedy') return r.name.toLowerCase().includes('comedy');
+        const roomCat = (r.category || '').toLowerCase();
+        if (category === 'Just Chatting') return roomCat === 'entertainment' || roomCat === 'lifestyle';
+        if (category === 'Music') return roomCat === 'music';
+        if (category === 'Gaming') return roomCat === 'gaming';
+        if (category === 'Comedy') return roomCat === 'comedy';
         return true;
       });
     },
@@ -315,40 +336,62 @@ export default function LiveTVPage() {
               switch (item.key) {
                 case 'TrendingGrid':
                   return (
-                    <div key="trending-grid" className="px-4 py-2">
-                      <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mb-3 flex items-center gap-2.5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-red-600 animate-pulse shadow-lg shadow-red-500/50" />
-                        Trending Now
-                      </h2>
-                      {uiLoading || streamsLoading ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                          {Array.from({ length: 10 }).map((_, idx) => (
-                            <div
-                              key={`trending-skeleton-${idx}`}
-                              className="aspect-[3/4] bg-muted animate-pulse rounded-2xl border border-border"
-                            />
-                          ))}
-                        </div>
-                      ) : allStreamsSortedByPopularity.length === 0 ? (
-                        <div className="rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-dashed border-border/50 p-8 relative overflow-hidden">
-                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(239,68,68,0.08),transparent)]" />
-                          <div className="relative space-y-3">
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center mx-auto">
-                              <span className="text-3xl">📈</span>
-                            </div>
-                            <h3 className="font-black text-lg text-foreground text-center">No streams available</h3>
-                            <p className="text-sm font-semibold text-muted-foreground text-center">
-                              Check back soon for live content
-                            </p>
+                    <div key="trending-grid" className="space-y-6">
+                      {/* Live Rooms Section */}
+                      {roomsByGender.length > 0 && (
+                        <div className="px-4 py-2">
+                          <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mb-3 flex items-center gap-2.5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 animate-pulse shadow-lg shadow-purple-500/50" />
+                            Live Rooms
+                          </h2>
+                          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                            {roomsByGender.map((room) => (
+                              <LiveTVRoomChannelCard key={room.id} room={room} />
+                            ))}
                           </div>
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                          {allStreamsSortedByPopularity.map((stream) => (
-                            <StreamCard key={stream.id} stream={stream} flexibleWidth />
-                          ))}
-                        </div>
                       )}
+                      
+                      {/* Trending Streams */}
+                      <div className="px-4 py-2">
+                        <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mb-3 flex items-center gap-2.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-red-600 animate-pulse shadow-lg shadow-red-500/50" />
+                          Trending Now
+                        </h2>
+                        {uiLoading || streamsLoading ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                            {Array.from({ length: 10 }).map((_, idx) => (
+                              <div
+                                key={`trending-skeleton-${idx}`}
+                                className="aspect-[3/4] bg-muted animate-pulse rounded-2xl border border-border"
+                              />
+                            ))}
+                          </div>
+                        ) : allStreamsSortedByPopularity.length === 0 && roomsByGender.length === 0 ? (
+                          <div className="rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-dashed border-border/50 p-8 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(239,68,68,0.08),transparent)]" />
+                            <div className="relative space-y-3">
+                              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500/20 to-red-600/20 flex items-center justify-center mx-auto">
+                                <span className="text-3xl">📈</span>
+                              </div>
+                              <h3 className="font-black text-lg text-foreground text-center">No streams available</h3>
+                              <p className="text-sm font-semibold text-muted-foreground text-center">
+                                Check back soon for live content
+                              </p>
+                            </div>
+                          </div>
+                        ) : allStreamsSortedByPopularity.length === 0 ? (
+                          <div className="text-center py-4 text-muted-foreground text-sm">
+                            No individual streams right now. Check out the live rooms above!
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                            {allStreamsSortedByPopularity.map((stream) => (
+                              <StreamCard key={stream.id} stream={stream} flexibleWidth />
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
 

@@ -30,6 +30,7 @@ interface TileProps {
   gifterStatus?: GifterStatus | null;
   slotIndex: number;
   liveStreamId?: number;
+  roomId?: string; // NEW: Room ID for room-specific leaderboards
   trendingRank?: number; // NEW: Trending position (1 = top)
   sharedRoom?: Room | null; // Shared LiveKit room connection
   isRoomConnected?: boolean; // Whether shared room is connected
@@ -55,6 +56,7 @@ export default function Tile({
   gifterStatus,
   slotIndex,
   liveStreamId,
+  roomId,
   trendingRank,
   sharedRoom,
   isRoomConnected = false,
@@ -1205,23 +1207,21 @@ export default function Tile({
       {/* Bottom Right Overlay - Username and Badge */}
       <div className="absolute bottom-2 right-2 z-20">
         <div className="flex flex-col items-end gap-1">
-          {/* Username and Badge - Show on hover */}
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-            <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-              <button
-                onClick={() => setShowMiniProfile(true)}
-                className="text-white text-sm font-semibold hover:text-blue-200 transition"
-              >
-                {streamerUsername}
-              </button>
-              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
-                <TierBadge
-                  tier_key={gifterStatus.tier_key}
-                  level={gifterStatus.level_in_tier}
-                  size="sm"
-                />
-              )}
-            </div>
+          {/* Username and Badge - ALWAYS VISIBLE */}
+          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+            <button
+              onClick={() => setShowMiniProfile(true)}
+              className="text-white text-sm font-semibold hover:text-blue-200 transition"
+            >
+              {streamerUsername}
+            </button>
+            {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
+              <TierBadge
+                tier_key={gifterStatus.tier_key}
+                level={gifterStatus.level_in_tier}
+                size="sm"
+              />
+            )}
           </div>
           
           {/* Leaderboard Rank - ALWAYS VISIBLE - Prestigious Display */}
@@ -1425,13 +1425,6 @@ export default function Tile({
         >
           💎 Gift
         </button>
-        <button
-          onClick={() => router.push(`/live/${streamerUsername}`)}
-          className="px-3 py-1.5 bg-purple-500 text-white rounded text-xs font-medium hover:bg-purple-600 transition-colors shadow-lg"
-          title="Watch in Solo View"
-        >
-          📺 Watch Solo
-        </button>
       </div>
 
       {/* Gift Modal */}
@@ -1441,6 +1434,7 @@ export default function Tile({
           recipientUsername={streamerUsername}
           slotIndex={slotIndex}
           liveStreamId={liveStreamId}
+          roomId={roomId}
           onGiftSent={() => {
             setShowGiftModal(false);
           }}

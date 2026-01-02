@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication, LocalTrackPublication } from 'livekit-client';
-import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT, canUserGoLive } from '@/lib/livekit-constants';
+import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT, canUserGoLiveSolo } from '@/lib/livekit-constants';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
@@ -138,9 +138,9 @@ export default function SoloHostStream() {
         return;
       }
 
-      const canLive = canUserGoLive({ id: user.id, email: user.email });
+      const canLive = canUserGoLiveSolo({ id: user.id, email: user.email });
       if (!canLive) {
-        setError('Go Live is currently limited to the owner account');
+        setError('Solo Live is currently paused. Try Group Live in Live Central!');
         setLoading(false);
         return;
       }

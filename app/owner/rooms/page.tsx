@@ -78,18 +78,28 @@ export default function OwnerRoomsPage() {
   };
 
   const handleManageRoles = async (room: RoomInstance) => {
+    console.log('[ROLES] Opening roles panel for room:', room.id, room.name);
     setSelectedRoom(room);
     setRolesLoading(true);
     
     try {
       const res = await fetch(`/api/admin/rooms/${room.id}/roles`);
+      const data = await res.json();
+      
       if (res.ok) {
-        const data = await res.json();
+        console.log('[ROLES] Fetched roles:', data);
         setRoomAdmins(data.admins || []);
         setRoomModerators(data.moderators || []);
+      } else {
+        console.error('[ROLES] API error:', res.status, data?.error);
+        // Still show the panel but with empty roles
+        setRoomAdmins([]);
+        setRoomModerators([]);
       }
     } catch (err) {
-      console.error('Error fetching roles:', err);
+      console.error('[ROLES] Error fetching roles:', err);
+      setRoomAdmins([]);
+      setRoomModerators([]);
     } finally {
       setRolesLoading(false);
     }
@@ -156,11 +166,15 @@ export default function OwnerRoomsPage() {
 
   const handleAddAdmin = async (roomId: string, userId: string, username: string) => {
     try {
-      await fetch(`/api/admin/rooms/${roomId}/admins`, {
+      const res = await fetch(`/api/admin/rooms/${roomId}/roles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: userId }),
+        body: JSON.stringify({ profileId: userId, role: 'room_admin' }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error('Error adding admin:', err?.error);
+      }
       // Refresh roles
       if (selectedRoom) handleManageRoles(selectedRoom);
     } catch (err) {
@@ -170,11 +184,15 @@ export default function OwnerRoomsPage() {
 
   const handleAddModerator = async (roomId: string, userId: string, username: string) => {
     try {
-      await fetch(`/api/admin/rooms/${roomId}/moderators`, {
+      const res = await fetch(`/api/admin/rooms/${roomId}/roles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: userId }),
+        body: JSON.stringify({ profileId: userId, role: 'room_moderator' }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error('Error adding moderator:', err?.error);
+      }
       // Refresh roles
       if (selectedRoom) handleManageRoles(selectedRoom);
     } catch (err) {
@@ -184,11 +202,15 @@ export default function OwnerRoomsPage() {
 
   const handleRemoveAdmin = async (roomId: string, userId: string) => {
     try {
-      await fetch(`/api/admin/rooms/${roomId}/admins`, {
+      const res = await fetch(`/api/admin/rooms/${roomId}/roles`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: userId }),
+        body: JSON.stringify({ profileId: userId, role: 'room_admin' }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error('Error removing admin:', err?.error);
+      }
       // Refresh roles
       if (selectedRoom) handleManageRoles(selectedRoom);
     } catch (err) {
@@ -198,11 +220,15 @@ export default function OwnerRoomsPage() {
 
   const handleRemoveModerator = async (roomId: string, userId: string) => {
     try {
-      await fetch(`/api/admin/rooms/${roomId}/moderators`, {
+      const res = await fetch(`/api/admin/rooms/${roomId}/roles`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: userId }),
+        body: JSON.stringify({ profileId: userId, role: 'room_moderator' }),
       });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error('Error removing moderator:', err?.error);
+      }
       // Refresh roles
       if (selectedRoom) handleManageRoles(selectedRoom);
     } catch (err) {

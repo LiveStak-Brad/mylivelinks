@@ -172,10 +172,75 @@ export async function POST(request: NextRequest) {
       }
 
       const wantsPublish = canPublish === true || body?.role === 'publisher';
-      const canGoLive = await runStage('can_user_go_live', 1_000, async () => {
+      
+      // Check if this is a "main" room (live_central, live-central, or similar)
+      const isMainRoom = !roomName || 
+        roomName === 'live_central' || 
+        roomName === 'live-central' || 
+        roomName.toLowerCase().includes('live_central') ||
+        roomName.toLowerCase().includes('live-central');
+      
+      const canGoLive = await runStage('can_user_go_live', 2_000, async () => {
         try {
           const supabase = auth.supabase;
 
+          // For main rooms (live_central), GROUP LIVE IS OPEN TO EVERYONE
+          // IMPORTANT: For main rooms, ALWAYS grant publish permission to authenticated users
+          // This ensures they can go live even if the initial token request didn't specify canPublish
+          if (isMainRoom) {
+            // GROUP LIVE: All authenticated users can publish
+            const allowed = canUserGoLive({ id: user.id, email: user.email });
+            console.log('[LIVEKIT_TOKEN] Main room permission check:', { 
+              userId: user.id, 
+              roomName, 
+              isMainRoom: true, 
+              allowed,
+              wantsPublish,
+            });
+            return allowed;
+          }
+
+          // Check room-specific permissions for other rooms
+          if (roomName) {
+            // Try to get room config for permission check
+            const { data: roomConfig, error: roomErr } = await (supabase as any).rpc('rpc_get_room_config', {
+              p_slug: roomName,
+            });
+            
+            if (!roomErr && roomConfig?.permissions) {
+              // For team/official rooms, use the room's permission system
+              return roomConfig.permissions.canPublish === true;
+            }
+            
+            // If room starts with 'team-', check team membership
+            if (roomName.startsWith('team-')) {
+              const teamSlug = roomName.replace('team-', '');
+              const { data: teamData } = await (supabase as any)
+                .from('teams')
+                .select('id')
+                .eq('slug', teamSlug)
+                .single();
+              
+              if (teamData?.id) {
+                // Check if user has publish role in team
+                const { data: membership } = await (supabase as any)
+                  .from('team_memberships')
+                  .select('role, status')
+                  .eq('team_id', teamData.id)
+                  .eq('profile_id', user.id)
+                  .eq('status', 'approved')
+                  .single();
+                
+                if (membership) {
+                  const publishRoles = ['team_admin', 'owner', 'admin', 'moderator'];
+                  return publishRoles.includes(membership.role);
+                }
+              }
+              return false; // Not a team member
+            }
+          }
+
+          // Fallback for unknown rooms - check owner/tester status
           const [{ data: isOwner, error: ownerErr }, { data: isTester, error: testerErr }] = await Promise.all([
             (supabase as any).rpc('is_owner', { p_profile_id: user.id }),
             (supabase as any).rpc('is_live_tester', { p_profile_id: user.id }),
@@ -183,18 +248,34 @@ export async function POST(request: NextRequest) {
 
           if (!ownerErr && isOwner === true) return true;
           if (!testerErr && isTester === true) return true;
-        } catch {
-          // Fall through
+        } catch (err) {
+          console.log('[LIVEKIT_TOKEN] can_user_go_live error:', err);
+          // Fall through to default
         }
 
-        // Fallback: hardcoded bootstrap list
+        // Default fallback: use canUserGoLive (which now allows all authenticated users for group live)
         return canUserGoLive({ id: user.id, email: user.email });
       });
-      const effectiveCanPublish = wantsPublish && canGoLive;
+      
+      // For main rooms, ALWAYS grant publish to authenticated users who are allowed
+      // This ensures users can go live later even if initial connection didn't request publish
+      const effectiveCanPublish = isMainRoom 
+        ? canGoLive  // For main rooms: if they CAN publish, grant it
+        : (wantsPublish && canGoLive);  // For other rooms: only if they asked for it AND are allowed
 
       if (wantsPublish && !effectiveCanPublish) {
-        console.log('[LIVEKIT_TOKEN] publish_denied_non_owner', { reqId, userId: user.id, roomName });
+        console.log('[LIVEKIT_TOKEN] publish_denied', { reqId, userId: user.id, roomName, isMainRoom, canGoLive });
       }
+      
+      console.log('[LIVEKIT_TOKEN] Permission result:', { 
+        reqId, 
+        userId: user.id, 
+        roomName, 
+        isMainRoom, 
+        wantsPublish, 
+        canGoLive, 
+        effectiveCanPublish 
+      });
 
       if (!LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
         return sendJson(500, { error: 'LiveKit env/config missing', stage: 'token_sign' }, 'token_sign');

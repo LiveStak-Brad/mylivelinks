@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
+import { Download } from 'lucide-react';
 import { getPinnedPost, upsertPinnedPost, deletePinnedPost, PinnedPost } from '@/lib/pinnedPosts';
 import { uploadAvatar, uploadPinnedPostMedia, deleteAvatar, deletePinnedPostMedia } from '@/lib/storage';
 import Image from 'next/image';
@@ -15,6 +16,7 @@ import TopFriendsSettings from '@/components/profile/TopFriendsSettings';
 import { PHOTO_FILTER_PRESETS, PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
 import { ProfileSection, ProfileTab } from '@/lib/profileTypeConfig';
 import type { GenderEnum } from '@/lib/link/dating-types';
+import PwaInstallButton from '@/components/PwaInstallButton';
 
 interface UserLink {
   id?: number;
@@ -657,6 +659,28 @@ export default function ProfileSettingsPage() {
             </Link>
           </div>
         </div>
+
+        <PwaInstallButton>
+          {({ onClick, disabled, label }) => (
+            <div className="mb-6">
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">Download the app</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Install Live Links on your home screen for faster access.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClick}
+                  disabled={disabled}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-2 text-sm font-semibold text-white shadow-md transition disabled:opacity-40"
+                >
+                  <Download className="h-4 w-4" />
+                  {label}
+                </button>
+              </div>
+            </div>
+          )}
+        </PwaInstallButton>
 
         {/* Success Message */}
         {successMessage && (

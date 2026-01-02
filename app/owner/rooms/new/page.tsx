@@ -68,7 +68,8 @@ export default function CreateRoomPage() {
       
       if (res.ok) {
         const result = await res.json();
-        router.push(`/owner/rooms/${result.room.id}`);
+        // Use room_key for cleaner URLs
+        router.push(`/owner/rooms/${result.room.room_key || result.room.id}`);
       } else {
         const err = await res.json();
         toast({

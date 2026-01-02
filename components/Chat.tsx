@@ -25,7 +25,7 @@ interface ChatMessage {
 }
 
 interface ChatProps {
-  roomId?: string;
+  roomSlug?: string;
   liveStreamId?: number;
   onGiftClick?: () => void;
   onShareClick?: () => void;
@@ -33,8 +33,8 @@ interface ChatProps {
   readOnly?: boolean; // If true, hide input box
 }
 
-export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, onSettingsClick, readOnly = false }: ChatProps) {
-  console.log('[CHAT] 🎬 Component rendered with:', { roomId, liveStreamId, readOnly });
+export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick, onSettingsClick, readOnly = false }: ChatProps) {
+  console.log('[CHAT] 🎬 Component rendered with:', { roomSlug, liveStreamId, readOnly });
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -113,8 +113,8 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
     
     try {
       // Require scope to be specified
-      if (!roomId && !liveStreamId) {
-        throw new Error('Chat requires roomId or liveStreamId');
+      if (!roomSlug && !liveStreamId) {
+        throw new Error('Chat requires roomSlug or liveStreamId');
       }
 
       // Build query with scope filter
@@ -136,8 +136,8 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
         `);
 
       // Apply scope filter (XOR: exactly one must be set)
-      if (roomId) {
-        query = query.eq('room_id', roomId).is('live_stream_id', null);
+      if (roomSlug) {
+        query = query.eq('room_id', roomSlug).is('live_stream_id', null);
       } else if (liveStreamId) {
         query = query.eq('live_stream_id', liveStreamId).is('room_id', null);
       }
@@ -182,7 +182,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
       console.error('Error loading messages:', error);
       
       // If no scope provided, don't show anything
-      if (!roomId && !liveStreamId) {
+      if (!roomSlug && !liveStreamId) {
         console.error('[CHAT] ❌ No scope provided - cannot load messages');
         setMessages([]);
         setLoading(false);
@@ -208,8 +208,8 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
         `);
 
       // Apply scope filter
-      if (roomId) {
-        fallbackQuery = fallbackQuery.eq('room_id', roomId).is('live_stream_id', null);
+      if (roomSlug) {
+        fallbackQuery = fallbackQuery.eq('room_id', roomSlug).is('live_stream_id', null);
       } else if (liveStreamId) {
         fallbackQuery = fallbackQuery.eq('live_stream_id', liveStreamId).is('room_id', null);
       }
@@ -411,8 +411,8 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
   // CRITICAL: Create realtime subscription, recreate if room/stream changes
   useEffect(() => {
     // Don't subscribe if we don't have a room or stream ID
-    if (!roomId && !liveStreamId) {
-      console.warn('[CHAT] ⚠️ No roomId or liveStreamId, skipping subscription');
+    if (!roomSlug && !liveStreamId) {
+      console.warn('[CHAT] ⚠️ No roomSlug or liveStreamId, skipping subscription');
       return;
     }
 
@@ -423,20 +423,20 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
       subscriptionRef.current = null;
     }
 
-    const filterString = roomId 
-      ? `room_id=eq.${roomId}`
+    const filterString = roomSlug 
+      ? `room_id=eq.${roomSlug}`
       : `live_stream_id=eq.${liveStreamId}`;
     
     console.log('[CHAT] 🔌 Creating realtime subscription', { 
-      roomId, 
+      roomSlug, 
       liveStreamId, 
-      channelName: `chat-messages-${roomId || liveStreamId}`,
+      channelName: `chat-messages-${roomSlug || liveStreamId}`,
       filter: filterString 
     });
     
     // Subscribe to new messages (realtime) with scope filter
     const channel = supabase
-      .channel(`chat-messages-${roomId || liveStreamId}`)
+      .channel(`chat-messages-${roomSlug || liveStreamId}`)
       .on(
         'postgres_changes',
         {
@@ -480,7 +480,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
         subscriptionRef.current = null;
       }
     };
-  }, [supabase, roomId, liveStreamId]); // Depend on roomId and liveStreamId to recreate subscription
+  }, [supabase, roomSlug, liveStreamId]); // Depend on roomSlug and liveStreamId to recreate subscription
 
   // CRITICAL: Load messages when currentUserId changes, but don't recreate subscription
   useEffect(() => {
@@ -520,7 +520,7 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
     }
 
     console.log('[CHAT] 👤 Current user ID:', currentUserId);
-    console.log('[CHAT] 🏠 Chat scope:', { roomId, liveStreamId });
+    console.log('[CHAT] 🏠 Chat scope:', { roomSlug, liveStreamId });
 
     // Use current user's profile for optimistic message (or fallback)
     const optimisticUsername = currentUserProfile?.username || 'You';
@@ -608,12 +608,12 @@ export default function Chat({ roomId, liveStreamId, onGiftClick, onShareClick, 
           insertData.live_stream_id = liveStreamId;
           insertData.room_id = null;
           console.log('[CHAT] 🎥 Solo stream message - live_stream_id:', liveStreamId);
-        } else if (roomId) {
-          insertData.room_id = roomId;
+        } else if (roomSlug) {
+          insertData.room_id = roomSlug;
           insertData.live_stream_id = null;
-          console.log('[CHAT] 👥 Room message - room_id:', roomId);
+          console.log('[CHAT] 👥 Room message - room_id:', roomSlug);
         } else {
-          console.error('[CHAT] ❌ CRITICAL: Neither roomId nor liveStreamId is set!');
+          console.error('[CHAT] ❌ CRITICAL: Neither roomSlug nor liveStreamId is set!');
         }
         
         console.log('[CHAT] 💬 Final insert data:', insertData);

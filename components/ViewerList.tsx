@@ -22,10 +22,11 @@ interface Viewer {
 }
 
 interface ViewerListProps {
+  roomId: string;
   onDragStart?: (viewer: Viewer) => void;
 }
 
-export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
+export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
   const [viewers, setViewers] = useState<Viewer[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -41,6 +42,8 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
   } | null>(null);
   const supabase = createClient();
 
+  const normalizedRoomId = roomId || 'live_central';
+
   useEffect(() => {
     // Get current user ID and load viewers
     const initViewers = async () => {
@@ -55,13 +58,14 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
 
     // Realtime subscriptions for room_presence (global room presence)
     const roomPresenceChannel = supabase
-      .channel('room-presence-realtime')
+      .channel(`room-presence-realtime-${normalizedRoomId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'room_presence',
+          filter: `room_id=eq.${normalizedRoomId}`,
         },
         () => {
           // Reload viewers when room presence changes
@@ -90,7 +94,7 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       supabase.removeChannel(roomPresenceChannel);
       supabase.removeChannel(liveStreamsChannel);
     };
-  }, []);
+  }, [normalizedRoomId, supabase]);
 
   const loadViewers = async () => {
     try {
@@ -125,7 +129,8 @@ export default function ViewerList({ onDragStart }: ViewerListProps = {}) {
       // This shows everyone currently on /live page, regardless of what tiles they're watching
       const { data: presenceData, error } = await supabase
         .from('room_presence')
-        .select('profile_id, username, is_live_available, last_seen_at')
+        .select('profile_id, username, is_live_available, last_seen_at, room_id')
+        .eq('room_id', normalizedRoomId)
         .gt('last_seen_at', new Date(Date.now() - 60000).toISOString()) // Active within last 60 seconds
         .order('is_live_available', { ascending: false }) // live_available users first
         .order('last_seen_at', { ascending: false }); // Then by most recent

@@ -207,7 +207,7 @@ export default function RoomRow({
                 Duplicate
               </button>
               <a
-                href={`/${room.room_key}`}
+                href={`/room/${room.room_key}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition"

@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { createClient } from '@/lib/supabase';
 
 // Notification types
-export type NotieType = 'gift' | 'follow' | 'live' | 'mention' | 'comment' | 'level_up' | 'system' | 'purchase' | 'conversion';
+export type NotieType = 'gift' | 'follow' | 'live' | 'mention' | 'comment' | 'level_up' | 'system' | 'purchase' | 'conversion' | 'team_invite' | 'team_invite_accepted';
 
 export interface Notie {
   id: string;
@@ -223,7 +223,7 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
           avatarFallback,
           isRead: readIds.has(id),
           createdAt: ls.started_at ? new Date(ls.started_at) : new Date(),
-          actionUrl: '/live',
+          actionUrl: '/room/live-central',
           metadata: { profile_id: String(ls.profile_id), live_stream_id: String(ls.id) },
         };
       });
@@ -382,7 +382,91 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       } catch {
       }
 
-      const combined = [...followNoties, ...liveNoties, ...giftNoties, ...purchaseNoties, ...conversionNoties]
+      // Load team invite notifications from the notifications table
+      let teamInviteNoties: Notie[] = [];
+      try {
+        const { data: teamNotifs } = await supabase
+          .from('notifications')
+          .select('id, actor_id, type, entity_type, entity_id, message, read, created_at')
+          .eq('recipient_id', user.id)
+          .in('type', ['team_invite', 'team_invite_accepted'])
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (teamNotifs && teamNotifs.length > 0) {
+          // Get actor profiles
+          const actorIds = [...new Set(teamNotifs.map((n: any) => n.actor_id))];
+          const { data: actorProfiles } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, display_name')
+            .in('id', actorIds);
+
+          const actorById = new Map<string, any>();
+          for (const p of actorProfiles || []) {
+            if (p?.id) actorById.set(p.id, p);
+          }
+
+          // Get team info for invite notifications
+          const teamIds = [...new Set(teamNotifs.filter((n: any) => n.entity_type === 'team').map((n: any) => n.entity_id))];
+          const { data: teams } = teamIds.length > 0
+            ? await supabase.from('teams').select('id, name, slug, icon_url').in('id', teamIds)
+            : { data: [] };
+
+          const teamById = new Map<string, any>();
+          for (const t of teams || []) {
+            if (t?.id) teamById.set(t.id, t);
+          }
+
+          // Get invite IDs to include in metadata
+          const { data: invites } = await supabase
+            .from('team_invites')
+            .select('id, team_id, inviter_id, status')
+            .eq('invitee_id', user.id)
+            .eq('status', 'pending');
+
+          const inviteByTeamAndInviter = new Map<string, any>();
+          for (const inv of invites || []) {
+            const key = `${inv.team_id}:${inv.inviter_id}`;
+            inviteByTeamAndInviter.set(key, inv);
+          }
+
+          teamInviteNoties = teamNotifs.map((n: any) => {
+            const id = `notif:${n.id}`;
+            const actor = actorById.get(n.actor_id);
+            const team = n.entity_type === 'team' ? teamById.get(n.entity_id) : null;
+            const username = actor?.username || 'Someone';
+            const displayName = actor?.display_name || username;
+            const avatarFallback = (displayName?.[0] || '?').toUpperCase();
+
+            // Find the invite for this notification
+            const inviteKey = `${n.entity_id}:${n.actor_id}`;
+            const invite = inviteByTeamAndInviter.get(inviteKey);
+
+            return {
+              id,
+              type: n.type as NotieType,
+              title: n.type === 'team_invite' ? 'Team Invite' : 'Invite Accepted',
+              message: n.message || `${displayName} invited you to join a team`,
+              avatarUrl: actor?.avatar_url,
+              avatarFallback,
+              isRead: readIds.has(id) || n.read,
+              createdAt: new Date(n.created_at),
+              actionUrl: team?.slug ? `/teams/${team.slug}` : '/teams',
+              metadata: {
+                team_id: n.entity_id,
+                team_name: team?.name,
+                team_slug: team?.slug,
+                invite_id: invite?.id,
+                actor_id: n.actor_id,
+              },
+            };
+          });
+        }
+      } catch (err) {
+        console.error('[Noties] Team invite error:', err);
+      }
+
+      const combined = [...followNoties, ...liveNoties, ...giftNoties, ...purchaseNoties, ...conversionNoties, ...teamInviteNoties]
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, 100);
 

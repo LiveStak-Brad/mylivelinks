@@ -15,6 +15,7 @@ interface GoLiveButtonProps {
   onGoLive?: (liveStreamId: number, profileId: string) => void;
   publishAllowed?: boolean;
   mode?: 'solo' | 'group'; // Streaming mode: 'solo' for 1:1 streams, 'group' for multi-user grid
+  buttonRef?: React.RefObject<HTMLButtonElement>; // External ref for programmatic triggering
 }
 
 interface DeviceInfo {
@@ -32,7 +33,7 @@ function isScreenShareSupported(): boolean {
          'getDisplayMedia' in navigator.mediaDevices;
 }
 
-export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, publishAllowed = true, mode = 'group' }: GoLiveButtonProps) {
+export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, publishAllowed = true, mode = 'group', buttonRef }: GoLiveButtonProps) {
   const [isLive, setIsLive] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1028,6 +1029,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   return (
     <>
       <button
+        ref={buttonRef}
         onClick={handleGoLive}
         disabled={loading}
         className={`group relative p-2 md:p-3 lg:p-4 transition-all duration-200 ${
