@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy, Tv, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video, Link2 } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video, Link2, Users } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import LeaderboardModal from './LeaderboardModal';
@@ -205,6 +205,7 @@ function HeaderIcons() {
 export default function GlobalHeader() {
   const rawPathname = usePathname();
   const pathname = rawPathname ?? '';
+  const router = useRouter();
   const [isOwner, setIsOwner] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -253,6 +254,20 @@ export default function GlobalHeader() {
   const canOpenLive = LIVE_LAUNCH_ENABLED || isOwner;
   const isLiveRoom = pathname === '/live'; // Check if we're on the live room page
 
+  const handleTeamsShortcut = useCallback(() => {
+    if (pathname === '/teams' || pathname.startsWith('/teams/')) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.dispatchEvent(new Event('teams:focusSearch'));
+      return;
+    }
+
+    router.push('/teams');
+    window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.dispatchEvent(new Event('teams:focusSearch'));
+    }, 250);
+  }, [pathname, router]);
+
   return (
     <>
       {/* Skip Link for accessibility */}
@@ -275,9 +290,15 @@ export default function GlobalHeader() {
             >
               <Trophy className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-amber-500" strokeWidth={2} />
             </button>
-            <Link href="/liveTV" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
-              <Tv className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-pink-500" strokeWidth={2} />
-            </Link>
+            <button
+              onClick={handleTeamsShortcut}
+              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+              aria-label="Teams"
+              title="Teams"
+              type="button"
+            >
+              <Users className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-cyan-500" strokeWidth={2} />
+            </button>
             <Link href="/" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Home">
               <Home className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-purple-500" strokeWidth={2} />
             </Link>
@@ -298,9 +319,15 @@ export default function GlobalHeader() {
             >
               <Trophy className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-amber-500" strokeWidth={2} />
             </button>
-            <Link href="/liveTV" className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100" title="Rooms">
-              <Tv className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-pink-500" strokeWidth={2} />
-            </Link>
+            <button
+              onClick={handleTeamsShortcut}
+              className="p-1 sm:p-1.5 md:p-2 lg:p-2.5 xl:p-3 hover:scale-110 transition opacity-70 hover:opacity-100"
+              aria-label="Teams"
+              title="Teams"
+              type="button"
+            >
+              <Users className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 xl:w-13 xl:h-13 2xl:w-14 2xl:h-14 text-cyan-500" strokeWidth={2} />
+            </button>
             
             {/* Link or Nah Icon - Same as used in Link module pages */}
             <Link 

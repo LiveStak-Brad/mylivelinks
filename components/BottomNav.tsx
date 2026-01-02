@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Rss, Video, MessageCircle, Bell } from 'lucide-react';
+import { Home, Rss, Video, Tv, MessageCircle, Bell } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { isRouteActive } from '@/lib/navigation';
 import { canUserGoLive } from '@/lib/livekit-constants';
@@ -13,7 +13,7 @@ import { Modal } from './ui/Modal';
 
 interface NavItem {
   href: string;
-  label: string;
+  ariaLabel: string;
   icon: React.ComponentType<{ className?: string }>;
   matchType?: 'exact' | 'prefix';
   badge?: number;
@@ -56,28 +56,15 @@ export default function BottomNav() {
     };
   }, []);
 
-  const [username, setUsername] = useState<string | null>(null);
-
   const checkAuth = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setIsLoggedIn(!!user);
       const canGoLive = canUserGoLive(user ? { id: user.id, email: user.email } : null);
       setIsOwner(canGoLive);
-      
-      // Fetch username for solo stream routing
-      if (user && canGoLive) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', user.id)
-          .single();
-        setUsername(profile?.username || null);
-      }
     } catch (error) {
       setIsLoggedIn(false);
       setIsOwner(false);
-      setUsername(null);
     }
   };
 
@@ -94,37 +81,41 @@ export default function BottomNav() {
   const navItems: NavItem[] = [
     {
       href: '/',
-      label: 'Home',
+      ariaLabel: 'Home',
       icon: Home,
       matchType: 'exact',
     },
     {
       href: '/feed',
-      label: 'Feed',
+      ariaLabel: 'Feed',
       icon: Rss,
       matchType: 'exact',
     },
     {
       href: '/live',
-      label: 'Go Live',
+      ariaLabel: 'Go Live',
       icon: Video,
       matchType: 'prefix',
     },
     {
+      href: '/liveTV',
+      ariaLabel: 'LiveTV',
+      icon: Tv,
+      matchType: 'exact',
+    },
+    {
       href: '/messages',
-      label: 'Messages',
+      ariaLabel: 'Messages',
       icon: MessageCircle,
       matchType: 'prefix',
       badge: mounted && unreadMessages > 0 ? unreadMessages : undefined,
-      requiresAuth: true,
     },
     {
       href: '/noties',
-      label: 'Noties',
+      ariaLabel: 'Noties',
       icon: Bell,
       matchType: 'exact',
       badge: mounted && unreadNoties > 0 ? unreadNoties : undefined,
-      requiresAuth: true,
     },
   ];
 
@@ -141,16 +132,14 @@ export default function BottomNav() {
             matchType: item.matchType 
           });
 
-          // Hide auth-required items if not logged in
-          if (item.requiresAuth && !isLoggedIn) {
-            return null;
-          }
+          const effectiveHref = item.requiresAuth && !isLoggedIn ? '/login' : item.href;
 
           if (item.href === '/live') {
             return (
               <button
                 key={item.href}
                 type="button"
+                data-href={item.href}
                 onClick={() => {
                   if (isOwner) {
                     // Owner: Route to dedicated host stream page
@@ -161,13 +150,12 @@ export default function BottomNav() {
                   setShowGoLiveModal(true);
                 }}
                 className={`bottom-nav-item ${isActive ? 'bottom-nav-item-active' : ''}`}
-                aria-label={item.label}
+                aria-label={item.ariaLabel}
                 aria-current={isActive ? 'page' : undefined}
               >
                 <div className="relative">
                   <Icon />
                 </div>
-                <span className="bottom-nav-label">{item.label}</span>
               </button>
             );
           }
@@ -175,9 +163,10 @@ export default function BottomNav() {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={effectiveHref}
+              data-href={item.href}
               className={`bottom-nav-item ${isActive ? 'bottom-nav-item-active' : ''}`}
-              aria-label={item.label}
+              aria-label={item.ariaLabel}
               aria-current={isActive ? 'page' : undefined}
             >
               <div className="relative">
@@ -188,10 +177,6 @@ export default function BottomNav() {
                   <span className="bottom-nav-badge-dot" aria-label={`${item.badge} unread`} />
                 )}
               </div>
-              
-              <span className="bottom-nav-label">
-                {item.label}
-              </span>
             </Link>
           );
         })}
