@@ -19,7 +19,7 @@ import type { RealtimeChannel, User } from '@supabase/supabase-js';
 export type Surface = 'home' | 'feed' | 'chat' | 'live' | 'members' | 'settings';
 export type TeamRole = 'Team_Admin' | 'Team_Moderator' | 'Team_Member';
 export type UIRole = 'leader' | 'core' | 'member' | 'guest';
-export type MembershipStatus = 'requested' | 'approved' | 'rejected' | 'banned' | 'left';
+export type MembershipStatus = 'requested' | 'pending' | 'approved' | 'rejected' | 'banned' | 'left';
 
 export interface TeamData {
   id: string;

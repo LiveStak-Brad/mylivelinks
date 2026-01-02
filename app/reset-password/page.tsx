@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import SmartBrandLogo from '@/components/SmartBrandLogo';
@@ -24,11 +24,11 @@ function ResetPasswordInner() {
   const accessToken = searchParams?.get('access_token');
   const type = searchParams?.get('type');
 
-  useState(() => {
+  useEffect(() => {
     if (accessToken && type === 'recovery') {
       setStep('reset');
     }
-  });
+  }, [accessToken, type]);
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();

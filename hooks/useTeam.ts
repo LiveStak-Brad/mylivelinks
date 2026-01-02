@@ -11,7 +11,7 @@ export type FeedSort = 'hot' | 'new' | 'top';
 export type MemberFilter = 'all' | 'live' | 'online';
 export type MemberActivity = 'online' | 'live' | 'offline';
 
-export type TeamMembershipStatus = 'requested' | 'approved' | 'rejected' | 'banned' | 'left' | 'none';
+export type TeamMembershipStatus = 'requested' | 'pending' | 'approved' | 'rejected' | 'banned' | 'left' | 'none';
 
 export interface TeamMember {
   id: string;

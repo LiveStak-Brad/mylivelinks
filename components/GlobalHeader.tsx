@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useId } from 'react';
+import { useState, useEffect, useRef, useCallback, useId, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Crown, Bell, MessageCircle, Trophy, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video, Tv, Users, Search, Camera } from 'lucide-react';
@@ -244,47 +244,43 @@ export default function GlobalHeader() {
   const [isOwner, setIsOwner] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  
-  const supabase = createClient();
 
-  useEffect(() => {
-    checkOwnerStatus();
-  }, []);
+  const supabase = useMemo(() => createClient(), []);
 
-  const checkOwnerStatus = async () => {
+  const checkOwnerStatus = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setIsLoggedIn(true);
-        const ownerStatus = OWNER_IDS.includes(user.id) || 
+        const ownerStatus = OWNER_IDS.includes(user.id) ||
           OWNER_EMAILS.includes(user.email?.toLowerCase() || '');
         setIsOwner(ownerStatus);
       } else {
         setIsLoggedIn(false);
         setIsOwner(false);
       }
-    } catch (error) {
+    } catch {
       // Silent fail
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    void checkOwnerStatus();
+  }, [checkOwnerStatus]);
 
   // Listen for auth changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkOwnerStatus();
+      void checkOwnerStatus();
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [checkOwnerStatus, supabase]);
   
   // Don't show header on certain pages
   const hideHeader = pathname === '/login' || pathname === '/signup' || pathname === '/onboarding';
-  
-  if (hideHeader) {
-    return null;
-  }
 
   const canOpenLive = LIVE_LAUNCH_ENABLED || isOwner;
   const isLiveRoom = pathname === '/live' || pathname?.startsWith('/room/'); // Check if we're on a live room page
@@ -329,6 +325,10 @@ export default function GlobalHeader() {
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent(type, { detail }));
   }, []);
+
+  if (hideHeader) {
+    return null;
+  }
 
   return (
     <>

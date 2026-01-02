@@ -30,7 +30,7 @@ export interface Team {
 
 export interface TeamMembership {
   team_id: string;
-  status: 'requested' | 'approved' | 'rejected' | 'banned' | 'left';
+  status: 'requested' | 'pending' | 'approved' | 'rejected' | 'banned' | 'left';
   role: 'Team_Admin' | 'Team_Moderator' | 'Team_Member';
 }
 

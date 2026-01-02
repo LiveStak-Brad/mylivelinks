@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useState,
+  useEffect,
   useCallback,
   ReactNode,
 } from 'react';
@@ -78,11 +79,9 @@ export function ToastProvider({
   const [mounted, setMounted] = useState(false);
 
   // SSR safety
-  useState(() => {
-    if (typeof window !== 'undefined') {
-      setMounted(true);
-    }
-  });
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const toast = useCallback(
     (data: Omit<ToastData, 'id'>) => {

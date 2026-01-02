@@ -534,29 +534,52 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
     let followeeIds: string[] = [];
     let userId: string | null = null;
     let notificationsChannel: any = null;
+    let txChannel: any = null;
 
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !isMounted) return;
-      userId = user.id;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !isMounted) return;
+        userId = user.id;
 
-      notificationsChannel = supabase
-        .channel('noties-notifications-realtime')
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${user.id}` },
-          () => {
-            void loadNoties();
-          }
-        )
-        .subscribe();
+        notificationsChannel = supabase
+          .channel('noties-notifications-realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${user.id}` },
+            () => {
+              void loadNoties();
+            }
+          )
+          .subscribe();
 
-      const { data } = await supabase
-        .from('follows')
-        .select('followee_id')
-        .eq('follower_id', user.id)
-        .limit(500);
-      followeeIds = Array.from(new Set((data || []).map((r: any) => String(r.followee_id)).filter(Boolean)));
+        txChannel = supabase
+          .channel('noties-tx-realtime')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'ledger_entries', filter: `user_id=eq.${user.id}` },
+            () => {
+              void loadNoties();
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'diamond_conversions', filter: `profile_id=eq.${user.id}` },
+            () => {
+              void loadNoties();
+            }
+          )
+          .subscribe();
+
+        const { data } = await supabase
+          .from('follows')
+          .select('followee_id')
+          .eq('follower_id', user.id)
+          .limit(500);
+        followeeIds = Array.from(new Set((data || []).map((r: any) => String(r.followee_id)).filter(Boolean)));
+      } catch (err) {
+        console.error('[Noties] Realtime init error:', err);
+      }
     };
 
     void init();
@@ -566,24 +589,6 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'follows' },
-        () => {
-          void loadNoties();
-        }
-      )
-      .subscribe();
-
-    const txChannel = supabase
-      .channel('noties-tx-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'ledger_entries', filter: userId ? `user_id=eq.${userId}` : undefined },
-        () => {
-          void loadNoties();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'diamond_conversions', filter: userId ? `profile_id=eq.${userId}` : undefined },
         () => {
           void loadNoties();
         }
@@ -610,9 +615,11 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       if (notificationsChannel) {
         supabase.removeChannel(notificationsChannel);
       }
+      if (txChannel) {
+        supabase.removeChannel(txChannel);
+      }
       supabase.removeChannel(followsChannel);
       supabase.removeChannel(liveChannel);
-      supabase.removeChannel(txChannel);
     };
   }, [loadNoties, supabase]);
 
