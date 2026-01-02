@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthedRouteHandlerClient } from '@/lib/admin';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * User Analytics API
  * GET /api/user-analytics?profileId=...&range=7d|30d|90d|all

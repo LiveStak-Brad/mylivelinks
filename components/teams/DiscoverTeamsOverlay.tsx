@@ -29,6 +29,7 @@ import {
   Modal,
   Textarea,
   Tooltip,
+  ToastProvider,
   useToast,
 } from '@/components/ui';
 import {
@@ -67,7 +68,7 @@ const STATUS_PRIORITY: Record<TeamViewModel['joinState'], number> = {
   eligible: 5,
 };
 
-export default function DiscoverTeamsOverlay({ isOpen, onClose }: DiscoverTeamsOverlayProps) {
+function DiscoverTeamsOverlayContent({ isOpen, onClose }: DiscoverTeamsOverlayProps) {
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>('idle');
@@ -763,6 +764,14 @@ export default function DiscoverTeamsOverlay({ isOpen, onClose }: DiscoverTeamsO
       )}
     </>,
     document.body
+  );
+}
+
+export default function DiscoverTeamsOverlay(props: DiscoverTeamsOverlayProps) {
+  return (
+    <ToastProvider>
+      <DiscoverTeamsOverlayContent {...props} />
+    </ToastProvider>
   );
 }
 

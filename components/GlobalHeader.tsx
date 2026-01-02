@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Crown, Bell, MessageCircle, Trophy, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video, Link2, Users } from 'lucide-react';
+import { Crown, Bell, MessageCircle, Trophy, Shuffle, Eye, Gift as GiftIcon, Sparkles, Volume2, Focus, Settings, Rss, Home, Video, Users } from 'lucide-react';
 import UserMenu from './UserMenu';
 import SmartBrandLogo from './SmartBrandLogo';
 import LeaderboardModal from './LeaderboardModal';
