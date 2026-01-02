@@ -40,6 +40,9 @@ next-env.d.ts
 public/trending.mov
 public/trendingnew.mp4
 
+# Guardrails: teams routing is slug-only. Never commit a teamId-based route.
+app/teams/[teamId]/
+
 
 
 

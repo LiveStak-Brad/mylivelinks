@@ -37,7 +37,7 @@ export default function TeamAdminPage() {
   const caps = getTeamAdminCapabilities(viewerRole);
 
   // NOTE: This admin console is still UI-only / mock-backed. We treat slug as the team identifier.
-  const teamId = params?.slug ?? 'team_demo_001';
+  const teamSlug = params?.slug ?? 'team_demo_001';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export default function TeamAdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.getSnapshot(teamId);
+      const data = await api.getSnapshot(teamSlug);
       setSnapshot(data);
     } catch (e: any) {
       setError(typeof e?.message === 'string' ? e.message : 'Failed to load');
@@ -63,7 +63,7 @@ export default function TeamAdminPage() {
 
   useEffect(() => {
     void load();
-  }, [teamId]);
+  }, [teamSlug]);
 
   if (loading) {
     return <Loading fullScreen text="Loading team admin console..." />;
@@ -410,11 +410,11 @@ export default function TeamAdminPage() {
 
   const headerActions = (
     <div className="flex items-center gap-2">
-      <a href={`/teams/${teamId}/admin?role=${viewerRole}`}>
+      <a href={`/teams/${teamSlug}/admin?role=${viewerRole}`}>
         <span className="text-xs text-muted-foreground">Role:</span>
       </a>
       <span className="text-xs font-mono text-foreground">{viewerRole}</span>
-      <a href={`/teams/${teamId}/admin?role=Team_Admin`}>
+      <a href={`/teams/${teamSlug}/admin?role=Team_Admin`}>
         <button
           type="button"
           className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted"
@@ -423,7 +423,7 @@ export default function TeamAdminPage() {
           Admin
         </button>
       </a>
-      <a href={`/teams/${teamId}/admin?role=Team_Moderator`}>
+      <a href={`/teams/${teamSlug}/admin?role=Team_Moderator`}>
         <button
           type="button"
           className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted"
@@ -432,7 +432,7 @@ export default function TeamAdminPage() {
           Mod
         </button>
       </a>
-      <a href={`/teams/${teamId}/admin?role=Team_Member`}>
+      <a href={`/teams/${teamSlug}/admin?role=Team_Member`}>
         <button
           type="button"
           className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted"
