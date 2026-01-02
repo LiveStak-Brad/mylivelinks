@@ -41,7 +41,8 @@ public/trending.mov
 public/trendingnew.mp4
 
 # Guardrails: teams routing is slug-only. Never commit a teamId-based route.
-app/teams/[teamId]/
+# NOTE: [] are special in gitignore (character classes) so they must be escaped to match a literal folder name.
+app/teams/\[teamId\]/
 
 
 

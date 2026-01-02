@@ -1431,7 +1431,7 @@ export default function Tile({
           recipientUsername={streamerUsername}
           slotIndex={slotIndex}
           liveStreamId={liveStreamId}
-          roomId={roomId}
+          roomSlug={roomId}
           onGiftSent={() => {
             setShowGiftModal(false);
           }}

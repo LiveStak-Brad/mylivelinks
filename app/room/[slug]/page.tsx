@@ -161,10 +161,14 @@ export default function RoomPage() {
     const roomId = room.room_key === 'live_central' || room.slug === 'live-central' 
       ? 'live_central' 
       : (room.slug || room.room_key);
+
+    const contentRoomId = room.room_key === 'live_central' || room.slug === 'live-central'
+      ? 'live-central'
+      : (room.slug || room.room_key);
     
     return {
       roomId,
-      contentRoomId: room.slug || room.room_key,
+      contentRoomId,
       type: room.room_type as 'live_central' | 'team' | 'official' | 'private',
       branding: {
         name: room.name,

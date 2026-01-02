@@ -1,528 +1,524 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Users,
   UserPlus,
   Shield,
-  Radio,
-  Paintbrush,
-  SmilePlus,
-  Activity,
   ShieldAlert,
+  Activity,
+  ArrowLeft,
+  Loader2,
+  Check,
+  X,
+  Ban,
+  VolumeX,
+  Clock,
 } from 'lucide-react';
-import type { ModerationQueueItem, TeamAdminSnapshot } from '@/lib/teamAdmin/types';
-import { getTeamAdminCapabilities } from '@/lib/teamAdmin/permissions';
-import { createMockTeamAdminApi, createAuditEvent, getMockRoleFromQuery } from '@/lib/teamAdmin/mockService';
-import { DashboardPage, type DashboardTab } from '@/components/layout';
-import { ErrorState, Loading, useToast } from '@/components/ui';
-import MemberRequestsTab from '@/components/teamAdmin/tabs/MemberRequestsTab';
-import MembersTab from '@/components/teamAdmin/tabs/MembersTab';
-import ModerationTab from '@/components/teamAdmin/tabs/ModerationTab';
-import LivePermissionsTab from '@/components/teamAdmin/tabs/LivePermissionsTab';
-import CustomizationTab from '@/components/teamAdmin/tabs/CustomizationTab';
-import EmotesTab from '@/components/teamAdmin/tabs/EmotesTab';
-import AuditTab from '@/components/teamAdmin/tabs/AuditTab';
+import { Button, Badge, Input } from '@/components/ui';
+import { createClient } from '@/lib/supabase';
+
+/**
+ * REAL Team Admin Panel
+ * 
+ * Permissions:
+ * - Only Team_Admin and Team_Moderator can access
+ * - Team_Admin can: approve requests, change roles, ban/mute members
+ * - Team_Moderator can: approve requests, mute members
+ */
+
+interface TeamMemberRecord {
+  profile_id: string;
+  status: string;
+  role: string;
+  requested_at: string;
+  approved_at: string | null;
+  banned_at: string | null;
+  profile: {
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
+interface TeamData {
+  id: string;
+  name: string;
+  slug: string;
+  team_tag: string;
+  description: string | null;
+  icon_url: string | null;
+  banner_url: string | null;
+  approved_member_count: number;
+  pending_request_count: number;
+}
 
 export default function TeamAdminPage() {
-  const { toast } = useToast();
-  const params = useParams<{ slug: string }>();
-  const sp = useSearchParams();
-
-  const viewerRole = useMemo(() => {
-    return getMockRoleFromQuery(sp?.get('role') ?? null) ?? 'Team_Admin';
-  }, [sp]);
-
-  const caps = getTeamAdminCapabilities(viewerRole);
-
-  // NOTE: This admin console is still UI-only / mock-backed. We treat slug as the team identifier.
-  const teamSlug = params?.slug ?? 'team_demo_001';
+  const params = useParams();
+  const router = useRouter();
+  const teamSlug = params?.slug as string;
+  const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
+  const [team, setTeam] = useState<TeamData | null>(null);
+  const [viewerRole, setViewerRole] = useState<string | null>(null);
+  const [members, setMembers] = useState<TeamMemberRecord[]>([]);
+  const [requests, setRequests] = useState<TeamMemberRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<'requests' | 'members' | 'audit'>('requests');
   const [error, setError] = useState<string | null>(null);
-  const [snapshot, setSnapshot] = useState<TeamAdminSnapshot | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<string>('requests');
+  // Check permissions and load data
+  useEffect(() => {
+    loadAdminData();
+  }, [teamSlug]);
 
-  const api = useMemo(() => createMockTeamAdminApi(), []);
-
-  const load = async () => {
+  const loadAdminData = async () => {
     setLoading(true);
     setError(null);
+
     try {
-      const data = await api.getSnapshot(teamSlug);
-      setSnapshot(data);
-    } catch (e: any) {
-      setError(typeof e?.message === 'string' ? e.message : 'Failed to load');
-      setSnapshot(null);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push(`/teams/${teamSlug}`);
+        return;
+      }
+
+      // Get team data
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('slug', teamSlug)
+        .single();
+
+      if (teamError || !teamData) {
+        setError('Team not found');
+        return;
+      }
+
+      setTeam(teamData);
+
+      // Check viewer's role
+      const { data: membership } = await supabase
+        .from('team_memberships')
+        .select('role, status')
+        .eq('team_id', teamData.id)
+        .eq('profile_id', user.id)
+        .eq('status', 'approved')
+        .maybeSingle();
+
+      const role = membership?.role || null;
+      setViewerRole(role);
+
+      // Only Team_Admin and Team_Moderator can access admin panel
+      if (!role || (role !== 'Team_Admin' && role !== 'Team_Moderator')) {
+        router.push(`/teams/${teamSlug}`);
+        return;
+      }
+
+      // Load pending requests
+      const { data: requestsData } = await supabase
+        .from('team_memberships')
+        .select(`
+          profile_id,
+          status,
+          role,
+          requested_at,
+          approved_at,
+          banned_at,
+          profile:profiles!team_memberships_profile_id_fkey (
+            username,
+            display_name,
+            avatar_url
+          )
+        `)
+        .eq('team_id', teamData.id)
+        .eq('status', 'requested')
+        .order('requested_at', { ascending: false });
+
+      setRequests((requestsData as any) || []);
+
+      // Load approved members
+      const { data: membersData } = await supabase
+        .from('team_memberships')
+        .select(`
+          profile_id,
+          status,
+          role,
+          requested_at,
+          approved_at,
+          banned_at,
+          profile:profiles!team_memberships_profile_id_fkey (
+            username,
+            display_name,
+            avatar_url
+          )
+        `)
+        .eq('team_id', teamData.id)
+        .eq('status', 'approved')
+        .order('approved_at', { ascending: false });
+
+      setMembers((membersData as any) || []);
+    } catch (err: any) {
+      console.error('[admin] Load error:', err);
+      setError(err?.message || 'Failed to load admin data');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    void load();
-  }, [teamSlug]);
+  const handleApproveRequest = async (profileId: string) => {
+    if (!team) return;
+    setActionLoading(`approve-${profileId}`);
 
+    try {
+      const { error } = await supabase.rpc('rpc_approve_member', {
+        p_team_id: team.id,
+        p_profile_id: profileId,
+      });
+
+      if (error) throw error;
+
+      // Refresh data
+      await loadAdminData();
+    } catch (err: any) {
+      console.error('[admin] Approve error:', err);
+      alert(err?.message || 'Failed to approve request');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectRequest = async (profileId: string) => {
+    if (!team) return;
+    setActionLoading(`reject-${profileId}`);
+
+    try {
+      const { error } = await supabase.rpc('rpc_reject_member', {
+        p_team_id: team.id,
+        p_profile_id: profileId,
+      });
+
+      if (error) throw error;
+
+      // Refresh data
+      await loadAdminData();
+    } catch (err: any) {
+      console.error('[admin] Reject error:', err);
+      alert(err?.message || 'Failed to reject request');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleChangeRole = async (profileId: string, newRole: string) => {
+    if (!team || viewerRole !== 'Team_Admin') return;
+    setActionLoading(`role-${profileId}`);
+
+    try {
+      const { error } = await supabase.rpc('rpc_change_member_role', {
+        p_team_id: team.id,
+        p_profile_id: profileId,
+        p_role: newRole,
+      });
+
+      if (error) throw error;
+
+      // Refresh data
+      await loadAdminData();
+    } catch (err: any) {
+      console.error('[admin] Role change error:', err);
+      alert(err?.message || 'Failed to change role');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleBanMember = async (profileId: string) => {
+    if (!team || viewerRole !== 'Team_Admin') return;
+    if (!confirm('Are you sure you want to ban this member? They will not be able to rejoin.')) return;
+
+    setActionLoading(`ban-${profileId}`);
+
+    try {
+      const { error } = await supabase.rpc('rpc_ban_member', {
+        p_team_id: team.id,
+        p_profile_id: profileId,
+      });
+
+      if (error) throw error;
+
+      // Refresh data
+      await loadAdminData();
+    } catch (err: any) {
+      console.error('[admin] Ban error:', err);
+      alert(err?.message || 'Failed to ban member');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Loading state
   if (loading) {
-    return <Loading fullScreen text="Loading team admin console..." />;
-  }
-
-  if (error || !snapshot) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <ErrorState title="Failed to load" description={error ?? 'Unknown error'} onRetry={load} />
+      <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-400" />
+          <p className="text-white/60">Loading admin panel...</p>
+        </div>
       </div>
     );
   }
 
-  const fallbackActor = snapshot.members[0]?.profile ?? {
-    id: 'actor',
-    username: 'actor',
-    displayName: null,
-    avatarUrl: null,
-  };
+  // Error state
+  if (error || !team) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] text-white flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <ShieldAlert className="h-12 w-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+          <p className="text-white/60 mb-4">{error || 'You do not have permission to access this admin panel.'}</p>
+          <Button onClick={() => router.push(`/teams/${teamSlug}`)}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Team
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
-  const actorProfile = snapshot.members.find((m) => m.role === viewerRole)?.profile ?? fallbackActor;
+  const canChangeRoles = viewerRole === 'Team_Admin';
+  const canBan = viewerRole === 'Team_Admin';
 
-  const applyAudit = (event: ReturnType<typeof createAuditEvent>) => {
-    setSnapshot((s) => {
-      if (!s) return s;
-      return { ...s, audit: [event, ...s.audit] };
-    });
-  };
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
+      {/* Header */}
+      <header className="border-b border-white/10 bg-[#0a0a0f]">
+        <div className="mx-auto max-w-7xl px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push(`/teams/${teamSlug}`)}
+                className="text-white/70 hover:text-white"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-white">{team.name} Admin</h1>
+                <p className="text-sm text-white/50">
+                  {team.approved_member_count} members · {team.pending_request_count || 0} pending
+                </p>
+              </div>
+            </div>
+            <Badge className="bg-purple-500/20 text-purple-300 text-sm">
+              {viewerRole === 'Team_Admin' ? 'Team Admin' : 'Team Moderator'}
+            </Badge>
+          </div>
+        </div>
+      </header>
 
-  const tabs: DashboardTab[] = [
-    {
-      id: 'requests',
-      label: 'Member Requests',
-      icon: <UserPlus className="w-4 h-4" />,
-      content: (
-        <MemberRequestsTab
-          requests={snapshot.requests}
-          canApprove={caps.canApproveMemberRequests}
-          canReject={caps.canRejectMemberRequests}
-          onApprove={(requestId, note) => {
-            setSnapshot((s) => {
-              if (!s) return s;
-              const req = s.requests.find((r) => r.id === requestId) ?? null;
-              const next = { ...s, requests: s.requests.filter((r) => r.id !== requestId) };
-              if (req) {
-                applyAudit(
-                  createAuditEvent({
-                    actor: actorProfile,
-                    actorRole: viewerRole,
-                    action: 'Approved member request',
-                    targetLabel: `@${req.profile.username}`,
-                    detail: note ? `Note: ${note}` : null,
-                    severity: 'info',
-                  })
-                );
-              }
-              return next;
-            });
-          }}
-          onReject={(requestId, note) => {
-            setSnapshot((s) => {
-              if (!s) return s;
-              const req = s.requests.find((r) => r.id === requestId) ?? null;
-              const next = { ...s, requests: s.requests.filter((r) => r.id !== requestId) };
-              if (req) {
-                applyAudit(
-                  createAuditEvent({
-                    actor: actorProfile,
-                    actorRole: viewerRole,
-                    action: 'Rejected member request',
-                    targetLabel: `@${req.profile.username}`,
-                    detail: note ? `Note: ${note}` : null,
-                    severity: 'warning',
-                  })
-                );
-              }
-              return next;
-            });
-          }}
-        />
-      ),
-    },
-    ...(caps.canViewMembers
-      ? [
-          {
-            id: 'members',
-            label: 'Members',
-            icon: <Users className="w-4 h-4" />,
-            content: (
-              <MembersTab
-                members={snapshot.members}
-                viewerRole={viewerRole}
-                onChangeRole={(profileId, role) => {
-                  setSnapshot((s) => {
-                    if (!s) return s;
-                    const member = s.members.find((m) => m.profile.id === profileId);
-                    const next = {
-                      ...s,
-                      members: s.members.map((m) => (m.profile.id === profileId ? { ...m, role } : m)),
-                    };
-                    if (member) {
-                      applyAudit(
-                        createAuditEvent({
-                          actor: actorProfile,
-                          actorRole: viewerRole,
-                          action: 'Changed member role',
-                          targetLabel: `@${member.profile.username}`,
-                          detail: `${member.role} → ${role}`,
-                          severity: 'info',
-                        })
-                      );
-                    }
-                    return next;
-                  });
-                }}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(caps.canMuteMembers || caps.canBanMembers
-      ? [
-          {
-            id: 'moderation',
-            label: 'Moderation',
-            icon: <ShieldAlert className="w-4 h-4" />,
-            content: (
-              <ModerationTab
-                members={snapshot.members}
-                queue={snapshot.moderationQueue}
-                viewerRole={viewerRole}
-                onMute={(profileId, durationSeconds, reason) => {
-                  setSnapshot((s) => {
-                    if (!s) return s;
-                    const target = s.members.find((m) => m.profile.id === profileId);
-                    const mutedUntil =
-                      durationSeconds === null ? null : new Date(Date.now() + durationSeconds * 1000).toISOString();
-                    const next = {
-                      ...s,
-                      members: s.members.map((m) =>
-                        m.profile.id === profileId ? { ...m, status: { ...m.status, mutedUntil } } : m
-                      ),
-                    };
-                    if (target) {
-                      applyAudit(
-                        createAuditEvent({
-                          actor: actorProfile,
-                          actorRole: viewerRole,
-                          action: 'Muted member',
-                          targetLabel: `@${target.profile.username}`,
-                          detail: `${durationSeconds ?? 0}s${reason ? ` · Reason: ${reason}` : ''}`,
-                          severity: 'warning',
-                        })
-                      );
-                    }
-                    return next;
-                  });
-                }}
-                onBan={(profileId, durationSeconds, reason) => {
-                  setSnapshot((s) => {
-                    if (!s) return s;
-                    const target = s.members.find((m) => m.profile.id === profileId);
-                    const bannedUntil =
-                      durationSeconds === null ? null : new Date(Date.now() + durationSeconds * 1000).toISOString();
-                    const next = {
-                      ...s,
-                      members: s.members.map((m) =>
-                        m.profile.id === profileId ? { ...m, status: { ...m.status, bannedUntil } } : m
-                      ),
-                    };
-                    if (target) {
-                      applyAudit(
-                        createAuditEvent({
-                          actor: actorProfile,
-                          actorRole: viewerRole,
-                          action: 'Banned member',
-                          targetLabel: `@${target.profile.username}`,
-                          detail: `${durationSeconds === null ? 'permanent' : `${durationSeconds}s`}${reason ? ` · Reason: ${reason}` : ''}`,
-                          severity: 'destructive',
-                        })
-                      );
-                    }
-                    return next;
-                  });
-                }}
-                onQueueAction={(itemId, action) => {
-                  setSnapshot((s) => {
-                    if (!s) return s;
-                    const item = s.moderationQueue.find((i) => i.id === itemId);
-                    const nextStatus: ModerationQueueItem['status'] = action === 'remove' ? 'actioned' : 'dismissed';
-                    const nextQueue = s.moderationQueue.map((i) =>
-                      i.id === itemId ? { ...i, status: nextStatus } : i
-                    );
-                    if (item) {
-                      applyAudit(
-                        createAuditEvent({
-                          actor: actorProfile,
-                          actorRole: viewerRole,
-                          action: action === 'remove' ? 'Removed content' : 'Dismissed report',
-                          targetLabel: `${item.type}:${item.id}`,
-                          detail: item.summary,
-                          severity: action === 'remove' ? 'warning' : 'info',
-                        })
-                      );
-                    }
-                    return { ...s, moderationQueue: nextQueue };
-                  });
-                }}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(caps.canEditLivePermissions
-      ? [
-          {
-            id: 'live',
-            label: 'Live',
-            icon: <Radio className="w-4 h-4" />,
-            content: (
-              <LivePermissionsTab
-                value={snapshot.livePermissions.whoCanGoLive}
-                viewerRole={viewerRole}
-                onChange={(v) => {
-                  setSnapshot((s) => (s ? { ...s, livePermissions: { ...s.livePermissions, whoCanGoLive: v } } : s));
-                  applyAudit(
-                    createAuditEvent({
-                      actor: actorProfile,
-                      actorRole: viewerRole,
-                      action: 'Changed live permissions',
-                      detail: `Policy: ${v}`,
-                      severity: 'info',
-                    })
-                  );
-                }}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(caps.canEditCustomization
-      ? [
-          {
-            id: 'customization',
-            label: 'Customization',
-            icon: <Paintbrush className="w-4 h-4" />,
-            content: (
-              <CustomizationTab
-                team={snapshot.team}
-                value={snapshot.customization}
-                viewerRole={viewerRole}
-                onChange={(v) => {
-                  setSnapshot((s) => (s ? { ...s, customization: v } : s));
-                  applyAudit(
-                    createAuditEvent({
-                      actor: actorProfile,
-                      actorRole: viewerRole,
-                      action: 'Updated team customization',
-                      detail: 'Branding/theme/rules updated (UI only).',
-                      severity: 'info',
-                    })
-                  );
-                }}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(caps.canManageEmotes
-      ? [
-          {
-            id: 'emotes',
-            label: 'Emotes',
-            icon: <SmilePlus className="w-4 h-4" />,
-            content: (
-              <EmotesTab
-                emotes={snapshot.emotes}
-                viewerRole={viewerRole}
-                onToggle={(emoteId, enabled) => {
-                  setSnapshot((s) => {
-                    if (!s) return s;
-                    const emote = s.emotes.find((e) => e.id === emoteId);
-                    const next = { ...s, emotes: s.emotes.map((e) => (e.id === emoteId ? { ...e, enabled } : e)) };
-                    if (emote) {
-                      applyAudit(
-                        createAuditEvent({
-                          actor: actorProfile,
-                          actorRole: viewerRole,
-                          action: enabled ? 'Enabled emote' : 'Disabled emote',
-                          targetLabel: `:${emote.name}:`,
-                          severity: 'info',
-                        })
-                      );
-                    }
-                    return next;
-                  });
-                }}
-                onUpload={(name, file) => {
-                  setSnapshot((s) => {
-                    if (!s) return s;
-                    const id = `emote_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-                    const next = {
-                      ...s,
-                      emotes: [
-                        {
-                          id,
-                          name,
-                          imageUrl: URL.createObjectURL(file),
-                          enabled: true,
-                          createdAt: new Date().toISOString(),
-                          createdBy: s.members[0]?.profile,
-                        },
-                        ...s.emotes,
-                      ],
-                    };
-                    applyAudit(
-                      createAuditEvent({
-                        actor: actorProfile,
-                        actorRole: viewerRole,
-                        action: 'Uploaded emote',
-                        targetLabel: `:${name}:`,
-                        severity: 'info',
-                      })
-                    );
-                    return next;
-                  });
-                }}
-              />
-            ),
-          },
-        ]
-      : []),
-    ...(caps.canViewAudit
-      ? [
-          {
-            id: 'audit',
-            label: 'Audit',
-            icon: <Activity className="w-4 h-4" />,
-            content: <AuditTab events={snapshot.audit} />,
-          },
-        ]
-      : []),
-  ];
-
-  const headerActions = (
-    <div className="flex items-center gap-2">
-      <a href={`/teams/${teamSlug}/admin?role=${viewerRole}`}>
-        <span className="text-xs text-muted-foreground">Role:</span>
-      </a>
-      <span className="text-xs font-mono text-foreground">{viewerRole}</span>
-      <a href={`/teams/${teamSlug}/admin?role=Team_Admin`}>
-        <button
-          type="button"
-          className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted"
-          onClick={() => toast({ title: 'Switched to Admin', description: 'UI-only role simulation.', variant: 'info' })}
-        >
-          Admin
-        </button>
-      </a>
-      <a href={`/teams/${teamSlug}/admin?role=Team_Moderator`}>
-        <button
-          type="button"
-          className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted"
-          onClick={() => toast({ title: 'Switched to Moderator', description: 'UI-only role simulation.', variant: 'info' })}
-        >
-          Mod
-        </button>
-      </a>
-      <a href={`/teams/${teamSlug}/admin?role=Team_Member`}>
-        <button
-          type="button"
-          className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-muted"
-          onClick={() => toast({ title: 'Switched to Member', description: 'UI-only role simulation.', variant: 'info' })}
-        >
-          Member
-        </button>
-      </a>
-    </div>
-  );
-
-  const roleChipStyles =
-    viewerRole === 'Team_Admin'
-      ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
-      : viewerRole === 'Team_Moderator'
-        ? 'bg-sky-500/15 text-sky-200 border-sky-500/30'
-        : 'bg-muted/60 text-foreground border-border';
-
-  const bannerStyle: React.CSSProperties = {
-    backgroundImage: snapshot.team.bannerUrl
-      ? `url(${snapshot.team.bannerUrl})`
-      : `linear-gradient(135deg, ${snapshot.customization.theme.primary} 0%, ${snapshot.customization.theme.accent} 50%, ${snapshot.customization.theme.primary} 100%)`,
-  };
-
-  const hero = (
-    <div className="relative overflow-hidden">
-      <div className="h-44 sm:h-56 bg-cover bg-center" style={bannerStyle} />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/10 to-transparent" />
-
-      <div className="relative">
-        <div className="mx-auto max-w-7xl px-4 md:px-6">
-          <div className="-mt-12 sm:-mt-14 flex items-end gap-3 pb-4">
-            <div className="relative">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl border border-border bg-background/80 backdrop-blur shadow-xl overflow-hidden">
-                {snapshot.team.iconUrl ? (
-                  <img src={snapshot.team.iconUrl} alt={snapshot.team.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xl font-bold text-foreground">
-                    {snapshot.team.name.slice(0, 1).toUpperCase()}
-                  </div>
+      {/* Tabs */}
+      <div className="border-b border-white/10 bg-[#0a0a0f]/95">
+        <div className="mx-auto max-w-7xl px-4">
+          <div className="flex gap-6">
+            <button
+              onClick={() => setActiveTab('requests')}
+              className={`py-4 px-2 border-b-2 transition ${
+                activeTab === 'requests'
+                  ? 'border-purple-400 text-white'
+                  : 'border-transparent text-white/50 hover:text-white/80'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                <span>Member Requests</span>
+                {requests.length > 0 && (
+                  <Badge className="bg-red-500 text-white text-xs">{requests.length}</Badge>
                 )}
               </div>
-              <div
-                className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl border border-border bg-background/80 backdrop-blur flex items-center justify-center shadow"
-                aria-hidden
-              >
-                <div className="w-5 h-5 rounded-md" style={{ background: snapshot.customization.theme.primary }} />
+            </button>
+            <button
+              onClick={() => setActiveTab('members')}
+              className={`py-4 px-2 border-b-2 transition ${
+                activeTab === 'members'
+                  ? 'border-purple-400 text-white'
+                  : 'border-transparent text-white/50 hover:text-white/80'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span>Members</span>
               </div>
-            </div>
-
-            <div className="min-w-0 pb-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-foreground tracking-tight truncate">
-                  {snapshot.team.name}
-                </h1>
-                <span
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur ${roleChipStyles}`}
-                >
-                  {viewerRole === 'Team_Admin'
-                    ? 'Team Admin'
-                    : viewerRole === 'Team_Moderator'
-                      ? 'Team Moderator'
-                      : 'Team Member'}
-                </span>
-              </div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                {snapshot.members.length} members
-                {snapshot.requests.length > 0 ? ` · ${snapshot.requests.length} pending` : ''}
-                {caps.canViewAudit ? ' · Audit enabled' : ''}
-              </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
-    </div>
-  );
 
-  return (
-    <DashboardPage
-      title={`${snapshot.team.name} — Team Console`}
-      description="Moderation + customization (UI only)"
-      icon={<Shield className="w-6 h-6" />}
-      hero={hero}
-      tabs={tabs}
-      defaultTab="requests"
-      activeTab={activeTab}
-      onTabChange={(t) => setActiveTab(t)}
-      showRefresh
-      onRefresh={load}
-      headerActions={headerActions}
-    />
+      {/* Content */}
+      <main className="mx-auto max-w-7xl px-4 py-6">
+        {activeTab === 'requests' && (
+          <div className="space-y-4">
+            {requests.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-12 text-center">
+                <UserPlus className="h-12 w-12 text-white/30 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-white mb-2">No Pending Requests</h3>
+                <p className="text-sm text-white/50">All join requests have been processed.</p>
+              </div>
+            ) : (
+              requests.map((req) => (
+                <div
+                  key={req.profile_id}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center gap-4"
+                >
+                  {/* Avatar */}
+                  <div className="h-12 w-12 rounded-full bg-purple-500/30 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {req.profile.avatar_url ? (
+                      <img
+                        src={req.profile.avatar_url}
+                        alt={req.profile.username}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm font-bold text-purple-300">
+                        {(req.profile.display_name || req.profile.username)[0].toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">
+                      {req.profile.display_name || req.profile.username}
+                    </p>
+                    <p className="text-xs text-white/50">@{req.profile.username}</p>
+                    <p className="text-xs text-white/40 mt-1">
+                      Requested {new Date(req.requested_at).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleApproveRequest(req.profile_id)}
+                      disabled={!!actionLoading}
+                      className="bg-green-500 hover:bg-green-600 text-white"
+                    >
+                      {actionLoading === `approve-${req.profile_id}` ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          Approve
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRejectRequest(req.profile_id)}
+                      disabled={!!actionLoading}
+                      className="border-white/20 text-white/80 hover:bg-white/10"
+                    >
+                      {actionLoading === `reject-${req.profile_id}` ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <X className="h-4 w-4 mr-1" />
+                          Reject
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === 'members' && (
+          <div className="space-y-4">
+            {members.map((member) => (
+              <div
+                key={member.profile_id}
+                className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center gap-4"
+              >
+                {/* Avatar */}
+                <div className="h-12 w-12 rounded-full bg-purple-500/30 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {member.profile.avatar_url ? (
+                    <img
+                      src={member.profile.avatar_url}
+                      alt={member.profile.username}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-sm font-bold text-purple-300">
+                      {(member.profile.display_name || member.profile.username)[0].toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-white truncate">
+                      {member.profile.display_name || member.profile.username}
+                    </p>
+                    <Badge
+                      className={
+                        member.role === 'Team_Admin'
+                          ? 'bg-amber-500/20 text-amber-300 text-xs'
+                          : member.role === 'Team_Moderator'
+                          ? 'bg-purple-500/20 text-purple-300 text-xs'
+                          : 'bg-white/10 text-white/60 text-xs'
+                      }
+                    >
+                      {member.role === 'Team_Admin' ? 'Admin' : member.role === 'Team_Moderator' ? 'Moderator' : 'Member'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-white/50">@{member.profile.username}</p>
+                  {member.approved_at && (
+                    <p className="text-xs text-white/40 mt-1">
+                      Joined {new Date(member.approved_at).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                {canChangeRoles && member.role !== 'Team_Admin' && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={member.role}
+                      onChange={(e) => handleChangeRole(member.profile_id, e.target.value)}
+                      disabled={!!actionLoading}
+                      className="rounded-lg bg-white/5 border border-white/10 text-white text-sm px-3 py-2"
+                    >
+                      <option value="Team_Member">Member</option>
+                      <option value="Team_Moderator">Moderator</option>
+                      <option value="Team_Admin">Admin</option>
+                    </select>
+                    {canBan && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleBanMember(member.profile_id)}
+                        disabled={!!actionLoading}
+                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                      >
+                        <Ban className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
   );
 }

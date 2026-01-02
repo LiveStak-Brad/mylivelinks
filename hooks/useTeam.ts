@@ -137,6 +137,22 @@ function stableGradient(seed: string): string {
 
 const teamSlugCache = new Map<string, string>();
 
+const teamIdCache = new Map<string, string>();
+
+async function getTeamIdBySlug(teamSlug: string): Promise<string> {
+  const slug = teamSlug?.trim();
+  if (!slug) throw new Error('team_slug_required');
+  const cached = teamIdCache.get(slug);
+  if (cached) return cached;
+
+  const supabase = createClient();
+  const { data, error } = await supabase.from('teams').select('id').eq('slug', slug).single();
+  if (error) throw error;
+  if (!data?.id) throw new Error('team_not_found');
+  teamIdCache.set(slug, data.id);
+  return data.id;
+}
+
 async function getTeamSlugById(teamId: string): Promise<string> {
   const cached = teamSlugCache.get(teamId);
   if (cached) return cached;
@@ -936,6 +952,40 @@ export function useSendChatMessage(teamId: string | null) {
   return { mutate, isLoading, error };
 }
 
+export function useLeaveTeamBySlug(teamSlug: string) {
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTeamId(null);
+    setResolveError(null);
+    void (async () => {
+      try {
+        const id = await getTeamIdBySlug(teamSlug);
+        if (!cancelled) setTeamId(id);
+      } catch (e) {
+        if (!cancelled) setResolveError(e as Error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamSlug]);
+
+  const base = useLeaveTeam(teamId ?? '');
+  const mutate = useCallback(async () => {
+    if (!teamId) throw resolveError ?? new Error('team_not_found');
+    return base.mutate();
+  }, [base, resolveError, teamId]);
+
+  return {
+    mutate,
+    isLoading: base.isLoading,
+    error: base.error ?? resolveError,
+  };
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    MUTATIONS
    ════════════════════════════════════════════════════════════════════════════ */
@@ -1150,6 +1200,36 @@ export function useTeamNotificationPrefs(teamId: string | null) {
   );
 
   return { prefs, isLoading, isSaving, error, updatePref };
+}
+
+export function useTeamNotificationPrefsBySlug(teamSlug: string | null) {
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTeamId(null);
+    setResolveError(null);
+    if (!teamSlug) return;
+    void (async () => {
+      try {
+        const id = await getTeamIdBySlug(teamSlug);
+        if (!cancelled) setTeamId(id);
+      } catch (e) {
+        if (!cancelled) setResolveError(e as Error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [teamSlug]);
+
+  const base = useTeamNotificationPrefs(teamId);
+
+  return {
+    ...base,
+    error: base.error ?? resolveError,
+  };
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

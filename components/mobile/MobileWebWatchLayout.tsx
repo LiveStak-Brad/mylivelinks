@@ -360,7 +360,7 @@ export default function MobileWebWatchLayout({
     });
   }, [getPrimaryReportTarget]);
 
-  const safeRoomId = roomId || 'live_central';
+  const safeRoomId = roomId || 'live-central';
 
   const handleGiftAction = useCallback(() => {
     if (onGiftClick) {
@@ -577,6 +577,7 @@ export default function MobileWebWatchLayout({
           recipientUsername={giftModalTarget.recipientUsername}
           slotIndex={giftModalTarget.slotIndex}
           liveStreamId={giftModalTarget.liveStreamId}
+          roomSlug={safeRoomId}
           onGiftSent={() => setGiftModalTarget(null)}
           onClose={() => setGiftModalTarget(null)}
         />
@@ -664,6 +665,7 @@ export default function MobileWebWatchLayout({
             <button
               onClick={() => {
                 const streamer = selectedActionSlot.streamer;
+                if (!streamer) return;
                 setActiveSheet(null);
                 setGiftModalTarget({
                   recipientId: streamer.profile_id,
@@ -692,6 +694,7 @@ export default function MobileWebWatchLayout({
             <button
               onClick={() => {
                 const streamer = selectedActionSlot.streamer;
+                if (!streamer) return;
                 setActiveSheet(null);
                 router.push(`/${encodeURIComponent(streamer.username)}`);
               }}
@@ -704,6 +707,7 @@ export default function MobileWebWatchLayout({
             <button
               onClick={() => {
                 const streamer = selectedActionSlot.streamer;
+                if (!streamer) return;
                 setActiveSheet(null);
                 openChat(streamer.profile_id, streamer.username, streamer.avatar_url);
               }}

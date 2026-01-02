@@ -44,6 +44,7 @@ import {
   Input,
 } from '@/components/ui';
 import { Textarea } from '@/components/ui/Textarea';
+import { useToast } from '@/components/ui/Toast';
 import { useTeamContext, Surface } from '@/contexts/TeamContext';
 import {
   useTeam,
@@ -55,9 +56,9 @@ import {
   useTeamChat,
   useCreatePost,
   useReactToPost,
-  useLeaveTeam,
+  useLeaveTeamBySlug,
   useSendChatMessage,
-  useTeamNotificationPrefs,
+  useTeamNotificationPrefsBySlug,
   FeedSort,
   TeamMember,
   FeedItem,
@@ -325,7 +326,7 @@ export default function TeamPageContent() {
             <MembersScreen members={members} isLoading={membersLoading} />
           )}
           {currentSurface === 'settings' && permissions.canAccessSettings && (
-            <SettingsScreen role={uiRole} team={team} teamId={teamId || ''} />
+            <SettingsScreen role={uiRole} team={team} />
           )}
         </main>
       </div>
@@ -340,9 +341,8 @@ export default function TeamPageContent() {
       {/* ══════════════════════════════════════════════════════════════════════
           INVITE MEMBERS MODAL
           ══════════════════════════════════════════════════════════════════════ */}
-      {showInviteModal && teamId && (
+      {showInviteModal && team?.slug && (
         <InviteMembersModal
-          teamId={teamId}
           teamName={team.name}
           teamSlug={team.slug}
           onClose={() => setShowInviteModal(false)}
@@ -350,6 +350,52 @@ export default function TeamPageContent() {
       )}
     </div>
   );
+}
+
+function DockedChatBar({ onOpenChat }: { onOpenChat: () => void }) {
+  return (
+    <div className="fixed bottom-[68px] inset-x-0 z-40 border-t border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl">
+      <div className="mx-auto max-w-5xl px-4 py-2">
+        <button
+          onClick={onOpenChat}
+          className="flex w-full items-center gap-3 rounded-2xl bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
+        >
+          <MessageCircle className="h-5 w-5 text-purple-400" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white">Team Chat</p>
+            <p className="truncate text-xs text-white/50">Tap to open chat</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RoleBadge({ role }: { role: RoleState }) {
+  const styles: Record<RoleState, string> = {
+    leader: 'bg-amber-500/20 text-amber-400',
+    core: 'bg-purple-500/20 text-purple-400',
+    member: 'bg-white/10 text-white/60',
+    guest: 'bg-white/5 text-white/40',
+  };
+
+  if (role === 'member' || role === 'guest') return null;
+
+  return (
+    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[role]}`}>
+      {role}
+    </span>
+  );
+}
+
+function formatTime(timestamp: number): string {
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1289,493 +1335,136 @@ function MemberRow({ member }: { member: TeamMember }) {
     </div>
   );
 }
-
-/* ════════════════════════════════════════════════════════════════════════════
+ 
+ /* ════════════════════════════════════════════════════════════════════════════
    SETTINGS SCREEN
    ════════════════════════════════════════════════════════════════════════════ */
 
-function SettingsScreen({ role, team, teamId }: { role: RoleState; team: { name: string; slug: string; description?: string; themeColor?: string; iconUrl?: string; bannerUrl?: string }; teamId: string }) {
+function SettingsScreen({
+  role,
+  team,
+}: {
+  role: RoleState;
+  team: { name: string; slug: string; description?: string; themeColor?: string; iconUrl?: string; bannerUrl?: string };
+}) {
+  const { toast } = useToast();
   const isLeader = role === 'leader';
-  const bannerInputRef = useRef<HTMLInputElement>(null);
-  const iconInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState<'banner' | 'icon' | null>(null);
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [iconPreview, setIconPreview] = useState<string | null>(null);
-  
-  // Edit states
-  const [editingSlug, setEditingSlug] = useState(false);
-  const [newSlug, setNewSlug] = useState(team.slug);
-  const [slugError, setSlugError] = useState<string | null>(null);
-  const [savingSlug, setSavingSlug] = useState(false);
-  
-  // Leave team states
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const { mutate: leaveTeam, isLoading: isLeaving } = useLeaveTeam(teamId);
-  
-  // Notification preferences
-  const { prefs, updatePref, isSaving: isSavingPrefs } = useTeamNotificationPrefs(teamId);
-  
+  const shareLink = `https://www.mylivelinks.com/teams/${team.slug}`;
+  const [copied, setCopied] = useState(false);
+
+  const { mutate: leaveTeam, isLoading: isLeaving } = useLeaveTeamBySlug(team.slug);
+  const { prefs, updatePref, isSaving: isSavingPrefs } = useTeamNotificationPrefsBySlug(team.slug);
+  const safePrefs =
+    prefs ?? ({ all_activity: true, live_alerts: true, mentions_only: false, feed_posts: true, chat_messages: true } as const);
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({ title: 'Copied', description: 'Team link copied to clipboard.', variant: 'success' });
+    } catch (err: any) {
+      toast({ title: 'Copy failed', description: err?.message || 'Unable to copy link.', variant: 'error' });
+    }
+  };
+
   const handleLeaveTeam = async () => {
     try {
       await leaveTeam();
-      // Redirect to teams discovery
       window.location.href = '/teams';
-    } catch (err) {
-      console.error('Failed to leave team:', err);
-    }
-  };
-
-  const validateSlug = (slug: string): boolean => {
-    // Slug format: ^[a-z0-9][a-z0-9-]{5,62}[a-z0-9]$
-    return /^[a-z0-9][a-z0-9-]{5,62}[a-z0-9]$/.test(slug);
-  };
-
-  const handleSaveSlug = async () => {
-    const cleanSlug = newSlug.toLowerCase().trim();
-    
-    if (!validateSlug(cleanSlug)) {
-      setSlugError('Slug must be 7-64 characters, lowercase letters, numbers, and hyphens only');
-      return;
-    }
-
-    setSavingSlug(true);
-    setSlugError(null);
-
-    try {
-      const { createClient } = await import('@/lib/supabase');
-      const supabase = createClient();
-      
-      const { error } = await supabase
-        .from('teams')
-        .update({ slug: cleanSlug, updated_at: new Date().toISOString() })
-        .eq('id', teamId);
-
-      if (error) {
-        if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
-          setSlugError('This slug is already taken');
-        } else {
-          setSlugError(error.message);
-        }
-        return;
-      }
-
-      // Redirect to new slug URL
-      window.location.href = `/teams/${cleanSlug}`;
     } catch (err: any) {
-      setSlugError(err?.message || 'Failed to update slug');
-    } finally {
-      setSavingSlug(false);
-    }
-  };
-
-  const handleBannerUpload = () => {
-    bannerInputRef.current?.click();
-  };
-
-  const handleIconUpload = () => {
-    iconInputRef.current?.click();
-  };
-
-  const handleFileChange = (type: 'banner' | 'icon') => async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !teamId) return;
-
-    // Show preview immediately
-    const previewUrl = URL.createObjectURL(file);
-    if (type === 'banner') {
-      setBannerPreview(previewUrl);
-    } else {
-      setIconPreview(previewUrl);
-    }
-
-    setUploading(type);
-
-    try {
-      // Dynamic import to avoid SSR issues
-      const { uploadTeamAsset } = await import('@/lib/teamAssets');
-      const result = await uploadTeamAsset(teamId, file, type);
-
-      if (!result.success) {
-        alert(`Upload failed: ${result.error}`);
-        // Clear preview on error
-        if (type === 'banner') setBannerPreview(null);
-        else setIconPreview(null);
-      } else {
-        // Refresh the page to show new image
-        window.location.reload();
-      }
-    } catch (err: any) {
-      alert(`Upload failed: ${err?.message || 'Unknown error'}`);
-      if (type === 'banner') setBannerPreview(null);
-      else setIconPreview(null);
-    } finally {
-      setUploading(null);
+      toast({ title: 'Failed to leave team', description: err?.message || 'Unknown error', variant: 'error' });
     }
   };
 
   return (
     <div className="space-y-4">
-      {/* Hidden file inputs */}
-      <input
-        ref={bannerInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileChange('banner')}
-      />
-      <input
-        ref={iconInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileChange('icon')}
-      />
-
-      {/* Team Branding */}
-      {isLeader && (
-        <SettingsGroup title="Team Branding">
-          <div className="p-4 space-y-4">
-            {/* Banner Preview & Upload */}
-            <div>
-              <label className="text-sm font-medium text-white/80 mb-2 block">Team Banner</label>
-              <div 
-                onClick={uploading ? undefined : handleBannerUpload}
-                className={`relative h-24 w-full rounded-xl overflow-hidden border border-white/10 transition ${uploading === 'banner' ? 'opacity-50' : 'cursor-pointer group hover:border-purple-500/50'}`}
-              >
-                {bannerPreview || team.bannerUrl ? (
-                  <img src={bannerPreview || team.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-r from-purple-600/30 via-pink-600/20 to-blue-600/30" />
-                )}
-                {uploading === 'banner' ? (
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                    <Loader2 className="h-6 w-6 text-white animate-spin" />
-                  </div>
-                ) : (
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                    <div className="text-center">
-                      <ImageIcon className="h-6 w-6 text-white mx-auto mb-1" />
-                      <span className="text-xs text-white">Upload Banner</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-white/40 mt-1">Recommended: 1200×400px</p>
-            </div>
-
-            {/* Icon Preview & Upload */}
-            <div>
-              <label className="text-sm font-medium text-white/80 mb-2 block">Team Icon</label>
-              <div className="flex items-center gap-4">
-                <div 
-                  onClick={uploading ? undefined : handleIconUpload}
-                  className={`relative h-16 w-16 rounded-full overflow-hidden border-2 border-white/10 transition ${uploading === 'icon' ? 'opacity-50' : 'cursor-pointer group hover:border-purple-500/50'}`}
-                >
-                  {iconPreview || team.iconUrl ? (
-                    <img src={iconPreview || team.iconUrl} alt="Icon" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-purple-500 flex items-center justify-center">
-                      <span className="text-xl font-bold text-white">{team.name.slice(0, 2).toUpperCase()}</span>
-                    </div>
-                  )}
-                  {uploading === 'icon' ? (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <Loader2 className="h-5 w-5 text-white animate-spin" />
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                      <ImageIcon className="h-5 w-5 text-white" />
-                    </div>
-                  )}
-                </div>
-                <div className="text-sm text-white/60">
-                  <p>Click to upload a new icon</p>
-                  <p className="text-xs text-white/40">Square image, min 200×200px</p>
-                </div>
-              </div>
-            </div>
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-white">Team Profile</p>
+            <p className="text-xs text-white/50">Update your team details (some settings may still be rolling out).</p>
           </div>
-        </SettingsGroup>
-      )}
-
-      <SettingsGroup title="Team Profile">
-        <SettingsRow label="Team Name" value={team.name} action={isLeader ? "Edit" : undefined} />
-        <SettingsRow label="Bio" value={team.description ?? 'No description'} action={isLeader ? "Edit" : undefined} />
-        <SettingsRow label="Theme Color" value={team.themeColor ?? 'Purple'} action={isLeader ? "Change" : undefined} />
-      </SettingsGroup>
-
-      <SettingsGroup title="Team URL">
-        {isLeader && editingSlug ? (
-          <div className="p-4 space-y-3">
-            <div>
-              <label className="text-sm font-medium text-white/80 mb-2 block">Team Slug</label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-white/50">mylivelinks.com/teams/</span>
-                <Input
-                  value={newSlug}
-                  onChange={(e) => {
-                    setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                    setSlugError(null);
-                  }}
-                  placeholder="your-team-slug"
-                  className="flex-1 bg-white/5 border-white/10 text-white"
-                  disabled={savingSlug}
-                />
-              </div>
-              {slugError && <p className="text-sm text-red-400 mt-1">{slugError}</p>}
-              <p className="text-xs text-white/40 mt-1">7-64 characters, lowercase letters, numbers, and hyphens</p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setEditingSlug(false); setNewSlug(team.slug); setSlugError(null); }}
-                disabled={savingSlug}
-                className="text-white/70"
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSaveSlug}
-                disabled={savingSlug || newSlug === team.slug}
-                className="bg-purple-500 hover:bg-purple-600 text-white"
-              >
-                {savingSlug ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
+          {isLeader && (
+            <Badge className="bg-purple-500/20 text-purple-300 text-[10px]">Leader</Badge>
+          )}
+        </div>
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/70">Team Name</span>
+            <span className="text-sm text-white">{team.name}</span>
           </div>
-        ) : (
-          <>
-            <SettingsRow 
-              label="Team URL" 
-              value={`mylivelinks.com/teams/${team.slug}`} 
-              action={isLeader ? "Edit" : undefined}
-              onAction={isLeader ? () => setEditingSlug(true) : undefined}
-            />
-            <SettingsRow label="Share Link" value={`mylivelinks.com/teams/${team.slug}`} action="Copy" />
-          </>
-        )}
-      </SettingsGroup>
-
-      {isLeader && (
-        <SettingsGroup title="Moderation">
-          <SettingsRow label="Pending Requests" value="0" action="Review" />
-          <SettingsRow label="Pinned Posts" value="0" action="Manage" />
-          <SettingsRow label="Banned Members" value="0" action="View" />
-        </SettingsGroup>
-      )}
-
-      <SettingsGroup title="Notifications">
-        <SettingsRow 
-          label="All Activity" 
-          toggle 
-          checked={prefs?.all_activity ?? true}
-          onToggle={(val) => updatePref('all_activity', val)}
-          disabled={isSavingPrefs}
-        />
-        <SettingsRow 
-          label="Live Alerts" 
-          toggle 
-          checked={prefs?.live_alerts ?? true}
-          onToggle={(val) => updatePref('live_alerts', val)}
-          disabled={isSavingPrefs}
-        />
-        <SettingsRow 
-          label="Mentions Only" 
-          toggle 
-          checked={prefs?.mentions_only ?? false}
-          onToggle={(val) => updatePref('mentions_only', val)}
-          disabled={isSavingPrefs}
-        />
-      </SettingsGroup>
-
-      {/* Leave Team */}
-      {role !== 'leader' && (
-        <SettingsGroup title="Danger Zone">
-          <div className="p-4">
-            <p className="text-sm text-white/60 mb-3">
-              Leaving the team will remove you from all team activities. You can request to rejoin later.
-            </p>
-            <Button
-              onClick={() => setShowLeaveModal(true)}
-              variant="ghost"
-              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-            >
-              Leave Team
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/70">Team URL</span>
+            <span className="text-xs text-white/60 font-mono truncate max-w-[60%]">{shareLink}</span>
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleCopyLink} className="bg-purple-500 hover:bg-purple-600 text-white">
+              {copied ? 'Copied!' : 'Copy link'}
             </Button>
           </div>
-        </SettingsGroup>
-      )}
+        </div>
+      </div>
 
-      {/* Leave Team Confirmation Modal */}
-      {showLeaveModal && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowLeaveModal(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div className="rounded-2xl bg-[#1a1a24] border border-white/10 p-6 max-w-sm mx-4 text-center shadow-2xl pointer-events-auto">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
-                <AlertTriangle className="h-8 w-8 text-red-400" />
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">Leave {team.name}?</h3>
-              <p className="text-sm text-white/60 mb-6">
-                You'll lose access to the team's content and activities. You can request to rejoin later.
-              </p>
-              <div className="flex gap-3">
-                <Button 
-                  onClick={() => setShowLeaveModal(false)}
-                  variant="ghost"
-                  className="flex-1 text-white/70 hover:text-white hover:bg-white/10"
-                  disabled={isLeaving}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleLeaveTeam}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white"
-                  disabled={isLeaving}
-                >
-                  {isLeaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Leave Team'}
-                </Button>
-              </div>
-            </div>
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <p className="text-sm font-semibold text-white">Notifications</p>
+        <div className="mt-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/70">All Activity</span>
+            <button
+              type="button"
+              onClick={() => updatePref('all_activity', !safePrefs.all_activity)}
+              disabled={isSavingPrefs || !prefs}
+              className={`h-6 w-11 rounded-full border transition ${
+                safePrefs.all_activity ? 'bg-purple-500/60 border-purple-400/50' : 'bg-white/10 border-white/20'
+              }`}
+              aria-label="Toggle all activity"
+            />
           </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
-      <div className="border-b border-white/10 bg-white/5 px-4 py-3">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
-      </div>
-      <div className="divide-y divide-white/5">{children}</div>
-    </div>
-  );
-}
-
-function SettingsRow({
-  label,
-  value,
-  action,
-  onAction,
-  toggle,
-  checked: controlledChecked,
-  onToggle,
-  disabled,
-}: {
-  label: string;
-  value?: string;
-  action?: string;
-  onAction?: () => void;
-  toggle?: boolean;
-  checked?: boolean;
-  onToggle?: (value: boolean) => void;
-  disabled?: boolean;
-}) {
-  const [internalChecked, setInternalChecked] = useState(controlledChecked ?? false);
-  const isChecked = controlledChecked !== undefined ? controlledChecked : internalChecked;
-
-  const handleToggle = () => {
-    if (disabled) return;
-    const newValue = !isChecked;
-    if (onToggle) {
-      onToggle(newValue);
-    } else {
-      setInternalChecked(newValue);
-    }
-  };
-
-  const handleAction = () => {
-    if (onAction) {
-      onAction();
-    } else if (action === 'Copy' && value) {
-      navigator.clipboard.writeText(value.startsWith('http') ? value : `https://${value}`);
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-between px-4 py-3">
-      <div>
-        <p className="text-sm text-white">{label}</p>
-        {value && <p className="text-xs text-white/50">{value}</p>}
-      </div>
-      {toggle ? (
-        <button
-          onClick={handleToggle}
-          disabled={disabled}
-          className={`relative h-6 w-11 rounded-full transition ${isChecked ? 'bg-purple-500' : 'bg-white/20'} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition ${isChecked ? 'translate-x-5' : ''}`}
-          />
-        </button>
-      ) : action ? (
-        <Button size="sm" variant="ghost" onClick={handleAction} className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10">
-          {action}
-        </Button>
-      ) : (
-        <ChevronRight className="h-4 w-4 text-white/30" />
-      )}
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
-   DOCKED CHAT BAR
-   ════════════════════════════════════════════════════════════════════════════ */
-
-function DockedChatBar({ onOpenChat }: { onOpenChat: () => void }) {
-  return (
-    <div className="fixed bottom-[68px] inset-x-0 z-40 border-t border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl">
-      <div className="mx-auto max-w-5xl px-4 py-2">
-        <button
-          onClick={onOpenChat}
-          className="flex w-full items-center gap-3 rounded-2xl bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
-        >
-          <MessageCircle className="h-5 w-5 text-purple-400" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white">Team Chat</p>
-            <p className="truncate text-xs text-white/50">Tap to open chat</p>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/70">Live Alerts</span>
+            <button
+              type="button"
+              onClick={() => updatePref('live_alerts', !safePrefs.live_alerts)}
+              disabled={isSavingPrefs || !prefs}
+              className={`h-6 w-11 rounded-full border transition ${
+                safePrefs.live_alerts ? 'bg-purple-500/60 border-purple-400/50' : 'bg-white/10 border-white/20'
+              }`}
+              aria-label="Toggle live alerts"
+            />
           </div>
-        </button>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-white/70">Mentions Only</span>
+            <button
+              type="button"
+              onClick={() => updatePref('mentions_only', !safePrefs.mentions_only)}
+              disabled={isSavingPrefs || !prefs}
+              className={`h-6 w-11 rounded-full border transition ${
+                safePrefs.mentions_only ? 'bg-purple-500/60 border-purple-400/50' : 'bg-white/10 border-white/20'
+              }`}
+              aria-label="Toggle mentions only"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <p className="text-sm font-semibold text-white">Leave Team</p>
+        <p className="mt-1 text-xs text-white/50">You can re-join later if invited again.</p>
+        <div className="mt-3 flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleLeaveTeam}
+            disabled={isLeaving}
+            className="border-white/20 text-white/80 hover:bg-white/10"
+          >
+            {isLeaving ? 'Leaving...' : 'Leave'}
+          </Button>
+        </div>
       </div>
     </div>
   );
-}
-
-/* ════════════════════════════════════════════════════════════════════════════
-   UTILITY COMPONENTS
-   ════════════════════════════════════════════════════════════════════════════ */
-
-function RoleBadge({ role }: { role: RoleState }) {
-  const styles: Record<RoleState, string> = {
-    leader: 'bg-amber-500/20 text-amber-400',
-    core: 'bg-purple-500/20 text-purple-400',
-    member: 'bg-white/10 text-white/60',
-    guest: 'bg-white/5 text-white/40',
-  };
-
-  if (role === 'member' || role === 'guest') return null;
-
-  return (
-    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase ${styles[role]}`}>
-      {role}
-    </span>
-  );
-}
-
-function formatTime(timestamp: number): string {
-  const diff = Date.now() - timestamp;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1783,16 +1472,15 @@ function formatTime(timestamp: number): string {
    ════════════════════════════════════════════════════════════════════════════ */
 
 function InviteMembersModal({
-  teamId,
   teamName,
   teamSlug,
   onClose,
 }: {
-  teamId: string;
   teamName: string;
   teamSlug: string;
   onClose: () => void;
 }) {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<Array<{ id: string; username: string; display_name: string | null; avatar_url: string | null }>>([]);
   const [loading, setLoading] = useState(true);
@@ -1800,30 +1488,59 @@ function InviteMembersModal({
   const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
 
-  const shareLink = `https://mylivelinks.com/teams/${teamSlug}`;
+  const shareLink = `https://www.mylivelinks.com/teams/${teamSlug}`;
 
   // Load users on mount and search change
   useEffect(() => {
     const loadUsers = async () => {
       setLoading(true);
-      const { searchUsersToInvite } = await import('@/lib/teamInvites');
-      const results = await searchUsersToInvite(teamId, searchQuery);
-      setUsers(results);
-      setLoading(false);
+      try {
+        const { searchUsersToInviteBySlug } = await import('@/lib/teamInvites');
+        const results = await searchUsersToInviteBySlug(teamSlug, searchQuery);
+        setUsers(results);
+      } catch (err: any) {
+        console.error('[teams] Failed to load invite candidates:', err);
+        setUsers([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
     const debounce = setTimeout(loadUsers, 300);
     return () => clearTimeout(debounce);
-  }, [teamId, searchQuery]);
+  }, [teamSlug, searchQuery]);
 
   const handleInvite = async (userId: string) => {
     setInviting(userId);
-    const { sendTeamInvite } = await import('@/lib/teamInvites');
-    const result = await sendTeamInvite(teamId, userId);
-    if (result.success) {
-      setInvitedIds(prev => new Set([...prev, userId]));
+    try {
+      const { sendTeamInviteBySlug } = await import('@/lib/teamInvites');
+      const result = await sendTeamInviteBySlug(teamSlug, userId);
+      const alreadySent = typeof result.error === 'string' && result.error.toLowerCase().includes('invite already sent');
+      if (result.success || alreadySent) {
+        setInvitedIds((prev) => new Set([...prev, userId]));
+        setUsers((prev) => prev.filter((u) => u.id !== userId));
+        toast({
+          title: 'Invite sent',
+          description: 'They’ll see it in Noties.',
+          variant: 'success',
+        });
+      } else {
+        toast({
+          title: 'Invite failed',
+          description: result.error || 'Unknown error',
+          variant: 'error',
+        });
+      }
+    } catch (err: any) {
+      console.error('[teams] Invite error:', err);
+      toast({
+        title: 'Invite failed',
+        description: err?.message || 'Unknown error',
+        variant: 'error',
+      });
+    } finally {
+      setInviting(null);
     }
-    setInviting(null);
   };
 
   const handleCopyLink = async () => {

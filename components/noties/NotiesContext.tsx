@@ -533,11 +533,24 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
     let followeeIds: string[] = [];
     let userId: string | null = null;
+    let notificationsChannel: any = null;
 
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !isMounted) return;
       userId = user.id;
+
+      notificationsChannel = supabase
+        .channel('noties-notifications-realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${user.id}` },
+          () => {
+            void loadNoties();
+          }
+        )
+        .subscribe();
+
       const { data } = await supabase
         .from('follows')
         .select('followee_id')
@@ -594,6 +607,9 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false;
+      if (notificationsChannel) {
+        supabase.removeChannel(notificationsChannel);
+      }
       supabase.removeChannel(followsChannel);
       supabase.removeChannel(liveChannel);
       supabase.removeChannel(txChannel);

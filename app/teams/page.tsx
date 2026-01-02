@@ -10,8 +10,6 @@ import DiscoverTeamsOverlay from '@/components/teams/DiscoverTeamsOverlay';
 import { createClient } from '@/lib/supabase';
 
 const TEAMS_DISCOVERY_ENABLED = process.env.NEXT_PUBLIC_ENABLE_TEAMS_DISCOVERY === 'true';
-const hasDiscoveryResults = false; // Placeholder until the real query is wired up (UI-only route)
-const showPreviewSandbox = !TEAMS_DISCOVERY_ENABLED || !hasDiscoveryResults;
 const ONBOARDING_KEY = 'mylivelinks_teams_onboarding_completed';
 
 export default function TeamsIndexPage() {
@@ -208,17 +206,6 @@ export default function TeamsIndexPage() {
               <p className="text-sm text-muted-foreground">
                 Use the discovery overlay to browse public teams, send join requests, or unlock private teams with invite codes.
               </p>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Link href="/teams/team_demo_001/admin?role=Team_Admin">
-                  <Button variant="primary">Open Team Admin Demo</Button>
-                </Link>
-                {showPreviewSandbox && (
-                  <Link href="/teams/sandbox">
-                    <Button variant="outline">Premium Teams Sandbox</Button>
-                  </Link>
-                )}
-              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -233,18 +220,8 @@ export default function TeamsIndexPage() {
                 />
               </div>
               <p className="text-sm text-muted-foreground">
-                This is a placeholder route so you can access the Team Admin panel UI.
+                Search for teams you've joined or been invited to.
               </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Link href="/teams/team_demo_001/admin?role=Team_Admin">
-                  <Button variant="primary">Open Demo Team Admin</Button>
-                </Link>
-                {showPreviewSandbox && (
-                  <Link href="/teams/sandbox">
-                    <Button variant="outline">Premium Teams Sandbox</Button>
-                  </Link>
-                )}
-              </div>
             </div>
           )}
         </PageSection>

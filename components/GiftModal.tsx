@@ -19,7 +19,7 @@ interface GiftModalProps {
   recipientUsername: string;
   slotIndex?: number;
   liveStreamId?: number;
-  roomId?: string; // NEW: Room ID for room-specific leaderboards
+  roomSlug?: string; // NEW: Room ID for room-specific leaderboards
   commentId?: string;
   postId?: string;
   onGiftSent: () => void;
@@ -31,7 +31,7 @@ export default function GiftModal({
   recipientUsername,
   slotIndex,
   liveStreamId,
-  roomId,
+  roomSlug,
   commentId,
   postId,
   onGiftSent,
@@ -157,7 +157,7 @@ export default function GiftModal({
             coinsAmount: selectedGift.coin_cost,
             giftTypeId: selectedGift.id,
             streamId: liveStreamId || null,
-            roomId: roomId || null, // NEW: For room-specific leaderboards
+            roomSlug: roomSlug || null, // NEW: For room-specific leaderboards
             requestId,
           };
 

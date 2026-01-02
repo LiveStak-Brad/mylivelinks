@@ -148,25 +148,58 @@ export default function Leaderboard({ roomSlug, roomName }: LeaderboardProps = {
     try {
       // Note: p_room_id is NULL for global leaderboards
       const roomIdParam = scope === 'room' ? roomSlug : null;
+      const roomIdParams =
+        scope === 'room' && roomSlug === 'live-central'
+          ? ['live-central', 'live_central']
+          : (roomIdParam ? [roomIdParam] : [null]);
       
       console.log('[Leaderboard] Loading:', { type, period, scope, roomId: roomIdParam });
       
-      const { data, error } = await supabase.rpc('get_leaderboard', {
-        p_type: type,
-        p_period: period,
-        p_limit: 100,
-        p_room_id: roomIdParam,
-      });
+      const results = await Promise.all(
+        roomIdParams.map((rid) =>
+          supabase.rpc('get_leaderboard', {
+            p_type: type,
+            p_period: period,
+            p_limit: 100,
+            p_room_id: rid,
+          })
+        )
+      );
 
-      if (error) {
-        console.error('[Leaderboard] RPC error:', error);
-        throw error;
+      const firstError = results.find((r) => r.error)?.error;
+      if (firstError) {
+        console.error('[Leaderboard] RPC error:', firstError);
+        throw firstError;
       }
 
-      console.log('[Leaderboard] Raw data:', data?.length ?? 0, 'entries');
+      const combinedRows = results.flatMap((r) => (Array.isArray(r.data) ? (r.data as any[]) : []));
 
-      const rows = Array.isArray(data) ? data : [];
-      const mapped = rows
+      console.log('[Leaderboard] Raw data:', combinedRows.length, 'entries');
+
+      const mergedByProfile = new Map<string, any>();
+      for (const row of combinedRows) {
+        const key = String(row.profile_id);
+        const prev = mergedByProfile.get(key);
+        const nextMetric = Number(row.metric_value ?? 0);
+        if (!prev) {
+          mergedByProfile.set(key, {
+            ...row,
+            metric_value: nextMetric,
+          });
+        } else {
+          mergedByProfile.set(key, {
+            ...prev,
+            metric_value: Number(prev.metric_value ?? 0) + nextMetric,
+            // Prefer non-empty avatar/username if any
+            username: prev.username || row.username,
+            avatar_url: prev.avatar_url || row.avatar_url,
+            is_live: Boolean(prev.is_live || row.is_live),
+            gifter_level: Math.max(Number(prev.gifter_level ?? 0), Number(row.gifter_level ?? 0)),
+          });
+        }
+      }
+
+      const mapped = Array.from(mergedByProfile.values())
         .map((row: any) => ({
           profile_id: row.profile_id,
           username: row.username,
@@ -174,9 +207,11 @@ export default function Leaderboard({ roomSlug, roomName }: LeaderboardProps = {
           is_live: Boolean(row.is_live ?? false),
           gifter_level: row.gifter_level || 0,
           metric_value: Number(row.metric_value ?? 0),
-          rank: Number(row.rank ?? 0),
+          rank: 0,
         }))
-        .filter((entry: any) => Number(entry.metric_value ?? 0) > 0);
+        .filter((entry: any) => Number(entry.metric_value ?? 0) > 0)
+        .sort((a: any, b: any) => Number(b.metric_value ?? 0) - Number(a.metric_value ?? 0))
+        .map((entry: any, idx: number) => ({ ...entry, rank: idx + 1 }));
 
       console.log('[Leaderboard] Mapped entries:', mapped.length);
       setEntries(mapped);

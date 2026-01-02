@@ -109,7 +109,7 @@ export default function LiveRoom({
   roomConfig = DEFAULT_ROOM_CONFIG,
 }: LiveRoomProps = {}) {
   const scopeRoomId = useMemo(
-    () => roomConfig.contentRoomId || roomConfig.roomId || 'live_central',
+    () => roomConfig.contentRoomId || roomConfig.roomId || 'live-central',
     [roomConfig.contentRoomId, roomConfig.roomId]
   );
   const { resolvedTheme } = useTheme();

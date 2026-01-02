@@ -6,6 +6,23 @@
 
 import { createClient } from '@/lib/supabase';
 
+ const teamIdBySlugCache = new Map<string, string>();
+
+ async function getTeamIdBySlug(teamSlug: string): Promise<string> {
+   const slug = teamSlug?.trim();
+   if (!slug) throw new Error('team_slug_required');
+
+   const cached = teamIdBySlugCache.get(slug);
+   if (cached) return cached;
+
+   const supabase = createClient();
+   const { data, error } = await supabase.from('teams').select('id').eq('slug', slug).single();
+   if (error) throw error;
+   if (!data?.id) throw new Error('team_not_found');
+   teamIdBySlugCache.set(slug, data.id);
+   return data.id;
+ }
+
 export interface TeamInvite {
   invite_id: number;
   team_id: string;
@@ -57,6 +74,15 @@ export async function sendTeamInvite(
 
   return data as SendInviteResult;
 }
+
+ export async function sendTeamInviteBySlug(
+   teamSlug: string,
+   inviteeId: string,
+   message?: string
+ ): Promise<SendInviteResult> {
+   const teamId = await getTeamIdBySlug(teamSlug);
+   return sendTeamInvite(teamId, inviteeId, message);
+ }
 
 /**
  * Accept a team invite
@@ -188,3 +214,11 @@ export async function searchUsersToInvite(
     avatar_url: p.avatar_url,
   }));
 }
+
+ export async function searchUsersToInviteBySlug(
+   teamSlug: string,
+   searchQuery?: string
+ ): Promise<Array<{ id: string; username: string; display_name: string | null; avatar_url: string | null }>> {
+   const teamId = await getTeamIdBySlug(teamSlug);
+   return searchUsersToInvite(teamId, searchQuery);
+ }
