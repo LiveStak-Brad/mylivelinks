@@ -77,8 +77,8 @@ export default function TeamsIndexPage() {
                   <Button variant="primary">Open Team Admin Demo</Button>
                 </Link>
                 {showPreviewSandbox && (
-                  <Link href="/teams/preview">
-                    <Button variant="outline">Preview Teams UI</Button>
+                  <Link href="/teams/sandbox">
+                    <Button variant="outline">Premium Teams Sandbox</Button>
                   </Link>
                 )}
               </div>
@@ -103,8 +103,8 @@ export default function TeamsIndexPage() {
                   <Button variant="primary">Open Demo Team Admin</Button>
                 </Link>
                 {showPreviewSandbox && (
-                  <Link href="/teams/preview">
-                    <Button variant="outline">Preview Teams UI</Button>
+                  <Link href="/teams/sandbox">
+                    <Button variant="outline">Premium Teams Sandbox</Button>
                   </Link>
                 )}
               </div>
