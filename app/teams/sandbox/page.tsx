@@ -19,8 +19,8 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-  Textarea,
 } from '@/components/ui';
+import { Textarea } from '@/components/ui/Textarea';
 import {
   Activity,
   Bolt,
