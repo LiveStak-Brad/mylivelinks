@@ -23,7 +23,6 @@ import {
 import { Textarea } from '@/components/ui/Textarea';
 import {
   Activity,
-  Bolt,
   Flame,
   Gift,
   MessageCircle,
@@ -33,6 +32,7 @@ import {
   Shield,
   Sparkles,
   Users,
+  Zap,
 } from 'lucide-react';
 
 type MembershipState = 'not_member' | 'pending' | 'approved';
@@ -620,7 +620,7 @@ function HomeTab({ posts, composerDisabled, theme, membership }: HomeTabProps) {
                 <p className="text-sm text-white/90">{post.text}</p>
                 <div className="flex gap-3 text-xs text-white/70">
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1">
-                    <Bolt className="h-3 w-3" />
+                    <Zap className="h-3 w-3" />
                     {post.reactions} reacts
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2 py-1">
