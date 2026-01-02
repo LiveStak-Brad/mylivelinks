@@ -57,7 +57,7 @@ export {
   ToastContext,
 } from './Toast';
 
-export { Loading, type LoadingProps, PageLoading } from './Loading';
+export { Loading, PageLoading } from './Loading';
 
 export { 
   Skeleton, 
