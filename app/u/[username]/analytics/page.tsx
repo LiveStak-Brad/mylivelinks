@@ -128,8 +128,7 @@ export default function UserAnalyticsPage() {
   const router = useRouter();
   const params = useParams<{ username?: string }>();
   const username = params?.username ?? '';
-  if (!username) return null;
-  
+
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [dateRange, setDateRange] = useState<DateRange>(getDateRangeFromPreset('30d'));
   const [loading, setLoading] = useState(true);
@@ -208,6 +207,8 @@ export default function UserAnalyticsPage() {
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'badges', label: 'Badges', icon: Award },
   ];
+
+  if (!username) return null;
 
   if (error === 'Profile not found') {
     return (

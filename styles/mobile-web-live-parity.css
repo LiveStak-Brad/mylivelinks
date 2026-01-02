@@ -91,6 +91,27 @@
     flex-shrink: 0;
   }
 
+  .mobile-live-chrome-hidden .mobile-live-topbar {
+    background: transparent;
+    border-bottom: 0;
+    padding-top: max(6px, env(safe-area-inset-top));
+    padding-bottom: 6px;
+  }
+
+  .mobile-live-chrome-hidden .mobile-live-topbar-btn,
+  .mobile-live-chrome-hidden .mobile-live-topbar-actions {
+    display: none;
+  }
+
+  .mobile-live-chrome-hidden .mobile-live-topbar-title {
+    align-items: flex-start;
+  }
+
+  .mobile-live-chrome-hidden .mobile-live-topbar-roomname {
+    font-size: 14px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+
   .mobile-live-grid-wrap {
     flex: 1;
     min-height: 0;

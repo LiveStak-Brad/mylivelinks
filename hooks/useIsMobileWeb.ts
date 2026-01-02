@@ -12,7 +12,12 @@ import { useState, useEffect } from 'react';
  * - Excludes tablets (iPad, larger Android tablets) via userAgent check
  */
 export function useIsMobileWeb(): boolean {
-  const [isMobileWeb, setIsMobileWeb] = useState(false);
+  const getIsMobileWeb = () => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 1024;
+  };
+
+  const [isMobileWeb, setIsMobileWeb] = useState(getIsMobileWeb);
 
   useEffect(() => {
     const checkIsMobileWeb = () => {

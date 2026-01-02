@@ -325,6 +325,11 @@ export default function GlobalHeader() {
     router.push('/live/host');
   }, [isLoggedIn, router]);
 
+  const dispatchLiveRoomCommand = useCallback((type: string, detail?: any) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent(type, { detail }));
+  }, []);
+
   return (
     <>
       {/* Skip Link for accessibility */}
@@ -570,16 +575,36 @@ export default function GlobalHeader() {
             {/* LEFT MIDDLE - Sort buttons (ONLY on live room page) - Close to logo */}
             {isLiveRoom && (
               <div className="hidden md:flex absolute items-center header-icon-cluster header-icon-cluster-tight left-[50%] -translate-x-[200px] md:-translate-x-[240px] lg:-translate-x-[280px] xl:-translate-x-[340px] 2xl:-translate-x-[420px]">
-                <button className="nav-icon-button nav-icon-button-compact" title="Randomize">
+                <button
+                  type="button"
+                  className="nav-icon-button nav-icon-button-compact"
+                  title="Randomize"
+                  onClick={() => dispatchLiveRoomCommand('liveroom:randomize')}
+                >
                   <Shuffle className={`${HEADER_ICON_CLASS} text-purple-500`} strokeWidth={2} />
                 </button>
-                <button className="nav-icon-button nav-icon-button-compact" title="Most Viewed">
+                <button
+                  type="button"
+                  className="nav-icon-button nav-icon-button-compact"
+                  title="Most Viewed"
+                  onClick={() => dispatchLiveRoomCommand('liveroom:setSortMode', { mode: 'most_viewed' })}
+                >
                   <Eye className={`${HEADER_ICON_CLASS} text-cyan-500`} strokeWidth={2} />
                 </button>
-                <button className="nav-icon-button nav-icon-button-compact" title="Most Gifted">
+                <button
+                  type="button"
+                  className="nav-icon-button nav-icon-button-compact"
+                  title="Most Gifted"
+                  onClick={() => dispatchLiveRoomCommand('liveroom:setSortMode', { mode: 'most_gifted' })}
+                >
                   <GiftIcon className={`${HEADER_ICON_CLASS} text-pink-500`} strokeWidth={2} />
                 </button>
-                <button className="nav-icon-button nav-icon-button-compact" title="Newest">
+                <button
+                  type="button"
+                  className="nav-icon-button nav-icon-button-compact"
+                  title="Newest"
+                  onClick={() => dispatchLiveRoomCommand('liveroom:setSortMode', { mode: 'newest' })}
+                >
                   <Sparkles className={`${HEADER_ICON_CLASS} text-yellow-500`} strokeWidth={2} />
                 </button>
               </div>
@@ -588,10 +613,20 @@ export default function GlobalHeader() {
             {/* RIGHT MIDDLE - Live controls (ONLY on live room page) - Mirror distance from logo */}
             {isLiveRoom && (
               <div className="hidden md:flex absolute items-center header-icon-cluster header-icon-cluster-tight left-[50%] translate-x-[80px] md:translate-x-[100px] lg:translate-x-[120px] xl:translate-x-[140px] 2xl:translate-x-[180px]">
-                <button className="nav-icon-button nav-icon-button-compact" title="Unmute All">
+                <button
+                  type="button"
+                  className="nav-icon-button nav-icon-button-compact"
+                  title="Unmute All"
+                  onClick={() => dispatchLiveRoomCommand('liveroom:unmuteAll')}
+                >
                   <Volume2 className={`${HEADER_ICON_CLASS} text-green-500`} strokeWidth={2} />
                 </button>
-                <button className="nav-icon-button nav-icon-button-compact" title="Focus Mode">
+                <button
+                  type="button"
+                  className="nav-icon-button nav-icon-button-compact"
+                  title="Focus Mode"
+                  onClick={() => dispatchLiveRoomCommand('liveroom:toggleFocusMode')}
+                >
                   <Focus className={`${HEADER_ICON_CLASS} text-indigo-500`} strokeWidth={2} />
                 </button>
               </div>

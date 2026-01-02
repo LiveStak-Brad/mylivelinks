@@ -919,13 +919,16 @@ export default function LiveRoom({
     }
   }, [expandedTileId]);
 
-  const toggleFocusMode = () => {
-    setUiPanels(prev => ({ ...prev, focusMode: !prev.focusMode }));
-    // Exit fullscreen when disabling focus mode
-    if (uiPanels.focusMode) {
-      setExpandedTileId(null);
-    }
-  };
+  const toggleFocusMode = useCallback(() => {
+    setUiPanels((prev) => {
+      const next = !prev.focusMode;
+      // Exit fullscreen when disabling focus mode (return to normal chat mode)
+      if (!next) {
+        setExpandedTileId(null);
+      }
+      return { ...prev, focusMode: next };
+    });
+  }, []);
 
   const handleExpandTile = (slotIndex: number) => {
     setExpandedTileId(slotIndex);
@@ -2642,6 +2645,33 @@ export default function LiveRoom({
     loadLiveStreamers();
   };
 
+  // Wire GlobalHeader "live room" vector buttons to LiveRoom state
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onRandomize = () => handleRandomize();
+    const onUnmuteAll = () => handleUnmuteAll();
+    const onToggleFocusMode = () => toggleFocusMode();
+    const onSetSortMode = (evt: Event) => {
+      const mode = (evt as CustomEvent)?.detail?.mode as LiveSortMode | undefined;
+      if (!mode) return;
+      if (mode !== 'random' && mode !== 'most_viewed' && mode !== 'most_gifted' && mode !== 'newest' && mode !== 'trending') return;
+      handleSortModeChange(mode);
+    };
+
+    window.addEventListener('liveroom:randomize', onRandomize);
+    window.addEventListener('liveroom:unmuteAll', onUnmuteAll);
+    window.addEventListener('liveroom:toggleFocusMode', onToggleFocusMode);
+    window.addEventListener('liveroom:setSortMode', onSetSortMode);
+
+    return () => {
+      window.removeEventListener('liveroom:randomize', onRandomize);
+      window.removeEventListener('liveroom:unmuteAll', onUnmuteAll);
+      window.removeEventListener('liveroom:toggleFocusMode', onToggleFocusMode);
+      window.removeEventListener('liveroom:setSortMode', onSetSortMode);
+    };
+  }, [handleRandomize, handleSortModeChange, handleUnmuteAll, toggleFocusMode]);
+
   const handleAddStreamer = async (slotIndex: number, streamerId: string) => {
     const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
     
@@ -2808,7 +2838,7 @@ export default function LiveRoom({
   // ============================================
 
   return (
-    <div className="h-[100dvh] w-[100dvw] bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col fixed inset-0 pt-16 lg:pt-[72px] min-h-0">
+    <div className="h-[100dvh] w-[100dvw] bg-gray-50 dark:bg-gray-900 overflow-hidden flex flex-col fixed inset-0 pt-0 lg:pt-[72px] min-h-0">
       {/* Hidden Go Live Button - triggered by camera button in header */}
       <div className="fixed -left-[9999px]" id="liveroom-go-live-button">
         <GoLiveButton

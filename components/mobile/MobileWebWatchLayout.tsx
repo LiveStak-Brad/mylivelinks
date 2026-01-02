@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect, type ReactNode } from 'react';
-import { ArrowLeft, Gift, MessageCircle, Users, Trophy, SlidersHorizontal, Share2, Video as VideoIcon, X, Volume2, Maximize2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Gift, MessageCircle, Users, Trophy, SlidersHorizontal, Share2, Video as VideoIcon, X, Volume2, Maximize2, User, MessageSquare } from 'lucide-react';
 import { Room } from 'livekit-client';
 import Tile from '@/components/Tile';
 import GoLiveButton from '@/components/GoLiveButton';
@@ -10,6 +11,7 @@ import ReportModal from '@/components/ReportModal';
 import Chat from '@/components/Chat';
 import ViewerList from '@/components/ViewerList';
 import Leaderboard from '@/components/Leaderboard';
+import { useIM } from '@/components/im';
 import type { GifterStatus } from '@/lib/gifter-status';
 
 interface LiveStreamer {
@@ -138,6 +140,9 @@ export default function MobileWebWatchLayout({
   onCloseTile,
   streamingMode = 'group', // Default to group mode for backward compat
 }: MobileWebWatchLayoutProps) {
+  const router = useRouter();
+  const { openChat } = useIM();
+
   // Focus mode state - which tile is focused (null = grid view)
   const [focusedSlotIndex, setFocusedSlotIndex] = useState<number | null>(null);
   
@@ -161,6 +166,9 @@ export default function MobileWebWatchLayout({
   } | null>(null);
 
   const [activeSheet, setActiveSheet] = useState<BottomSheetKey>(null);
+
+  const [isChromeVisible, setIsChromeVisible] = useState(false);
+  const [selectedActionSlotIndex, setSelectedActionSlotIndex] = useState<number | null>(null);
   
   // Global mute state
   const [globalMuted, setGlobalMuted] = useState(false);
@@ -201,7 +209,7 @@ export default function MobileWebWatchLayout({
         isPinned: false,
         isMuted: false,
         isEmpty: true,
-        volume: 100,
+        volume: 0.5,
       });
     }
   }
@@ -215,18 +223,24 @@ export default function MobileWebWatchLayout({
     ? displaySlots.find(s => s.slotIndex === focusedSlotIndex) 
     : null;
 
-  // Handle focus mode toggle - only for slots with active streamers
+  const selectedActionSlot = selectedActionSlotIndex !== null
+    ? displaySlots.find((s) => s.slotIndex === selectedActionSlotIndex) || null
+    : null;
+
+  const parseLiveStreamId = (raw: unknown): number | undefined => {
+    const idStr = raw ? String(raw) : '';
+    if (!idStr) return undefined;
+    if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) return undefined;
+    const parsed = parseInt(idStr);
+    return parsed > 0 ? parsed : undefined;
+  };
+
   const handleTileTap = useCallback((slotIndex: number, hasStreamer: boolean) => {
-    if (!hasStreamer) return; // Can't focus empty slots
-    
-    if (focusedSlotIndex === slotIndex) {
-      // Already focused - exit focus mode
-      setFocusedSlotIndex(null);
-    } else {
-      // Enter focus mode on this tile
-      setFocusedSlotIndex(slotIndex);
-    }
-  }, [focusedSlotIndex]);
+    if (!hasStreamer) return;
+    setIsChromeVisible(true);
+    setSelectedActionSlotIndex(slotIndex);
+    setActiveSheet('options');
+  }, []);
 
   // Handle exit focus mode
   const handleExitFocus = useCallback(() => {
@@ -258,14 +272,7 @@ export default function MobileWebWatchLayout({
         recipientId: streamer.profile_id,
         recipientUsername: streamer.username,
         slotIndex: targetSlot.slotIndex,
-        liveStreamId: streamer.id && streamer.live_available 
-          ? (() => {
-              const idStr = streamer.id.toString();
-              if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) return undefined;
-              const parsed = parseInt(idStr);
-              return parsed > 0 ? parsed : undefined;
-            })()
-          : undefined,
+        liveStreamId: streamer.id && streamer.live_available ? parseLiveStreamId(streamer.id) : undefined,
       });
     }
   }, [focusedSlot, activeSlots]);
@@ -372,15 +379,17 @@ export default function MobileWebWatchLayout({
   }, [handleSharePress, onShareClick]);
 
   const handleOpenSheet = useCallback((key: BottomSheetKey) => {
+    setIsChromeVisible(true);
     setActiveSheet((prev) => (prev === key ? null : key));
   }, []);
 
   const handleCloseSheet = useCallback(() => {
     setActiveSheet(null);
+    setSelectedActionSlotIndex(null);
   }, []);
 
   return (
-    <div className="mobile-live-container mobile-live-v3">
+    <div className={`mobile-live-container mobile-live-v3 ${isChromeVisible ? '' : 'mobile-live-chrome-hidden'}`}>
       {/* TOP BAR - Full width */}
       <div className="mobile-live-topbar">
         <button
@@ -391,10 +400,15 @@ export default function MobileWebWatchLayout({
           <ArrowLeft />
         </button>
 
-        <div className="mobile-live-topbar-title">
+        <button
+          type="button"
+          className="mobile-live-topbar-title"
+          onClick={() => setIsChromeVisible((prev) => !prev)}
+          aria-label="Toggle room controls"
+        >
           <div className="mobile-live-topbar-roomname">{roomName || 'Live Room'}</div>
           <div className="mobile-live-topbar-subtitle">{activeCount} Live</div>
-        </div>
+        </button>
 
         <div className="mobile-live-topbar-actions">
           {currentUserId && (
@@ -482,12 +496,7 @@ export default function MobileWebWatchLayout({
                       gifterStatus={slot.streamer.gifter_status}
                       slotIndex={slot.slotIndex}
                       liveStreamId={slot.streamer.id && slot.streamer.live_available 
-                        ? (() => {
-                            const idStr = slot.streamer.id.toString();
-                            if (idStr.startsWith('stream-') || idStr.startsWith('seed-')) return undefined;
-                            const parsed = parseInt(idStr);
-                            return parsed > 0 ? parsed : undefined;
-                          })()
+                        ? parseLiveStreamId(slot.streamer.id)
                         : undefined
                       }
                       sharedRoom={sharedRoom}
@@ -514,6 +523,7 @@ export default function MobileWebWatchLayout({
         )}
 
         {/* BOTTOM TAB BAR */}
+        {isChromeVisible && (
         <div className="mobile-live-bottombar">
           <button
             onClick={() => handleOpenSheet('chat')}
@@ -557,6 +567,7 @@ export default function MobileWebWatchLayout({
             <span>Controls</span>
           </button>
         </div>
+        )}
       </div>
 
       {/* Gift Modal */}
@@ -615,10 +626,95 @@ export default function MobileWebWatchLayout({
 
       <BottomSheet
         isOpen={activeSheet === 'options'}
-        title="Controls"
+        title={selectedActionSlot?.streamer?.username ? `${selectedActionSlot.streamer.username}` : 'Controls'}
         onClose={handleCloseSheet}
       >
-        <div className="space-y-2">
+        {selectedActionSlot?.streamer ? (
+          <div className="space-y-2">
+            <button
+              onClick={() => {
+                if (!selectedActionSlotIndex) return;
+                onMuteTile(selectedActionSlotIndex);
+              }}
+              className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
+            >
+              <span>{selectedActionSlot.isMuted || globalMuted ? 'Unmute' : 'Mute'}</span>
+              <Volume2 className="w-5 h-5" />
+            </button>
+
+            <div className="w-full px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800">
+              <div className="flex items-center justify-between gap-3 text-gray-900 dark:text-gray-100 font-semibold">
+                <span>Volume</span>
+                <span className="text-sm opacity-70">{Math.round((selectedActionSlot.volume ?? 0) * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={Math.max(0, Math.min(1, selectedActionSlot.volume ?? 0))}
+                onChange={(e) => {
+                  if (!selectedActionSlotIndex) return;
+                  onVolumeChange(selectedActionSlotIndex, Number(e.target.value));
+                }}
+                className="w-full mt-3"
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                const streamer = selectedActionSlot.streamer;
+                setActiveSheet(null);
+                setGiftModalTarget({
+                  recipientId: streamer.profile_id,
+                  recipientUsername: streamer.username,
+                  slotIndex: selectedActionSlot.slotIndex,
+                  liveStreamId: streamer.id && streamer.live_available ? parseLiveStreamId(streamer.id) : undefined,
+                });
+              }}
+              className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
+            >
+              <span>Send gift</span>
+              <Gift className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveSheet(null);
+                setFocusedSlotIndex(selectedActionSlot.slotIndex);
+              }}
+              className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold ${focusedSlotIndex === selectedActionSlot.slotIndex ? 'ring-2 ring-purple-500' : ''}`}
+            >
+              <span>Maximize</span>
+              <Maximize2 className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => {
+                const streamer = selectedActionSlot.streamer;
+                setActiveSheet(null);
+                router.push(`/${encodeURIComponent(streamer.username)}`);
+              }}
+              className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
+            >
+              <span>View profile</span>
+              <User className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => {
+                const streamer = selectedActionSlot.streamer;
+                setActiveSheet(null);
+                openChat(streamer.profile_id, streamer.username, streamer.avatar_url);
+              }}
+              className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
+            >
+              <span>Instant message</span>
+              <MessageSquare className="w-5 h-5" />
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
           <button
             onClick={handleGiftAction}
             disabled={activeCount === 0}
@@ -675,6 +771,7 @@ export default function MobileWebWatchLayout({
             Report user
           </button>
         </div>
+        )}
       </BottomSheet>
     </div>
   );

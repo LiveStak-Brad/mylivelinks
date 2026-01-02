@@ -40,8 +40,6 @@ export default function TierDetail({
   isOpen,
   onClose,
 }: TierDetailProps) {
-  if (!isOpen) return null;
-  
   const currentTier = useMemo(
     () => getTierByKey(gifterStatus.tier_key),
     [gifterStatus.tier_key]
@@ -56,6 +54,8 @@ export default function TierDetail({
     () => GIFTER_TIERS.find((t) => t.order === tier.order + 1),
     [tier.order]
   );
+
+  if (!isOpen) return null;
 
   return (
     <div

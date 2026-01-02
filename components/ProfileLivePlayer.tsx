@@ -40,6 +40,7 @@ export default function ProfileLivePlayer({
   const router = useRouter();
   const wasHiddenRef = useRef(false);
   const roomRef = useRef<Room | null>(null);
+  const isOwnProfileRef = useRef(false);
   const [canOpenLive, setCanOpenLive] = useState(false);
 
   // BANDWIDTH SAVING: Disconnect when user leaves the tab
@@ -181,13 +182,17 @@ export default function ProfileLivePlayer({
       // Attach to audio element
       const element = audioTrack.attach(audioRef.current);
       
+      const shouldMuteForEcho = isOwnProfileRef.current;
+
       // CRITICAL: Ensure audio is enabled and playing
       if (audioRef.current) {
-        audioRef.current.muted = false;
-        audioRef.current.volume = volume / 100;
-        audioRef.current.play().catch(err => {
-          console.warn('[PROFILE_LIVE] Audio autoplay blocked:', err);
-        });
+        audioRef.current.muted = shouldMuteForEcho || isMuted;
+        audioRef.current.volume = shouldMuteForEcho || isMuted ? 0 : volume / 100;
+        if (!shouldMuteForEcho) {
+          audioRef.current.play().catch(err => {
+            console.warn('[PROFILE_LIVE] Audio autoplay blocked:', err);
+          });
+        }
       }
       
       console.log('[PROFILE_LIVE] Audio attached successfully', {
@@ -207,8 +212,9 @@ export default function ProfileLivePlayer({
   // Apply volume settings whenever they change
   useEffect(() => {
     if (audioRef.current && audioTrack) {
-      audioRef.current.volume = isMuted ? 0 : volume / 100;
-      audioRef.current.muted = isMuted;
+      const shouldMuteForEcho = isOwnProfileRef.current;
+      audioRef.current.volume = shouldMuteForEcho || isMuted ? 0 : volume / 100;
+      audioRef.current.muted = shouldMuteForEcho || isMuted;
       console.log('[PROFILE_LIVE] Volume updated:', {
         volume: audioRef.current.volume,
         muted: audioRef.current.muted,
@@ -271,6 +277,7 @@ export default function ProfileLivePlayer({
       }
       
       const isOwnProfile = user.id === profileId;
+      isOwnProfileRef.current = isOwnProfile;
       console.log('[PROFILE_LIVE] Is own profile:', isOwnProfile);
 
       // Get LiveKit token as viewer
@@ -335,7 +342,9 @@ export default function ProfileLivePlayer({
             setVideoTrack(track);
           } else if (track.kind === Track.Kind.Audio) {
             console.log('[PROFILE_LIVE] Setting audio track');
-            setAudioTrack(track);
+            if (!isOwnProfileRef.current) {
+              setAudioTrack(track);
+            }
           }
         }
       });
@@ -431,7 +440,9 @@ export default function ProfileLivePlayer({
             source: chosenAudioPub.source,
             trackSid: chosenAudioPub.trackSid,
           });
-          setAudioTrack(chosenAudioPub.track as RemoteTrack);
+          if (!isOwnProfileRef.current) {
+            setAudioTrack(chosenAudioPub.track as RemoteTrack);
+          }
         } else {
           console.log('[PROFILE_LIVE] No audio track found');
         }

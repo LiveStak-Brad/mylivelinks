@@ -155,6 +155,16 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
 
+  const extractUserId = useCallback((identity: string): string => {
+    if (identity.startsWith('u_')) {
+      const parts = identity.split(':');
+      if (parts.length >= 1) {
+        return parts[0].substring(2);
+      }
+    }
+    return identity;
+  }, []);
+
   const resumePlayback = useCallback(
     async (source: string) => {
       const v = videoRef.current;
@@ -575,8 +585,19 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             }
 
             if (publication.track && publication.kind === Track.Kind.Audio && audioRef.current) {
-              console.log('[SoloStreamViewer] 🔊 Attaching EXISTING audio track to audio element');
-              publication.track.attach(audioRef.current);
+              const participantUserId = extractUserId(participant.identity);
+              const isSelfAudio = !!currentUserId && participantUserId === currentUserId;
+              if (isSelfAudio) {
+                console.log('[SoloStreamViewer] 🔇 Skipping self audio track');
+                try {
+                  publication.track.detach();
+                } catch {
+                  // ignore
+                }
+              } else {
+                console.log('[SoloStreamViewer] 🔊 Attaching EXISTING audio track to audio element');
+                publication.track.attach(audioRef.current);
+              }
             }
 
             void resumePlayback('existing_track_attach');
@@ -626,8 +647,19 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           }
 
           if (track.kind === Track.Kind.Audio && audioRef.current) {
-            console.log('[SoloStreamViewer] 🔊 Attaching AUDIO track to audio element');
-            track.attach(audioRef.current);
+            const participantUserId = extractUserId(participant.identity);
+            const isSelfAudio = !!currentUserId && participantUserId === currentUserId;
+            if (isSelfAudio) {
+              console.log('[SoloStreamViewer] 🔇 Skipping self audio track');
+              try {
+                track.detach();
+              } catch {
+                // ignore
+              }
+            } else {
+              console.log('[SoloStreamViewer] 🔊 Attaching AUDIO track to audio element');
+              track.attach(audioRef.current);
+            }
           }
 
           void resumePlayback('track_subscribed');
@@ -690,7 +722,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       connectedUsernameRef.current = null;
       setIsRoomConnected(false);
     };
-  }, [resumePlayback, streamer?.live_available, streamer?.profile_id, streamer?.username]); // STABLE DEPS: only reconnect if these change
+  }, [resumePlayback, streamer?.live_available, streamer?.profile_id, streamer?.username, currentUserId, extractUserId]); // STABLE DEPS: only reconnect if these change
 
   useEffect(() => {
     if (!streamer?.live_available) return;

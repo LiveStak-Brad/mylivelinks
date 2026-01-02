@@ -133,6 +133,42 @@ export function useLiveRoomParticipants(
   const stopLiveInFlightRef = useRef(false);
   const myProfileIdRef = useRef<string | null>(null);
 
+  const extractProfileIdFromIdentity = useCallback((identityRaw: string | null | undefined): string | null => {
+    const identity = typeof identityRaw === 'string' ? identityRaw : '';
+    if (!identity) return null;
+    if (identity.startsWith('u_')) {
+      const rest = identity.slice('u_'.length);
+      const profileId = rest.split(':')[0];
+      return profileId || null;
+    }
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identity)) {
+      return identity;
+    }
+    return null;
+  }, []);
+
+  const applyNoSelfAudio = useCallback((room: Room) => {
+    const myProfileId = myProfileIdRef.current;
+    if (!myProfileId) return;
+
+    room.remoteParticipants.forEach((participant) => {
+      const profileId = extractProfileIdFromIdentity(participant.identity);
+      if (!profileId || profileId !== myProfileId) return;
+
+      participant.audioTrackPublications.forEach((publication: any) => {
+        const track: any = publication?.track;
+        if (!track) return;
+        if (typeof track.setMuted === 'function') {
+          track.setMuted(true);
+          return;
+        }
+        if (typeof track.setVolume === 'function') {
+          track.setVolume(0);
+        }
+      });
+    });
+  }, [extractProfileIdFromIdentity]);
+
   const [appState, setAppState] = useState(() => {
     try {
       return AppState.currentState;
@@ -807,6 +843,7 @@ export function useLiveRoomParticipants(
           reachedConnectedRef.current = true;
           setConnectDebug(prev => ({ ...prev, reachedConnected: true }));
           setConnectionError(null);
+          applyNoSelfAudio(room);
           updateParticipants(room);
         });
 
@@ -828,6 +865,7 @@ export function useLiveRoomParticipants(
               audioPubs: participant.audioTrackPublications.size,
             });
           }
+          applyNoSelfAudio(room);
           updateParticipants(room);
         });
 
@@ -847,6 +885,24 @@ export function useLiveRoomParticipants(
               });
             }
             updateParticipants(room);
+            return;
+          }
+
+          if (track?.kind === Track.Kind.Audio) {
+            const myProfileId = myProfileIdRef.current;
+            const participantProfileId = extractProfileIdFromIdentity(participant?.identity);
+
+            if (myProfileId && participantProfileId && participantProfileId === myProfileId) {
+              try {
+                if (typeof track.setMuted === 'function') {
+                  track.setMuted(true);
+                } else if (typeof track.setVolume === 'function') {
+                  track.setVolume(0);
+                }
+              } catch {
+                // ignore
+              }
+            }
           }
         });
 

@@ -897,10 +897,7 @@ export default function Tile({
         attachedAudioTrackRef.current = audioTrack;
       }
       
-      // CRITICAL: Echo prevention - ONLY mute current user's OWN tile audio when publishing
-      // Use reliable publishing state flag instead of checking localParticipant (pub.isSubscribed is unreliable)
-      // This prevents feedback loop: when you publish audio, don't play it back to yourself
-      const shouldMuteForEcho = isCurrentUser && isCurrentUserPublishing;
+      const shouldMuteForEcho = isCurrentUser;
       
       if (DEBUG_LIVEKIT && isCurrentUser) {
         console.log('[DEBUG] Echo prevention check:', {
