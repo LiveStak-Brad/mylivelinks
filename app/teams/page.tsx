@@ -8,6 +8,8 @@ import { Button, Chip, Input } from '@/components/ui';
 import DiscoverTeamsOverlay from '@/components/teams/DiscoverTeamsOverlay';
 
 const TEAMS_DISCOVERY_ENABLED = process.env.NEXT_PUBLIC_ENABLE_TEAMS_DISCOVERY === 'true';
+const hasDiscoveryResults = false; // Placeholder until the real query is wired up (UI-only route)
+const showPreviewSandbox = !TEAMS_DISCOVERY_ENABLED || !hasDiscoveryResults;
 
 export default function TeamsIndexPage() {
   const [query, setQuery] = useState('');
@@ -70,9 +72,16 @@ export default function TeamsIndexPage() {
                 Use the discovery overlay to browse public teams, send join requests, or unlock private teams with invite codes.
               </p>
 
-              <Link href="/teams/team_demo_001/admin?role=Team_Admin">
-                <Button variant="primary">Open Team Admin Demo</Button>
-              </Link>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link href="/teams/team_demo_001/admin?role=Team_Admin">
+                  <Button variant="primary">Open Team Admin Demo</Button>
+                </Link>
+                {showPreviewSandbox && (
+                  <Link href="/teams/preview">
+                    <Button variant="outline">Preview Teams UI</Button>
+                  </Link>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -89,9 +98,16 @@ export default function TeamsIndexPage() {
               <p className="text-sm text-muted-foreground">
                 This is a placeholder route so you can access the Team Admin panel UI.
               </p>
-              <Link href="/teams/team_demo_001/admin?role=Team_Admin">
-                <Button variant="primary">Open Demo Team Admin</Button>
-              </Link>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link href="/teams/team_demo_001/admin?role=Team_Admin">
+                  <Button variant="primary">Open Demo Team Admin</Button>
+                </Link>
+                {showPreviewSandbox && (
+                  <Link href="/teams/preview">
+                    <Button variant="outline">Preview Teams UI</Button>
+                  </Link>
+                )}
+              </div>
             </div>
           )}
         </PageSection>
