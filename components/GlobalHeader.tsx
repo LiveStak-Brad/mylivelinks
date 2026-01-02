@@ -255,6 +255,10 @@ export default function GlobalHeader() {
   const isLiveRoom = pathname === '/live'; // Check if we're on the live room page
 
   const handleTeamsShortcut = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     if (pathname === '/teams' || pathname.startsWith('/teams/')) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       window.dispatchEvent(new Event('teams:focusSearch'));
