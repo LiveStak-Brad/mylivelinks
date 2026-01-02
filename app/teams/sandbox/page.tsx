@@ -208,8 +208,8 @@ const badgeSlots = ['Left badge', 'Right badge', 'Hidden'] as const;
 const MIN_TEAM_SPLIT = 300;
 
 export default function PremiumTeamsSandboxPage() {
-  const [membership, setMembership] = useState<MembershipState>('not_member');
-  const [role, setRole] = useState<RoleState>('member');
+  const [membership, setMembership] = useState<MembershipState>('approved');
+  const [role, setRole] = useState<RoleState>('admin');
   const [tab, setTab] = useState<TabKey>('home');
   const [themeKey, setThemeKey] = useState<ThemeKey>('neon');
   const [useTeamCard, setUseTeamCard] = useState(true);
