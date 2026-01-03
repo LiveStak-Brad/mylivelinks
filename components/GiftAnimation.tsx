@@ -21,8 +21,8 @@ export default function GiftAnimation({
   const [scale, setScale] = useState(1);
 
   useEffect(() => {
-    const computeScale = () => {
-      if (typeof window === 'undefined') return;
+    const computeScale = (): number => {
+      if (typeof window === 'undefined') return 1;
       const w = window.innerWidth;
       if (w <= 420) return 0.55;
       if (w <= 640) return 0.7;

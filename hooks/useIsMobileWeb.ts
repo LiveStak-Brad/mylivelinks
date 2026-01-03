@@ -14,7 +14,14 @@ import { useState, useEffect } from 'react';
 export function useIsMobileWeb(): boolean {
   const getIsMobileWeb = () => {
     if (typeof window === 'undefined') return false;
-    return window.innerWidth <= 1024;
+    const width = window.innerWidth;
+    const hasCoarsePointer =
+      typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+    const isMobileUA = /Mobi|Android|iPhone|iPod|Windows Phone/i.test(ua);
+    const isTabletUA = /iPad|Tablet|Nexus 7|Nexus 9|SM-T|Kindle|Silk/i.test(ua);
+
+    return width <= 900 && (hasCoarsePointer || isMobileUA) && !isTabletUA;
   };
 
   const [isMobileWeb, setIsMobileWeb] = useState(getIsMobileWeb);
@@ -27,9 +34,13 @@ export function useIsMobileWeb(): boolean {
       }
 
       const width = window.innerWidth;
+      const hasCoarsePointer =
+        typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+      const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+      const isMobileUA = /Mobi|Android|iPhone|iPod|Windows Phone/i.test(ua);
+      const isTabletUA = /iPad|Tablet|Nexus 7|Nexus 9|SM-T|Kindle|Silk/i.test(ua);
 
-      // Treat small screens (phones, tablets, small laptops) as "mobile web" for LIVE layout.
-      return width <= 1024;
+      return width <= 900 && (hasCoarsePointer || isMobileUA) && !isTabletUA;
     };
 
     // Initial check
