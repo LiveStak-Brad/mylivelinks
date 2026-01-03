@@ -543,59 +543,113 @@ function HomeScreen({
   onGoToLive: () => void;
   onGoToChat: () => void;
 }) {
+  const hasLive = liveCount > 0;
+  const featuredLiveMembers = liveMembers.slice(0, 6);
+  const momentumStatus = hasLive ? 'Live energy is up' : onlineCount > 0 ? 'People are around' : 'Quiet moment';
+
   return (
     <>
-      {/* ══════════ LIVE / PRESENCE STRIP ══════════ */}
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4">
-        {liveCount > 0 ? (
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-white">
-              <span className="text-red-400">{liveCount} live</span> · {onlineCount} online
+      {/* ══════════ PRIMARY CTA / PRESENCE ══════════ */}
+      <div className="rounded-3xl border border-white/10 bg-gradient-to-r from-purple-600/20 via-pink-500/10 to-transparent p-4 sm:p-5 shadow-[0_0_25px_rgba(0,0,0,0.35)]">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="flex-1 space-y-2">
+            <p className="text-[11px] uppercase tracking-[0.35em] text-white/50">Team Home</p>
+            <h2 className="text-xl font-semibold text-white">Fire up the team room</h2>
+            <p className="text-sm text-white/70">
+              {hasLive
+                ? 'People are live right now—jump in or start your own.'
+                : 'Kick things off and everyone online gets pinged instantly.'}
             </p>
-            <div className="flex gap-3 overflow-x-auto pb-1">
-              {liveMembers.slice(0, 5).map((m) => (
-                <button
-                  key={m.id}
-                  onClick={onGoToLive}
-                  className="group flex flex-col items-center gap-1.5 rounded-xl bg-white/5 p-3 transition hover:bg-white/10"
-                >
-                  <div className="relative">
-                    <div className="rounded-full p-0.5 bg-gradient-to-br from-red-500 to-pink-500">
-                      <Image
-                        src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=8B5CF6&color=fff`}
-                        alt={m.name}
-                        width={48}
-                        height={48}
-                        className="h-12 w-12 rounded-full border-2 border-[#0a0a0f] object-cover"
-                      />
-                    </div>
-                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-red-500 px-1.5 py-0.5">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                      <span className="text-[9px] font-bold text-white uppercase">Live</span>
-                    </span>
-                  </div>
-                  <span className="text-xs font-medium text-white/80 group-hover:text-white whitespace-nowrap">
-                    {m.name.split(' ')[0]}
-                  </span>
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+              <span className="flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-white/80">
+                <span className={`h-1.5 w-1.5 rounded-full ${hasLive ? 'bg-red-400 animate-pulse' : 'bg-white/40'}`} />
+                {hasLive ? `${liveCount} live now` : 'Stage is open'}
+              </span>
+              <span className="rounded-full border border-white/10 px-3 py-1 text-white/60">
+                {onlineCount} online
+              </span>
             </div>
+          </div>
+
+          <div className="w-full flex flex-col gap-2 md:w-auto">
+            <Button
+              onClick={onGoToLive}
+              className="h-12 rounded-2xl bg-gradient-to-r from-red-500 to-pink-500 text-base font-semibold text-white shadow-[0_18px_35px_rgba(255,0,128,0.35)] hover:from-red-400 hover:to-pink-400"
+            >
+              <Zap className="mr-2 h-4 w-4" /> Go Live
+            </Button>
+            <p className="text-center text-[11px] text-white/60 md:text-left">
+              Sends an alert to everyone here.
+            </p>
+          </div>
+        </div>
+
+        {hasLive ? (
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+            {featuredLiveMembers.map((m) => (
+              <button
+                key={m.id}
+                onClick={onGoToLive}
+                className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 transition hover:border-white/30 hover:bg-white/10"
+              >
+                <div className="relative">
+                  <Image
+                    src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=8B5CF6&color=fff`}
+                    alt={m.name}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 rounded-full border-2 border-[#0a0a0f] object-cover"
+                  />
+                  <span className="absolute -bottom-1 -right-1 flex items-center gap-1 rounded-full bg-red-500 px-1.5 py-0.5">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                    <span className="text-[9px] font-bold text-white uppercase">Live</span>
+                  </span>
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-white leading-tight">{m.name.split(' ')[0]}</p>
+                  <p className="text-[11px] text-white/50">tap to jump in</p>
+                </div>
+              </button>
+            ))}
           </div>
         ) : (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">{onlineCount} online</p>
-              <p className="text-xs text-white/50">No one live right now</p>
-            </div>
-            <Button
-              size="sm"
-              onClick={onGoToLive}
-              className="bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600"
-            >
-              Go Live
-            </Button>
+          <div className="mt-3 flex items-center gap-2 text-xs text-white/70">
+            <span className="flex items-center gap-2 rounded-full border border-dashed border-white/20 px-3 py-1">
+              <MessageCircle className="h-3.5 w-3.5 text-purple-300" />
+              Start the room, set the vibe.
+            </span>
           </div>
         )}
+      </div>
+
+      {/* ══════════ ACTION ROW ══════════ */}
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <QuickAction
+          icon={<Video className="h-4 w-4" />}
+          label="Go Live"
+          onClick={onGoToLive}
+          variant="live"
+          description="Notify everyone"
+          className="col-span-2 sm:col-span-2"
+        />
+        <QuickAction
+          icon={<Hash className="h-4 w-4" />}
+          label="Post"
+          onClick={onGoToFeed}
+          description="Share an update"
+        />
+        <QuickAction
+          icon={<MessageCircle className="h-4 w-4" />}
+          label="Chat"
+          onClick={onGoToChat}
+          description="Drop a quick note"
+        />
+        <QuickAction
+          icon={<TrendingUp className="h-4 w-4" />}
+          label="Poll"
+          onClick={onGoToFeed}
+          description="Take the pulse"
+        />
       </div>
 
       {/* ══════════ PINNED ANNOUNCEMENT ══════════ */}
@@ -604,29 +658,20 @@ function HomeScreen({
       )}
 
       {/* ══════════ MOMENTUM + PROGRESS ══════════ */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-amber-400" />
-            <span className="text-sm font-medium text-white">Team Momentum</span>
+      <div className="rounded-2xl border border-white/5 bg-black/40 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-white/70">
+            <Sparkles className="h-4 w-4 text-amber-300" />
+            <span className="text-xs font-semibold uppercase tracking-[0.3em] text-white/60">Team Momentum</span>
           </div>
+          <span className="text-[11px] text-white/40">{momentumStatus}</span>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="mt-2 grid grid-cols-3 gap-2">
           <MomentumStat icon={<Hash className="h-4 w-4" />} value={String(feedItems.length)} label="posts" />
           <MomentumStat icon={<Video className="h-4 w-4" />} value={String(liveCount)} label="live now" />
           <MomentumStat icon={<Users className="h-4 w-4" />} value={String(team.approvedMemberCount)} label="members" />
         </div>
       </div>
-
-      {/* ══════════ QUICK ACTIONS (if nothing live) ══════════ */}
-      {liveCount === 0 && (
-        <div className="grid grid-cols-4 gap-2">
-          <QuickAction icon={<Hash className="h-5 w-5" />} label="Post" onClick={onGoToFeed} />
-          <QuickAction icon={<Video className="h-5 w-5" />} label="Go Live" onClick={onGoToLive} variant="live" />
-          <QuickAction icon={<MessageCircle className="h-5 w-5" />} label="Chat" onClick={onGoToChat} />
-          <QuickAction icon={<TrendingUp className="h-5 w-5" />} label="Poll" onClick={onGoToFeed} />
-        </div>
-      )}
 
       {/* ══════════ PRIMARY CONTENT STACK ══════════ */}
       {feedItems.length > 0 ? (
@@ -642,12 +687,33 @@ function HomeScreen({
           ))}
         </div>
       ) : (
-        <EmptyState
-          icon={<Hash className="h-6 w-6 text-white/50" />}
-          title="No posts yet"
-          description="Be the first to share something with the team!"
-          action={{ label: 'Create Post', onClick: onGoToFeed }}
-        />
+        <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-white">Start the conversation</p>
+            <p className="text-xs text-white/60">Drop a post or go live to set the tone for everyone.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onGoToFeed}
+                className="border-white/30 text-white/80 hover:bg-white/10"
+              >
+                Create post
+              </Button>
+              <Button
+                size="sm"
+                onClick={onGoToLive}
+                className="bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-400 hover:to-pink-400"
+              >
+                Go Live
+              </Button>
+            </div>
+          </div>
+          <div className="hidden sm:flex flex-col items-center text-white/40">
+            <ChevronRight className="-rotate-90 h-6 w-6" />
+            <span className="text-[10px] uppercase tracking-[0.3em]">Action row</span>
+          </div>
+        </div>
       )}
     </>
   );
@@ -655,28 +721,51 @@ function HomeScreen({
 
 function MomentumStat({ icon, value, label }: { icon: ReactNode; value: string; label: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2">
-      <span className="text-purple-400">{icon}</span>
+    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white/70">
+        {icon}
+      </div>
       <div>
-        <p className="text-sm font-bold text-white">{value}</p>
-        <p className="text-[10px] text-white/50">{label}</p>
+        <p className="text-base font-semibold text-white leading-tight">{value}</p>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</p>
       </div>
     </div>
   );
 }
 
-function QuickAction({ icon, label, onClick, variant }: { icon: ReactNode; label: string; onClick: () => void; variant?: 'live' }) {
+function QuickAction({
+  icon,
+  label,
+  onClick,
+  variant,
+  description,
+  className,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  variant?: 'live';
+  description?: string;
+  className?: string;
+}) {
+  const isLive = variant === 'live';
+
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center gap-1 rounded-xl p-3 transition ${
-        variant === 'live'
-          ? 'bg-gradient-to-br from-red-500/20 to-pink-500/20 text-red-400 hover:from-red-500/30 hover:to-pink-500/30'
-          : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
-      }`}
+      className={`flex items-center gap-3 rounded-2xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
+        isLive
+          ? 'border-transparent bg-gradient-to-br from-red-500/25 to-pink-500/25 text-white shadow-[0_12px_30px_rgba(255,0,153,0.25)] hover:from-red-500/35 hover:to-pink-500/35'
+          : 'border-white/10 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/10'
+      } ${className || ''}`}
     >
-      {icon}
-      <span className="text-[10px] font-medium">{label}</span>
+      <div className={`flex h-9 w-9 items-center justify-center rounded-2xl ${isLive ? 'bg-white/15 text-white' : 'bg-white/10 text-white/70'}`}>
+        {icon}
+      </div>
+      <div className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold">{label}</span>
+        {description && <span className="text-[11px] text-white/50">{description}</span>}
+      </div>
     </button>
   );
 }
