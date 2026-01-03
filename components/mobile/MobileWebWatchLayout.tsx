@@ -71,9 +71,11 @@ type BottomSheetProps = {
   title: string;
   onClose: () => void;
   children: ReactNode;
+  panelClassName?: string;
+  contentClassName?: string;
 };
 
-function BottomSheet({ isOpen, title, onClose, children }: BottomSheetProps) {
+function BottomSheet({ isOpen, title, onClose, children, panelClassName, contentClassName }: BottomSheetProps) {
   if (!isOpen) return null;
 
   return (
@@ -82,7 +84,9 @@ function BottomSheet({ isOpen, title, onClose, children }: BottomSheetProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-t-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+        className={`w-full rounded-t-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 ${
+          panelClassName || 'max-w-md'
+        }`}
         style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -96,7 +100,7 @@ function BottomSheet({ isOpen, title, onClose, children }: BottomSheetProps) {
             <X className="w-5 h-5 text-gray-700 dark:text-gray-200" />
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto p-4">{children}</div>
+        <div className={`overflow-y-auto ${contentClassName || 'max-h-[70vh] p-4'}`}>{children}</div>
       </div>
     </div>
   );
@@ -387,6 +391,9 @@ export default function MobileWebWatchLayout({
     setSelectedActionSlotIndex(null);
   }, []);
 
+  const bottomSheetPanelClassName = isLandscape ? 'max-w-2xl' : 'max-w-md';
+  const bottomSheetContentClassName = isLandscape ? 'max-h-[45vh] p-3' : 'max-h-[70vh] p-4';
+
   return (
     <div className={`mobile-live-container mobile-live-v3 ${isChromeVisible ? '' : 'mobile-live-chrome-hidden'}`}>
       {/* TOP BAR - Full width */}
@@ -607,6 +614,8 @@ export default function MobileWebWatchLayout({
         isOpen={activeSheet === 'chat'}
         title="Chat"
         onClose={handleCloseSheet}
+        panelClassName={bottomSheetPanelClassName}
+        contentClassName={bottomSheetContentClassName}
       >
         <Chat
           roomSlug={safeRoomId}
@@ -621,6 +630,8 @@ export default function MobileWebWatchLayout({
         isOpen={activeSheet === 'viewers'}
         title="Viewers"
         onClose={handleCloseSheet}
+        panelClassName={bottomSheetPanelClassName}
+        contentClassName={bottomSheetContentClassName}
       >
         <ViewerList roomId={safeRoomId} />
       </BottomSheet>
@@ -629,6 +640,8 @@ export default function MobileWebWatchLayout({
         isOpen={activeSheet === 'leaderboard'}
         title="Leaderboard"
         onClose={handleCloseSheet}
+        panelClassName={bottomSheetPanelClassName}
+        contentClassName={bottomSheetContentClassName}
       >
         <Leaderboard roomSlug={safeRoomId} roomName={roomName} />
       </BottomSheet>
@@ -637,6 +650,8 @@ export default function MobileWebWatchLayout({
         isOpen={activeSheet === 'options'}
         title="Mixer"
         onClose={handleCloseSheet}
+        panelClassName={bottomSheetPanelClassName}
+        contentClassName={bottomSheetContentClassName}
       >
         <div className="grid grid-cols-6 gap-3">
           {displaySlots.slice(0, 12).map((slot) => {
@@ -649,7 +664,7 @@ export default function MobileWebWatchLayout({
                   {slot.streamer?.username ? slot.streamer.username : `Slot ${slot.slotIndex}`}
                 </div>
 
-                <div className="h-24 w-8 flex items-center justify-center">
+                <div className={`${isLandscape ? 'h-16' : 'h-24'} w-8 flex items-center justify-center`}>
                   <input
                     type="range"
                     min={0}
