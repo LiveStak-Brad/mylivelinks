@@ -7,6 +7,10 @@
 ALTER TABLE public.ledger_entries 
 ADD COLUMN IF NOT EXISTS room_id text;
 
+-- Ensure gifts has request_id for idempotency/traceability
+ALTER TABLE public.gifts
+ADD COLUMN IF NOT EXISTS request_id varchar(255);
+
 -- Add index for room-based queries
 CREATE INDEX IF NOT EXISTS idx_ledger_entries_room_id 
 ON public.ledger_entries(room_id) 
@@ -188,6 +192,10 @@ DECLARE
   v_gift_rate NUMERIC;
   v_diamonds_awarded BIGINT;
 BEGIN
+  IF public.is_blocked(p_sender_id, p_recipient_id) THEN
+    RAISE EXCEPTION 'Gifting unavailable.';
+  END IF;
+
   v_request_id := COALESCE(p_request_id, gen_random_uuid()::text);
   v_sender_idempotency_key := 'gift:sender:' || v_request_id;
   v_recipient_idempotency_key := 'gift:recipient:' || v_request_id;
@@ -206,7 +214,7 @@ BEGIN
     RETURN jsonb_build_object(
       'gift_id', v_existing_gift_id,
       'coins_spent', p_coins_amount,
-      'diamonds_awarded', NULL,
+      'diamonds_awarded', p_coins_amount,
       'platform_fee', 0
     );
   END IF;
@@ -215,54 +223,71 @@ BEGIN
     RAISE EXCEPTION 'sender_id and recipient_id are required';
   END IF;
 
+  IF p_sender_id = p_recipient_id THEN
+    RAISE EXCEPTION 'Cannot send gift to yourself';
+  END IF;
+
   IF p_coins_amount IS NULL OR p_coins_amount <= 0 THEN
     RAISE EXCEPTION 'coins_amount must be positive';
   END IF;
 
-  SELECT coin_balance INTO v_sender_balance
+  SELECT coin_balance
+  INTO v_sender_balance
   FROM public.profiles
   WHERE id = p_sender_id
   FOR UPDATE;
 
-  IF v_sender_balance IS NULL THEN
-    RAISE EXCEPTION 'Sender profile not found';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'sender profile not found';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_recipient_id) THEN
+    RAISE EXCEPTION 'recipient profile not found';
   END IF;
 
   IF v_sender_balance < p_coins_amount THEN
     RAISE EXCEPTION 'Insufficient coin balance (have: %, need: %)', v_sender_balance, p_coins_amount;
   END IF;
 
-  -- Get gift type info
-  IF p_gift_type_id IS NOT NULL THEN
-    SELECT id, creator_rate INTO v_gift_type_id, v_gift_rate
-    FROM public.gift_types
-    WHERE id = p_gift_type_id;
-  END IF;
-  
-  v_gift_type_id := COALESCE(v_gift_type_id, 1);
-  v_gift_rate := COALESCE(v_gift_rate, 0.6);
+  SELECT value_num INTO v_gift_rate
+  FROM public.money_config
+  WHERE key = 'gift_diamond_rate';
+
+  v_gift_rate := COALESCE(v_gift_rate, 1.0);
   v_diamonds_awarded := FLOOR(p_coins_amount * v_gift_rate)::bigint;
 
-  -- Deduct coins from sender
-  UPDATE public.profiles
-  SET coin_balance = coin_balance - p_coins_amount,
-      updated_at = now()
-  WHERE id = p_sender_id;
+  IF v_diamonds_awarded <= 0 THEN
+    RAISE EXCEPTION 'Invalid gift award rate';
+  END IF;
 
-  -- Award diamonds to recipient
-  UPDATE public.profiles
-  SET earnings_balance = COALESCE(earnings_balance, 0) + v_diamonds_awarded,
-      updated_at = now()
-  WHERE id = p_recipient_id;
+  -- Resolve gift type
+  IF p_gift_type_id IS NOT NULL THEN
+    v_gift_type_id := p_gift_type_id;
+  ELSE
+    SELECT id
+    INTO v_gift_type_id
+    FROM public.gift_types
+    WHERE COALESCE(is_active, true) = true
+    ORDER BY COALESCE(display_order, 0) ASC, id ASC
+    LIMIT 1;
+
+    IF v_gift_type_id IS NULL THEN
+      RAISE EXCEPTION 'No active gift_types found';
+    END IF;
+  END IF;
 
   -- Create gift record
   INSERT INTO public.gifts(
     sender_id,
     recipient_id,
     gift_type_id,
-    coins_amount,
-    diamonds_amount,
+    coin_amount,
+    platform_revenue,
+    streamer_revenue,
     live_stream_id,
+    coins_spent,
+    diamonds_awarded,
+    platform_fee_coins,
     request_id
   )
   VALUES (
@@ -270,8 +295,12 @@ BEGIN
     p_recipient_id,
     v_gift_type_id,
     p_coins_amount,
+    0,
     v_diamonds_awarded,
     p_stream_id,
+    p_coins_amount,
+    v_diamonds_awarded,
+    0,
     v_request_id
   )
   RETURNING id INTO v_gift_id;
@@ -320,11 +349,14 @@ BEGIN
     p_room_id  -- NEW
   );
 
-  -- Update gifter stats
   UPDATE public.profiles
-  SET gifter_level = COALESCE(gifter_level, 0) + 1,
-      updated_at = now()
+  SET total_spent = COALESCE(total_spent, 0) + p_coins_amount,
+      total_gifts_sent = COALESCE(total_gifts_sent, 0) + p_coins_amount
   WHERE id = p_sender_id;
+
+  UPDATE public.profiles
+  SET total_gifts_received = COALESCE(total_gifts_received, 0) + p_coins_amount
+  WHERE id = p_recipient_id;
 
   RETURN jsonb_build_object(
     'gift_id', v_gift_id,
@@ -338,3 +370,6 @@ $$;
 
 -- Grant access
 GRANT EXECUTE ON FUNCTION public.send_gift_v2(UUID, UUID, BIGINT, BIGINT, BIGINT, VARCHAR, TEXT) TO authenticated;
+
+-- Ensure PostgREST schema cache sees the new signature immediately
+NOTIFY pgrst, 'reload schema';

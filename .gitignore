@@ -44,6 +44,10 @@ public/trendingnew.mp4
 # NOTE: [] are special in gitignore (character classes) so they must be escaped to match a literal folder name.
 app/teams/\[teamId\]/
 
+# Local audit outputs (keep on disk, do not commit)
+Teams_Audit_Report.md
+*_Audit_Report.md
+
 
 
 
