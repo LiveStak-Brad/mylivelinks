@@ -400,8 +400,6 @@ export default function TeamPageContent() {
   const showRequestToJoin = isGuest && !pendingInvite && !pendingInviteLoading && !hasPendingRequest;
   const showPendingRequestState = isGuest && hasPendingRequest && !pendingInvite;
 
-  // TODO: Re-enable these components when they're implemented
-  /*
   if (showRequestToJoin) {
     return (
       <RequestToJoinState
@@ -418,7 +416,6 @@ export default function TeamPageContent() {
       />
     );
   }
-  */
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">

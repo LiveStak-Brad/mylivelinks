@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { createClient } from '@/lib/supabase';
 import type { RealtimeChannel, User } from '@supabase/supabase-js';
+import { getPendingInviteForTeam, acceptTeamInvite, declineTeamInvite, PendingTeamInvite } from '@/lib/teamInvites';
 
 /* ════════════════════════════════════════════════════════════════════════════
    TYPES
@@ -102,6 +103,13 @@ export interface TeamContextValue {
   isTeamLiveUnlocked: boolean;
   canToggleTeamLiveVisibility: boolean;
   teamLiveVisibility: TeamLiveVisibility;
+  
+  // Pending invite state
+  pendingInvite: PendingTeamInvite | null;
+  pendingInviteLoading: boolean;
+  acceptPendingInvite: () => Promise<boolean>;
+  declinePendingInvite: () => Promise<boolean>;
+  dismissPendingInvite: () => void;
   
   // Actions
   refreshTeam: () => Promise<void>;
@@ -218,6 +226,11 @@ export function TeamProvider({ teamSlug, children }: TeamProviderProps) {
   const [teamLiveRoomConfig, setTeamLiveRoomConfig] = useState<TeamLiveRoomState | null>(null);
   const [teamLiveRoomLoading, setTeamLiveRoomLoading] = useState(false);
   const [teamLiveVisibilityUpdating, setTeamLiveVisibilityUpdating] = useState(false);
+  
+  // Pending invite state
+  const [pendingInvite, setPendingInvite] = useState<PendingTeamInvite | null>(null);
+  const [pendingInviteLoading, setPendingInviteLoading] = useState(false);
+  const [pendingInviteDismissed, setPendingInviteDismissed] = useState(false);
   
   const supabase = useMemo(() => createClient(), []);
   
@@ -379,6 +392,74 @@ export function TeamProvider({ teamSlug, children }: TeamProviderProps) {
     }
   }, [supabase, team?.id, userId]);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Fetch pending invite for this team
+  // ─────────────────────────────────────────────────────────────────────────
+  const fetchPendingInvite = useCallback(async () => {
+    if (!team?.id || !userId) {
+      setPendingInvite(null);
+      return;
+    }
+    
+    // Don't fetch if user is already a member
+    if (membership?.status === 'approved') {
+      setPendingInvite(null);
+      return;
+    }
+    
+    setPendingInviteLoading(true);
+    try {
+      const invite = await getPendingInviteForTeam(team.id);
+      setPendingInvite(invite);
+    } catch (err) {
+      console.warn('[TeamContext] fetchPendingInvite error:', err);
+      setPendingInvite(null);
+    } finally {
+      setPendingInviteLoading(false);
+    }
+  }, [team?.id, userId, membership?.status]);
+
+  const handleAcceptPendingInvite = useCallback(async (): Promise<boolean> => {
+    if (!pendingInvite) return false;
+    
+    try {
+      const result = await acceptTeamInvite(pendingInvite.invite_id);
+      if (result.success) {
+        setPendingInvite(null);
+        setPendingInviteDismissed(true);
+        // Refresh membership to get the new status
+        await fetchMembership();
+        await fetchTeam();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[TeamContext] acceptPendingInvite error:', err);
+      return false;
+    }
+  }, [pendingInvite, fetchMembership, fetchTeam]);
+
+  const handleDeclinePendingInvite = useCallback(async (): Promise<boolean> => {
+    if (!pendingInvite) return false;
+    
+    try {
+      const result = await declineTeamInvite(pendingInvite.invite_id);
+      if (result.success) {
+        setPendingInvite(null);
+        setPendingInviteDismissed(true);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[TeamContext] declinePendingInvite error:', err);
+      return false;
+    }
+  }, [pendingInvite]);
+
+  const dismissPendingInvite = useCallback(() => {
+    setPendingInviteDismissed(true);
+  }, []);
+
 // ─────────────────────────────────────────────────────────────────────────
 // Team live room config
 // ─────────────────────────────────────────────────────────────────────────
@@ -469,6 +550,13 @@ const updateTeamLiveVisibility = useCallback(async (visibility: TeamLiveVisibili
       fetchPresence();
     }
   }, [team?.id, userId, fetchMembership, fetchModerationStatus, fetchPresence]);
+  
+  // Load pending invite after membership is checked
+  useEffect(() => {
+    if (team?.id && userId && !pendingInviteDismissed) {
+      fetchPendingInvite();
+    }
+  }, [team?.id, userId, membership?.status, pendingInviteDismissed, fetchPendingInvite]);
   
   // ─────────────────────────────────────────────────────────────────────────
   // Presence heartbeat (every 30s when viewing team)
@@ -579,6 +667,10 @@ const canToggleTeamLiveVisibility = !!teamLiveRoomConfig?.viewerIsAdmin && isTea
   // ─────────────────────────────────────────────────────────────────────────
   // Context value
   // ─────────────────────────────────────────────────────────────────────────
+  
+  // Only show pending invite if not dismissed and user is not already approved
+  const visiblePendingInvite = pendingInviteDismissed || membership?.status === 'approved' ? null : pendingInvite;
+  
   const value = useMemo<TeamContextValue>(() => ({
     teamId: team?.id ?? null,
     teamSlug,
@@ -598,6 +690,11 @@ const canToggleTeamLiveVisibility = !!teamLiveRoomConfig?.viewerIsAdmin && isTea
   isTeamLiveUnlocked,
   canToggleTeamLiveVisibility,
   teamLiveVisibility,
+    pendingInvite: visiblePendingInvite,
+    pendingInviteLoading,
+    acceptPendingInvite: handleAcceptPendingInvite,
+    declinePendingInvite: handleDeclinePendingInvite,
+    dismissPendingInvite,
     refreshTeam: fetchTeam,
     refreshMembership: fetchMembership,
     refreshPresence: fetchPresence,
@@ -618,6 +715,11 @@ const canToggleTeamLiveVisibility = !!teamLiveRoomConfig?.viewerIsAdmin && isTea
   isTeamLiveUnlocked,
   canToggleTeamLiveVisibility,
   teamLiveVisibility,
+    visiblePendingInvite,
+    pendingInviteLoading,
+    handleAcceptPendingInvite,
+    handleDeclinePendingInvite,
+    dismissPendingInvite,
     currentSurface,
     setSurface,
     uiRole,

@@ -222,3 +222,81 @@ export async function searchUsersToInvite(
    const teamId = await getTeamIdBySlug(teamSlug);
    return searchUsersToInvite(teamId, searchQuery);
  }
+
+/**
+ * Get pending invite for a specific team for the current user
+ */
+export interface PendingTeamInvite {
+  invite_id: number;
+  team_id: string;
+  team_name: string;
+  team_slug: string;
+  team_icon_url: string | null;
+  inviter_id: string;
+  inviter_username: string;
+  inviter_display_name: string | null;
+  inviter_avatar_url: string | null;
+  message: string | null;
+  created_at: string;
+}
+
+export async function getPendingInviteForTeam(teamId: string): Promise<PendingTeamInvite | null> {
+  const supabase = createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: invite, error } = await supabase
+    .from('team_invites')
+    .select(`
+      id,
+      team_id,
+      inviter_id,
+      message,
+      created_at,
+      teams!team_invites_team_id_fkey (
+        id,
+        name,
+        slug,
+        icon_url
+      ),
+      profiles!team_invites_inviter_id_fkey (
+        id,
+        username,
+        display_name,
+        avatar_url
+      )
+    `)
+    .eq('team_id', teamId)
+    .eq('invitee_id', user.id)
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  if (error || !invite) return null;
+
+  const team = invite.teams as any;
+  const inviter = invite.profiles as any;
+
+  return {
+    invite_id: invite.id,
+    team_id: invite.team_id,
+    team_name: team?.name ?? 'Unknown Team',
+    team_slug: team?.slug ?? '',
+    team_icon_url: team?.icon_url ?? null,
+    inviter_id: invite.inviter_id,
+    inviter_username: inviter?.username ?? 'Unknown',
+    inviter_display_name: inviter?.display_name ?? null,
+    inviter_avatar_url: inviter?.avatar_url ?? null,
+    message: invite.message,
+    created_at: invite.created_at,
+  };
+}
+
+export async function getPendingInviteForTeamBySlug(teamSlug: string): Promise<PendingTeamInvite | null> {
+  try {
+    const teamId = await getTeamIdBySlug(teamSlug);
+    return getPendingInviteForTeam(teamId);
+  } catch {
+    return null;
+  }
+}
