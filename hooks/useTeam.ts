@@ -25,6 +25,7 @@ export interface TeamMember {
 
 export interface FeedItem {
   id: string;
+  authorId: string;
   type: 'post' | 'thread' | 'poll' | 'clip' | 'announcement' | 'event';
   author: TeamMember;
   title?: string;
@@ -392,9 +393,6 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
           p_before_id: cursor?.beforeId ?? null,
         });
 
-        console.log('[useTeamFeed] RPC response - rows:', rows?.length ?? 0, 'error:', rpcError);
-        if (rows?.[0]) console.log('[useTeamFeed] First row sample:', rows[0]);
-
         if (rpcError) throw rpcError;
 
         const mapped = (rows as any[]).map((r) => {
@@ -415,7 +413,8 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
           const hotScore = Math.round((upvotes * 2 + comments * 3) / Math.max(1, (Date.now() - createdAtMs) / 36e5));
 
           return {
-            id: String(r.post_id),
+            id: String(r.post_id ?? r.id),
+            authorId: String(r.author_id),
             type: isPinned ? 'announcement' : 'post',
             author,
             body: String(r.text_content ?? ''),
@@ -433,8 +432,8 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
         if ((rows as any[])?.length === 0) setHasMore(false);
 
         const last = (rows as any[])?.[(rows as any[])?.length - 1];
-        if (last?.created_at && last?.post_id) {
-          cursorRef.current = { beforeCreatedAt: last.created_at, beforeId: last.post_id };
+        if (last?.created_at && (last?.post_id || last?.id)) {
+          cursorRef.current = { beforeCreatedAt: last.created_at, beforeId: last.post_id ?? last.id };
         }
 
         if (!cancelled) {
@@ -491,7 +490,8 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
             activity: 'offline',
           };
           return {
-            id: String(r.post_id),
+            id: String(r.post_id ?? r.id),
+            authorId: String(r.author_id),
             type: isPinned ? 'announcement' : 'post',
             author,
             body: String(r.text_content ?? ''),
@@ -508,8 +508,8 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
 
         if ((rows as any[])?.length === 0) setHasMore(false);
         const last = (rows as any[])?.[(rows as any[])?.length - 1];
-        if (last?.created_at && last?.post_id) {
-          cursorRef.current = { beforeCreatedAt: last.created_at, beforeId: last.post_id };
+        if (last?.created_at && (last?.post_id || last?.id)) {
+          cursorRef.current = { beforeCreatedAt: last.created_at, beforeId: last.post_id ?? last.id };
         }
 
         if (!cancelled) setRawItems((prev) => [...prev, ...mapped]);
@@ -827,38 +827,54 @@ export function useTeamChat(teamId: string | null) {
       setError(null);
 
       try {
-        const { data, error: rpcError } = await supabase.rpc('rpc_get_team_chat_messages', {
-          p_team_id: teamId,
-          p_limit: 100,
-          p_before_created_at: null,
-          p_before_id: null,
-        });
+        console.log('🔍 [useTeamChat] BYPASSING RPC - Using direct table query');
+        
+        // Query the table directly instead of using the broken RPC
+        const { data: messages, error: queryError } = await supabase
+          .from('team_chat_messages')
+          .select(`
+            id,
+            team_id,
+            author_id,
+            content,
+            is_system,
+            is_deleted,
+            created_at,
+            reply_to_id,
+            profiles:author_id (
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .eq('team_id', teamId)
+          .order('created_at', { ascending: true })
+          .limit(100);
 
-        if (rpcError) throw rpcError;
+        if (queryError) throw queryError;
 
-        const mapped: ChatMessage[] = ((data as any[]) || [])
-          .map((m) => ({
-            id: String(m.message_id),
-            author: {
-              id: String(m.author_id),
-              name: m.author_display_name || m.author_username || 'Unknown',
-              handle: `@${m.author_username || 'unknown'}`,
-              avatar: m.author_avatar_url || 'https://ui-avatars.com/api/?name=U&background=111827&color=fff',
-              role: dbRoleToRoleState(m.author_role),
-              activity: 'offline' as MemberActivity,
-            },
-            text: m.content,
-            timestamp: new Date(m.created_at).getTime(),
-            reactions: (m.reactions || []).map((r: any) => ({ emoji: r.emoji, count: r.count })),
-            isSystem: m.is_system,
-            replyTo: m.reply_to_id ? String(m.reply_to_id) : undefined,
-          }))
-          .sort((a, b) => a.timestamp - b.timestamp);
+        const mapped: ChatMessage[] = (messages || []).map((m: any) => ({
+          id: String(m.id),
+          author: {
+            id: String(m.author_id),
+            name: m.profiles?.display_name || m.profiles?.username || 'Unknown',
+            handle: `@${m.profiles?.username || 'unknown'}`,
+            avatar: m.profiles?.avatar_url || 'https://ui-avatars.com/api/?name=U&background=111827&color=fff',
+            role: 'member',  // Default role since we're bypassing the RPC
+            activity: 'offline' as MemberActivity,
+          },
+          text: m.is_deleted ? '[Message deleted]' : m.content,
+          timestamp: new Date(m.created_at).getTime(),
+          reactions: [],  // Can add later if needed
+          isSystem: m.is_system,
+          replyTo: m.reply_to_id ? String(m.reply_to_id) : undefined,
+        }));
 
+        console.log('[useTeamChat] ✅ Fetched', mapped.length, 'messages for team:', teamId);
         if (!cancelled) setMessages(mapped);
       } catch (e) {
         if (!cancelled) {
-          console.error('[useTeamChat] Error:', e);
+          console.error('[useTeamChat] ❌ Error fetching messages:', e);
           setError(e as Error);
           setMessages([]);
         }
@@ -1038,6 +1054,77 @@ export function useCreatePost(teamSlug: string) {
   );
 
   return { mutate, isLoading, error };
+}
+
+export function useDeletePost() {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const mutate = useCallback(
+    async ({ postId }: { postId: string }) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { error: rpcError } = await supabase.rpc('rpc_delete_team_post', {
+          p_post_id: postId,
+        });
+
+        if (rpcError) throw rpcError;
+        return true;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  const deletePost = useCallback(
+    (postId: string) => mutate({ postId }),
+    [mutate]
+  );
+
+  return { mutate, deletePost, isLoading, error };
+}
+
+export function usePinPost() {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const mutate = useCallback(
+    async ({ postId, pin }: { postId: string; pin: boolean }) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { error: rpcError } = await supabase.rpc('rpc_pin_team_post', {
+          p_post_id: postId,
+          p_pin: pin,
+        });
+
+        if (rpcError) throw rpcError;
+        return true;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  const pinPost = useCallback(
+    (postId: string, pin: boolean) => mutate({ postId, pin }),
+    [mutate]
+  );
+
+  return { mutate, pinPost, isLoading, error };
 }
 
 export function useReactToPost(teamId: string) {

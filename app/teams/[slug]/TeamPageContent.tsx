@@ -1665,15 +1665,15 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
   };
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Messages */}
-      <div className="flex-1 overflow-hidden rounded-2xl border border-white/5 bg-white/0">
+    <div className="flex h-[calc(100vh-280px)] flex-col">
+      {/* Messages - scrollable area */}
+      <div className="flex-1 overflow-y-auto rounded-2xl border border-white/5 bg-white/0">
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="flex h-full flex-col overflow-y-auto pr-2"
+          className="h-full overflow-y-auto pr-2"
         >
-          <div className="flex flex-col justify-end gap-2 px-4 pb-4 pt-4">
+          <div className="flex min-h-full flex-col justify-end gap-2 px-4 pb-4 pt-4">
             {isLoading ? (
               <div className="flex flex-1 items-center justify-center py-10">
                 <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
@@ -1693,9 +1693,9 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
         </div>
       </div>
 
-      {/* Jump to Live */}
+      {/* Jump to Live - fixed height, doesn't scroll */}
       {streamingMembers.length > 0 && (
-        <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+        <div className="mt-2 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
           <Radio className="h-4 w-4 text-red-400 animate-pulse" />
           <span className="text-sm text-white">
             <span className="font-semibold text-red-400">{streamingMembers[0]?.name}</span> is live
@@ -1706,8 +1706,8 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
         </div>
       )}
 
-      {/* Composer */}
-      <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
+      {/* Composer - fixed at bottom, doesn't scroll */}
+      <div className="mt-2 shrink-0 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <Input
             value={inputText}
