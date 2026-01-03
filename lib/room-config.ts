@@ -32,6 +32,7 @@ export interface RoomBranding {
   backgroundUrl?: string;
   fallbackGradient?: string;
   theme?: 'default' | 'dark' | 'team';
+  presentedBy?: string;
 }
 
 export interface RoomConfig {
@@ -113,7 +114,8 @@ export function createTeamRoomConfig(
   teamSlug: string,
   teamName: string,
   teamIconUrl?: string,
-  teamBannerUrl?: string
+  teamBannerUrl?: string,
+  presentedBy?: string
 ): RoomConfig {
   return {
     roomId: `team-${teamSlug}`,
@@ -127,6 +129,7 @@ export function createTeamRoomConfig(
       iconUrl: teamIconUrl,
       bannerUrl: teamBannerUrl,
       theme: 'team',
+      presentedBy,
     },
     permissions: {
       canView: (user) => {

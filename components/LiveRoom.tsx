@@ -2961,7 +2961,10 @@ export default function LiveRoom({
       <RoomBanner
         roomKey={roomConfig.roomId}
         roomName={roomConfig.branding.name}
-        presentedBy={roomConfig.teamSlug ? `Team: ${roomConfig.teamSlug}` : 'MyLiveLinks Official'}
+        presentedBy={
+          roomConfig.branding.presentedBy ??
+          (roomConfig.teamSlug ? `Team: ${roomConfig.teamSlug}` : 'MyLiveLinks Official')
+        }
         bannerStyle="default"
         customGradient={roomConfig.branding.fallbackGradient}
         showGoLiveButton={true}

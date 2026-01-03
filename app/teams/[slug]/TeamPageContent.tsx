@@ -157,7 +157,7 @@ export default function TeamPageContent() {
   // useTeamFeed already separates pinned from unpinned
   const pinnedItems = feedData?.pinnedItems ?? [];
   const teamLiveThreshold = teamLiveRoomConfig?.unlockThreshold ?? 100;
-  const teamLiveMemberCount = teamLiveRoomConfig?.approvedMemberCount ?? team.approvedMemberCount;
+  const teamLiveMemberCount = teamLiveRoomConfig?.approvedMemberCount ?? team?.approvedMemberCount ?? 0;
   const handleGoLiveClick = useCallback(() => {
     if (!team?.slug || !isTeamLiveUnlocked) return;
     router.push(`/teams/room/${team.slug}`);
