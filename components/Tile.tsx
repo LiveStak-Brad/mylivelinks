@@ -1190,7 +1190,6 @@ export default function Tile({
             ? 'border-red-500 shadow-lg shadow-red-500/20'
             : 'border-gray-300 dark:border-gray-700'
         }
-        ${isMuted ? 'opacity-60' : ''}
       `}
     >
       {/* Video/Stream Area */}
@@ -1209,7 +1208,7 @@ export default function Tile({
                 : isPortraitVideo || isSquareVideo
                   ? 'object-contain'
                   : 'object-cover'
-            } ${isMuted ? 'grayscale' : ''}`}
+            }`}
             autoPlay
             playsInline
             muted={isMuted}
@@ -1218,19 +1217,19 @@ export default function Tile({
 
         {/* Fallback: Avatar or placeholder when no video track */}
         {!videoTrack && (
-          <div className="absolute inset-0 w-full h-full">
+          <>
             {streamerAvatar ? (
               <img
                 src={streamerAvatar}
                 alt={streamerUsername}
-                className={`w-full h-full object-cover ${isMuted ? 'grayscale' : ''}`}
+                className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                <span className="text-gray-500 text-4xl font-bold">{(streamerUsername?.charAt(0) ?? '?').toUpperCase()}</span>
+                <div className="text-white text-2xl">👤</div>
               </div>
             )}
-          </div>
+          </>
         )}
 
         {/* Audio element for LiveKit audio track - always render when we have a streamer */}
@@ -1289,11 +1288,7 @@ export default function Tile({
       )}
 
       {/* Muted Indicator */}
-      {isMuted && (
-        <div className="absolute top-12 left-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs z-20">
-          🔇 Muted
-        </div>
-      )}
+
 
       {/* Grid Controls: Volume (top-left) and Close (top-right) */}
       {!shouldUseCompact && !isFullscreen && (

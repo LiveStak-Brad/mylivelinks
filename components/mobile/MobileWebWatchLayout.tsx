@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Gift, MessageCircle, Users, Trophy, SlidersHorizontal, Share2, Video as VideoIcon, X, Volume2, Maximize2, User, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Gift, MessageCircle, Users, Trophy, SlidersHorizontal, Share2, Video as VideoIcon, X, Volume2, Maximize2, User, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import { Room } from 'livekit-client';
 import Tile from '@/components/Tile';
 import GoLiveButton from '@/components/GoLiveButton';
@@ -406,7 +406,14 @@ export default function MobileWebWatchLayout({
           aria-label="Toggle room controls"
         >
           <div className="mobile-live-topbar-roomname">{roomName || 'Live Room'}</div>
-          <div className="mobile-live-topbar-subtitle">{activeCount} Live</div>
+          <div className="mobile-live-topbar-subtitle flex items-center justify-center gap-1">
+            <span>{activeCount} Live</span>
+            {isChromeVisible ? (
+              <ChevronDown className="w-3.5 h-3.5 opacity-80" aria-hidden="true" />
+            ) : (
+              <ChevronUp className="w-3.5 h-3.5 opacity-80" aria-hidden="true" />
+            )}
+          </div>
         </button>
 
         <div className="mobile-live-topbar-actions">
@@ -628,155 +635,56 @@ export default function MobileWebWatchLayout({
 
       <BottomSheet
         isOpen={activeSheet === 'options'}
-        title={selectedActionSlot?.streamer?.username ? `${selectedActionSlot.streamer.username}` : 'Controls'}
+        title="Mixer"
         onClose={handleCloseSheet}
       >
-        {selectedActionSlot?.streamer ? (
-          <div className="space-y-2">
-            <button
-              onClick={() => {
-                if (!selectedActionSlotIndex) return;
-                onMuteTile(selectedActionSlotIndex);
-              }}
-              className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
-            >
-              <span>{selectedActionSlot.isMuted || globalMuted ? 'Unmute' : 'Mute'}</span>
-              <Volume2 className="w-5 h-5" />
-            </button>
+        <div className="grid grid-cols-6 gap-3">
+          {displaySlots.slice(0, 12).map((slot) => {
+            const vol = Math.max(0, Math.min(1, slot.volume ?? 0));
+            const isEffectivelyMuted = globalMuted || slot.isMuted || vol === 0;
 
-            <div className="w-full px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800">
-              <div className="flex items-center justify-between gap-3 text-gray-900 dark:text-gray-100 font-semibold">
-                <span>Volume</span>
-                <span className="text-sm opacity-70">{Math.round((selectedActionSlot.volume ?? 0) * 100)}%</span>
+            return (
+              <div key={slot.slotIndex} className="flex flex-col items-center gap-2">
+                <div className="text-[10px] font-semibold text-gray-900 dark:text-gray-100 truncate w-full text-center">
+                  {slot.streamer?.username ? slot.streamer.username : `Slot ${slot.slotIndex}`}
+                </div>
+
+                <div className="h-24 w-8 flex items-center justify-center">
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.02}
+                    value={vol}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      onVolumeChange(slot.slotIndex, next);
+
+                      if (globalMuted && next > 0) {
+                        setGlobalMuted(false);
+                      }
+
+                      if (next === 0 && !slot.isMuted) {
+                        onMuteTile(slot.slotIndex);
+                      }
+
+                      if (next > 0 && slot.isMuted) {
+                        onMuteTile(slot.slotIndex);
+                      }
+                    }}
+                    className="w-24"
+                    style={{ transform: 'rotate(-90deg)' }}
+                    aria-label={`Volume ${slot.slotIndex}`}
+                  />
+                </div>
+
+                <div className="text-[10px] text-gray-700 dark:text-gray-200 opacity-80">
+                  {isEffectivelyMuted ? '🔇' : `${Math.round(vol * 100)}%`}
+                </div>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={Math.max(0, Math.min(1, selectedActionSlot.volume ?? 0))}
-                onChange={(e) => {
-                  if (!selectedActionSlotIndex) return;
-                  onVolumeChange(selectedActionSlotIndex, Number(e.target.value));
-                }}
-                className="w-full mt-3"
-              />
-            </div>
-
-            <button
-              onClick={() => {
-                const streamer = selectedActionSlot.streamer;
-                if (!streamer) return;
-                setActiveSheet(null);
-                setGiftModalTarget({
-                  recipientId: streamer.profile_id,
-                  recipientUsername: streamer.username,
-                  slotIndex: selectedActionSlot.slotIndex,
-                  liveStreamId: streamer.id && streamer.live_available ? parseLiveStreamId(streamer.id) : undefined,
-                });
-              }}
-              className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
-            >
-              <span>Send gift</span>
-              <Gift className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={() => {
-                setActiveSheet(null);
-                setFocusedSlotIndex(selectedActionSlot.slotIndex);
-              }}
-              className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold ${focusedSlotIndex === selectedActionSlot.slotIndex ? 'ring-2 ring-purple-500' : ''}`}
-            >
-              <span>Maximize</span>
-              <Maximize2 className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={() => {
-                const streamer = selectedActionSlot.streamer;
-                if (!streamer) return;
-                setActiveSheet(null);
-                router.push(`/${encodeURIComponent(streamer.username)}`);
-              }}
-              className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
-            >
-              <span>View profile</span>
-              <User className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={() => {
-                const streamer = selectedActionSlot.streamer;
-                if (!streamer) return;
-                setActiveSheet(null);
-                openChat(streamer.profile_id, streamer.username, streamer.avatar_url);
-              }}
-              className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
-            >
-              <span>Instant message</span>
-              <MessageSquare className="w-5 h-5" />
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-          <button
-            onClick={handleGiftAction}
-            disabled={activeCount === 0}
-            className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
-          >
-            <span>Send gift</span>
-            <Gift className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleShareAction}
-            className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
-          >
-            <span>Share room</span>
-            <Share2 className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleMixerPress}
-            className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold ${globalMuted ? 'ring-2 ring-purple-500' : ''}`}
-          >
-            <span>{globalMuted ? 'Unmute all' : 'Mute all'}</span>
-            <Volume2 className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handlePiPToggle}
-            disabled={activeCount === 0}
-            className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50 ${focusedSlotIndex !== null ? 'ring-2 ring-purple-500' : ''}`}
-          >
-            <span>{focusedSlotIndex !== null ? 'Exit focus' : 'Focus mode'}</span>
-            <Maximize2 className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => {
-              handleCloseSheet();
-              onSettingsClick?.();
-            }}
-            className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold"
-          >
-            <span>Settings</span>
-            <SlidersHorizontal className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleReportStream}
-            disabled={activeCount === 0}
-            className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
-          >
-            Report stream
-          </button>
-
-          <button
-            onClick={handleReportUser}
-            disabled={activeCount === 0}
-            className="w-full text-left px-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 font-semibold disabled:opacity-50"
-          >
-            Report user
-          </button>
+            );
+          })}
         </div>
-        )}
       </BottomSheet>
     </div>
   );
