@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
@@ -41,6 +41,8 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [canOpenLive, setCanOpenLive] = useState(false);
+  const [routingTeams, setRoutingTeams] = useState(false);
+  const [ownedTeamSlug, setOwnedTeamSlug] = useState<string | null>(null);
 
   useEffect(() => {
     checkUser();
@@ -66,17 +68,92 @@ export default function LandingPage() {
             earnings_balance: 0,
             gifter_level: 0
           });
-        setCanOpenLive(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user.id, email: user.email }));
-        setCurrentUser({ id: user.id, email: user.email });
-        setLoading(false);
-        return;
       }
-      
+
+      const { data: ownedTeams } = await supabase
+        .from('teams')
+        .select('slug')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      setOwnedTeamSlug((ownedTeams ?? [])?.[0]?.slug ?? null);
       setCanOpenLive(!!(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user.id, email: user.email })));
       setCurrentUser(profile || { id: user.id, email: user.email });
       setLoading(false);
     } else {
       router.push('/login');
+    }
+  };
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+
+    const fetchOwnedTeam = async () => {
+      try {
+        const { data } = await supabase
+          .from('teams')
+          .select('slug')
+          .eq('created_by', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!cancelled) setOwnedTeamSlug((data ?? [])?.[0]?.slug ?? null);
+      } catch (error) {
+        console.error('[home][teams] ownership fetch error:', error);
+      }
+    };
+
+    fetchOwnedTeam();
+
+    const channel = supabase
+      .channel(`home:teams_owner:${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'teams',
+          filter: `created_by=eq.${currentUser.id}`,
+        },
+        () => {
+          fetchOwnedTeam();
+        }
+      )
+      .subscribe();
+
+    const onFocus = () => fetchOwnedTeam();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id, supabase]);
+
+  const teamsPrimaryCtaLabel = useMemo(
+    () => (ownedTeamSlug ? 'Visit My Team' : 'Create Your Team'),
+    [ownedTeamSlug]
+  );
+
+  const handleTeamsPrimaryCtaClick = async () => {
+    if (routingTeams) return;
+    setRoutingTeams(true);
+
+    try {
+      if (ownedTeamSlug) {
+        router.push(`/teams/${ownedTeamSlug}`);
+        return;
+      }
+
+      router.push('/teams/setup');
+    } catch (error) {
+      console.error('[home][teams] routing error:', error);
+      router.push(ownedTeamSlug ? `/teams/${ownedTeamSlug}` : '/teams/setup');
+    } finally {
+      setRoutingTeams(false);
     }
   };
 
@@ -114,27 +191,31 @@ export default function LandingPage() {
                 <div>
                   <div className="flex items-center justify-center sm:justify-start gap-3 mb-1">
                     <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-                      Teams are here!
+                      TEAMS
                     </h1>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 shadow-lg shadow-pink-500/25 animate-pulse">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 shadow-lg shadow-pink-500/25">
                       <Sparkles className="w-3.5 h-3.5 text-white" />
                       <span className="text-xs font-bold text-white uppercase tracking-wide">New</span>
                     </span>
                   </div>
-                  <p className="text-sm text-white/70">Create communities around shared interests.</p>
+                  <p className="text-sm text-white/70">My Team. My People. My Community.</p>
                 </div>
               </div>
               
               <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-3 sm:items-center">
-                <Link href="/teams" className="w-full sm:w-auto">
-                  <Button size="sm" className="w-full px-6 font-semibold shadow-lg whitespace-nowrap bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 border-0">
-                    Explore Teams
-                  </Button>
-                </Link>
+                <Button
+                  size="sm"
+                  className="w-full sm:w-auto px-6 font-semibold shadow-lg whitespace-nowrap bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 border-0"
+                  onClick={handleTeamsPrimaryCtaClick}
+                  disabled={routingTeams}
+                >
+                  {teamsPrimaryCtaLabel}
+                </Button>
                 <PwaInstallButton
                   size="sm"
                   className="w-full sm:w-auto font-semibold shadow-lg"
                   variant="gradient"
+                  label="Download App"
                 />
               </div>
             </div>
