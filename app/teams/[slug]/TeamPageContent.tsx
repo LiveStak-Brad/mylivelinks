@@ -38,6 +38,8 @@ import {
   Zap,
   AlertTriangle,
   Loader2,
+  X,
+  Plus,
 } from 'lucide-react';
 import {
   Badge,
@@ -68,13 +70,23 @@ import {
   useSendChatMessage,
   useTeamNotificationPrefsBySlug,
   useJoinTeam,
+  usePostComments,
+  useCreateComment,
+  useGiftPost,
+  useGiftComment,
+  useCreatePoll,
+  usePollOptions,
+  useVotePoll,
   FeedSort,
   TeamMember,
   FeedItem,
+  PostComment,
   ChatMessage,
   LiveRoom,
   NotificationPrefs,
+  PollOption,
 } from '@/hooks/useTeam';
+import GiftPickerMini from '@/components/messages/GiftPickerMini';
 
 /* ════════════════════════════════════════════════════════════════════════════
    TYPES
@@ -531,7 +543,8 @@ export default function TeamPageContent() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 pb-6">
+      {/* pb-40 accounts for: 68px bottom nav + ~56px DockedChatBar + safe area */}
+      <div className="mx-auto max-w-5xl px-4 pb-40 md:pb-6">
         {/* ══════════════════════════════════════════════════════════════════════
             NAVIGATION TABS
             ══════════════════════════════════════════════════════════════════════ */}
@@ -660,9 +673,10 @@ function DockedChatBar({ onOpenChat, priority = 'default' }: { onOpenChat: () =>
 
   return (
     <div
-      className={`fixed bottom-[68px] inset-x-0 z-40 border-t ${
+      className={`fixed inset-x-0 z-40 border-t ${
         isSubtle ? 'border-white/5 bg-black/70 backdrop-blur' : 'border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl'
       }`}
+      style={{ bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))' }}
     >
       <div className="mx-auto max-w-5xl px-4 py-2">
         <button
@@ -1100,6 +1114,7 @@ function HomeScreen({
 }) {
   const { deletePost } = useDeletePost();
   const { pinPost } = usePinPost();
+  const { reactToPost } = useReactToPost();
   const { toast } = useToast();
 
   const handleDeletePost = useCallback(async (postId: string) => {
@@ -1123,6 +1138,11 @@ function HomeScreen({
       toast({ title: 'Failed to update pin', variant: 'error' });
     }
   }, [pinPost, toast, onPostCreated]);
+  
+  const handleReactToPost = useCallback(async (postId: string) => {
+    return await reactToPost(postId);
+  }, [reactToPost]);
+
   const liveMemberCount = liveMemberEntries.length;
   const hasLive = liveMemberCount > 0 || liveCount > 0;
   const liveChipValue = liveMemberCount > 0 ? liveMemberCount : liveCount;
@@ -1245,6 +1265,8 @@ function HomeScreen({
               canModerate={canModerate}
               onDelete={handleDeletePost}
               onPin={handlePinPost}
+              onReact={handleReactToPost}
+              onRefresh={onPostCreated}
             />
           ))}
         </div>
@@ -1402,11 +1424,55 @@ function FeedScreen({
   isLoadingMore: boolean;
 }) {
   const { toast } = useToast();
+  const { reactToPost } = useReactToPost();
+  const handleReactToPost = useCallback(async (postId: string) => {
+    return await reactToPost(postId);
+  }, [reactToPost]);
   const [postText, setPostText] = useState('');
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const createPost = useCreatePost(teamSlug);
+  const { createPoll, isLoading: isCreatingPoll } = useCreatePoll(teamSlug);
   const deletePost = useDeletePost();
   const pinPost = usePinPost();
   const isFeedEmpty = feedItems.length === 0;
+  
+  const handleAddPollOption = () => {
+    if (pollOptions.length < 10) {
+      setPollOptions([...pollOptions, '']);
+    }
+  };
+  
+  const handleRemovePollOption = (index: number) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, i) => i !== index));
+    }
+  };
+  
+  const handlePollOptionChange = (index: number, value: string) => {
+    const newOptions = [...pollOptions];
+    newOptions[index] = value;
+    setPollOptions(newOptions);
+  };
+  
+  const handleCreatePoll = async () => {
+    const validOptions = pollOptions.filter(o => o.trim().length > 0);
+    if (!pollQuestion.trim() || validOptions.length < 2) {
+      toast({ title: 'Poll needs a question and at least 2 options', variant: 'destructive' });
+      return;
+    }
+    try {
+      await createPoll(pollQuestion.trim(), validOptions);
+      setPollQuestion('');
+      setPollOptions(['', '']);
+      setShowPollCreator(false);
+      onPostCreated?.();
+      toast({ title: 'Poll created!' });
+    } catch (err: any) {
+      toast({ title: 'Failed to create poll', description: err?.message, variant: 'destructive' });
+    }
+  };
   
   const handleDeletePost = async (postId: string) => {
     if (!window.confirm('Delete this post? This cannot be undone.')) return;
@@ -1453,12 +1519,12 @@ function FeedScreen({
       });
     }
   };
-  
+
   return (
     <>
       {/* Muted banner */}
       {isMuted && <MutedBanner />}
-      
+
       {/* Composer */}
       {canPost && !isMuted && (
         <div className="relative overflow-hidden rounded-3xl border border-purple-500/30 bg-gradient-to-br from-[#1c1533] via-[#141228] to-[#090912] p-5 shadow-[0_20px_55px_rgba(60,27,119,0.45)] ring-1 ring-white/10">
@@ -1490,7 +1556,10 @@ function FeedScreen({
                         Media
                       </span>
                     </button>
-                    <button className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white">
+                    <button 
+                      onClick={() => setShowPollCreator(true)}
+                      className={`rounded-xl border px-3 py-2 text-xs transition hover:border-white/30 hover:text-white ${showPollCreator ? 'border-purple-500 bg-purple-500/20 text-white' : 'border-white/10 text-white/60'}`}
+                    >
                       <span className="flex items-center gap-2">
                         <TrendingUp className="h-4 w-4" />
                         Poll
@@ -1510,6 +1579,87 @@ function FeedScreen({
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Poll Creator Modal */}
+      {showPollCreator && (
+        <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-[#1c1533] via-[#141228] to-[#090912] p-5 shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Create Poll</h3>
+            <button onClick={() => setShowPollCreator(false)} className="text-white/50 hover:text-white">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider mb-1 block">Question</label>
+              <input
+                type="text"
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                placeholder="Ask the team something..."
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-purple-500/50 focus:outline-none"
+              />
+            </div>
+            
+            <div>
+              <label className="text-xs text-white/50 uppercase tracking-wider mb-2 block">Options</label>
+              <div className="space-y-2">
+                {pollOptions.map((option, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={option}
+                      onChange={(e) => handlePollOptionChange(idx, e.target.value)}
+                      placeholder={`Option ${idx + 1}`}
+                      className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder:text-white/40 focus:border-purple-500/50 focus:outline-none"
+                    />
+                    {pollOptions.length > 2 && (
+                      <button
+                        onClick={() => handleRemovePollOption(idx)}
+                        className="rounded-lg p-2 text-white/40 hover:text-red-400 hover:bg-white/5"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {pollOptions.length < 10 && (
+                <button
+                  onClick={handleAddPollOption}
+                  className="mt-2 flex items-center gap-2 text-xs text-purple-400 hover:text-purple-300"
+                >
+                  <Plus className="h-3 w-3" /> Add option
+                </button>
+              )}
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowPollCreator(false);
+                  setPollQuestion('');
+                  setPollOptions(['', '']);
+                }}
+                className="border-white/20 text-white/60"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCreatePoll}
+                disabled={isCreatingPoll || !pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+              >
+                {isCreatingPoll ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Poll'}
+              </Button>
             </div>
           </div>
         </div>
@@ -1584,6 +1734,8 @@ function FeedScreen({
               canModerate={canModerate}
               onDelete={handleDeletePost}
               onPin={handlePinPost}
+              onReact={handleReactToPost}
+              onRefresh={onPostCreated}
             />
           ))}
           
@@ -1615,6 +1767,9 @@ function FeedCard({
   canModerate,
   onDelete,
   onPin,
+  onReact,
+  onGift,
+  onRefresh,
 }: { 
   item: FeedItem; 
   compact?: boolean;
@@ -1622,20 +1777,65 @@ function FeedCard({
   canModerate?: boolean;
   onDelete?: (postId: string) => void;
   onPin?: (postId: string, pin: boolean) => void;
+  onReact?: (postId: string) => Promise<{ reaction_count: number; is_reacted: boolean } | null>;
+  onGift?: (postId: string, authorId: string) => void;
+  onRefresh?: () => void;
 }) {
+  const { toast } = useToast();
   const [showMenu, setShowMenu] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [showGiftPicker, setShowGiftPicker] = useState(false);
+  const [commentText, setCommentText] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
+  const giftPickerRef = useRef<HTMLDivElement>(null);
+  
+  // Local optimistic state for reactions
+  const [localIsReacted, setLocalIsReacted] = useState(item.isReacted ?? false);
+  const [localReactionCount, setLocalReactionCount] = useState(item.upvotes);
+  
+  // Comments
+  const { comments, isLoading: commentsLoading, refetch: refetchComments } = usePostComments(showComments ? item.id : null);
+  const { createComment, isLoading: isCreatingComment } = useCreateComment();
+  const { giftPost, isLoading: isGiftingPost } = useGiftPost();
+  
+  // Poll voting
+  const isPoll = item.type === 'poll' || !!item.isPoll;
+  const { options: pollOptions, refetch: refetchPoll } = usePollOptions(isPoll ? item.id : null);
+  const { vote: votePoll, isLoading: isVoting } = useVotePoll();
+  const [localPollOptions, setLocalPollOptions] = useState<PollOption[]>([]);
+  
+  // Sync poll options when loaded
+  useEffect(() => {
+    if (pollOptions.length > 0) {
+      setLocalPollOptions(pollOptions);
+    }
+  }, [pollOptions]);
+  
+  const handleVote = async (optionId: string) => {
+    if (isVoting) return;
+    try {
+      const updated = await votePoll(item.id, optionId);
+      setLocalPollOptions(updated);
+    } catch (err: any) {
+      toast({ title: 'Failed to vote', description: err?.message, variant: 'destructive' });
+    }
+  };
   
   const isThread = item.type === 'thread';
-  const isPoll = item.type === 'poll';
   const isClip = item.type === 'clip';
   
   // User can delete if they are the author OR a moderator
   const isOwner = !!(viewerProfileId && item.authorId === viewerProfileId);
   const canDelete = isOwner || !!canModerate;
-  const canPin = !!canModerate; // Only moderators can pin
+  const canPin = !!canModerate;
   const hasActions = canDelete || canPin;
+  const canGift = !isOwner && !!viewerProfileId; // Can't gift yourself
   
+  // Sync local state when item changes
+  useEffect(() => {
+    setLocalIsReacted(item.isReacted ?? false);
+    setLocalReactionCount(item.upvotes);
+  }, [item.isReacted, item.upvotes]);
   
   // Close menu on click outside
   useEffect(() => {
@@ -1647,6 +1847,51 @@ function FeedCard({
     if (showMenu) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
+  
+  const handleReact = async () => {
+    if (!onReact) return;
+    
+    // Optimistic update
+    const wasReacted = localIsReacted;
+    setLocalIsReacted(!wasReacted);
+    setLocalReactionCount((c) => wasReacted ? c - 1 : c + 1);
+    
+    try {
+      const result = await onReact(item.id);
+      if (result) {
+        setLocalIsReacted(result.is_reacted);
+        setLocalReactionCount(result.reaction_count);
+      }
+    } catch {
+      // Revert on error
+      setLocalIsReacted(wasReacted);
+      setLocalReactionCount((c) => wasReacted ? c + 1 : c - 1);
+    }
+  };
+  
+  const handleSubmitComment = async () => {
+    if (!commentText.trim()) return;
+    try {
+      await createComment(item.id, commentText.trim());
+      setCommentText('');
+      refetchComments();
+      onRefresh?.(); // Refresh to update comment count
+      toast({ title: 'Comment added' });
+    } catch (err: any) {
+      toast({ title: 'Failed to add comment', description: err?.message, variant: 'error' });
+    }
+  };
+  
+  const handleGiftSelect = async (gift: { id: number; coin_cost: number; name: string }) => {
+    setShowGiftPicker(false);
+    try {
+      await giftPost(item.id, gift.id, gift.coin_cost);
+      toast({ title: `Sent ${gift.name} to ${item.author.name}!` });
+      onRefresh?.();
+    } catch (err: any) {
+      toast({ title: 'Failed to send gift', description: err?.message, variant: 'error' });
+    }
+  };
 
   return (
     <div className={`relative rounded-2xl border border-white/10 bg-white/5 transition hover:border-white/20 ${compact ? 'p-3' : 'p-4'}`}>
@@ -1692,21 +1937,42 @@ function FeedCard({
           <p className={`mt-1 text-white/80 ${compact ? 'text-sm line-clamp-2' : 'text-sm'}`}>{item.body}</p>
 
           {/* Poll Options */}
-          {isPoll && item.pollOptions && (
+          {isPoll && localPollOptions.length > 0 && (
             <div className="mt-3 space-y-2">
-              {item.pollOptions.map((opt, i) => {
-                const total = item.pollOptions!.reduce((acc, o) => acc + o.votes, 0);
-                const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
+              {localPollOptions.map((opt) => {
+                const total = localPollOptions.reduce((acc, o) => acc + o.voteCount, 0);
+                const pct = total > 0 ? Math.round((opt.voteCount / total) * 100) : 0;
+                const hasVoted = localPollOptions.some(o => o.isSelected);
                 return (
-                  <button key={i} className="relative w-full rounded-xl bg-white/10 p-3 text-left overflow-hidden hover:bg-white/15">
-                    <div className="absolute inset-0 bg-purple-500/20" style={{ width: `${pct}%` }} />
+                  <button 
+                    key={opt.id} 
+                    onClick={() => handleVote(opt.id)}
+                    disabled={isVoting}
+                    className={`relative w-full rounded-xl p-3 text-left overflow-hidden transition ${
+                      opt.isSelected 
+                        ? 'bg-purple-500/20 border border-purple-500/50' 
+                        : 'bg-white/10 hover:bg-white/15 border border-transparent'
+                    } ${isVoting ? 'opacity-50' : ''}`}
+                  >
+                    <div 
+                      className={`absolute inset-0 ${opt.isSelected ? 'bg-purple-500/30' : 'bg-white/10'}`} 
+                      style={{ width: hasVoted ? `${pct}%` : '0%', transition: 'width 0.3s ease' }} 
+                    />
                     <div className="relative flex items-center justify-between">
-                      <span className="text-sm text-white">{opt.label}</span>
-                      <span className="text-xs font-bold text-white/70">{pct}%</span>
+                      <span className={`text-sm ${opt.isSelected ? 'text-white font-medium' : 'text-white'}`}>
+                        {opt.text}
+                        {opt.isSelected && <span className="ml-2 text-purple-400">✓</span>}
+                      </span>
+                      {hasVoted && (
+                        <span className="text-xs font-bold text-white/70">{pct}% ({opt.voteCount})</span>
+                      )}
                     </div>
                   </button>
                 );
               })}
+              <p className="text-[10px] text-white/40 text-center mt-2">
+                {localPollOptions.reduce((acc, o) => acc + o.voteCount, 0)} votes
+              </p>
             </div>
           )}
 
@@ -1726,12 +1992,44 @@ function FeedCard({
 
           {/* Actions */}
           <div className="mt-3 flex items-center gap-4">
-            <button className="flex items-center gap-1 text-xs text-white/50 hover:text-white">
-              <Heart className="h-4 w-4" /> {item.upvotes}
+            {/* Heart/Like button */}
+            <button 
+              onClick={handleReact}
+              className={`flex items-center gap-1 text-xs transition ${localIsReacted ? 'text-pink-500' : 'text-white/50 hover:text-pink-400'}`}
+            >
+              <Heart className={`h-4 w-4 ${localIsReacted ? 'fill-current' : ''}`} /> {localReactionCount}
             </button>
-            <button className="flex items-center gap-1 text-xs text-white/50 hover:text-white">
+            
+            {/* Comments button */}
+            <button 
+              onClick={() => setShowComments(!showComments)}
+              className={`flex items-center gap-1 text-xs transition ${showComments ? 'text-purple-400' : 'text-white/50 hover:text-white'}`}
+            >
               <MessageCircle className="h-4 w-4" /> {item.comments}
             </button>
+            
+            {/* Gift button */}
+            {canGift && (
+              <div className="relative" ref={giftPickerRef}>
+                <button
+                  onClick={() => setShowGiftPicker(!showGiftPicker)}
+                  disabled={isGiftingPost}
+                  className={`flex items-center gap-1 text-xs transition ${(item.giftCount ?? 0) > 0 ? 'text-yellow-400' : 'text-white/50 hover:text-yellow-400'}`}
+                >
+                  <Gift className="h-4 w-4" /> {(item.giftCount ?? 0) > 0 ? item.giftCount : ''}
+                </button>
+                {showGiftPicker && (
+                  <div className="absolute bottom-full left-0 mb-2 z-50">
+                    <GiftPickerMini
+                      isOpen={showGiftPicker}
+                      onClose={() => setShowGiftPicker(false)}
+                      onSelectGift={handleGiftSelect}
+                      recipientUsername={item.author.name}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
             
             {/* More menu */}
             {hasActions && (
@@ -1780,6 +2078,122 @@ function FeedCard({
               </button>
             )}
           </div>
+          
+          {/* Comments Section */}
+          {showComments && !compact && (
+            <div className="mt-4 border-t border-white/10 pt-4">
+              {/* Comment Composer */}
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmitComment()}
+                  placeholder="Write a comment..."
+                  className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-purple-500/50 focus:outline-none"
+                />
+                <button
+                  onClick={handleSubmitComment}
+                  disabled={!commentText.trim() || isCreatingComment}
+                  className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50"
+                >
+                  {isCreatingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </button>
+              </div>
+              
+              {/* Comments List */}
+              {commentsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-white/40" />
+                </div>
+              ) : comments.length === 0 ? (
+                <p className="text-center text-sm text-white/40 py-2">No comments yet. Be the first!</p>
+              ) : (
+                <div className="space-y-3">
+                  {comments.map((comment) => (
+                    <CommentRow 
+                      key={comment.id} 
+                      comment={comment} 
+                      viewerProfileId={viewerProfileId}
+                      onRefresh={() => { refetchComments(); onRefresh?.(); }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommentRow({ 
+  comment, 
+  viewerProfileId,
+  onRefresh,
+}: { 
+  comment: PostComment; 
+  viewerProfileId?: string | null;
+  onRefresh?: () => void;
+}) {
+  const { toast } = useToast();
+  const [showGiftPicker, setShowGiftPicker] = useState(false);
+  const { giftComment, isLoading: isGifting } = useGiftComment();
+  
+  const isOwner = viewerProfileId === comment.authorId;
+  const canGift = !isOwner && !!viewerProfileId;
+  
+  const handleGiftSelect = async (gift: { id: number; coin_cost: number; name: string }) => {
+    setShowGiftPicker(false);
+    try {
+      await giftComment(comment.id, gift.id, gift.coin_cost);
+      toast({ title: `Sent ${gift.name}!` });
+      onRefresh?.();
+    } catch (err: any) {
+      toast({ title: 'Failed to send gift', description: err?.message, variant: 'error' });
+    }
+  };
+  
+  return (
+    <div className="flex gap-2">
+      <Image
+        src={comment.authorAvatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.authorUsername)}&background=8B5CF6&color=fff`}
+        alt={comment.authorUsername}
+        width={28}
+        height={28}
+        className="h-7 w-7 rounded-full flex-shrink-0"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-white">{comment.authorDisplayName || comment.authorUsername}</span>
+          <span className="text-[10px] text-white/40">{formatTime(comment.createdAt)}</span>
+        </div>
+        <p className="text-sm text-white/80 mt-0.5">{comment.textContent}</p>
+        <div className="mt-1 flex items-center gap-3">
+          <button className="text-[10px] text-white/40 hover:text-white">Like</button>
+          <button className="text-[10px] text-white/40 hover:text-white">Reply</button>
+          {canGift && (
+            <div className="relative">
+              <button
+                onClick={() => setShowGiftPicker(!showGiftPicker)}
+                disabled={isGifting}
+                className={`text-[10px] transition ${comment.giftCount > 0 ? 'text-yellow-400' : 'text-white/40 hover:text-yellow-400'}`}
+              >
+                🎁 {comment.giftCount > 0 ? comment.giftCount : 'Gift'}
+              </button>
+              {showGiftPicker && (
+                <div className="absolute bottom-full left-0 mb-2 z-50">
+                  <GiftPickerMini
+                    isOpen={showGiftPicker}
+                    onClose={() => setShowGiftPicker(false)}
+                    onSelectGift={handleGiftSelect}
+                    recipientUsername={comment.authorDisplayName || comment.authorUsername}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1921,7 +2335,7 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
   };
 
   return (
-    <div className="flex h-[calc(100vh-280px)] flex-col">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 280px - env(safe-area-inset-bottom, 0px))' }}>
       {/* Messages - scrollable area */}
       <div className="flex-1 overflow-y-auto rounded-2xl border border-white/5 bg-white/0">
         <div
@@ -1963,7 +2377,7 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
       )}
 
       {/* Composer - fixed at bottom, doesn't scroll */}
-      <div className="mt-2 shrink-0 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
+      <div className="mt-2 shrink-0 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur chat-bottom-safe">
         <div className="flex items-center gap-2">
           <Input
             value={inputText}

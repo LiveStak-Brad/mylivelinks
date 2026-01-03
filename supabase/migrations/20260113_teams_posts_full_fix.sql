@@ -309,8 +309,8 @@ BEGIN
     p.id,
     p.team_id,
     p.author_id,
-    pr.username,
-    pr.avatar_url,
+    pr.username::text,
+    pr.avatar_url::text,
     p.text_content,
     p.media_url,
     p.is_pinned,
@@ -489,6 +489,87 @@ BEGIN
 END;
 $$;
 
+-- rpc_delete_team_post
+DROP FUNCTION IF EXISTS public.rpc_delete_team_post(uuid);
+CREATE OR REPLACE FUNCTION public.rpc_delete_team_post(p_post_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+  v_team_id uuid;
+  v_author_id uuid;
+  v_can_moderate boolean := false;
+BEGIN
+  IF v_actor IS NULL THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+
+  SELECT team_id, author_id INTO v_team_id, v_author_id
+  FROM public.team_feed_posts
+  WHERE id = p_post_id;
+
+  IF v_team_id IS NULL THEN
+    RAISE EXCEPTION 'post_not_found';
+  END IF;
+
+  -- Allow if author OR moderator
+  v_can_moderate := public.team_can_moderate(v_team_id, v_actor);
+  
+  IF v_author_id != v_actor AND NOT v_can_moderate THEN
+    RAISE EXCEPTION 'forbidden';
+  END IF;
+
+  DELETE FROM public.team_feed_posts WHERE id = p_post_id;
+
+  RETURN true;
+END;
+$$;
+
+-- rpc_pin_team_post
+DROP FUNCTION IF EXISTS public.rpc_pin_team_post(uuid, boolean);
+CREATE OR REPLACE FUNCTION public.rpc_pin_team_post(p_post_id uuid, p_pin boolean)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+  v_team_id uuid;
+BEGIN
+  IF v_actor IS NULL THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+
+  SELECT team_id INTO v_team_id
+  FROM public.team_feed_posts
+  WHERE id = p_post_id;
+
+  IF v_team_id IS NULL THEN
+    RAISE EXCEPTION 'post_not_found';
+  END IF;
+
+  -- Only moderators can pin/unpin
+  IF NOT public.team_can_moderate(v_team_id, v_actor) THEN
+    RAISE EXCEPTION 'forbidden';
+  END IF;
+
+  UPDATE public.team_feed_posts
+  SET 
+    is_pinned = p_pin,
+    pinned_at = CASE WHEN p_pin THEN now() ELSE NULL END,
+    updated_at = now()
+  WHERE id = p_post_id;
+
+  RETURN true;
+END;
+$$;
+
 -- rpc_get_team_members
 DROP FUNCTION IF EXISTS public.rpc_get_team_members(text, text, text, text, int);
 CREATE OR REPLACE FUNCTION public.rpc_get_team_members(
@@ -548,8 +629,8 @@ BEGIN
   RETURN QUERY
   SELECT
     m.profile_id,
-    pr.username,
-    pr.avatar_url,
+    pr.username::text,
+    pr.avatar_url::text,
     m.status,
     m.role,
     m.requested_at,
@@ -605,10 +686,13 @@ BEGIN
   SELECT
     ls.id::int,
     ls.profile_id,
-    pr.username,
-    pr.avatar_url,
+    pr.username::text,
+    pr.avatar_url::text,
     ls.started_at,
-    ls.status
+    CASE
+      WHEN ls.ended_at IS NULL AND ls.live_available = true THEN 'live'::text
+      ELSE 'ended'::text
+    END AS status
   FROM public.team_live_rooms tlr
   JOIN public.live_streams ls ON ls.id = tlr.live_stream_id
   JOIN public.profiles pr ON pr.id = ls.profile_id
@@ -727,8 +811,8 @@ BEGIN
       FROM public.live_streams ls
       JOIN public.team_live_rooms tlr ON tlr.live_stream_id = ls.id
       WHERE tlr.team_id = p_team_id
-        AND ls.status = 'live'
         AND ls.live_available = true
+        AND ls.ended_at IS NULL
     )
     SELECT jsonb_build_object(
       'team_id', p_team_id,
@@ -903,6 +987,8 @@ REVOKE ALL ON FUNCTION public.rpc_get_team_feed(text, int, timestamptz, uuid) FR
 REVOKE ALL ON FUNCTION public.rpc_create_team_post(text, text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.rpc_create_team_comment(uuid, text, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.rpc_react_team_post(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rpc_delete_team_post(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rpc_pin_team_post(uuid, boolean) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.rpc_get_team_members(text, text, text, text, int) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.rpc_get_team_live_rooms(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.rpc_upsert_team_presence(uuid, uuid, text) FROM PUBLIC;
@@ -914,6 +1000,8 @@ GRANT EXECUTE ON FUNCTION public.rpc_get_team_feed(text, int, timestamptz, uuid)
 GRANT EXECUTE ON FUNCTION public.rpc_create_team_post(text, text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_create_team_comment(uuid, text, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_react_team_post(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_delete_team_post(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_pin_team_post(uuid, boolean) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_get_team_members(text, text, text, text, int) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_get_team_live_rooms(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rpc_upsert_team_presence(uuid, uuid, text) TO authenticated;

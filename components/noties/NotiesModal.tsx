@@ -161,6 +161,7 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
       case 'system': return <Settings className="w-4 h-4 text-gray-500" />;
       case 'team_invite': return <Users className="w-4 h-4 text-teal-500" />;
       case 'team_invite_accepted': return <UserCheck className="w-4 h-4 text-green-500" />;
+      case 'team_join_request': return <UserPlus className="w-4 h-4 text-amber-500" />;
       default: return <Bell className="w-4 h-4 text-gray-500" />;
     }
   };

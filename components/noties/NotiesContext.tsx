@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { createClient } from '@/lib/supabase';
 
 // Notification types
-export type NotieType = 'gift' | 'follow' | 'live' | 'mention' | 'comment' | 'level_up' | 'system' | 'purchase' | 'conversion' | 'team_invite' | 'team_invite_accepted';
+export type NotieType = 'gift' | 'follow' | 'live' | 'mention' | 'comment' | 'level_up' | 'system' | 'purchase' | 'conversion' | 'team_invite' | 'team_invite_accepted' | 'team_join_request';
 
 export interface Notie {
   id: string;
@@ -389,7 +389,7 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
           .from('notifications')
           .select('id, actor_id, type, entity_type, entity_id, message, read, created_at')
           .eq('recipient_id', user.id)
-          .in('type', ['team_invite', 'team_invite_accepted'])
+          .in('type', ['team_invite', 'team_invite_accepted', 'team_join_request'])
           .order('created_at', { ascending: false })
           .limit(20);
 
@@ -445,17 +445,28 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
               ? `/teams/invite/${invite.id}`
               : null;
             const fallbackTeamUrl = team?.slug ? `/teams/${team.slug}` : '/teams';
+            
+            // For join requests, link to admin panel
+            const joinRequestUrl = n.type === 'team_join_request' && team?.slug
+              ? `/teams/${team.slug}/admin`
+              : null;
+
+            // Determine title based on type
+            let title = 'Team Notification';
+            if (n.type === 'team_invite') title = 'Team Invite';
+            else if (n.type === 'team_invite_accepted') title = 'Invite Accepted';
+            else if (n.type === 'team_join_request') title = 'Join Request';
 
             return {
               id,
               type: n.type as NotieType,
-              title: n.type === 'team_invite' ? 'Team Invite' : 'Invite Accepted',
+              title,
               message: n.message || `${displayName} invited you to join a team`,
               avatarUrl: actor?.avatar_url,
               avatarFallback,
               isRead: readIds.has(id) || n.read,
               createdAt: new Date(n.created_at),
-              actionUrl: pendingInviteUrl ?? fallbackTeamUrl,
+              actionUrl: joinRequestUrl ?? pendingInviteUrl ?? fallbackTeamUrl,
               metadata: {
                 team_id: n.entity_id,
                 team_name: team?.name,

@@ -290,27 +290,19 @@ export default function GlobalHeader() {
       return;
     }
 
-    // If already on teams pages, just scroll to top
-    if (pathname === '/teams' || pathname.startsWith('/teams/')) {
+    // If already on teams landing page, just scroll to top
+    if (pathname === '/teams') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       window.dispatchEvent(new Event('teams:focusSearch'));
       return;
     }
 
-    // Check if teams onboarding is completed
-    const onboardingCompleted = localStorage.getItem('mylivelinks_teams_onboarding_completed') === 'true';
-    
-    if (!onboardingCompleted) {
-      // First time - route to setup
-      router.push('/teams/setup');
-    } else {
-      // Onboarding done - route to main teams page
-      router.push('/teams');
-      window.setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        window.dispatchEvent(new Event('teams:focusSearch'));
-      }, 250);
-    }
+    // Always navigate to /teams landing page
+    router.push('/teams');
+    window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.dispatchEvent(new Event('teams:focusSearch'));
+    }, 250);
   }, [pathname, router]);
 
   const handleSoloGoLive = useCallback(() => {

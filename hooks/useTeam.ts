@@ -38,8 +38,26 @@ export interface FeedItem {
   comments: number;
   isPinned?: boolean;
   isAnnouncement?: boolean;
-  pollOptions?: { label: string; votes: number }[];
+  isReacted?: boolean;
+  giftCount?: number;
+  isPoll?: boolean;
+  pollOptions?: { id: string; label: string; votes: number; isSelected?: boolean }[];
   topReplies?: { author: TeamMember; text: string }[];
+}
+
+export interface PostComment {
+  id: string;
+  postId: string;
+  authorId: string;
+  authorUsername: string;
+  authorDisplayName: string | null;
+  authorAvatarUrl: string | null;
+  textContent: string;
+  parentCommentId: string | null;
+  createdAt: number;
+  giftCount: number;
+  isReacted?: boolean;
+  reactionCount?: number;
 }
 
 export interface ChatMessage {
@@ -415,7 +433,7 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
           return {
             id: String(r.post_id ?? r.id),
             authorId: String(r.author_id),
-            type: isPinned ? 'announcement' : 'post',
+            type: r.is_poll ? 'poll' : (isPinned ? 'announcement' : 'post'),
             author,
             body: String(r.text_content ?? ''),
             media: r.media_url ? String(r.media_url) : undefined,
@@ -426,6 +444,9 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
             comments,
             isPinned,
             isAnnouncement: isPinned,
+            isReacted: !!r.is_reacted,
+            giftCount: Number(r.gift_count ?? 0),
+            isPoll: !!r.is_poll,
           } satisfies FeedItem;
         });
 
@@ -492,7 +513,7 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
           return {
             id: String(r.post_id ?? r.id),
             authorId: String(r.author_id),
-            type: isPinned ? 'announcement' : 'post',
+            type: r.is_poll ? 'poll' : (isPinned ? 'announcement' : 'post'),
             author,
             body: String(r.text_content ?? ''),
             media: r.media_url ? String(r.media_url) : undefined,
@@ -503,6 +524,9 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
             comments,
             isPinned,
             isAnnouncement: isPinned,
+            isReacted: !!r.is_reacted,
+            giftCount: Number(r.gift_count ?? 0),
+            isPoll: !!r.is_poll,
           } satisfies FeedItem;
         });
 
@@ -1127,13 +1151,13 @@ export function usePinPost() {
   return { mutate, pinPost, isLoading, error };
 }
 
-export function useReactToPost(teamId: string) {
+export function useReactToPost() {
   const supabase = useMemo(() => createClient(), []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const mutate = useCallback(
-    async ({ postId }: { postId: string }) => {
+  const reactToPost = useCallback(
+    async (postId: string): Promise<{ reaction_count: number; is_reacted: boolean } | null> => {
       setIsLoading(true);
       setError(null);
 
@@ -1143,7 +1167,9 @@ export function useReactToPost(teamId: string) {
           p_reaction_type: 'like',
         });
         if (rpcError) throw rpcError;
-        return data;
+        // RPC returns array with single row
+        const result = Array.isArray(data) ? data[0] : data;
+        return result as { reaction_count: number; is_reacted: boolean } | null;
       } catch (e) {
         setError(e as Error);
         throw e;
@@ -1154,7 +1180,7 @@ export function useReactToPost(teamId: string) {
     [supabase]
   );
 
-  return { mutate, isLoading, error };
+  return { reactToPost, isLoading, error };
 }
 
 export function useJoinTeam() {
@@ -1335,6 +1361,319 @@ export function useTeamNotificationPrefsBySlug(teamSlug: string | null) {
     ...base,
     error: base.error ?? resolveError,
   };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   POST COMMENTS HOOKS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function usePostComments(postId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const refetch = useCallback(async () => {
+    if (!postId) {
+      setComments([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: rpcError } = await supabase.rpc('rpc_get_post_comments', {
+        p_post_id: postId,
+        p_limit: 100,
+        p_offset: 0,
+      });
+
+      if (rpcError) throw rpcError;
+
+      const mapped: PostComment[] = ((data as any[]) || []).map((c) => ({
+        id: String(c.comment_id),
+        postId: String(c.post_id),
+        authorId: String(c.author_id),
+        authorUsername: String(c.author_username ?? 'Unknown'),
+        authorDisplayName: c.author_display_name ? String(c.author_display_name) : null,
+        authorAvatarUrl: c.author_avatar_url ? String(c.author_avatar_url) : null,
+        textContent: String(c.text_content ?? ''),
+        parentCommentId: c.parent_comment_id ? String(c.parent_comment_id) : null,
+        createdAt: new Date(c.created_at).getTime(),
+        giftCount: Number(c.gift_count ?? 0),
+      }));
+
+      setComments(mapped);
+    } catch (e) {
+      setError(e as Error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [postId, supabase]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { comments, isLoading, error, refetch };
+}
+
+export function useCreateComment() {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const createComment = useCallback(
+    async (postId: string, textContent: string, parentCommentId?: string) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_create_team_comment', {
+          p_post_id: postId,
+          p_text_content: textContent,
+          p_parent_comment_id: parentCommentId ?? null,
+        });
+
+        if (rpcError) throw rpcError;
+        return data;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  return { createComment, isLoading, error };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   GIFTING HOOKS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export function useGiftPost() {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const giftPost = useCallback(
+    async (postId: string, giftTypeId: number, coinsAmount: number) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_gift_team_post', {
+          p_post_id: postId,
+          p_gift_type_id: giftTypeId,
+          p_coins_amount: coinsAmount,
+        });
+
+        if (rpcError) throw rpcError;
+        return data;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  return { giftPost, isLoading, error };
+}
+
+export function useGiftComment() {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const giftComment = useCallback(
+    async (commentId: string, giftTypeId: number, coinsAmount: number) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_gift_team_comment', {
+          p_comment_id: commentId,
+          p_gift_type_id: giftTypeId,
+          p_coins_amount: coinsAmount,
+        });
+
+        if (rpcError) throw rpcError;
+        return data;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  return { giftComment, isLoading, error };
+}
+
+export function useReactToComment() {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const reactToComment = useCallback(
+    async (commentId: string) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_react_team_comment', {
+          p_comment_id: commentId,
+          p_reaction_type: 'like',
+        });
+
+        if (rpcError) throw rpcError;
+        return data;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  return { reactToComment, isLoading, error };
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   POLL HOOKS
+   ════════════════════════════════════════════════════════════════════════════ */
+
+export interface PollOption {
+  id: string;
+  text: string;
+  voteCount: number;
+  isSelected: boolean;
+}
+
+export function useCreatePoll(teamSlug: string) {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const createPoll = useCallback(
+    async (question: string, options: string[]) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_create_team_poll', {
+          p_team_slug: teamSlug,
+          p_question: question,
+          p_options: options,
+        });
+
+        if (rpcError) throw rpcError;
+        return data as string; // Returns post ID
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase, teamSlug]
+  );
+
+  return { createPoll, isLoading, error };
+}
+
+export function usePollOptions(postId: string | null) {
+  const supabase = useMemo(() => createClient(), []);
+  const [options, setOptions] = useState<PollOption[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const refetch = useCallback(async () => {
+    if (!postId) {
+      setOptions([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: rpcError } = await supabase.rpc('rpc_get_poll_options', {
+        p_post_id: postId,
+      });
+
+      if (rpcError) throw rpcError;
+
+      const mapped: PollOption[] = ((data as any[]) || []).map((o) => ({
+        id: String(o.option_id),
+        text: String(o.option_text),
+        voteCount: Number(o.vote_count ?? 0),
+        isSelected: !!o.is_selected,
+      }));
+
+      setOptions(mapped);
+    } catch (e) {
+      setError(e as Error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [postId, supabase]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { options, isLoading, error, refetch };
+}
+
+export function useVotePoll() {
+  const supabase = useMemo(() => createClient(), []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const vote = useCallback(
+    async (postId: string, optionId: string): Promise<PollOption[]> => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: rpcError } = await supabase.rpc('rpc_vote_team_poll', {
+          p_post_id: postId,
+          p_option_id: optionId,
+        });
+
+        if (rpcError) throw rpcError;
+
+        const mapped: PollOption[] = ((data as any[]) || []).map((o) => ({
+          id: String(o.option_id),
+          text: String(o.option_text),
+          voteCount: Number(o.vote_count ?? 0),
+          isSelected: !!o.is_selected,
+        }));
+
+        return mapped;
+      } catch (e) {
+        setError(e as Error);
+        throw e;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [supabase]
+  );
+
+  return { vote, isLoading, error };
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

@@ -91,7 +91,12 @@ export default function TeamAvatar({
           />
         ) : (
           <div
-            className="w-full h-full flex items-center justify-center text-xs font-bold text-white bg-gradient-to-br from-white/20 to-white/5"
+            className="w-full h-full flex items-center justify-center text-xs font-bold text-white"
+            style={
+              teamColor
+                ? { backgroundColor: teamColor }
+                : { backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))' }
+            }
           >
             {alt.slice(0, 2).toUpperCase()}
           </div>
@@ -153,6 +158,7 @@ interface TeamAvatarStackProps {
     src?: string | null;
     alt: string;
     isLive?: boolean;
+    color?: string;
   }>;
   maxVisible?: number;
   size?: AvatarContext;
@@ -180,6 +186,7 @@ export function TeamAvatarStack({
             alt={avatar.alt}
             size={size}
             isLive={avatar.isLive}
+            teamColor={avatar.color}
             className="ring-2 ring-[#0a0a0f]"
           />
         ))}
