@@ -288,7 +288,7 @@ export default function TeamPageContent() {
         {/* ══════════════════════════════════════════════════════════════════════
             SURFACE CONTENT
             ══════════════════════════════════════════════════════════════════════ */}
-        <main className="mt-4 space-y-4">
+        <main className="mt-4 space-y-3 md:space-y-4">
           {currentSurface === 'home' && (
             <HomeScreen
               liveMembers={liveMembers}
@@ -335,7 +335,10 @@ export default function TeamPageContent() {
           DOCKED CHAT BAR (visible on all surfaces except Chat)
           ══════════════════════════════════════════════════════════════════════ */}
       {currentSurface !== 'chat' && (
-        <DockedChatBar onOpenChat={() => setSurface('chat')} />
+        <DockedChatBar
+          onOpenChat={() => setSurface('chat')}
+          priority={currentSurface === 'feed' && sortedFeed.length === 0 ? 'subtle' : 'default'}
+        />
       )}
 
       {/* ══════════════════════════════════════════════════════════════════════
@@ -352,18 +355,26 @@ export default function TeamPageContent() {
   );
 }
 
-function DockedChatBar({ onOpenChat }: { onOpenChat: () => void }) {
+function DockedChatBar({ onOpenChat, priority = 'default' }: { onOpenChat: () => void; priority?: 'default' | 'subtle' }) {
+  const isSubtle = priority === 'subtle';
+
   return (
-    <div className="fixed bottom-[68px] inset-x-0 z-40 border-t border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl">
+    <div
+      className={`fixed bottom-[68px] inset-x-0 z-40 border-t ${
+        isSubtle ? 'border-white/5 bg-black/70 backdrop-blur' : 'border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl'
+      }`}
+    >
       <div className="mx-auto max-w-5xl px-4 py-2">
         <button
           onClick={onOpenChat}
-          className="flex w-full items-center gap-3 rounded-2xl bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
+          className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
+            isSubtle ? 'bg-white/5 text-white/80 hover:bg-white/10' : 'bg-white/5 hover:bg-white/10'
+          }`}
         >
-          <MessageCircle className="h-5 w-5 text-purple-400" />
+          <MessageCircle className={`h-5 w-5 ${isSubtle ? 'text-white/50' : 'text-purple-400'}`} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white">Team Chat</p>
-            <p className="truncate text-xs text-white/50">Tap to open chat</p>
+            <p className={`text-sm font-medium ${isSubtle ? 'text-white/80' : 'text-white'}`}>Team Chat</p>
+            <p className={`truncate text-xs ${isSubtle ? 'text-white/40' : 'text-white/50'}`}>Tap to open chat</p>
           </div>
         </button>
       </div>
@@ -825,6 +836,7 @@ function FeedScreen({
 }) {
   const [postText, setPostText] = useState('');
   const createPost = useCreatePost(teamSlug);
+  const isFeedEmpty = feedItems.length === 0;
   
   const handleSubmitPost = async () => {
     if (!postText.trim() || !canPost) return;
@@ -843,35 +855,54 @@ function FeedScreen({
       
       {/* Composer */}
       {canPost && !isMuted && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="flex gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-500/20">
-              <Hash className="h-5 w-5 text-purple-400" />
+        <div className="relative overflow-hidden rounded-3xl border border-purple-500/30 bg-gradient-to-br from-[#1c1533] via-[#141228] to-[#090912] p-5 shadow-[0_20px_55px_rgba(60,27,119,0.45)] ring-1 ring-white/10">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{ background: 'radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.45), transparent 55%)' }}
+          />
+          <div className="relative flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.35em] text-white/50">
+              <span>Start the conversation</span>
+              <span className="text-white/40">Your update notifies the team</span>
             </div>
-            <div className="flex-1">
-              <Textarea
-                value={postText}
-                onChange={(e) => setPostText(e.target.value)}
-                placeholder="Share something with the team..."
-                className="min-h-[80px] resize-none border-0 bg-transparent text-white placeholder:text-white/40 focus:ring-0"
-              />
-              <div className="mt-3 flex items-center justify-between">
-                <div className="flex gap-2">
-                  <button className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white">
-                    <ImageIcon className="h-5 w-5" />
-                  </button>
-                  <button className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white">
-                    <TrendingUp className="h-5 w-5" />
-                  </button>
+            <div className="flex gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/30 text-purple-200 ring-1 ring-purple-400/40 shadow-[0_0_35px_rgba(139,92,246,0.35)]">
+                <Hash className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <Textarea
+                  value={postText}
+                  onChange={(e) => setPostText(e.target.value)}
+                  placeholder="Share something with the team..."
+                  className="min-h-[88px] w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-purple-400/60 focus:ring-0"
+                />
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex gap-2">
+                    <button className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white">
+                      <span className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" />
+                        Media
+                      </span>
+                    </button>
+                    <button className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white">
+                      <span className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        Poll
+                      </span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-white/45">Share a win, idea, or request.</p>
+                    <Button 
+                      size="sm" 
+                      className="rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(167,139,250,0.35)] hover:from-purple-400 hover:to-pink-400"
+                      onClick={handleSubmitPost}
+                      disabled={!postText.trim() || createPost.isLoading}
+                    >
+                      {createPost.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Post'}
+                    </Button>
+                  </div>
                 </div>
-                <Button 
-                  size="sm" 
-                  className="bg-purple-500 hover:bg-purple-600"
-                  onClick={handleSubmitPost}
-                  disabled={!postText.trim() || createPost.isLoading}
-                >
-                  {createPost.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Post'}
-                </Button>
               </div>
             </div>
           </div>
@@ -879,7 +910,7 @@ function FeedScreen({
       )}
 
       {/* Sort Controls */}
-      <div className="flex items-center gap-2">
+      <div className={`mt-4 flex flex-wrap items-center gap-2 ${isFeedEmpty ? 'text-white/40' : ''}`}>
         {(['hot', 'new', 'top'] as FeedSort[]).map((sort) => (
           <Chip
             key={sort}
@@ -887,7 +918,13 @@ function FeedScreen({
             variant="outline"
             selected={feedSort === sort}
             onClick={() => onSortChange(sort)}
-            className={feedSort === sort ? 'border-purple-400 bg-purple-500/20 text-white' : 'border-white/20 text-white/60'}
+            className={
+              feedSort === sort
+                ? 'border-purple-400 bg-purple-500/20 text-white shadow-[0_0_15px_rgba(139,92,246,0.45)]'
+                : isFeedEmpty
+                ? 'border-white/10 text-white/35'
+                : 'border-white/20 text-white/60'
+            }
             icon={sort === 'hot' ? <Flame className="h-3 w-3" /> : sort === 'new' ? <Clock className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
           >
             {sort.charAt(0).toUpperCase() + sort.slice(1)}
@@ -916,18 +953,27 @@ function FeedScreen({
       ))}
 
       {/* Feed Items */}
-      {feedItems.length > 0 ? (
+      {isFeedEmpty ? (
+        <div className="rounded-2xl border border-dashed border-white/15 bg-white/5 px-5 py-6 text-center shadow-inner shadow-purple-900/30">
+          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-purple-500/15 text-purple-200">
+            <ArrowUp className="h-5 w-5" />
+          </div>
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.35em] text-white/40">Start the conversation</p>
+          <p className="mt-2 text-base font-semibold text-white">Nothing has been posted yet</p>
+          <p className="mt-1 text-sm text-white/60">
+            Drop the first update using the composer above—everyone will feel the spark.
+          </p>
+          <div className="mt-3 flex items-center justify-center gap-2 text-xs text-white/45">
+            <ArrowUp className="h-4 w-4" />
+            <span>Tap the glowing box above to share something</span>
+          </div>
+        </div>
+      ) : (
         <div className="space-y-3">
           {feedItems.map((item) => (
             <FeedCard key={item.id} item={item} />
           ))}
         </div>
-      ) : (
-        <EmptyState
-          icon={<Hash className="h-6 w-6 text-white/50" />}
-          title="No posts yet"
-          description="Be the first to share something with the team!"
-        />
       )}
     </>
   );
