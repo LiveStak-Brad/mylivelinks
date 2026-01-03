@@ -47,6 +47,7 @@ import {
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
 import { useTeamContext, Surface, TeamLiveVisibility, TeamLiveRoomState } from '@/contexts/TeamContext';
+import { deleteTeamAsset, uploadTeamAsset } from '@/lib/teamAssets';
 import {
   useTeam,
   useTeamMembership,
@@ -1691,9 +1692,14 @@ function SettingsScreen({
   isLiveVisibilityUpdating: boolean;
 }) {
   const { toast } = useToast();
+  const { refreshTeam, teamId } = useTeamContext();
   const isLeader = role === 'leader';
   const shareLink = `https://www.mylivelinks.com/teams/${team.slug}`;
   const [copied, setCopied] = useState(false);
+  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [isDeletingIcon, setIsDeletingIcon] = useState(false);
+  const [isDeletingBanner, setIsDeletingBanner] = useState(false);
 
   const { mutate: leaveTeam, isLoading: isLeaving } = useLeaveTeamBySlug(team.slug);
   const { prefs, updatePref, isSaving: isSavingPrefs } = useTeamNotificationPrefsBySlug(team.slug);
@@ -1750,6 +1756,66 @@ function SettingsScreen({
     }
   };
 
+  const handleUpload = async (file: File, type: 'icon' | 'banner') => {
+    if (!teamId) {
+      toast({ title: 'Unable to update', description: 'Team not loaded yet.', variant: 'error' });
+      return;
+    }
+    if (!isLeader) {
+      toast({ title: 'Forbidden', description: 'Only Team Admins can edit team assets.', variant: 'error' });
+      return;
+    }
+
+    const setUploading = type === 'icon' ? setIsUploadingIcon : setIsUploadingBanner;
+    setUploading(true);
+    try {
+      const res = await uploadTeamAsset(teamId, file, type);
+      if (!res.success) {
+        throw new Error(res.error || 'Upload failed');
+      }
+      await refreshTeam();
+      toast({
+        title: 'Updated',
+        description: type === 'icon' ? 'Team photo updated.' : 'Team banner updated.',
+        variant: 'success',
+      });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err?.message || 'Unknown error', variant: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (type: 'icon' | 'banner') => {
+    if (!teamId) {
+      toast({ title: 'Unable to update', description: 'Team not loaded yet.', variant: 'error' });
+      return;
+    }
+    if (!isLeader) {
+      toast({ title: 'Forbidden', description: 'Only Team Admins can edit team assets.', variant: 'error' });
+      return;
+    }
+
+    const setDeleting = type === 'icon' ? setIsDeletingIcon : setIsDeletingBanner;
+    setDeleting(true);
+    try {
+      const res = await deleteTeamAsset(teamId, type);
+      if (!res.success) {
+        throw new Error(res.error || 'Delete failed');
+      }
+      await refreshTeam();
+      toast({
+        title: 'Removed',
+        description: type === 'icon' ? 'Team photo removed.' : 'Team banner removed.',
+        variant: 'success',
+      });
+    } catch (err: any) {
+      toast({ title: 'Remove failed', description: err?.message || 'Unknown error', variant: 'error' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -1762,6 +1828,90 @@ function SettingsScreen({
             <Badge className="bg-purple-500/20 text-purple-300 text-[10px]">Leader</Badge>
           )}
         </div>
+        {isLeader && (
+          <div className="mt-4 space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <p className="text-sm font-semibold text-white">Team Photo</p>
+                <p className="text-xs text-white/50">Square icon used in tiles and headers.</p>
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="relative h-14 w-14 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+                    {team.iconUrl ? (
+                      <Image src={team.iconUrl} alt="Team icon" fill className="object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-white/20">
+                        <ImageIcon className="h-6 w-6" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="inline-flex">
+                      <span className="sr-only">Upload team photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingIcon || isDeletingIcon}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void handleUpload(file, 'icon');
+                          e.currentTarget.value = '';
+                        }}
+                        className="block w-full text-xs text-white/60 file:mr-3 file:rounded-lg file:border-0 file:bg-purple-500/20 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-purple-200 hover:file:bg-purple-500/30"
+                      />
+                    </label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleDelete('icon')}
+                      disabled={!team.iconUrl || isUploadingIcon || isDeletingIcon}
+                      className="border-white/20 text-white/80 hover:bg-white/10"
+                    >
+                      {isDeletingIcon ? 'Removing...' : 'Remove photo'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <p className="text-sm font-semibold text-white">Team Banner</p>
+                <p className="text-xs text-white/50">Wide header image shown on your team page.</p>
+                <div className="mt-3 space-y-2">
+                  <div className="relative h-20 w-full overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+                    {team.bannerUrl ? (
+                      <Image src={team.bannerUrl} alt="Team banner" fill className="object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-white/20">
+                        <ImageIcon className="h-6 w-6" />
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={isUploadingBanner || isDeletingBanner}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleUpload(file, 'banner');
+                      e.currentTarget.value = '';
+                    }}
+                    className="block w-full text-xs text-white/60 file:mr-3 file:rounded-lg file:border-0 file:bg-purple-500/20 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-purple-200 hover:file:bg-purple-500/30"
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleDelete('banner')}
+                      disabled={!team.bannerUrl || isUploadingBanner || isDeletingBanner}
+                      className="border-white/20 text-white/80 hover:bg-white/10"
+                    >
+                      {isDeletingBanner ? 'Removing...' : 'Remove banner'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="mt-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm text-white/70">Team Name</span>
