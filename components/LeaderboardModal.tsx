@@ -63,6 +63,7 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
         p_type: type,
         p_period: period,
         p_limit: 50,
+        p_room_id: null,
       });
 
       if (error) throw error;

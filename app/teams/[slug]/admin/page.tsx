@@ -5,18 +5,17 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   Users,
   UserPlus,
-  Shield,
   ShieldAlert,
-  Activity,
   ArrowLeft,
   Loader2,
   Check,
   X,
   Ban,
-  VolumeX,
   Clock,
+  RefreshCcw,
+  Trash2,
 } from 'lucide-react';
-import { Button, Badge, Input } from '@/components/ui';
+import { Button, Badge } from '@/components/ui';
 import { createClient } from '@/lib/supabase';
 
 /**
@@ -37,6 +36,25 @@ interface TeamMemberRecord {
   banned_at: string | null;
   profile: {
     username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
+interface TeamInviteRecord {
+  id: number;
+  invitee_id: string;
+  inviter_id: string;
+  status: string;
+  message: string | null;
+  created_at: string;
+  invitee: {
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+  inviter: {
+    username: string | null;
     display_name: string | null;
     avatar_url: string | null;
   };
@@ -65,6 +83,7 @@ export default function TeamAdminPage() {
   const [viewerRole, setViewerRole] = useState<string | null>(null);
   const [members, setMembers] = useState<TeamMemberRecord[]>([]);
   const [requests, setRequests] = useState<TeamMemberRecord[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<TeamInviteRecord[]>([]);
   const [activeTab, setActiveTab] = useState<'requests' | 'members' | 'audit'>('requests');
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -160,6 +179,33 @@ export default function TeamAdminPage() {
         .order('approved_at', { ascending: false });
 
       setMembers((membersData as any) || []);
+
+      // Load pending invites
+      const { data: invitesData } = await supabase
+        .from('team_invites')
+        .select(`
+          id,
+          invitee_id,
+          inviter_id,
+          status,
+          message,
+          created_at,
+          invitee:profiles!team_invites_invitee_id_fkey (
+            username,
+            display_name,
+            avatar_url
+          ),
+          inviter:profiles!team_invites_inviter_id_fkey (
+            username,
+            display_name,
+            avatar_url
+          )
+        `)
+        .eq('team_id', teamData.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      setPendingInvites((invitesData as any) || []);
     } catch (err: any) {
       console.error('[admin] Load error:', err);
       setError(err?.message || 'Failed to load admin data');
@@ -254,6 +300,49 @@ export default function TeamAdminPage() {
     } catch (err: any) {
       console.error('[admin] Ban error:', err);
       alert(err?.message || 'Failed to ban member');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCancelInvite = async (inviteId: number) => {
+    if (!team) return;
+    if (!confirm('Remove this invite? The user will no longer see it.')) return;
+    setActionLoading(`cancel-invite-${inviteId}`);
+    try {
+      const { data, error } = await supabase.rpc('rpc_cancel_team_invite', {
+        p_invite_id: inviteId,
+      });
+
+      if (error || !data?.success) {
+        throw error || new Error(data?.error || 'Unable to cancel invite');
+      }
+
+      await loadAdminData();
+    } catch (err: any) {
+      console.error('[admin] Cancel invite error:', err);
+      alert(err?.message || 'Failed to remove invite');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResendInvite = async (inviteId: number) => {
+    if (!team) return;
+    setActionLoading(`resend-invite-${inviteId}`);
+    try {
+      const { data, error } = await supabase.rpc('rpc_resend_team_invite', {
+        p_invite_id: inviteId,
+      });
+
+      if (error || !data?.success) {
+        throw error || new Error(data?.error || 'Unable to resend invite');
+      }
+
+      await loadAdminData();
+    } catch (err: any) {
+      console.error('[admin] Resend invite error:', err);
+      alert(err?.message || 'Failed to resend invite');
     } finally {
       setActionLoading(null);
     }
@@ -441,81 +530,189 @@ export default function TeamAdminPage() {
         )}
 
         {activeTab === 'members' && (
-          <div className="space-y-4">
-            {members.map((member) => (
-              <div
-                key={member.profile_id}
-                className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center gap-4"
-              >
-                {/* Avatar */}
-                <div className="h-12 w-12 rounded-full bg-purple-500/30 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {member.profile.avatar_url ? (
-                    <img
-                      src={member.profile.avatar_url}
-                      alt={member.profile.username}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm font-bold text-purple-300">
-                      {(member.profile.display_name || member.profile.username)[0].toUpperCase()}
-                    </span>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-white truncate">
-                      {member.profile.display_name || member.profile.username}
-                    </p>
-                    <Badge
-                      className={
-                        member.role === 'Team_Admin'
-                          ? 'bg-amber-500/20 text-amber-300 text-xs'
-                          : member.role === 'Team_Moderator'
-                          ? 'bg-purple-500/20 text-purple-300 text-xs'
-                          : 'bg-white/10 text-white/60 text-xs'
-                      }
-                    >
-                      {member.role === 'Team_Admin' ? 'Admin' : member.role === 'Team_Moderator' ? 'Moderator' : 'Member'}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-white/50">@{member.profile.username}</p>
-                  {member.approved_at && (
-                    <p className="text-xs text-white/40 mt-1">
-                      Joined {new Date(member.approved_at).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-
-                {/* Actions */}
-                {canChangeRoles && member.role !== 'Team_Admin' && (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={member.role}
-                      onChange={(e) => handleChangeRole(member.profile_id, e.target.value)}
-                      disabled={!!actionLoading}
-                      className="rounded-lg bg-white/5 border border-white/10 text-white text-sm px-3 py-2"
-                    >
-                      <option value="Team_Member">Member</option>
-                      <option value="Team_Moderator">Moderator</option>
-                      <option value="Team_Admin">Admin</option>
-                    </select>
-                    {canBan && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleBanMember(member.profile_id)}
-                        disabled={!!actionLoading}
-                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-                      >
-                        <Ban className="h-4 w-4" />
-                      </Button>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="space-y-4">
+              {members.map((member) => (
+                <div
+                  key={member.profile_id}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center gap-4"
+                >
+                  {/* Avatar */}
+                  <div className="h-12 w-12 rounded-full bg-purple-500/30 flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {member.profile.avatar_url ? (
+                      <img
+                        src={member.profile.avatar_url}
+                        alt={member.profile.username}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm font-bold text-purple-300">
+                        {(member.profile.display_name || member.profile.username)[0].toUpperCase()}
+                      </span>
                     )}
                   </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-white truncate">
+                        {member.profile.display_name || member.profile.username}
+                      </p>
+                      <Badge
+                        className={
+                          member.role === 'Team_Admin'
+                            ? 'bg-amber-500/20 text-amber-300 text-xs'
+                            : member.role === 'Team_Moderator'
+                            ? 'bg-purple-500/20 text-purple-300 text-xs'
+                            : 'bg-white/10 text-white/60 text-xs'
+                        }
+                      >
+                        {member.role === 'Team_Admin' ? 'Admin' : member.role === 'Team_Moderator' ? 'Moderator' : 'Member'}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-white/50">@{member.profile.username}</p>
+                    {member.approved_at && (
+                      <p className="text-xs text-white/40 mt-1">
+                        Joined {new Date(member.approved_at).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  {canChangeRoles && member.role !== 'Team_Admin' && (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={member.role}
+                        onChange={(e) => handleChangeRole(member.profile_id, e.target.value)}
+                        disabled={!!actionLoading}
+                        className="rounded-lg bg-white/5 border border-white/10 text-white text-sm px-3 py-2"
+                      >
+                        <option value="Team_Member">Member</option>
+                        <option value="Team_Moderator">Moderator</option>
+                        <option value="Team_Admin">Admin</option>
+                      </select>
+                      {canBan && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleBanMember(member.profile_id)}
+                          disabled={!!actionLoading}
+                          className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                        >
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white/60 uppercase tracking-wide">Invited Members</p>
+                  <p className="text-xl font-semibold text-white">
+                    {pendingInvites.length} pending
+                  </p>
+                </div>
+                <Badge className="bg-white/10 text-white/70 text-xs">Team invite list</Badge>
+              </div>
+              <p className="text-sm text-white/50">
+                Cancel invites or resend the notification. Invited members can join in addition to any other teams they are already part of.
+              </p>
+
+              <div className="space-y-3">
+                {pendingInvites.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-6 text-center">
+                    <Users className="h-8 w-8 text-white/30 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-white">No pending invites</p>
+                    <p className="text-xs text-white/50">Send invites from the team page to populate this list.</p>
+                  </div>
+                ) : (
+                  pendingInvites.map((invite) => (
+                    <div
+                      key={invite.id}
+                      className="rounded-xl border border-white/10 bg-[#0f0f15] p-4 flex flex-col gap-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 rounded-full bg-purple-500/30 flex items-center justify-center overflow-hidden flex-shrink-0">
+                          {invite.invitee?.avatar_url ? (
+                            <img
+                              src={invite.invitee.avatar_url}
+                              alt={invite.invitee.username}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-sm font-bold text-purple-200">
+                              {(invite.invitee?.display_name || invite.invitee?.username || '?')[0].toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-white truncate">
+                            {invite.invitee?.display_name || invite.invitee?.username || 'Unknown user'}
+                          </p>
+                          {invite.invitee?.username && (
+                            <p className="text-xs text-white/50">@{invite.invitee.username}</p>
+                          )}
+                          <p className="text-xs text-white/40 mt-1 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Invited {new Date(invite.created_at).toLocaleDateString()}
+                          </p>
+                          <p className="text-xs text-white/40">
+                            Invited by {invite.inviter?.display_name || invite.inviter?.username || 'team admin'}
+                          </p>
+                          {invite.message && (
+                            <p className="mt-2 rounded-lg bg-white/5 p-2 text-xs text-white/70">
+                              “{invite.message}”
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCancelInvite(invite.id)}
+                          disabled={!!actionLoading}
+                          className="flex-1 border-white/20 text-white/80 hover:bg-white/10"
+                        >
+                          {actionLoading === `cancel-invite-${invite.id}` ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Remove invite
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleResendInvite(invite.id)}
+                          disabled={!!actionLoading}
+                          className="flex-1 bg-purple-500/80 hover:bg-purple-500 text-white"
+                        >
+                          {actionLoading === `resend-invite-${invite.id}` ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <RefreshCcw className="h-4 w-4 mr-1" />
+                              Re-send
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
-            ))}
+
+              <p className="text-xs text-white/40">
+                Tip: Members can be part of multiple teams, so resending an invite won’t remove them from any existing communities.
+              </p>
+            </div>
           </div>
         )}
       </main>
