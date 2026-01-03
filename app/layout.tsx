@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import './globals.css';
@@ -62,7 +63,9 @@ export default function RootLayout({
             <ToastProvider>
               <NotiesProvider>
                 <MessagesProvider>
-                  <NavigationWrapper />
+                  <Suspense fallback={null}>
+                    <NavigationWrapper />
+                  </Suspense>
                   <GlobalLiveFloatingButton />
                   <AgeVerificationModal />
                   <IMProvider />
