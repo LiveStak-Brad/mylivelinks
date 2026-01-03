@@ -3,6 +3,7 @@
 import { CSSProperties, ReactNode, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase';
 import {
   ArrowUp,
   Bell,
@@ -21,6 +22,7 @@ import {
   MessageCircle,
   Mic,
   MoreHorizontal,
+  Pin,
   PlusCircle,
   Radio,
   Search,
@@ -29,6 +31,7 @@ import {
   Share2,
   Shield,
   Sparkles,
+  Trash2,
   TrendingUp,
   Users,
   Video,
@@ -48,6 +51,7 @@ import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
 import { useTeamContext, Surface, TeamLiveVisibility, TeamLiveRoomState } from '@/contexts/TeamContext';
 import { deleteTeamAsset, uploadTeamAsset } from '@/lib/teamAssets';
+import type { PendingTeamInvite } from '@/lib/teamInvites';
 import {
   useTeam,
   useTeamMembership,
@@ -57,6 +61,8 @@ import {
   useTeamLiveRooms,
   useTeamChat,
   useCreatePost,
+  useDeletePost,
+  usePinPost,
   useReactToPost,
   useLeaveTeamBySlug,
   useSendChatMessage,
@@ -89,6 +95,16 @@ type TeamLiveViewState = {
   visibility: TeamLiveVisibility;
   isLoading: boolean;
 };
+type LiveMemberEntry = {
+  profileId: string;
+  username: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  streamingMode: 'solo' | 'group' | string;
+  streamId: number;
+  destination: string;
+  teamSlug?: string | null;
+};
 
 /* ════════════════════════════════════════════════════════════════════════════
    MAIN PAGE COMPONENT
@@ -114,8 +130,16 @@ export default function TeamPageContent() {
     canToggleTeamLiveVisibility,
     isUpdatingTeamLiveVisibility,
     updateTeamLiveVisibility,
+    pendingInvite,
+    pendingInviteLoading,
+    acceptPendingInvite,
+    declinePendingInvite,
+    dismissPendingInvite,
   } = useTeamContext();
   const router = useRouter();
+  const supabaseClient = useMemo(() => createClient(), []);
+  const [liveMemberEntries, setLiveMemberEntries] = useState<LiveMemberEntry[]>([]);
+  const [liveMembersLoading, setLiveMembersLoading] = useState(false);
   
   const [feedSort, setFeedSort] = useState<FeedSort>('hot');
   const [topRange, setTopRange] = useState<TopRange>('24h');
@@ -123,7 +147,7 @@ export default function TeamPageContent() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   
   // Fetch data using shared hooks (cached, no duplicate requests)
-  const { data: feedData, isLoading: feedLoading, refetch: refetchFeed } = useTeamFeed(teamId, feedSort);
+  const { data: feedData, isLoading: feedLoading, refetch: refetchFeed, loadMore, hasMore, isLoadingMore } = useTeamFeed(teamId, feedSort);
   const { data: membersRaw, isLoading: membersLoading } = useTeamMembers(teamId, 'all');
   const { data: presenceData } = useTeamPresence(teamId);
   const { data: liveRoomsRaw, isLoading: liveLoading } = useTeamLiveRooms(teamId);
@@ -133,19 +157,167 @@ export default function TeamPageContent() {
   const feedItems = feedData?.feedItems ?? [];
   const members = Array.isArray(membersRaw) ? membersRaw : [];
   const liveRooms = Array.isArray(liveRoomsRaw) ? liveRoomsRaw : [];
+  const memberProfileIds = useMemo(
+    () => members.map((member) => member.id).filter(Boolean),
+    [members]
+  );
   
-  // Debug: log feed data
   useEffect(() => {
-    console.log('[TeamPageContent] feedData:', feedData);
-    console.log('[TeamPageContent] feedItems count:', feedItems.length);
-    console.log('[TeamPageContent] feedLoading:', feedLoading);
-  }, [feedData, feedItems.length, feedLoading]);
+    let cancelled = false;
+    if (!teamId || memberProfileIds.length === 0) {
+      setLiveMemberEntries([]);
+      setLiveMembersLoading(false);
+      return;
+    }
+    
+    const loadLiveMembers = async () => {
+      setLiveMembersLoading(true);
+      try {
+        const { data: streamRows, error: streamError } = await supabaseClient
+          .from('live_streams')
+          .select(`
+            id,
+            profile_id,
+            streaming_mode,
+            live_available,
+            profiles:profiles!live_streams_profile_id_fkey(username, display_name, avatar_url)
+          `)
+          .eq('live_available', true)
+          .in('profile_id', memberProfileIds)
+          .order('started_at', { ascending: false })
+          .limit(60);
+        
+        if (streamError) throw streamError;
+        
+        const normalizedStreams = (streamRows ?? [])
+          .map((row: any) => {
+            const streamId =
+              typeof row?.id === 'number' ? row.id : Number.parseInt(String(row?.id ?? '0'), 10);
+            if (!Number.isFinite(streamId)) return null;
+            const streamingMode = (row?.streaming_mode as string | null) ?? 'solo';
+            const profileId = String(row?.profile_id ?? '');
+            if (!profileId) return null;
+            const username =
+              (row?.profiles?.username as string | undefined) ||
+              (row?.profiles?.display_name as string | undefined) ||
+              profileId.slice(0, 8);
+            const displayName = (row?.profiles?.display_name as string | undefined) ?? null;
+            const avatarUrl = (row?.profiles?.avatar_url as string | undefined) ?? null;
+            return { streamId, streamingMode, profileId, username, displayName, avatarUrl };
+          })
+          .filter((row): row is {
+            streamId: number;
+            streamingMode: string;
+            profileId: string;
+            username: string;
+            displayName: string | null;
+            avatarUrl: string | null;
+          } => !!row);
+        
+        const groupStreamIds = normalizedStreams
+          .filter((row) => row.streamingMode === 'group')
+          .map((row) => row.streamId);
+        
+        const teamSlugByStreamId = new Map<number, string | null>();
+        if (groupStreamIds.length > 0) {
+          const { data: roomRows, error: roomError } = await supabaseClient
+            .from('team_live_rooms')
+            .select('live_stream_id, team_id')
+            .in('live_stream_id', groupStreamIds);
+          
+          if (!roomError && Array.isArray(roomRows) && roomRows.length > 0) {
+            const teamIds = Array.from(
+              new Set(
+                roomRows
+                  .map((row: any) => row?.team_id)
+                  .filter((id: any): id is string => typeof id === 'string')
+              )
+            );
+            
+            const teamSlugMap = new Map<string, string>();
+            if (teamIds.length > 0) {
+              const { data: teamRows, error: teamError } = await supabaseClient
+                .from('teams')
+                .select('id, slug')
+                .in('id', teamIds);
+              
+              if (!teamError && Array.isArray(teamRows)) {
+                teamRows.forEach((teamRow: any) => {
+                  if (teamRow?.id && teamRow?.slug) {
+                    teamSlugMap.set(String(teamRow.id), String(teamRow.slug));
+                  }
+                });
+              }
+            }
+            
+            roomRows.forEach((room: any) => {
+              const streamId =
+                typeof room?.live_stream_id === 'number'
+                  ? room.live_stream_id
+                  : Number.parseInt(String(room?.live_stream_id ?? '0'), 10);
+              if (!Number.isFinite(streamId)) return;
+              const slug =
+                room?.team_id && teamSlugMap.has(String(room.team_id))
+                  ? teamSlugMap.get(String(room.team_id))!
+                  : null;
+              teamSlugByStreamId.set(streamId, slug);
+            });
+          }
+        }
+        
+        const deduped = new Map<string, LiveMemberEntry>();
+        normalizedStreams.forEach((row) => {
+          if (deduped.has(row.profileId)) return;
+          const streamId = row.streamId;
+          const teamSlug = teamSlugByStreamId.get(streamId) ?? null;
+          const destination =
+            row.streamingMode === 'group'
+              ? teamSlug
+                ? `/teams/room/${teamSlug}`
+                : '/room/live-central'
+              : `/live/${encodeURIComponent(row.username)}`;
+          
+          deduped.set(row.profileId, {
+            profileId: row.profileId,
+            username: row.username,
+            displayName: row.displayName,
+            avatarUrl: row.avatarUrl,
+            streamingMode: row.streamingMode,
+            streamId,
+            destination,
+            teamSlug: teamSlug ?? undefined,
+          });
+        });
+        
+        if (!cancelled) {
+          setLiveMemberEntries(Array.from(deduped.values()).slice(0, 15));
+        }
+      } catch (err) {
+        console.error('[TeamHome] Failed to load live members', err);
+        if (!cancelled) {
+          setLiveMemberEntries([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLiveMembersLoading(false);
+        }
+      }
+    };
+    
+    void loadLiveMembers();
+    
+    return () => {
+      cancelled = true;
+    };
+  }, [memberProfileIds, supabaseClient, teamId, presenceData?.liveCount]);
   
   // Derive counts
-  const liveMembers = members.filter((m) => m.activity === 'live' || m.isStreaming);
   const onlineMembers = members.filter((m) => m.activity === 'online');
   const onlineCount = presenceData?.onlineCount ?? onlineMembers.length;
   const liveCount = presenceData?.liveCount ?? liveRooms.length;
+  const canViewLiveMemberPresence =
+    (membership?.status === 'approved') ||
+    ((teamLiveRoomConfig?.visibility ?? 'private') === 'public');
   
   // Sort feed
   const sortedFeed = useMemo(() => {
@@ -170,6 +342,13 @@ export default function TeamPageContent() {
     if (!team?.slug || !isTeamLiveUnlocked) return;
     router.push(`/teams/room/${team.slug}`);
   }, [router, team?.slug, isTeamLiveUnlocked]);
+  const handleLiveMemberNavigate = useCallback(
+    (destination: string) => {
+      if (!destination) return;
+      router.push(destination);
+    },
+    [router]
+  );
   const goLiveCta = useMemo<GoLiveCtaState>(() => {
     const label = isTeamLiveUnlocked ? 'Go Live' : 'Unlock at 100 members';
     const helper = isTeamLiveUnlocked
@@ -326,7 +505,7 @@ export default function TeamPageContent() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 pb-40">
+      <div className="mx-auto max-w-5xl px-4 pb-6">
         {/* ══════════════════════════════════════════════════════════════════════
             NAVIGATION TABS
             ══════════════════════════════════════════════════════════════════════ */}
@@ -347,21 +526,27 @@ export default function TeamPageContent() {
             SURFACE CONTENT
             ══════════════════════════════════════════════════════════════════════ */}
         <main className="mt-4 space-y-3 md:space-y-4">
-          {currentSurface === 'home' && (
-            <HomeScreen
-              liveMembers={liveMembers}
-              onlineCount={onlineCount}
-              liveCount={liveCount}
-              pinnedItems={pinnedItems}
-              feedItems={sortedFeed.slice(0, 5)}
-              liveRooms={liveRooms}
-              team={team}
+        {currentSurface === 'home' && (
+          <HomeScreen
+            liveMemberEntries={liveMemberEntries}
+            liveMembersLoading={liveMembersLoading}
+            canViewLiveMembers={canViewLiveMemberPresence}
+            onlineCount={onlineCount}
+            liveCount={liveCount}
+            pinnedItems={pinnedItems}
+            feedItems={sortedFeed.slice(0, 5)}
+            liveRooms={liveRooms}
+            team={team}
             goLiveCta={goLiveCta}
-              onGoToFeed={() => setSurface('feed')}
-              onGoToLive={() => setSurface('live')}
-              onGoToChat={() => setSurface('chat')}
-            />
-          )}
+            onGoToFeed={() => setSurface('feed')}
+            onGoToLive={() => setSurface('live')}
+            onGoToChat={() => setSurface('chat')}
+            onLiveMemberNavigate={handleLiveMemberNavigate}
+            viewerProfileId={membership?.profileId ?? null}
+            canModerate={permissions.canModerate}
+            onPostCreated={refetchFeed}
+          />
+        )}
           {currentSurface === 'feed' && (
             <FeedScreen
               pinnedItems={pinnedItems}
@@ -373,21 +558,24 @@ export default function TeamPageContent() {
               teamSlug={teamSlug ?? ''}
               canPost={permissions.canPost}
               isMuted={permissions.isMuted}
+              viewerProfileId={membership?.profileId ?? null}
+              canModerate={permissions.canModerate}
               onPostCreated={refetchFeed}
+              loadMore={loadMore}
+              hasMore={hasMore}
+              isLoadingMore={isLoadingMore}
             />
           )}
           {currentSurface === 'chat' && (
             <ChatScreen teamId={teamId} members={members} canChat={permissions.canPost && !permissions.isMuted} />
           )}
           {currentSurface === 'live' && (
-          <LiveScreen
-            liveRooms={liveRooms}
-            members={members}
-            role={uiRole}
-            isLoading={liveLoading}
-            teamLiveState={teamLiveState}
-            onLaunchTeamRoom={handleGoLiveClick}
-          />
+            <LiveScreen
+              liveRooms={liveRooms}
+              isLoading={liveLoading}
+              teamLiveState={teamLiveState}
+              onLaunchTeamRoom={handleGoLiveClick}
+            />
           )}
           {currentSurface === 'members' && (
             <MembersScreen members={members} isLoading={membersLoading} />
@@ -423,6 +611,18 @@ export default function TeamPageContent() {
           teamName={team.name}
           teamSlug={team.slug}
           onClose={() => setShowInviteModal(false)}
+        />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          PENDING INVITE ACCEPTANCE MODAL
+          ══════════════════════════════════════════════════════════════════════ */}
+      {pendingInvite && (
+        <PendingInviteModal
+          invite={pendingInvite}
+          onAccept={acceptPendingInvite}
+          onDecline={declinePendingInvite}
+          onDismiss={dismissPendingInvite}
         />
       )}
     </div>
@@ -606,7 +806,9 @@ function NavTab({
    ════════════════════════════════════════════════════════════════════════════ */
 
 function HomeScreen({
-  liveMembers,
+  liveMemberEntries,
+  liveMembersLoading,
+  canViewLiveMembers,
   onlineCount,
   liveCount,
   pinnedItems,
@@ -617,8 +819,14 @@ function HomeScreen({
   onGoToFeed,
   onGoToLive,
   onGoToChat,
+  onLiveMemberNavigate,
+  viewerProfileId,
+  canModerate,
+  onPostCreated,
 }: {
-  liveMembers: TeamMember[];
+  liveMemberEntries: LiveMemberEntry[];
+  liveMembersLoading: boolean;
+  canViewLiveMembers: boolean;
   onlineCount: number;
   liveCount: number;
   pinnedItems: FeedItem[];
@@ -629,9 +837,40 @@ function HomeScreen({
   onGoToFeed: () => void;
   onGoToLive: () => void;
   onGoToChat: () => void;
+  onLiveMemberNavigate: (destination: string) => void;
+  viewerProfileId: string | null;
+  canModerate: boolean;
+  onPostCreated: () => void;
 }) {
-  const hasLive = liveCount > 0;
-  const featuredLiveMembers = liveMembers.slice(0, 6);
+  const { deletePost } = useDeletePost();
+  const { pinPost } = usePinPost();
+  const { toast } = useToast();
+
+  const handleDeletePost = useCallback(async (postId: string) => {
+    try {
+      await deletePost(postId);
+      toast({ title: 'Post deleted' });
+      onPostCreated();
+    } catch (err) {
+      console.error('[HomeScreen] delete failed', err);
+      toast({ title: 'Failed to delete post', variant: 'destructive' });
+    }
+  }, [deletePost, toast, onPostCreated]);
+
+  const handlePinPost = useCallback(async (postId: string, pin: boolean) => {
+    try {
+      await pinPost(postId, pin);
+      toast({ title: pin ? 'Post pinned' : 'Post unpinned' });
+      onPostCreated();
+    } catch (err) {
+      console.error('[HomeScreen] pin failed', err);
+      toast({ title: 'Failed to update pin', variant: 'destructive' });
+    }
+  }, [pinPost, toast, onPostCreated]);
+  const liveMemberCount = liveMemberEntries.length;
+  const hasLive = liveMemberCount > 0 || liveCount > 0;
+  const liveChipValue = liveMemberCount > 0 ? liveMemberCount : liveCount;
+  const liveChipText = hasLive ? `${liveChipValue} live now` : 'Stage is open';
   const momentumStatus = hasLive ? 'Live energy is up' : onlineCount > 0 ? 'People are around' : 'Quiet moment';
 
   return (
@@ -650,12 +889,19 @@ function HomeScreen({
             <div className="flex flex-wrap items-center gap-2 text-[11px]">
               <span className="flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-white/80">
                 <span className={`h-1.5 w-1.5 rounded-full ${hasLive ? 'bg-red-400 animate-pulse' : 'bg-white/40'}`} />
-                {hasLive ? `${liveCount} live now` : 'Stage is open'}
+                {liveChipText}
               </span>
               <span className="rounded-full border border-white/10 px-3 py-1 text-white/60">
                 {onlineCount} online
               </span>
             </div>
+            {canViewLiveMembers && (
+              <LiveMembersRail
+                entries={liveMemberEntries}
+                loading={liveMembersLoading}
+                onNavigate={onLiveMemberNavigate}
+              />
+            )}
           </div>
 
           <div className="w-full flex flex-col gap-2 md:w-auto">
@@ -671,43 +917,6 @@ function HomeScreen({
             </p>
           </div>
         </div>
-
-        {hasLive ? (
-          <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
-            {featuredLiveMembers.map((m) => (
-              <button
-                key={m.id}
-                onClick={onGoToLive}
-                className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 transition hover:border-white/30 hover:bg-white/10"
-              >
-                <div className="relative">
-                  <Image
-                    src={m.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=8B5CF6&color=fff`}
-                    alt={m.name}
-                    width={40}
-                    height={40}
-                    className="h-10 w-10 rounded-full border-2 border-[#0a0a0f] object-cover"
-                  />
-                  <span className="absolute -bottom-1 -right-1 flex items-center gap-1 rounded-full bg-red-500 px-1.5 py-0.5">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                    <span className="text-[9px] font-bold text-white uppercase">Live</span>
-                  </span>
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-semibold text-white leading-tight">{m.name.split(' ')[0]}</p>
-                  <p className="text-[11px] text-white/50">tap to jump in</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-3 flex items-center gap-2 text-xs text-white/70">
-            <span className="flex items-center gap-2 rounded-full border border-dashed border-white/20 px-3 py-1">
-              <MessageCircle className="h-3.5 w-3.5 text-purple-300" />
-              Start the room, set the vibe.
-            </span>
-          </div>
-        )}
       </div>
 
       {/* ══════════ ACTION ROW ══════════ */}
@@ -772,7 +981,15 @@ function HomeScreen({
             </button>
           </div>
           {feedItems.slice(0, 4).map((item) => (
-            <FeedCard key={item.id} item={item} compact />
+            <FeedCard 
+              key={item.id} 
+              item={item} 
+              compact
+              viewerProfileId={viewerProfileId}
+              canModerate={canModerate}
+              onDelete={handleDeletePost}
+              onPin={handlePinPost}
+            />
           ))}
         </div>
       ) : (
@@ -905,7 +1122,12 @@ function FeedScreen({
   teamSlug,
   canPost,
   isMuted,
+  viewerProfileId,
+  canModerate,
   onPostCreated,
+  loadMore,
+  hasMore,
+  isLoadingMore,
 }: {
   pinnedItems: FeedItem[];
   feedItems: FeedItem[];
@@ -916,12 +1138,42 @@ function FeedScreen({
   teamSlug: string;
   canPost: boolean;
   isMuted: boolean;
+  viewerProfileId: string | null;
+  canModerate: boolean;
   onPostCreated?: () => void;
+  loadMore: () => void;
+  hasMore: boolean;
+  isLoadingMore: boolean;
 }) {
   const { toast } = useToast();
   const [postText, setPostText] = useState('');
   const createPost = useCreatePost(teamSlug);
+  const deletePost = useDeletePost();
+  const pinPost = usePinPost();
   const isFeedEmpty = feedItems.length === 0;
+  
+  const handleDeletePost = async (postId: string) => {
+    if (!window.confirm('Delete this post? This cannot be undone.')) return;
+    try {
+      await deletePost.mutate({ postId });
+      onPostCreated?.(); // Refetch
+      toast({ title: 'Post deleted', variant: 'success' });
+    } catch (err: any) {
+      console.error('[FeedScreen] Failed to delete post:', err);
+      toast({ title: 'Failed to delete', description: err?.message, variant: 'error' });
+    }
+  };
+  
+  const handlePinPost = async (postId: string, pin: boolean) => {
+    try {
+      await pinPost.mutate({ postId, pin });
+      onPostCreated?.(); // Refetch
+      toast({ title: pin ? 'Post pinned' : 'Post unpinned', variant: 'success' });
+    } catch (err: any) {
+      console.error('[FeedScreen] Failed to pin/unpin post:', err);
+      toast({ title: 'Failed to update', description: err?.message, variant: 'error' });
+    }
+  };
   
   const handleSubmitPost = async () => {
     if (!postText.trim() || !canPost) return;
@@ -1069,21 +1321,86 @@ function FeedScreen({
       ) : (
         <div className="space-y-3">
           {feedItems.map((item) => (
-            <FeedCard key={item.id} item={item} />
+            <FeedCard 
+              key={item.id} 
+              item={item}
+              viewerProfileId={viewerProfileId}
+              canModerate={canModerate}
+              onDelete={handleDeletePost}
+              onPin={handlePinPost}
+            />
           ))}
+          
+          {/* Load More / End of Posts */}
+          {hasMore ? (
+            <button
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              className="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+            >
+              {isLoadingMore ? 'Loading…' : 'Load more posts'}
+            </button>
+          ) : feedItems.length > 0 ? (
+            <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/5 py-4 text-sm text-white/50">
+              <span>🎉</span>
+              <span>You've reached the end — no more posts</span>
+            </div>
+          ) : null}
         </div>
       )}
     </>
   );
 }
 
-function FeedCard({ item, compact = false }: { item: FeedItem; compact?: boolean }) {
+function FeedCard({ 
+  item, 
+  compact = false,
+  viewerProfileId,
+  canModerate,
+  onDelete,
+  onPin,
+}: { 
+  item: FeedItem; 
+  compact?: boolean;
+  viewerProfileId?: string | null;
+  canModerate?: boolean;
+  onDelete?: (postId: string) => void;
+  onPin?: (postId: string, pin: boolean) => void;
+}) {
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  
   const isThread = item.type === 'thread';
   const isPoll = item.type === 'poll';
   const isClip = item.type === 'clip';
+  
+  // User can delete if they are the author OR a moderator
+  const isOwner = !!(viewerProfileId && item.authorId === viewerProfileId);
+  const canDelete = isOwner || !!canModerate;
+  const canPin = !!canModerate; // Only moderators can pin
+  const hasActions = canDelete || canPin;
+  
+  
+  // Close menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    if (showMenu) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
 
   return (
-    <div className={`rounded-2xl border border-white/10 bg-white/5 overflow-hidden transition hover:border-white/20 ${compact ? 'p-3' : 'p-4'}`}>
+    <div className={`relative rounded-2xl border border-white/10 bg-white/5 transition hover:border-white/20 ${compact ? 'p-3' : 'p-4'}`}>
+      {/* Pinned badge */}
+      {item.isPinned && (
+        <div className="mb-2 flex items-center gap-1 text-xs text-amber-400">
+          <Pin className="h-3 w-3" />
+          <span>Pinned</span>
+        </div>
+      )}
       {/* Author Row */}
       <div className="flex items-start gap-3">
         <div className="flex flex-col items-center gap-1">
@@ -1108,7 +1425,7 @@ function FeedCard({ item, compact = false }: { item: FeedItem; compact?: boolean
             <span className="font-semibold text-white text-sm">{item.author.name}</span>
             <RoleBadge role={item.author.role} />
             <span className="text-xs text-white/40">{formatTime(item.createdAt)}</span>
-            {item.type !== 'post' && (
+            {item.type !== 'post' && item.type !== 'announcement' && (
               <Badge className="bg-white/10 text-white/70 text-[10px]">{item.type}</Badge>
             )}
           </div>
@@ -1159,9 +1476,53 @@ function FeedCard({ item, compact = false }: { item: FeedItem; compact?: boolean
             <button className="flex items-center gap-1 text-xs text-white/50 hover:text-white">
               <MessageCircle className="h-4 w-4" /> {item.comments}
             </button>
-            <button className="ml-auto text-white/30 hover:text-white">
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
+            
+            {/* More menu */}
+            {hasActions && (
+              <div className="relative ml-auto" ref={menuRef}>
+                <button 
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="text-white/30 hover:text-white"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+                
+                {showMenu && (
+                  <div className="absolute right-0 top-6 z-50 w-36 rounded-lg border border-white/10 bg-gray-900 py-1 shadow-xl">
+                    {canPin && (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          onPin?.(item.id, !item.isPinned);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10"
+                      >
+                        <Pin className="h-4 w-4" />
+                        {item.isPinned ? 'Unpin' : 'Pin'}
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => {
+                          setShowMenu(false);
+                          onDelete?.(item.id);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-white/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {!hasActions && (
+              <button className="ml-auto text-white/30 hover:text-white">
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1182,7 +1543,13 @@ type PendingMessage = {
 
 function ChatScreen({ teamId, members, canChat }: { teamId: string | null; members: TeamMember[]; canChat: boolean }) {
   const { membership } = useTeamContext();
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3509c317-d888-4424-833f-1b9a779736e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeamPageContent.tsx:1546',message:'ChatScreen MOUNT',data:{teamId,hasMembership:!!membership},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
+  // #endregion
   const { messages, isLoading, refetch } = useTeamChat(teamId);
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/3509c317-d888-4424-833f-1b9a779736e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeamPageContent.tsx:1546',message:'useTeamChat RESULT',data:{messagesLength:messages.length,isLoading,teamId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3,H4'})}).catch(()=>{});
+  // #endregion
   const { mutate: sendMessage, isLoading: isSending } = useSendChatMessage(teamId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [inputText, setInputText] = useState('');
@@ -1226,7 +1593,12 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
       _isPending: true,
     }));
 
-    return [...baseMessages, ...optimistic].sort((a, b) => a.timestamp - b.timestamp);
+    const result = [...baseMessages, ...optimistic].sort((a, b) => a.timestamp - b.timestamp);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/3509c317-d888-4424-833f-1b9a779736e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeamPageContent.tsx:1591',message:'orderedMessages COMPUTED',data:{baseMessagesLength:baseMessages.length,optimisticLength:optimistic.length,resultLength:result.length,firstMessage:result[0]?.text?.substring(0,30)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
+    console.log('[ChatScreen] 📨 Displaying', result.length, 'messages (', baseMessages.length, 'from DB +', optimistic.length, 'pending)');
+    return result;
   }, [messages, pendingMessages, fallbackMember]);
 
   useEffect(() => {
@@ -1293,7 +1665,7 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
   };
 
   return (
-    <div className="flex flex-col gap-3" style={{ height: 'calc(100vh - 200px)' }}>
+    <div className="flex h-full flex-col">
       {/* Messages */}
       <div className="flex-1 overflow-hidden rounded-2xl border border-white/5 bg-white/0">
         <div
@@ -1301,7 +1673,7 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
           onScroll={handleScroll}
           className="flex h-full flex-col overflow-y-auto pr-2"
         >
-          <div className="flex min-h-full flex-col justify-end gap-2 pb-4 pt-4">
+          <div className="flex flex-col justify-end gap-2 px-4 pb-4 pt-4">
             {isLoading ? (
               <div className="flex flex-1 items-center justify-center py-10">
                 <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
@@ -1335,7 +1707,7 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
       )}
 
       {/* Composer */}
-      <div className="sticky bottom-0 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
+      <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <Input
             value={inputText}
@@ -2274,5 +2646,304 @@ function InviteMembersModal({
         </div>
       </div>
     </>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   PENDING INVITE ACCEPTANCE MODAL
+   ════════════════════════════════════════════════════════════════════════════ */
+
+function PendingInviteModal({
+  invite,
+  onAccept,
+  onDecline,
+  onDismiss,
+}: {
+  invite: PendingTeamInvite;
+  onAccept: () => Promise<boolean>;
+  onDecline: () => Promise<boolean>;
+  onDismiss: () => void;
+}) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isDeclining, setIsDeclining] = useState(false);
+
+  const handleAccept = async () => {
+    setIsAccepting(true);
+    try {
+      const success = await onAccept();
+      if (success) {
+        toast({
+          title: `Welcome to ${invite.team_name}!`,
+          description: "You're now a member of this team.",
+          variant: 'success',
+        });
+        // Reload to refresh membership state
+        router.refresh();
+      } else {
+        toast({
+          title: 'Could not accept invite',
+          description: 'Please try again in a moment.',
+          variant: 'error',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Could not accept invite',
+        description: err?.message || 'Please try again.',
+        variant: 'error',
+      });
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  const handleDecline = async () => {
+    setIsDeclining(true);
+    try {
+      const success = await onDecline();
+      if (success) {
+        toast({
+          title: 'Invite declined',
+          description: 'You can always join later if invited again.',
+          variant: 'info',
+        });
+      } else {
+        toast({
+          title: 'Could not decline invite',
+          description: 'Please try again in a moment.',
+          variant: 'error',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Could not decline invite',
+        description: err?.message || 'Please try again.',
+        variant: 'error',
+      });
+    } finally {
+      setIsDeclining(false);
+    }
+  };
+
+  const inviterName = invite.inviter_display_name || invite.inviter_username;
+  const inviterAvatar = invite.inviter_avatar_url || 
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(inviterName)}&background=8B5CF6&color=fff`;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" 
+        onClick={onDismiss} 
+      />
+      
+      {/* Modal */}
+      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 mx-auto max-w-md animate-scale-in">
+        <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-[#1a1a24] via-[#141220] to-[#0f0f18] p-6 shadow-2xl shadow-purple-900/30">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-purple-400" />
+              <h2 className="text-lg font-bold text-white">Team Invite</h2>
+            </div>
+            <button
+              onClick={onDismiss}
+              className="rounded-full p-2 text-white/50 hover:bg-white/10 hover:text-white transition"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Invite Details */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 mb-4">
+            <div className="flex items-center gap-4 mb-3">
+              {/* Team Icon */}
+              <div className="relative h-14 w-14 rounded-2xl bg-purple-500/20 flex items-center justify-center overflow-hidden ring-2 ring-purple-500/30">
+                {invite.team_icon_url ? (
+                  <Image
+                    src={invite.team_icon_url}
+                    alt={invite.team_name}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <span className="text-xl font-bold text-purple-300">
+                    {invite.team_name[0]?.toUpperCase() ?? 'T'}
+                  </span>
+                )}
+              </div>
+              <div>
+                <p className="text-sm text-white/60">You've been invited to join</p>
+                <h3 className="text-xl font-bold text-white">{invite.team_name}</h3>
+              </div>
+            </div>
+
+            {/* Inviter */}
+            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-white/10">
+              <Image
+                src={inviterAvatar}
+                alt={inviterName}
+                width={36}
+                height={36}
+                className="rounded-full"
+              />
+              <div>
+                <p className="text-sm text-white/60">Invited by</p>
+                <p className="text-sm font-medium text-white">{inviterName}</p>
+              </div>
+            </div>
+
+            {/* Personal message */}
+            {invite.message && (
+              <div className="mt-4 rounded-xl border border-purple-500/20 bg-purple-500/5 p-3">
+                <p className="text-sm text-white/80 italic">"{invite.message}"</p>
+              </div>
+            )}
+          </div>
+
+          {/* Info Banner */}
+          <div className="rounded-xl border border-teal-500/30 bg-teal-500/10 p-3 mb-4">
+            <p className="text-sm font-medium text-teal-100">Join unlimited teams</p>
+            <p className="text-xs text-white/60 mt-0.5">
+              Accepting this invite won't remove you from any other teams.
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button
+              onClick={handleAccept}
+              disabled={isAccepting || isDeclining}
+              className="flex-1 h-12 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-semibold shadow-lg shadow-teal-500/25 hover:from-teal-400 hover:to-emerald-400"
+            >
+              {isAccepting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Users className="h-4 w-4 mr-2" />
+              )}
+              Accept & Join
+            </Button>
+            <Button
+              onClick={handleDecline}
+              disabled={isAccepting || isDeclining}
+              variant="outline"
+              className="flex-1 h-12 rounded-xl border-white/20 text-white/80 hover:bg-white/10"
+            >
+              {isDeclining ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                'Decline'
+              )}
+            </Button>
+          </div>
+
+          {/* Dismiss hint */}
+          <p className="text-center text-xs text-white/40 mt-4">
+            You can dismiss this and decide later. The invite will stay pending.
+          </p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function LiveMembersRail({
+  entries,
+  loading,
+  onNavigate,
+}: {
+  entries: LiveMemberEntry[];
+  loading: boolean;
+  onNavigate: (destination: string) => void;
+}) {
+  if (loading && entries.length === 0) {
+    return (
+      <div className="mt-3 rounded-2xl border border-white/10 bg-black/40 p-3">
+        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.35em] text-white/40">
+          <span>Live members</span>
+          <span className="text-white/30">Loading…</span>
+        </div>
+        <div className="mt-3 flex gap-3 overflow-hidden">
+          {Array.from({ length: 5 }).map((_, idx) => (
+            <div
+              key={`live-skeleton-${idx}`}
+              className="flex flex-col items-center gap-2 animate-pulse"
+            >
+              <div className="h-12 w-12 rounded-full bg-white/10" />
+              <div className="h-2 w-10 rounded-full bg-white/10" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="mt-3 rounded-2xl border border-dashed border-white/10 bg-black/30 p-3 text-white/60">
+        <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.35em] text-white/40">
+          <span>Live members</span>
+          <span>No one live right now</span>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div
+              key={`placeholder-${idx}`}
+              className="h-10 w-10 rounded-full border border-dashed border-white/10 bg-white/5"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const fallbackAvatar = (username: string) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(username || 'Live')}&background=111827&color=fff`;
+
+  const truncatedEntries = entries.slice(0, 15);
+
+  return (
+    <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-3">
+      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.35em] text-white/40">
+        <span>Live members</span>
+        <span className="text-white/60 tracking-[0.2em]">
+          {loading ? 'Updating…' : `${entries.length} on air`}
+        </span>
+      </div>
+      <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+        {truncatedEntries.map((entry) => (
+          <button
+            key={`${entry.profileId}:${entry.streamId}`}
+            type="button"
+            onClick={() => onNavigate(entry.destination)}
+            className="group flex min-w-[72px] flex-col items-center gap-1 text-white/80 transition hover:text-white"
+          >
+            <div className="relative">
+              <div className="rounded-full bg-gradient-to-br from-red-500/60 to-pink-500/50 p-[2px]">
+                <div className="h-12 w-12 overflow-hidden rounded-full bg-black/40">
+                  <Image
+                    src={entry.avatarUrl || fallbackAvatar(entry.username)}
+                    alt={entry.username}
+                    width={48}
+                    height={48}
+                    className="h-12 w-12 rounded-full object-cover"
+                  />
+                </div>
+              </div>
+              <span className="absolute -bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white shadow-lg">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
+                Live
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold leading-tight text-white/80 group-hover:text-white">
+              {entry.displayName || entry.username}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
