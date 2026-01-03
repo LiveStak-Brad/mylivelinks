@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
 
       const user = auth.user;
       const authError = auth.authError;
+      const supabase = auth.supabase;
 
       if (authError || !user) {
         return sendJson(401, { error: 'Unauthorized', stage: 'auth_verify' }, 'auth_verify');
