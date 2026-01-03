@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -790,10 +790,23 @@ export function useTeamChat(teamId: string | null) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const refreshKeyRef = useRef(0);
+  const [refreshToken, bumpRefreshToken] = useReducer((x: number) => x + 1, 0);
 
   const refetch = useCallback(() => {
-    refreshKeyRef.current += 1;
+    bumpRefreshToken();
+  }, []);
+
+  const upsertMessage = useCallback((next: ChatMessage) => {
+    setMessages((prev) => {
+      const existingIndex = prev.findIndex((msg) => msg.id === next.id);
+      if (existingIndex === -1) {
+        const inserted = [...prev, next].sort((a, b) => a.timestamp - b.timestamp);
+        return inserted;
+      }
+      const cloned = [...prev];
+      cloned[existingIndex] = next;
+      return cloned.sort((a, b) => a.timestamp - b.timestamp);
+    });
   }, []);
 
   // Initial fetch
@@ -820,22 +833,24 @@ export function useTeamChat(teamId: string | null) {
 
         if (rpcError) throw rpcError;
 
-        const mapped: ChatMessage[] = ((data as any[]) || []).map((m) => ({
-          id: String(m.message_id),
-          author: {
-            id: String(m.author_id),
-            name: m.author_display_name || m.author_username || 'Unknown',
-            handle: `@${m.author_username || 'unknown'}`,
-            avatar: m.author_avatar_url || 'https://ui-avatars.com/api/?name=U&background=111827&color=fff',
-            role: dbRoleToRoleState(m.author_role),
-            activity: 'offline' as MemberActivity,
-          },
-          text: m.content,
-          timestamp: new Date(m.created_at).getTime(),
-          reactions: (m.reactions || []).map((r: any) => ({ emoji: r.emoji, count: r.count })),
-          isSystem: m.is_system,
-          replyTo: m.reply_to_id ? String(m.reply_to_id) : undefined,
-        }));
+        const mapped: ChatMessage[] = ((data as any[]) || [])
+          .map((m) => ({
+            id: String(m.message_id),
+            author: {
+              id: String(m.author_id),
+              name: m.author_display_name || m.author_username || 'Unknown',
+              handle: `@${m.author_username || 'unknown'}`,
+              avatar: m.author_avatar_url || 'https://ui-avatars.com/api/?name=U&background=111827&color=fff',
+              role: dbRoleToRoleState(m.author_role),
+              activity: 'offline' as MemberActivity,
+            },
+            text: m.content,
+            timestamp: new Date(m.created_at).getTime(),
+            reactions: (m.reactions || []).map((r: any) => ({ emoji: r.emoji, count: r.count })),
+            isSystem: m.is_system,
+            replyTo: m.reply_to_id ? String(m.reply_to_id) : undefined,
+          }))
+          .sort((a, b) => a.timestamp - b.timestamp);
 
         if (!cancelled) setMessages(mapped);
       } catch (e) {
@@ -853,7 +868,7 @@ export function useTeamChat(teamId: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [teamId, supabase, refreshKeyRef.current]);
+  }, [teamId, supabase, refreshToken]);
 
   // Realtime subscription for new messages
   useEffect(() => {
@@ -895,7 +910,7 @@ export function useTeamChat(teamId: string | null) {
             replyTo: newMsg.reply_to_id ? String(newMsg.reply_to_id) : undefined,
           };
 
-          setMessages((prev) => [...prev, mapped]);
+          upsertMessage(mapped);
         }
       )
       .subscribe();
@@ -903,7 +918,7 @@ export function useTeamChat(teamId: string | null) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, teamId]);
+  }, [supabase, teamId, upsertMessage]);
 
   return { messages, isLoading, error, refetch };
 }

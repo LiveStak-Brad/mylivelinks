@@ -2,6 +2,7 @@
 
 import { CSSProperties, ReactNode, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import {
   ArrowUp,
   Bell,
@@ -45,7 +46,7 @@ import {
 } from '@/components/ui';
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
-import { useTeamContext, Surface } from '@/contexts/TeamContext';
+import { useTeamContext, Surface, TeamLiveVisibility, TeamLiveRoomState } from '@/contexts/TeamContext';
 import {
   useTeam,
   useTeamMembership,
@@ -73,6 +74,20 @@ import {
 
 type RoleState = 'leader' | 'core' | 'member' | 'guest';
 type TopRange = '24h' | '7d';
+type GoLiveCtaState = {
+  label: string;
+  helper: string;
+  disabled: boolean;
+  loading: boolean;
+  onClick: () => void;
+};
+type TeamLiveViewState = {
+  isUnlocked: boolean;
+  unlockThreshold: number;
+  approvedMemberCount: number;
+  visibility: TeamLiveVisibility;
+  isLoading: boolean;
+};
 
 /* ════════════════════════════════════════════════════════════════════════════
    MAIN PAGE COMPONENT
@@ -92,7 +107,14 @@ export default function TeamPageContent() {
     isLoading,
     isError,
     errorMessage,
+    teamLiveRoomConfig,
+    teamLiveRoomLoading,
+    isTeamLiveUnlocked,
+    canToggleTeamLiveVisibility,
+    isUpdatingTeamLiveVisibility,
+    updateTeamLiveVisibility,
   } = useTeamContext();
+  const router = useRouter();
   
   const [feedSort, setFeedSort] = useState<FeedSort>('hot');
   const [topRange, setTopRange] = useState<TopRange>('24h');
@@ -100,13 +122,14 @@ export default function TeamPageContent() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   
   // Fetch data using shared hooks (cached, no duplicate requests)
-  const { data: feedItemsRaw, isLoading: feedLoading } = useTeamFeed(teamId, feedSort);
+  const { data: feedData, isLoading: feedLoading, refetch: refetchFeed } = useTeamFeed(teamId, feedSort);
   const { data: membersRaw, isLoading: membersLoading } = useTeamMembers(teamId, 'all');
   const { data: presenceData } = useTeamPresence(teamId);
   const { data: liveRoomsRaw, isLoading: liveLoading } = useTeamLiveRooms(teamId);
   
   // Ensure arrays are never null/undefined and always iterable
-  const feedItems = Array.isArray(feedItemsRaw) ? feedItemsRaw : [];
+  // useTeamFeed returns { pinnedItems, feedItems } - extract properly
+  const feedItems = feedData?.feedItems ?? [];
   const members = Array.isArray(membersRaw) ? membersRaw : [];
   const liveRooms = Array.isArray(liveRoomsRaw) ? liveRoomsRaw : [];
   
@@ -131,7 +154,34 @@ export default function TeamPageContent() {
     }
   }, [feedItems, feedSort]);
   
-  const pinnedItems = feedItems.filter((i) => i.isPinned);
+  // useTeamFeed already separates pinned from unpinned
+  const pinnedItems = feedData?.pinnedItems ?? [];
+  const teamLiveThreshold = teamLiveRoomConfig?.unlockThreshold ?? 100;
+  const teamLiveMemberCount = teamLiveRoomConfig?.approvedMemberCount ?? team.approvedMemberCount;
+  const handleGoLiveClick = useCallback(() => {
+    if (!team?.slug || !isTeamLiveUnlocked) return;
+    router.push(`/teams/room/${team.slug}`);
+  }, [router, team?.slug, isTeamLiveUnlocked]);
+  const goLiveCta = useMemo<GoLiveCtaState>(() => {
+    const label = isTeamLiveUnlocked ? 'Go Live' : 'Unlock at 100 members';
+    const helper = isTeamLiveUnlocked
+      ? 'Sends an alert to everyone here.'
+      : `Team Live unlocks at ${teamLiveThreshold} members (${Math.min(teamLiveMemberCount, teamLiveThreshold)}/${teamLiveThreshold}).`;
+    return {
+      label,
+      helper,
+      loading: teamLiveRoomLoading,
+      disabled: !isTeamLiveUnlocked || !team?.slug || teamLiveRoomLoading,
+      onClick: handleGoLiveClick,
+    };
+  }, [isTeamLiveUnlocked, teamLiveThreshold, teamLiveMemberCount, teamLiveRoomLoading, team?.slug, handleGoLiveClick]);
+  const teamLiveState = useMemo<TeamLiveViewState>(() => ({
+    isUnlocked: isTeamLiveUnlocked,
+    unlockThreshold: teamLiveThreshold,
+    approvedMemberCount: teamLiveMemberCount,
+    visibility: teamLiveRoomConfig?.visibility ?? 'private',
+    isLoading: teamLiveRoomLoading,
+  }), [isTeamLiveUnlocked, teamLiveThreshold, teamLiveMemberCount, teamLiveRoomConfig?.visibility, teamLiveRoomLoading]);
   
   // ─────────────────────────────────────────────────────────────────────────
   // Loading state
@@ -298,6 +348,7 @@ export default function TeamPageContent() {
               feedItems={sortedFeed.slice(0, 5)}
               liveRooms={liveRooms}
               team={team}
+            goLiveCta={goLiveCta}
               onGoToFeed={() => setSurface('feed')}
               onGoToLive={() => setSurface('live')}
               onGoToChat={() => setSurface('chat')}
@@ -314,19 +365,34 @@ export default function TeamPageContent() {
               teamSlug={teamSlug ?? ''}
               canPost={permissions.canPost}
               isMuted={permissions.isMuted}
+              onPostCreated={refetchFeed}
             />
           )}
           {currentSurface === 'chat' && (
             <ChatScreen teamId={teamId} members={members} canChat={permissions.canPost && !permissions.isMuted} />
           )}
           {currentSurface === 'live' && (
-            <LiveScreen liveRooms={liveRooms} members={members} role={uiRole} isLoading={liveLoading} onGoBack={() => setSurface('home')} />
+          <LiveScreen
+            liveRooms={liveRooms}
+            members={members}
+            role={uiRole}
+            isLoading={liveLoading}
+            teamLiveState={teamLiveState}
+            onLaunchTeamRoom={handleGoLiveClick}
+          />
           )}
           {currentSurface === 'members' && (
             <MembersScreen members={members} isLoading={membersLoading} />
           )}
           {currentSurface === 'settings' && permissions.canAccessSettings && (
-            <SettingsScreen role={uiRole} team={team} />
+          <SettingsScreen
+            role={uiRole}
+            team={team}
+            teamLiveConfig={teamLiveRoomConfig}
+            canToggleLiveVisibility={canToggleTeamLiveVisibility}
+            onLiveVisibilityChange={updateTeamLiveVisibility}
+            isLiveVisibilityUpdating={isUpdatingTeamLiveVisibility}
+          />
           )}
         </main>
       </div>
@@ -539,6 +605,7 @@ function HomeScreen({
   feedItems,
   liveRooms,
   team,
+  goLiveCta,
   onGoToFeed,
   onGoToLive,
   onGoToChat,
@@ -550,6 +617,7 @@ function HomeScreen({
   feedItems: FeedItem[];
   liveRooms: LiveRoom[];
   team: { name: string; approvedMemberCount: number };
+  goLiveCta: GoLiveCtaState;
   onGoToFeed: () => void;
   onGoToLive: () => void;
   onGoToChat: () => void;
@@ -584,13 +652,14 @@ function HomeScreen({
 
           <div className="w-full flex flex-col gap-2 md:w-auto">
             <Button
-              onClick={onGoToLive}
+              onClick={goLiveCta.disabled ? undefined : goLiveCta.onClick}
+              disabled={goLiveCta.disabled}
               className="h-12 rounded-2xl bg-gradient-to-r from-red-500 to-pink-500 text-base font-semibold text-white shadow-[0_18px_35px_rgba(255,0,128,0.35)] hover:from-red-400 hover:to-pink-400"
             >
-              <Zap className="mr-2 h-4 w-4" /> Go Live
+              <Zap className="mr-2 h-4 w-4" /> {goLiveCta.loading ? 'Checking...' : goLiveCta.label}
             </Button>
             <p className="text-center text-[11px] text-white/60 md:text-left">
-              Sends an alert to everyone here.
+              {goLiveCta.loading ? 'Checking team status...' : goLiveCta.helper}
             </p>
           </div>
         </div>
@@ -637,10 +706,11 @@ function HomeScreen({
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <QuickAction
           icon={<Video className="h-4 w-4" />}
-          label="Go Live"
-          onClick={onGoToLive}
+          label={goLiveCta.loading ? 'Checking...' : goLiveCta.label}
+          onClick={goLiveCta.onClick}
           variant="live"
-          description="Notify everyone"
+          description={goLiveCta.loading ? 'Checking team status...' : goLiveCta.helper}
+          disabled={goLiveCta.disabled}
           className="col-span-2 sm:col-span-2"
         />
         <QuickAction
@@ -713,10 +783,11 @@ function HomeScreen({
               </Button>
               <Button
                 size="sm"
-                onClick={onGoToLive}
+                onClick={goLiveCta.disabled ? undefined : goLiveCta.onClick}
+                disabled={goLiveCta.disabled}
                 className="bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-400 hover:to-pink-400"
               >
-                Go Live
+                {goLiveCta.loading ? 'Checking...' : goLiveCta.label}
               </Button>
             </div>
           </div>
@@ -751,6 +822,7 @@ function QuickAction({
   variant,
   description,
   className,
+  disabled = false,
 }: {
   icon: ReactNode;
   label: string;
@@ -758,17 +830,19 @@ function QuickAction({
   variant?: 'live';
   description?: string;
   className?: string;
+  disabled?: boolean;
 }) {
   const isLive = variant === 'live';
 
   return (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
       className={`flex items-center gap-3 rounded-2xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
         isLive
           ? 'border-transparent bg-gradient-to-br from-red-500/25 to-pink-500/25 text-white shadow-[0_12px_30px_rgba(255,0,153,0.25)] hover:from-red-500/35 hover:to-pink-500/35'
           : 'border-white/10 bg-white/5 text-white/80 hover:border-white/20 hover:bg-white/10'
-      } ${className || ''}`}
+      } ${disabled ? 'cursor-not-allowed opacity-50' : ''} ${className || ''}`}
     >
       <div className={`flex h-9 w-9 items-center justify-center rounded-2xl ${isLive ? 'bg-white/15 text-white' : 'bg-white/10 text-white/70'}`}>
         {icon}
@@ -823,6 +897,7 @@ function FeedScreen({
   teamSlug,
   canPost,
   isMuted,
+  onPostCreated,
 }: {
   pinnedItems: FeedItem[];
   feedItems: FeedItem[];
@@ -833,7 +908,9 @@ function FeedScreen({
   teamSlug: string;
   canPost: boolean;
   isMuted: boolean;
+  onPostCreated?: () => void;
 }) {
+  const { toast } = useToast();
   const [postText, setPostText] = useState('');
   const createPost = useCreatePost(teamSlug);
   const isFeedEmpty = feedItems.length === 0;
@@ -841,10 +918,23 @@ function FeedScreen({
   const handleSubmitPost = async () => {
     if (!postText.trim() || !canPost) return;
     try {
-      await createPost.mutate({ text: postText });
+      const result = await createPost.mutate({ text: postText });
       setPostText('');
-    } catch (err) {
-      console.error('Failed to create post:', err);
+      // Refetch feed to show new post immediately
+      onPostCreated?.();
+      toast({
+        title: 'Posted!',
+        description: 'Your update is now live.',
+        variant: 'success',
+      });
+      console.log('[FeedScreen] Post created successfully:', result);
+    } catch (err: any) {
+      console.error('[FeedScreen] Failed to create post:', err);
+      toast({
+        title: 'Failed to post',
+        description: err?.message || 'Something went wrong. Please try again.',
+        variant: 'error',
+      });
     }
   };
   
@@ -1075,29 +1165,113 @@ function FeedCard({ item, compact = false }: { item: FeedItem; compact?: boolean
    CHAT SCREEN
    ════════════════════════════════════════════════════════════════════════════ */
 
+type PendingMessage = {
+  id: string;
+  text: string;
+  createdAt: number;
+  serverId?: string | null;
+};
+
 function ChatScreen({ teamId, members, canChat }: { teamId: string | null; members: TeamMember[]; canChat: boolean }) {
+  const { membership } = useTeamContext();
   const { messages, isLoading, refetch } = useTeamChat(teamId);
   const { mutate: sendMessage, isLoading: isSending } = useSendChatMessage(teamId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [inputText, setInputText] = useState('');
+  const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
+  const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+
+  const viewerProfileId = membership?.profileId ?? null;
+
+  const viewerMember = useMemo(() => {
+    if (viewerProfileId) {
+      const match = members.find((m) => m.id === viewerProfileId);
+      if (match) return match;
+    }
+    return null;
+  }, [members, viewerProfileId]);
+
+  const fallbackMember: TeamMember = useMemo(
+    () =>
+      viewerMember ?? {
+        id: viewerProfileId ?? 'current-user',
+        name: 'You',
+        handle: '@you',
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent('You')}&background=8B5CF6&color=fff`,
+        role: 'member',
+        activity: 'online',
+      },
+    [viewerMember, viewerProfileId]
+  );
+
+  type DisplayChatMessage = ChatMessage & { _isPending?: boolean };
+
+  const orderedMessages = useMemo<DisplayChatMessage[]>(() => {
+    const baseMessages: DisplayChatMessage[] = messages.map((msg) => ({ ...msg, _isPending: undefined }));
+    const optimistic: DisplayChatMessage[] = pendingMessages.map((pending) => ({
+      id: pending.id,
+      author: fallbackMember,
+      text: pending.text,
+      timestamp: pending.createdAt,
+      reactions: [],
+      isSystem: false,
+      _isPending: true,
+    }));
+
+    return [...baseMessages, ...optimistic].sort((a, b) => a.timestamp - b.timestamp);
+  }, [messages, pendingMessages, fallbackMember]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    setPendingMessages([]);
+  }, [teamId]);
+
+  useEffect(() => {
+    setPendingMessages((prev) =>
+      prev.filter((pending) => {
+        if (!pending.serverId) return true;
+        return !messages.some((msg) => msg.id === pending.serverId);
+      })
+    );
   }, [messages]);
 
   const streamingMembers = members.filter((m) => m.isStreaming);
+
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+    setIsPinnedToBottom(distanceFromBottom < 120);
+  }, []);
+
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    if (isPinnedToBottom) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [orderedMessages, isPinnedToBottom]);
 
   const handleSend = async () => {
     if (!inputText.trim() || !canChat || isSending) return;
 
     const text = inputText.trim();
-    setInputText(''); // Clear immediately for snappy UX
+    const optimisticId = `pending-${Date.now()}`;
+    setInputText('');
+    setIsPinnedToBottom(true);
+    setPendingMessages((prev) => [...prev, { id: optimisticId, text, createdAt: Date.now() }]);
 
     try {
-      await sendMessage({ content: text });
-      // Message will appear via realtime subscription
+      const result = await sendMessage({ content: text });
+      const serverId = result?.message_id ? String(result.message_id) : null;
+      if (serverId) {
+        setPendingMessages((prev) =>
+          prev.map((msg) => (msg.id === optimisticId ? { ...msg, serverId } : msg))
+        );
+      } else {
+        setPendingMessages((prev) => prev.filter((msg) => msg.id !== optimisticId));
+      }
+      refetch();
     } catch (err) {
-      // Restore text on error
+      setPendingMessages((prev) => prev.filter((msg) => msg.id !== optimisticId));
       setInputText(text);
       console.error('Failed to send message:', err);
     }
@@ -1111,53 +1285,61 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
   };
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 200px)' }}>
+    <div className="flex flex-col gap-3" style={{ height: 'calc(100vh - 200px)' }}>
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 space-y-1 overflow-y-auto pr-2">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+      <div className="flex-1 overflow-hidden rounded-2xl border border-white/5 bg-white/0">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex h-full flex-col overflow-y-auto pr-2"
+        >
+          <div className="flex min-h-full flex-col justify-end gap-2 pb-4 pt-4">
+            {isLoading ? (
+              <div className="flex flex-1 items-center justify-center py-10">
+                <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+              </div>
+            ) : orderedMessages.length > 0 ? (
+              orderedMessages.map((msg) => <ChatMessageRow key={msg.id} message={msg} />)
+            ) : (
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-white/10 px-6 py-10 text-center text-white/70">
+                <MessageCircle className="h-6 w-6 text-white/60" />
+                <div>
+                  <p className="text-base font-semibold text-white">Say hi 👋</p>
+                  <p className="text-sm text-white/60">Start the team chat and keep it rolling.</p>
+                </div>
+              </div>
+            )}
           </div>
-        ) : messages.length > 0 ? (
-          messages.map((msg) => (
-            <ChatMessageRow key={msg.id} message={msg} />
-          ))
-        ) : (
-          <EmptyState
-            icon={<MessageCircle className="h-6 w-6 text-white/50" />}
-            title="No messages yet"
-            description="Start the conversation!"
-          />
-        )}
+        </div>
       </div>
 
       {/* Jump to Live */}
       {streamingMembers.length > 0 && (
-        <div className="my-3 flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-500/30 p-3">
+        <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
           <Radio className="h-4 w-4 text-red-400 animate-pulse" />
           <span className="text-sm text-white">
             <span className="font-semibold text-red-400">{streamingMembers[0]?.name}</span> is live
           </span>
-          <Button size="sm" className="ml-auto bg-red-500 hover:bg-red-600 text-white text-xs">
+          <Button size="sm" className="ml-auto bg-red-500 text-xs text-white hover:bg-red-600">
             Join
           </Button>
         </div>
       )}
 
       {/* Composer */}
-      <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div className="sticky bottom-0 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <Input
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={canChat ? "Message the team..." : "You cannot chat in this team"}
+            placeholder={canChat ? 'Say hi 👋' : 'You cannot chat in this team'}
             disabled={!canChat || isSending}
             className="flex-1 border-0 bg-transparent text-white placeholder:text-white/40 focus:ring-0"
           />
-          <Button 
-            size="sm" 
-            className="bg-purple-500 hover:bg-purple-600" 
+          <Button
+            size="sm"
+            className="bg-purple-500 hover:bg-purple-600"
             disabled={!canChat || !inputText.trim() || isSending}
             onClick={handleSend}
           >
@@ -1169,18 +1351,20 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
   );
 }
 
-function ChatMessageRow({ message }: { message: ChatMessage }) {
+function ChatMessageRow({ message }: { message: ChatMessage & { _isPending?: boolean } }) {
   if (message.isSystem) {
     return (
-      <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+      <div className="flex items-center gap-2 rounded-lg border border-purple-500/20 bg-purple-500/10 py-2 px-3">
         <Radio className="h-4 w-4 text-purple-400" />
         <span className="text-sm text-purple-300">{message.text}</span>
       </div>
     );
   }
 
+  const isPending = Boolean(message._isPending);
+
   return (
-    <div className="group flex items-start gap-3 rounded-xl p-2 hover:bg-white/5">
+    <div className={`group flex items-start gap-3 rounded-xl p-2 ${isPending ? 'opacity-70' : 'hover:bg-white/5'}`}>
       <Image
         src={message.author.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(message.author.name)}&background=8B5CF6&color=fff`}
         alt={message.author.name}
@@ -1204,6 +1388,7 @@ function ChatMessageRow({ message }: { message: ChatMessage }) {
             ))}
           </div>
         )}
+        {isPending && <p className="mt-1 text-[10px] uppercase tracking-wide text-white/40">Sending…</p>}
       </div>
     </div>
   );
@@ -1213,98 +1398,113 @@ function ChatMessageRow({ message }: { message: ChatMessage }) {
    LIVE SCREEN
    ════════════════════════════════════════════════════════════════════════════ */
 
-function LiveScreen({ liveRooms, members, role, isLoading, onGoBack }: { liveRooms: LiveRoom[]; members: TeamMember[]; role: RoleState; isLoading: boolean; onGoBack?: () => void }) {
-  const [showComingSoon, setShowComingSoon] = useState(false);
+function LiveScreen({
+  liveRooms,
+  isLoading,
+  teamLiveState,
+  onLaunchTeamRoom,
+}: {
+  liveRooms: LiveRoom[];
+  isLoading: boolean;
+  teamLiveState: TeamLiveViewState;
+  onLaunchTeamRoom: () => void;
+}) {
+  const buttonLabel = teamLiveState.isUnlocked ? 'Go Live' : 'Unlock at 100 members';
+  const buttonDisabled = !teamLiveState.isUnlocked || teamLiveState.isLoading;
+  const progressPercent = Math.min(
+    100,
+    Math.max(0, Math.round((teamLiveState.approvedMemberCount / teamLiveState.unlockThreshold) * 100))
+  );
+
+  const lockedCopy = `Team Live unlocks at ${teamLiveState.unlockThreshold} members (${Math.min(
+    teamLiveState.approvedMemberCount,
+    teamLiveState.unlockThreshold
+  )}/${teamLiveState.unlockThreshold}).`;
 
   return (
     <>
-      {/* Go Live CTA */}
       <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-6 text-center">
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-pink-500">
           <Video className="h-6 w-6 text-white" />
         </div>
         <h3 className="font-semibold text-white mb-1">Start a Live Room</h3>
-        <p className="text-sm text-white/50 mb-4">Stream, hang out, or host a team event</p>
-        <Button 
-          onClick={() => setShowComingSoon(true)}
-          className="bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600"
+        <p className="text-sm text-white/50 mb-4">
+          {teamLiveState.isUnlocked
+            ? 'Launch the dedicated Team Live room with chat, viewers, and leaderboards.'
+            : 'Grow your team to unlock the Team Live room.'}
+        </p>
+        <Button
+          onClick={() => {
+            if (!buttonDisabled) onLaunchTeamRoom();
+          }}
+          disabled={buttonDisabled}
+          className="bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Go Live
+          {teamLiveState.isLoading ? 'Checking...' : buttonLabel}
         </Button>
+        <p className="mt-2 text-xs text-white/60">
+          {teamLiveState.isUnlocked ? 'Sends an alert to everyone here.' : lockedCopy}
+        </p>
       </div>
 
-      {/* Coming Soon Modal */}
-      {showComingSoon && (
+      {!teamLiveState.isUnlocked ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">Team Live Locked</p>
+              <p className="text-xs text-white/60">Invite more members to unlock the Team Live experience.</p>
+            </div>
+            <Badge className="bg-white/10 text-white/70 text-[10px] uppercase">Locked</Badge>
+          </div>
+          <div className="mt-4 h-2 w-full rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <div className="mt-2 text-xs text-white/60">
+            {teamLiveState.approvedMemberCount}/{teamLiveState.unlockThreshold} members
+          </div>
+        </div>
+      ) : (
         <>
-          <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowComingSoon(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div className="rounded-2xl bg-[#1a1a24] border border-white/10 p-6 max-w-sm mx-4 text-center shadow-2xl pointer-events-auto">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-red-500/20 to-pink-500/20">
-                <Video className="h-8 w-8 text-pink-400" />
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
+            </div>
+          ) : liveRooms.length > 0 ? (
+            <div className="space-y-3">
+              <h3 className="text-xs font-medium uppercase tracking-wider text-white/50">Live Now</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {liveRooms.map((room) => (
+                  <LiveTile key={room.id} room={room} />
+                ))}
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Coming Soon!</h3>
-              <p className="text-sm text-white/60 mb-6">
-                Team Live streaming is launching soon. Stream to your team, host events, and go live together!
-              </p>
-              <div className="flex gap-3">
-                {onGoBack && (
-                  <Button 
-                    onClick={() => { setShowComingSoon(false); onGoBack(); }}
-                    variant="ghost"
-                    className="flex-1 text-white/70 hover:text-white hover:bg-white/10"
-                  >
-                    ← Back to Home
-                  </Button>
-                )}
-                <Button 
-                  onClick={() => setShowComingSoon(false)} 
-                  className={`${onGoBack ? 'flex-1' : 'w-full'} bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white`}
-                >
-                  Got it
-                </Button>
+            </div>
+          ) : (
+            <EmptyState
+              icon={<Video className="h-6 w-6 text-white/50" />}
+              title="No one is live"
+              description="Be the first to start a stream!"
+            />
+          )}
+
+          <div className="space-y-3">
+            <h3 className="text-xs font-medium uppercase tracking-wider text-white/50">Upcoming</h3>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/20">
+                  <Calendar className="h-5 w-5 text-purple-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-white">No upcoming events</p>
+                  <p className="text-xs text-white/50">Schedule an event for the team</p>
+                </div>
               </div>
             </div>
           </div>
         </>
       )}
-
-      {/* Live Grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center h-32">
-          <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
-        </div>
-      ) : liveRooms.length > 0 ? (
-        <div className="space-y-3">
-          <h3 className="text-xs font-medium uppercase tracking-wider text-white/50">Live Now</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {liveRooms.map((room) => (
-              <LiveTile key={room.id} room={room} />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <EmptyState
-          icon={<Video className="h-6 w-6 text-white/50" />}
-          title="No one is live"
-          description="Be the first to start a stream!"
-        />
-      )}
-
-      {/* Scheduled */}
-      <div className="space-y-3">
-        <h3 className="text-xs font-medium uppercase tracking-wider text-white/50">Upcoming</h3>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/20">
-              <Calendar className="h-5 w-5 text-purple-400" />
-            </div>
-            <div>
-              <p className="font-medium text-white">No upcoming events</p>
-              <p className="text-xs text-white/50">Schedule an event for the team</p>
-            </div>
-          </div>
-        </div>
-      </div>
     </>
   );
 }
@@ -1478,9 +1678,17 @@ function MemberRow({ member }: { member: TeamMember }) {
 function SettingsScreen({
   role,
   team,
+  teamLiveConfig,
+  canToggleLiveVisibility,
+  onLiveVisibilityChange,
+  isLiveVisibilityUpdating,
 }: {
   role: RoleState;
   team: { name: string; slug: string; description?: string; themeColor?: string; iconUrl?: string; bannerUrl?: string };
+  teamLiveConfig: TeamLiveRoomState | null;
+  canToggleLiveVisibility: boolean;
+  onLiveVisibilityChange: (visibility: TeamLiveVisibility) => Promise<void>;
+  isLiveVisibilityUpdating: boolean;
 }) {
   const { toast } = useToast();
   const isLeader = role === 'leader';
@@ -1491,6 +1699,36 @@ function SettingsScreen({
   const { prefs, updatePref, isSaving: isSavingPrefs } = useTeamNotificationPrefsBySlug(team.slug);
   const safePrefs =
     prefs ?? ({ all_activity: true, live_alerts: true, mentions_only: false, feed_posts: true, chat_messages: true } as const);
+  const liveVisibilityOptions: Array<{ value: TeamLiveVisibility; title: string; description: string }> = [
+    {
+      value: 'private',
+      title: 'Private',
+      description: 'Only team members can access Team Live.',
+    },
+    {
+      value: 'public',
+      title: 'Public',
+      description: 'Anyone can watch, but the stream still runs inside your team.',
+    },
+  ];
+
+  const handleVisibilityToggle = async (nextVisibility: TeamLiveVisibility) => {
+    if (!teamLiveConfig || teamLiveConfig.visibility === nextVisibility) return;
+    try {
+      await onLiveVisibilityChange(nextVisibility);
+      toast({
+        title: 'Visibility updated',
+        description: nextVisibility === 'public' ? 'Team Live is now public.' : 'Team Live is now private.',
+        variant: 'success',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Failed to update visibility',
+        description: err?.message || 'Unknown error',
+        variant: 'error',
+      });
+    }
+  };
 
   const handleCopyLink = async () => {
     try {
@@ -1539,6 +1777,50 @@ function SettingsScreen({
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-white">Team Live Visibility</p>
+            <p className="text-xs text-white/50">Control who can view your Team Live room.</p>
+          </div>
+          <Badge className={teamLiveConfig?.isUnlocked ? 'bg-emerald-500/20 text-emerald-300 text-[10px]' : 'bg-white/10 text-white/60 text-[10px]'}>
+            {teamLiveConfig?.isUnlocked ? 'Unlocked' : 'Locked'}
+          </Badge>
+        </div>
+        {!teamLiveConfig?.isUnlocked ? (
+          <p className="mt-3 text-xs text-white/50">
+            Team Live unlocks at {teamLiveConfig?.unlockThreshold ?? 100} members. You're at{' '}
+            {teamLiveConfig?.approvedMemberCount ?? team.approvedMemberCount}.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {liveVisibilityOptions.map((option) => {
+              const selected = teamLiveConfig.visibility === option.value;
+              const disabled = (!canToggleLiveVisibility || isLiveVisibilityUpdating) && !selected;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleVisibilityToggle(option.value)}
+                  disabled={selected || disabled}
+                  className={`rounded-2xl border px-4 py-3 text-left transition ${
+                    selected
+                      ? 'border-purple-400 bg-purple-500/20 text-white shadow-[0_10px_25px_rgba(99,102,241,0.25)]'
+                      : 'border-white/10 bg-white/5 text-white/70 hover:border-white/30 hover:bg-white/10'
+                  } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                >
+                  <p className="text-sm font-semibold text-white">{option.title}</p>
+                  <p className="text-xs text-white/60">{option.description}</p>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {!canToggleLiveVisibility && teamLiveConfig?.isUnlocked && (
+          <p className="mt-3 text-xs text-white/40">Only Team Admins can change visibility.</p>
+        )}
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
