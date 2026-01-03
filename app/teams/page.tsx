@@ -555,15 +555,13 @@ export default function TeamsIndexPage() {
               </p>
             </div>
             <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <Button
-                asChild
-                className="h-12 rounded-2xl bg-white text-base font-semibold text-pink-600 shadow-lg shadow-pink-500/40 hover:text-pink-700"
+              <Link
+                href="/teams/setup"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-6 text-base font-semibold text-pink-600 shadow-lg shadow-pink-500/40 hover:text-pink-700 transition"
               >
-                <Link href="/teams/setup" className="inline-flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Start a team
-                </Link>
-              </Button>
+                <Plus className="h-4 w-4" />
+                Start a team
+              </Link>
               <div className="flex flex-wrap gap-3 text-xs text-white/80">
                 <span className="rounded-full border border-white/30 px-3 py-1 uppercase tracking-[0.2em]">
                   Free to launch
@@ -604,15 +602,13 @@ export default function TeamsIndexPage() {
                   </div>
                 </div>
               </div>
-              <Button
-                asChild
-                className="h-12 rounded-2xl bg-white/10 px-5 text-base font-semibold text-white hover:bg-white/20"
+              <Link
+                href={`/teams/${ownerHeroData.primaryRow.team?.slug ?? ''}`}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white/10 px-5 text-base font-semibold text-white hover:bg-white/20 transition"
               >
-                <Link href={`/teams/${ownerHeroData.primaryRow.team?.slug ?? ''}`} className="inline-flex items-center gap-2">
-                  Jump back in
-                  <ArrowUpRight className="h-4 w-4" />
-                </Link>
-              </Button>
+                Jump back in
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
             </div>
             <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-white/70">
@@ -837,9 +833,12 @@ export default function TeamsIndexPage() {
                   <p className="mt-1 text-sm text-white/60">
                     Create a team to unlock live rooms, posts, and chat for your community.
                   </p>
-                  <Button asChild className="mt-4 rounded-2xl bg-white/20 text-white hover:bg-white/30">
-                    <Link href="/teams/setup">Create your first team</Link>
-                  </Button>
+                  <Link
+                    href="/teams/setup"
+                    className="inline-flex mt-4 items-center justify-center rounded-2xl bg-white/20 px-4 py-2 text-white hover:bg-white/30 transition"
+                  >
+                    Create your first team
+                  </Link>
                 </>
               ) : (
                 <>
