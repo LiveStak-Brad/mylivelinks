@@ -134,6 +134,13 @@ export default function TeamPageContent() {
   const members = Array.isArray(membersRaw) ? membersRaw : [];
   const liveRooms = Array.isArray(liveRoomsRaw) ? liveRoomsRaw : [];
   
+  // Debug: log feed data
+  useEffect(() => {
+    console.log('[TeamPageContent] feedData:', feedData);
+    console.log('[TeamPageContent] feedItems count:', feedItems.length);
+    console.log('[TeamPageContent] feedLoading:', feedLoading);
+  }, [feedData, feedItems.length, feedLoading]);
+  
   // Derive counts
   const liveMembers = members.filter((m) => m.activity === 'live' || m.isStreaming);
   const onlineMembers = members.filter((m) => m.activity === 'online');

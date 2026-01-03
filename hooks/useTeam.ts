@@ -349,15 +349,15 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
   const [error, setError] = useState<Error | null>(null);
   const [notAuthorized, setNotAuthorized] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const cursorRef = useRef<{ beforeCreatedAt: string | null; beforeId: string | null } | null>(null);
-  const refreshKeyRef = useRef(0);
 
   const refetch = useCallback(() => {
-    refreshKeyRef.current += 1;
     cursorRef.current = null;
     setHasMore(true);
     setRawItems([]);
+    setRefreshKey((k) => k + 1);
   }, []);
 
   const loadMore = useCallback(() => {
@@ -391,6 +391,9 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
           p_before_created_at: cursor?.beforeCreatedAt ?? null,
           p_before_id: cursor?.beforeId ?? null,
         });
+
+        console.log('[useTeamFeed] RPC response - rows:', rows?.length ?? 0, 'error:', rpcError);
+        if (rows?.[0]) console.log('[useTeamFeed] First row sample:', rows[0]);
 
         if (rpcError) throw rpcError;
 
@@ -454,7 +457,7 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
     return () => {
       cancelled = true;
     };
-  }, [teamId, supabase, refreshKeyRef.current]);
+  }, [teamId, supabase, refreshKey]);
 
   useEffect(() => {
     if (!isLoadingMore) return;
