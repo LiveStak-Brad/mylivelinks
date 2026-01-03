@@ -1459,7 +1459,7 @@ function FeedScreen({
   const handleCreatePoll = async () => {
     const validOptions = pollOptions.filter(o => o.trim().length > 0);
     if (!pollQuestion.trim() || validOptions.length < 2) {
-      toast({ title: 'Poll needs a question and at least 2 options', variant: 'destructive' });
+      toast({ title: 'Poll needs a question and at least 2 options', variant: 'error' });
       return;
     }
     try {
@@ -1470,7 +1470,7 @@ function FeedScreen({
       onPostCreated?.();
       toast({ title: 'Poll created!' });
     } catch (err: any) {
-      toast({ title: 'Failed to create poll', description: err?.message, variant: 'destructive' });
+      toast({ title: 'Failed to create poll', description: err?.message, variant: 'error' });
     }
   };
   
@@ -1817,7 +1817,7 @@ function FeedCard({
       const updated = await votePoll(item.id, optionId);
       setLocalPollOptions(updated);
     } catch (err: any) {
-      toast({ title: 'Failed to vote', description: err?.message, variant: 'destructive' });
+      toast({ title: 'Failed to vote', description: err?.message, variant: 'error' });
     }
   };
   
