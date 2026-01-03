@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import type { DatingProfile, DatingProfilePrefs, ReligionEnum, BuildEnum } from '@/lib/link/dating-types';
+import type {
+  DatingProfile,
+  DatingProfilePrefs,
+  ReligionEnum,
+  BuildEnum,
+  OrientationEnum,
+} from '@/lib/link/dating-types';
 import * as linkApi from '@/lib/link/api';
 import { uploadLinkPhoto } from '@/lib/link/storage';
 import { SafetyModal } from '@/components/link/SafetyModal';
@@ -11,6 +17,18 @@ const INTEREST_TAGS = [
   'Music', 'Gaming', 'Fitness', 'Business', 'Art', 'Tech',
   'Travel', 'Food', 'Sports', 'Fashion', 'Photography', 'Reading',
   'Movies', 'Cooking', 'Dancing', 'Yoga', 'Hiking', 'Pets'
+];
+
+const ORIENTATION_OPTIONS: { value: OrientationEnum; label: string }[] = [
+  { value: 'straight', label: 'Straight' },
+  { value: 'gay', label: 'Gay' },
+  { value: 'lesbian', label: 'Lesbian' },
+  { value: 'bisexual', label: 'Bisexual' },
+  { value: 'pansexual', label: 'Pansexual' },
+  { value: 'queer', label: 'Queer' },
+  { value: 'asexual', label: 'Asexual' },
+  { value: 'questioning', label: 'Questioning' },
+  { value: 'other', label: 'Other' },
 ];
 
 const DATING_GUIDELINES_KEY = 'mll_link_dating_guidelines_accepted';
@@ -25,6 +43,8 @@ const INITIAL_PREFS: DatingProfilePrefs = {
   height_pref: 'doesnt_matter',
   build_pref: 'doesnt_matter',
   interests_pref: 'doesnt_matter',
+  orientation_pref: 'doesnt_matter',
+  show_orientation: false,
 };
 
 const mergePrefs = (prefs?: Partial<DatingProfilePrefs> | null): DatingProfilePrefs => ({
@@ -49,6 +69,11 @@ export default function DatingProfileEditor() {
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean[]>([]);
   const [safetyModalOpen, setSafetyModalOpen] = useState(false);
   const [pendingEnable, setPendingEnable] = useState(false);
+  const orientationPrefValues: OrientationEnum[] = Array.isArray(profile.prefs?.orientation_pref)
+    ? (profile.prefs?.orientation_pref as OrientationEnum[])
+    : [];
+  const orientationPrefIsDoesntMatter =
+    !Array.isArray(profile.prefs?.orientation_pref) || orientationPrefValues.length === 0;
 
   useEffect(() => {
     loadProfile();
@@ -419,6 +444,49 @@ export default function DatingProfileEditor() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
+                <label className="block text-sm font-bold mb-2">Orientation (Optional)</label>
+                <select
+                  value={profile.prefs?.orientation || ''}
+                  onChange={(e) => {
+                    const value = e.target.value as OrientationEnum;
+                    updatePrefs('orientation', value || undefined);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                >
+                  <option value="">Prefer not to say</option>
+                  {ORIENTATION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-pink-100 dark:border-pink-900/40 bg-pink-50/60 dark:bg-pink-900/10 px-4 py-3">
+                <div>
+                  <p className="text-sm font-bold">Show Orientation on Dating Card</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    Only appears within Link Dating if enabled.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-pressed={profile.prefs?.show_orientation ? 'true' : 'false'}
+                  onClick={() => updatePrefs('show_orientation', !(profile.prefs?.show_orientation ?? false))}
+                  className={`relative w-14 h-8 rounded-full transition-colors ${
+                    profile.prefs?.show_orientation ? 'bg-gradient-to-r from-pink-600 to-rose-600' : 'bg-gray-300 dark:bg-gray-700'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-md transition-transform ${
+                      profile.prefs?.show_orientation ? 'translate-x-6' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-bold mb-2">Smoker</label>
                 <select
                   value={profile.prefs?.smoker || ''}
@@ -551,6 +619,48 @@ export default function DatingProfileEditor() {
                   max="99"
                   className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
                 />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold mb-2">Orientation Preference</label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                We only filter orientation if you pick at least one option below.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => updatePrefs('orientation_pref', 'doesnt_matter')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    orientationPrefIsDoesntMatter
+                      ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                      : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  Doesn't matter
+                </button>
+                {ORIENTATION_OPTIONS.map((option) => {
+                  const isSelected = orientationPrefValues.includes(option.value);
+                  return (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => {
+                        const nextValues = isSelected
+                          ? orientationPrefValues.filter((v) => v !== option.value)
+                          : [...orientationPrefValues, option.value];
+                        updatePrefs('orientation_pref', nextValues.length ? nextValues : 'doesnt_matter');
+                      }}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

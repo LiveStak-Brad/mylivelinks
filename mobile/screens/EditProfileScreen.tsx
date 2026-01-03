@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 
@@ -23,6 +23,12 @@ type ProfileRow = {
   bio?: string | null;
   profile_type?: ProfileType | null;
   enabled_modules?: string[] | null;
+  location_zip?: string | null;
+  location_city?: string | null;
+  location_region?: string | null;
+  location_label?: string | null;
+  location_hidden?: boolean | null;
+  location_show_zip?: boolean | null;
 };
 
 export function EditProfileScreen({ navigation }: Props) {
@@ -42,6 +48,12 @@ export function EditProfileScreen({ navigation }: Props) {
   const [showTypePickerModal, setShowTypePickerModal] = useState(false);
   const [enabledModules, setEnabledModules] = useState<ProfileSection[] | null>(null);
   const [enabledTabs, setEnabledTabs] = useState<ProfileTab[] | null>(null);
+  const [locationZip, setLocationZip] = useState('');
+  const [locationLabel, setLocationLabel] = useState('');
+  const [locationHidden, setLocationHidden] = useState(false);
+  const [locationShowZip, setLocationShowZip] = useState(false);
+  const [locationDisplay, setLocationDisplay] = useState('');
+  const [locationSaving, setLocationSaving] = useState(false);
 
   const canSave = useMemo(() => !!userId && !saving && !loading, [loading, saving, userId]);
 
@@ -64,7 +76,7 @@ export function EditProfileScreen({ navigation }: Props) {
     try {
       const { data, error: e } = await supabase
         .from('profiles')
-        .select('id, username, display_name, bio, profile_type')
+        .select('id, username, display_name, bio, profile_type, location_zip, location_city, location_region, location_label, location_hidden, location_show_zip')
         .eq('id', userId)
         .single();
 
@@ -76,6 +88,18 @@ export function EditProfileScreen({ navigation }: Props) {
       setBio(String(row.bio ?? ''));
       // Load profile type from backend
       setProfileType((row as any).profile_type || 'creator');
+      setLocationZip(String((row as any).location_zip ?? ''));
+      setLocationLabel(String((row as any).location_label ?? ''));
+      setLocationHidden(Boolean((row as any).location_hidden));
+      setLocationShowZip(Boolean((row as any).location_show_zip));
+      if ((row as any).location_city || (row as any).location_region) {
+        const cityRegion = [String((row as any).location_city ?? ''), String((row as any).location_region ?? '')]
+          .filter((part) => part && part.trim().length > 0)
+          .join(', ');
+        setLocationDisplay(cityRegion);
+      } else {
+        setLocationDisplay('');
+      }
       // Load enabled modules (optional modules only)
       if (row.enabled_modules && Array.isArray(row.enabled_modules)) {
         setEnabledModules(row.enabled_modules as ProfileSection[]);
@@ -147,6 +171,47 @@ export function EditProfileScreen({ navigation }: Props) {
     }
   }, [bio, displayName, navigation, profileType, userId]);
 
+  const handleLocationSave = useCallback(async () => {
+    if (!supabaseConfigured) {
+      Alert.alert('Offline', 'Supabase is not configured.');
+      return;
+    }
+    if (!userId) {
+      Alert.alert('Not signed in', 'Please log in to update your location.');
+      return;
+    }
+    if (!locationZip.trim()) {
+      Alert.alert('ZIP required', 'Enter a 5-digit ZIP to set your location.');
+      return;
+    }
+
+    setLocationSaving(true);
+    try {
+      const { data, error: rpcError } = await supabase.rpc('rpc_update_profile_location', {
+        p_zip: locationZip.trim(),
+        p_label: locationLabel.trim() || null,
+        p_hide: locationHidden,
+        p_show_zip: locationShowZip,
+      });
+
+      if (rpcError) {
+        throw rpcError;
+      }
+
+      const payload = Array.isArray(data) ? data[0] : data;
+      if (payload) {
+        const cityRegion = [payload.location_city, payload.location_region].filter(Boolean).join(', ');
+        setLocationDisplay(cityRegion);
+        setLocationZip(payload.location_zip || locationZip);
+      }
+      Alert.alert('Location updated', 'Your manual location was saved.');
+    } catch (err: any) {
+      Alert.alert('Location error', err?.message || 'Failed to update location.');
+    } finally {
+      setLocationSaving(false);
+    }
+  }, [locationHidden, locationLabel, locationShowZip, locationZip, supabase, supabaseConfigured, userId]);
+
   return (
     <PageShell
       title="Edit Profile"
@@ -208,6 +273,56 @@ export function EditProfileScreen({ navigation }: Props) {
               />
               <Text style={styles.fieldHint}>A brief description for your profile</Text>
             </View>
+            </View>
+
+            {/* Location Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Feather name="map-pin" size={18} color={theme.colors.accent} />
+                <Text style={styles.sectionTitle}>Manual Location</Text>
+              </View>
+              <Text style={styles.fieldHint}>
+                Manual ZIP for discovery. No GPS tracking. Leave blank to hide.
+              </Text>
+              <View style={styles.field}>
+                <Text style={styles.label}>ZIP Code</Text>
+                <Input
+                  value={locationZip}
+                  onChangeText={setLocationZip}
+                  placeholder="90012"
+                  keyboardType="number-pad"
+                  maxLength={5}
+                />
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.label}>Area Label</Text>
+                <Input
+                  value={locationLabel}
+                  onChangeText={setLocationLabel}
+                  placeholder="St. Louis Metro"
+                />
+              </View>
+              {locationDisplay ? (
+                <Text style={styles.locationHelper}>Current: {locationDisplay}</Text>
+              ) : null}
+              <View style={styles.toggleRow}>
+                <Text style={styles.label}>Hide location</Text>
+                <Switch value={locationHidden} onValueChange={setLocationHidden} />
+              </View>
+              <View style={styles.toggleRow}>
+                <Text style={styles.label}>Show ZIP publicly</Text>
+                <Switch
+                  value={locationShowZip}
+                  onValueChange={setLocationShowZip}
+                  disabled={locationHidden}
+                />
+              </View>
+              <Button
+                title={locationSaving ? 'Saving…' : 'Set Location'}
+                onPress={handleLocationSave}
+                loading={locationSaving}
+                style={styles.locationButton}
+              />
             </View>
 
             {/* Profile Type Section */}
@@ -402,6 +517,19 @@ function createStyles(theme: ThemeDefinition) {
       fontSize: 11,
       fontWeight: '600',
       marginTop: -4,
+    },
+    locationHelper: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    locationButton: {
+      marginTop: 12,
     },
     readonlyContainer: {
       paddingVertical: 12,

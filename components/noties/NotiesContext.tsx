@@ -4,7 +4,22 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { createClient } from '@/lib/supabase';
 
 // Notification types
-export type NotieType = 'gift' | 'follow' | 'live' | 'mention' | 'comment' | 'level_up' | 'system' | 'purchase' | 'conversion' | 'team_invite' | 'team_invite_accepted' | 'team_join_request';
+export type NotieType =
+  | 'gift'
+  | 'follow'
+  | 'follow_link'
+  | 'live'
+  | 'mention'
+  | 'comment'
+  | 'like_post'
+  | 'like_comment'
+  | 'level_up'
+  | 'system'
+  | 'purchase'
+  | 'conversion'
+  | 'team_invite'
+  | 'team_invite_accepted'
+  | 'team_join_request';
 
 export interface Notie {
   id: string;

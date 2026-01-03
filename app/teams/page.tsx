@@ -645,13 +645,13 @@ export default function TeamsIndexPage() {
             )}
           </div>
           <div
-            className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide touch-pan-x snap-x snap-mandatory"
+            className="flex gap-4 overflow-x-auto pb-4 touch-pan-x snap-x snap-mandatory"
             aria-label="New teams"
           >
             {showCreateTeamCta && (
               <Link
                 href="/teams/setup"
-                className="group relative flex w-[85vw] max-w-[18rem] shrink-0 snap-start flex-col justify-between rounded-3xl border border-dashed border-white/20 bg-gradient-to-br from-purple-500/20 via-pink-500/10 to-indigo-500/20 p-4 text-white transition hover:-translate-y-1 hover:border-white/40 sm:w-60"
+                className="group relative block flex w-[34vw] max-w-[10rem] shrink-0 snap-start flex-col justify-between rounded-3xl border border-dashed border-white/20 bg-gradient-to-br from-purple-500/20 via-pink-500/10 to-indigo-500/20 p-4 text-white transition hover:-translate-y-1 hover:border-white/40 sm:w-60"
               >
                 <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.35em] text-white/70">
                   <span>Create</span>
@@ -928,7 +928,7 @@ function NewTeamTile({
   return (
     <Link
       href={`/teams/${team.slug}`}
-      className="group flex w-[85vw] max-w-[18rem] shrink-0 snap-start flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4 transition hover:-translate-y-1 hover:border-white/30 sm:w-60"
+      className="group block flex w-[34vw] max-w-[10rem] shrink-0 snap-start flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4 transition hover:-translate-y-1 hover:border-white/30 sm:w-60"
     >
       <div className="relative h-32 w-full overflow-hidden rounded-2xl border border-white/10">
         <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />

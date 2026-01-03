@@ -169,6 +169,12 @@ export default function RoomCard({ room, interested, onOpenPreview, onToggleInte
           {room.name}
         </h3>
 
+        {room.subtitle ? (
+          <p className="text-sm text-muted-foreground line-clamp-1">
+            {room.subtitle}
+          </p>
+        ) : null}
+
         {/* Progress Section */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">

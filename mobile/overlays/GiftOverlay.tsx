@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Animated, {
   useAnimatedStyle,
@@ -10,8 +10,9 @@ import Animated, {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { Participant } from '../types/live';
 import { useAuthContext } from '../contexts/AuthContext';
-import { fetchAuthed } from '../lib/api';
 import { generateSessionId } from '../lib/deviceId';
+import { fetchWithWebSession } from '../lib/webSession';
+import { supabase } from '../lib/supabase';
 
 interface GiftOverlayProps {
   visible: boolean;
@@ -20,6 +21,16 @@ interface GiftOverlayProps {
   targetRecipientId: string | null;
   onSelectRecipientId: (recipientId: string) => void;
   roomId?: string | null;
+  liveStreamId?: number | null;
+}
+
+interface GiftType {
+  id: number;
+  name: string;
+  coin_cost: number;
+  icon_url?: string;
+  emoji?: string;
+  tier: number;
 }
 
 export const GiftOverlay: React.FC<GiftOverlayProps> = ({
@@ -29,9 +40,14 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
   targetRecipientId,
   onSelectRecipientId,
   roomId,
+  liveStreamId,
 }) => {
   const { user, getAccessToken } = useAuthContext();
-  const [coinsAmount, setCoinsAmount] = useState<number>(50);
+  const [giftTypes, setGiftTypes] = useState<GiftType[]>([]);
+  const [selectedGift, setSelectedGift] = useState<GiftType | null>(null);
+  const [userCoinBalance, setUserCoinBalance] = useState(0);
+  const [loadingGifts, setLoadingGifts] = useState(false);
+  const [giftError, setGiftError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const translateX = useSharedValue(0);
 
@@ -81,6 +97,53 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
     return p?.username || targetRecipientId;
   }, [participants, targetRecipientId]);
 
+  useEffect(() => {
+    if (!visible || !user?.id) return;
+    let cancelled = false;
+
+    const loadGifts = async () => {
+      setLoadingGifts(true);
+      setGiftError(null);
+      try {
+        const [{ data: giftData, error: giftDataError }, { data: profileData }] = await Promise.all([
+          supabase
+            .from('gift_types')
+            .select('*')
+            .eq('is_active', true)
+            .order('display_order'),
+          supabase
+            .from('profiles')
+            .select('coin_balance')
+            .eq('id', user.id)
+            .maybeSingle(),
+        ]);
+
+        if (giftDataError) throw giftDataError;
+        if (cancelled) return;
+
+        setGiftTypes(giftData || []);
+        setSelectedGift((giftData && giftData.length > 0 ? giftData[0] : null) as GiftType | null);
+        setUserCoinBalance((profileData as any)?.coin_balance ?? 0);
+      } catch (error: any) {
+        if (!cancelled) {
+          setGiftTypes([]);
+          setSelectedGift(null);
+          setGiftError(error?.message || 'Failed to load gifts');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingGifts(false);
+        }
+      }
+    };
+
+    loadGifts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, visible]);
+
   const handleSendGift = useCallback(async () => {
     if (sending) return;
 
@@ -99,45 +162,66 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
       return;
     }
 
-    if (!coinsAmount || coinsAmount <= 0) {
-      Alert.alert('Invalid amount', 'Choose a valid coin amount.');
+    if (!selectedGift) {
+      Alert.alert('Select a gift', 'Choose a gift from the catalog.');
+      return;
+    }
+
+    if (userCoinBalance < selectedGift.coin_cost) {
+      Alert.alert('Insufficient coins', 'Top up your balance to send this gift.');
       return;
     }
 
     setSending(true);
     try {
-      const accessToken = await getAccessToken();
+      await getAccessToken(); // ensure session exists even though request uses cookie
       const requestId = generateSessionId();
-
-      const res = await fetchAuthed(
+      const response = await fetchWithWebSession(
         '/api/gifts/send',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             toUserId: recipientProfileId,
-            coinsAmount,
+            coinsAmount: selectedGift.coin_cost,
+            giftTypeId: selectedGift.id,
             requestId,
-            context: 'live_room',
-            roomId: roomId || null,
+            streamId: liveStreamId ?? null,
+            roomSlug: roomId || null,
           }),
         },
-        accessToken
+        { contentTypeJson: true }
       );
 
-      if (!res.ok) {
-        const msg = res.status === 403 ? 'Gifting is temporarily disabled.' : (res.message || 'Failed to send gift');
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const msg =
+          response.status === 403
+            ? 'Gifting is temporarily disabled.'
+            : data?.error || 'Failed to send gift';
         throw new Error(msg);
       }
 
-      Alert.alert('Gift sent', `Sent ${coinsAmount} coins to ${recipientLabel || 'recipient'}.`);
+      Alert.alert('Gift sent', `Sent ${selectedGift.coin_cost} coins to ${recipientLabel || 'recipient'}.`);
+      setUserCoinBalance((prev) => Math.max(0, prev - selectedGift.coin_cost));
       onClose();
     } catch (err: any) {
       Alert.alert('Gift failed', err?.message || 'Failed to send gift');
     } finally {
       setSending(false);
     }
-  }, [coinsAmount, getAccessToken, onClose, recipientLabel, recipientProfileId, sending, user?.id]);
+  }, [
+    getAccessToken,
+    liveStreamId,
+    onClose,
+    recipientLabel,
+    recipientProfileId,
+    roomId,
+    selectedGift,
+    sending,
+    user?.id,
+    userCoinBalance,
+  ]);
 
   if (!visible) return null;
 
@@ -158,7 +242,7 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
 
               <View style={styles.noteBox}>
                 <Text style={styles.noteText}>Send a gift</Text>
-                <Text style={styles.noteSubtext}>Choose a recipient and a coin amount.</Text>
+                <Text style={styles.noteSubtext}>Choose a recipient and a gift from the catalog.</Text>
               </View>
 
               <View style={styles.section}>
@@ -189,29 +273,51 @@ export const GiftOverlay: React.FC<GiftOverlayProps> = ({
                 )}
               </View>
 
+              <View style={styles.balanceBox}>
+                <Text style={styles.balanceLabel}>Your balance</Text>
+                <Text style={styles.balanceValue}>{userCoinBalance.toLocaleString()} coins</Text>
+              </View>
+
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Amount</Text>
-                <View style={styles.amountRow}>
-                  {[10, 50, 100, 500].map((amt) => {
-                    const active = coinsAmount === amt;
-                    return (
-                      <TouchableOpacity
-                        key={amt}
-                        style={[styles.amountPill, active && styles.amountPillActive]}
-                        onPress={() => setCoinsAmount(amt)}
-                        disabled={sending}
-                      >
-                        <Text style={[styles.amountText, active && styles.amountTextActive]}>{amt}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <Text style={styles.sectionTitle}>Gift catalog</Text>
+                {giftError ? (
+                  <Text style={styles.emptyText}>{giftError}</Text>
+                ) : loadingGifts ? (
+                  <View style={styles.loadingGifts}>
+                    <ActivityIndicator color="#a855f7" />
+                  </View>
+                ) : (
+                  <View style={styles.giftGrid}>
+                    {giftTypes.map((gift) => {
+                      const active = selectedGift?.id === gift.id;
+                      return (
+                        <TouchableOpacity
+                          key={gift.id}
+                          style={[styles.giftCard, active && styles.giftCardActive]}
+                          onPress={() => setSelectedGift(gift)}
+                          disabled={sending}
+                        >
+                          {gift.icon_url ? (
+                            <Image source={{ uri: gift.icon_url }} style={styles.giftIcon} />
+                          ) : (
+                            <Text style={styles.giftEmoji}>{gift.emoji || '🎁'}</Text>
+                          )}
+                          <Text style={styles.giftName} numberOfLines={1}>{gift.name}</Text>
+                          <Text style={styles.giftCost}>{gift.coin_cost.toLocaleString()} coins</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
 
               <TouchableOpacity
-                style={[styles.sendButton, (!recipientProfileId || sending) && styles.sendButtonDisabled]}
+                style={[
+                  styles.sendButton,
+                  (!recipientProfileId || !selectedGift || sending || loadingGifts) && styles.sendButtonDisabled,
+                ]}
                 onPress={handleSendGift}
-                disabled={!recipientProfileId || sending}
+                disabled={!recipientProfileId || !selectedGift || sending || loadingGifts}
               >
                 {sending ? (
                   <ActivityIndicator color="#fff" />
@@ -332,32 +438,69 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
-  amountRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  amountPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  balanceBox: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    minWidth: 56,
+    borderColor: 'rgba(255,255,255,0.08)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  amountPillActive: {
-    borderColor: '#ff6b9d',
-    backgroundColor: 'rgba(255, 107, 157, 0.14)',
-  },
-  amountText: {
-    color: '#fff',
+  balanceLabel: {
+    color: '#9aa0a6',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  balanceValue: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '800',
   },
-  amountTextActive: {
+  giftGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  giftCard: {
+    width: '30%',
+    minWidth: 90,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    gap: 6,
+  },
+  giftCardActive: {
+    borderColor: '#ff6b9d',
+    backgroundColor: 'rgba(255,107,157,0.12)',
+  },
+  giftEmoji: {
+    fontSize: 28,
+  },
+  giftIcon: {
+    width: 32,
+    height: 32,
+  },
+  giftName: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  giftCost: {
     color: '#ff6b9d',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  loadingGifts: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
   sendButton: {
     marginTop: 18,

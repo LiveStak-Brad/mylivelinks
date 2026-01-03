@@ -17,6 +17,8 @@ import { PHOTO_FILTER_PRESETS, PhotoFilterId, getPhotoFilterPreset } from '@/lib
 import { ProfileSection, ProfileTab } from '@/lib/profileTypeConfig';
 import type { GenderEnum } from '@/lib/link/dating-types';
 import PwaInstallButton from '@/components/PwaInstallButton';
+import { LocationEditor } from '@/components/location/LocationEditor';
+import type { ProfileLocation } from '@/lib/location';
 
 interface UserLink {
   id?: number;
@@ -52,6 +54,7 @@ export default function ProfileSettingsPage() {
   const [bio, setBio] = useState('');
   const [username, setUsername] = useState('');
   const [gender, setGender] = useState<GenderEnum | null>(null);
+  const [locationInfo, setLocationInfo] = useState<ProfileLocation | null>(null);
   
   // Social media fields
   const [socialInstagram, setSocialInstagram] = useState('');
@@ -282,6 +285,17 @@ export default function ProfileSettingsPage() {
           link_color: p.link_color || '',
           links_section_title: p.links_section_title || 'My Links'
         });
+
+        setLocationInfo({
+          zip: p.location_zip || null,
+          city: p.location_city || null,
+          region: p.location_region || null,
+          country: p.location_country || 'US',
+          label: p.location_label || null,
+          hidden: p.location_hidden ?? false,
+          showZip: p.location_show_zip ?? false,
+          updatedAt: p.location_updated_at || null,
+        });
       }
 
       // Load links
@@ -357,8 +371,7 @@ export default function ProfileSettingsPage() {
           display_name: displayName,
           bio: bio,
           avatar_url: avatarUrl, // Will be updated if avatar changed
-          // TODO(profile-logic): include gender once profiles.gender is available in Supabase
-          // gender: gender || null,
+          gender: gender ?? null,
           // Enabled modules (optional modules only)
           enabled_modules: Array.isArray(enabledModules) ? enabledModules : null,
           // Enabled tabs (optional tabs only)
@@ -798,6 +811,10 @@ export default function ProfileSettingsPage() {
               <p className="text-xs text-gray-500 mt-1">{bio.length}/500</p>
             </div>
           </div>
+        </div>
+
+        <div className="mb-6">
+          <LocationEditor location={locationInfo} onSaved={setLocationInfo} />
         </div>
 
         {/* About */}

@@ -32,6 +32,16 @@ const safeSupabaseAnonKey = supabaseAnonKey ?? 'public-anon-key-not-set';
 
 export const supabaseBaseUrl = safeSupabaseUrl;
 
+let derivedProjectRef = 'local';
+try {
+  const host = new URL(safeSupabaseUrl).host;
+  derivedProjectRef = host.split('.')[0] || derivedProjectRef;
+} catch {
+  // ignore – fallback to "local"
+}
+
+export const supabaseProjectRef = derivedProjectRef;
+
 export const supabase = createClient(safeSupabaseUrl, safeSupabaseAnonKey, {
   auth: {
     storage: ExpoSecureStoreAdapter,

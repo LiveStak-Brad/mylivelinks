@@ -363,7 +363,7 @@ export default function LandingPage() {
             <div
               className={
                 mobileTeamsScrollable
-                  ? 'flex gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide touch-pan-x overscroll-x-contain snap-x snap-mandatory'
+                  ? 'flex gap-3 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-x-contain snap-x snap-mandatory'
                   : 'flex gap-3 overflow-x-hidden overflow-y-hidden'
               }
             >
@@ -417,8 +417,8 @@ export default function LandingPage() {
                 );
 
                 const cardClassName = mobileTeamsFill
-                  ? 'flex-1 min-w-0 transition-transform duration-200 ease-out active:scale-[0.98]'
-                  : `${mobileTeamsScrollable ? 'snap-start ' : ''}flex-shrink-0 w-24 transition-transform duration-200 ease-out active:scale-[0.98]`;
+                  ? 'block flex-1 min-w-0 transition-transform duration-200 ease-out active:scale-[0.98]'
+                  : `${mobileTeamsScrollable ? 'snap-start ' : ''}block flex-shrink-0 w-28 transition-transform duration-200 ease-out active:scale-[0.98]`;
 
                 if (card.kind === 'placeholder') {
                   return (
@@ -540,6 +540,76 @@ export default function LandingPage() {
           </div>
         </div>
       )}
+
+      {/* Section 2.5: Live Feature Highlight */}
+      <div className="container mx-auto px-4 pb-3">
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-white/10 bg-gradient-to-r from-slate-950/90 via-slate-900/90 to-slate-950/90 shadow-2xl">
+            <CardContent className="p-5 sm:p-6 flex flex-col gap-5 md:flex-row md:items-center">
+              <div className="flex-1 text-center md:text-left space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50">Live feature</p>
+                <h2 className="text-2xl font-extrabold text-white">Live is happening</h2>
+                <p className="text-sm text-white/80">
+                  Join Live Central to go live together or hang out. Solo live streams are coming next.
+                </p>
+                <p className="text-xs text-white/60">
+                  Discover live rooms on LiveTV. Trending and Discovery help streams get seen.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-start justify-center pt-1">
+                  <Link href="/liveTV" className="w-full sm:w-auto">
+                    <Button size="sm" className="w-full sm:w-auto px-6 font-semibold shadow-lg">
+                      Watch Live
+                    </Button>
+                  </Link>
+                  <Link
+                    href="/room/live-central"
+                    className="text-sm font-semibold text-white/80 hover:text-white underline decoration-dotted decoration-white/40 underline-offset-4"
+                  >
+                    Go Live in Live Central
+                  </Link>
+                </div>
+              </div>
+
+              <div className="w-full md:max-w-[220px]">
+                <div className="relative rounded-2xl border border-white/15 bg-white/5 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.65)]">
+                  <div className="flex items-center justify-between text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-3">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" aria-hidden />
+                      Live Central
+                    </span>
+                    <span className="text-white/50">Group room</span>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-black/30 aspect-video flex items-center justify-center overflow-hidden">
+                    <Image
+                      src="/livecentral.png"
+                      alt="Live Central group room"
+                      width={180}
+                      height={120}
+                      className="object-contain opacity-90"
+                      priority={false}
+                    />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex -space-x-2">
+                      {['/livecentral.png', '/no-profile-pic.png', '/coin-icon.png'].map((src, idx) => (
+                        <Image
+                          key={`${src}-${idx}`}
+                          src={src}
+                          alt="Live participant"
+                          width={32}
+                          height={32}
+                          className="rounded-full border border-white/20 bg-white/10 object-cover shadow"
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs font-semibold text-white/70">Rooms are filling up</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Section 3: What you can do right now (2 rows) */}
       <div className="container mx-auto px-4 py-3">

@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, Heart, MessageCircle, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui';
+import { getNotificationDestination } from '@/lib/noties/getNotificationDestination';
 
 type Notification = {
   id: number;
@@ -26,6 +28,8 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { toast } = useToast();
   const supabase = createClient();
 
   // Load notifications
@@ -212,6 +216,41 @@ export function NotificationBell() {
                   key={notif.id}
                   onClick={() => {
                     if (!notif.read) markAsRead(notif.id);
+
+                    const destination = getNotificationDestination({
+                      type: notif.type,
+                      entity_type: notif.entity_type,
+                      entity_id: notif.entity_id,
+                      actor_username: notif.actor?.username ?? null,
+                      metadata: null,
+                    });
+
+                    if (destination.toast) {
+                      toast({
+                        title: destination.toast.title,
+                        description: destination.toast.description,
+                        variant: destination.toast.variant,
+                        action:
+                          destination.toast.secondaryLabel && destination.toast.secondaryHref
+                            ? {
+                                label: destination.toast.secondaryLabel,
+                                onClick: () => router.push(destination.toast!.secondaryHref!),
+                              }
+                            : undefined,
+                      });
+                    }
+
+                    if (destination.kind === 'external') {
+                      try {
+                        window.open(destination.url, '_blank', 'noopener,noreferrer');
+                      } catch {
+                        router.push('/noties');
+                      }
+                    } else {
+                      router.push(destination.href);
+                    }
+
+                    setIsOpen(false);
                   }}
                   className={`
                     flex items-start gap-3 p-4 border-b border-border last:border-0

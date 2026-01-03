@@ -17,6 +17,8 @@ import { Tile } from '../components/live/Tile';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { LiveChatActionBar } from '../components/live/LiveChatActionBar';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
+import { useViewerHeartbeat } from '../hooks/useViewerHeartbeat';
+import { fetchWithWebSession } from '../lib/webSession';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -27,6 +29,13 @@ type StreamerProfile = {
   username: string;
   display_name?: string | null;
   avatar_url?: string | null;
+};
+
+type TopGifter = {
+  profile_id: string;
+  username: string;
+  avatar_url?: string | null;
+  total_coins: number;
 };
 
 export function SoloStreamViewerScreen({ navigation, route }: Props) {
@@ -41,6 +50,7 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
   const [streamer, setStreamer] = useState<StreamerProfile | null>(null);
   const [loadingStreamer, setLoadingStreamer] = useState(true);
   const [streamerLiveStreamId, setStreamerLiveStreamId] = useState<number | null>(null);
+  const [streamerIsLive, setStreamerIsLive] = useState(false);
   const [streamTitle, setStreamTitle] = useState<string | null>(null);
 
   const [showGifts, setShowGifts] = useState(false);
@@ -51,7 +61,9 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
   const [activeViewersLoading, setActiveViewersLoading] = useState(false);
   const [viewerCountDb, setViewerCountDb] = useState<number | null>(null);
   const [viewerTrackingDisabled, setViewerTrackingDisabled] = useState(false);
-  const viewerHeartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
+  const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
+  const [trendingRank, setTrendingRank] = useState<number | null>(null);
 
   const [showChatSettings, setShowChatSettings] = useState(false);
   const [chatShowAvatars, setChatShowAvatars] = useState(true);
@@ -156,6 +168,7 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
 
         setStreamerLiveStreamId((liveStream as any)?.id ?? null);
         setStreamTitle((liveStream as any)?.stream_title ?? null);
+        setStreamerIsLive(Boolean((liveStream as any)?.live_available));
       } catch (err: any) {
         if (cancelled) return;
         Alert.alert('Stream unavailable', err?.message || 'Unable to load stream');
@@ -170,6 +183,68 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
       cancelled = true;
     };
   }, [username]);
+
+  useEffect(() => {
+    if (!streamer?.id) {
+      setTopGifters([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadTopGifters = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('gifts')
+          .select(`
+            sender_id,
+            coin_value,
+            profiles!gifts_sender_id_fkey (
+              username,
+              avatar_url
+            )
+          `)
+          .eq('recipient_id', streamer.id)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        const totals = (data || []).reduce((acc: Record<string, TopGifter>, gift: any) => {
+          const senderId = gift.sender_id;
+          if (!senderId) return acc;
+          if (!acc[senderId]) {
+            acc[senderId] = {
+              profile_id: senderId,
+              username: gift.profiles?.username || 'Unknown',
+              avatar_url: gift.profiles?.avatar_url ?? null,
+              total_coins: 0,
+            };
+          }
+          acc[senderId].total_coins += gift.coin_value || 0;
+          return acc;
+        }, {});
+
+        const topThree = Object.values(totals)
+          .sort((a, b) => b.total_coins - a.total_coins)
+          .slice(0, 3);
+
+        setTopGifters(topThree);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('[GIFTERS][MOBILE] failed to load:', error);
+          setTopGifters([]);
+        }
+      }
+    };
+
+    loadTopGifters();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [streamer?.id]);
 
   const remoteStreamers = useMemo(() => {
     const r = room as unknown as Room | null;
@@ -282,21 +357,140 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
 
   const viewerCount = viewerCountDb ?? viewerCountLiveKitFallback;
 
+  const watchSessionKey = useMemo(() => {
+    if (!streamerLiveStreamId || !viewer?.id) return null;
+    return `solo:${viewer.id}:${streamerLiveStreamId}`;
+  }, [streamerLiveStreamId, viewer?.id]);
+
+  useViewerHeartbeat({
+    liveStreamId: streamerLiveStreamId || 0,
+    isActive: Boolean(streamerIsLive && isConnected && !streamEnded),
+    isUnmuted: !isMuted,
+    isVisible: true,
+    isSubscribed: !!isConnected,
+    enabled: Boolean(streamerLiveStreamId && streamerIsLive),
+    slotIndex: 0,
+    watchSessionKey: watchSessionKey || undefined,
+  });
+
+  useEffect(() => {
+    if (!streamerLiveStreamId || !viewer?.id || !streamerIsLive) return;
+    let cancelled = false;
+
+    const ping = async (is_active = true) => {
+      try {
+        await fetchWithWebSession('/api/active-viewers/heartbeat', {
+          method: 'POST',
+          body: JSON.stringify({
+            live_stream_id: streamerLiveStreamId,
+            viewer_id: viewer.id,
+            is_active,
+            is_unmuted: !isMuted,
+            is_visible: true,
+            is_subscribed: !!isConnected,
+          }),
+        }, { contentTypeJson: true });
+      } catch (error) {
+        console.warn('[HEARTBEAT][SERVICE][MOBILE] failed:', error);
+      }
+    };
+
+    ping(true);
+    const interval = setInterval(() => {
+      if (!cancelled) {
+        void ping(true);
+      }
+    }, 12_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      void ping(false);
+    };
+  }, [viewer?.id, streamerLiveStreamId, streamerIsLive, isMuted, isConnected]);
+
+  useEffect(() => {
+    if (!streamer?.id) {
+      setLeaderboardRank(null);
+      setTrendingRank(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLeaderboardRank = async () => {
+      try {
+        const { data, error } = await supabase.rpc('rpc_get_leaderboard_rank', {
+          p_profile_id: streamer.id,
+          p_leaderboard_type: 'top_streamers_daily',
+        });
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        const rank = Array.isArray(data) && data.length > 0 ? data[0]?.current_rank ?? null : null;
+        setLeaderboardRank(rank);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('[LEADERBOARD][MOBILE] failed to load:', error);
+          setLeaderboardRank(null);
+        }
+      }
+    };
+
+    const loadTrendingRank = async () => {
+      if (!streamerLiveStreamId || !streamerIsLive) {
+        setTrendingRank(null);
+        return;
+      }
+      try {
+        const { data, error } = await supabase.rpc('rpc_get_trending_live_streams', {
+          p_limit: 100,
+          p_offset: 0,
+        });
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        if (Array.isArray(data)) {
+          const idx = data.findIndex((entry: any) => entry.stream_id === streamerLiveStreamId);
+          setTrendingRank(idx >= 0 ? idx + 1 : null);
+        } else {
+          setTrendingRank(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('[TRENDING][MOBILE] failed to load:', error);
+          setTrendingRank(null);
+        }
+      }
+    };
+
+    const refresh = () => {
+      loadLeaderboardRank();
+      loadTrendingRank();
+    };
+
+    refresh();
+    const interval = setInterval(refresh, 30_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [streamer?.id, streamerLiveStreamId, streamerIsLive]);
+
   const refreshViewerCount = useCallback(async (liveStreamId: number) => {
     if (viewerTrackingDisabled) return;
     try {
-      const cutoff = new Date(Date.now() - 60_000).toISOString();
-      const { count, error } = await supabase
-        .from('active_viewers')
-        .select('*', { count: 'exact', head: true })
-        .eq('live_stream_id', liveStreamId)
-        .eq('is_active', true)
-        .gt('last_active_at', cutoff);
-
-      if (error) throw error;
-      setViewerCountDb(typeof count === 'number' ? count : 0);
+      const response = await fetchWithWebSession(`/api/active-viewers?live_stream_id=${liveStreamId}`);
+      if (!response.ok) {
+        throw new Error('viewer_count_failed');
+      }
+      const data = await response.json().catch(() => null);
+      const nextCount = typeof data?.viewer_count === 'number' ? data.viewer_count : 0;
+      setViewerCountDb(nextCount);
     } catch {
-      // If this instance doesn't have active_viewers enabled, fall back to LiveKit count.
       setViewerCountDb(null);
       setViewerTrackingDisabled(true);
     }
@@ -310,68 +504,9 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
     void refreshViewerCount(streamerLiveStreamId);
     const interval = setInterval(() => {
       void refreshViewerCount(streamerLiveStreamId);
-    }, 12_000);
+    }, 15_000);
     return () => clearInterval(interval);
   }, [refreshViewerCount, streamerLiveStreamId]);
-
-  const sendViewerHeartbeat = useCallback(async (liveStreamId: number) => {
-    if (viewerTrackingDisabled) return;
-    try {
-      const { data } = await supabase.auth.getUser();
-      const userId = data?.user?.id;
-      if (!userId) return;
-
-      const { error } = await (supabase.rpc as any)('update_viewer_heartbeat', {
-        p_viewer_id: userId,
-        p_live_stream_id: liveStreamId,
-        p_is_active: true,
-        p_is_unmuted: true,
-        p_is_visible: true,
-        p_is_subscribed: true,
-      });
-
-      if (error) throw error;
-    } catch {
-      // Disable to prevent spamming RPC if not installed
-      setViewerTrackingDisabled(true);
-    }
-  }, [viewerTrackingDisabled]);
-
-  useEffect(() => {
-    if (viewerHeartbeatIntervalRef.current) {
-      clearInterval(viewerHeartbeatIntervalRef.current);
-      viewerHeartbeatIntervalRef.current = null;
-    }
-
-    if (!streamerLiveStreamId || !isConnected) return;
-
-    void sendViewerHeartbeat(streamerLiveStreamId);
-    viewerHeartbeatIntervalRef.current = setInterval(() => {
-      void sendViewerHeartbeat(streamerLiveStreamId);
-    }, 12_000);
-
-    return () => {
-      if (viewerHeartbeatIntervalRef.current) {
-        clearInterval(viewerHeartbeatIntervalRef.current);
-        viewerHeartbeatIntervalRef.current = null;
-      }
-      // Best-effort cleanup
-      void (async () => {
-        try {
-          const { data } = await supabase.auth.getUser();
-          const userId = data?.user?.id;
-          if (!userId) return;
-          await supabase
-            .from('active_viewers')
-            .delete()
-            .eq('viewer_id', userId)
-            .eq('live_stream_id', streamerLiveStreamId);
-        } catch {
-          // ignore
-        }
-      })();
-    };
-  }, [isConnected, sendViewerHeartbeat, streamerLiveStreamId]);
 
   const loadActiveViewers = useCallback(async () => {
     if (!streamerLiveStreamId || viewerTrackingDisabled) {
@@ -380,43 +515,19 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
     }
     setActiveViewersLoading(true);
     try {
-      const cutoff = new Date(Date.now() - 60_000).toISOString();
-      const { data, error } = await supabase
-        .from('active_viewers')
-        .select('viewer_id, last_active_at, is_active')
-        .eq('live_stream_id', streamerLiveStreamId)
-        .eq('is_active', true)
-        .gt('last_active_at', cutoff)
-        .order('last_active_at', { ascending: false });
-
-      if (error) throw error;
-      const rows = (data || []) as Array<{ viewer_id: string; last_active_at: string; is_active: boolean }>;
-      const viewerIds = Array.from(new Set(rows.map((r) => r.viewer_id)));
-      if (viewerIds.length === 0) {
-        setActiveViewers([]);
-        return;
+      const response = await fetchWithWebSession(`/api/active-viewers/list?live_stream_id=${streamerLiveStreamId}`);
+      if (!response.ok) {
+        throw new Error('viewer_list_failed');
       }
-
-      const { data: profiles, error: profileErr } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .in('id', viewerIds);
-      if (profileErr) throw profileErr;
-
-      const profileMap = new Map<string, { username: string; avatar_url?: string | null }>(
-        (profiles || []).map((p: any) => [String(p.id), { username: String(p.username || 'Unknown'), avatar_url: p.avatar_url ?? null }])
-      );
-
+      const data = await response.json().catch(() => null);
+      const viewers = Array.isArray(data?.viewers) ? data.viewers : [];
       setActiveViewers(
-        rows.map((r) => {
-          const profile = profileMap.get(r.viewer_id);
-          return {
-            viewer_id: r.viewer_id,
-            username: profile?.username || 'Unknown',
-            avatar_url: profile?.avatar_url,
-            last_active_at: r.last_active_at,
-          };
-        })
+        viewers.map((viewer: any) => ({
+          viewer_id: viewer.profile_id,
+          username: viewer.username || 'Unknown',
+          avatar_url: viewer.avatar_url ?? null,
+          last_active_at: viewer.last_seen,
+        }))
       );
     } catch {
       setActiveViewers([]);
@@ -607,6 +718,33 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
           <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]} numberOfLines={1}>
             {headerStreamTitle}
           </Text>
+          <View style={styles.rankRow}>
+            <View style={styles.rankChip}>
+              <Ionicons name="flame" size={14} color="#ff7b54" />
+              <Text style={styles.rankChipText}>
+                {trendingRank != null ? `#${trendingRank}` : '—'}
+              </Text>
+            </View>
+            <View style={styles.rankChip}>
+              <Ionicons name="trophy" size={14} color="#facc15" />
+              <Text style={styles.rankChipText}>
+                {leaderboardRank != null ? `#${leaderboardRank}` : '—'}
+              </Text>
+            </View>
+          </View>
+          {topGifters.length > 0 && (
+            <View style={styles.topGiftersRow}>
+              {topGifters.map((gifter) => (
+                <View key={gifter.profile_id} style={styles.gifterBubble}>
+                  {gifter.avatar_url ? (
+                    <Image source={{ uri: gifter.avatar_url }} style={styles.gifterAvatar} />
+                  ) : (
+                    <View style={styles.gifterAvatarFallback} />
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.topRight}>
@@ -923,6 +1061,7 @@ export function SoloStreamViewerScreen({ navigation, route }: Props) {
         participants={visibleParticipantsForGiftOverlay}
         targetRecipientId={targetRecipientId}
         onSelectRecipientId={(id) => setTargetRecipientId(id)}
+        liveStreamId={streamerLiveStreamId}
       />
     </View>
   );
@@ -991,6 +1130,49 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  rankRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  rankChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  rankChipText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  topGiftersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  gifterBubble: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  gifterAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  gifterAvatarFallback: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 14,
   },
   content: {
     flex: 1,

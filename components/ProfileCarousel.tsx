@@ -13,6 +13,13 @@ interface Profile {
   bio: string | null;
   follower_count: number;
   is_live: boolean;
+  location_zip?: string | null;
+  location_city?: string | null;
+  location_region?: string | null;
+  location_country?: string | null;
+  location_label?: string | null;
+  location_hidden?: boolean | null;
+  location_show_zip?: boolean | null;
 }
 
 interface ProfileCarouselProps {
@@ -40,7 +47,7 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
         // Get most popular profiles for non-logged-in users
         const { data } = await supabase
           .from('profiles')
-          .select('id, username, display_name, avatar_url, bio, follower_count, is_live')
+          .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
           .not('username', 'is', null)
           .order('follower_count', { ascending: false })
           .limit(20);
@@ -68,7 +75,7 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
         // If not following anyone, show most popular
         const { data } = await supabase
           .from('profiles')
-          .select('id, username, display_name, avatar_url, bio, follower_count, is_live')
+          .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
           .not('username', 'is', null)
           .neq('id', userId)
           .order('follower_count', { ascending: false })
@@ -100,7 +107,7 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
       // Get most popular profiles to fill the rest
       const { data: popular } = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url, bio, follower_count, is_live')
+        .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
         .not('username', 'is', null)
         .neq('id', userId)
         .not('id', 'in', `(${[...followingIds, ...recommendedIds].join(',')})`)
@@ -110,7 +117,7 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
       // Fetch profile details for recommended
       const { data: recommended } = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url, bio, follower_count, is_live')
+        .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
         .in('id', recommendedIds);
 
       // Combine: recommended first (sorted by follow count), then popular, prioritize live users
@@ -129,7 +136,7 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
       // Fallback to popular profiles
       const { data } = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url, bio, follower_count, is_live')
+        .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
         .not('username', 'is', null)
         .neq('id', userId)
         .order('follower_count', { ascending: false })

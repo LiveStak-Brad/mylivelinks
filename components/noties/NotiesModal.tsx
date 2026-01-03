@@ -7,6 +7,8 @@ import { Bell, Check, CheckCheck, Gift, UserPlus, AtSign, MessageCircle, Trophy,
 import { useNoties, NotieType, Notie } from './NotiesContext';
 import { acceptTeamInvite, declineTeamInvite } from '@/lib/teamInvites';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import { useToast } from '@/components/ui';
+import { getNotificationDestination } from '@/lib/noties/getNotificationDestination';
 
 type TabType = 'all' | 'mentions' | 'gifts' | 'system';
 
@@ -30,6 +32,7 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
   const [mounted, setMounted] = useState(false);
   const [modalPosition, setModalPosition] = useState<ModalPosition>({ top: 0, left: 0 });
   const { noties, unreadCount, isLoading, markAsRead, markAllAsRead } = useNoties();
+  const { toast } = useToast();
 
   // Mount check for portal
   useEffect(() => {
@@ -182,8 +185,35 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
 
   const handleNotieClick = (notie: Notie) => {
     markAsRead(notie.id);
-    if (notie.actionUrl) {
-      router.push(notie.actionUrl);
+    const destination = getNotificationDestination({
+      type: notie.type,
+      actionUrl: notie.actionUrl,
+      metadata: notie.metadata,
+    });
+
+    if (destination.toast) {
+      toast({
+        title: destination.toast.title,
+        description: destination.toast.description,
+        variant: destination.toast.variant,
+        action:
+          destination.toast.secondaryLabel && destination.toast.secondaryHref
+            ? {
+                label: destination.toast.secondaryLabel,
+                onClick: () => router.push(destination.toast!.secondaryHref!),
+              }
+            : undefined,
+      });
+    }
+
+    if (destination.kind === 'external') {
+      try {
+        window.open(destination.url, '_blank', 'noopener,noreferrer');
+      } catch {
+        router.push('/noties');
+      }
+    } else {
+      router.push(destination.href);
     }
     onClose();
   };

@@ -14,6 +14,7 @@ interface ProfileInfoModalProps {
   photos?: string[];
   location?: string;
   tags?: string[];
+  orientationLabel?: string;
 }
 
 export function ProfileInfoModal({
@@ -26,6 +27,7 @@ export function ProfileInfoModal({
   photos = [],
   location,
   tags = [],
+  orientationLabel,
 }: ProfileInfoModalProps) {
   const [reportOpen, setReportOpen] = useState(false);
   const profileUrl = useMemo(() => {
@@ -88,6 +90,11 @@ export function ProfileInfoModal({
             <h3 className="text-2xl font-bold">{displayName}</h3>
             {username && <p className="text-gray-600 dark:text-gray-400">@{username}</p>}
             {location && <p className="text-sm text-gray-500 mt-1">{location}</p>}
+            {orientationLabel && (
+              <p className="text-sm font-semibold text-pink-600 dark:text-pink-300 mt-1">
+                Orientation: {orientationLabel}
+              </p>
+            )}
           </div>
 
           <p className="text-gray-700 dark:text-gray-300">{bio}</p>

@@ -65,6 +65,8 @@ import ProfilePhotosClient from '@/components/photos/ProfilePhotosClient';
 import VlogReelsClient from '@/components/profile/VlogReelsClient';
 import { ReferralProgressModule } from '@/components/referral';
 import ReportModal from '@/components/ReportModal';
+import { LocationBadge } from '@/components/location/LocationBadge';
+import type { ProfileLocation } from '@/lib/location';
 
 interface ProfileData {
   profile: {
@@ -116,6 +118,14 @@ interface ProfileData {
     top_friends_title?: string;
     top_friends_avatar_style?: 'circle' | 'square';
     top_friends_max_count?: number;
+    location_zip?: string | null;
+    location_city?: string | null;
+    location_region?: string | null;
+    location_country?: string | null;
+    location_label?: string | null;
+    location_hidden?: boolean | null;
+    location_show_zip?: boolean | null;
+    location_updated_at?: string | null;
     // Private (only if owner)
     coin_balance?: number;
     earnings_balance?: number;
@@ -820,6 +830,16 @@ export default function ModernProfilePage() {
   }
   
   const { profile } = profileData;
+  const profileLocation: ProfileLocation = {
+    zip: profile.location_zip,
+    city: profile.location_city,
+    region: profile.location_region,
+    country: profile.location_country,
+    label: profile.location_label,
+    hidden: profile.location_hidden,
+    showZip: profile.location_show_zip,
+    updatedAt: profile.location_updated_at,
+  };
 
   // Tabs are config-driven (parity with mobile).
   const enabledTabs = getEnabledTabs(
@@ -1081,6 +1101,9 @@ export default function ModernProfilePage() {
                   </p>
                   {/* Profile Type Badge */}
                   <ProfileTypeBadge profileType={profile.profile_type || 'creator'} />
+                </div>
+                <div className="flex justify-center md:justify-start">
+                  <LocationBadge location={profileLocation} isSelf={isOwnProfile} muted className="mt-1" />
                 </div>
                 
                 {profile.bio && (

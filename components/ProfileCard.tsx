@@ -10,6 +10,8 @@ import { StatusBadge, LiveDot } from '@/components/ui';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import ReportModal from '@/components/ReportModal';
+import { LocationBadge } from '@/components/location/LocationBadge';
+import type { ProfileLocation } from '@/lib/location';
 
 interface ProfileCardProps {
   profile: {
@@ -20,6 +22,13 @@ interface ProfileCardProps {
     bio: string | null;
     follower_count: number;
     is_live: boolean;
+    location_zip?: string | null;
+    location_city?: string | null;
+    location_region?: string | null;
+    location_country?: string | null;
+    location_label?: string | null;
+    location_hidden?: boolean | null;
+    location_show_zip?: boolean | null;
   };
   currentUserId: string | null;
   onFollow?: (profileId: string, isFollowing: boolean) => void;
@@ -102,6 +111,15 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
   };
 
   const displayName = profile.display_name || profile.username;
+  const locationPayload: ProfileLocation = {
+    zip: profile.location_zip,
+    city: profile.location_city,
+    region: profile.location_region,
+    country: profile.location_country,
+    label: profile.location_label,
+    hidden: profile.location_hidden,
+    showZip: profile.location_show_zip,
+  };
   const truncatedBio = profile.bio ? (profile.bio.length > 80 ? profile.bio.substring(0, 80) + '...' : profile.bio) : 'No bio yet';
 
   const profileUrl = typeof window !== 'undefined' ? `${window.location.origin}/${encodeURIComponent(profile.username)}` : null;
@@ -188,6 +206,7 @@ export default function ProfileCard({ profile, currentUserId, onFollow }: Profil
             <p className="text-sm text-muted-foreground truncate">
               @{profile.username}
             </p>
+            <LocationBadge location={locationPayload} muted size="sm" className="mt-2" />
           </div>
           
           <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">

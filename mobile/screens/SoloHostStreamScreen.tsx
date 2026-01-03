@@ -20,6 +20,7 @@ import {
   Share,
   ScrollView,
   Image,
+  ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,16 +36,20 @@ import { Tile } from '../components/live/Tile';
 import type { Participant } from '../types/live';
 import { canUserGoLive } from '../lib/livekit-constants';
 import { Modal, Input } from '../components/ui';
+import { useActiveViewerCount } from '../hooks/useActiveViewerCount';
+import { useGiftFeed } from '../hooks/useGiftFeed';
 
 type SoloHostStreamScreenProps = {
   onExit?: () => void;
 };
 
-type TopGifter = {
-  profile_id: string;
-  username: string;
-  avatar_url?: string | null;
-  total_coins: number;
+type LeaderboardRank = {
+  current_rank: number;
+  total_entries: number;
+  metric_value: number;
+  rank_tier: string | null;
+  points_to_next_rank: number;
+  next_rank: number;
 };
 
 export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
@@ -58,8 +63,8 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
   const isOwner = useMemo(() => canUserGoLive(user ? { id: user.id, email: user.email } : null), [user?.email, user?.id]);
   
   const [currentUser, setCurrentUser] = useState<{ id: string; username: string; display_name?: string | null; avatar_url?: string | null } | null>(null);
-  const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
-  const [myLiveStreamId, setMyLiveStreamId] = useState<number | null>(null);
+  const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
+  const [trendingRank, setTrendingRank] = useState<number | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const [showSetupModal, setShowSetupModal] = useState(true);
@@ -79,11 +84,33 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
     isConnected,
     room,
     participants,
+    liveStreamId,
+    localMicEnabled,
+    localCameraEnabled,
+    cameraFacingMode,
+    setMicrophoneEnabled,
+    setCameraEnabled,
+    flipCamera,
+    connectionError,
+    lastConnectError,
+    lastTokenError,
+    isPublishing,
   } = useLiveRoomParticipants({ enabled: true });
 
   const { messages, loading: loadingMessages, retryMessage } = useChatMessages({
-    liveStreamId: myLiveStreamId || undefined,
+    liveStreamId: liveStreamId ?? undefined,
   });
+  const { topGifters, recentGifts } = useGiftFeed(currentUser?.id);
+  const fallbackViewerCount = useMemo(() => {
+    if (!room) return 0;
+    const remote = room.remoteParticipants?.size ?? 0;
+    return Math.max(0, remote);
+  }, [room]);
+  const { viewerCount } = useActiveViewerCount({
+    liveStreamId,
+    fallbackCount: fallbackViewerCount,
+  });
+  const displayViewerCount = liveStreamId ? viewerCount : fallbackViewerCount;
 
   // Load current user
   useEffect(() => {
@@ -146,110 +173,84 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
 
   useEffect(() => {
     if (!currentUser?.id) return;
-
     let cancelled = false;
-    const loadTopGifters = async () => {
+
+    const loadLeaderboardRank = async () => {
       try {
-        const { data: giftersData } = await supabase
-          .from('gifts')
-          .select(
-            `
-              sender_id,
-              coin_value,
-              profiles!gifts_sender_id_fkey (
-                username,
-                avatar_url
-              )
-            `
-          )
-          .eq('recipient_id', currentUser.id)
-          .order('created_at', { ascending: false })
-          .limit(100);
-
+        const { data, error } = await supabase.rpc('rpc_get_leaderboard_rank', {
+          p_profile_id: currentUser.id,
+          p_leaderboard_type: 'top_streamers_daily',
+        });
         if (cancelled) return;
-
-        if (giftersData && giftersData.length > 0) {
-          const gifterTotals = (giftersData as any[]).reduce((acc: Record<string, TopGifter>, gift) => {
-            const senderId = gift.sender_id as string;
-            if (!acc[senderId]) {
-              acc[senderId] = {
-                profile_id: senderId,
-                username: gift.profiles?.username || 'Unknown',
-                avatar_url: gift.profiles?.avatar_url ?? null,
-                total_coins: 0,
-              };
-            }
-            acc[senderId].total_coins += gift.coin_value || 0;
-            return acc;
-          }, {});
-
-          const top3 = Object.values(gifterTotals)
-            .sort((a, b) => b.total_coins - a.total_coins)
-            .slice(0, 3);
-
-          setTopGifters(top3);
+        if (error || !Array.isArray(data) || data.length === 0) {
+          setLeaderboardRank(null);
           return;
         }
-
-        setTopGifters([
-          { profile_id: 'mock1', username: 'TopSupporter', avatar_url: null, total_coins: 5000 },
-          { profile_id: 'mock2', username: 'MegaFan', avatar_url: null, total_coins: 3500 },
-          { profile_id: 'mock3', username: 'GiftKing', avatar_url: null, total_coins: 2000 },
-        ]);
+        setLeaderboardRank(data[0] as LeaderboardRank);
       } catch (err) {
-        if (cancelled) return;
-        console.warn('[SoloHostStreamScreen] Failed to load top gifters:', err);
-        setTopGifters([
-          { profile_id: 'mock1', username: 'TopSupporter', avatar_url: null, total_coins: 5000 },
-          { profile_id: 'mock2', username: 'MegaFan', avatar_url: null, total_coins: 3500 },
-          { profile_id: 'mock3', username: 'GiftKing', avatar_url: null, total_coins: 2000 },
-        ]);
+        if (!cancelled) {
+          console.warn('[SoloHostStreamScreen] Failed to load leaderboard rank:', err);
+          setLeaderboardRank(null);
+        }
       }
     };
 
-    loadTopGifters();
+    const loadTrendingRank = async () => {
+      if (!isLive || !liveStreamId) {
+        setTrendingRank(null);
+        return;
+      }
+      try {
+        const { data, error } = await supabase.rpc('rpc_get_trending_live_streams', {
+          p_limit: 100,
+          p_offset: 0,
+        });
+        if (cancelled) return;
+        if (error || !Array.isArray(data)) {
+          setTrendingRank(null);
+          return;
+        }
+        const index = data.findIndex((entry: any) => entry.stream_id === liveStreamId);
+        setTrendingRank(index >= 0 ? index + 1 : null);
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('[SoloHostStreamScreen] Failed to load trending rank:', err);
+          setTrendingRank(null);
+        }
+      }
+    };
+
+    void loadLeaderboardRank();
+    void loadTrendingRank();
+    const interval = setInterval(() => {
+      void loadLeaderboardRank();
+      void loadTrendingRank();
+    }, 30_000);
+
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isLive, liveStreamId]);
 
-  // Load my live_stream_id when going live (chat scoping)
-  useEffect(() => {
-    if (!isLive || !currentUser?.id) {
-      setMyLiveStreamId(null);
-      return;
+
+  const attemptStartStream = useCallback(async () => {
+    try {
+      setShowSetupModal(false);
+      const trimmedTitle = streamTitle.trim();
+      await goLive({ streamTitle: trimmedTitle });
+    } catch (err: any) {
+      if (err?.message === 'ALREADY_LIVE_ELSEWHERE') {
+        setShowAlreadyLiveModal(true);
+        setShowSetupModal(false);
+        return;
+      }
+      setShowSetupModal(true);
+      Alert.alert('Live error', err?.message || 'Failed to start stream');
     }
+  }, [goLive, streamTitle]);
 
-    let cancelled = false;
-    const loadStreamId = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('live_streams')
-          .select('id')
-          .eq('profile_id', currentUser.id)
-          .maybeSingle();
-
-        if (cancelled) return;
-        if (error) {
-          console.warn('[SoloHostStreamScreen] Failed to load live_stream_id:', error);
-          setMyLiveStreamId(null);
-          return;
-        }
-        setMyLiveStreamId((data as any)?.id ?? null);
-      } catch (err) {
-        if (cancelled) return;
-        console.warn('[SoloHostStreamScreen] Failed to load live_stream_id:', err);
-        setMyLiveStreamId(null);
-      }
-    };
-
-    loadStreamId();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentUser?.id, isLive]);
-
-  const handleStartStream = useCallback(async () => {
+  const handleStartStream = useCallback(() => {
     if (!currentUser?.id) {
       Alert.alert('Login required', 'Please log in to go live.');
       return;
@@ -270,19 +271,15 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
       return;
     }
 
-    try {
-      setShowSetupModal(false);
-      await goLive();
-    } catch (err: any) {
-      if (err?.message === 'ALREADY_LIVE_ELSEWHERE') {
-        // Show modal to choose resume or end other stream
-        setShowAlreadyLiveModal(true);
-        setShowSetupModal(false);
-      } else {
-        Alert.alert('Live error', err?.message || 'Failed to start stream');
-      }
-    }
-  }, [currentUser?.id, goLive, isConnected, permissionsGranted, streamTitle]);
+    Alert.alert(
+      'Go Live?',
+      'Are you sure you want to start streaming right now?',
+      [
+        { text: 'Not yet', style: 'cancel' },
+        { text: 'Go Live', style: 'default', onPress: () => void attemptStartStream() },
+      ]
+    );
+  }, [attemptStartStream, currentUser?.id, isConnected, permissionsGranted, streamTitle]);
 
   const handleEndOtherAndStartHere = useCallback(async () => {
     setShowAlreadyLiveModal(false);
@@ -290,12 +287,12 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
       await endOtherStream();
       // Wait a moment then start on this device
       await new Promise(resolve => setTimeout(resolve, 500));
-      await goLive();
+      await goLive({ streamTitle: streamTitle.trim() });
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to end other stream and start here');
       setShowSetupModal(true);
     }
-  }, [endOtherStream, goLive]);
+  }, [endOtherStream, goLive, streamTitle]);
 
   const handleResumeHere = useCallback(async () => {
     setShowAlreadyLiveModal(false);
@@ -307,7 +304,29 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
     }
   }, [resumeOnThisDevice]);
 
-  const viewerCount = room?.remoteParticipants?.size ?? 0;
+  const handleToggleMic = useCallback(async () => {
+    try {
+      await setMicrophoneEnabled(!localMicEnabled);
+    } catch (err: any) {
+      Alert.alert('Mic error', err?.message || 'Failed to toggle microphone');
+    }
+  }, [localMicEnabled, setMicrophoneEnabled]);
+
+  const handleToggleCam = useCallback(async () => {
+    try {
+      await setCameraEnabled(!localCameraEnabled);
+    } catch (err: any) {
+      Alert.alert('Camera error', err?.message || 'Failed to toggle camera');
+    }
+  }, [localCameraEnabled, setCameraEnabled]);
+
+  const handleFlipCamera = useCallback(async () => {
+    try {
+      await flipCamera();
+    } catch (err: any) {
+      Alert.alert('Camera error', err?.message || 'Failed to flip camera');
+    }
+  }, [flipCamera]);
 
   const localParticipant = participants.find((p) => p.isLocal) || null;
 
@@ -315,8 +334,8 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
     identity: localParticipant?.identity || currentUser?.id || 'local',
     username: currentUser?.display_name || currentUser?.username || 'You',
     isSpeaking: false,
-    isCameraEnabled: true,
-    isMicEnabled: true,
+    isCameraEnabled: localCameraEnabled,
+    isMicEnabled: localMicEnabled,
     isLocal: true,
     viewerCount: undefined,
   };
@@ -358,7 +377,7 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
     return `#${body}${alphaHex}`;
   };
 
-  const canChat = !!isLive && !!myLiveStreamId;
+  const canChat = !!isLive && !!liveStreamId;
 
   const handleExit = useCallback(async () => {
     if (isLive) {
@@ -382,7 +401,28 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
     }
   }, [isLive, onExit, stopLive]);
 
+  const handleEndStreamPress = useCallback(() => {
+    if (!isLive) return;
+    Alert.alert('End stream', 'End your live stream now?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'End Stream',
+        style: 'destructive',
+        onPress: () => {
+          stopLive().catch((err: any) => {
+            Alert.alert('End failed', err?.message || 'Failed to end stream');
+          });
+        },
+      },
+    ]);
+  }, [isLive, stopLive]);
+
   const headerName = currentUser?.display_name || currentUser?.username || 'Streamer';
+  const headerStreamTitle = streamTitle.trim().length > 0 ? streamTitle.trim() : `${headerName}'s stream`;
+  const liveErrorMessage = connectionError || lastConnectError || lastTokenError?.message || null;
+  const trendingLabel = trendingRank != null ? `#${trendingRank}` : '—';
+  const leaderboardLabel =
+    leaderboardRank?.current_rank != null ? `#${leaderboardRank.current_rank}` : '—';
   const optionsBottom = Math.max(12, (insets.bottom || 0) + 12);
   const chatBottom = optionsBottom + 72;
   const chatHeight = Math.max(190, Math.min(windowHeight * 0.3, 320));
@@ -403,6 +443,25 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
       Alert.alert('Share failed', err?.message || 'Could not open share sheet');
     }
   }, [currentUser?.username]);
+
+  const handleTrendingPress = useCallback(() => {
+    if (!trendingRank) {
+      Alert.alert('Trending', 'You are not currently on the trending board. Keep streaming!');
+      return;
+    }
+    Alert.alert('Trending rank', `You are currently ranked #${trendingRank} on trending streams.`);
+  }, [trendingRank]);
+
+  const handleLeaderboardPress = useCallback(() => {
+    if (!leaderboardRank) {
+      Alert.alert('Leaderboard', 'Leaderboard data is unavailable right now.');
+      return;
+    }
+    Alert.alert(
+      'Leaderboard rank',
+      `Current rank: #${leaderboardRank.current_rank}\nPoints to next: ${leaderboardRank.points_to_next_rank ?? 0}`
+    );
+  }, [leaderboardRank]);
 
   if (!isOwner) {
     return (
@@ -445,7 +504,7 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
           <BlurView intensity={22} tint="dark" style={styles.streamerPill}>
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => Alert.alert('Coming Soon', 'Mini profile coming soon.')}
+              onPress={() => Alert.alert('Profile', 'Mini profile coming soon.')}
               style={styles.streamerPillInner}
             >
               <View style={styles.streamerAvatarWrap}>
@@ -459,28 +518,43 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
                 <Text style={styles.streamerName} numberOfLines={1}>
                   {headerName}
                 </Text>
+                <Text style={styles.streamerTitle} numberOfLines={1}>
+                  {headerStreamTitle}
+                </Text>
                 <View style={styles.streamerStatsRow}>
-                  <TouchableOpacity
-                    onPress={() => Alert.alert('Coming Soon', 'Trending coming soon.')}
-                    activeOpacity={0.8}
-                    style={styles.streamerStatButton}
+                  <View
+                    style={[
+                      styles.liveStatusPill,
+                      isLive ? styles.liveStatusActive : styles.liveStatusIdle,
+                    ]}
                   >
+                    <Text style={styles.liveStatusText}>{isLive ? 'LIVE' : 'OFFLINE'}</Text>
+                  </View>
+                  <TouchableOpacity onPress={handleTrendingPress} activeOpacity={0.8} style={styles.streamerStatButton}>
                     <Ionicons name="flame" size={14} color="#f97316" />
-                    <Text style={styles.streamerStatValue}>12</Text>
+                    <Text style={styles.streamerStatValue}>{trendingLabel}</Text>
                   </TouchableOpacity>
                   <Text style={styles.dotSep}>•</Text>
-                  <TouchableOpacity
-                    onPress={() => Alert.alert('Coming Soon', 'Leaderboard coming soon.')}
-                    activeOpacity={0.8}
-                    style={styles.streamerStatButton}
-                  >
+                  <TouchableOpacity onPress={handleLeaderboardPress} activeOpacity={0.8} style={styles.streamerStatButton}>
                     <Ionicons name="trophy" size={14} color="#eab308" />
-                    <Text style={styles.streamerStatValue}>8</Text>
+                    <Text style={styles.streamerStatValue}>{leaderboardLabel}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </TouchableOpacity>
           </BlurView>
+
+          <View style={styles.topOverlayCenter}>
+            <TouchableOpacity
+              onPress={() => Alert.alert('Viewers', `${displayViewerCount} watching`)}
+              activeOpacity={0.85}
+            >
+              <BlurView intensity={22} tint="dark" style={styles.viewerCountPill}>
+                <Ionicons name="eye" size={14} color="#fff" />
+                <Text style={styles.viewerCountText}>{displayViewerCount}</Text>
+              </BlurView>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.topOverlayRight}>
             {topGifters.length > 0 && (
@@ -491,7 +565,9 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
                   return (
                     <TouchableOpacity
                       key={gifter.profile_id}
-                      onPress={() => Alert.alert('Top Supporters', 'Stream gifters coming soon.')}
+                      onPress={() =>
+                        Alert.alert('Top Supporter', `${gifter.username} • ${gifter.total_coins.toLocaleString()} coins`)
+                      }
                       activeOpacity={0.85}
                       style={[styles.gifterBubble, { borderColor: ringColor }]}
                     >
@@ -518,19 +594,38 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
               </TouchableOpacity>
             </BlurView>
           </View>
-
-          <View style={styles.topOverlayCenter}>
-            <TouchableOpacity
-              onPress={() => Alert.alert('Viewers', `${viewerCount} watching`)}
-              activeOpacity={0.85}
-            >
-              <BlurView intensity={22} tint="dark" style={styles.viewerCountPill}>
-                <Ionicons name="eye" size={14} color="#fff" />
-                <Text style={styles.viewerCountText}>{viewerCount}</Text>
-              </BlurView>
-            </TouchableOpacity>
-          </View>
         </View>
+
+        {liveErrorMessage && (
+          <View style={[styles.liveErrorBanner, { top: (insets.top || 0) + 78, left: 12, right: 12 }]}>
+            <Text style={styles.liveErrorTitle}>Live connection issue</Text>
+            <Text style={styles.liveErrorText} numberOfLines={3}>
+              {liveErrorMessage}
+            </Text>
+          </View>
+        )}
+
+        {recentGifts.length > 0 && (
+          <View style={[styles.giftTicker, { top: (insets.top || 0) + 120 }]}>
+            {recentGifts.slice(0, 4).map((gift) => (
+              <View key={gift.id} style={styles.giftTickerItem}>
+                {gift.avatarUrl ? (
+                  <Image source={{ uri: gift.avatarUrl }} style={styles.giftTickerAvatar} />
+                ) : (
+                  <View style={styles.giftTickerAvatarFallback} />
+                )}
+                <View style={styles.giftTickerTextWrap}>
+                  <Text style={styles.giftTickerUser} numberOfLines={1}>
+                    {gift.senderUsername}
+                  </Text>
+                  <Text style={styles.giftTickerText} numberOfLines={1}>
+                    sent {gift.coinValue.toLocaleString()} coins{gift.giftName ? ` • ${gift.giftName}` : ''}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
         <View style={[styles.chatOverlay, { height: chatHeight, bottom: chatBottom }]}>
           <ScrollView
@@ -626,48 +721,60 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
           </ScrollView>
         </View>
 
-        <View style={[styles.optionsOverlay, { bottom: optionsBottom, left: 12, right: 12 }]}>
-          <View style={styles.streamerOptionsBar}>
-            <TouchableOpacity
-              style={styles.streamerOptionButton}
-              onPress={() => Alert.alert('Coming Soon', 'Battle mode coming soon.')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="flash-outline" size={22} color="#fff" />
-            </TouchableOpacity>
+        <View style={[styles.controlOverlay, { bottom: optionsBottom, left: 12, right: 12 }]}>
+          {isLive ? (
+            <View style={styles.controlBar}>
+              <TouchableOpacity
+                style={[styles.controlButton, !localMicEnabled && styles.controlButtonMuted]}
+                onPress={handleToggleMic}
+                activeOpacity={0.85}
+              >
+                <Ionicons name={localMicEnabled ? 'mic' : 'mic-off'} size={22} color="#fff" />
+                <Text style={styles.controlLabel}>{localMicEnabled ? 'Mic on' : 'Mic off'}</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.streamerOptionButton}
-              onPress={() => Alert.alert('Coming Soon', 'Co-host coming soon.')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="person-add-outline" size={22} color="#fff" />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.controlButton, !localCameraEnabled && styles.controlButtonMuted]}
+                onPress={handleToggleCam}
+                activeOpacity={0.85}
+              >
+                <Ionicons name={localCameraEnabled ? 'videocam' : 'videocam-off'} size={22} color="#fff" />
+                <Text style={styles.controlLabel}>{localCameraEnabled ? 'Camera on' : 'Camera off'}</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.streamerOptionButton}
-              onPress={() => Alert.alert('Coming Soon', 'Guests coming soon.')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="people-outline" size={22} color="#fff" />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.controlButton, !localCameraEnabled && styles.controlButtonDisabled]}
+                onPress={handleFlipCamera}
+                activeOpacity={0.85}
+                disabled={!localCameraEnabled}
+              >
+                <Ionicons name="sync" size={22} color="#fff" />
+                <Text style={styles.controlLabel}>Flip</Text>
+              </TouchableOpacity>
 
+              <TouchableOpacity
+                style={[styles.controlButton, styles.endButton]}
+                onPress={handleEndStreamPress}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="stop-circle" size={22} color="#fff" />
+                <Text style={styles.controlLabel}>End</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
             <TouchableOpacity
-              style={styles.streamerOptionButton}
-              onPress={() => Alert.alert('Coming Soon', 'Options coming soon.')}
-              activeOpacity={0.8}
+              style={styles.primaryGoLiveButton}
+              onPress={() => setShowSetupModal(true)}
+              activeOpacity={0.9}
             >
-              <Ionicons name="settings-outline" size={22} color="#fff" />
+              {requestingPermissions || isPublishing ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Ionicons name="radio" size={22} color="#fff" />
+              )}
+              <Text style={styles.primaryGoLiveLabel}>Go Live</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.streamerOptionButton}
-              onPress={() => Alert.alert('Coming Soon', 'Filters coming soon.')}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="funnel-outline" size={22} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
       </View>
 
@@ -841,7 +948,7 @@ const styles = StyleSheet.create({
     right: 12,
     zIndex: 18,
   },
-  optionsOverlay: {
+  controlOverlay: {
     position: 'absolute',
     zIndex: 19,
   },
@@ -912,11 +1019,37 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     maxWidth: 160,
   },
+  streamerTitle: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+    maxWidth: 200,
+  },
   streamerStatsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginTop: 2,
+  },
+  liveStatusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  liveStatusActive: {
+    backgroundColor: 'rgba(239,68,68,0.35)',
+    borderColor: 'rgba(239,68,68,0.7)',
+  },
+  liveStatusIdle: {
+    backgroundColor: 'rgba(75,85,99,0.45)',
+    borderColor: 'rgba(156,163,175,0.5)',
+  },
+  liveStatusText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
   },
   streamerStatButton: {
     flexDirection: 'row',
@@ -949,6 +1082,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
   },
+  liveErrorBanner: {
+    position: 'absolute',
+    backgroundColor: 'rgba(239, 68, 68, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.6)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  liveErrorTitle: {
+    color: '#fecaca',
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  liveErrorText: {
+    color: '#ffe4e6',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   topOverlayRight: {
     alignItems: 'flex-end',
     position: 'relative',
@@ -979,6 +1132,48 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
+  },
+  giftTicker: {
+    position: 'absolute',
+    right: 12,
+    width: 220,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 16,
+    padding: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    zIndex: 19,
+  },
+  giftTickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  giftTickerAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  giftTickerAvatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  giftTickerTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  giftTickerUser: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  giftTickerText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    fontWeight: '600',
   },
   closeButtonWrap: {
     width: 38,
@@ -1038,25 +1233,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  streamerOptionsBar: {
+  controlBar: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  controlButton: {
+    flex: 1,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 999,
     paddingVertical: 10,
     paddingHorizontal: 12,
-  },
-  streamerOptionButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  controlButtonMuted: {
+    backgroundColor: 'rgba(239,68,68,0.28)',
+    borderColor: 'rgba(239,68,68,0.4)',
+  },
+  controlButtonDisabled: {
+    opacity: 0.4,
+  },
+  controlLabel: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  endButton: {
+    backgroundColor: 'rgba(239,68,68,0.4)',
+    borderColor: 'rgba(239,68,68,0.7)',
+  },
+  primaryGoLiveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#dc2626',
+    borderRadius: 999,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    gap: 10,
+  },
+  primaryGoLiveLabel: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
   },
   messageList: {
     flex: 1,

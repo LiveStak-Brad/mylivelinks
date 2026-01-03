@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     // Only show rooms that are gauging interest (not live, paused, or draft)
     // Status 'interest' and 'opening_soon' are for the Coming Soon carousel
     const { data: rows, error } = await supabase
-      .from('v_rooms_public')
+      .from('v_rooms_effective')
       .select('*')
       .in('status', ['interest', 'opening_soon'])
       .order('display_order', { ascending: true });

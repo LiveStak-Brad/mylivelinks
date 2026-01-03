@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DatingProfile, DatingDecisionResult } from '@/lib/link/types';
+import { orientationToDisplay } from '@/lib/link/dating-types';
 import * as linkApi from '@/lib/link/api';
 import { SwipeCard } from '@/components/link/SwipeCard';
 import { ProfileInfoModal } from '@/components/link/ProfileInfoModal';
@@ -38,6 +39,13 @@ export default function DatingSwipePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getOrientationLabel = (prefs?: DatingProfile['prefs']): string | undefined => {
+    if (!prefs?.show_orientation || !prefs.orientation) {
+      return undefined;
+    }
+    return orientationToDisplay(prefs.orientation);
   };
 
   const handleSwipe = async (direction: 'left' | 'right') => {
@@ -179,6 +187,7 @@ export default function DatingSwipePage() {
                 const offset = idx * 12;
                 const scale = 1 - idx * 0.05;
                 const opacity = 1 - idx * 0.3;
+                const orientationLabel = getOrientationLabel(candidate.prefs);
 
                 return (
                   <SwipeCard
@@ -189,6 +198,7 @@ export default function DatingSwipePage() {
                     photos={candidate.photos || []}
                     location={candidate.location_text}
                     tags={[]}
+                    orientationLabel={orientationLabel}
                     style={{
                       transform: `translateY(${offset}px) scale(${scale})`,
                       opacity,
@@ -234,6 +244,7 @@ export default function DatingSwipePage() {
           photos={currentCandidate.photos || []}
           location={currentCandidate.location_text}
           tags={[]}
+          orientationLabel={getOrientationLabel(currentCandidate.prefs)}
         />
       )}
 

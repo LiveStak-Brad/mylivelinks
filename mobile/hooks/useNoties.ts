@@ -12,7 +12,17 @@ import { emitTopBarRefresh } from './topbar/useTopBarState';
  * for mobile consumption. Provides same data structure and methods.
  */
 
-export type NotieType = 'gift' | 'follow' | 'live' | 'mention' | 'comment' | 'level_up' | 'system' | 'purchase' | 'conversion';
+export type NotieType =
+  | 'gift'
+  | 'follow'
+  | 'follow_link'
+  | 'live'
+  | 'mention'
+  | 'comment'
+  | 'level_up'
+  | 'system'
+  | 'purchase'
+  | 'conversion';
 
 export interface Notie {
   id: string;

@@ -15,6 +15,8 @@ export interface DatingAboutYou {
   drinker?: DrinkerEnum;
   interests?: string[];  // Free-form tags
   dating_bio?: string;  // Replaces top-level bio
+  orientation?: OrientationEnum;
+  show_orientation?: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ export interface DatingPreferences {
   height_pref: 'doesnt_matter' | { min: HeightEnum; max: HeightEnum };
   build_pref: BuildEnum[] | 'doesnt_matter';
   interests_pref: string[] | 'doesnt_matter';
+  orientation_pref?: OrientationEnum[] | 'doesnt_matter';
 }
 
 /**
@@ -111,6 +114,17 @@ export type GenderEnum =
   | 'other' 
   | 'prefer_not_to_say';
 
+export type OrientationEnum =
+  | 'straight'
+  | 'gay'
+  | 'lesbian'
+  | 'bisexual'
+  | 'pansexual'
+  | 'queer'
+  | 'asexual'
+  | 'questioning'
+  | 'other';
+
 export type HeightEnum = 
   | 'under_5' 
   | '5_0_to_5_3' 
@@ -176,6 +190,24 @@ export function genderToDisplay(gender: GenderEnum): string {
 }
 
 /**
+ * Convert orientation enum to display string
+ */
+export function orientationToDisplay(orientation: OrientationEnum): string {
+  const map: Record<OrientationEnum, string> = {
+    straight: 'Straight',
+    gay: 'Gay',
+    lesbian: 'Lesbian',
+    bisexual: 'Bisexual',
+    pansexual: 'Pansexual',
+    queer: 'Queer',
+    asexual: 'Asexual',
+    questioning: 'Questioning',
+    other: 'Other',
+  };
+  return map[orientation] || orientation;
+}
+
+/**
  * Convert build enum to display string
  */
 export function buildToDisplay(build: BuildEnum): string {
@@ -229,6 +261,8 @@ export function getDefaultDatingPrefs(): Partial<DatingProfilePrefs> {
     height_pref: 'doesnt_matter',
     build_pref: 'doesnt_matter',
     interests_pref: 'doesnt_matter',
+    orientation_pref: 'doesnt_matter',
+    show_orientation: false,
   };
 }
 

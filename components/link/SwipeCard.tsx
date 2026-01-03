@@ -1,15 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import { LocationBadge } from '@/components/location/LocationBadge';
+import type { ProfileLocation } from '@/lib/location';
 
 interface SwipeCardProps {
   displayName: string;
   username?: string;
   bio: string;
   photos?: string[];
-  location?: string;
+  location?: string | ProfileLocation;
   tags?: string[];
   style?: React.CSSProperties;
+  orientationLabel?: string;
 }
 
 export function SwipeCard({
@@ -20,11 +23,17 @@ export function SwipeCard({
   location,
   tags = [],
   style,
+  orientationLabel,
 }: SwipeCardProps) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   const mainPhoto = photos[currentPhotoIndex] || photos[0] || '/placeholder-avatar.png';
   const photoHeight = 'min(460px, 55vh)';
+
+  const derivedLocation: ProfileLocation | null =
+    typeof location === 'string'
+      ? { label: location }
+      : location || null;
 
   return (
     <div
@@ -72,7 +81,14 @@ export function SwipeCard({
             <div>
               <h2 className="text-2xl font-bold">{displayName}</h2>
               {username && <p className="text-gray-600 dark:text-gray-400">@{username}</p>}
-              {location && <p className="text-sm text-gray-500">{location}</p>}
+              {derivedLocation && (
+                <LocationBadge location={derivedLocation} muted size="sm" className="mt-1" />
+              )}
+              {orientationLabel && (
+                <p className="text-sm font-semibold text-pink-600 dark:text-pink-300 mt-1">
+                  Orientation: {orientationLabel}
+                </p>
+              )}
             </div>
 
             <p className="whitespace-pre-line text-gray-700 dark:text-gray-300">{bio}</p>

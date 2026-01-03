@@ -145,7 +145,7 @@ export function useChatMessages(options?: { roomId?: string; liveStreamId?: numb
         return;
       }
 
-      const { data, error } = await scopedQuery.order('created_at', { ascending: false }).limit(50);
+      const { data, error } = await scopedQuery.order('created_at', { ascending: true }).limit(50);
 
       if (error) throw error;
 
@@ -201,7 +201,7 @@ export function useChatMessages(options?: { roomId?: string; liveStreamId?: numb
         } as ChatMessage;
       });
 
-      setMessages(messagesWithProfiles.reverse());
+      setMessages(messagesWithProfiles);
     } catch (error) {
       console.error('[CHAT] Error loading messages:', error);
     } finally {
@@ -339,7 +339,22 @@ export function useChatMessages(options?: { roomId?: string; liveStreamId?: numb
             : `live_stream_id=eq.${liveStreamId}`,
         },
         (payload: any) => {
-          if (payload?.new) {
+          if (!payload?.new) return;
+
+          if (roomId) {
+            if (
+              payload.new.room_id === roomId &&
+              (payload.new.live_stream_id === null || payload.new.live_stream_id === undefined)
+            ) {
+              loadMessageWithProfile(payload.new);
+            }
+            return;
+          }
+
+          if (
+            payload.new.live_stream_id === liveStreamId &&
+            (payload.new.room_id === null || payload.new.room_id === undefined)
+          ) {
             loadMessageWithProfile(payload.new);
           }
         }

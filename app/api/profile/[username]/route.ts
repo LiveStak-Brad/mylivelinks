@@ -75,6 +75,33 @@ export async function GET(
     const totalSpent = Number((data as any)?.profile?.total_spent ?? 0);
     const totalGiftsReceived = Number((data as any)?.profile?.total_gifts_received ?? 0);
 
+    if (profileId) {
+      try {
+        const { data: locationRow } = await supabase
+          .from('profiles')
+          .select(
+            [
+              'location_zip',
+              'location_city',
+              'location_region',
+              'location_country',
+              'location_label',
+              'location_hidden',
+              'location_show_zip',
+              'location_updated_at',
+            ].join(', ')
+          )
+          .eq('id', profileId)
+          .maybeSingle();
+
+        if (locationRow && (data as any)?.profile) {
+          Object.assign((data as any).profile, locationRow);
+        }
+      } catch (locationError) {
+        console.warn('Could not load profile location fields', locationError);
+      }
+    }
+
     const gifter_statuses: Record<string, any> = {};
     try {
       const topSupporters = Array.isArray((data as any)?.top_supporters)

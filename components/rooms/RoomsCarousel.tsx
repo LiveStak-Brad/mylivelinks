@@ -4,10 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import RoomCard from './RoomCard';
 import RoomPreviewModal from './RoomPreviewModal';
-import Image from 'next/image';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
-import { isLiveOwnerUser } from '@/lib/livekit-constants';
 
 // Force cache bust for banner images
 
@@ -21,6 +19,7 @@ export type ComingSoonRoom = {
   category: RoomCategory;
   status: RoomStatus;
   description?: string | null;
+  subtitle?: string | null;
   image_url: string | null;
   fallback_gradient?: string;
   current_interest_count?: number;
@@ -36,7 +35,6 @@ export default function RoomsCarousel() {
   const [interestedRoomIds, setInterestedRoomIds] = useState<Set<string>>(new Set());
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
   const supabase = createClient();
 
   const selectedRoom = useMemo(() => {
@@ -46,13 +44,6 @@ export default function RoomsCarousel() {
 
   useEffect(() => {
     let cancelled = false;
-
-    const checkOwner = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!cancelled && user) {
-        setIsOwner(isLiveOwnerUser({ id: user.id, email: user.email }));
-      }
-    };
 
     const loadRooms = async () => {
       try {
@@ -90,7 +81,6 @@ export default function RoomsCarousel() {
       }
     };
 
-    checkOwner();
     loadRooms();
     loadInterests();
 
@@ -188,11 +178,11 @@ export default function RoomsCarousel() {
           <div className="flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-amber-500" />
             <h2 className="text-2xl md:text-3xl font-bold text-foreground">
-              Rooms
+              Future Rooms
             </h2>
           </div>
           <p className="text-muted-foreground text-sm md:text-base max-w-xl">
-            Live Central is live now! More themed rooms coming soon based on your votes.
+            Vote on themed rooms you want next.
           </p>
         </div>
 
@@ -230,38 +220,6 @@ export default function RoomsCarousel() {
           {/* Left Padding for edge alignment */}
           <div className="flex-shrink-0 w-0.5 md:w-1" />
           
-          {/* Live Central Featured Card - NOW OPEN TO EVERYONE */}
-          <Link
-            href="/room/live-central"
-            className="
-              group relative flex-shrink-0 w-[320px] md:w-[380px] 
-              rounded-2xl overflow-hidden cursor-pointer
-              transition-all duration-300 ease-out
-              hover:scale-[1.03] hover:shadow-2xl hover:shadow-red-500/30
-              border-2 border-red-500/50 hover:border-red-500
-            "
-          >
-            <div className="relative h-[200px] md:h-[220px]">
-              <Image
-                src="/livecentralmeta.png"
-                alt="Live Central"
-                fill
-                className="object-cover"
-                priority
-              />
-              {/* Live Badge */}
-              <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-red-500 flex items-center gap-1.5 animate-pulse">
-                <div className="w-2 h-2 rounded-full bg-white" />
-                <span className="text-xs font-bold text-white">LIVE</span>
-              </div>
-              {/* Overlay with CTA */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                <h3 className="text-lg font-bold text-white">Live Central</h3>
-                <p className="text-sm text-white/80">Watch & stream with up to 12 creators!</p>
-              </div>
-            </div>
-          </Link>
-          
           {(rooms ?? []).map((room) => (
             <RoomCard
               key={room.id}
@@ -272,7 +230,7 @@ export default function RoomsCarousel() {
             />
           ))}
 
-          <a
+          <Link
             href="/apply"
             className="
               group relative flex-shrink-0 w-[260px] md:w-[280px] 
@@ -287,23 +245,23 @@ export default function RoomsCarousel() {
               <div className="flex items-center justify-between">
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-sm border border-white/20">
                   <Plus className="w-4 h-4 text-white" />
-                  <span className="text-xs font-semibold text-white">Room Idea?</span>
+                  <span className="text-xs font-semibold text-white">Submit a Room Idea</span>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
-                  Enter it here
+                  Submit a Room Idea
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Submit your room idea and help shape what we build next.
+                  Propose a themed room, add an image, and we&apos;ll track interest.
                 </p>
                 <div className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold w-fit">
-                  Apply
+                  Submit
                 </div>
               </div>
             </div>
-          </a>
+          </Link>
           
           {/* Right Padding */}
           <div className="flex-shrink-0 w-0.5 md:w-1" />

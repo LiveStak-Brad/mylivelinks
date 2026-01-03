@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -36,6 +36,13 @@ export function NotiesScreen({ navigation }: Props) {
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 2200);
+  }, []);
+
   const handleMarkAllRead = () => {
     console.log('[Noties] Mark all as read');
     markAllAsRead();
@@ -43,7 +50,12 @@ export function NotiesScreen({ navigation }: Props) {
 
   const handleNavigateActionUrl = (actionUrl?: string) => {
     const url = typeof actionUrl === 'string' ? actionUrl.trim() : '';
-    if (!url) return;
+    if (!url) {
+      console.warn('[Noties] Missing actionUrl; routing to Noties');
+      showToast('Details unavailable');
+      navigation.getParent?.()?.navigate?.('MainTabs', { screen: 'Noties' });
+      return;
+    }
 
     const resolved = resolveNotieAction(url);
     const parent = navigation.getParent?.();
@@ -96,11 +108,16 @@ export function NotiesScreen({ navigation }: Props) {
       }
     }
 
+    console.warn('[Noties] Unrecognized actionUrl; attempting external open:', url);
+    showToast('Details unavailable');
+
     try {
       const absolute = url.startsWith('http') ? url : `https://www.mylivelinks.com${url}`;
       void Linking.openURL(absolute);
     } catch {
       // ignore
+      console.warn('[Noties] Failed to open actionUrl; routing to Noties');
+      parent?.navigate?.('MainTabs', { screen: 'Noties' });
     }
   };
 
@@ -129,6 +146,12 @@ export function NotiesScreen({ navigation }: Props) {
       />
 
       <View style={styles.content}>
+        {toast ? (
+          <View style={styles.toastWrap}>
+            <Text style={styles.toastText}>{toast}</Text>
+          </View>
+        ) : null}
+
         {/* Notifications List */}
         {isLoading ? (
           <View style={styles.loadingContainer}>
@@ -265,6 +288,22 @@ function createStyles(theme: ThemeDefinition) {
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 32,
+    },
+    toastWrap: {
+      marginTop: 10,
+      marginBottom: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.cardSurface,
+    },
+    toastText: {
+      color: theme.colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '700',
+      textAlign: 'center',
     },
     emptyIcon: {
       fontSize: 64,

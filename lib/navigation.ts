@@ -4,7 +4,7 @@
  * Helpers for consistent active-route detection and navigation state management.
  */
 
-import { Home, Radio } from 'lucide-react';
+import { Home, Rss, Users, Video, Tv } from 'lucide-react';
 
 /**
  * Check if a route is active based on the current pathname.
@@ -112,8 +112,20 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
   { 
     href: '/feed', 
     label: 'Feed',
-    icon: Radio,
+    icon: Rss,
     matchType: 'exact',
+  },
+  {
+    href: '/teams',
+    label: 'Teams',
+    icon: Users,
+    matchType: 'prefix',
+  },
+  {
+    href: '/liveTV',
+    label: 'LiveTV',
+    icon: Tv,
+    matchType: 'prefix',
   },
 ];
 

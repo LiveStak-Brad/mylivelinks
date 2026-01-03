@@ -1,8 +1,10 @@
 'use client';
 
 import { Bell } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useNoties } from '@/components/noties';
-import { EmptyState } from '@/components/ui';
+import { EmptyState, useToast } from '@/components/ui';
+import { getNotificationDestination } from '@/lib/noties/getNotificationDestination';
 
 /**
  * NOTIES PAGE
@@ -13,7 +15,9 @@ import { EmptyState } from '@/components/ui';
  * Route: /noties
  */
 export default function NotiesPage() {
-  const { noties, isLoading, markAllAsRead } = useNoties();
+  const router = useRouter();
+  const { toast } = useToast();
+  const { noties, isLoading, markAllAsRead, markAsRead } = useNoties();
 
   return (
     <main 
@@ -70,6 +74,50 @@ export default function NotiesPage() {
                       : 'bg-primary/5 border-primary/20'
                     }
                   `}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (!notie.isRead) {
+                      markAsRead(notie.id);
+                    }
+
+                    const destination = getNotificationDestination({
+                      type: notie.type,
+                      actionUrl: notie.actionUrl,
+                      metadata: notie.metadata,
+                    });
+
+                    if (destination.toast) {
+                      toast({
+                        title: destination.toast.title,
+                        description: destination.toast.description,
+                        variant: destination.toast.variant,
+                        action:
+                          destination.toast.secondaryLabel && destination.toast.secondaryHref
+                            ? {
+                                label: destination.toast.secondaryLabel,
+                                onClick: () => router.push(destination.toast!.secondaryHref!),
+                              }
+                            : undefined,
+                      });
+                    }
+
+                    if (destination.kind === 'external') {
+                      try {
+                        window.open(destination.url, '_blank', 'noopener,noreferrer');
+                      } catch {
+                        router.push('/noties');
+                      }
+                      return;
+                    }
+
+                    router.push(destination.href);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    (e.currentTarget as HTMLDivElement).click();
+                  }}
                 >
                   <div className="flex items-start gap-3">
                     <div className="relative flex-shrink-0">

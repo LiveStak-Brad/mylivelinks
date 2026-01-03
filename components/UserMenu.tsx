@@ -8,18 +8,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { 
   Wallet, 
-  BarChart3, 
   User, 
   Settings, 
   LogOut, 
   ChevronDown,
   ExternalLink,
-  Film,
-  Sparkles,
-  Shield
+  ShoppingBag,
+  Bell,
+  MessageCircle
 } from 'lucide-react';
 import LiveAvatar from './LiveAvatar';
-import ThemeToggle from './ThemeToggle';
 
 interface UserMenuProps {
   className?: string;
@@ -300,69 +298,37 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
               iconColor="text-amber-500"
               label="Wallet"
             />
-            
+
             <MenuItem
-              href="/me/analytics"
               onClick={closeMenu}
-              icon={BarChart3}
-              iconColor="text-purple-500"
-              label="Analytics"
+              icon={ShoppingBag}
+              iconColor="text-muted-foreground"
+              label="Purchases"
             />
 
             <MenuItem
-              href="/gifter-levels"
+              href="/noties"
               onClick={closeMenu}
-              icon={Sparkles}
-              iconColor="text-cyan-500"
-              label="Gifter Levels"
-            />
-            
-            <MenuItem
-              href="/composer"
-              onClick={closeMenu}
-              icon={Film}
-              iconColor="text-pink-500"
-              label="Composer"
+              icon={Bell}
+              iconColor="text-amber-500"
+              label="Notifications"
             />
 
-            <MenuDivider />
-
             <MenuItem
-              href="/policies"
+              href="/messages"
               onClick={closeMenu}
-              icon={Shield}
+              icon={MessageCircle}
               iconColor="text-emerald-500"
-              label="Safety & Policies"
+              label="Messages"
             />
 
-            <div className="mt-1 ml-7 space-y-1">
-              <Link
-                href="/policies/community-guidelines"
-                className="block px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition"
-                onClick={closeMenu}
-              >
-                Community Guidelines
-              </Link>
-              <Link
-                href="/policies/terms-of-service"
-                className="block px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition"
-                onClick={closeMenu}
-              >
-                Terms of Service
-              </Link>
-              <Link
-                href="/policies/privacy-policy"
-                className="block px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition"
-                onClick={closeMenu}
-              >
-                Privacy Policy
-              </Link>
-            </div>
-            
-            <MenuDivider />
-            
-            {/* Theme Toggle */}
-            <ThemeToggle variant="menu-item" />
+            <MenuItem
+              href="/settings"
+              onClick={closeMenu}
+              icon={Settings}
+              iconColor="text-gray-500"
+              label="Settings"
+            />
             
             <MenuDivider />
             

@@ -1400,6 +1400,23 @@ export function ProfileScreen({
     'large': 24
   }[profile.card_border_radius || 'medium'] || 18;
   const accentColor = profile.accent_color || theme.colors.accent;
+  const manualLocation = useMemo(() => {
+    const data = profile as any;
+    if (data.location_hidden && !isOwnProfile) {
+      return null;
+    }
+    const label = String(data.location_label ?? '').trim();
+    if (label.length > 0) {
+      return label;
+    }
+    const city = String(data.location_city ?? '').trim();
+    const region = String(data.location_region ?? '').trim();
+    const parts = [city, region].filter((part) => part.length > 0);
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+    return null;
+  }, [profile, isOwnProfile]);
 
   // Card style to apply to all cards
   const customCardStyle = {
@@ -1534,6 +1551,7 @@ export function ProfileScreen({
             {profile.display_name || profile.username}
           </Text>
           <Text style={styles.username}>@{profile.username}</Text>
+          {manualLocation && <Text style={styles.locationText}>{manualLocation}</Text>}
 
           {/* Bio */}
           {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
@@ -3336,6 +3354,13 @@ function createStyles(theme: any) {
       fontSize: 16,
       fontWeight: '600',
       marginBottom: 12,
+    },
+    locationText: {
+      color: theme.colors.textSecondary,
+      fontSize: 13,
+      marginTop: -8,
+      marginBottom: 12,
+      textAlign: 'center',
     },
     bio: {
       color: theme.colors.textSecondary,

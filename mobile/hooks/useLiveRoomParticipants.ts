@@ -20,6 +20,7 @@ import { getDeviceId, generateSessionId } from '../lib/deviceId';
 import { selectGridParticipants, type ParticipantLite, type SortMode } from '../lib/live';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
+import { createWebRequestHeaders } from '../lib/webSession';
 
 import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT, canUserGoLive } from '../lib/livekit-constants';
 
@@ -27,6 +28,17 @@ const DEBUG = DEBUG_LIVEKIT;
 const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com').replace(/\/+$/, '');
 const TOKEN_ENDPOINT = `${API_BASE_URL}${TOKEN_ENDPOINT_PATH}`;
+
+type CameraFacingMode = 'user' | 'environment';
+type CameraControlOptions = { facingMode?: CameraFacingMode };
+
+const CAMERA_CAPTURE_DEFAULTS = {
+  resolution: {
+    width: 1920,
+    height: 1080,
+    frameRate: 30,
+  },
+} as const;
 
 const nowMs = (): number => {
   try {
@@ -72,7 +84,7 @@ interface UseLiveRoomParticipantsReturn {
   participants: Participant[];
   myIdentity: string | null;
   isConnected: boolean;
-  goLive: () => Promise<void>;
+  goLive: (options?: { streamTitle?: string | null }) => Promise<void>;
   stopLive: () => Promise<void>;
   endOtherStream: () => Promise<void>;
   resumeOnThisDevice: () => Promise<void>;
@@ -80,6 +92,13 @@ interface UseLiveRoomParticipantsReturn {
   isPublishing: boolean;
   tileCount: number;
   room: Room | null;
+  liveStreamId: number | null;
+  localMicEnabled: boolean;
+  localCameraEnabled: boolean;
+  cameraFacingMode: CameraFacingMode;
+  setMicrophoneEnabled: (enabled: boolean) => Promise<void>;
+  setCameraEnabled: (enabled: boolean, options?: CameraControlOptions) => Promise<void>;
+  flipCamera: () => Promise<void>;
   connectionError: string | null;
   tokenDebug: { endpoint: string; status: number | null; bodySnippet: string | null };
   connectDebug: { wsUrl: string | null; errorMessage: string | null; reachedConnected: boolean };
@@ -104,7 +123,7 @@ export function useLiveRoomParticipants(
   const { enabled = false } = options;
   if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked');
 
-  const { user, getAccessToken } = useAuthContext();
+  const { user } = useAuthContext();
   type LiveKitParticipant = RemoteParticipant | LocalParticipant;
   const [allParticipants, setAllParticipants] = useState<LiveKitParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
@@ -125,6 +144,12 @@ export function useLiveRoomParticipants(
   const [lastTokenError, setLastTokenError] = useState<{ status: number | null; bodySnippet: string; message: string } | null>(null);
   const [lastWsUrl, setLastWsUrl] = useState<string | null>(null);
   const [lastConnectError, setLastConnectError] = useState<string | null>(null);
+  const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
+  const liveStreamIdRef = useRef<number | null>(null);
+  const [localMicEnabledState, setLocalMicEnabledState] = useState(false);
+  const [localCameraEnabledState, setLocalCameraEnabledState] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<CameraFacingMode>('user');
+  const cameraFacingModeRef = useRef<CameraFacingMode>('user');
   const tokenAttemptIdRef = useRef(0);
   const tokenAttemptInFlightRef = useRef<number | null>(null);
   const isLiveRef = useRef(false);
@@ -132,6 +157,14 @@ export function useLiveRoomParticipants(
   const goLiveInFlightRef = useRef(false);
   const stopLiveInFlightRef = useRef(false);
   const myProfileIdRef = useRef<string | null>(null);
+  const updateLiveStreamId = useCallback((value: number | null) => {
+    liveStreamIdRef.current = value;
+    setLiveStreamId(value);
+  }, []);
+  const updateCameraFacingMode = useCallback((value: CameraFacingMode) => {
+    cameraFacingModeRef.current = value;
+    setCameraFacingMode(value);
+  }, []);
 
   const extractProfileIdFromIdentity = useCallback((identityRaw: string | null | undefined): string | null => {
     const identity = typeof identityRaw === 'string' ? identityRaw : '';
@@ -177,12 +210,82 @@ export function useLiveRoomParticipants(
     }
   });
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      updateLiveStreamId(null);
+      return;
+    }
+
+    const loadActiveStream = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('live_streams')
+          .select('id')
+          .eq('profile_id', user.id)
+          .eq('live_available', true)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (error) {
+          updateLiveStreamId(null);
+          return;
+        }
+        updateLiveStreamId((data as any)?.id ?? null);
+      } catch {
+        if (!cancelled) {
+          updateLiveStreamId(null);
+        }
+      }
+    };
+
+    loadActiveStream();
+    return () => {
+      cancelled = true;
+    };
+  }, [updateLiveStreamId, user?.id]);
+
   // Refs to prevent reconnect on rerender
   const roomRef = useRef<Room | null>(null);
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
   const reachedConnectedRef = useRef(false);
   const lastTokenStatusRef = useRef<number | null>(null);
+  const ensureRoomConnected = useCallback((): Room => {
+    const room = roomRef.current;
+    if (!room || room.state !== 'connected') {
+      throw new Error('LiveKit room not connected');
+    }
+    return room;
+  }, []);
+  const setMicrophoneEnabled = useCallback(async (enabled: boolean) => {
+    const room = ensureRoomConnected();
+    await room.localParticipant.setMicrophoneEnabled(enabled);
+    setLocalMicEnabledState(enabled);
+  }, [ensureRoomConnected]);
+  const setCameraEnabled = useCallback(
+    async (enabled: boolean, options?: CameraControlOptions) => {
+      const room = ensureRoomConnected();
+      if (!enabled) {
+        await room.localParticipant.setCameraEnabled(false);
+        setLocalCameraEnabledState(false);
+        return;
+      }
+      const nextFacing = options?.facingMode ?? cameraFacingModeRef.current ?? 'user';
+      await room.localParticipant.setCameraEnabled(true, {
+        ...CAMERA_CAPTURE_DEFAULTS,
+        facingMode: nextFacing,
+      });
+      updateCameraFacingMode(nextFacing);
+      setLocalCameraEnabledState(true);
+    },
+    [ensureRoomConnected, updateCameraFacingMode]
+  );
+  const flipCamera = useCallback(async () => {
+    const nextFacing = cameraFacingModeRef.current === 'user' ? 'environment' : 'user';
+    await setCameraEnabled(true, { facingMode: nextFacing });
+  }, [setCameraEnabled]);
 
   const livekitModuleRef = useRef<any>(null);
 
@@ -266,46 +369,6 @@ export function useLiveRoomParticipants(
       // Generate session ID for this connection
       const sessionId = generateSessionId();
 
-      let accessToken = await getAccessToken();
-
-      // Ensure token freshness (mobile must use Bearer token)
-      // If token is missing OR session is expired/near-expiry, refresh session then re-check token.
-      try {
-        const { data } = await supabase.auth.getSession();
-        const session = data?.session;
-        const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : null;
-        const refreshSkewMs = 60_000;
-        const isExpiredOrSoon = expiresAtMs != null && expiresAtMs <= Date.now() + refreshSkewMs;
-
-        if (!accessToken || isExpiredOrSoon) {
-          if (isExpiredOrSoon) {
-            await supabase.auth.refreshSession();
-          }
-          accessToken = await getAccessToken();
-          // Fallback: AuthContext state might not have updated yet; use session token if available.
-          if (!accessToken) {
-            const { data: refreshed } = await supabase.auth.getSession();
-            accessToken = refreshed?.session?.access_token ?? null;
-          }
-        }
-      } catch (err) {
-        console.warn('[TOKEN] Session refresh check failed:', err);
-        // Fall through; if we still don't have a token, we will hard-stop below.
-      }
-
-      // 1) Make Bearer token mandatory and blocking
-      if (!accessToken) {
-        lastTokenStatusRef.current = 0;
-        setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: 0, bodySnippet: null });
-        setLastTokenError({
-          status: 0,
-          bodySnippet: '',
-          message: 'No Supabase access token available on mobile',
-        });
-        setConnectionError('No Supabase access token available on mobile');
-        throw new Error('No Supabase access token available on mobile');
-      }
-
       console.log('[PARITY-PROOF] token_fetch_inputs', {
         EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
         TOKEN_ENDPOINT,
@@ -342,12 +405,8 @@ export function useLiveRoomParticipants(
           sessionId: sessionId.substring(0, 8) + '...',
           role: params.role,
           canPublish: params.canPublish,
-          hasAccessToken: !!accessToken,
         });
       }
-
-      // TEMP: Prove whether we actually have a token at the moment we send the request (do not log token)
-      console.log('[TOKEN] hasAccessToken:', !!accessToken);
 
       const requestBody = {
         roomName: ROOM_NAME,
@@ -370,7 +429,7 @@ export function useLiveRoomParticipants(
         endpoint: TOKEN_ENDPOINT,
         method: 'POST',
         bodyKeys: Object.keys(requestBody),
-        headerKeys: ['Content-Type', 'Authorization'],
+        headerKeys: ['Content-Type', 'Cookie', 'Origin'],
       });
 
       // Preflight reachability check (diagnostic) before token POST
@@ -412,6 +471,24 @@ export function useLiveRoomParticipants(
         });
       }
 
+      let requestHeaders: Headers;
+      try {
+        ({ headers: requestHeaders } = await createWebRequestHeaders({
+          contentTypeJson: true,
+        }));
+      } catch (sessionError: any) {
+        console.error('[TOKEN] Unable to build cookie auth headers:', sessionError);
+        lastTokenStatusRef.current = 0;
+        setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: 0, bodySnippet: null });
+        setLastTokenError({
+          status: 0,
+          bodySnippet: '',
+          message: 'No Supabase session available on mobile',
+        });
+        setConnectionError('No Supabase session available on mobile');
+        throw sessionError;
+      }
+
       const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const tokenFetchStart = nowMs();
       const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
@@ -442,10 +519,7 @@ export function useLiveRoomParticipants(
       const response = await fetch(TOKEN_ENDPOINT, {
         method: 'POST',
         redirect: 'follow',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: requestHeaders,
         body: JSON.stringify(requestBody),
         ...(controller ? { signal: controller.signal } : {}),
       }).finally(() => clearTimeout(timeoutId));
@@ -500,7 +574,7 @@ export function useLiveRoomParticipants(
 
         let message = `Token fetch failed: ${response.status}`;
         if (response.status === 401 || response.status === 403) {
-          message = 'Auth token missing/expired – Bearer token not being sent or Supabase session invalid';
+          message = 'Auth cookie missing/expired – Supabase session invalid';
           setLastTokenError({
             status: response.status,
             bodySnippet: snippet500,
@@ -687,6 +761,24 @@ export function useLiveRoomParticipants(
     }
 
     setAllParticipants([localParticipant, ...remoteParticipants].filter(Boolean) as LiveKitParticipant[]);
+
+    if (localParticipant) {
+      const raw: any = localParticipant;
+      const videoPublications = raw?.videoTrackPublications
+        ? Array.from(raw.videoTrackPublications.values())
+        : Array.from(raw?.trackPublications?.values?.() ?? []).filter((pub: any) => pub?.kind === 'video' || pub?.track?.kind === 'video');
+      const audioPublications = raw?.audioTrackPublications
+        ? Array.from(raw.audioTrackPublications.values())
+        : Array.from(raw?.trackPublications?.values?.() ?? []).filter((pub: any) => pub?.kind === 'audio' || pub?.track?.kind === 'audio');
+
+      const hasVideo = videoPublications.some((pub: any) => !!pub?.track && !pub?.isMuted);
+      const hasAudio = audioPublications.some((pub: any) => !!pub?.track && !pub?.isMuted);
+      setLocalCameraEnabledState(hasVideo);
+      setLocalMicEnabledState(hasAudio);
+    } else {
+      setLocalCameraEnabledState(false);
+      setLocalMicEnabledState(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -760,21 +852,6 @@ export function useLiveRoomParticipants(
           return;
         }
 
-        // 4) Guard against race conditions: do not attempt token fetch until AuthContext has a token.
-        const bearer = await getAccessToken();
-        if (!bearer) {
-          lastTokenStatusRef.current = 0;
-          setTokenDebug({ endpoint: TOKEN_ENDPOINT, status: 0, bodySnippet: null });
-          setLastTokenError({
-            status: 0,
-            bodySnippet: '',
-            message: 'No Supabase access token available on mobile',
-          });
-          setConnectionError('No Supabase access token available on mobile');
-          isConnectingRef.current = false;
-          hasConnectedRef.current = false;
-          return;
-        }
         const participantName = authContext.profileId;
         setMyIdentity(participantName);
 
@@ -969,7 +1046,7 @@ export function useLiveRoomParticipants(
     };
 
     connectToRoom();
-  }, [appState, enabled, getAccessToken, getAuthContext, updateParticipants, user?.email, user?.id]);
+  }, [appState, enabled, getAuthContext, updateParticipants, user?.email, user?.id]);
 
   useEffect(() => {
     return () => {
@@ -1057,7 +1134,7 @@ export function useLiveRoomParticipants(
     return participants;
   }, [allParticipants, toParticipantLite, sortMode, randomSeed, myIdentity]);
 
-  const goLive = async () => {
+  const goLive = async (options?: { streamTitle?: string | null }) => {
     if (goLiveInFlightRef.current) return;
     if (isLiveRef.current) return;
 
@@ -1067,6 +1144,9 @@ export function useLiveRoomParticipants(
       if (!authContext.isAuthed || !authContext.profileId) {
         throw new Error('Not authenticated');
       }
+      const providedTitle = options?.streamTitle;
+      const sanitizedStreamTitle =
+        typeof providedTitle === 'string' ? providedTitle.trim() : undefined;
 
       // Check if already live elsewhere
       const { data: existingActiveStream } = await supabase
@@ -1109,9 +1189,13 @@ export function useLiveRoomParticipants(
       let liveStreamId: string | number;
 
       if (primaryId) {
+        const payload: Record<string, any> = { live_available: true, started_at: startedAt, ended_at: null };
+        if (sanitizedStreamTitle !== undefined) {
+          payload.stream_title = sanitizedStreamTitle.length > 0 ? sanitizedStreamTitle : null;
+        }
         const { data: updated, error: updateError } = await supabase
           .from('live_streams')
-          .update({ live_available: true, started_at: startedAt, ended_at: null })
+          .update(payload)
           .eq('id', primaryId)
           .select('id')
           .single();
@@ -1132,9 +1216,17 @@ export function useLiveRoomParticipants(
           }
         }
       } else {
+        const payload: Record<string, any> = {
+          profile_id: authContext.profileId,
+          live_available: true,
+          started_at: startedAt,
+        };
+        if (sanitizedStreamTitle !== undefined) {
+          payload.stream_title = sanitizedStreamTitle.length > 0 ? sanitizedStreamTitle : null;
+        }
         const { data: inserted, error: insertError } = await supabase
           .from('live_streams')
-          .insert({ profile_id: authContext.profileId, live_available: true, started_at: startedAt })
+          .insert(payload)
           .select('id')
           .single();
 
@@ -1142,6 +1234,9 @@ export function useLiveRoomParticipants(
           throw new Error(insertError?.message || 'Failed to start live stream');
         }
         liveStreamId = inserted.id;
+      }
+      if (liveStreamId != null) {
+        updateLiveStreamId(typeof liveStreamId === 'number' ? liveStreamId : Number(liveStreamId));
       }
 
       // Ensure user appears in slot 1 for themselves (same schema as web saveGridLayout)
@@ -1184,15 +1279,14 @@ export function useLiveRoomParticipants(
       try {
         // Enable camera with optimal quality settings
         await room.localParticipant.setCameraEnabled(true, {
-          resolution: {
-            width: 1920,
-            height: 1080,
-            frameRate: 30,
-          },
+          ...CAMERA_CAPTURE_DEFAULTS,
+          facingMode: cameraFacingModeRef.current ?? 'user',
         });
+        setLocalCameraEnabledState(true);
         
         // Enable microphone with audio optimizations
         await room.localParticipant.setMicrophoneEnabled(true);
+        setLocalMicEnabledState(true);
 
         // Force a state refresh so the memoized selection sees the updated local track publications.
         updateParticipants(room);
@@ -1258,6 +1352,7 @@ export function useLiveRoomParticipants(
         .from('live_streams')
         .update({ live_available: false, ended_at: new Date().toISOString() })
         .eq('profile_id', authContext.profileId);
+      updateLiveStreamId(null);
 
       await supabase.from('user_grid_slots').delete().eq('streamer_id', authContext.profileId);
 
@@ -1285,6 +1380,8 @@ export function useLiveRoomParticipants(
       setIsLive(false);
       isPublishingRef.current = false;
       isLiveRef.current = false;
+      setLocalMicEnabledState(false);
+      setLocalCameraEnabledState(false);
       stopLiveInFlightRef.current = false;
     }
   };
@@ -1302,6 +1399,7 @@ export function useLiveRoomParticipants(
         .from('live_streams')
         .update({ live_available: false, ended_at: new Date().toISOString() })
         .eq('profile_id', authContext.profileId);
+      updateLiveStreamId(null);
 
       // Remove from grid slots
       await supabase.from('user_grid_slots').delete().eq('streamer_id', authContext.profileId);
@@ -1352,6 +1450,7 @@ export function useLiveRoomParticipants(
       if (!existingStream) {
         throw new Error('No active stream found');
       }
+      updateLiveStreamId(existingStream.id ?? null);
 
       const room = roomRef.current;
       if (!room || room.state !== 'connected') {
@@ -1389,14 +1488,13 @@ export function useLiveRoomParticipants(
       isPublishingRef.current = true;
       try {
         await room.localParticipant.setCameraEnabled(true, {
-          resolution: {
-            width: 1920,
-            height: 1080,
-            frameRate: 30,
-          },
+          ...CAMERA_CAPTURE_DEFAULTS,
+          facingMode: cameraFacingModeRef.current ?? 'user',
         });
         
         await room.localParticipant.setMicrophoneEnabled(true);
+        setLocalCameraEnabledState(true);
+        setLocalMicEnabledState(true);
         updateParticipants(room);
       } catch (err: any) {
         setIsPublishing(false);
@@ -1409,6 +1507,8 @@ export function useLiveRoomParticipants(
       setIsPublishing(false);
       isLiveRef.current = false;
       isPublishingRef.current = false;
+      setLocalCameraEnabledState(false);
+      setLocalMicEnabledState(false);
       throw err;
     }
   };
@@ -1425,6 +1525,13 @@ export function useLiveRoomParticipants(
     isPublishing,
     tileCount: selectedParticipants.length,
     room: roomRef.current,
+     liveStreamId,
+     localMicEnabled: localMicEnabledState,
+     localCameraEnabled: localCameraEnabledState,
+     cameraFacingMode,
+     setMicrophoneEnabled,
+     setCameraEnabled,
+     flipCamera,
     connectionError,
     tokenDebug,
     connectDebug: {
