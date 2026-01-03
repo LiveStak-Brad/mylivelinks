@@ -94,6 +94,7 @@ export default function Tile({
   const { openChat } = useIM();
   const [showCompactActions, setShowCompactActions] = useState(false);
   const shouldUseCompact = compactMode && !isFullscreen;
+  const isSelfTile = !!user && user.id === streamerId;
   const compactButtonClass =
     'w-full px-3 py-2 rounded-lg text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/15 transition';
   const compactDangerButtonClass =
@@ -1331,7 +1332,43 @@ export default function Tile({
             {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
 
-          <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+          <div
+            className="absolute top-2 right-2 z-20 flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                const newState = !showVolumeSlider;
+                setShowVolumeSlider(newState);
+                onVolumeSliderToggle?.(newState);
+              }}
+              className="p-1 text-white/90 hover:text-white transition"
+              title="Volume"
+            >
+              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+
+            {showVolumeSlider && (
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => {
+                  handleVolumeInput(parseFloat(e.target.value));
+                }}
+                onBlur={() => {
+                  setShowVolumeSlider(false);
+                  onVolumeSliderToggle?.(false);
+                }}
+                className="w-16 h-1 accent-white/90 opacity-90"
+                title="Volume Slider"
+              />
+            )}
+
             {onExpand && (
               <button
                 type="button"
@@ -1585,17 +1622,19 @@ export default function Tile({
                   )}
                 </button>
               )}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleGiftOpen();
-                }}
-                className="text-white hover:opacity-90 transition"
-                title="Send Gift"
-              >
-                <Gift className="w-5 h-5" />
-              </button>
+              {!isSelfTile && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGiftOpen();
+                  }}
+                  className="text-white hover:opacity-90 transition"
+                  title="Send Gift"
+                >
+                  <Gift className="w-5 h-5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1618,17 +1657,19 @@ export default function Tile({
               <Heart className="w-5 h-5" fill={isLiked ? 'currentColor' : 'none'} />
             </button>
           )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleGiftOpen();
-            }}
-            className="text-white hover:opacity-90 transition"
-            title="Send Gift"
-          >
-            <Gift className="w-5 h-5" />
-          </button>
+          {!isSelfTile && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleGiftOpen();
+              }}
+              className="text-white hover:opacity-90 transition"
+              title="Send Gift"
+            >
+              <Gift className="w-5 h-5" />
+            </button>
+          )}
         </div>
       )}
 
