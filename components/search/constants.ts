@@ -151,6 +151,7 @@ export interface LiveResult {
   avatarUrl?: string | null;
   viewerCount: number;
   isLive: boolean;
+  startsAt?: string | null;
 }
 
 export const SEARCH_RECENTS_STORAGE_KEY = 'mylivelinks.search.recents';

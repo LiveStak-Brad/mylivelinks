@@ -1,9 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
-import { getLogoPath } from '@/lib/imageUtils';
 
 interface SmartBrandLogoProps {
   size?: number;
@@ -27,22 +25,12 @@ export default function SmartBrandLogo({
   priority = false,
   fallbackToPng = true,
 }: SmartBrandLogoProps) {
-  const { theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [isDark, setIsDark] = useState(false);
-  const [imgSrc, setImgSrc] = useState<string>('');
+  const [imgSrc, setImgSrc] = useState<string>('/branding/mylivelinkstransparent.png');
 
   useEffect(() => {
     setMounted(true);
-    setIsDark(resolvedTheme === 'dark');
-  }, [resolvedTheme]);
-
-  useEffect(() => {
-    if (mounted) {
-      // Use the transparent logo that actually exists
-      setImgSrc('/branding/mylivelinkstransparent.png');
-    }
-  }, [mounted, isDark, iconOnly]);
+  }, []);
 
   // Prevent hydration mismatch
   if (!mounted) {

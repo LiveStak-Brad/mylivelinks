@@ -204,7 +204,7 @@ export function SearchPage({ initialTab }: SearchPageProps) {
             .limit(postsLimit),
           supabase
             .from('teams')
-            .select('id, name, slug, description, avatar_url, approved_member_count, member_count')
+            .select('id, name, slug, team_tag, description, banner_url, icon_url, approved_member_count')
             .or(`name.ilike.${likePattern},description.ilike.${likePattern}`)
             .order('approved_member_count', { ascending: false })
             .limit(teamsLimit),
@@ -255,10 +255,8 @@ export function SearchPage({ initialTab }: SearchPageProps) {
           name: team.name,
           slug: team.slug,
           description: team.description,
-          avatarUrl: team.avatar_url,
-          memberCount: Number(
-            team.approved_member_count ?? team.member_count ?? 0
-          ),
+          avatarUrl: team.icon_url || team.banner_url || null,
+          memberCount: Number(team.approved_member_count ?? 0),
         }));
 
         const mappedLive: LiveResult[] = (liveResponse.data ?? []).map((row: any) => ({

@@ -208,7 +208,7 @@ export function LiveResultCard({ live, query }: { live: LiveResult; query: strin
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
           <Button size="sm" className="justify-center" leftIcon={<Play className="h-4 w-4" />}>
-            {live.liveNow ? 'Join live' : 'Set reminder'}
+            {live.isLive ? 'Join live' : 'Set reminder'}
           </Button>
           <Button size="sm" variant="outline" leftIcon={<Check className="h-4 w-4" />}>
             Follow host
