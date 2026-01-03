@@ -2653,30 +2653,39 @@ export default function LiveRoom({
     const newSlots = [...gridSlots];
     const slot = newSlots.find((s) => s.slotIndex === slotIndex);
     if (slot) {
-      // CRITICAL: If user closes their own box, stop publishing
-      if (slot.streamer && slot.streamer.profile_id === currentUserId && isCurrentUserPublishing) {
-        console.log('User closed their own box, stopping live stream...');
-        // Trigger stop live by updating database (this will cause isLive to become false)
+      // CRITICAL: If user closes their own box, end their stream (do NOT rely on isCurrentUserPublishing, which can be briefly stale)
+      if (slot.streamer && slot.streamer.profile_id === currentUserId) {
+        console.log('User closed their own box, ending live stream...');
         try {
-          const { data: { user } } = await supabase.auth.getUser();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
           if (user) {
-            // Update live_streams to set live_available = false
             await supabase
               .from('live_streams')
               .update({ live_available: false, ended_at: new Date().toISOString() })
               .eq('profile_id', user.id);
-            
-            // CRITICAL: Also remove from user_grid_slots so others don't see this user
+
             console.log('Removing self from all grid slots...');
-            await supabase
-              .from('user_grid_slots')
-              .delete()
-              .eq('streamer_id', user.id);
-            
-            // The GoLiveButton will detect the change and stop publishing
+            await supabase.from('user_grid_slots').delete().eq('streamer_id', user.id);
+
+            // Best-effort service role cleanup (covers RLS edge cases)
+            try {
+              await fetch('/api/stream-cleanup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ action: 'end_stream', reason: 'close_tile' }),
+              });
+            } catch (cleanupErr) {
+              console.warn('[LIVE] Failed to call stream-cleanup API:', cleanupErr);
+            }
+
+            // Proactively clear local state; GoLiveButton realtime will also stop LiveKit publishing
+            setIsCurrentUserPublishing(false);
           }
         } catch (err) {
-          console.error('Error stopping live when closing own box:', err);
+          console.error('Error ending live when closing own box:', err);
         }
       }
       // Prevent auto-refill of this streamer in this viewer's grid
