@@ -7,6 +7,7 @@ interface GiftAnimationProps {
   giftIcon?: string;
   senderUsername: string;
   coinAmount: number;
+  scale?: number;
   onComplete: () => void;
 }
 
@@ -15,12 +16,19 @@ export default function GiftAnimation({
   giftIcon,
   senderUsername,
   coinAmount,
+  scale: scaleOverride,
   onComplete,
 }: GiftAnimationProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [scale, setScale] = useState(1);
 
+  const effectiveScale = typeof scaleOverride === 'number' ? scaleOverride : scale;
+
   useEffect(() => {
+    if (typeof scaleOverride === 'number') {
+      return;
+    }
+
     const computeScale = (): number => {
       if (typeof window === 'undefined') return 1;
       const w = window.innerWidth;
@@ -103,29 +111,28 @@ export default function GiftAnimation({
       <div className="absolute inset-0 bg-gradient-to-t from-purple-900/40 via-transparent to-transparent animate-pulse" />
       
       {/* Gift animation */}
-      <div
-        className="relative z-10 text-center animate-gift-bounce"
-        style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}
-      >
-        {/* Gift icon */}
-        <div className="mb-4 animate-gift-spin">
-          {giftIcon ? (
-            <img src={giftIcon} alt={giftName} className="w-24 h-24 mx-auto drop-shadow-2xl" />
-          ) : (
-            <div className="text-8xl drop-shadow-2xl filter brightness-125">
-              {getGiftEmoji(giftName)}
-            </div>
-          )}
-        </div>
-        
-        {/* Gift info */}
-        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full shadow-2xl backdrop-blur-sm">
-          <p className="text-lg font-bold drop-shadow-lg">
-            {senderUsername} sent {giftName}!
-          </p>
-          <p className="text-sm opacity-90">
-            +{coinAmount} coins
-          </p>
+      <div style={{ transform: `scale(${effectiveScale})`, transformOrigin: 'center' }}>
+        <div className="relative z-10 text-center animate-gift-bounce">
+          {/* Gift icon */}
+          <div className="mb-4 animate-gift-spin">
+            {giftIcon ? (
+              <img src={giftIcon} alt={giftName} className="w-24 h-24 mx-auto drop-shadow-2xl" />
+            ) : (
+              <div className="text-8xl drop-shadow-2xl filter brightness-125">
+                {getGiftEmoji(giftName)}
+              </div>
+            )}
+          </div>
+          
+          {/* Gift info */}
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full shadow-2xl backdrop-blur-sm">
+            <p className="text-lg font-bold drop-shadow-lg">
+              {senderUsername} sent {giftName}!
+            </p>
+            <p className="text-sm opacity-90">
+              +{coinAmount} coins
+            </p>
+          </div>
         </div>
       </div>
       

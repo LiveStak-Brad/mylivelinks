@@ -80,6 +80,7 @@ export default function Tile({
   const [isActive, setIsActive] = useState(true);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9); // Track video orientation
+  const tileContainerRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
@@ -94,6 +95,27 @@ export default function Tile({
   const isSelfTile = !!user && user.id === streamerId;
   const gridIconSizeClass = compactMode ? 'w-4 h-4' : 'w-5 h-5';
   const gridNameMaxWidthClass = compactMode ? 'max-w-[55%]' : 'max-w-[70%]';
+
+  const [giftOverlayScale, setGiftOverlayScale] = useState(1);
+
+  useEffect(() => {
+    const el = tileContainerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+
+    const compute = () => {
+      const rect = el.getBoundingClientRect();
+      const minDim = Math.min(rect.width, rect.height);
+      if (!minDim || !isFinite(minDim)) return;
+
+      const next = Math.max(0.35, Math.min(1, minDim / 320));
+      setGiftOverlayScale(next);
+    };
+
+    compute();
+    const ro = new ResizeObserver(() => compute());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [compactMode, isFullscreen]);
 
   const handleGiftOpen = useCallback(() => {
     setShowGiftModal(true);
@@ -1159,6 +1181,7 @@ export default function Tile({
     <div
       data-tile-id={slotIndex}
       onClick={() => {}}
+      ref={tileContainerRef}
       className={`
         relative ${isFullscreen ? 'w-full h-full' : compactMode ? 'w-full h-full' : 'aspect-[3/2]'} rounded-lg overflow-hidden group
         border-2 transition-all duration-200
@@ -1224,6 +1247,7 @@ export default function Tile({
             giftIcon={gift.giftIcon}
             senderUsername={gift.senderUsername}
             coinAmount={gift.coinAmount}
+            scale={giftOverlayScale}
             onComplete={() => {
               setActiveGiftAnimations((prev) => prev.filter((g) => g.id !== gift.id));
             }}
@@ -1531,9 +1555,11 @@ export default function Tile({
       {/* Action Buttons */}
       {!shouldUseCompact && !isFullscreen && (
         <div className="absolute inset-x-0 bottom-0 z-20">
-          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent" />
+          <div
+            className={`absolute inset-x-0 bottom-0 ${compactMode ? 'h-14' : 'h-12'} bg-gradient-to-t from-black/70 to-transparent`}
+          />
           <div className="relative flex items-end justify-between px-2 pb-2">
-            <div className="flex items-end gap-2 min-w-0 pointer-events-auto">
+            <div className="flex items-end gap-2 min-w-0 pointer-events-auto flex-1">
               {!isSelfTile && (
                 <button
                   type="button"
@@ -1553,7 +1579,11 @@ export default function Tile({
                   e.stopPropagation();
                   setShowMiniProfile(true);
                 }}
-                className={`text-white text-xs font-semibold truncate ${gridNameMaxWidthClass} drop-shadow`}
+                className={`text-white font-semibold drop-shadow min-w-0 ${
+                  compactMode
+                    ? 'text-[10px] leading-tight whitespace-normal break-words overflow-hidden max-h-7'
+                    : 'text-xs truncate flex-1'
+                }`}
                 title={streamerUsername}
               >
                 {streamerUsername}
