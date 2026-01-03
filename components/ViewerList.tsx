@@ -132,30 +132,31 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
       let error: any = null;
 
       if (hasRoomIdColumn) {
-        const result = await supabase
+        const scoped = await supabase
           .from('room_presence')
           .select('profile_id, username, is_live_available, last_seen_at, room_id')
           .eq('room_id', normalizedRoomId)
           .gt('last_seen_at', new Date(Date.now() - 60000).toISOString())
           .order('is_live_available', { ascending: false })
           .order('last_seen_at', { ascending: false });
-        presenceData = result.data;
-        error = result.error;
 
-        if (error?.code === '42703') {
+        if (scoped.error?.code === '42703') {
           setHasRoomIdColumn(false);
+        } else {
+          presenceData = scoped.data;
+          error = scoped.error;
         }
       }
 
-      if (!hasRoomIdColumn) {
-        const result = await supabase
+      if (!hasRoomIdColumn || error?.code === '42703' || presenceData == null) {
+        const unscoped = await supabase
           .from('room_presence')
           .select('profile_id, username, is_live_available, last_seen_at')
           .gt('last_seen_at', new Date(Date.now() - 60000).toISOString())
           .order('is_live_available', { ascending: false })
           .order('last_seen_at', { ascending: false });
-        presenceData = result.data;
-        error = result.error;
+        presenceData = unscoped.data;
+        error = unscoped.error;
       }
 
       if (error) throw error;

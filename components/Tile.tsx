@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { Gift, Heart, Maximize2, Minimize2, Volume2, VolumeX, X } from 'lucide-react';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import GiftModal from './GiftModal';
@@ -401,6 +402,30 @@ export default function Tile({
             }
           }
         } else if (track.kind === Track.Kind.Audio) {
+          const selfUserId = user?.id || null;
+          const localParticipantUserId = sharedRoom.localParticipant?.identity
+            ? extractUserId(sharedRoom.localParticipant.identity)
+            : null;
+          const isSelfAudio =
+            (!!selfUserId && participantUserId === selfUserId) ||
+            (!!localParticipantUserId && participantUserId === localParticipantUserId);
+          if (isSelfAudio) {
+            if (DEBUG_LIVEKIT) {
+              console.log('[SUB] Skipping self audio track', {
+                slotIndex,
+                streamerId,
+                participantIdentity: participant.identity,
+                source,
+              });
+            }
+            try {
+              track.detach();
+            } catch {
+              // ignore
+            }
+            return;
+          }
+
           const isScreenAudio = source === Track.Source.ScreenShareAudio;
           const isMic = source === Track.Source.Microphone;
 
@@ -546,7 +571,7 @@ export default function Tile({
             streamerId,
             participantIdentity: localParticipant.identity,
             trackPublicationsCount: localParticipant.trackPublications.size,
-            publications: Array.from(localParticipant.trackPublications.values()).map(p => ({
+            publications: Array.from(localParticipant.trackPublications.values()).map((p) => ({
               kind: p.track?.kind,
               source: p.source,
               sid: p.trackSid,
@@ -555,17 +580,22 @@ export default function Tile({
             hasPreferredLocalTrack,
           });
         }
-        
-        // Handle local tracks - attach them to this tile so user can see themselves
+
+        // Attach local tracks - VIDEO ONLY (never attach local audio to prevent echo)
         localParticipant.trackPublications.forEach((publication) => {
           const isPreferred =
             publication.source === Track.Source.ScreenShare ||
             publication.source === Track.Source.ScreenShareAudio ||
             publication.source === Track.Source.Camera ||
             publication.source === Track.Source.Microphone;
-          
+
           if (isPreferred && publication.track) {
             const track = publication.track;
+
+            if (track.kind === Track.Kind.Audio) {
+              return;
+            }
+
             if (DEBUG_LIVEKIT) {
               console.log('[SUB] Attaching LOCAL track to tile:', {
                 slotIndex,
@@ -573,8 +603,8 @@ export default function Tile({
                 source: publication.source,
               });
             }
-            
-            // Attach local tracks to this tile's video/audio elements
+
+            // Attach local video track to this tile
             handleTrackSubscribed(track as any, publication as any, localParticipant as any);
           }
         });
@@ -1286,8 +1316,52 @@ export default function Tile({
         </div>
       )}
 
+      {/* Grid Controls: Speaker (top-left) and Close (top-right) */}
+      {!shouldUseCompact && !isFullscreen && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMute();
+            }}
+            className="absolute top-2 left-2 z-20 p-1 text-white/90 hover:text-white transition"
+            title={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
+
+          <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+            {onExpand && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onExpand();
+                }}
+                className="p-1 text-white/90 hover:text-white transition"
+                title="Expand"
+              >
+                <Maximize2 className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-1 text-white/90 hover:text-white transition"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Bottom Right Overlay - Username and Badge */}
-      {!shouldUseCompact && (
+      {!shouldUseCompact && isFullscreen && (
         <div className="absolute bottom-2 right-2 z-20">
           <div className="flex flex-col items-end gap-1">
             {/* Username and Badge - ALWAYS VISIBLE */}
@@ -1368,7 +1442,7 @@ export default function Tile({
       )}
 
       {/* Controls */}
-      {!shouldUseCompact && (
+      {!shouldUseCompact && isFullscreen && (
         <div className="absolute top-10 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <div className="flex gap-1">
             {onExpand && !isFullscreen && (
@@ -1470,45 +1544,90 @@ export default function Tile({
       )}
 
       {/* Action Buttons */}
-      {!shouldUseCompact && (
-        <div className="absolute bottom-2 left-2 flex gap-2 opacity-100 transition-opacity z-10">
+      {!shouldUseCompact && !isFullscreen && (
+        <div className="absolute inset-x-0 bottom-0 z-20">
+          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent" />
+          <div className="relative flex items-end justify-between px-2 pb-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMiniProfile(true);
+              }}
+              className="text-white text-xs font-semibold truncate max-w-[70%] drop-shadow pointer-events-auto"
+              title={streamerUsername}
+            >
+              {streamerUsername}
+            </button>
+
+            <div className="flex items-center gap-2 pointer-events-auto">
+              {user && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleLikeTap();
+                  }}
+                  disabled={isLikeLoading}
+                  className={`relative text-white transition-all ${showLikePop ? 'scale-125' : 'scale-100'} hover:opacity-90`}
+                  title={isLiked ? 'Liked!' : 'Like'}
+                >
+                  <Heart className="w-5 h-5" fill={isLiked ? 'currentColor' : 'none'} />
+                  {showLikePop && (
+                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-red-500 text-lg font-bold animate-fade-up pointer-events-none">
+                      ❤️
+                    </span>
+                  )}
+                  {showFloatingHeart && (
+                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-red-500 text-2xl animate-fade-up pointer-events-none">
+                      ❤️
+                    </span>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleGiftOpen();
+                }}
+                className="text-white hover:opacity-90 transition"
+                title="Send Gift"
+              >
+                <Gift className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen action buttons (vector-only) */}
+      {!shouldUseCompact && isFullscreen && (
+        <div className="absolute bottom-2 left-2 flex gap-2 opacity-100 transition-opacity z-20">
           {user && (
             <button
-              onClick={handleLikeTap}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLikeTap();
+              }}
               disabled={isLikeLoading}
-              className={`relative px-3 py-1.5 rounded text-xs font-medium transition-all shadow-lg ${
-                isLiked
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-black/50 text-white hover:bg-black/70'
-              } ${showLikePop ? 'scale-125' : 'scale-100'}`}
+              className={`relative text-white transition-all ${showLikePop ? 'scale-125' : 'scale-100'} hover:opacity-90`}
               title={isLiked ? 'Liked!' : 'Like'}
             >
-              <span className="flex items-center gap-1">
-                <span className="text-base">{isLiked ? '❤️' : '🤍'}</span>
-                <span>{likesCount}</span>
-              </span>
-              {/* First like animation */}
-              {showLikePop && (
-                <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-red-500 text-lg font-bold animate-fade-up pointer-events-none">
-                  ❤️
-                </span>
-              )}
-              {/* Fidget tap animation (already liked) */}
-              {showFloatingHeart && (
-                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-red-500 text-2xl animate-fade-up pointer-events-none">
-                  ❤️
-                </span>
-              )}
+              <Heart className="w-5 h-5" fill={isLiked ? 'currentColor' : 'none'} />
             </button>
           )}
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               handleGiftOpen();
             }}
-            className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors shadow-lg"
+            className="text-white hover:opacity-90 transition"
+            title="Send Gift"
           >
-            💎 Gift
+            <Gift className="w-5 h-5" />
           </button>
         </div>
       )}

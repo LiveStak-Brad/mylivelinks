@@ -115,6 +115,13 @@ export default function LiveRoom({
     () => roomConfig.contentRoomId || roomConfig.roomId || 'live-central',
     [roomConfig.contentRoomId, roomConfig.roomId]
   );
+  const presenceRoomId = useMemo(() => {
+    const raw = roomConfig.roomId || roomConfig.contentRoomId || 'live_central';
+    // LiveCentral historically used both "live-central" and "live_central".
+    // room_presence scoping/migrations use "live_central".
+    if (raw === 'live-central') return 'live_central';
+    return raw;
+  }, [roomConfig.roomId, roomConfig.contentRoomId]);
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(true); // Start as true to render immediately
   const [initError, setInitError] = useState<string | null>(null); // Track initialization errors
@@ -833,9 +840,8 @@ export default function LiveRoom({
             .select('username')
             .eq('id', user.id)
             .maybeSingle();
-          if (profile) {
-            setCurrentUsername(profile.username);
-          }
+          const fallbackUsername = user.id.slice(0, 8);
+          setCurrentUsername((profile?.username as string | null | undefined) || fallbackUsername);
         } else {
           setCurrentUserId(null);
           setCurrentUsername(null);
@@ -857,13 +863,13 @@ export default function LiveRoom({
   useRoomPresence({
     userId: currentUserId,
     username: currentUsername,
-    roomId: scopeRoomId,
+    roomId: presenceRoomId,
     enabled: !authDisabled && !!currentUserId && !!currentUsername,
   });
 
   // ROOM-DEMAND: Track room presence count (excluding self) for publisher enable logic
   useEffect(() => {
-    if (!currentUserId || authDisabled || !scopeRoomId) {
+    if (!currentUserId || authDisabled || !presenceRoomId) {
       setRoomPresenceCountMinusSelf(0);
       return;
     }
@@ -889,7 +895,7 @@ export default function LiveRoom({
         // Prefer RPC if it exists
         if (hasPresenceCountRpcRef.current !== false) {
           const rpcResult = await supabase.rpc('get_room_presence_count_minus_self', {
-            p_room_id: scopeRoomId,
+            p_room_id: presenceRoomId,
           });
           if (!rpcResult.error) {
             count = (rpcResult.data || 0) as number;
@@ -920,7 +926,7 @@ export default function LiveRoom({
           const tryScopedQuery = async () => {
             const query = baseQuery();
             if (hasRoomPresenceRoomIdColumnRef.current !== false) {
-              const scoped = await query.eq('room_id', scopeRoomId);
+              const scoped = await query.eq('room_id', presenceRoomId);
               if (!scoped.error) {
                 hasRoomPresenceRoomIdColumnRef.current = true;
                 return scoped.count || 0;
@@ -978,7 +984,7 @@ export default function LiveRoom({
       }
 
       roomPresenceChannel = supabase
-        .channel(`room-presence-count-updates-${scopeRoomId}`)
+        .channel(`room-presence-count-updates-${presenceRoomId}`)
         .on(
           'postgres_changes',
           {
@@ -1011,7 +1017,7 @@ export default function LiveRoom({
         clearInterval(pollInterval);
       }
     };
-  }, [currentUserId, authDisabled, supabase, scopeRoomId]);
+  }, [currentUserId, authDisabled, supabase, presenceRoomId]);
 
   // Auto-enable Focus Mode when tile is expanded
   useEffect(() => {
@@ -3422,7 +3428,7 @@ export default function LiveRoom({
                   {/* Viewer List - Left side */}
                   {uiPanels.viewersOpen && (
                     <div className="2xl:w-80 xl:w-full lg:w-full flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto transition-all">
-                      <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
+                      <ViewerList roomId={presenceRoomId} onDragStart={(viewer) => {
                         // Viewer drag started - can add visual feedback if needed
                       }} />
                     </div>
@@ -3459,7 +3465,7 @@ export default function LiveRoom({
                     <Leaderboard roomSlug={scopeRoomId} roomName={roomConfig.branding.name} />
                   </PanelShell>
                   <PanelShell title="Viewers" className="flex-1 min-h-0 border-0 border-t border-gray-200 dark:border-gray-700" bodyClassName="p-0">
-                    <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
+                    <ViewerList roomId={presenceRoomId} onDragStart={(viewer) => {
                       // Viewer drag started - can add visual feedback if needed
                     }} />
                   </PanelShell>
@@ -3521,7 +3527,7 @@ export default function LiveRoom({
               >
                 {drawerOpen === 'leaderboard' && <Leaderboard roomSlug={scopeRoomId} roomName={roomConfig.branding.name} />}
                 {drawerOpen === 'viewers' && (
-                  <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
+                  <ViewerList roomId={presenceRoomId} onDragStart={(viewer) => {
                     // Viewer drag started - can add visual feedback if needed
                   }} />
                 )}

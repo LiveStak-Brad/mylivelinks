@@ -211,7 +211,22 @@ export function useLiveKitPublisher({
           // Fallback to microphone for audio
           console.log('Screen share has no audio, using microphone...');
           const audioTracks = await createTracks({
-            audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
+            audio: audioDeviceId
+              ? {
+                  deviceId: { exact: audioDeviceId },
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                  sampleRate: 48000,
+                  channelCount: 1,
+                }
+              : {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                  sampleRate: 48000,
+                  channelCount: 1,
+                },
             video: false,
           });
           tracks.push(...audioTracks);
