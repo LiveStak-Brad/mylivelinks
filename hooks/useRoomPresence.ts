@@ -19,35 +19,78 @@ export function useRoomPresence({ userId, username, roomId, enabled = true }: Us
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const normalizedRoomId = roomId || 'live_central';
+  const roomPresenceTableAvailableRef = useRef<boolean | null>(null);
+  const hasRoomIdColumnRef = useRef<boolean | null>(null);
 
-  const updatePresence = useCallback(async (isPresent: boolean, isLiveAvailable: boolean = false) => {
-    if (!userId || !username || !enabled) return;
+  const missingTableError = (error: any) => {
+    if (!error) return false;
+    const code = error.code;
+    const message = String(error.message || '');
+    return code === '42P01' || message.includes('room_presence');
+  };
 
-    try {
-      if (isPresent) {
-        // Upsert presence record with live_available status
-        const { error } = await supabase.rpc('upsert_room_presence', {
-          p_profile_id: userId,
-          p_username: username,
-          p_room_id: normalizedRoomId,
-          p_is_live_available: isLiveAvailable,
-        });
-        if (error) console.error('Error upserting room presence:', error);
-        presenceRef.current = true;
-      } else {
-        // Delete presence record
-        const { error } = await supabase
-          .from('room_presence')
-          .delete()
-          .eq('profile_id', userId)
-          .eq('room_id', normalizedRoomId);
-        if (error) console.error('Error deleting room presence:', error);
-        presenceRef.current = false;
+  const updatePresence = useCallback(
+    async (isPresent: boolean, isLiveAvailable: boolean = false) => {
+      if (!userId || !username || !enabled) return;
+      if (roomPresenceTableAvailableRef.current === false) return;
+
+      try {
+        if (isPresent) {
+          const baseRow: Record<string, any> = {
+            profile_id: userId,
+            username,
+            is_live_available: isLiveAvailable,
+            last_seen_at: new Date().toISOString(),
+          };
+
+          if (hasRoomIdColumnRef.current !== false) {
+            baseRow.room_id = normalizedRoomId;
+          }
+
+          const upsertRow = async (row: Record<string, any>) => {
+            const { error } = await supabase.from('room_presence').upsert(row);
+            return error;
+          };
+
+          let upsertError = await upsertRow(baseRow);
+          if (upsertError) {
+            if (upsertError.code === '42703' || String(upsertError.message || '').includes('room_id')) {
+              hasRoomIdColumnRef.current = false;
+              const fallbackRow = { ...baseRow };
+              delete fallbackRow.room_id;
+              upsertError = await upsertRow(fallbackRow);
+            }
+
+            if (upsertError) {
+              if (missingTableError(upsertError)) {
+                roomPresenceTableAvailableRef.current = false;
+                return;
+              }
+              console.error('Error upserting room presence:', upsertError);
+              return;
+            }
+          }
+
+          presenceRef.current = true;
+          roomPresenceTableAvailableRef.current = true;
+        } else {
+          const { error } = await supabase.from('room_presence').delete().eq('profile_id', userId);
+          if (error) {
+            if (missingTableError(error)) {
+              roomPresenceTableAvailableRef.current = false;
+              return;
+            }
+            console.error('Error deleting room presence:', error);
+            return;
+          }
+          presenceRef.current = false;
+        }
+      } catch (err) {
+        console.error('Error managing room presence:', err);
       }
-    } catch (err) {
-      console.error('Error managing room presence:', err);
-    }
-  }, [userId, username, enabled, supabase, normalizedRoomId]);
+    },
+    [userId, username, enabled, supabase, normalizedRoomId]
+  );
 
   // Initial presence update and heartbeat setup
   useEffect(() => {
@@ -112,7 +155,7 @@ export function useRoomPresence({ userId, username, roomId, enabled = true }: Us
     const handleBeforeUnload = () => {
       if (userId && enabled && presenceRef.current) {
         // Use navigator.sendBeacon for best effort to send data on unload
-        const payload = JSON.stringify({ profile_id: userId, room_id: normalizedRoomId });
+        const payload = JSON.stringify({ profile_id: userId });
         const blob = new Blob([payload], { type: 'application/json' });
         navigator.sendBeacon('/api/room-presence/remove', blob);
       }

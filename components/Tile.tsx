@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import GiftModal from './GiftModal';
@@ -12,6 +11,7 @@ import { useDailyLeaderboardRank } from '@/hooks/useDailyLeaderboardRank';
 import { RemoteTrack, TrackPublication, RemoteParticipant, Track, RoomEvent, Room } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
+import { useIM } from '@/components/im';
 
 interface GiftAnimationData {
   id: string;
@@ -35,6 +35,7 @@ interface TileProps {
   sharedRoom?: Room | null; // Shared LiveKit room connection
   isRoomConnected?: boolean; // Whether shared room is connected
   isCurrentUserPublishing?: boolean; // NEW: Whether current user is publishing (for echo prevention)
+  compactMode?: boolean;
   onClose: () => void;
   onMute: () => void;
   isMuted: boolean;
@@ -61,6 +62,7 @@ export default function Tile({
   sharedRoom,
   isRoomConnected = false,
   isCurrentUserPublishing = false, // NEW: Whether current user is publishing
+  compactMode = false,
   onClose,
   onMute,
   isMuted,
@@ -72,7 +74,6 @@ export default function Tile({
   onVolumeSliderToggle,
   onReplace,
 }: TileProps) {
-  const router = useRouter();
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [showMiniProfile, setShowMiniProfile] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
@@ -89,6 +90,87 @@ export default function Tile({
   const [showLikePop, setShowLikePop] = useState(false);
   const [showFloatingHeart, setShowFloatingHeart] = useState(false);
   const supabase = createClient();
+  const { openChat } = useIM();
+  const [showCompactActions, setShowCompactActions] = useState(false);
+  const shouldUseCompact = compactMode && !isFullscreen;
+  const compactButtonClass =
+    'w-full px-3 py-2 rounded-lg text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/15 transition';
+  const compactDangerButtonClass =
+    'w-full px-3 py-2 rounded-lg text-sm font-semibold border border-red-400/40 bg-red-500/20 hover:bg-red-500/30 text-red-100 transition';
+
+  useEffect(() => {
+    if (!shouldUseCompact && showCompactActions) {
+      setShowCompactActions(false);
+    }
+  }, [shouldUseCompact, showCompactActions]);
+
+  useEffect(() => {
+    setShowCompactActions(false);
+  }, [streamerId]);
+
+  useEffect(() => {
+    if (shouldUseCompact && showVolumeSlider) {
+      setShowVolumeSlider(false);
+    }
+  }, [shouldUseCompact, showVolumeSlider]);
+
+  const handleTileClick = useCallback(() => {
+    if (!shouldUseCompact) {
+      return;
+    }
+    setShowCompactActions(true);
+  }, [shouldUseCompact]);
+
+  const handleDismissCompactMenu = useCallback(() => {
+    setShowCompactActions(false);
+  }, []);
+
+  const handleViewProfile = useCallback(() => {
+    setShowCompactActions(false);
+    setShowMiniProfile(true);
+  }, []);
+
+  const handleOpenIMChat = useCallback(() => {
+    if (!streamerId || !streamerUsername) {
+      return;
+    }
+    openChat(streamerId, streamerUsername, streamerAvatar);
+    setShowCompactActions(false);
+  }, [openChat, streamerAvatar, streamerId, streamerUsername]);
+
+  const handleGiftOpen = useCallback(() => {
+    setShowCompactActions(false);
+    setShowGiftModal(true);
+  }, []);
+
+  const handleFullscreenToggle = useCallback(() => {
+    if (isFullscreen) {
+      onExitFullscreen?.();
+    } else {
+      onExpand?.();
+    }
+    setShowCompactActions(false);
+  }, [isFullscreen, onExitFullscreen, onExpand]);
+
+  const handleReplaceTile = useCallback(() => {
+    if (!onReplace) return;
+    onReplace();
+    setShowCompactActions(false);
+  }, [onReplace]);
+
+  const handleCloseTileAction = useCallback(() => {
+    onClose();
+    setShowCompactActions(false);
+  }, [onClose]);
+
+  const handleVolumeInput = useCallback((newVolume: number) => {
+    onVolumeChange(newVolume);
+    if (newVolume === 0 && !isMuted) {
+      onMute();
+    } else if (newVolume > 0 && isMuted) {
+      onMute();
+    }
+  }, [isMuted, onMute, onVolumeChange]);
 
   // Like system
   const { isLiked, likesCount, toggleLike, isLoading: isLikeLoading } = useLiveLike({
@@ -1094,6 +1176,7 @@ export default function Tile({
   return (
     <div
       data-tile-id={slotIndex}
+      onClick={handleTileClick}
       className={`
         relative ${isFullscreen ? 'w-full h-full' : 'aspect-[3/2]'} rounded-lg overflow-hidden group
         border-2 transition-all duration-200
@@ -1166,33 +1249,35 @@ export default function Tile({
       {/* LIVE badge removed - if video is visible, they're already live */}
 
       {/* Stats Overlay - Show viewer count, likes, and trending rank */}
-      <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-2 z-20">
-        {/* Left side: Trending rank OR likes */}
-        <div className="flex items-center gap-2">
-          {trendingRank && trendingRank <= 10 && (
-            <div className={`px-2 py-1 rounded text-xs font-bold shadow-lg ${
-              trendingRank === 1 ? 'bg-yellow-500 text-black' :
-              trendingRank === 2 ? 'bg-gray-400 text-black' :
-              trendingRank === 3 ? 'bg-orange-600 text-white' :
-              'bg-red-500/90 text-white'
-            }`}>
-              🔥 #{trendingRank}
-            </div>
-          )}
-          {likesCount > 0 && (
-            <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
-              ❤️ {likesCount}
+      {!shouldUseCompact && (
+        <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-2 z-20">
+          {/* Left side: Trending rank OR likes */}
+          <div className="flex items-center gap-2">
+            {trendingRank && trendingRank <= 10 && (
+              <div className={`px-2 py-1 rounded text-xs font-bold shadow-lg ${
+                trendingRank === 1 ? 'bg-yellow-500 text-black' :
+                trendingRank === 2 ? 'bg-gray-400 text-black' :
+                trendingRank === 3 ? 'bg-orange-600 text-white' :
+                'bg-red-500/90 text-white'
+              }`}>
+                🔥 #{trendingRank}
+              </div>
+            )}
+            {likesCount > 0 && (
+              <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
+                ❤️ {likesCount}
+              </div>
+            )}
+          </div>
+          
+          {/* Viewer count (right) */}
+          {viewerCount > 0 && (
+            <div className="bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs">
+              👁️ {viewerCount}
             </div>
           )}
         </div>
-        
-        {/* Viewer count (right) */}
-        {viewerCount > 0 && (
-          <div className="bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs">
-            👁️ {viewerCount}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Muted Indicator */}
       {isMuted && (
@@ -1202,227 +1287,381 @@ export default function Tile({
       )}
 
       {/* Bottom Right Overlay - Username and Badge */}
-      <div className="absolute bottom-2 right-2 z-20">
-        <div className="flex flex-col items-end gap-1">
-          {/* Username and Badge - ALWAYS VISIBLE */}
-          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-            <button
-              onClick={() => setShowMiniProfile(true)}
-              className="text-white text-sm font-semibold hover:text-blue-200 transition"
-            >
-              {streamerUsername}
-            </button>
-            {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
-              <TierBadge
-                tier_key={gifterStatus.tier_key}
-                level={gifterStatus.level_in_tier}
-                size="sm"
-              />
+      {!shouldUseCompact && (
+        <div className="absolute bottom-2 right-2 z-20">
+          <div className="flex flex-col items-end gap-1">
+            {/* Username and Badge - ALWAYS VISIBLE */}
+            <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <button
+                onClick={() => setShowMiniProfile(true)}
+                className="text-white text-sm font-semibold hover:text-blue-200 transition"
+              >
+                {streamerUsername}
+              </button>
+              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
+                <TierBadge
+                  tier_key={gifterStatus.tier_key}
+                  level={gifterStatus.level_in_tier}
+                  size="sm"
+                />
+              )}
+            </div>
+            
+            {/* Leaderboard Rank - ALWAYS VISIBLE - Prestigious Display */}
+            {!leaderboardRank.isLoading && leaderboardRank.rank !== null && (
+              <div 
+                className={`backdrop-blur-md px-2.5 py-1.5 rounded-lg shadow-xl border-2 transition-all ${
+                  leaderboardRank.rank === 1 
+                    ? 'bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-600 border-yellow-300 shadow-yellow-500/50' 
+                    : leaderboardRank.rank === 2
+                    ? 'bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 border-gray-200 shadow-gray-400/50'
+                    : leaderboardRank.rank === 3
+                    ? 'bg-gradient-to-br from-orange-400 via-amber-600 to-orange-700 border-orange-300 shadow-orange-500/50'
+                    : leaderboardRank.rank <= 10
+                    ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 border-blue-400 shadow-blue-500/50'
+                    : leaderboardRank.rank <= 50
+                    ? 'bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 border-purple-400 shadow-purple-500/50'
+                    : 'bg-gradient-to-br from-green-500 via-green-600 to-emerald-700 border-green-400 shadow-green-500/50'
+                }`}
+              >
+                <div className="flex flex-col items-end gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    {leaderboardRank.rank === 1 && <span className="text-sm">👑</span>}
+                    {leaderboardRank.rank === 2 && <span className="text-sm">🥈</span>}
+                    {leaderboardRank.rank === 3 && <span className="text-sm">🥉</span>}
+                    <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
+                      #{leaderboardRank.rank}
+                    </span>
+                    <span className="text-white/90 text-[10px] font-semibold uppercase tracking-wider drop-shadow">
+                      {leaderboardRank.tierName}
+                    </span>
+                  </div>
+                  {leaderboardRank.pointsToNextRank !== null && (
+                    <span className="text-white/95 text-[9px] font-medium tracking-tight drop-shadow">
+                      {leaderboardRank.rank === 1 
+                        ? '🏆 First Place' 
+                        : `+${leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to #${leaderboardRank.rank - 1}`
+                      }
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Unranked but has some progress */}
+            {!leaderboardRank.isLoading && leaderboardRank.rank === null && leaderboardRank.metricValue > 0 && (
+              <div className="bg-gradient-to-br from-slate-600 via-slate-700 to-gray-800 backdrop-blur-md px-2.5 py-1.5 rounded-lg border-2 border-slate-500 shadow-xl shadow-slate-600/30">
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
+                    Unranked
+                  </span>
+                  {leaderboardRank.pointsToNextRank !== null && (
+                    <span className="text-slate-200 text-[9px] font-medium tracking-tight drop-shadow">
+                      +{leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to Top 100
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
           </div>
-          
-          {/* Leaderboard Rank - ALWAYS VISIBLE - Prestigious Display */}
-          {!leaderboardRank.isLoading && leaderboardRank.rank !== null && (
-            <div 
-              className={`backdrop-blur-md px-2.5 py-1.5 rounded-lg shadow-xl border-2 transition-all ${
-                leaderboardRank.rank === 1 
-                  ? 'bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-600 border-yellow-300 shadow-yellow-500/50' 
-                  : leaderboardRank.rank === 2
-                  ? 'bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 border-gray-200 shadow-gray-400/50'
-                  : leaderboardRank.rank === 3
-                  ? 'bg-gradient-to-br from-orange-400 via-amber-600 to-orange-700 border-orange-300 shadow-orange-500/50'
-                  : leaderboardRank.rank <= 10
-                  ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 border-blue-400 shadow-blue-500/50'
-                  : leaderboardRank.rank <= 50
-                  ? 'bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 border-purple-400 shadow-purple-500/50'
-                  : 'bg-gradient-to-br from-green-500 via-green-600 to-emerald-700 border-green-400 shadow-green-500/50'
-              }`}
-            >
-              <div className="flex flex-col items-end gap-0.5">
-                <div className="flex items-center gap-1.5">
-                  {leaderboardRank.rank === 1 && <span className="text-sm">👑</span>}
-                  {leaderboardRank.rank === 2 && <span className="text-sm">🥈</span>}
-                  {leaderboardRank.rank === 3 && <span className="text-sm">🥉</span>}
-                  <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
-                    #{leaderboardRank.rank}
-                  </span>
-                  <span className="text-white/90 text-[10px] font-semibold uppercase tracking-wider drop-shadow">
-                    {leaderboardRank.tierName}
-                  </span>
-                </div>
-                {leaderboardRank.pointsToNextRank !== null && (
-                  <span className="text-white/95 text-[9px] font-medium tracking-tight drop-shadow">
-                    {leaderboardRank.rank === 1 
-                      ? '🏆 First Place' 
-                      : `+${leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to #${leaderboardRank.rank - 1}`
-                    }
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Unranked but has some progress - ALWAYS VISIBLE */}
-          {!leaderboardRank.isLoading && leaderboardRank.rank === null && leaderboardRank.metricValue > 0 && (
-            <div className="bg-gradient-to-br from-slate-600 via-slate-700 to-gray-800 backdrop-blur-md px-2.5 py-1.5 rounded-lg border-2 border-slate-500 shadow-xl shadow-slate-600/30">
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
-                  Unranked
-                </span>
-                {leaderboardRank.pointsToNextRank !== null && (
-                  <span className="text-slate-200 text-[9px] font-medium tracking-tight drop-shadow">
-                    +{leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to Top 100
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Controls */}
-      <div className="absolute top-10 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <div className="flex gap-1">
-          {onExpand && !isFullscreen && (
-            <button
-              onClick={onExpand}
-              className="p-1.5 bg-black/50 text-white rounded hover:bg-blue-500/80 transition"
-              title="Expand to Fullscreen"
-            >
-              ⛶
-            </button>
-          )}
-          {isFullscreen && onExitFullscreen && (
-            <button
-              onClick={onExitFullscreen}
-              className="p-1.5 bg-black/50 text-white rounded hover:bg-red-500/80 transition"
-              title="Exit Fullscreen"
-            >
-              ✕
-            </button>
-          )}
-          <button
-            onClick={onMute}
-            className={`p-1.5 rounded hover:bg-black/70 transition ${
-              isMuted
-                ? 'bg-red-500/80 text-white'
-                : 'bg-black/50 text-white'
-            }`}
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? '🔇' : '🔊'}
-          </button>
-          <button
-            onClick={() => {
-              const newState = !showVolumeSlider;
-              setShowVolumeSlider(newState);
-              onVolumeSliderToggle?.(newState);
-            }}
-            className="p-1.5 bg-black/50 text-white rounded hover:bg-black/70 transition"
-            title="Volume Control"
-          >
-            🔊
-          </button>
-          {!isFullscreen && (
-            <>
-              {onReplace && (
-                <button
-                  onClick={onReplace}
-                  className="p-1.5 bg-black/50 text-white rounded hover:bg-blue-500/80 transition"
-                  title="Replace Streamer"
-                >
-                  🔄
-                </button>
-              )}
+      {!shouldUseCompact && (
+        <div className="absolute top-10 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <div className="flex gap-1">
+            {onExpand && !isFullscreen && (
               <button
-                onClick={onClose}
+                onClick={onExpand}
+                className="p-1.5 bg-black/50 text-white rounded hover:bg-blue-500/80 transition"
+                title="Expand to Fullscreen"
+              >
+                ⛶
+              </button>
+            )}
+            {isFullscreen && onExitFullscreen && (
+              <button
+                onClick={onExitFullscreen}
                 className="p-1.5 bg-black/50 text-white rounded hover:bg-red-500/80 transition"
-                title="Close"
+                title="Exit Fullscreen"
               >
                 ✕
               </button>
-            </>
+            )}
+            <button
+              onClick={onMute}
+              className={`p-1.5 rounded hover:bg-black/70 transition ${
+                isMuted
+                  ? 'bg-red-500/80 text-white'
+                  : 'bg-black/50 text-white'
+              }`}
+              title={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? '🔇' : '🔊'}
+            </button>
+            <button
+              onClick={() => {
+                const newState = !showVolumeSlider;
+                setShowVolumeSlider(newState);
+                onVolumeSliderToggle?.(newState);
+              }}
+              className="p-1.5 bg-black/50 text-white rounded hover:bg-black/70 transition"
+              title="Volume Control"
+            >
+              🔊
+            </button>
+            {!isFullscreen && (
+              <>
+                {onReplace && (
+                  <button
+                    onClick={onReplace}
+                    className="p-1.5 bg-black/50 text-white rounded hover:bg-blue-500/80 transition"
+                    title="Replace Streamer"
+                  >
+                    🔄
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-1.5 bg-black/50 text-white rounded hover:bg-red-500/80 transition"
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </>
+            )}
+          </div>
+          
+          {/* Volume Slider - Shows when volume button is clicked */}
+          {showVolumeSlider && (
+            <div 
+              className="bg-black/90 backdrop-blur-sm rounded-lg p-3 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onDragStart={(e) => e.preventDefault()}
+            >
+              <div className="flex items-center gap-2 min-w-[120px]">
+                <span className="text-white text-xs">🔇</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    handleVolumeInput(parseFloat(e.target.value));
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onDragStart={(e) => e.preventDefault()}
+                  className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  style={{
+                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(isMuted ? 0 : volume) * 100}%, #4b5563 ${(isMuted ? 0 : volume) * 100}%, #4b5563 100%)`
+                  }}
+                />
+                <span className="text-white text-xs w-8 text-right">
+                  {Math.round((isMuted ? 0 : volume) * 100)}%
+                </span>
+              </div>
+            </div>
           )}
         </div>
-        
-        {/* Volume Slider - Shows when volume button is clicked */}
-        {showVolumeSlider && (
-          <div 
-            className="bg-black/90 backdrop-blur-sm rounded-lg p-3 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-            onDragStart={(e) => e.preventDefault()}
+      )}
+
+      {/* Action Buttons */}
+      {!shouldUseCompact && (
+        <div className="absolute bottom-2 left-2 flex gap-2 opacity-100 transition-opacity z-10">
+          {user && (
+            <button
+              onClick={handleLikeTap}
+              disabled={isLikeLoading}
+              className={`relative px-3 py-1.5 rounded text-xs font-medium transition-all shadow-lg ${
+                isLiked
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-black/50 text-white hover:bg-black/70'
+              } ${showLikePop ? 'scale-125' : 'scale-100'}`}
+              title={isLiked ? 'Liked!' : 'Like'}
+            >
+              <span className="flex items-center gap-1">
+                <span className="text-base">{isLiked ? '❤️' : '🤍'}</span>
+                <span>{likesCount}</span>
+              </span>
+              {/* First like animation */}
+              {showLikePop && (
+                <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-red-500 text-lg font-bold animate-fade-up pointer-events-none">
+                  ❤️
+                </span>
+              )}
+              {/* Fidget tap animation (already liked) */}
+              {showFloatingHeart && (
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-red-500 text-2xl animate-fade-up pointer-events-none">
+                  ❤️
+                </span>
+              )}
+            </button>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleGiftOpen();
+            }}
+            className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors shadow-lg"
           >
-            <div className="flex items-center gap-2 min-w-[120px]">
-              <span className="text-white text-xs">🔇</span>
+            💎 Gift
+          </button>
+        </div>
+      )}
+
+      {shouldUseCompact && !showCompactActions && (
+        <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none z-10">
+          <div className="px-3 py-1 text-[11px] font-semibold tracking-wide text-white bg-black/45 backdrop-blur-md rounded-full shadow-lg">
+            Click for stats & controls
+          </div>
+        </div>
+      )}
+
+      {shouldUseCompact && showCompactActions && (
+        <div
+          className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDismissCompactMenu();
+          }}
+        >
+          <div
+            className="w-full max-w-sm bg-gray-900 text-white rounded-2xl p-4 space-y-4 border border-white/10 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              {streamerAvatar ? (
+                <img
+                  src={streamerAvatar}
+                  alt={streamerUsername}
+                  className="w-12 h-12 rounded-full object-cover border border-white/10"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-lg font-bold">
+                  {(streamerUsername?.charAt(0) ?? '?').toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="text-base font-semibold truncate">{streamerUsername}</div>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-white/70 mt-1">
+                  {gifterStatus && (
+                    <span className="flex items-center gap-1">
+                      <TierBadge tier_key={gifterStatus.tier_key} level={gifterStatus.level_in_tier} size="sm" />
+                      <span>Lv {gifterStatus.level_in_tier}</span>
+                    </span>
+                  )}
+                  {viewerCount > 0 && <span>👁️ {viewerCount}</span>}
+                  {trendingRank && trendingRank <= 10 && <span>🔥 #{trendingRank}</span>}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDismissCompactMenu}
+                className="p-2 rounded-full hover:bg-white/10 transition"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white/5 rounded-xl p-3 text-center">
+                <div className="text-lg font-semibold">👁️ {viewerCount}</div>
+                <div className="uppercase tracking-wide text-white/60 mt-1">Viewers</div>
+              </div>
+              <div className="bg-white/5 rounded-xl p-3 text-center">
+                <div className="text-lg font-semibold">❤️ {likesCount}</div>
+                <div className="uppercase tracking-wide text-white/60 mt-1">Likes</div>
+              </div>
+              {!leaderboardRank.isLoading && (
+                <div className="bg-white/5 rounded-xl p-3 text-center col-span-2">
+                  {leaderboardRank.rank !== null ? (
+                    <>
+                      <div className="text-lg font-semibold">#{leaderboardRank.rank}</div>
+                      <div className="uppercase tracking-wide text-white/60 mt-1">Leaderboard</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-lg font-semibold">No rank yet</div>
+                      <div className="uppercase tracking-wide text-white/60 mt-1">Keep gifting</div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className={`${compactButtonClass} bg-blue-600/20 border-blue-400/60`} onClick={handleGiftOpen}>
+                💎 Send Gift
+              </button>
+              <button
+                type="button"
+                disabled={!user}
+                onClick={handleLikeTap}
+                className={`${compactButtonClass} ${!user ? 'opacity-40 cursor-not-allowed' : ''}`}
+              >
+                {isLiked ? '❤️ Liked' : '🤍 Like'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className={compactButtonClass} onClick={handleViewProfile}>
+                👤 View Profile
+              </button>
+              <button type="button" className={compactButtonClass} onClick={handleOpenIMChat}>
+                💬 Message
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className={compactButtonClass} onClick={onMute}>
+                {isMuted ? '🔊 Unmute' : '🔇 Mute'}
+              </button>
+              {(onExpand || onExitFullscreen) && (
+                <button type="button" className={compactButtonClass} onClick={handleFullscreenToggle}>
+                  {isFullscreen ? '⤢ Exit Focus' : '⤢ Expand'}
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-white/70">
+                <span>Volume</span>
+                <span>{Math.round((isMuted ? 0 : volume) * 100)}%</span>
+              </div>
               <input
                 type="range"
                 min="0"
                 max="1"
                 step="0.01"
                 value={isMuted ? 0 : volume}
-                onChange={(e) => {
-                  const newVolume = parseFloat(e.target.value);
-                  onVolumeChange(newVolume);
-                  if (newVolume === 0 && !isMuted) {
-                    onMute(); // Auto-mute at 0
-                  } else if (newVolume > 0 && isMuted) {
-                    onMute(); // Auto-unmute above 0
-                  }
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onDragStart={(e) => e.preventDefault()}
-                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                style={{
-                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(isMuted ? 0 : volume) * 100}%, #4b5563 ${(isMuted ? 0 : volume) * 100}%, #4b5563 100%)`
-                }}
+                onChange={(e) => handleVolumeInput(parseFloat(e.target.value))}
+                className="w-full h-1 bg-gray-700 rounded-lg appearance-none accent-blue-500"
               />
-              <span className="text-white text-xs w-8 text-right">
-                {Math.round((isMuted ? 0 : volume) * 100)}%
-              </span>
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* Action Buttons */}
-      <div className="absolute bottom-2 left-2 flex gap-2 opacity-100 transition-opacity z-10">
-        {user && (
-          <button
-            onClick={handleLikeTap}
-            disabled={isLikeLoading}
-            className={`relative px-3 py-1.5 rounded text-xs font-medium transition-all shadow-lg ${
-              isLiked
-                ? 'bg-red-500 text-white hover:bg-red-600'
-                : 'bg-black/50 text-white hover:bg-black/70'
-            } ${showLikePop ? 'scale-125' : 'scale-100'}`}
-            title={isLiked ? 'Liked!' : 'Like'}
-          >
-            <span className="flex items-center gap-1">
-              <span className="text-base">{isLiked ? '❤️' : '🤍'}</span>
-              <span>{likesCount}</span>
-            </span>
-            {/* First like animation */}
-            {showLikePop && (
-              <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-red-500 text-lg font-bold animate-fade-up pointer-events-none">
-                ❤️
-              </span>
+            {onReplace && (
+              <button type="button" className={compactButtonClass} onClick={handleReplaceTile}>
+                🔄 Replace in Grid
+              </button>
             )}
-            {/* Fidget tap animation (already liked) */}
-            {showFloatingHeart && (
-              <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-red-500 text-2xl animate-fade-up pointer-events-none">
-                ❤️
-              </span>
-            )}
-          </button>
-        )}
-        <button
-          onClick={() => setShowGiftModal(true)}
-          className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors shadow-lg"
-        >
-          💎 Gift
-        </button>
-      </div>
+            <button type="button" className={compactDangerButtonClass} onClick={handleCloseTileAction}>
+              ✕ Remove from Grid
+            </button>
+            <button
+              type="button"
+              className="w-full text-center text-sm text-white/70 hover:text-white transition"
+              onClick={handleDismissCompactMenu}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Gift Modal */}
       {showGiftModal && (

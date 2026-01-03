@@ -298,7 +298,9 @@ export async function POST(request: NextRequest) {
           const effectiveDeviceType = deviceType || 'web';
           const effectiveDeviceId = deviceId || 'unknown';
           const effectiveSessionId = sessionId || Date.now().toString();
-          const identity = `u_${userId}:${effectiveDeviceType}:${effectiveDeviceId}:${effectiveSessionId}`;
+
+          // P0 FIX: Stable identity per profile to prevent duplicate LiveKit participants
+          const identity = `u_${userId}`;
 
           const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
             identity,
@@ -316,9 +318,13 @@ export async function POST(request: NextRequest) {
             canUpdateOwnMetadata: true,
           });
 
-          if (participantMetadata) {
-            at.metadata = JSON.stringify(participantMetadata);
-          }
+          const metadataPayload = {
+            ...(participantMetadata && typeof participantMetadata === 'object' ? participantMetadata : {}),
+            device_type: effectiveDeviceType,
+            device_id: effectiveDeviceId,
+            session_id: effectiveSessionId,
+          };
+          at.metadata = JSON.stringify(metadataPayload);
 
           let wsUrl = LIVEKIT_URL;
           if (wsUrl.startsWith('https://')) {

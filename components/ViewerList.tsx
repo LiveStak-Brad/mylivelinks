@@ -43,6 +43,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
   const supabase = createClient();
 
   const normalizedRoomId = roomId || 'live_central';
+  const [hasRoomIdColumn, setHasRoomIdColumn] = useState<boolean>(true);
 
   useEffect(() => {
     // Get current user ID and load viewers
@@ -65,7 +66,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
           event: '*',
           schema: 'public',
           table: 'room_presence',
-          filter: `room_id=eq.${normalizedRoomId}`,
+          ...(hasRoomIdColumn ? { filter: `room_id=eq.${normalizedRoomId}` } : {}),
         },
         () => {
           // Reload viewers when room presence changes
@@ -94,7 +95,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
       supabase.removeChannel(roomPresenceChannel);
       supabase.removeChannel(liveStreamsChannel);
     };
-  }, [normalizedRoomId, supabase]);
+  }, [normalizedRoomId, supabase, hasRoomIdColumn]);
 
   const loadViewers = async () => {
     try {
@@ -127,13 +128,35 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
 
       // Get viewers from room_presence (global room presence, NOT tile watching)
       // This shows everyone currently on /live page, regardless of what tiles they're watching
-      const { data: presenceData, error } = await supabase
-        .from('room_presence')
-        .select('profile_id, username, is_live_available, last_seen_at, room_id')
-        .eq('room_id', normalizedRoomId)
-        .gt('last_seen_at', new Date(Date.now() - 60000).toISOString()) // Active within last 60 seconds
-        .order('is_live_available', { ascending: false }) // live_available users first
-        .order('last_seen_at', { ascending: false }); // Then by most recent
+      let presenceData: any[] | null = null;
+      let error: any = null;
+
+      if (hasRoomIdColumn) {
+        const result = await supabase
+          .from('room_presence')
+          .select('profile_id, username, is_live_available, last_seen_at, room_id')
+          .eq('room_id', normalizedRoomId)
+          .gt('last_seen_at', new Date(Date.now() - 60000).toISOString())
+          .order('is_live_available', { ascending: false })
+          .order('last_seen_at', { ascending: false });
+        presenceData = result.data;
+        error = result.error;
+
+        if (error?.code === '42703') {
+          setHasRoomIdColumn(false);
+        }
+      }
+
+      if (!hasRoomIdColumn) {
+        const result = await supabase
+          .from('room_presence')
+          .select('profile_id, username, is_live_available, last_seen_at')
+          .gt('last_seen_at', new Date(Date.now() - 60000).toISOString())
+          .order('is_live_available', { ascending: false })
+          .order('last_seen_at', { ascending: false });
+        presenceData = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
 
