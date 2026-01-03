@@ -37,12 +37,23 @@ const LIVE_REACTIONS = [
 
 export default function LandingPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [canOpenLive, setCanOpenLive] = useState(false);
   const [routingTeams, setRoutingTeams] = useState(false);
   const [ownedTeamSlug, setOwnedTeamSlug] = useState<string | null>(null);
+  const [memberTeamSlug, setMemberTeamSlug] = useState<string | null>(null);
+  const [newTeams, setNewTeams] = useState<
+    {
+      id: string;
+      slug: string;
+      name: string;
+      banner_url: string | null;
+      icon_url: string | null;
+      created_at: string;
+    }[]
+  >([]);
 
   useEffect(() => {
     checkUser();
@@ -70,14 +81,31 @@ export default function LandingPage() {
           });
       }
 
-      const { data: ownedTeams } = await supabase
-        .from('teams')
-        .select('slug')
-        .eq('created_by', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      const [{ data: ownedTeams }, { data: memberships }] = await Promise.all([
+        supabase
+          .from('teams')
+          .select('slug')
+          .eq('created_by', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1),
+        supabase
+          .from('team_memberships')
+          .select(
+            `
+            requested_at,
+            team:teams!team_memberships_team_id_fkey (
+              slug
+            )
+          `
+          )
+          .eq('profile_id', user.id)
+          .in('status', ['approved'])
+          .order('requested_at', { ascending: false })
+          .limit(1),
+      ]);
 
       setOwnedTeamSlug((ownedTeams ?? [])?.[0]?.slug ?? null);
+      setMemberTeamSlug(((memberships as any[]) ?? [])?.[0]?.team?.slug ?? null);
       setCanOpenLive(!!(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user.id, email: user.email })));
       setCurrentUser(profile || { id: user.id, email: user.email });
       setLoading(false);
@@ -133,25 +161,124 @@ export default function LandingPage() {
     };
   }, [currentUser?.id, supabase]);
 
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+
+    const fetchMembershipTeam = async () => {
+      try {
+        const { data } = await supabase
+          .from('team_memberships')
+          .select(
+            `
+            requested_at,
+            team:teams!team_memberships_team_id_fkey (
+              slug
+            )
+          `
+          )
+          .eq('profile_id', currentUser.id)
+          .in('status', ['approved'])
+          .order('requested_at', { ascending: false })
+          .limit(1);
+
+        if (!cancelled) setMemberTeamSlug(((data as any[]) ?? [])?.[0]?.team?.slug ?? null);
+      } catch (error) {
+        console.error('[home][teams] membership fetch error:', error);
+      }
+    };
+
+    fetchMembershipTeam();
+
+    const channel = supabase
+      .channel(`home:team_memberships:${currentUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'team_memberships',
+          filter: `profile_id=eq.${currentUser.id}`,
+        },
+        () => {
+          fetchMembershipTeam();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id, supabase]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('teams')
+          .select('id, slug, name, banner_url, icon_url, created_at')
+          .order('created_at', { ascending: false })
+          .limit(12);
+
+        if (error) throw error;
+        if (!cancelled) setNewTeams(((data as any) ?? []) as any);
+      } catch (error) {
+        console.error('[home][teams] new teams fetch error:', error);
+        if (!cancelled) setNewTeams([]);
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  const primaryTeamSlug = ownedTeamSlug || memberTeamSlug;
+
   const teamsPrimaryCtaLabel = useMemo(
-    () => (ownedTeamSlug ? 'Visit My Team' : 'Create Your Team'),
-    [ownedTeamSlug]
+    () => (primaryTeamSlug ? 'Visit My Team' : 'Create a Team'),
+    [primaryTeamSlug]
   );
+
+  const newTeamsCards = useMemo(() => {
+    const real = (newTeams ?? []).slice(0, 12);
+
+    if (real.length >= 3) {
+      return real.map((t) => ({ kind: 'team' as const, team: t }));
+    }
+
+    const cards: Array<
+      | { kind: 'team'; team: (typeof real)[number] }
+      | { kind: 'cta' }
+      | { kind: 'placeholder' }
+    > = real.map((t) => ({ kind: 'team', team: t }));
+
+    cards.push({ kind: 'cta' });
+    while (cards.length < 3) cards.push({ kind: 'placeholder' });
+    return cards;
+  }, [newTeams]);
+
+  const mobileTeamsScrollable = newTeamsCards.length > 3;
+  const mobileTeamsFill = !mobileTeamsScrollable && newTeamsCards.length === 3;
 
   const handleTeamsPrimaryCtaClick = async () => {
     if (routingTeams) return;
     setRoutingTeams(true);
 
     try {
-      if (ownedTeamSlug) {
-        router.push(`/teams/${ownedTeamSlug}`);
+      if (primaryTeamSlug) {
+        router.push(`/teams/${primaryTeamSlug}`);
         return;
       }
 
       router.push('/teams/setup');
     } catch (error) {
       console.error('[home][teams] routing error:', error);
-      router.push(ownedTeamSlug ? `/teams/${ownedTeamSlug}` : '/teams/setup');
+      router.push(primaryTeamSlug ? `/teams/${primaryTeamSlug}` : '/teams/setup');
     } finally {
       setRoutingTeams(false);
     }
@@ -199,6 +326,9 @@ export default function LandingPage() {
                     </span>
                   </div>
                   <p className="text-sm text-white/70">My Team. My People. My Community.</p>
+                  <p className="mt-1 text-xs text-white/60">
+                    Create communities around shared ideas. Chat, posts, lives, group gifting.
+                  </p>
                 </div>
               </div>
               
@@ -219,6 +349,185 @@ export default function LandingPage() {
                 />
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 pb-3">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">New Teams</p>
+          </div>
+
+          <div className="sm:hidden">
+            <div
+              className={
+                mobileTeamsScrollable
+                  ? 'flex gap-3 overflow-x-auto overflow-y-hidden scrollbar-hide touch-pan-x overscroll-x-contain snap-x snap-mandatory'
+                  : 'flex gap-3 overflow-x-hidden overflow-y-hidden'
+              }
+            >
+              {newTeamsCards.map((card, idx) => {
+                const fallbackGradients = [
+                  'from-pink-500/30 to-purple-500/30',
+                  'from-purple-500/30 to-blue-500/30',
+                  'from-rose-500/30 to-orange-500/30',
+                  'from-cyan-500/30 to-violet-500/30',
+                  'from-emerald-500/30 to-cyan-500/30',
+                ];
+                const gradient = fallbackGradients[idx % fallbackGradients.length];
+                const team = card.kind === 'team' ? card.team : null;
+                const imageUrl = team?.banner_url || team?.icon_url || null;
+
+                const cardInner = (
+                  <>
+                    <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br">
+                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={team?.name ?? 'Team'}
+                          className="absolute inset-0 h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : null}
+                      <div className="absolute top-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white">
+                        NEW
+                      </div>
+                      {card.kind === 'cta' ? (
+                        <div className="absolute inset-0 flex items-center justify-center px-3">
+                          <div className="w-full text-center">
+                            <p className="text-sm font-extrabold text-white tracking-tight drop-shadow-sm">
+                              Your Team Here
+                            </p>
+                            <p className="mt-0.5 text-[10px] font-medium text-white/75">
+                              Start something new
+                            </p>
+                            <div className="mt-2 inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold shadow-lg whitespace-nowrap bg-gradient-to-r from-pink-500 to-purple-500">
+                              <span className="text-[11px] text-white">Create a Team</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-[11px] font-semibold text-white/90 truncate">
+                      {card.kind === 'cta' ? 'Your Team Here' : team?.name ?? 'New Team'}
+                    </p>
+                  </>
+                );
+
+                const cardClassName = mobileTeamsFill
+                  ? 'flex-1 min-w-0 transition-transform duration-200 ease-out active:scale-[0.98]'
+                  : `${mobileTeamsScrollable ? 'snap-start ' : ''}flex-shrink-0 w-24 transition-transform duration-200 ease-out active:scale-[0.98]`;
+
+                if (card.kind === 'placeholder') {
+                  return (
+                    <div key={`new-team-carousel-placeholder-${idx}`} className={cardClassName}>
+                      {cardInner}
+                    </div>
+                  );
+                }
+
+                if (card.kind === 'cta') {
+                  return (
+                    <Link
+                      key={`new-team-carousel-cta-${idx}`}
+                      href="/teams/setup"
+                      className={`${cardClassName} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-xl`}
+                    >
+                      {cardInner}
+                    </Link>
+                  );
+                }
+
+                const t = card.team;
+                return (
+                  <Link
+                    key={`new-team-carousel-${t.id}`}
+                    href={`/teams/${t.slug}`}
+                    className={`${cardClassName} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-xl`}
+                  >
+                    {cardInner}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {newTeamsCards.map((card, idx) => {
+              const fallbackGradients = [
+                'from-pink-500/30 to-purple-500/30',
+                'from-purple-500/30 to-blue-500/30',
+                'from-rose-500/30 to-orange-500/30',
+                'from-cyan-500/30 to-violet-500/30',
+                'from-emerald-500/30 to-cyan-500/30',
+              ];
+              const gradient = fallbackGradients[idx % fallbackGradients.length];
+              const team = card.kind === 'team' ? card.team : null;
+              const imageUrl = team?.banner_url || team?.icon_url || null;
+
+              const tile = (
+                <>
+                  <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={team?.name ?? 'Team'}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : null}
+                    <div className="absolute top-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white">
+                      NEW
+                    </div>
+                    {card.kind === 'cta' ? (
+                      <div className="absolute inset-0 flex items-center justify-center px-3">
+                        <div className="w-full text-center">
+                          <p className="text-sm font-extrabold text-white tracking-tight drop-shadow-sm">
+                            Your Team Here
+                          </p>
+                          <p className="mt-0.5 text-[10px] font-medium text-white/75">Start something new</p>
+                          <div className="mt-2 inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold shadow-lg whitespace-nowrap bg-gradient-to-r from-pink-500 to-purple-500">
+                            <span className="text-[11px] text-white">Create a Team</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-xs font-semibold text-white/90 truncate">
+                    {card.kind === 'cta' ? 'Your Team Here' : team?.name ?? 'New Team'}
+                  </p>
+                </>
+              );
+
+              const baseClass =
+                'transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-xl';
+
+              if (card.kind === 'placeholder') {
+                return (
+                  <div key={`new-team-grid-placeholder-${idx}`} className={baseClass}>
+                    {tile}
+                  </div>
+                );
+              }
+
+              if (card.kind === 'cta') {
+                return (
+                  <Link key={`new-team-grid-cta-${idx}`} href="/teams/setup" className={baseClass}>
+                    {tile}
+                  </Link>
+                );
+              }
+
+              const t = card.team;
+              return (
+                <Link key={`new-team-grid-${t.id}`} href={`/teams/${t.slug}`} className={baseClass}>
+                  {tile}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
