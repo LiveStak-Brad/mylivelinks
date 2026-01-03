@@ -67,6 +67,7 @@ import {
   useLeaveTeamBySlug,
   useSendChatMessage,
   useTeamNotificationPrefsBySlug,
+  useJoinTeam,
   FeedSort,
   TeamMember,
   FeedItem,
@@ -390,6 +391,34 @@ export default function TeamPageContent() {
   if (permissions.isBanned) {
     return <BannedState teamName={team.name} />;
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Non-member state (guest without pending invite) - Show "Request to Join"
+  // ─────────────────────────────────────────────────────────────────────────
+  const isGuest = uiRole === 'guest';
+  const hasPendingRequest = membership?.status === 'requested' || membership?.status === 'pending';
+  const showRequestToJoin = isGuest && !pendingInvite && !pendingInviteLoading && !hasPendingRequest;
+  const showPendingRequestState = isGuest && hasPendingRequest && !pendingInvite;
+
+  // TODO: Re-enable these components when they're implemented
+  /*
+  if (showRequestToJoin) {
+    return (
+      <RequestToJoinState
+        team={team}
+        teamSlug={teamSlug ?? ''}
+      />
+    );
+  }
+
+  if (showPendingRequestState) {
+    return (
+      <PendingRequestState
+        team={team}
+      />
+    );
+  }
+  */
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
@@ -726,6 +755,236 @@ function BannedState({ teamName }: { teamName: string }) {
   );
 }
 
+function RequestToJoinState({ 
+  team, 
+  teamSlug 
+}: { 
+  team: { name: string; teamTag: string; iconUrl?: string; bannerUrl?: string; description?: string; approvedMemberCount: number };
+  teamSlug: string;
+}) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const { mutate: requestJoin, isLoading: isRequesting } = useJoinTeam();
+
+  const handleRequestJoin = async () => {
+    try {
+      await requestJoin({ teamSlug });
+      toast({
+        title: 'Request sent!',
+        description: 'The team admins will review your request.',
+        variant: 'success',
+      });
+      // Refresh the page to show the pending state
+      router.refresh();
+      window.location.reload();
+    } catch (err: any) {
+      toast({
+        title: 'Could not send request',
+        description: err?.message || 'Please try again.',
+        variant: 'error',
+      });
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
+      {/* Banner */}
+      <div className="relative h-48 w-full overflow-hidden">
+        {team.bannerUrl ? (
+          <>
+            <Image
+              src={team.bannerUrl}
+              alt={`${team.name} banner`}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/60 to-transparent" />
+          </>
+        ) : (
+          <div className="h-full w-full bg-gradient-to-r from-purple-600/40 via-pink-600/30 to-blue-600/40" />
+        )}
+      </div>
+
+      <div className="mx-auto max-w-lg px-4 -mt-16 relative">
+        {/* Team Icon */}
+        <div className="flex justify-center mb-4">
+          {team.iconUrl ? (
+            <Image
+              src={team.iconUrl}
+              alt={team.name}
+              width={96}
+              height={96}
+              className="rounded-2xl ring-4 ring-[#0a0a0f] shadow-xl"
+            />
+          ) : (
+            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-purple-500 ring-4 ring-[#0a0a0f] shadow-xl">
+              <span className="text-3xl font-bold text-white">{team.teamTag.slice(0, 2)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Team Info */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-white mb-1">{team.name}</h1>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Badge className="bg-purple-500/20 text-purple-300 text-xs">{team.teamTag}</Badge>
+            <span className="text-sm text-white/50">{team.approvedMemberCount} members</span>
+          </div>
+          {team.description && (
+            <p className="text-sm text-white/60 max-w-md mx-auto">{team.description}</p>
+          )}
+        </div>
+
+        {/* Request to Join Card */}
+        <div className="rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-500/10 via-[#1a1a24] to-[#0f0f18] p-6 shadow-xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/20">
+              <Users className="h-6 w-6 text-purple-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Join this team</h2>
+              <p className="text-sm text-white/60">Send a request to become a member</p>
+            </div>
+          </div>
+
+          <p className="text-sm text-white/70 mb-6">
+            Once approved, you'll have access to the team's feed, chat, live sessions, and more.
+          </p>
+
+          <Button
+            onClick={handleRequestJoin}
+            disabled={isRequesting}
+            className="w-full h-12 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold shadow-lg shadow-purple-500/25 hover:from-purple-400 hover:to-pink-400"
+          >
+            {isRequesting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Sending request...
+              </>
+            ) : (
+              <>
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Request to Join
+              </>
+            )}
+          </Button>
+
+          <p className="text-center text-xs text-white/40 mt-4">
+            Team admins will review your request and you'll be notified when approved.
+          </p>
+        </div>
+
+        {/* Back button */}
+        <div className="mt-6 text-center">
+          <Button
+            variant="outline"
+            onClick={() => router.push('/teams')}
+            className="border-white/20 text-white/70 hover:bg-white/10"
+          >
+            Back to Teams
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PendingRequestState({ 
+  team 
+}: { 
+  team: { name: string; teamTag: string; iconUrl?: string; bannerUrl?: string; description?: string; approvedMemberCount: number };
+}) {
+  const router = useRouter();
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f] text-white">
+      {/* Banner */}
+      <div className="relative h-48 w-full overflow-hidden">
+        {team.bannerUrl ? (
+          <>
+            <Image
+              src={team.bannerUrl}
+              alt={`${team.name} banner`}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/60 to-transparent" />
+          </>
+        ) : (
+          <div className="h-full w-full bg-gradient-to-r from-purple-600/40 via-pink-600/30 to-blue-600/40" />
+        )}
+      </div>
+
+      <div className="mx-auto max-w-lg px-4 -mt-16 relative">
+        {/* Team Icon */}
+        <div className="flex justify-center mb-4">
+          {team.iconUrl ? (
+            <Image
+              src={team.iconUrl}
+              alt={team.name}
+              width={96}
+              height={96}
+              className="rounded-2xl ring-4 ring-[#0a0a0f] shadow-xl"
+            />
+          ) : (
+            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-purple-500 ring-4 ring-[#0a0a0f] shadow-xl">
+              <span className="text-3xl font-bold text-white">{team.teamTag.slice(0, 2)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Team Info */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-white mb-1">{team.name}</h1>
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Badge className="bg-purple-500/20 text-purple-300 text-xs">{team.teamTag}</Badge>
+            <span className="text-sm text-white/50">{team.approvedMemberCount} members</span>
+          </div>
+          {team.description && (
+            <p className="text-sm text-white/60 max-w-md mx-auto">{team.description}</p>
+          )}
+        </div>
+
+        {/* Pending Request Card */}
+        <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-[#1a1a24] to-[#0f0f18] p-6 shadow-xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20">
+              <Clock className="h-6 w-6 text-amber-400" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Request pending</h2>
+              <p className="text-sm text-white/60">Waiting for admin approval</p>
+            </div>
+          </div>
+
+          <p className="text-sm text-white/70 mb-4">
+            Your request to join <span className="text-white font-medium">{team.name}</span> is being reviewed. 
+            You'll be notified when an admin approves your request.
+          </p>
+
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/20">
+              <Loader2 className="h-4 w-4 text-amber-400 animate-spin" />
+            </div>
+            <span className="text-sm text-white/70">Awaiting approval...</span>
+          </div>
+        </div>
+
+        {/* Back button */}
+        <div className="mt-6 text-center">
+          <Button
+            variant="outline"
+            onClick={() => router.push('/teams')}
+            className="border-white/20 text-white/70 hover:bg-white/10"
+          >
+            Back to Teams
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ icon, title, description, action }: { 
   icon: ReactNode; 
   title: string; 
@@ -853,7 +1112,7 @@ function HomeScreen({
       onPostCreated();
     } catch (err) {
       console.error('[HomeScreen] delete failed', err);
-      toast({ title: 'Failed to delete post', variant: 'destructive' });
+      toast({ title: 'Failed to delete post', variant: 'error' });
     }
   }, [deletePost, toast, onPostCreated]);
 
@@ -864,7 +1123,7 @@ function HomeScreen({
       onPostCreated();
     } catch (err) {
       console.error('[HomeScreen] pin failed', err);
-      toast({ title: 'Failed to update pin', variant: 'destructive' });
+      toast({ title: 'Failed to update pin', variant: 'error' });
     }
   }, [pinPost, toast, onPostCreated]);
   const liveMemberCount = liveMemberEntries.length;
@@ -2321,7 +2580,7 @@ function SettingsScreen({
         {!teamLiveConfig?.isUnlocked ? (
           <p className="mt-3 text-xs text-white/50">
             Team Live unlocks at {teamLiveConfig?.unlockThreshold ?? 100} members. You're at{' '}
-            {teamLiveConfig?.approvedMemberCount ?? team.approvedMemberCount}.
+            {teamLiveConfig?.approvedMemberCount ?? 0}.
           </p>
         ) : (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
