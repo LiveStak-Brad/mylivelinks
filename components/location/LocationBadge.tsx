@@ -50,7 +50,6 @@ export function LocationBadge({
   const label = formatLocationDisplay(location, {
     includeZip,
     isSelf,
-    fallback: null,
   });
 
   if (!label) return null;
