@@ -154,6 +154,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const connectedUsernameRef = useRef<string | null>(null); // Track who we're connected to
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
+  const wasHiddenRef = useRef(false);
+  const disconnectedDueToVisibilityRef = useRef(false);
 
   const extractUserId = useCallback((identity: string): string => {
     if (identity.startsWith('u_')) {
@@ -208,6 +210,38 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
   const lastVideoTimeRef = useRef<number>(0);
   const lastVideoProgressAtRef = useRef<number>(0);
+
+  const disconnectRoom = useCallback(
+    async (
+      reason: string,
+      options: { markVisibilityDisconnect?: boolean; preserveConnectedUsername?: boolean } = {}
+    ) => {
+      const { markVisibilityDisconnect = false, preserveConnectedUsername = false } = options;
+      if (markVisibilityDisconnect) {
+        disconnectedDueToVisibilityRef.current = true;
+      }
+      const existingRoom = roomRef.current;
+      if (!existingRoom) return;
+
+      if (DEBUG_LIVEKIT) {
+        console.log('[SoloStreamViewer] Disconnecting room', { reason });
+      }
+
+      roomRef.current = null;
+      try {
+        await existingRoom.disconnect();
+      } catch (err) {
+        console.error('[SoloStreamViewer] Error disconnecting room:', err);
+      } finally {
+        setIsRoomConnected(false);
+        isConnectingRef.current = false;
+        if (!preserveConnectedUsername) {
+          connectedUsernameRef.current = null;
+        }
+      }
+    },
+    [setIsRoomConnected]
+  );
 
   // Viewer heartbeat + live viewer count updates
   const watchSessionKey = useMemo(() => {
@@ -485,8 +519,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           if (DEBUG_LIVEKIT) {
             console.log('[SoloStreamViewer] Disconnecting previous room before connecting to new streamer');
           }
-          roomRef.current.disconnect();
-          roomRef.current = null;
+          await disconnectRoom('switch_streamer', { preserveConnectedUsername: true });
         }
 
         const room = new Room({
@@ -682,6 +715,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           }
           setIsRoomConnected(false);
           isConnectingRef.current = false;
+          connectedUsernameRef.current = null;
         });
 
         room.on(RoomEvent.Reconnecting, () => {
@@ -714,15 +748,54 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       if (DEBUG_LIVEKIT) {
         console.log('[SoloStreamViewer] Cleanup: disconnecting room');
       }
-      if (roomRef.current) {
-        roomRef.current.disconnect();
-        roomRef.current = null;
-      }
-      isConnectingRef.current = false;
-      connectedUsernameRef.current = null;
-      setIsRoomConnected(false);
+      void disconnectRoom('effect_cleanup');
     };
-  }, [resumePlayback, streamer?.live_available, streamer?.profile_id, streamer?.username, currentUserId, extractUserId]); // STABLE DEPS: only reconnect if these change
+  }, [disconnectRoom, resumePlayback, streamer?.live_available, streamer?.profile_id, streamer?.username, currentUserId, extractUserId]); // STABLE DEPS: only reconnect if these change
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        wasHiddenRef.current = true;
+        void disconnectRoom('visibility_hidden', { markVisibilityDisconnect: true });
+        return;
+      }
+
+      if (wasHiddenRef.current && disconnectedDueToVisibilityRef.current) {
+        wasHiddenRef.current = false;
+        disconnectedDueToVisibilityRef.current = false;
+        const targetUsername = streamer?.username || username;
+        if (targetUsername) {
+          router.replace(`/live/${encodeURIComponent(targetUsername)}`);
+        } else {
+          router.replace('/liveTV');
+        }
+      }
+    };
+
+    const handlePageHide = () => {
+      void disconnectRoom('pagehide');
+    };
+
+    const handleBeforeUnload = () => {
+      try {
+        roomRef.current?.disconnect();
+      } catch {
+        // ignore
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [disconnectRoom, router, streamer?.username, username]);
 
   useEffect(() => {
     if (!streamer?.live_available) return;
@@ -791,8 +864,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             
             // Disconnect LiveKit room
             if (roomRef.current) {
-              roomRef.current.disconnect();
-              roomRef.current = null;
+              void disconnectRoom('stream_end');
             }
           }
         }

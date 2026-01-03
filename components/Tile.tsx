@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { Gift, Heart, Maximize2, Minimize2, Volume2, VolumeX, X } from 'lucide-react';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import GiftModal from './GiftModal';
@@ -35,6 +35,7 @@ interface TileProps {
   sharedRoom?: Room | null; // Shared LiveKit room connection
   isRoomConnected?: boolean; // Whether shared room is connected
   isCurrentUserPublishing?: boolean; // NEW: Whether current user is publishing (for echo prevention)
+  compactMode?: boolean;
   onClose: () => void;
   onMute: () => void;
   isMuted: boolean;
@@ -61,6 +62,7 @@ export default function Tile({
   sharedRoom,
   isRoomConnected = false,
   isCurrentUserPublishing = false, // NEW: Whether current user is publishing
+  compactMode = false,
   onClose,
   onMute,
   isMuted,
@@ -72,13 +74,13 @@ export default function Tile({
   onVolumeSliderToggle,
   onReplace,
 }: TileProps) {
-  const router = useRouter();
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [showMiniProfile, setShowMiniProfile] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [isActive, setIsActive] = useState(true);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9); // Track video orientation
+  const tileContainerRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoTrack, setVideoTrack] = useState<RemoteTrack | null>(null);
@@ -89,6 +91,61 @@ export default function Tile({
   const [showLikePop, setShowLikePop] = useState(false);
   const [showFloatingHeart, setShowFloatingHeart] = useState(false);
   const supabase = createClient();
+  const shouldUseCompact = false;
+  const isSelfTile = !!user && user.id === streamerId;
+  const gridIconSizeClass = compactMode ? 'w-4 h-4' : 'w-5 h-5';
+  const gridNameMaxWidthClass = compactMode ? 'max-w-[55%]' : 'max-w-[70%]';
+
+  const [giftOverlayScale, setGiftOverlayScale] = useState(1);
+
+  useEffect(() => {
+    const el = tileContainerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+
+    const compute = () => {
+      const rect = el.getBoundingClientRect();
+      const minDim = Math.min(rect.width, rect.height);
+      if (!minDim || !isFinite(minDim)) return;
+
+      const next = Math.max(0.35, Math.min(1, minDim / 320));
+      setGiftOverlayScale(next);
+    };
+
+    compute();
+    const ro = new ResizeObserver(() => compute());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [compactMode, isFullscreen]);
+
+  const handleGiftOpen = useCallback(() => {
+    setShowGiftModal(true);
+  }, []);
+
+  const handleFullscreenToggle = useCallback(() => {
+    if (isFullscreen) {
+      onExitFullscreen?.();
+    } else {
+      onExpand?.();
+    }
+  }, [isFullscreen, onExitFullscreen, onExpand]);
+
+  const handleReplaceTile = useCallback(() => {
+    if (!onReplace) return;
+    onReplace();
+  }, [onReplace]);
+
+  const handleCloseTileAction = useCallback(() => {
+    onClose();
+  }, [onClose]);
+
+  const handleVolumeInput = useCallback((newVolume: number) => {
+    onVolumeChange(newVolume);
+    if (newVolume === 0 && !isMuted) {
+      onMute();
+    } else if (newVolume > 0 && isMuted) {
+      onMute();
+    }
+  }, [isMuted, onMute, onVolumeChange]);
 
   // Like system
   const { isLiked, likesCount, toggleLike, isLoading: isLikeLoading } = useLiveLike({
@@ -319,6 +376,30 @@ export default function Tile({
             }
           }
         } else if (track.kind === Track.Kind.Audio) {
+          const selfUserId = user?.id || null;
+          const localParticipantUserId = sharedRoom.localParticipant?.identity
+            ? extractUserId(sharedRoom.localParticipant.identity)
+            : null;
+          const isSelfAudio =
+            (!!selfUserId && participantUserId === selfUserId) ||
+            (!!localParticipantUserId && participantUserId === localParticipantUserId);
+          if (isSelfAudio) {
+            if (DEBUG_LIVEKIT) {
+              console.log('[SUB] Skipping self audio track', {
+                slotIndex,
+                streamerId,
+                participantIdentity: participant.identity,
+                source,
+              });
+            }
+            try {
+              track.detach();
+            } catch {
+              // ignore
+            }
+            return;
+          }
+
           const isScreenAudio = source === Track.Source.ScreenShareAudio;
           const isMic = source === Track.Source.Microphone;
 
@@ -464,7 +545,7 @@ export default function Tile({
             streamerId,
             participantIdentity: localParticipant.identity,
             trackPublicationsCount: localParticipant.trackPublications.size,
-            publications: Array.from(localParticipant.trackPublications.values()).map(p => ({
+            publications: Array.from(localParticipant.trackPublications.values()).map((p) => ({
               kind: p.track?.kind,
               source: p.source,
               sid: p.trackSid,
@@ -473,17 +554,22 @@ export default function Tile({
             hasPreferredLocalTrack,
           });
         }
-        
-        // Handle local tracks - attach them to this tile so user can see themselves
+
+        // Attach local tracks - VIDEO ONLY (never attach local audio to prevent echo)
         localParticipant.trackPublications.forEach((publication) => {
           const isPreferred =
             publication.source === Track.Source.ScreenShare ||
             publication.source === Track.Source.ScreenShareAudio ||
             publication.source === Track.Source.Camera ||
             publication.source === Track.Source.Microphone;
-          
+
           if (isPreferred && publication.track) {
             const track = publication.track;
+
+            if (track.kind === Track.Kind.Audio) {
+              return;
+            }
+
             if (DEBUG_LIVEKIT) {
               console.log('[SUB] Attaching LOCAL track to tile:', {
                 slotIndex,
@@ -491,8 +577,8 @@ export default function Tile({
                 source: publication.source,
               });
             }
-            
-            // Attach local tracks to this tile's video/audio elements
+
+            // Attach local video track to this tile
             handleTrackSubscribed(track as any, publication as any, localParticipant as any);
           }
         });
@@ -1094,8 +1180,10 @@ export default function Tile({
   return (
     <div
       data-tile-id={slotIndex}
+      onClick={() => {}}
+      ref={tileContainerRef}
       className={`
-        relative ${isFullscreen ? 'w-full h-full' : 'aspect-[3/2]'} rounded-lg overflow-hidden group
+        relative ${isFullscreen ? 'w-full h-full' : compactMode ? 'w-full h-full' : 'aspect-[3/2]'} rounded-lg overflow-hidden group
         border-2 transition-all duration-200
         ${
           tileState === 'live'
@@ -1112,14 +1200,22 @@ export default function Tile({
           <video
             ref={videoRef}
             className={`absolute inset-0 w-full h-full ${
-              isPortraitVideo || isSquareVideo ? 'object-contain' : 'object-cover'
+              !isFullscreen
+                ? compactMode
+                  ? 'object-contain'
+                  : isPortraitVideo || isSquareVideo
+                    ? 'object-contain'
+                    : 'object-cover'
+                : isPortraitVideo || isSquareVideo
+                  ? 'object-contain'
+                  : 'object-cover'
             } ${isMuted ? 'grayscale' : ''}`}
             autoPlay
             playsInline
             muted={isMuted}
           />
         )}
-        
+
         {/* Fallback: Avatar or placeholder when no video track */}
         {!videoTrack && (
           <div className="absolute inset-0 w-full h-full">
@@ -1138,16 +1234,11 @@ export default function Tile({
         )}
 
         {/* Audio element for LiveKit audio track - always render when we have a streamer */}
-        <audio
-          ref={audioRef}
-          autoPlay
-          playsInline
-          className="hidden"
-        />
+        <audio ref={audioRef} autoPlay playsInline className="hidden" />
 
         {/* No preview overlays - preview mode is invisible to users */}
         {/* No "Connecting..." UI - streamer should never see this */}
-        
+
         {/* Gift Animations Overlay */}
         {activeGiftAnimations.map((gift) => (
           <GiftAnimation
@@ -1156,8 +1247,9 @@ export default function Tile({
             giftIcon={gift.giftIcon}
             senderUsername={gift.senderUsername}
             coinAmount={gift.coinAmount}
+            scale={giftOverlayScale}
             onComplete={() => {
-              setActiveGiftAnimations(prev => prev.filter(g => g.id !== gift.id));
+              setActiveGiftAnimations((prev) => prev.filter((g) => g.id !== gift.id));
             }}
           />
         ))}
@@ -1166,33 +1258,35 @@ export default function Tile({
       {/* LIVE badge removed - if video is visible, they're already live */}
 
       {/* Stats Overlay - Show viewer count, likes, and trending rank */}
-      <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-2 z-20">
-        {/* Left side: Trending rank OR likes */}
-        <div className="flex items-center gap-2">
-          {trendingRank && trendingRank <= 10 && (
-            <div className={`px-2 py-1 rounded text-xs font-bold shadow-lg ${
-              trendingRank === 1 ? 'bg-yellow-500 text-black' :
-              trendingRank === 2 ? 'bg-gray-400 text-black' :
-              trendingRank === 3 ? 'bg-orange-600 text-white' :
-              'bg-red-500/90 text-white'
-            }`}>
-              🔥 #{trendingRank}
-            </div>
-          )}
-          {likesCount > 0 && (
-            <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
-              ❤️ {likesCount}
+      {!shouldUseCompact && (
+        <div className="absolute top-2 left-2 right-2 flex items-start justify-between gap-2 z-20">
+          {/* Left side: Trending rank OR likes */}
+          <div className="flex items-center gap-2">
+            {trendingRank && trendingRank <= 10 && (
+              <div className={`px-2 py-1 rounded text-xs font-bold shadow-lg ${
+                trendingRank === 1 ? 'bg-yellow-500 text-black' :
+                trendingRank === 2 ? 'bg-gray-400 text-black' :
+                trendingRank === 3 ? 'bg-orange-600 text-white' :
+                'bg-red-500/90 text-white'
+              }`}>
+                🔥 #{trendingRank}
+              </div>
+            )}
+            {likesCount > 0 && (
+              <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-2 py-1 rounded text-xs font-bold shadow-lg">
+                ❤️ {likesCount}
+              </div>
+            )}
+          </div>
+          
+          {/* Viewer count (right) */}
+          {viewerCount > 0 && (
+            <div className="bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs">
+              👁️ {viewerCount}
             </div>
           )}
         </div>
-        
-        {/* Viewer count (right) */}
-        {viewerCount > 0 && (
-          <div className="bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-xs">
-            👁️ {viewerCount}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Muted Indicator */}
       {isMuted && (
@@ -1201,160 +1295,28 @@ export default function Tile({
         </div>
       )}
 
-      {/* Bottom Right Overlay - Username and Badge */}
-      <div className="absolute bottom-2 right-2 z-20">
-        <div className="flex flex-col items-end gap-1">
-          {/* Username and Badge - ALWAYS VISIBLE */}
-          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-            <button
-              onClick={() => setShowMiniProfile(true)}
-              className="text-white text-sm font-semibold hover:text-blue-200 transition"
-            >
-              {streamerUsername}
-            </button>
-            {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
-              <TierBadge
-                tier_key={gifterStatus.tier_key}
-                level={gifterStatus.level_in_tier}
-                size="sm"
-              />
-            )}
-          </div>
-          
-          {/* Leaderboard Rank - ALWAYS VISIBLE - Prestigious Display */}
-          {!leaderboardRank.isLoading && leaderboardRank.rank !== null && (
-            <div 
-              className={`backdrop-blur-md px-2.5 py-1.5 rounded-lg shadow-xl border-2 transition-all ${
-                leaderboardRank.rank === 1 
-                  ? 'bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-600 border-yellow-300 shadow-yellow-500/50' 
-                  : leaderboardRank.rank === 2
-                  ? 'bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 border-gray-200 shadow-gray-400/50'
-                  : leaderboardRank.rank === 3
-                  ? 'bg-gradient-to-br from-orange-400 via-amber-600 to-orange-700 border-orange-300 shadow-orange-500/50'
-                  : leaderboardRank.rank <= 10
-                  ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 border-blue-400 shadow-blue-500/50'
-                  : leaderboardRank.rank <= 50
-                  ? 'bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 border-purple-400 shadow-purple-500/50'
-                  : 'bg-gradient-to-br from-green-500 via-green-600 to-emerald-700 border-green-400 shadow-green-500/50'
-              }`}
-            >
-              <div className="flex flex-col items-end gap-0.5">
-                <div className="flex items-center gap-1.5">
-                  {leaderboardRank.rank === 1 && <span className="text-sm">👑</span>}
-                  {leaderboardRank.rank === 2 && <span className="text-sm">🥈</span>}
-                  {leaderboardRank.rank === 3 && <span className="text-sm">🥉</span>}
-                  <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
-                    #{leaderboardRank.rank}
-                  </span>
-                  <span className="text-white/90 text-[10px] font-semibold uppercase tracking-wider drop-shadow">
-                    {leaderboardRank.tierName}
-                  </span>
-                </div>
-                {leaderboardRank.pointsToNextRank !== null && (
-                  <span className="text-white/95 text-[9px] font-medium tracking-tight drop-shadow">
-                    {leaderboardRank.rank === 1 
-                      ? '🏆 First Place' 
-                      : `+${leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to #${leaderboardRank.rank - 1}`
-                    }
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Unranked but has some progress - ALWAYS VISIBLE */}
-          {!leaderboardRank.isLoading && leaderboardRank.rank === null && leaderboardRank.metricValue > 0 && (
-            <div className="bg-gradient-to-br from-slate-600 via-slate-700 to-gray-800 backdrop-blur-md px-2.5 py-1.5 rounded-lg border-2 border-slate-500 shadow-xl shadow-slate-600/30">
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
-                  Unranked
-                </span>
-                {leaderboardRank.pointsToNextRank !== null && (
-                  <span className="text-slate-200 text-[9px] font-medium tracking-tight drop-shadow">
-                    +{leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to Top 100
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="absolute top-10 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <div className="flex gap-1">
-          {onExpand && !isFullscreen && (
-            <button
-              onClick={onExpand}
-              className="p-1.5 bg-black/50 text-white rounded hover:bg-blue-500/80 transition"
-              title="Expand to Fullscreen"
-            >
-              ⛶
-            </button>
-          )}
-          {isFullscreen && onExitFullscreen && (
-            <button
-              onClick={onExitFullscreen}
-              className="p-1.5 bg-black/50 text-white rounded hover:bg-red-500/80 transition"
-              title="Exit Fullscreen"
-            >
-              ✕
-            </button>
-          )}
-          <button
-            onClick={onMute}
-            className={`p-1.5 rounded hover:bg-black/70 transition ${
-              isMuted
-                ? 'bg-red-500/80 text-white'
-                : 'bg-black/50 text-white'
-            }`}
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? '🔇' : '🔊'}
-          </button>
-          <button
-            onClick={() => {
-              const newState = !showVolumeSlider;
-              setShowVolumeSlider(newState);
-              onVolumeSliderToggle?.(newState);
-            }}
-            className="p-1.5 bg-black/50 text-white rounded hover:bg-black/70 transition"
-            title="Volume Control"
-          >
-            🔊
-          </button>
-          {!isFullscreen && (
-            <>
-              {onReplace && (
-                <button
-                  onClick={onReplace}
-                  className="p-1.5 bg-black/50 text-white rounded hover:bg-blue-500/80 transition"
-                  title="Replace Streamer"
-                >
-                  🔄
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                className="p-1.5 bg-black/50 text-white rounded hover:bg-red-500/80 transition"
-                title="Close"
-              >
-                ✕
-              </button>
-            </>
-          )}
-        </div>
-        
-        {/* Volume Slider - Shows when volume button is clicked */}
-        {showVolumeSlider && (
-          <div 
-            className="bg-black/90 backdrop-blur-sm rounded-lg p-3 shadow-lg"
+      {/* Grid Controls: Volume (top-left) and Close (top-right) */}
+      {!shouldUseCompact && !isFullscreen && (
+        <>
+          <div
+            className="absolute top-2 left-2 z-20 flex items-center gap-1"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
-            onDragStart={(e) => e.preventDefault()}
           >
-            <div className="flex items-center gap-2 min-w-[120px]">
-              <span className="text-white text-xs">🔇</span>
+            <button
+              type="button"
+              onClick={() => {
+                const newState = !showVolumeSlider;
+                setShowVolumeSlider(newState);
+                onVolumeSliderToggle?.(newState);
+              }}
+              className="p-1 text-white/90 hover:text-white transition"
+              title="Volume"
+            >
+              {isMuted ? <VolumeX className={gridIconSizeClass} /> : <Volume2 className={gridIconSizeClass} />}
+            </button>
+
+            {showVolumeSlider && (
               <input
                 type="range"
                 min="0"
@@ -1362,67 +1324,334 @@ export default function Tile({
                 step="0.01"
                 value={isMuted ? 0 : volume}
                 onChange={(e) => {
-                  const newVolume = parseFloat(e.target.value);
-                  onVolumeChange(newVolume);
-                  if (newVolume === 0 && !isMuted) {
-                    onMute(); // Auto-mute at 0
-                  } else if (newVolume > 0 && isMuted) {
-                    onMute(); // Auto-unmute above 0
-                  }
+                  handleVolumeInput(parseFloat(e.target.value));
                 }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onDragStart={(e) => e.preventDefault()}
-                className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                style={{
-                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(isMuted ? 0 : volume) * 100}%, #4b5563 ${(isMuted ? 0 : volume) * 100}%, #4b5563 100%)`
+                onBlur={() => {
+                  setShowVolumeSlider(false);
+                  onVolumeSliderToggle?.(false);
                 }}
+                className="w-14 h-1 accent-white/90 opacity-90"
+                title="Volume Slider"
               />
-              <span className="text-white text-xs w-8 text-right">
-                {Math.round((isMuted ? 0 : volume) * 100)}%
-              </span>
-            </div>
+            )}
           </div>
-        )}
-      </div>
+
+          <div
+            className="absolute top-2 right-2 z-20 flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {onExpand && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onExpand();
+                }}
+                className="p-1 text-white/90 hover:text-white transition"
+                title="Expand"
+              >
+                <Maximize2 className={gridIconSizeClass} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-1 text-white/90 hover:text-white transition"
+              title="Close"
+            >
+              <X className={gridIconSizeClass} />
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Bottom Right Overlay - Username and Badge */}
+      {!shouldUseCompact && isFullscreen && (
+        <div className="absolute bottom-2 right-2 z-20">
+          <div className="flex flex-col items-end gap-1">
+            {/* Username and Badge - ALWAYS VISIBLE */}
+            <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+              <button
+                onClick={() => setShowMiniProfile(true)}
+                className="text-white text-sm font-semibold hover:text-blue-200 transition"
+              >
+                {streamerUsername}
+              </button>
+              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
+                <TierBadge
+                  tier_key={gifterStatus.tier_key}
+                  level={gifterStatus.level_in_tier}
+                  size="sm"
+                />
+              )}
+            </div>
+            
+            {/* Leaderboard Rank - ALWAYS VISIBLE - Prestigious Display */}
+            {!leaderboardRank.isLoading && leaderboardRank.rank !== null && (
+              <div 
+                className={`backdrop-blur-md px-2.5 py-1.5 rounded-lg shadow-xl border-2 transition-all ${
+                  leaderboardRank.rank === 1 
+                    ? 'bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-600 border-yellow-300 shadow-yellow-500/50' 
+                    : leaderboardRank.rank === 2
+                    ? 'bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 border-gray-200 shadow-gray-400/50'
+                    : leaderboardRank.rank === 3
+                    ? 'bg-gradient-to-br from-orange-400 via-amber-600 to-orange-700 border-orange-300 shadow-orange-500/50'
+                    : leaderboardRank.rank <= 10
+                    ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 border-blue-400 shadow-blue-500/50'
+                    : leaderboardRank.rank <= 50
+                    ? 'bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 border-purple-400 shadow-purple-500/50'
+                    : 'bg-gradient-to-br from-green-500 via-green-600 to-emerald-700 border-green-400 shadow-green-500/50'
+                }`}
+              >
+                <div className="flex flex-col items-end gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    {leaderboardRank.rank === 1 && <span className="text-sm">👑</span>}
+                    {leaderboardRank.rank === 2 && <span className="text-sm">🥈</span>}
+                    {leaderboardRank.rank === 3 && <span className="text-sm">🥉</span>}
+                    <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
+                      #{leaderboardRank.rank}
+                    </span>
+                    <span className="text-white/90 text-[10px] font-semibold uppercase tracking-wider drop-shadow">
+                      {leaderboardRank.tierName}
+                    </span>
+                  </div>
+                  {leaderboardRank.pointsToNextRank !== null && (
+                    <span className="text-white/95 text-[9px] font-medium tracking-tight drop-shadow">
+                      {leaderboardRank.rank === 1 
+                        ? '🏆 First Place' 
+                        : `+${leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to #${leaderboardRank.rank - 1}`
+                      }
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Unranked but has some progress */}
+            {!leaderboardRank.isLoading && leaderboardRank.rank === null && leaderboardRank.metricValue > 0 && (
+              <div className="bg-gradient-to-br from-slate-600 via-slate-700 to-gray-800 backdrop-blur-md px-2.5 py-1.5 rounded-lg border-2 border-slate-500 shadow-xl shadow-slate-600/30">
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-white text-xs font-bold tracking-tight drop-shadow-md">
+                    Unranked
+                  </span>
+                  {leaderboardRank.pointsToNextRank !== null && (
+                    <span className="text-slate-200 text-[9px] font-medium tracking-tight drop-shadow">
+                      +{leaderboardRank.pointsToNextRank.toLocaleString()} 💎 to Top 100
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Controls */}
+      {!shouldUseCompact && isFullscreen && (
+        <div className="absolute top-10 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <div className="flex gap-1">
+            {onExpand && !isFullscreen && (
+              <button
+                onClick={onExpand}
+                className="p-1.5 bg-black/50 text-white rounded hover:bg-blue-500/80 transition"
+                title="Expand to Fullscreen"
+              >
+                ⛶
+              </button>
+            )}
+            {isFullscreen && onExitFullscreen && (
+              <button
+                onClick={onExitFullscreen}
+                className="p-1.5 bg-black/50 text-white rounded hover:bg-red-500/80 transition"
+                title="Exit Fullscreen"
+              >
+                ✕
+              </button>
+            )}
+            <button
+              onClick={onMute}
+              className={`p-1.5 rounded hover:bg-black/70 transition ${
+                isMuted
+                  ? 'bg-red-500/80 text-white'
+                  : 'bg-black/50 text-white'
+              }`}
+              title={isMuted ? 'Unmute' : 'Mute'}
+            >
+              {isMuted ? '🔇' : '🔊'}
+            </button>
+            <button
+              onClick={() => {
+                const newState = !showVolumeSlider;
+                setShowVolumeSlider(newState);
+                onVolumeSliderToggle?.(newState);
+              }}
+              className="p-1.5 bg-black/50 text-white rounded hover:bg-black/70 transition"
+              title="Volume Control"
+            >
+              🔊
+            </button>
+            {!isFullscreen && (
+              <>
+                {onReplace && (
+                  <button
+                    onClick={onReplace}
+                    className="p-1.5 bg-black/50 text-white rounded hover:bg-blue-500/80 transition"
+                    title="Replace Streamer"
+                  >
+                    🔄
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-1.5 bg-black/50 text-white rounded hover:bg-red-500/80 transition"
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </>
+            )}
+          </div>
+          
+          {/* Volume Slider - Shows when volume button is clicked */}
+          {showVolumeSlider && (
+            <div 
+              className="bg-black/90 backdrop-blur-sm rounded-lg p-3 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onDragStart={(e) => e.preventDefault()}
+            >
+              <div className="flex items-center gap-2 min-w-[120px]">
+                <span className="text-white text-xs">🔇</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    handleVolumeInput(parseFloat(e.target.value));
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onDragStart={(e) => e.preventDefault()}
+                  className="flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  style={{
+                    background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(isMuted ? 0 : volume) * 100}%, #4b5563 ${(isMuted ? 0 : volume) * 100}%, #4b5563 100%)`
+                  }}
+                />
+                <span className="text-white text-xs w-8 text-right">
+                  {Math.round((isMuted ? 0 : volume) * 100)}%
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Action Buttons */}
-      <div className="absolute bottom-2 left-2 flex gap-2 opacity-100 transition-opacity z-10">
-        {user && (
-          <button
-            onClick={handleLikeTap}
-            disabled={isLikeLoading}
-            className={`relative px-3 py-1.5 rounded text-xs font-medium transition-all shadow-lg ${
-              isLiked
-                ? 'bg-red-500 text-white hover:bg-red-600'
-                : 'bg-black/50 text-white hover:bg-black/70'
-            } ${showLikePop ? 'scale-125' : 'scale-100'}`}
-            title={isLiked ? 'Liked!' : 'Like'}
-          >
-            <span className="flex items-center gap-1">
-              <span className="text-base">{isLiked ? '❤️' : '🤍'}</span>
-              <span>{likesCount}</span>
-            </span>
-            {/* First like animation */}
-            {showLikePop && (
-              <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-red-500 text-lg font-bold animate-fade-up pointer-events-none">
-                ❤️
-              </span>
-            )}
-            {/* Fidget tap animation (already liked) */}
-            {showFloatingHeart && (
-              <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-red-500 text-2xl animate-fade-up pointer-events-none">
-                ❤️
-              </span>
-            )}
-          </button>
-        )}
-        <button
-          onClick={() => setShowGiftModal(true)}
-          className="px-3 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors shadow-lg"
-        >
-          💎 Gift
-        </button>
-      </div>
+      {!shouldUseCompact && !isFullscreen && (
+        <div className="absolute inset-x-0 bottom-0 z-20">
+          <div
+            className={`absolute inset-x-0 bottom-0 ${compactMode ? 'h-14' : 'h-12'} bg-gradient-to-t from-black/70 to-transparent`}
+          />
+          <div className="relative flex items-end justify-between px-2 pb-2">
+            <div className="flex items-end gap-2 min-w-0 pointer-events-auto flex-1">
+              {!isSelfTile && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGiftOpen();
+                  }}
+                  className="text-white hover:opacity-90 transition flex-shrink-0"
+                  title="Send Gift"
+                >
+                  <Gift className={gridIconSizeClass} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMiniProfile(true);
+                }}
+                className={`text-white font-semibold drop-shadow min-w-0 ${
+                  compactMode
+                    ? 'text-[10px] leading-tight whitespace-normal break-words overflow-hidden max-h-7'
+                    : 'text-xs truncate flex-1'
+                }`}
+                title={streamerUsername}
+              >
+                {streamerUsername}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 pointer-events-auto flex-shrink-0">
+              {user && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleLikeTap();
+                  }}
+                  disabled={isLikeLoading}
+                  className={`relative text-white transition-all ${showLikePop ? 'scale-125' : 'scale-100'} hover:opacity-90`}
+                  title={isLiked ? 'Liked!' : 'Like'}
+                >
+                  <Heart className={gridIconSizeClass} fill={isLiked ? 'currentColor' : 'none'} />
+                  {showLikePop && (
+                    <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-red-500 text-lg font-bold animate-fade-up pointer-events-none">
+                      ❤️
+                    </span>
+                  )}
+                  {showFloatingHeart && (
+                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-red-500 text-2xl animate-fade-up pointer-events-none">
+                      ❤️
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen action buttons (vector-only) */}
+      {!shouldUseCompact && isFullscreen && (
+        <div className="absolute bottom-2 left-2 flex gap-2 opacity-100 transition-opacity z-20">
+          {user && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLikeTap();
+              }}
+              disabled={isLikeLoading}
+              className={`relative text-white transition-all ${showLikePop ? 'scale-125' : 'scale-100'} hover:opacity-90`}
+              title={isLiked ? 'Liked!' : 'Like'}
+            >
+              <Heart className="w-5 h-5" fill={isLiked ? 'currentColor' : 'none'} />
+            </button>
+          )}
+          {!isSelfTile && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleGiftOpen();
+              }}
+              className="text-white hover:opacity-90 transition"
+              title="Send Gift"
+            >
+              <Gift className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Gift Modal */}
       {showGiftModal && (

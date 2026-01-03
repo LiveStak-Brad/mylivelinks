@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Minus, Send, MoreHorizontal, Phone, Video, Smile } from 'lucide-react';
+import { X, Minus, Send, MoreHorizontal, Phone, Video, Smile, Gift } from 'lucide-react';
 import Image from 'next/image';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import GiftPickerMini from '@/components/messages/GiftPickerMini';
 
 // Map gift names to emojis
 const getGiftEmoji = (name: string) => {
@@ -48,6 +49,7 @@ export interface IMChatWindowProps {
   onClose: () => void;
   onMinimize: () => void;
   onSendMessage: (content: string) => void;
+  onSendGift: (giftId: number, giftName: string, giftCoins: number, giftIcon?: string) => void;
   onFocus: () => void;
   zIndex: number;
 }
@@ -75,6 +77,7 @@ export default function IMChatWindow({
   onClose,
   onMinimize,
   onSendMessage,
+  onSendGift,
   onFocus,
   zIndex,
 }: IMChatWindowProps) {
@@ -82,6 +85,7 @@ export default function IMChatWindow({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [messageInput, setMessageInput] = useState('');
+  const [showGiftPicker, setShowGiftPicker] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +152,12 @@ export default function IMChatWindow({
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleGiftSelect = async (gift: { id: number; name: string; coin_cost: number; icon_url?: string }) => {
+    onSendGift(gift.id, gift.name, gift.coin_cost, gift.icon_url);
+    setShowGiftPicker(false);
+    inputRef.current?.focus();
   };
 
   const formatTime = (date: Date) => {
@@ -392,9 +402,29 @@ export default function IMChatWindow({
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border p-2 bg-card">
+      <div className="relative border-t border-border p-2 bg-card">
+        <GiftPickerMini
+          isOpen={showGiftPicker}
+          onClose={() => setShowGiftPicker(false)}
+          onSelectGift={handleGiftSelect}
+          recipientUsername={recipientUsername}
+        />
+
         <div className="flex items-center gap-2">
-          <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition">
+          <button
+            onClick={() => setShowGiftPicker(!showGiftPicker)}
+            className={`p-2 rounded-full transition ${
+              showGiftPicker
+                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+            title="Send a gift"
+            type="button"
+          >
+            <Gift size={18} />
+          </button>
+
+          <button className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition" type="button">
             <Smile size={18} />
           </button>
           

@@ -441,6 +441,10 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
             // Find the invite for this notification
             const inviteKey = `${n.entity_id}:${n.actor_id}`;
             const invite = inviteByTeamAndInviter.get(inviteKey);
+            const pendingInviteUrl = n.type === 'team_invite' && invite?.id
+              ? `/teams/invite/${invite.id}`
+              : null;
+            const fallbackTeamUrl = team?.slug ? `/teams/${team.slug}` : '/teams';
 
             return {
               id,
@@ -451,7 +455,7 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
               avatarFallback,
               isRead: readIds.has(id) || n.read,
               createdAt: new Date(n.created_at),
-              actionUrl: team?.slug ? `/teams/${team.slug}` : '/teams',
+              actionUrl: pendingInviteUrl ?? fallbackTeamUrl,
               metadata: {
                 team_id: n.entity_id,
                 team_name: team?.name,

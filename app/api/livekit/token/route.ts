@@ -11,13 +11,27 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL?.trim();
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY?.trim();
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET?.trim();
 
-// CORS headers for mobile app requests
-// TODO: Tighten CORS allowlist for production (restrict to specific mobile app domains/origins)
-// Current: Allow all origins for initial mobile build compatibility
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // Allow all origins (can restrict to specific domains if needed)
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+// CORS: strict allowlist for sensitive auth endpoint
+const ALLOWED_ORIGINS = new Set(
+  [
+    'https://www.mylivelinks.com',
+    'https://mylivelinks.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+  ].map((v) => v.toLowerCase())
+);
+
+const getCorsHeaders = (request: NextRequest) => {
+  const origin = (request.headers.get('origin') || '').toLowerCase();
+  const allowOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://www.mylivelinks.com';
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Vary': 'Origin',
+  };
 };
 
 // Handle OPTIONS preflight request
@@ -26,7 +40,7 @@ export async function OPTIONS(request: NextRequest) {
     {},
     {
       headers: {
-        ...corsHeaders,
+        ...getCorsHeaders(request),
         'X-MLL-TOKEN-ROUTE': TOKEN_ROUTE_VERSION,
       },
     }
@@ -60,7 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(body, {
       status,
       headers: {
-        ...corsHeaders,
+        ...getCorsHeaders(request),
         'X-MLL-TOKEN-ROUTE': TOKEN_ROUTE_VERSION,
         'X-MLL-REQID': reqId,
       },
@@ -114,24 +128,24 @@ export async function POST(request: NextRequest) {
 
   const main = (async (): Promise<NextResponse> => {
     try {
+      const origin = (request.headers.get('origin') || '').toLowerCase();
+      if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+        return sendJson(403, { error: 'Web-only launch: invalid origin', stage: 'cors' }, 'cors');
+      }
+
       const authHeader = await runStage('auth_header_parse', 1_000, async () => {
         return request.headers.get('authorization') || request.headers.get('Authorization') || '';
       });
 
       const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
 
+      // LAUNCH GATE (WEB ONLY): do not accept Bearer auth (mobile-style). Web uses cookie auth.
+      if (bearerToken) {
+        return sendJson(403, { error: 'Web-only launch: Bearer auth not allowed', stage: 'auth_verify' }, 'auth_verify');
+      }
+
       const auth = await runStage('auth_verify', 3_000, async () => {
         const cookieClient = createRouteHandlerClient(request);
-
-        if (bearerToken) {
-          const admin = getSupabaseAdmin();
-          const result = await (admin.auth as any).getUser(bearerToken);
-          return {
-            user: result?.data?.user || null,
-            authError: result?.error || null,
-            supabase: admin as any,
-          };
-        }
 
         const result = await cookieClient.auth.getUser();
         return {
@@ -143,6 +157,7 @@ export async function POST(request: NextRequest) {
 
       const user = auth.user;
       const authError = auth.authError;
+      const supabase = auth.supabase;
 
       if (authError || !user) {
         return sendJson(401, { error: 'Unauthorized', stage: 'auth_verify' }, 'auth_verify');
@@ -171,6 +186,12 @@ export async function POST(request: NextRequest) {
         return sendJson(400, { error: 'roomName and participantName are required', stage: 'body_parse' }, 'body_parse');
       }
 
+      // LAUNCH GATE: single-room only
+      // Production launch mode is Live Central only; block arbitrary room joins.
+      if (roomName !== 'live_central' && roomName !== 'live-central') {
+        return sendJson(403, { error: 'Room not available', stage: 'room_gate' }, 'room_gate');
+      }
+
       const wantsPublish = canPublish === true || body?.role === 'publisher';
       
       // Check if this is a "main" room (live_central, live-central, or similar)
@@ -182,18 +203,12 @@ export async function POST(request: NextRequest) {
       
       const canGoLive = await runStage('can_user_go_live', 2_000, async () => {
         try {
-          const supabase = auth.supabase;
-
-          // For main rooms (live_central), GROUP LIVE IS OPEN TO EVERYONE
-          // IMPORTANT: For main rooms, ALWAYS grant publish permission to authenticated users
-          // This ensures they can go live even if the initial token request didn't specify canPublish
           if (isMainRoom) {
-            // GROUP LIVE: All authenticated users can publish
             const allowed = canUserGoLive({ id: user.id, email: user.email });
-            console.log('[LIVEKIT_TOKEN] Main room permission check:', { 
-              userId: user.id, 
-              roomName, 
-              isMainRoom: true, 
+            console.log('[LIVEKIT_TOKEN] Main room permission check:', {
+              userId: user.id,
+              roomName,
+              isMainRoom: true,
               allowed,
               wantsPublish,
             });
@@ -253,15 +268,12 @@ export async function POST(request: NextRequest) {
           // Fall through to default
         }
 
-        // Default fallback: use canUserGoLive (which now allows all authenticated users for group live)
-        return canUserGoLive({ id: user.id, email: user.email });
+        // Default fallback: for launch we only support Live Central anyway.
+        return false;
       });
       
-      // For main rooms, ALWAYS grant publish to authenticated users who are allowed
-      // This ensures users can go live later even if initial connection didn't request publish
-      const effectiveCanPublish = isMainRoom 
-        ? canGoLive  // For main rooms: if they CAN publish, grant it
-        : (wantsPublish && canGoLive);  // For other rooms: only if they asked for it AND are allowed
+      // For launch: publish is granted only when explicitly requested AND admin-gated.
+      const effectiveCanPublish = wantsPublish && canGoLive;
 
       if (wantsPublish && !effectiveCanPublish) {
         console.log('[LIVEKIT_TOKEN] publish_denied', { reqId, userId: user.id, roomName, isMainRoom, canGoLive });
@@ -287,12 +299,15 @@ export async function POST(request: NextRequest) {
           const effectiveDeviceType = deviceType || 'web';
           const effectiveDeviceId = deviceId || 'unknown';
           const effectiveSessionId = sessionId || Date.now().toString();
-          const identity = `u_${userId}:${effectiveDeviceType}:${effectiveDeviceId}:${effectiveSessionId}`;
+
+          // P0 FIX: Stable identity per profile to prevent duplicate LiveKit participants
+          const identity = `u_${userId}`;
 
           const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
             identity,
             name: participantName,
-            ttl: '6h',
+            // LAUNCH GATE: short-lived tokens to reduce reuse risk
+            ttl: '15m',
           });
 
           at.addGrant({
@@ -304,9 +319,13 @@ export async function POST(request: NextRequest) {
             canUpdateOwnMetadata: true,
           });
 
-          if (participantMetadata) {
-            at.metadata = JSON.stringify(participantMetadata);
-          }
+          const metadataPayload = {
+            ...(participantMetadata && typeof participantMetadata === 'object' ? participantMetadata : {}),
+            device_type: effectiveDeviceType,
+            device_id: effectiveDeviceId,
+            session_id: effectiveSessionId,
+          };
+          at.metadata = JSON.stringify(metadataPayload);
 
           let wsUrl = LIVEKIT_URL;
           if (wsUrl.startsWith('https://')) {

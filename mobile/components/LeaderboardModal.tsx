@@ -59,6 +59,7 @@ export function LeaderboardModal({ visible, onClose, onNavigateToProfile }: Lead
         p_type: type,
         p_period: period,
         p_limit: 50,
+        p_room_id: null,
       });
 
       if (error) throw error;

@@ -103,6 +103,9 @@ interface LiveRoomProps {
 // Default config for LiveCentral (the original main room)
 const DEFAULT_ROOM_CONFIG = createLiveCentralConfig(canUserGoLive);
 
+// Screens narrower than this should switch grid tiles to compact tap-to-open controls
+const COMPACT_GRID_BREAKPOINT = 1536;
+
 export default function LiveRoom({ 
   mode = 'solo', 
   layoutStyle = 'twitch-viewer',
@@ -112,6 +115,13 @@ export default function LiveRoom({
     () => roomConfig.contentRoomId || roomConfig.roomId || 'live-central',
     [roomConfig.contentRoomId, roomConfig.roomId]
   );
+  const presenceRoomId = useMemo(() => {
+    const raw = roomConfig.roomId || roomConfig.contentRoomId || 'live_central';
+    // LiveCentral historically used both "live-central" and "live_central".
+    // room_presence scoping/migrations use "live_central".
+    if (raw === 'live-central') return 'live_central';
+    return raw;
+  }, [roomConfig.roomId, roomConfig.contentRoomId]);
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(true); // Start as true to render immediately
   const [initError, setInitError] = useState<string | null>(null); // Track initialization errors
@@ -194,6 +204,9 @@ export default function LiveRoom({
   const [pendingPublish, setPendingPublish] = useState<boolean>(false);
   const [publishAllowed, setPublishAllowed] = useState<boolean>(true);
   const [roomPresenceCountMinusSelf, setRoomPresenceCountMinusSelf] = useState<number>(0); // Room-demand: count of others in room
+  const hasPresenceCountRpcRef = useRef<boolean | null>(null);
+  const hasRoomPresenceRoomIdColumnRef = useRef<boolean | null>(null);
+  const roomPresenceTableAvailableRef = useRef<boolean | null>(null);
   const closedStreamersRef = useRef<Set<string>>(new Set()); // Streamers closed by viewer (do not auto-refill)
   
   // BANDWIDTH SAVING: Router for redirecting when user leaves/returns
@@ -231,11 +244,29 @@ export default function LiveRoom({
 
   // MOBILE WEB: Detect mobile web browser and orientation
   const isMobileWeb = useIsMobileWeb();
-  
+  const [isCompactDesktop, setIsCompactDesktop] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return window.innerWidth < COMPACT_GRID_BREAKPOINT;
+  });
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window === 'undefined') {
+        return;
+      }
+      setIsCompactDesktop(window.innerWidth < COMPACT_GRID_BREAKPOINT);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
 
   // CRITICAL: Memoize Supabase client to prevent recreation on every render
   // This prevents effects from re-running and causing LiveKit disconnect/reconnect loops
   const supabase = useMemo(() => createClient(), []);
+  const enableLiveGridRpc = process.env.NEXT_PUBLIC_ENABLE_LIVE_GRID_RPC === 'true';
 
   // Check if auth is disabled for testing
   const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
@@ -361,7 +392,6 @@ export default function LiveRoom({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
           },
           credentials: 'include',
           body: JSON.stringify({
@@ -810,9 +840,8 @@ export default function LiveRoom({
             .select('username')
             .eq('id', user.id)
             .maybeSingle();
-          if (profile) {
-            setCurrentUsername(profile.username);
-          }
+          const fallbackUsername = user.id.slice(0, 8);
+          setCurrentUsername((profile?.username as string | null | undefined) || fallbackUsername);
         } else {
           setCurrentUserId(null);
           setCurrentUsername(null);
@@ -834,71 +863,161 @@ export default function LiveRoom({
   useRoomPresence({
     userId: currentUserId,
     username: currentUsername,
-    roomId: scopeRoomId,
+    roomId: presenceRoomId,
     enabled: !authDisabled && !!currentUserId && !!currentUsername,
   });
 
   // ROOM-DEMAND: Track room presence count (excluding self) for publisher enable logic
   useEffect(() => {
-    if (!currentUserId || authDisabled || !scopeRoomId) {
+    if (!currentUserId || authDisabled || !presenceRoomId) {
       setRoomPresenceCountMinusSelf(0);
       return;
     }
 
     const DEBUG_LIVEKIT = process.env.NEXT_PUBLIC_DEBUG_LIVEKIT === '1';
-    
-    // Initial load
+
+    const missingTableError = (error: any) => {
+      if (!error) return false;
+      const code = error.code;
+      const message = String(error.message || '');
+      return code === '42P01' || message.includes('room_presence');
+    };
+
     const loadRoomPresenceCount = async () => {
+      if (roomPresenceTableAvailableRef.current === false) {
+        setRoomPresenceCountMinusSelf(0);
+        return;
+      }
+
       try {
-        const { data, error } = await supabase.rpc('get_room_presence_count_minus_self', {
-          p_room_id: scopeRoomId,
-        });
-        if (error) {
-          console.error('Error getting room presence count:', error);
-          return;
+        let count: number | null = null;
+
+        // Prefer RPC if it exists
+        if (hasPresenceCountRpcRef.current !== false) {
+          const rpcResult = await supabase.rpc('get_room_presence_count_minus_self', {
+            p_room_id: presenceRoomId,
+          });
+          if (!rpcResult.error) {
+            count = (rpcResult.data || 0) as number;
+            hasPresenceCountRpcRef.current = true;
+          } else {
+            if (rpcResult.error?.code === 'PGRST202' || missingTableError(rpcResult.error)) {
+              hasPresenceCountRpcRef.current = false;
+              if (missingTableError(rpcResult.error)) {
+                roomPresenceTableAvailableRef.current = false;
+                setRoomPresenceCountMinusSelf(0);
+                return;
+              }
+            } else {
+              console.error('Error loading room presence count (rpc):', rpcResult.error);
+            }
+          }
         }
-        const count = data || 0;
-        setRoomPresenceCountMinusSelf(count);
+
+        // Fallback to direct query
+        if (count == null) {
+          const baseQuery = () =>
+            supabase
+              .from('room_presence')
+              .select('profile_id', { count: 'exact', head: true })
+              .gt('last_seen_at', new Date(Date.now() - 60000).toISOString())
+              .neq('profile_id', currentUserId);
+
+          const tryScopedQuery = async () => {
+            const query = baseQuery();
+            if (hasRoomPresenceRoomIdColumnRef.current !== false) {
+              const scoped = await query.eq('room_id', presenceRoomId);
+              if (!scoped.error) {
+                hasRoomPresenceRoomIdColumnRef.current = true;
+                return scoped.count || 0;
+              }
+              const scopedError = scoped.error;
+              if (scopedError?.code === '42703' || String(scopedError?.message || '').includes('room_id')) {
+                hasRoomPresenceRoomIdColumnRef.current = false;
+              } else if (missingTableError(scopedError)) {
+                roomPresenceTableAvailableRef.current = false;
+                setRoomPresenceCountMinusSelf(0);
+                return null;
+              } else {
+                console.error('Error loading room presence count (scoped):', scopedError);
+              }
+            }
+
+            const unscoped = await baseQuery();
+            if (unscoped.error) {
+              if (missingTableError(unscoped.error)) {
+                roomPresenceTableAvailableRef.current = false;
+                setRoomPresenceCountMinusSelf(0);
+                return null;
+              }
+              console.error('Error loading room presence count (unscoped):', unscoped.error);
+              return null;
+            }
+            return unscoped.count || 0;
+          };
+
+          const scopedCount = await tryScopedQuery();
+          if (scopedCount == null) {
+            return;
+          }
+          count = scopedCount;
+          roomPresenceTableAvailableRef.current = true;
+        }
+
+        setRoomPresenceCountMinusSelf(count || 0);
         if (DEBUG_LIVEKIT) {
-          console.log('[ROOM-DEMAND] room presence count (minus self):', count);
+          console.log('[ROOM-DEMAND] room presence count (minus self):', count || 0);
         }
       } catch (err) {
         console.error('Error loading room presence count:', err);
       }
     };
 
-    loadRoomPresenceCount();
+    let cancelled = false;
+    let roomPresenceChannel: ReturnType<typeof supabase.channel> | null = null;
+    let pollInterval: NodeJS.Timeout | null = null;
 
-    // Subscribe to room_presence changes
-    const roomPresenceChannel = supabase
-      .channel(`room-presence-count-updates-${scopeRoomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'room_presence',
-          filter: `room_id=eq.${scopeRoomId}`,
-        },
-        async () => {
-          // Debounce rapid updates
-          setTimeout(async () => {
-            await loadRoomPresenceCount();
-          }, 500);
-        }
-      )
-      .subscribe();
+    const initPresenceTracking = async () => {
+      await loadRoomPresenceCount();
+      if (cancelled || roomPresenceTableAvailableRef.current === false) {
+        return;
+      }
 
-    // Also poll every 5 seconds as backup (in case realtime misses updates)
-    const pollInterval = setInterval(() => {
-      loadRoomPresenceCount();
-    }, 5000);
+      roomPresenceChannel = supabase
+        .channel(`room-presence-count-updates-${presenceRoomId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'room_presence',
+          },
+          async () => {
+            setTimeout(async () => {
+              await loadRoomPresenceCount();
+            }, 500);
+          }
+        )
+        .subscribe();
+
+      pollInterval = setInterval(() => {
+        if (roomPresenceTableAvailableRef.current === false) return;
+        loadRoomPresenceCount();
+      }, 5000);
+    };
+
+    initPresenceTracking();
 
     return () => {
-      supabase.removeChannel(roomPresenceChannel);
-      clearInterval(pollInterval);
+      cancelled = true;
+      if (roomPresenceChannel) {
+        supabase.removeChannel(roomPresenceChannel);
+      }
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
     };
-  }, [currentUserId, authDisabled, supabase, scopeRoomId]);
+  }, [currentUserId, authDisabled, supabase, presenceRoomId]);
 
   // Auto-enable Focus Mode when tile is expanded
   useEffect(() => {
@@ -1285,46 +1404,16 @@ export default function LiveRoom({
 
       // CRITICAL: Only call RPCs that require viewer_id if we have one
       // If authDisabled, skip RPCs and go directly to fallback query
-      if (!authDisabled && viewerId) {
-        // Try sorted function first (if it exists and not random mode)
-        if (sortMode !== 'random') {
-          const result = await supabase.rpc('get_live_grid', {
-            p_viewer_id: viewerId,
-            p_sort_mode: sortMode,
-          });
-          if (!result.error && result.data) {
-            data = result.data;
-          } else {
-            // Fallback if get_live_grid doesn't exist
-            error = result.error;
-          }
-        }
-
-        // If random mode or get_live_grid failed, use fallback RPC
-        if (sortMode === 'random' || error) {
-          const result = await supabase.rpc('get_live_grid', {
-            p_viewer_id: viewerId,
-            p_sort_mode: sortMode,
-          });
-          if (!result.error && result.data) {
-            data = result.data;
-          } else {
-            // Fallback if get_live_grid doesn't exist
-            error = result.error;
-          }
-        }
-
-        // If random mode or get_live_grid failed, use fallback RPC
-        if (sortMode === 'random' || (error && sortMode !== 'trending')) {
-          const fallbackResult = await supabase.rpc('get_available_streamers_filtered', {
-            p_viewer_id: viewerId,
-          });
-          if (fallbackResult.error) {
-            console.error('RPC error, falling back to direct query:', fallbackResult.error);
-            error = fallbackResult.error;
-          } else if (fallbackResult.data) {
-            data = fallbackResult.data;
-          }
+      if (enableLiveGridRpc && !authDisabled && viewerId) {
+        // Tonight launch mode: avoid get_live_grid (returns 400 in current DB).
+        // Use filtered RPC if present, otherwise fall back to direct query.
+        const fallbackResult = await supabase.rpc('get_available_streamers_filtered', {
+          p_viewer_id: viewerId,
+        });
+        if (fallbackResult.error) {
+          error = fallbackResult.error;
+        } else if (fallbackResult.data) {
+          data = fallbackResult.data;
         }
       }
       
@@ -2564,30 +2653,39 @@ export default function LiveRoom({
     const newSlots = [...gridSlots];
     const slot = newSlots.find((s) => s.slotIndex === slotIndex);
     if (slot) {
-      // CRITICAL: If user closes their own box, stop publishing
-      if (slot.streamer && slot.streamer.profile_id === currentUserId && isCurrentUserPublishing) {
-        console.log('User closed their own box, stopping live stream...');
-        // Trigger stop live by updating database (this will cause isLive to become false)
+      // CRITICAL: If user closes their own box, end their stream (do NOT rely on isCurrentUserPublishing, which can be briefly stale)
+      if (slot.streamer && slot.streamer.profile_id === currentUserId) {
+        console.log('User closed their own box, ending live stream...');
         try {
-          const { data: { user } } = await supabase.auth.getUser();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
           if (user) {
-            // Update live_streams to set live_available = false
             await supabase
               .from('live_streams')
               .update({ live_available: false, ended_at: new Date().toISOString() })
               .eq('profile_id', user.id);
-            
-            // CRITICAL: Also remove from user_grid_slots so others don't see this user
+
             console.log('Removing self from all grid slots...');
-            await supabase
-              .from('user_grid_slots')
-              .delete()
-              .eq('streamer_id', user.id);
-            
-            // The GoLiveButton will detect the change and stop publishing
+            await supabase.from('user_grid_slots').delete().eq('streamer_id', user.id);
+
+            // Best-effort service role cleanup (covers RLS edge cases)
+            try {
+              await fetch('/api/stream-cleanup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ action: 'end_stream', reason: 'close_tile' }),
+              });
+            } catch (cleanupErr) {
+              console.warn('[LIVE] Failed to call stream-cleanup API:', cleanupErr);
+            }
+
+            // Proactively clear local state; GoLiveButton realtime will also stop LiveKit publishing
+            setIsCurrentUserPublishing(false);
           }
         } catch (err) {
-          console.error('Error stopping live when closing own box:', err);
+          console.error('Error ending live when closing own box:', err);
         }
       }
       // Prevent auto-refill of this streamer in this viewer's grid
@@ -3261,6 +3359,7 @@ export default function LiveRoom({
                         sharedRoom={sharedRoom}
                         isRoomConnected={isRoomConnected}
                         isCurrentUserPublishing={isCurrentUserPublishing}
+                        compactMode={isCompactDesktop}
                         onClose={() => handleCloseTile(slot.slotIndex)}
                         onMute={() => handleMuteTile(slot.slotIndex)}
                         isMuted={slot.isMuted}
@@ -3338,7 +3437,7 @@ export default function LiveRoom({
                   {/* Viewer List - Left side */}
                   {uiPanels.viewersOpen && (
                     <div className="2xl:w-80 xl:w-full lg:w-full flex-shrink-0 border-r border-gray-200 dark:border-gray-700 overflow-y-auto transition-all">
-                      <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
+                      <ViewerList roomId={presenceRoomId} onDragStart={(viewer) => {
                         // Viewer drag started - can add visual feedback if needed
                       }} />
                     </div>
@@ -3375,7 +3474,7 @@ export default function LiveRoom({
                     <Leaderboard roomSlug={scopeRoomId} roomName={roomConfig.branding.name} />
                   </PanelShell>
                   <PanelShell title="Viewers" className="flex-1 min-h-0 border-0 border-t border-gray-200 dark:border-gray-700" bodyClassName="p-0">
-                    <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
+                    <ViewerList roomId={presenceRoomId} onDragStart={(viewer) => {
                       // Viewer drag started - can add visual feedback if needed
                     }} />
                   </PanelShell>
@@ -3437,7 +3536,7 @@ export default function LiveRoom({
               >
                 {drawerOpen === 'leaderboard' && <Leaderboard roomSlug={scopeRoomId} roomName={roomConfig.branding.name} />}
                 {drawerOpen === 'viewers' && (
-                  <ViewerList roomId={scopeRoomId} onDragStart={(viewer) => {
+                  <ViewerList roomId={presenceRoomId} onDragStart={(viewer) => {
                     // Viewer drag started - can add visual feedback if needed
                   }} />
                 )}

@@ -29,7 +29,6 @@ export default function PoliciesIndexPage() {
       <div className="container mx-auto px-4 py-10">
         <div className="max-w-3xl">
           <h1 className="text-3xl font-bold text-foreground">Safety &amp; Policies</h1>
-          <p className="mt-2 text-muted-foreground">Public, crawlable policy pages. No login required.</p>
 
           <div className="mt-10">
             <h2 className="text-lg font-bold text-foreground">Required</h2>

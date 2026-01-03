@@ -4,6 +4,10 @@ import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
 import IMChatWindow, { IMMessage } from './IMChatWindow';
 
+function encodeGiftContent(gift: { giftId: number; giftName: string; giftCoins: number; giftIcon?: string }) {
+  return `__gift__:${JSON.stringify(gift)}`;
+}
+
 // Decode message content to extract type and data
 function decodeIMContent(
   content: string
@@ -274,6 +278,120 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
     }
   }, [currentUserId, supabase]);
 
+  const sendGift = useCallback(
+    async (
+      chatId: string,
+      recipientId: string,
+      giftId: number,
+      giftName: string,
+      giftCoins: number,
+      giftIcon?: string
+    ) => {
+      if (!currentUserId) return;
+
+      const tempId = `temp-gift-${Date.now()}`;
+      const requestId = crypto.randomUUID();
+
+      const newMessage: IMMessage = {
+        id: tempId,
+        senderId: currentUserId,
+        content: '',
+        timestamp: new Date(),
+        status: 'sending',
+        type: 'gift',
+        giftName,
+        giftCoins,
+        giftIcon,
+      };
+
+      setChatWindows((prev) =>
+        prev.map((c) => (c.chatId === chatId ? { ...c, messages: [...c.messages, newMessage] } : c))
+      );
+
+      try {
+        const response = await fetch('/api/gifts/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toUserId: recipientId,
+            coinsAmount: giftCoins,
+            giftTypeId: giftId,
+            context: 'dm',
+            requestId,
+          }),
+        });
+
+        const raw = await response.text();
+        let data: any = null;
+        try {
+          data = raw ? JSON.parse(raw) : null;
+        } catch {
+          data = null;
+        }
+
+        if (!response.ok) {
+          const errMsg =
+            (data && typeof data?.error === 'string' && data.error.length ? data.error : null) ||
+            (raw && raw.length ? raw : null) ||
+            'Failed to send gift';
+          throw new Error(errMsg);
+        }
+
+        const giftContent = encodeGiftContent({
+          giftId,
+          giftName,
+          giftCoins,
+          giftIcon,
+        });
+
+        const { data: row, error } = await supabase
+          .from('instant_messages')
+          .insert({
+            sender_id: currentUserId,
+            recipient_id: recipientId,
+            content: giftContent,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        setChatWindows((prev) =>
+          prev.map((c) =>
+            c.chatId === chatId
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === tempId
+                      ? {
+                          ...m,
+                          id: row.id.toString(),
+                          timestamp: row.created_at ? new Date(row.created_at) : m.timestamp,
+                          status: 'sent',
+                        }
+                      : m
+                  ),
+                }
+              : c
+          )
+        );
+      } catch (error) {
+        console.error('[IM] Error sending gift:', error);
+        setChatWindows((prev) =>
+          prev.map((c) =>
+            c.chatId === chatId
+              ? {
+                  ...c,
+                  messages: c.messages.filter((m) => m.id !== tempId),
+                }
+              : c
+          )
+        );
+      }
+    },
+    [currentUserId, supabase]
+  );
+
   // Close a chat
   const closeChat = useCallback((chatId: string) => {
     setChatWindows(prev => prev.filter(c => c.chatId !== chatId));
@@ -401,6 +519,9 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
           onClose={() => closeChat(chat.chatId)}
           onMinimize={() => toggleMinimize(chat.chatId)}
           onSendMessage={(content) => sendMessage(chat.chatId, chat.recipientId, content)}
+          onSendGift={(giftId, giftName, giftCoins, giftIcon) =>
+            sendGift(chat.chatId, chat.recipientId, giftId, giftName, giftCoins, giftIcon)
+          }
           onFocus={() => focusChat(chat.chatId)}
           zIndex={focusedChatId === chat.chatId ? 9999 : 9990 + index}
         />

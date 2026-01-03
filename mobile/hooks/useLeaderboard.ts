@@ -78,6 +78,7 @@ export function useLeaderboard(
       const { data, error } = await supabase.rpc('get_leaderboard', {
         p_type: type,
         p_period: period,
+        p_limit: 100,
         p_room_id: normalizedRoomId,
       });
 
