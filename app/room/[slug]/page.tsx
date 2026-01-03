@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { Video, Zap, ArrowLeft, Lock, Users } from 'lucide-react';
+import { Video, ArrowLeft, Lock, Users } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import LiveRoom from '@/components/LiveRoom';
@@ -40,7 +40,6 @@ export default function RoomPage() {
   const [room, setRoom] = useState<RoomData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [audioEnabled, setAudioEnabled] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -134,23 +133,6 @@ export default function RoomPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleEnableAudio = async () => {
-    try {
-      // @ts-ignore - AudioContext is available in browser
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') {
-          await ctx.resume();
-        }
-        ctx.close();
-      }
-    } catch (error) {
-      console.warn('[AUDIO] Could not resume AudioContext:', error);
-    }
-    setAudioEnabled(true);
   };
 
   // Create room config for LiveRoom component
@@ -260,39 +242,6 @@ export default function RoomPage() {
                 </Button>
               </Link>
             </div>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  // Audio enable screen
-  if (!audioEnabled) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center border-0 shadow-2xl overflow-hidden">
-          <div className="h-2 bg-gradient-to-r from-primary via-accent to-primary" />
-          <div className="p-8">
-            <div className="relative mx-auto mb-8">
-              <div className="absolute inset-0 -m-4 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full blur-xl animate-pulse" />
-              <div className="relative w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/30">
-                <Zap className="w-10 h-10 text-white" />
-              </div>
-            </div>
-            
-            <h2 className="text-2xl font-bold text-foreground mb-2">{room.name}</h2>
-            <p className="text-muted-foreground mb-6">
-              Click below to enable audio and enter the room.
-            </p>
-            
-            <Button
-              onClick={handleEnableAudio}
-              size="lg"
-              className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 shadow-lg shadow-primary/30"
-            >
-              <Zap className="w-5 h-5 mr-2" />
-              Enable Audio & Enter
-            </Button>
           </div>
         </Card>
       </div>

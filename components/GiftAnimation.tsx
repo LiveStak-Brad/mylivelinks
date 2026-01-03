@@ -18,6 +18,23 @@ export default function GiftAnimation({
   onComplete,
 }: GiftAnimationProps) {
   const [isVisible, setIsVisible] = useState(true);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const computeScale = () => {
+      if (typeof window === 'undefined') return;
+      const w = window.innerWidth;
+      if (w <= 420) return 0.55;
+      if (w <= 640) return 0.7;
+      if (w <= 900) return 0.85;
+      return 1;
+    };
+
+    const apply = () => setScale(computeScale());
+    apply();
+    window.addEventListener('resize', apply);
+    return () => window.removeEventListener('resize', apply);
+  }, []);
 
   useEffect(() => {
     // Animation duration: 3 seconds
@@ -86,7 +103,10 @@ export default function GiftAnimation({
       <div className="absolute inset-0 bg-gradient-to-t from-purple-900/40 via-transparent to-transparent animate-pulse" />
       
       {/* Gift animation */}
-      <div className="relative z-10 text-center animate-gift-bounce">
+      <div
+        className="relative z-10 text-center animate-gift-bounce"
+        style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}
+      >
         {/* Gift icon */}
         <div className="mb-4 animate-gift-spin">
           {giftIcon ? (

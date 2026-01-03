@@ -12,7 +12,6 @@ import { useDailyLeaderboardRank } from '@/hooks/useDailyLeaderboardRank';
 import { RemoteTrack, TrackPublication, RemoteParticipant, Track, RoomEvent, Room } from 'livekit-client';
 import { createClient } from '@/lib/supabase';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
-import { useIM } from '@/components/im';
 
 interface GiftAnimationData {
   id: string;
@@ -91,57 +90,12 @@ export default function Tile({
   const [showLikePop, setShowLikePop] = useState(false);
   const [showFloatingHeart, setShowFloatingHeart] = useState(false);
   const supabase = createClient();
-  const { openChat } = useIM();
-  const [showCompactActions, setShowCompactActions] = useState(false);
-  const shouldUseCompact = compactMode && !isFullscreen;
+  const shouldUseCompact = false;
   const isSelfTile = !!user && user.id === streamerId;
-  const compactButtonClass =
-    'w-full px-3 py-2 rounded-lg text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/15 transition';
-  const compactDangerButtonClass =
-    'w-full px-3 py-2 rounded-lg text-sm font-semibold border border-red-400/40 bg-red-500/20 hover:bg-red-500/30 text-red-100 transition';
-
-  useEffect(() => {
-    if (!shouldUseCompact && showCompactActions) {
-      setShowCompactActions(false);
-    }
-  }, [shouldUseCompact, showCompactActions]);
-
-  useEffect(() => {
-    setShowCompactActions(false);
-  }, [streamerId]);
-
-  useEffect(() => {
-    if (shouldUseCompact && showVolumeSlider) {
-      setShowVolumeSlider(false);
-    }
-  }, [shouldUseCompact, showVolumeSlider]);
-
-  const handleTileClick = useCallback(() => {
-    if (!shouldUseCompact) {
-      return;
-    }
-    setShowCompactActions(true);
-  }, [shouldUseCompact]);
-
-  const handleDismissCompactMenu = useCallback(() => {
-    setShowCompactActions(false);
-  }, []);
-
-  const handleViewProfile = useCallback(() => {
-    setShowCompactActions(false);
-    setShowMiniProfile(true);
-  }, []);
-
-  const handleOpenIMChat = useCallback(() => {
-    if (!streamerId || !streamerUsername) {
-      return;
-    }
-    openChat(streamerId, streamerUsername, streamerAvatar);
-    setShowCompactActions(false);
-  }, [openChat, streamerAvatar, streamerId, streamerUsername]);
+  const gridIconSizeClass = compactMode ? 'w-4 h-4' : 'w-5 h-5';
+  const gridNameMaxWidthClass = compactMode ? 'max-w-[55%]' : 'max-w-[70%]';
 
   const handleGiftOpen = useCallback(() => {
-    setShowCompactActions(false);
     setShowGiftModal(true);
   }, []);
 
@@ -151,18 +105,15 @@ export default function Tile({
     } else {
       onExpand?.();
     }
-    setShowCompactActions(false);
   }, [isFullscreen, onExitFullscreen, onExpand]);
 
   const handleReplaceTile = useCallback(() => {
     if (!onReplace) return;
     onReplace();
-    setShowCompactActions(false);
   }, [onReplace]);
 
   const handleCloseTileAction = useCallback(() => {
     onClose();
-    setShowCompactActions(false);
   }, [onClose]);
 
   const handleVolumeInput = useCallback((newVolume: number) => {
@@ -1207,9 +1158,9 @@ export default function Tile({
   return (
     <div
       data-tile-id={slotIndex}
-      onClick={handleTileClick}
+      onClick={() => {}}
       className={`
-        relative ${isFullscreen ? 'w-full h-full' : 'aspect-[3/2]'} rounded-lg overflow-hidden group
+        relative ${isFullscreen ? 'w-full h-full' : compactMode ? 'w-full h-full' : 'aspect-[3/2]'} rounded-lg overflow-hidden group
         border-2 transition-all duration-200
         ${
           tileState === 'live'
@@ -1226,14 +1177,22 @@ export default function Tile({
           <video
             ref={videoRef}
             className={`absolute inset-0 w-full h-full ${
-              isPortraitVideo || isSquareVideo ? 'object-contain' : 'object-cover'
+              !isFullscreen
+                ? compactMode
+                  ? 'object-contain'
+                  : isPortraitVideo || isSquareVideo
+                    ? 'object-contain'
+                    : 'object-cover'
+                : isPortraitVideo || isSquareVideo
+                  ? 'object-contain'
+                  : 'object-cover'
             } ${isMuted ? 'grayscale' : ''}`}
             autoPlay
             playsInline
             muted={isMuted}
           />
         )}
-        
+
         {/* Fallback: Avatar or placeholder when no video track */}
         {!videoTrack && (
           <div className="absolute inset-0 w-full h-full">
@@ -1252,16 +1211,11 @@ export default function Tile({
         )}
 
         {/* Audio element for LiveKit audio track - always render when we have a streamer */}
-        <audio
-          ref={audioRef}
-          autoPlay
-          playsInline
-          className="hidden"
-        />
+        <audio ref={audioRef} autoPlay playsInline className="hidden" />
 
         {/* No preview overlays - preview mode is invisible to users */}
         {/* No "Connecting..." UI - streamer should never see this */}
-        
+
         {/* Gift Animations Overlay */}
         {activeGiftAnimations.map((gift) => (
           <GiftAnimation
@@ -1271,7 +1225,7 @@ export default function Tile({
             senderUsername={gift.senderUsername}
             coinAmount={gift.coinAmount}
             onComplete={() => {
-              setActiveGiftAnimations(prev => prev.filter(g => g.id !== gift.id));
+              setActiveGiftAnimations((prev) => prev.filter((g) => g.id !== gift.id));
             }}
           />
         ))}
@@ -1317,23 +1271,11 @@ export default function Tile({
         </div>
       )}
 
-      {/* Grid Controls: Speaker (top-left) and Close (top-right) */}
+      {/* Grid Controls: Volume (top-left) and Close (top-right) */}
       {!shouldUseCompact && !isFullscreen && (
         <>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onMute();
-            }}
-            className="absolute top-2 left-2 z-20 p-1 text-white/90 hover:text-white transition"
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-          </button>
-
           <div
-            className="absolute top-2 right-2 z-20 flex items-center gap-1"
+            className="absolute top-2 left-2 z-20 flex items-center gap-1"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -1347,7 +1289,7 @@ export default function Tile({
               className="p-1 text-white/90 hover:text-white transition"
               title="Volume"
             >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              {isMuted ? <VolumeX className={gridIconSizeClass} /> : <Volume2 className={gridIconSizeClass} />}
             </button>
 
             {showVolumeSlider && (
@@ -1364,11 +1306,17 @@ export default function Tile({
                   setShowVolumeSlider(false);
                   onVolumeSliderToggle?.(false);
                 }}
-                className="w-16 h-1 accent-white/90 opacity-90"
+                className="w-14 h-1 accent-white/90 opacity-90"
                 title="Volume Slider"
               />
             )}
+          </div>
 
+          <div
+            className="absolute top-2 right-2 z-20 flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             {onExpand && (
               <button
                 type="button"
@@ -1379,7 +1327,7 @@ export default function Tile({
                 className="p-1 text-white/90 hover:text-white transition"
                 title="Expand"
               >
-                <Maximize2 className="w-5 h-5" />
+                <Maximize2 className={gridIconSizeClass} />
               </button>
             )}
             <button
@@ -1391,7 +1339,7 @@ export default function Tile({
               className="p-1 text-white/90 hover:text-white transition"
               title="Close"
             >
-              <X className="w-5 h-5" />
+              <X className={gridIconSizeClass} />
             </button>
           </div>
         </>
@@ -1585,19 +1533,34 @@ export default function Tile({
         <div className="absolute inset-x-0 bottom-0 z-20">
           <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent" />
           <div className="relative flex items-end justify-between px-2 pb-2">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMiniProfile(true);
-              }}
-              className="text-white text-xs font-semibold truncate max-w-[70%] drop-shadow pointer-events-auto"
-              title={streamerUsername}
-            >
-              {streamerUsername}
-            </button>
+            <div className="flex items-end gap-2 min-w-0 pointer-events-auto">
+              {!isSelfTile && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGiftOpen();
+                  }}
+                  className="text-white hover:opacity-90 transition flex-shrink-0"
+                  title="Send Gift"
+                >
+                  <Gift className={gridIconSizeClass} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMiniProfile(true);
+                }}
+                className={`text-white text-xs font-semibold truncate ${gridNameMaxWidthClass} drop-shadow`}
+                title={streamerUsername}
+              >
+                {streamerUsername}
+              </button>
+            </div>
 
-            <div className="flex items-center gap-2 pointer-events-auto">
+            <div className="flex items-center gap-2 pointer-events-auto flex-shrink-0">
               {user && (
                 <button
                   type="button"
@@ -1609,7 +1572,7 @@ export default function Tile({
                   className={`relative text-white transition-all ${showLikePop ? 'scale-125' : 'scale-100'} hover:opacity-90`}
                   title={isLiked ? 'Liked!' : 'Like'}
                 >
-                  <Heart className="w-5 h-5" fill={isLiked ? 'currentColor' : 'none'} />
+                  <Heart className={gridIconSizeClass} fill={isLiked ? 'currentColor' : 'none'} />
                   {showLikePop && (
                     <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-red-500 text-lg font-bold animate-fade-up pointer-events-none">
                       ❤️
@@ -1620,19 +1583,6 @@ export default function Tile({
                       ❤️
                     </span>
                   )}
-                </button>
-              )}
-              {!isSelfTile && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleGiftOpen();
-                  }}
-                  className="text-white hover:opacity-90 transition"
-                  title="Send Gift"
-                >
-                  <Gift className="w-5 h-5" />
                 </button>
               )}
             </div>
@@ -1670,156 +1620,6 @@ export default function Tile({
               <Gift className="w-5 h-5" />
             </button>
           )}
-        </div>
-      )}
-
-      {shouldUseCompact && !showCompactActions && (
-        <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none z-10">
-          <div className="px-3 py-1 text-[11px] font-semibold tracking-wide text-white bg-black/45 backdrop-blur-md rounded-full shadow-lg">
-            Click for stats & controls
-          </div>
-        </div>
-      )}
-
-      {shouldUseCompact && showCompactActions && (
-        <div
-          className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDismissCompactMenu();
-          }}
-        >
-          <div
-            className="w-full max-w-sm bg-gray-900 text-white rounded-2xl p-4 space-y-4 border border-white/10 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start gap-3">
-              {streamerAvatar ? (
-                <img
-                  src={streamerAvatar}
-                  alt={streamerUsername}
-                  className="w-12 h-12 rounded-full object-cover border border-white/10"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-lg font-bold">
-                  {(streamerUsername?.charAt(0) ?? '?').toUpperCase()}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="text-base font-semibold truncate">{streamerUsername}</div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-white/70 mt-1">
-                  {gifterStatus && (
-                    <span className="flex items-center gap-1">
-                      <TierBadge tier_key={gifterStatus.tier_key} level={gifterStatus.level_in_tier} size="sm" />
-                      <span>Lv {gifterStatus.level_in_tier}</span>
-                    </span>
-                  )}
-                  {viewerCount > 0 && <span>👁️ {viewerCount}</span>}
-                  {trendingRank && trendingRank <= 10 && <span>🔥 #{trendingRank}</span>}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleDismissCompactMenu}
-                className="p-2 rounded-full hover:bg-white/10 transition"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-white/5 rounded-xl p-3 text-center">
-                <div className="text-lg font-semibold">👁️ {viewerCount}</div>
-                <div className="uppercase tracking-wide text-white/60 mt-1">Viewers</div>
-              </div>
-              <div className="bg-white/5 rounded-xl p-3 text-center">
-                <div className="text-lg font-semibold">❤️ {likesCount}</div>
-                <div className="uppercase tracking-wide text-white/60 mt-1">Likes</div>
-              </div>
-              {!leaderboardRank.isLoading && (
-                <div className="bg-white/5 rounded-xl p-3 text-center col-span-2">
-                  {leaderboardRank.rank !== null ? (
-                    <>
-                      <div className="text-lg font-semibold">#{leaderboardRank.rank}</div>
-                      <div className="uppercase tracking-wide text-white/60 mt-1">Leaderboard</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-lg font-semibold">No rank yet</div>
-                      <div className="uppercase tracking-wide text-white/60 mt-1">Keep gifting</div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" className={`${compactButtonClass} bg-blue-600/20 border-blue-400/60`} onClick={handleGiftOpen}>
-                💎 Send Gift
-              </button>
-              <button
-                type="button"
-                disabled={!user}
-                onClick={handleLikeTap}
-                className={`${compactButtonClass} ${!user ? 'opacity-40 cursor-not-allowed' : ''}`}
-              >
-                {isLiked ? '❤️ Liked' : '🤍 Like'}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" className={compactButtonClass} onClick={handleViewProfile}>
-                👤 View Profile
-              </button>
-              <button type="button" className={compactButtonClass} onClick={handleOpenIMChat}>
-                💬 Message
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" className={compactButtonClass} onClick={onMute}>
-                {isMuted ? '🔊 Unmute' : '🔇 Mute'}
-              </button>
-              {(onExpand || onExitFullscreen) && (
-                <button type="button" className={compactButtonClass} onClick={handleFullscreenToggle}>
-                  {isFullscreen ? '⤢ Exit Focus' : '⤢ Expand'}
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-white/70">
-                <span>Volume</span>
-                <span>{Math.round((isMuted ? 0 : volume) * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                value={isMuted ? 0 : volume}
-                onChange={(e) => handleVolumeInput(parseFloat(e.target.value))}
-                className="w-full h-1 bg-gray-700 rounded-lg appearance-none accent-blue-500"
-              />
-            </div>
-
-            {onReplace && (
-              <button type="button" className={compactButtonClass} onClick={handleReplaceTile}>
-                🔄 Replace in Grid
-              </button>
-            )}
-            <button type="button" className={compactDangerButtonClass} onClick={handleCloseTileAction}>
-              ✕ Remove from Grid
-            </button>
-            <button
-              type="button"
-              className="w-full text-center text-sm text-white/70 hover:text-white transition"
-              onClick={handleDismissCompactMenu}
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       )}
 

@@ -238,8 +238,7 @@ export default function MobileWebWatchLayout({
   const handleTileTap = useCallback((slotIndex: number, hasStreamer: boolean) => {
     if (!hasStreamer) return;
     setIsChromeVisible(true);
-    setSelectedActionSlotIndex(slotIndex);
-    setActiveSheet('options');
+    setFocusedSlotIndex(slotIndex);
   }, []);
 
   // Handle exit focus mode
@@ -456,6 +455,7 @@ export default function MobileWebWatchLayout({
               sharedRoom={sharedRoom}
               isRoomConnected={isRoomConnected}
               isCurrentUserPublishing={isCurrentUserPublishing}
+              compactMode={false}
               onClose={() => onCloseTile(focusedSlot.slotIndex)}
               onMute={() => onMuteTile(focusedSlot.slotIndex)}
               isMuted={focusedSlot.isMuted || globalMuted}
@@ -502,12 +502,13 @@ export default function MobileWebWatchLayout({
                       sharedRoom={sharedRoom}
                       isRoomConnected={isRoomConnected}
                       isCurrentUserPublishing={isCurrentUserPublishing}
+                      compactMode={true}
                       onClose={() => onCloseTile(slot.slotIndex)}
                       onMute={() => onMuteTile(slot.slotIndex)}
                       isMuted={globalMuted || slot.isMuted}
                       volume={slot.volume}
                       onVolumeChange={(vol) => onVolumeChange(slot.slotIndex, vol)}
-                      onExpand={() => handleTileTap(slot.slotIndex, true)}
+                      onExpand={() => setFocusedSlotIndex(slot.slotIndex)}
                     />
                   ) : (
                     /* Empty slot placeholder */
