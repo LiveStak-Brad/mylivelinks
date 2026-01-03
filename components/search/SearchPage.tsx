@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { ReactNode, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
@@ -71,7 +71,15 @@ interface SearchPageProps {
   initialTab: SearchTab;
 }
 
-export function SearchPage({ initialTab }: SearchPageProps) {
+export function SearchPage(props: SearchPageProps) {
+  return (
+    <Suspense fallback={<div className="min-h-[50vh]" />}>
+      <SearchPageContent {...props} />
+    </Suspense>
+  );
+}
+
+function SearchPageContent({ initialTab }: SearchPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 

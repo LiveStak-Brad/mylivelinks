@@ -4,6 +4,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import type { ProfileLocation } from '@/lib/location';
 
+interface ProfileLocationRow {
+  location_zip: string | null;
+  location_city: string | null;
+  location_region: string | null;
+  location_country: string | null;
+  location_label: string | null;
+  location_hidden: boolean | null;
+  location_show_zip: boolean | null;
+  location_updated_at: string | null;
+}
+
 interface UseProfileLocationResult {
   location: ProfileLocation | null;
   loading: boolean;
@@ -49,18 +60,20 @@ export function useProfileLocation(): UseProfileLocationResult {
         throw profileError;
       }
 
-      if (!data) {
+      const row = data as ProfileLocationRow | null;
+
+      if (!row) {
         setLocation(null);
       } else {
         setLocation({
-          zip: data.location_zip,
-          city: data.location_city,
-          region: data.location_region,
-          country: data.location_country,
-          label: data.location_label,
-          hidden: data.location_hidden,
-          showZip: data.location_show_zip,
-          updatedAt: data.location_updated_at,
+          zip: row.location_zip,
+          city: row.location_city,
+          region: row.location_region,
+          country: row.location_country,
+          label: row.location_label,
+          hidden: row.location_hidden,
+          showZip: row.location_show_zip,
+          updatedAt: row.location_updated_at,
         });
       }
     } catch (err) {

@@ -43,8 +43,11 @@ export function formatLocationDisplay(
     return fallback;
   }
 
-  if ((location.label && (forceLabel || location.label.trim().length > 0)) ?? false) {
-    return location.label.trim();
+  if (location.label) {
+    const trimmedLabel = location.label.trim();
+    if (forceLabel || trimmedLabel.length > 0) {
+      return trimmedLabel;
+    }
   }
 
   const parts = [];
