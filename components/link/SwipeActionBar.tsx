@@ -1,5 +1,7 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
+
 type SwipeActionVariant = 'regular' | 'dating' | 'auto';
 
 interface SwipeActionBarProps {
@@ -32,6 +34,8 @@ const variantStyles: Record<SwipeActionVariant, {
 
 const BOTTOM_NAV_CLEARANCE_PX = 86;
 
+type PrimaryVisualState = 'idle' | 'loading' | 'success';
+
 export function SwipeActionBar({
   primaryLabel,
   secondaryLabel,
@@ -46,6 +50,101 @@ export function SwipeActionBar({
   const stickyOffset = `calc(env(safe-area-inset-bottom, 0px) + ${BOTTOM_NAV_CLEARANCE_PX}px)`;
   const safePadding = 'calc(env(safe-area-inset-bottom, 0px) + 8px)';
   const styles = variantStyles[variant];
+
+  const [primaryVisualState, setPrimaryVisualState] = useState<PrimaryVisualState>('idle');
+  const primaryTimeoutsRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    return () => {
+      primaryTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      primaryTimeoutsRef.current = [];
+    };
+  }, []);
+
+  const handlePrimaryClick = useCallback(() => {
+    if (disabled) return;
+    if (primaryVisualState !== 'idle') return;
+
+    setPrimaryVisualState('loading');
+    onPrimary();
+
+    primaryTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    primaryTimeoutsRef.current = [];
+
+    primaryTimeoutsRef.current.push(
+      window.setTimeout(() => setPrimaryVisualState('success'), 180),
+      window.setTimeout(() => setPrimaryVisualState('idle'), 380)
+    );
+  }, [disabled, onPrimary, primaryVisualState]);
+
+  const primaryContent = (() => {
+    if (primaryVisualState === 'loading') {
+      return (
+        <>
+          <svg className="h-6 w-6 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="3"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"
+            />
+          </svg>
+          <span className="sr-only">Submitting</span>
+        </>
+      );
+    }
+
+    if (primaryVisualState === 'success') {
+      return (
+        <>
+          <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="sr-only">Success</span>
+        </>
+      );
+    }
+
+    const idleIcon = (() => {
+      if (variant === 'dating') {
+        return (
+          <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2.5}
+              d="M21 8.25c0-2.485-2.099-4.5-4.687-4.5-1.935 0-3.597 1.126-4.313 2.733-.716-1.607-2.378-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
+            />
+          </svg>
+        );
+      }
+
+      return (
+        <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2.5}
+            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+          />
+        </svg>
+      );
+    })();
+
+    return (
+      <>
+        {idleIcon}
+        {primaryLabel}
+      </>
+    );
+  })();
 
   return (
     <div
@@ -91,14 +190,11 @@ export function SwipeActionBar({
           <button
             type="button"
             aria-label={primaryLabel}
-            onClick={onPrimary}
+            onClick={handlePrimaryClick}
             disabled={disabled}
-            className={`flex h-16 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r text-lg font-semibold text-white shadow-xl transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50 ${styles.primaryGradient}`}
+            className={`flex h-16 flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r text-lg font-semibold text-white shadow-xl transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99] ${styles.primaryGradient} ${primaryVisualState === 'loading' ? 'scale-[1.01]' : ''}`}
           >
-            <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-            {primaryLabel}
+            {primaryContent}
           </button>
         </div>
       </div>

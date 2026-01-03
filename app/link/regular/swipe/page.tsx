@@ -8,6 +8,7 @@ import { SwipeCard } from '@/components/link/SwipeCard';
 import { ProfileInfoModal } from '@/components/link/ProfileInfoModal';
 import { ConnectionModal } from '@/components/link/ConnectionModal';
 import { SwipeActionBar } from '@/components/link/SwipeActionBar';
+import { CaughtUpEmptyState } from '@/components/link/CaughtUpEmptyState';
 
 export default function RegularSwipePage() {
   const router = useRouter();
@@ -119,30 +120,45 @@ export default function RegularSwipePage() {
   // Show "no profiles" message if loaded but empty
   if (!loading && candidates.length === 0) {
     return (
-      <div className="min-h-svh bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10 flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-8">
-            <svg className="w-16 h-16 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          </div>
-          <h2 className="text-3xl font-bold mb-4">No Profiles Yet</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">
-            Check back later for new people to connect with!
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={() => router.push('/link/profile')}
-              className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors"
-            >
-              Set Up My Profile
-            </button>
+      <div className="min-h-svh bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-950 dark:to-blue-900/10">
+        <div className="mx-auto flex min-h-svh max-w-2xl flex-col px-4 pt-6">
+          <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => router.push('/link')}
-              className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl font-semibold transition-colors"
+              className="p-3 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
             >
-              Back to Link
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
             </button>
+
+            <div className="text-center">
+              <h1 className="text-xl font-bold">Link or Nah</h1>
+              <p className="text-xs text-blue-600 dark:text-blue-400">Build your network</p>
+            </div>
+
+            <button
+              onClick={() => router.push('/link/settings')}
+              className="p-3 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex flex-1 items-center justify-center">
+            <CaughtUpEmptyState
+              onRefresh={() => {
+                setCurrentIndex(0);
+                setCandidates([]);
+                loadCandidates();
+              }}
+              onSecondary={() => router.push('/link/profile')}
+              showAutoLinkTip={true}
+              variant="regular"
+            />
           </div>
         </div>
       </div>
@@ -192,23 +208,16 @@ export default function RegularSwipePage() {
         <div className="relative flex-1 min-h-[360px]">
           {!hasMore ? (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-8">
-                  <svg className="w-16 h-16 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h2 className="text-3xl font-bold mb-4">No More Profiles</h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">
-                  Check back later for new connections!
-                </p>
-                <button
-                  onClick={() => router.push('/link/mutuals')}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors"
-                >
-                  View Mutuals
-                </button>
-              </div>
+              <CaughtUpEmptyState
+                onRefresh={() => {
+                  setCurrentIndex(0);
+                  setCandidates([]);
+                  loadCandidates();
+                }}
+                onSecondary={() => router.push('/link/profile')}
+                showAutoLinkTip={true}
+                variant="regular"
+              />
             </div>
           ) : (
             <>

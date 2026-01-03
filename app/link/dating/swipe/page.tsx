@@ -8,6 +8,7 @@ import { SwipeCard } from '@/components/link/SwipeCard';
 import { ProfileInfoModal } from '@/components/link/ProfileInfoModal';
 import { ConnectionModal } from '@/components/link/ConnectionModal';
 import { SwipeActionBar } from '@/components/link/SwipeActionBar';
+import { CaughtUpEmptyState } from '@/components/link/CaughtUpEmptyState';
 
 export default function DatingSwipePage() {
   const router = useRouter();
@@ -160,23 +161,17 @@ export default function DatingSwipePage() {
         <div className="relative flex-1 min-h-[360px]">
           {!hasMore ? (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <div className="w-32 h-32 bg-gradient-to-br from-pink-100 to-rose-100 dark:from-pink-900/30 dark:to-rose-900/30 rounded-full flex items-center justify-center mx-auto mb-8">
-                  <svg className="w-16 h-16 text-pink-600 dark:text-pink-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <h2 className="text-3xl font-bold mb-4">No More Profiles</h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-8 text-lg">
-                  Check back later for new matches!
-                </p>
-                <button
-                  onClick={() => router.push('/link/dating/matches')}
-                  className="px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-semibold transition-colors"
-                >
-                  View Matches
-                </button>
-              </div>
+              <CaughtUpEmptyState
+                onRefresh={() => {
+                  setCurrentIndex(0);
+                  setCandidates([]);
+                  loadCandidates();
+                }}
+                onSecondary={() => router.push('/link/dating/profile')}
+                showAutoLinkTip={false}
+                variant="dating"
+                subtitle="Check back later for more Links."
+              />
             </div>
           ) : (
             <>
