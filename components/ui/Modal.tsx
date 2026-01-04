@@ -16,8 +16,8 @@ import { X } from 'lucide-react';
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
-  description?: string;
+  title?: ReactNode;
+  description?: ReactNode;
   children: ReactNode;
   /** 
    * Size on desktop. All modals go full-screen on mobile by default.
@@ -35,6 +35,8 @@ export interface ModalProps {
   footer?: ReactNode;
   /** Allow callers to disable internal body scrolling */
   scrollableContent?: boolean;
+  /** Optional action button next to the close icon */
+  headerAction?: ReactNode;
 }
 
 // Maps to CSS tokens
@@ -60,6 +62,7 @@ function Modal({
   className = '',
   footer,
   scrollableContent = true,
+  headerAction,
 }: ModalProps) {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -147,7 +150,7 @@ function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header - consistent height and padding */}
-        {(title || showCloseButton) && (
+        {(title || showCloseButton || headerAction) && (
           <div 
             className={`
               flex items-start justify-between border-b border-border flex-shrink-0
@@ -161,25 +164,28 @@ function Modal({
           >
             <div className="min-w-0 flex-1" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {title && (
-                <h2 className="text-lg font-semibold text-foreground truncate">{title}</h2>
+                <div className="text-lg font-semibold text-foreground truncate">{title}</div>
               )}
               {description && (
-                <p className="text-sm text-muted-foreground line-clamp-2">{description}</p>
+                <div className="text-sm text-muted-foreground line-clamp-2">{description}</div>
               )}
             </div>
-            {showCloseButton && (
-              <button
-                onClick={onClose}
-                className="flex-shrink-0 rounded-lg hover:bg-muted transition-colors mobile-touch-target"
-                style={{ 
-                  padding: 'var(--space-2)',
-                  margin: 'calc(-1 * var(--space-1))',
-                }}
-                aria-label="Close"
-              >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {headerAction}
+              {showCloseButton && (
+                <button
+                  onClick={onClose}
+                  className="flex-shrink-0 rounded-lg hover:bg-muted transition-colors mobile-touch-target"
+                  style={{ 
+                    padding: 'var(--space-2)',
+                    margin: 'calc(-1 * var(--space-1))',
+                  }}
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
           </div>
         )}
         

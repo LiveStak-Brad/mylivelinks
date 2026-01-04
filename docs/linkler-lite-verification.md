@@ -36,12 +36,11 @@ curl -s -X POST http://localhost:3000/api/linkler/support \
   -H "Authorization: Bearer <SUPABASE_SESSION_JWT>" \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "My showcase page is stuck on loading.",
-    "context": { "screen": "profile", "browser": "edge" }
+    "message": "My showcase page is stuck on loading."
   }' | jq
 ```
 
-The response mirrors the previous contract but now includes `retryAfterSeconds` only when the short cooldown (or kill switch) blocks new submissions. Ticket rows are inserted even if `ai.ok` is `false` (you’ll just see `ai.error` populated).
+Linkler now auto-attaches the surface/platform context server-side, so the client only supplies the plain-text description. The response mirrors the previous contract but now includes `retryAfterSeconds` only when the short cooldown (or kill switch) blocks new submissions. Ticket rows are inserted even if `ai.ok` is `false` (you’ll just see `ai.error` populated).
 
 ## 3. Cooldown proof
 

@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export type LinklerPanelTab = 'support' | 'companion';
-
 export type CompanionEntry = {
   id: string;
   role: 'user' | 'assistant';
@@ -19,13 +17,6 @@ export type CompanionEntry = {
 };
 
 export type LinklerPanelState = {
-  activeTab: LinklerPanelTab;
-  setActiveTab: (tab: LinklerPanelTab) => void;
-  sessionId: string;
-  setSessionId: (sessionId: string) => void;
-  messages: CompanionEntry[];
-  appendMessage: (entry: CompanionEntry) => void;
-  resetConversation: () => void;
   cooldownEndsAt: number | null;
   setCooldownFromSeconds: (seconds: number) => void;
   cooldownRemaining: number;
@@ -36,13 +27,9 @@ export type LinklerPanelState = {
   supportMessages: CompanionEntry[];
   appendSupportMessage: (entry: CompanionEntry) => void;
   resetSupportConversation: () => void;
-  supportForceEscalate: boolean;
-  setSupportForceEscalate: (value: boolean) => void;
 };
 
 const STORAGE_KEYS = {
-  SESSION_ID: 'linkler.sessionId',
-  MESSAGES: 'linkler.transcript',
   LAST_TICKET: 'linkler.lastTicket',
   COOLDOWN: 'linkler.cooldownEndsAt',
   SUPPORT_SESSION_ID: 'linkler.support.sessionId',
@@ -72,16 +59,6 @@ function generateSessionId() {
 }
 
 export function useLinklerPanel(): LinklerPanelState {
-  const [activeTab, setActiveTab] = useState<LinklerPanelTab>('support');
-  const [sessionId, setSessionIdState] = useState(() => {
-    if (!isBrowser()) return generateSessionId();
-    const stored = window.localStorage.getItem(STORAGE_KEYS.SESSION_ID);
-    return stored || generateSessionId();
-  });
-  const [messages, setMessages] = useState<CompanionEntry[]>(() => {
-    if (!isBrowser()) return [];
-    return safeParseJSON<CompanionEntry[]>(window.localStorage.getItem(STORAGE_KEYS.MESSAGES), []);
-  });
   const [lastTicket, setLastTicketState] = useState<{ id: string; created_at?: string } | null>(() => {
     if (!isBrowser()) return null;
     return safeParseJSON<{ id: string; created_at?: string } | null>(
@@ -111,22 +88,11 @@ export function useLinklerPanel(): LinklerPanelState {
     if (!isBrowser()) return [];
     return safeParseJSON<CompanionEntry[]>(window.localStorage.getItem(STORAGE_KEYS.SUPPORT_MESSAGES), []);
   });
-  const [supportForceEscalate, setSupportForceEscalate] = useState(false);
-
-  useEffect(() => {
-    if (!isBrowser()) return;
-    window.localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionId);
-  }, [sessionId]);
 
   useEffect(() => {
     if (!isBrowser()) return;
     window.localStorage.setItem(STORAGE_KEYS.SUPPORT_SESSION_ID, supportSessionId);
   }, [supportSessionId]);
-
-  useEffect(() => {
-    if (!isBrowser()) return;
-    window.localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
-  }, [messages]);
 
   useEffect(() => {
     if (!isBrowser()) return;
@@ -169,17 +135,6 @@ export function useLinklerPanel(): LinklerPanelState {
     return diff <= 0 ? 0 : Math.ceil(diff / 1000);
   }, [cooldownEndsAt, heartbeat]);
 
-  const setSessionId = useCallback((nextId: string) => {
-    setSessionIdState(nextId);
-  }, []);
-
-  const appendMessage = useCallback((entry: CompanionEntry) => {
-    setMessages((prev) => {
-      const next = [...prev, entry].slice(-40);
-      return next;
-    });
-  }, []);
-
   const appendSupportMessage = useCallback((entry: CompanionEntry) => {
     setSupportMessages((prev) => {
       const next = [...prev, entry].slice(-40);
@@ -187,16 +142,9 @@ export function useLinklerPanel(): LinklerPanelState {
     });
   }, []);
 
-  const resetConversation = useCallback(() => {
-    setMessages([]);
-    setSessionIdState(generateSessionId());
-    setCooldownEndsAt(null);
-  }, []);
-
   const resetSupportConversation = useCallback(() => {
     setSupportMessages([]);
     setSupportSessionIdState(generateSessionId());
-    setSupportForceEscalate(false);
   }, []);
 
   const setCooldownFromSeconds = useCallback((seconds: number) => {
@@ -213,13 +161,6 @@ export function useLinklerPanel(): LinklerPanelState {
   }, []);
 
   return {
-    activeTab,
-    setActiveTab,
-    sessionId,
-    setSessionId,
-    messages,
-    appendMessage,
-    resetConversation,
     cooldownEndsAt,
     setCooldownFromSeconds,
     cooldownRemaining,
@@ -230,7 +171,5 @@ export function useLinklerPanel(): LinklerPanelState {
     supportMessages,
     appendSupportMessage,
     resetSupportConversation,
-    supportForceEscalate,
-    setSupportForceEscalate,
   };
 }

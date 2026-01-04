@@ -6,18 +6,19 @@ import { createClient } from '@/lib/supabase';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import Image from 'next/image';
 import Link from 'next/link';
-import { 
-  Wallet, 
-  User, 
-  Settings, 
-  LogOut, 
+import {
+  Wallet,
+  User,
+  Settings,
+  LogOut,
   ChevronDown,
   ExternalLink,
   ShoppingBag,
   Bell,
-  MessageCircle
+  MessageCircle,
 } from 'lucide-react';
 import LiveAvatar from './LiveAvatar';
+import ThemeToggle from './ThemeToggle';
 
 interface UserMenuProps {
   className?: string;
@@ -331,6 +332,8 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
             />
             
             <MenuDivider />
+
+            <ThemeToggle variant="menu-item" className="mb-1" />
             
             {/* Logout */}
             <MenuItem

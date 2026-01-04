@@ -2,8 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  Linking,
+  Modal as RNModal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,28 +29,38 @@ import {
   type LinklerEscalationReason,
 } from '../../shared/linkler/escalation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase, supabaseConfigured } from '../lib/supabase';
 
 const LINKLER_IMAGE = require('../../linkler.png');
 
-type Tab = 'support' | 'companion';
-
 type CompanionEntry = {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   text: string;
   createdAt: number;
   meta?: {
-    exposureTips?: string[];
-    featureIdeas?: string[];
-    suggestSendToHuman?: boolean;
+    ticketId?: string;
     recommendHuman?: boolean;
+    suggestSendToHuman?: boolean;
     degraded?: boolean;
   };
 };
 
+type LinklerUsage = {
+  usedToday: number;
+  remainingToday: number;
+  dailyLimit: number;
+};
+
+type TicketSummary = {
+  id: string;
+  status: string;
+  updated_at: string;
+  created_at: string;
+  message: string | null;
+};
+
 const STORAGE_KEYS = {
-  SESSION: 'linkler.mobile.session',
-  MESSAGES: 'linkler.mobile.messages',
   LAST_TICKET: 'linkler.mobile.lastTicket',
   COOLDOWN: 'linkler.mobile.cooldown',
   SUPPORT_SESSION: 'linkler.mobile.support.session',
@@ -56,40 +70,34 @@ const STORAGE_KEYS = {
 const COMPOSER_MIN_HEIGHT = 44;
 const COMPOSER_MAX_HEIGHT = 96;
 const NEAR_BOTTOM_THRESHOLD = 80;
-const MAX_COOLDOWN_MS = 15_000;
 
 export function LinklerFab({ show = true }: { show?: boolean }) {
   const { theme } = useThemeMode();
-  const { getAccessToken } = useAuthContext();
+  const { user, getAccessToken } = useAuthContext();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+
   const [visible, setVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>('support');
   const [supportMessage, setSupportMessage] = useState('');
   const [supportContext, setSupportContext] = useState('');
   const [supportEscalating, setSupportEscalating] = useState(false);
-  const [lastTicketId, setLastTicketId] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string>(generateId());
-  const [companionMessages, setCompanionMessages] = useState<CompanionEntry[]>([]);
-  const [companionMessage, setCompanionMessage] = useState('');
-  const [companionSending, setCompanionSending] = useState(false);
-  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
-  const [storageLoaded, setStorageLoaded] = useState(false);
-  const [tick, setTick] = useState(Date.now());
-  const [supportSessionId, setSupportSessionId] = useState<string>(generateId());
   const [supportMessages, setSupportMessages] = useState<CompanionEntry[]>([]);
+  const [supportSessionId, setSupportSessionId] = useState<string>(generateId());
   const [supportAsking, setSupportAsking] = useState(false);
-  const [supportLinklerError, setSupportLinklerError] = useState<string | null>(null);
-  const [supportSafetyNotice, setSupportSafetyNotice] = useState<string | null>(null);
   const [supportEscalationReason, setSupportEscalationReason] = useState<LinklerEscalationReason | null>(null);
-  const [supportForceEscalate, setSupportForceEscalate] = useState(false);
-  const [supportFailureReason, setSupportFailureReason] = useState<LinklerEscalationReason | null>(null);
-  const [companionNotice, setCompanionNotice] = useState<string | null>(null);
   const [supportComposerHeight, setSupportComposerHeight] = useState(COMPOSER_MIN_HEIGHT);
-  const [companionComposerHeight, setCompanionComposerHeight] = useState(COMPOSER_MIN_HEIGHT);
+  const [storageLoaded, setStorageLoaded] = useState(false);
+  const [lastTicketId, setLastTicketId] = useState<string | null>(null);
+  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
+  const [tick, setTick] = useState(Date.now());
+  const [usage, setUsage] = useState<LinklerUsage | null>(null);
+  const [ticketsVisible, setTicketsVisible] = useState(false);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<TicketSummary[]>([]);
+  const [supportError, setSupportError] = useState<string | null>(null);
 
   const COOLDOWN_COPY = 'Hang on a sec...';
-  const COOLDOWN_HINT = 'Hang on a sec... Try again in a few seconds.';
   const UNAVAILABLE_COPY = 'Linkler is temporarily unavailable.';
 
   const {
@@ -100,51 +108,28 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
     showNewMessages: supportShowNewMessages,
   } = useTranscriptScroll();
 
-  const {
-    scrollRef: companionScrollRef,
-    handleScroll: handleCompanionScroll,
-    notifyContentChange: notifyCompanionScrollChange,
-    scrollToBottom: scrollCompanionToBottom,
-    showNewMessages: companionShowNewMessages,
-  } = useTranscriptScroll();
-
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const [session, transcript, ticket, cooldown, supportSession, supportTranscript] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEYS.SESSION),
-          AsyncStorage.getItem(STORAGE_KEYS.MESSAGES),
+        const [ticket, cooldown, supportSession, supportTranscript] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.LAST_TICKET),
           AsyncStorage.getItem(STORAGE_KEYS.COOLDOWN),
           AsyncStorage.getItem(STORAGE_KEYS.SUPPORT_SESSION),
           AsyncStorage.getItem(STORAGE_KEYS.SUPPORT_MESSAGES),
         ]);
         if (cancelled) return;
-        if (session) setSessionId(session);
-        if (transcript) {
-          try {
-            setCompanionMessages(JSON.parse(transcript));
-          } catch {
-            // ignore
-          }
-        }
         if (ticket) setLastTicketId(ticket);
         if (cooldown) {
           const parsed = Number(cooldown);
-          if (Number.isFinite(parsed)) {
-            const remaining = parsed - Date.now();
-            if (remaining > 0 && remaining <= MAX_COOLDOWN_MS) {
-              setCooldownEndsAt(parsed);
-            }
-          }
+          if (Number.isFinite(parsed)) setCooldownEndsAt(parsed);
         }
         if (supportSession) setSupportSessionId(supportSession);
         if (supportTranscript) {
           try {
             setSupportMessages(JSON.parse(supportTranscript));
           } catch {
-            // ignore
+            // ignore corrupted transcript
           }
         }
       } finally {
@@ -165,28 +150,13 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
 
   useEffect(() => {
     if (!storageLoaded) return;
-    void AsyncStorage.setItem(STORAGE_KEYS.SESSION, sessionId);
-  }, [sessionId, storageLoaded]);
-
-  useEffect(() => {
-    if (!storageLoaded) return;
     void AsyncStorage.setItem(STORAGE_KEYS.SUPPORT_SESSION, supportSessionId);
   }, [storageLoaded, supportSessionId]);
 
   useEffect(() => {
     if (!storageLoaded) return;
-    void AsyncStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(companionMessages.slice(-40)));
-  }, [companionMessages, storageLoaded]);
-
-  useEffect(() => {
-    if (!storageLoaded) return;
-    void AsyncStorage.setItem(STORAGE_KEYS.SUPPORT_MESSAGES, JSON.stringify(supportMessages.slice(-40)));
+    void AsyncStorage.setItem(STORAGE_KEYS.SUPPORT_MESSAGES, JSON.stringify(supportMessages.slice(-60)));
   }, [storageLoaded, supportMessages]);
-
-  useEffect(() => {
-    if (!storageLoaded) return;
-    notifySupportScrollChange();
-  }, [storageLoaded, supportMessages, notifySupportScrollChange]);
 
   useEffect(() => {
     if (!storageLoaded) return;
@@ -207,28 +177,9 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
   }, [cooldownEndsAt, storageLoaded]);
 
   useEffect(() => {
-    if (!cooldownEndsAt) return;
-    if (cooldownEndsAt - Date.now() <= 0) {
-      setCooldownEndsAt(null);
-    }
-  }, [cooldownEndsAt, tick]);
-
-  useEffect(() => {
     if (!storageLoaded) return;
-    notifyCompanionScrollChange();
-  }, [storageLoaded, companionMessages, notifyCompanionScrollChange]);
-
-  useEffect(() => {
-    if (!supportMessage.trim()) {
-      setSupportComposerHeight(COMPOSER_MIN_HEIGHT);
-    }
-  }, [supportMessage]);
-
-  useEffect(() => {
-    if (!companionMessage.trim()) {
-      setCompanionComposerHeight(COMPOSER_MIN_HEIGHT);
-    }
-  }, [companionMessage]);
+    notifySupportScrollChange();
+  }, [storageLoaded, supportMessages, notifySupportScrollChange]);
 
   const cooldownRemaining = useMemo(() => {
     if (!cooldownEndsAt) return 0;
@@ -252,24 +203,45 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
     return null;
   }, [supportMessages]);
 
+  const appendSystemMessage = useCallback((text: string, meta?: CompanionEntry['meta']) => {
+    setSupportMessages((prev) => [
+      ...prev.slice(-59),
+      {
+        id: generateId(),
+        role: 'system',
+        text,
+        createdAt: Date.now(),
+        meta,
+      },
+    ]);
+  }, []);
+
   const resetSupportConversation = useCallback(() => {
     setSupportMessages([]);
     setSupportSessionId(generateId());
-    setSupportForceEscalate(false);
     setSupportEscalationReason(null);
-    setSupportSafetyNotice(null);
-    setSupportLinklerError(null);
-    setSupportFailureReason(null);
   }, []);
+
+  const handleSupportComposerSize = useCallback(
+    (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
+      const next = Math.min(
+        Math.max(event.nativeEvent.contentSize.height, COMPOSER_MIN_HEIGHT),
+        COMPOSER_MAX_HEIGHT
+      );
+      setSupportComposerHeight(next);
+    },
+    []
+  );
 
   const handleAskLinklerSupport = useCallback(async () => {
     if (supportAsking || cooldownDisabled) return;
 
     const trimmed = supportMessage.trim();
     if (!trimmed) {
-      Alert.alert('Linkler', 'Please describe the issue before sending.');
+      setSupportError('Share what is going on before sending.');
       return;
     }
+    setSupportError(null);
 
     let contextPayload: Record<string, unknown> | undefined;
     if (supportContext.trim()) {
@@ -293,16 +265,13 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
       text: trimmed,
       createdAt: Date.now(),
     };
-    setSupportMessages((prev) => [...prev.slice(-39), userEntry]);
+    setSupportMessages((prev) => [...prev.slice(-59), userEntry]);
     setSupportMessage('');
-    setSupportSafetyNotice(null);
-    setSupportLinklerError(null);
-    setSupportFailureReason(null);
+    setSupportError(null);
 
     const emergency = detectLinklerEmergency(trimmed);
     if (emergency.isEmergency) {
-      setSupportSafetyNotice("This sounds urgent. We'll alert the human team right away.");
-      setSupportForceEscalate(true);
+      appendSystemMessage('This sounds urgent. Looping in the human team.');
       setSupportEscalationReason('emergency');
       return;
     }
@@ -317,38 +286,22 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
     if (!res.ok || !res.data?.ok) {
       const retrySeconds = (res.data as any)?.retryAfterSeconds;
       if (retrySeconds) {
-        const clamped = Math.min(retrySeconds, MAX_COOLDOWN_MS / 1000);
-        setCooldownEndsAt(Date.now() + clamped * 1000);
-        setSupportLinklerError(COOLDOWN_HINT);
-        setSupportFailureReason(null);
+        setCooldownEndsAt(Date.now() + retrySeconds * 1000);
         return;
       }
 
-      const failureReason: LinklerEscalationReason =
-        res.status === 503 ? 'linkler_disabled' : 'ai_unavailable';
-      const fallbackMessage = res.data?.reply?.trim() || UNAVAILABLE_COPY;
-      setSupportMessages((prev) => [
-        ...prev.slice(-39),
-        {
-          id: generateId(),
-          role: 'assistant',
-          text: fallbackMessage,
-          createdAt: Date.now(),
-          meta: { degraded: true },
-        },
-      ]);
-      setSupportLinklerError(UNAVAILABLE_COPY);
-      setSupportFailureReason(failureReason);
+      appendSystemMessage(UNAVAILABLE_COPY);
+      setSupportEscalationReason(res.status === 503 ? 'linkler_disabled' : 'ai_unavailable');
       return;
     }
 
     setSupportSessionId(res.data.sessionId);
     if (res.data.cooldownSeconds) {
-      const clamped = Math.min(res.data.cooldownSeconds, MAX_COOLDOWN_MS / 1000);
-      setCooldownEndsAt(Date.now() + clamped * 1000);
+      setCooldownEndsAt(Date.now() + res.data.cooldownSeconds * 1000);
     } else {
       setCooldownEndsAt(null);
     }
+    setUsage(res.data.usage ?? null);
 
     const assistantEntry: CompanionEntry = {
       id: generateId(),
@@ -356,23 +309,18 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
       text: res.data.reply,
       createdAt: Date.now(),
       meta: {
-        exposureTips: res.data.exposureTips || [],
-        featureIdeas: res.data.featureIdeas || [],
-        suggestSendToHuman: res.data.suggestSendToHuman,
         recommendHuman: res.data.recommendHuman,
+        suggestSendToHuman: res.data.suggestSendToHuman,
         degraded: res.data.degraded,
       },
     };
-    setSupportMessages((prev) => [...prev.slice(-39), assistantEntry]);
-
-    setSupportFailureReason(null);
-    setSupportLinklerError(null);
+    setSupportMessages((prev) => [...prev.slice(-59), assistantEntry]);
 
     if (res.data.recommendHuman) {
-      setSupportForceEscalate(true);
       setSupportEscalationReason('ai_recommended');
     }
   }, [
+    appendSystemMessage,
     cooldownDisabled,
     getAccessToken,
     setCooldownEndsAt,
@@ -382,386 +330,132 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
     supportSessionId,
   ]);
 
-  const derivedEscalationReason =
-    supportEscalationReason || (supportForceEscalate ? supportFailureReason ?? 'user_requested' : null);
-
-  const escalationHint = useMemo(() => {
-    switch (derivedEscalationReason) {
-      case 'emergency':
-        return 'This sounds urgent. Sending it to our human team.';
-      case 'ai_unavailable':
-      case 'timeout':
-        return 'Linkler could not respond, so we can escalate it manually.';
-      case 'ai_recommended':
-        return 'Linkler suggested a human take a closer look.';
-      case 'linkler_disabled':
-        return 'Linkler is offline. We will pass it to support directly.';
-      case 'user_requested':
-        return 'Ready to involve the human team? Send the latest details.';
-      default:
-        return 'Send this conversation to human support.';
-    }
-  }, [derivedEscalationReason]);
-
-  const handleSupportEscalation = useCallback(async () => {
-    if (supportEscalating) return;
-
-    let messageBody = supportMessage.trim();
-    if (!messageBody) {
-      messageBody = lastSupportUser?.text?.trim() ?? '';
-    }
-
-    if (!messageBody) {
-      Alert.alert('Linkler', 'Please add a quick summary before escalating.');
+  const refreshTickets = useCallback(async () => {
+    if (!supabaseConfigured || !user) {
+      setTicketsError('Sign in to view tickets.');
+      setTickets([]);
       return;
     }
+    setTicketsLoading(true);
+    setTicketsError(null);
+    const { data, error } = await supabase
+      .from('support_tickets')
+      .select('id,status,updated_at,created_at,message')
+      .order('updated_at', { ascending: false })
+      .limit(50);
+    if (error) {
+      setTicketsError(error.message);
+      setTickets([]);
+    } else {
+      setTickets(data ?? []);
+    }
+    setTicketsLoading(false);
+  }, [user]);
 
-    let contextPayload: Record<string, unknown> | undefined;
-    if (supportContext.trim()) {
-      try {
-        contextPayload = JSON.parse(supportContext);
-      } catch (err: any) {
-        Alert.alert('Linkler', `Context must be valid JSON (${err?.message || 'parse error'})`);
+  const handleSupportEscalation = useCallback(
+    async (overrideReason?: LinklerEscalationReason) => {
+      if (supportEscalating) return;
+
+      let messageBody = supportMessage.trim();
+      if (!messageBody) {
+        messageBody = lastSupportUser?.text?.trim() ?? '';
+      }
+
+      if (!messageBody) {
+        setSupportError('Add a quick summary before escalating.');
         return;
       }
-    }
 
-    const token = await getAccessToken();
-    if (!token) {
-      Alert.alert('Linkler', 'Please sign in again to contact support.');
-      return;
-    }
-
-    const context = buildLinklerEscalationContext({
-      sessionId: supportSessionId,
-      transcript: supportMessages,
-      lastLinklerReply: lastSupportAssistant?.text,
-      reason: derivedEscalationReason ?? 'user_requested',
-      metadata: {
-        ...(contextPayload ? { userContext: contextPayload } : {}),
-        channel: 'support-tab-mobile',
-      },
-    });
-
-    setSupportEscalating(true);
-    const res = await linklerSupportIntake({ message: messageBody, context }, token);
-    setSupportEscalating(false);
-
-    if (!res.ok || !res.data?.ok || !res.data.ticket) {
-      Alert.alert('Linkler', res.data?.error || res.message || 'Support request failed.');
-      return;
-    }
-
-    setLastTicketId(res.data.ticket.id);
-    resetSupportConversation();
-    setSupportMessage('');
-    setSupportContext('');
-    Alert.alert('Linkler', 'Sent to human support. A team member will follow up soon.');
-  }, [
-    derivedEscalationReason,
-    getAccessToken,
-    lastSupportAssistant,
-    lastSupportUser,
-    resetSupportConversation,
-    supportContext,
-    supportEscalating,
-    supportMessage,
-    supportMessages,
-    supportSessionId,
-  ]);
-
-  const canEscalate = Boolean(derivedEscalationReason);
-
-  const handleRequestEscalation = useCallback(() => {
-    setSupportForceEscalate(true);
-    setSupportEscalationReason((prev) => prev ?? supportFailureReason ?? 'user_requested');
-  }, [supportFailureReason]);
-
-  const handleSupportComposerSize = useCallback(
-    (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
-      const next = Math.min(
-        Math.max(event.nativeEvent.contentSize.height, COMPOSER_MIN_HEIGHT),
-        COMPOSER_MAX_HEIGHT
-      );
-      setSupportComposerHeight(next);
-    },
-    []
-  );
-
-  const handleCompanionSend = useCallback(async () => {
-    if (companionSending || cooldownDisabled) return;
-    const trimmed = companionMessage.trim();
-    if (!trimmed) return;
-
-    const token = await getAccessToken();
-    if (!token) {
-      Alert.alert('Linkler', 'Please sign in to chat with Linkler.');
-      return;
-    }
-
-    setCompanionMessage('');
-    setCompanionSending(true);
-    setCompanionNotice(null);
-
-    const userEntry: CompanionEntry = {
-      id: generateId(),
-      role: 'user',
-      text: trimmed,
-      createdAt: Date.now(),
-    };
-    setCompanionMessages((prev) => [...prev.slice(-39), userEntry]);
-
-    try {
-      const res = await linklerCompanionChat({ message: trimmed, sessionId }, token);
-
-      if (!res.ok || !res.data?.ok) {
-        const retrySeconds = (res.data as any)?.retryAfterSeconds;
-        if (retrySeconds) {
-          const clamped = Math.min(retrySeconds, MAX_COOLDOWN_MS / 1000);
-          setCooldownEndsAt(Date.now() + clamped * 1000);
-          setCompanionNotice(COOLDOWN_HINT);
+      let contextPayload: Record<string, unknown> | undefined;
+      if (supportContext.trim()) {
+        try {
+          contextPayload = JSON.parse(supportContext);
+        } catch (err: any) {
+          Alert.alert('Linkler', `Context must be valid JSON (${err?.message || 'parse error'})`);
           return;
         }
+      }
 
-        const fallbackReply = res.data?.reply?.trim() || UNAVAILABLE_COPY;
-        setCompanionMessages((prev) => [
-          ...prev.slice(-39),
-          {
-            id: generateId(),
-            role: 'assistant',
-            text: fallbackReply,
-            createdAt: Date.now(),
-            meta: { degraded: true },
-          },
-        ]);
-        setCompanionNotice(UNAVAILABLE_COPY);
+      const token = await getAccessToken();
+      if (!token) {
+        Alert.alert('Linkler', 'Please sign in again to contact support.');
         return;
       }
 
-      setSessionId(res.data.sessionId);
-      if (res.data.cooldownSeconds) {
-        const clamped = Math.min(res.data.cooldownSeconds, MAX_COOLDOWN_MS / 1000);
-        setCooldownEndsAt(Date.now() + clamped * 1000);
-      } else {
-        setCooldownEndsAt(null);
+      const reasonToSend = overrideReason ?? supportEscalationReason ?? 'user_requested';
+      const context = buildLinklerEscalationContext({
+        sessionId: supportSessionId,
+        transcript: supportMessages,
+        lastLinklerReply: lastSupportAssistant?.text,
+        reason: reasonToSend,
+        metadata: {
+          ...(contextPayload ? { userContext: contextPayload } : {}),
+          channel: 'support-chat-mobile',
+        },
+      });
+
+      setSupportEscalating(true);
+      const res = await linklerSupportIntake({ message: messageBody, context }, token);
+      setSupportEscalating(false);
+
+      if (!res.ok || !res.data?.ok || !res.data.ticket) {
+        Alert.alert('Linkler', res.data?.error || res.message || 'Support request failed.');
+        return;
       }
 
-      const assistantEntry: CompanionEntry = {
-        id: generateId(),
-        role: 'assistant',
-        text: res.data.reply,
-        createdAt: Date.now(),
-        meta: {
-          exposureTips: res.data.exposureTips || [],
-          featureIdeas: res.data.featureIdeas || [],
-          suggestSendToHuman: res.data.suggestSendToHuman,
-          recommendHuman: res.data.recommendHuman,
-          degraded: res.data.degraded,
-        },
-      };
-      setCompanionMessages((prev) => [...prev.slice(-39), assistantEntry]);
-      setCompanionNotice(null);
-    } catch (error: any) {
-      setCompanionMessages((prev) => [
-        ...prev.slice(-39),
-        {
-          id: generateId(),
-          role: 'assistant',
-          text: UNAVAILABLE_COPY,
-          createdAt: Date.now(),
-          meta: { degraded: true },
-        },
-      ]);
-      setCompanionNotice(UNAVAILABLE_COPY);
-    } finally {
-      setCompanionSending(false);
-    }
-  }, [companionMessage, companionSending, cooldownDisabled, getAccessToken, sessionId]);
-
-  const handleCompanionComposerSize = useCallback(
-    (event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>) => {
-      const next = Math.min(
-        Math.max(event.nativeEvent.contentSize.height, COMPOSER_MIN_HEIGHT),
-        COMPOSER_MAX_HEIGHT
+      const ticketId = res.data.ticket.id;
+      setLastTicketId(ticketId);
+      resetSupportConversation();
+      setSupportContext('');
+      setSupportMessage('');
+      setSupportError(null);
+      appendSystemMessage(
+        `Ticket created: #${ticketId.slice(0, 8).toUpperCase()} (View in Tickets)`,
+        { ticketId }
       );
-      setCompanionComposerHeight(next);
+      if (ticketsVisible) {
+        void refreshTickets();
+      }
     },
-    []
+    [
+      appendSystemMessage,
+      getAccessToken,
+      lastSupportAssistant,
+      lastSupportUser,
+      refreshTickets,
+      resetSupportConversation,
+      supportContext,
+      supportEscalating,
+      supportEscalationReason,
+      supportMessage,
+      supportMessages,
+      supportSessionId,
+      ticketsVisible,
+    ]
   );
 
-  const handleEscalateFromChat = useCallback(() => {
-    const summary = buildTranscriptSummary(companionMessages);
-    if (summary) {
-      setSupportMessage(summary);
+  const handleOpenTickets = useCallback(() => {
+    setTicketsVisible(true);
+    void refreshTickets();
+  }, [refreshTickets]);
+
+  const cooldownText =
+    cooldownDisabled && `${COOLDOWN_COPY} Linkler will reply in about ${cooldownRemaining}s.`;
+
+  const escalationHint = useMemo(() => {
+    switch (supportEscalationReason) {
+      case 'ai_recommended':
+        return 'Linkler suggested looping in a human.';
+      case 'linkler_disabled':
+        return 'Linkler is offline. Humans can still help.';
+      case 'ai_unavailable':
+        return 'Linkler could not finish this request.';
+      case 'emergency':
+        return 'This sounds urgent. Escalate to a human.';
+      default:
+        return 'Escalate when you prefer a human review.';
     }
-    setSupportForceEscalate(true);
-    setSupportEscalationReason((prev) => prev ?? 'user_requested');
-    setActiveTab('support');
-  }, [companionMessages]);
-
-  const supportComposerPadding = Math.max(insets.bottom, 12);
-  const companionComposerPadding = Math.max(insets.bottom, 12);
-  const sheetPaddingBottom = Math.max(insets.bottom, 16);
-
-  const renderSupportSection = () => (
-    <View style={styles.chatSection}>
-      {lastTicketId && (
-        <View style={styles.notice}>
-          <Text style={styles.noticeTitle}>Ticket sent</Text>
-          <Text style={styles.noticeSubtitle}>#{lastTicketId.slice(0, 8).toUpperCase()}</Text>
-        </View>
-      )}
-
-      <View style={styles.supportHint}>
-        <Text style={styles.supportHintTitle}>Ask Linkler first</Text>
-        <Text style={styles.supportHintText}>
-          Linkler replies here and shows the human option only when it is needed.
-        </Text>
-      </View>
-
-      <View style={styles.scrollWrapper}>
-        <ScrollView
-          ref={supportScrollRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          onScroll={handleSupportScroll}
-          scrollEventThrottle={16}
-          keyboardShouldPersistTaps="handled"
-        >
-          {supportMessages.length === 0 ? (
-            <Text style={styles.chatPlaceholder}>
-              Share what is going on and Linkler will respond in this space.
-            </Text>
-          ) : (
-            supportMessages.map((entry) => (
-              <CompanionBubble key={entry.id} entry={entry} themeMode={theme.mode} />
-            ))
-          )}
-        </ScrollView>
-        {supportShowNewMessages && (
-          <Pressable style={styles.newMessagesChip} onPress={scrollSupportToBottom}>
-            <Text style={styles.newMessagesText}>New messages</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {supportSafetyNotice ? <Text style={styles.supportNotice}>{supportSafetyNotice}</Text> : null}
-      {supportLinklerError ? <Text style={styles.statusText}>{supportLinklerError}</Text> : null}
-
-      <View style={[styles.composerCard, { paddingBottom: supportComposerPadding }]}>
-        <TextInput
-          multiline
-          value={supportMessage}
-          onChangeText={setSupportMessage}
-          placeholder="Describe the issue... Linkler will try to help first."
-          style={[styles.input, { height: supportComposerHeight }]}
-          textAlignVertical="top"
-          editable={!supportAsking && !cooldownDisabled}
-          onContentSizeChange={handleSupportComposerSize}
-        />
-        {supportError ? <Text style={styles.errorText}>{supportError}</Text> : null}
-        <TextInput
-          multiline
-          value={supportContext}
-          onChangeText={setSupportContext}
-          placeholder='Optional context (JSON). Example: {"screen":"home"}'
-          style={[styles.input, styles.contextInput]}
-          textAlignVertical="top"
-        />
-        <View style={styles.actionsRow}>
-          <Button
-            title={supportAsking ? 'Asking Linkler...' : cooldownDisabled ? COOLDOWN_COPY : 'Ask Linkler'}
-            onPress={() => void handleAskLinklerSupport()}
-            disabled={supportAsking || cooldownDisabled}
-            style={styles.chatButton}
-          />
-          {!canEscalate && (
-            <Pressable onPress={handleRequestEscalation} style={styles.escalateLink}>
-              <Text style={styles.escalateLinkText}>Need a human review?</Text>
-            </Pressable>
-          )}
-        </View>
-        {cooldownDisabled && !supportLinklerError ? (
-          <Text style={styles.statusText}>{COOLDOWN_HINT}</Text>
-        ) : null}
-      </View>
-
-      {canEscalate && (
-        <View style={styles.supportEscalateBox}>
-          <Text style={styles.supportEscalateText}>{escalationHint}</Text>
-          <Button
-            title={supportEscalating ? 'Sending...' : 'Send to human support'}
-            variant="secondary"
-            onPress={() => void handleSupportEscalation()}
-            disabled={supportEscalating}
-          />
-        </View>
-      )}
-    </View>
-  );
-
-  const renderCompanionSection = () => (
-    <View style={styles.chatSection}>
-      <View style={styles.scrollWrapper}>
-        <ScrollView
-          ref={companionScrollRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          onScroll={handleCompanionScroll}
-          scrollEventThrottle={16}
-          keyboardShouldPersistTaps="handled"
-        >
-          {companionMessages.length === 0 ? (
-            <Text style={styles.chatPlaceholder}>
-              Say hi! Linkler can share exposure tips, feature guidance, and knows when to loop in humans.
-            </Text>
-          ) : (
-            companionMessages.map((entry) => (
-              <CompanionBubble key={entry.id} entry={entry} themeMode={theme.mode} />
-            ))
-          )}
-        </ScrollView>
-        {companionShowNewMessages && (
-          <Pressable style={styles.newMessagesChip} onPress={scrollCompanionToBottom}>
-            <Text style={styles.newMessagesText}>New messages</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {companionNotice ? <Text style={styles.statusText}>{companionNotice}</Text> : null}
-
-      <View style={[styles.composerCard, { paddingBottom: companionComposerPadding }]}>
-        <TextInput
-          multiline
-          value={companionMessage}
-          onChangeText={setCompanionMessage}
-          placeholder="Share what's going on..."
-          style={[styles.input, { height: companionComposerHeight }]}
-          textAlignVertical="top"
-          editable={!companionSending && !cooldownDisabled}
-          onContentSizeChange={handleCompanionComposerSize}
-        />
-        <View style={styles.actionsRow}>
-          <Button
-            title={companionSending ? 'Sending...' : 'Chat with Linkler'}
-            onPress={() => void handleCompanionSend()}
-            disabled={!companionMessage.trim() || companionSending || cooldownDisabled}
-            style={styles.chatButton}
-          />
-          <Button
-            title="Send to support"
-            variant="secondary"
-            onPress={handleEscalateFromChat}
-            style={styles.chatButton}
-          />
-        </View>
-        {cooldownDisabled && !companionNotice ? (
-          <Text style={styles.statusText}>{COOLDOWN_HINT}</Text>
-        ) : null}
-        {companionNotice ? <Text style={styles.statusText}>{companionNotice}</Text> : null}
-      </View>
-    </View>
-  );
+  }, [supportEscalationReason]);
 
   if (!show) {
     return null;
@@ -779,303 +473,541 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
       </Pressable>
 
       <Modal visible={visible} onRequestClose={() => setVisible(false)}>
-        <View style={[styles.sheet, { paddingBottom: sheetPaddingBottom }]}>
-          <Text style={styles.sheetTitle}>Linkler</Text>
-          <Text style={styles.sheetSubtitle}>AI replies first. Humans are on standby.</Text>
-
-          <View style={styles.tabs}>
-            <Pressable
-              onPress={() => setActiveTab('support')}
-              style={[styles.tabButton, activeTab === 'support' && styles.tabButtonActive]}
-            >
-              <Text style={[styles.tabLabel, activeTab === 'support' && styles.tabLabelActive]}>Support</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setActiveTab('companion')}
-              style={[styles.tabButton, activeTab === 'companion' && styles.tabButtonActive]}
-            >
-              <Text style={[styles.tabLabel, activeTab === 'companion' && styles.tabLabelActive]}>Companion</Text>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={styles.sheetTitle}>Linkler Support</Text>
+              <Text style={styles.sheetSubtitle}>
+                {usage
+                  ? `${usage.remainingToday} messages remaining today`
+                  : 'AI triage with human backup'}
+              </Text>
+            </View>
+            <Pressable style={styles.ticketsButton} onPress={handleOpenTickets}>
+              <Text style={styles.ticketsButtonText}>Tickets</Text>
             </Pressable>
           </View>
 
-          {activeTab === 'support' ? renderSupportSection() : renderCompanionSection()}
+          <View style={styles.chatSection}>
+            <View style={styles.scrollWrapper}>
+              <ScrollView
+                ref={supportScrollRef}
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                onScroll={handleSupportScroll}
+                scrollEventThrottle={16}
+                keyboardShouldPersistTaps="handled"
+              >
+                {supportMessages.length === 0 ? (
+                  <Text style={styles.chatPlaceholder}>
+                    Ask Linkler anything about your account. We will escalate when it needs a human.
+                  </Text>
+                ) : (
+                  supportMessages.map((entry) => (
+                    <CompanionBubble
+                      key={entry.id}
+                      entry={entry}
+                      themeMode={theme.mode}
+                      onViewTickets={handleOpenTickets}
+                    />
+                  ))
+                )}
+              </ScrollView>
+              {supportShowNewMessages && (
+                <Pressable style={styles.newMessagesChip} onPress={scrollSupportToBottom}>
+                  <Text style={styles.newMessagesText}>New messages</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          <View style={[styles.composerCard, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <TextInput
+              multiline
+              value={supportMessage}
+              onChangeText={setSupportMessage}
+              placeholder="Describe what is going on..."
+              style={[styles.input, { height: supportComposerHeight }]}
+              textAlignVertical="top"
+              editable={!supportAsking && !cooldownDisabled}
+              onContentSizeChange={handleSupportComposerSize}
+            />
+            {supportError ? <Text style={styles.errorText}>{supportError}</Text> : null}
+
+            <TextInput
+              multiline
+              value={supportContext}
+              onChangeText={setSupportContext}
+              placeholder='Optional context (JSON). Example: {"screen":"profile"}'
+              style={[styles.input, styles.contextInput]}
+              textAlignVertical="top"
+            />
+
+            <Button
+              title={
+                supportAsking
+                  ? 'Sending...'
+                  : cooldownDisabled
+                    ? `${COOLDOWN_COPY} (${cooldownRemaining}s)`
+                    : 'Ask Linkler'
+              }
+              onPress={() => void handleAskLinklerSupport()}
+              disabled={supportAsking || cooldownDisabled}
+            />
+            {cooldownText ? <Text style={styles.statusText}>{cooldownText}</Text> : null}
+
+            <View style={styles.escalationStack}>
+              {escalationHint ? <Text style={styles.supportEscalateText}>{escalationHint}</Text> : null}
+              <Button
+                title={supportEscalating ? 'Escalating...' : 'Escalate to human support'}
+                variant="secondary"
+                onPress={() => void handleSupportEscalation()}
+                disabled={supportEscalating}
+              />
+            </View>
+          </View>
         </View>
       </Modal>
+
+      <TicketsModal
+        visible={ticketsVisible}
+        tickets={tickets}
+        loading={ticketsLoading}
+        error={ticketsError}
+        onRequestClose={() => setTicketsVisible(false)}
+        onRefresh={refreshTickets}
+      />
     </>
   );
 }
 
-function CompanionBubble({ entry, themeMode }: { entry: CompanionEntry; themeMode: string }) {
+type CompanionBubbleProps = {
+  entry: CompanionEntry;
+  themeMode: 'light' | 'dark';
+  onViewTickets: () => void;
+};
+
+function CompanionBubble({ entry, themeMode, onViewTickets }: CompanionBubbleProps) {
   const isAssistant = entry.role === 'assistant';
-  const recommendHuman = entry.meta?.recommendHuman ?? entry.meta?.suggestSendToHuman;
+  const isSystem = entry.role === 'system';
+  const containerStyles = [
+    stylesBubble.container,
+    isAssistant && stylesBubble.assistant,
+    entry.role === 'user' && stylesBubble.user,
+    isSystem && stylesBubble.system,
+    {
+      borderColor: themeMode === 'light' ? 'rgba(15,23,42,0.1)' : 'rgba(255,255,255,0.15)',
+    },
+  ];
+
   return (
-    <View
-      style={[
-        stylesBubble.container,
-        isAssistant ? stylesBubble.assistant : stylesBubble.user,
-        { borderColor: themeMode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' },
-      ]}
-    >
-      <Text style={stylesBubble.author}>{isAssistant ? 'Linkler' : 'You'}</Text>
+    <View style={containerStyles}>
+      <View style={stylesBubble.headerRow}>
+        <Text style={stylesBubble.author}>
+          {isSystem ? 'System' : isAssistant ? 'Linkler' : 'You'}
+        </Text>
+        <Text style={stylesBubble.time}>
+          {new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      </View>
       <Text style={stylesBubble.text}>{entry.text}</Text>
 
-      {entry.meta?.exposureTips?.length ? (
-        <View style={stylesBubble.metaBlock}>
-          <Text style={stylesBubble.metaTitle}>Exposure tips</Text>
-          {entry.meta.exposureTips.map((tip) => (
-            <Text key={tip} style={stylesBubble.metaText}>
-              • {tip}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-
-      {entry.meta?.featureIdeas?.length ? (
-        <View style={stylesBubble.metaBlock}>
-          <Text style={stylesBubble.metaTitle}>Feature ideas</Text>
-          {entry.meta.featureIdeas.map((idea) => (
-            <Text key={idea} style={stylesBubble.metaText}>
-              #{idea}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-
-      {recommendHuman && (
-        <Text style={stylesBubble.metaTitle}>Linkler recommends sending this to human support.</Text>
+      {entry.meta?.ticketId && (
+        <Pressable
+          style={stylesBubble.ticketLink}
+          onPress={onViewTickets}
+          accessibilityRole="button"
+        >
+          <Text style={stylesBubble.ticketLinkText}>View in Tickets</Text>
+        </Pressable>
       )}
     </View>
   );
 }
 
-function buildTranscriptSummary(entries: CompanionEntry[]) {
-  if (!entries.length) return '';
-  const recent = entries.slice(-4).map((entry) => `${entry.role === 'assistant' ? 'Linkler' : 'User'}: ${entry.text}`);
-  return `Context from Linkler chat:\n${recent.join('\n')}`;
+type TicketsModalProps = {
+  visible: boolean;
+  tickets: TicketSummary[];
+  loading: boolean;
+  error: string | null;
+  onRequestClose: () => void;
+  onRefresh: () => void;
+};
+
+function TicketsModal({ visible, tickets, loading, error, onRequestClose, onRefresh }: TicketsModalProps) {
+  return (
+    <RNModal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onRequestClose}
+    >
+      <Pressable style={stylesTickets.overlay} onPress={onRequestClose}>
+        <Pressable style={stylesTickets.sheet} onPress={(event) => event.stopPropagation()}>
+          <View style={stylesTickets.header}>
+            <Text style={stylesTickets.title}>Tickets</Text>
+            <Pressable onPress={onRequestClose} style={stylesTickets.closeButton}>
+              <Text style={stylesTickets.closeText}>Close</Text>
+            </Pressable>
+          </View>
+
+          {loading ? (
+            <View style={stylesTickets.state}>
+              <ActivityIndicator />
+              <Text style={stylesTickets.stateText}>Loading tickets...</Text>
+            </View>
+          ) : error ? (
+            <View style={stylesTickets.state}>
+              <Text style={stylesTickets.stateText}>{error}</Text>
+              <Button title="Retry" onPress={onRefresh} />
+            </View>
+          ) : tickets.length === 0 ? (
+            <View style={stylesTickets.state}>
+              <Text style={stylesTickets.stateText}>No tickets yet.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={tickets}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <TicketRow item={item} />}
+              contentContainerStyle={stylesTickets.listContent}
+            />
+          )}
+
+          <Pressable
+            style={stylesTickets.webLink}
+            onPress={() => Linking.openURL('https://www.mylivelinks.com/tickets')}
+          >
+            <Text style={stylesTickets.webLinkText}>Open full tickets page</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </RNModal>
+  );
 }
 
-function generateId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
+function TicketRow({ item }: { item: TicketSummary }) {
+  return (
+    <View style={stylesTickets.row}>
+      <View style={stylesTickets.rowHeader}>
+        <Text style={stylesTickets.rowId}>#{item.id.slice(0, 8).toUpperCase()}</Text>
+        <Text style={[stylesTickets.statusPill, getStatusStyle(item.status)]}>{item.status}</Text>
+      </View>
+      <Text style={stylesTickets.rowMeta}>
+        Updated {new Date(item.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+      </Text>
+      {item.message ? (
+        <Text
+          style={stylesTickets.rowPreview}
+          numberOfLines={2}
+        >
+          {item.message}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function getStatusStyle(status: string) {
+  switch (status.toLowerCase()) {
+    case 'open':
+      return stylesTickets.statusOpen;
+    case 'resolved':
+      return stylesTickets.statusResolved;
+    default:
+      return stylesTickets.statusDefault;
   }
-  return `linkler-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function createStyles(theme: any) {
   return StyleSheet.create({
     fab: {
-      position: 'absolute',
-      right: 18,
-      bottom: 32,
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      backgroundColor: theme.colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: '#000',
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 8,
-    },
-    fabImage: {
-      width: 56,
-      height: 56,
-      resizeMode: 'contain',
-    },
-    sheet: {
-      gap: 12,
-      width: '100%',
-      maxWidth: 420,
-      maxHeight: '90%',
-      minHeight: 420,
-      alignSelf: 'stretch',
-    },
-    sheetTitle: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: theme.colors.textPrimary,
-    },
-    sheetSubtitle: {
-      fontSize: 14,
-      color: theme.colors.textSecondary,
-    },
-    tabs: {
-      flexDirection: 'row',
-      borderRadius: 16,
-      backgroundColor: theme.colors.surfaceCard,
-      padding: 4,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-    },
-    tabButton: {
-      flex: 1,
-      paddingVertical: 8,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    tabButtonActive: {
-      backgroundColor: theme.colors.accent,
-    },
-    tabLabel: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: theme.colors.textSecondary,
-    },
-    tabLabelActive: {
-      color: '#fff',
-    },
-    chatSection: {
-      flex: 1,
-      gap: 12,
-      width: '100%',
-    },
-    notice: {
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      padding: 10,
-      backgroundColor: theme.tokens.surfaceCard,
-      gap: 4,
-    },
-    noticeTitle: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.colors.textPrimary,
-    },
-    noticeSubtitle: {
-      fontSize: 12,
-      color: theme.colors.textSecondary,
-    },
-    supportHint: {
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      padding: 12,
-      backgroundColor: theme.tokens.surfaceCard,
-      gap: 4,
-    },
-    supportHintTitle: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.colors.textPrimary,
-    },
-    supportHintText: {
-      fontSize: 12,
-      color: theme.colors.textSecondary,
-    },
-    scrollWrapper: {
-      flex: 1,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.tokens.surfaceCard,
-      overflow: 'hidden',
-      position: 'relative',
-    },
-    scrollView: {
-      flex: 1,
-    },
-    scrollContent: {
-      paddingHorizontal: 12,
-      paddingVertical: 12,
-      gap: 12,
-    },
-    chatPlaceholder: {
-      fontSize: 13,
-      color: theme.colors.textSecondary,
-    },
-    newMessagesChip: {
-      position: 'absolute',
-      bottom: 12,
-      alignSelf: 'center',
-      paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 999,
-      backgroundColor: theme.colors.surfaceCard,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      shadowColor: '#000',
-      shadowOpacity: 0.15,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
-      elevation: 4,
-    },
-    newMessagesText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.colors.textPrimary,
-    },
-    supportNotice: {
-      fontSize: 12,
-      color: theme.colors.accent,
-      fontWeight: '700',
-    },
-    statusText: {
-      fontSize: 12,
-      color: theme.colors.textSecondary,
-      fontWeight: '700',
-    },
-    composerCard: {
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.tokens.surfaceCard,
-      padding: 12,
-      gap: 12,
-    },
-    input: {
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      color: theme.colors.textPrimary,
-      backgroundColor: theme.tokens.surfaceCard,
-      fontSize: 14,
-    },
-    contextInput: {
-      minHeight: 70,
-    },
-    errorText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.colors.error,
-    },
-    actionsRow: {
-      flexDirection: 'row',
-      gap: 10,
-      alignItems: 'center',
-    },
-    chatButton: {
-      flex: 1,
-    },
-    escalateLink: {
-      paddingVertical: 6,
-      paddingHorizontal: 4,
-    },
-    escalateLinkText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.colors.accent,
-    },
-    supportEscalateBox: {
-      gap: 8,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.accent,
-      padding: 12,
-      backgroundColor: theme.mode === 'light' ? 'rgba(94,155,255,0.08)' : 'rgba(94,155,255,0.18)',
+    position: 'absolute',
+    right: 18,
+    bottom: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#6c63ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  fabImage: {
+    width: 56,
+    height: 56,
+    resizeMode: 'contain',
+  },
+  sheet: {
+    gap: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  sheetSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  ticketsButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#d4d4d8',
+    backgroundColor: '#f4f4f5',
+  },
+  ticketsButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  chatSection: {
+    flex: 1,
+  },
+  scrollWrapper: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    overflow: 'hidden',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  chatPlaceholder: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  newMessagesChip: {
+    position: 'absolute',
+    bottom: 12,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  newMessagesText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  composerCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#fff',
+    padding: 12,
+    gap: 12,
+  },
+  input: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#0f172a',
+    backgroundColor: '#fff',
+  },
+  contextInput: {
+    minHeight: 64,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#dc2626',
+    fontWeight: '600',
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#4b5563',
+    fontWeight: '600',
+  },
+  escalationStack: {
+    gap: 8,
+    marginTop: 4,
     },
     supportEscalateText: {
-      fontSize: 12,
-      color: theme.colors.accent,
-      fontWeight: '700',
-    },
+    fontSize: 12,
+    color: '#475569',
+  },
   });
 }
+
+const stylesBubble = StyleSheet.create({
+  container: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    gap: 8,
+    backgroundColor: '#fff',
+  },
+  assistant: {
+    backgroundColor: 'rgba(99,102,241,0.08)',
+  },
+  user: {
+    backgroundColor: 'rgba(56,189,248,0.08)',
+  },
+  system: {
+    backgroundColor: 'rgba(148,163,184,0.15)',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  author: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  time: {
+    fontSize: 11,
+    color: '#94a3b8',
+  },
+  text: {
+    fontSize: 13,
+    color: '#0f172a',
+  },
+  ticketLink: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(99,102,241,0.12)',
+  },
+  ticketLinkText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4c1d95',
+  },
+});
+
+const stylesTickets = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    maxHeight: '90%',
+    gap: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  closeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#f4f4f5',
+  },
+  closeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  state: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 24,
+  },
+  stateText: {
+    fontSize: 13,
+    color: '#4b5563',
+  },
+  listContent: {
+    gap: 12,
+    paddingBottom: 16,
+  },
+  row: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: 12,
+    gap: 6,
+  },
+  rowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rowId: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  rowMeta: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  rowPreview: {
+    fontSize: 13,
+    color: '#0f172a',
+  },
+  statusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  statusOpen: {
+    backgroundColor: 'rgba(59,130,246,0.12)',
+    color: '#1d4ed8',
+  },
+  statusResolved: {
+    backgroundColor: 'rgba(16,185,129,0.12)',
+    color: '#047857',
+  },
+  statusDefault: {
+    backgroundColor: 'rgba(148,163,184,0.2)',
+    color: '#475569',
+  },
+  webLink: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  webLinkText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4c1d95',
+  },
+});
 
 function useTranscriptScroll() {
   const scrollRef = useRef<ScrollView | null>(null);
@@ -1116,39 +1048,10 @@ function useTranscriptScroll() {
   };
 }
 
-const stylesBubble = StyleSheet.create({
-  container: {
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
-    gap: 6,
-  },
-  user: {
-    backgroundColor: 'rgba(94,155,255,0.12)',
-  },
-  assistant: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  author: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#f8fafc',
-  },
-  text: {
-    fontSize: 13,
-    color: '#f1f5f9',
-  },
-  metaBlock: {
-    marginTop: 4,
-    gap: 2,
-  },
-  metaTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#cbd5f5',
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#dbeafe',
-  },
-});
+function generateId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `linkler-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+

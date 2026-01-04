@@ -18,15 +18,15 @@
 ## Support Intake Tab
 
 1. Textarea (minimum 3 lines) with placeholder “Describe the issue…”.
-2. Secondary field for optional context JSON (collapsible `<details>` if advanced users want to add extra metadata).
-3. Send button posts to `POST /api/linkler/support`. Disable button until textarea has >3 characters.
+2. Context is collected automatically (surface, subject, IDs, platform). The UI must not expose JSON fields—just let users type plain text.
+3. Send button posts to `POST /api/linkler/support`. Disable the button until the textarea has >3 characters.
 4. After successful submission:
    - Show inline confirmation (ticket ID + timestamp).
    - Provide CTA “View status” that links to `/support` (future) or copies the ticket ID.
-   - Clear textarea but keep context collapsed.
+   - Clear the textarea; auto-context refreshes on its own.
 5. Failure states:
    - Display toast with backend `error` string.
-   - Keep drafts intact so user can retry without retyping.
+   - Keep drafts intact so users can retry without retyping.
 
 ## Companion Chat Tab
 

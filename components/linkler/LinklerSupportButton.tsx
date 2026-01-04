@@ -2,7 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { Modal } from '@/components/ui';
+import Image from 'next/image';
+import { Modal, Button } from '@/components/ui';
 import { LinklerPanel } from './LinklerPanel';
 import { useLinklerPanel } from './useLinklerPanel';
 import { LinklerWidget } from './LinklerWidget';
@@ -55,6 +56,7 @@ export function LinklerSupportButton({
   const pathname = usePathname();
   const linklerState = useLinklerPanel();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [ticketsOpen, setTicketsOpen] = useState(false);
 
   const isHidden = useMemo(() => {
     if (forceHidden) return true;
@@ -80,13 +82,24 @@ export function LinklerSupportButton({
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Linkler"
-        description="AI support + companion chat"
+        title={
+          <div className="flex items-center gap-3">
+            <div className="relative h-10 w-10 rounded-full border border-border overflow-hidden">
+              <Image src="/linklerprofile.png" alt="Linkler" fill className="object-cover scale-125" />
+            </div>
+            <span>Linkler Support</span>
+          </div>
+        }
+        headerAction={
+          <Button variant="outline" size="sm" onClick={() => setTicketsOpen(true)}>
+            Tickets
+          </Button>
+        }
         size="md"
         scrollableContent={false}
       >
         <div className="flex h-full w-full flex-col">
-          <LinklerPanel state={linklerState} />
+          <LinklerPanel state={linklerState} ticketsOpen={ticketsOpen} onCloseTickets={() => setTicketsOpen(false)} />
         </div>
       </Modal>
     </>
