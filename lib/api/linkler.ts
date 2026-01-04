@@ -70,7 +70,7 @@ export async function submitSupportTicket(payload: {
   message: string;
   context?: Record<string, unknown>;
 }) {
-  return requestJson<SupportIntakeResponse>('/api/support/intake', {
+  return requestJson<SupportIntakeResponse>('/api/linkler/support', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -82,13 +82,10 @@ export type CompanionMessageResponse = {
   reply: string;
   exposureTips: string[];
   featureIdeas: string[];
+  recommendHuman: boolean;
   suggestSendToHuman: boolean;
+  degraded: boolean;
   cooldownSeconds: number;
-  usage: {
-    usedToday: number;
-    remainingToday: number;
-    dailyLimit: number;
-  };
   ai?: {
     ok: boolean;
     model?: string;
@@ -104,7 +101,7 @@ export async function postCompanionMessage(payload: {
   sessionId?: string;
   context?: Record<string, unknown>;
 }) {
-  return requestJson<CompanionMessageResponse>('/api/support/companion', {
+  return requestJson<CompanionMessageResponse>('/api/linkler/companion', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

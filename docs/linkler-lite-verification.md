@@ -1,32 +1,38 @@
 # Linkler Lite Verification Commands
 
-All endpoints run under the Next.js dev server (`npm run dev`) on `http://localhost:3000`. The support + moderation routes require a valid Supabase session token; grab one from `localStorage.getItem('sb-access-token')` in an authenticated browser tab or issue a service token for testing.
+All endpoints run under the Next.js dev server (`npm run dev`) on `http://localhost:3000`. The Linkler APIs require a valid Supabase session token; grab one from `localStorage.getItem('sb-access-token')` in an authenticated browser tab (owner profile for the admin-only routes) or issue a service token for testing. `/api/ollama/*` and `/api/ai/ping` are now owner-gated; public calls must fail.
 
-## 1. Connectivity Smoke Test
+## 1. Infrastructure guard (no public leakage)
 
 ```bash
-curl -s http://localhost:3000/api/ai/ping | jq
-# target a specific model
-curl -s "http://localhost:3000/api/ai/ping?model=llama3.3:latest" | jq
+# Public calls must be rejected (401/403) and must NOT include any baseUrl/ngrok fields
+curl -i http://localhost:3000/api/ollama/health
+curl -i http://localhost:3000/api/ai/ping
+
+# Owner-authenticated ping should succeed without exposing OLLAMA_BASE_URL
+curl -s -X GET http://localhost:3000/api/ai/ping \
+  -H "Authorization: Bearer <OWNER_SESSION_JWT>" | jq
+
+# Static scan to ensure no client bundle references ngrok URLs
+rg -n "ngrok" app components mobile/components
 ```
 
-**Expected (example):**
+Expected unauthenticated responses:
 
 ```json
+HTTP/1.1 401 Unauthorized
 {
-  "ok": true,
-  "model": "llama3.3:latest",
-  "ms": 842,
-  "error": null
+  "ok": false,
+  "error": "Unauthorized"
 }
 ```
 
-If Ollama is offline you’ll see `ok: false` with `error: "Ollama request timed out"`.
+Authenticated `/api/ai/ping` calls return the existing `{ ok, model, ms, prompt, models }` payload but never include `baseUrl`.
 
-## 2. Support Intake Ticket
+## 2. Support intake ticket (`/api/linkler/support`)
 
 ```bash
-curl -s -X POST http://localhost:3000/api/support/intake \
+curl -s -X POST http://localhost:3000/api/linkler/support \
   -H "Authorization: Bearer <SUPABASE_SESSION_JWT>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -35,35 +41,46 @@ curl -s -X POST http://localhost:3000/api/support/intake \
   }' | jq
 ```
 
-**Expected (example):**
+The response mirrors the previous contract but now includes `retryAfterSeconds` only when the short cooldown (or kill switch) blocks new submissions. Ticket rows are inserted even if `ai.ok` is `false` (you’ll just see `ai.error` populated).
 
-```json
-{
-  "ok": true,
-  "ticket": {
-    "id": "2b2cb0a3-5d6a-4c01-8da8-552206f39d1a",
-    "reporter_profile_id": "USER_UUID",
-    "status": "open",
-    "assigned_to": "OWNER_PROFILE_ID",
-    "ai_summary": {
-      "summary": "Profile fails to load",
-      "category": "profile_loading",
-      "severity": "medium",
-      "followups": ["Check profile modules", "Verify latest deploy"]
-    },
-    "created_at": "2025-01-18T05:11:32.133Z"
-  },
-  "ai": {
-    "ok": true,
-    "model": "llama3.3:latest",
-    "ms": 1198
-  }
-}
+## 3. Cooldown proof
+
+```bash
+# Immediate second send should trigger the cooldown window
+curl -s -X POST http://localhost:3000/api/linkler/support \
+  -H "Authorization: Bearer <SUPABASE_SESSION_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"first attempt"}' | jq
+curl -s -X POST http://localhost:3000/api/linkler/support \
+  -H "Authorization: Bearer <SUPABASE_SESSION_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"second attempt"}' | jq
 ```
 
-Ticket rows are inserted even if `ai.ok` is `false` (you’ll just see `ai.error` populated).
+The second call returns `429` with `{"ok": false, "error": "...", "retryAfterSeconds": <seconds>}` confirming the short cooldown gate.
 
-## 3. Moderation Classification
+## 4. Kill switch (`LINKLER_ENABLED=false`)
+
+Start the dev server with the flag disabled, then hit both Linkler endpoints:
+
+```bash
+LINKLER_ENABLED=false npm run dev
+
+# In another terminal once the server is up
+curl -s -X POST http://localhost:3000/api/linkler/support \
+  -H "Authorization: Bearer <SUPABASE_SESSION_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"does this work?"}' | jq
+
+curl -s -X POST http://localhost:3000/api/linkler/companion \
+  -H "Authorization: Bearer <SUPABASE_SESSION_JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"ping"}' | jq
+```
+
+Both calls must return `503` with `{ ok: false, error: "Linkler is temporarily unavailable..." }`, proving the kill switch disables the surfaces without front-end changes.
+
+## 5. Moderation classification
 
 ```bash
 curl -s -X POST http://localhost:3000/api/moderation/classify \
@@ -75,7 +92,7 @@ curl -s -X POST http://localhost:3000/api/moderation/classify \
   }' | jq
 ```
 
-**Expected (example):**
+Expected (example):
 
 ```json
 {
@@ -92,25 +109,25 @@ curl -s -X POST http://localhost:3000/api/moderation/classify \
 
 If the guard model flags content you’ll see alternative labels plus its explanatory notes; no enforcement occurs.
 
-## Optional: Companion Chat Sanity
+## 6. Companion chat sanity (`/api/linkler/companion`)
 
 ```bash
-curl -s -X POST http://localhost:3000/api/support/companion \
+curl -s -X POST http://localhost:3000/api/linkler/companion \
   -H "Authorization: Bearer <SUPABASE_SESSION_JWT>" \
   -H "Content-Type: application/json" \
   -d '{ "message": "Got ideas to grow my audience?", "sessionId": "REUSE-UUID" }' | jq
 ```
 
-Returns the Linkler reply, rate-limit counters, and session ID for reuse.
+Returns the Linkler reply, session ID for reuse, and the cooldown for the next send. Subsequent rapid sends should return 429 with `retryAfterSeconds` matching the cooldown returned in the previous response.
 
-## 4. UI Sanity (Web + Mobile)
+## 7. UI sanity (web + mobile)
 
 - **Web:** Log in, open the floating Linkler button on Home and on `app/[username]/modern-page`. Confirm both tabs work:
-  - Support tab posts to `/api/support/intake` and shows the ticket confirmation banner.
-  - Companion tab maintains transcript + cooldowns and the “Send to support” handoff.
-- **Mobile:** In the Expo app, verify the Linkler button floats above Home and the user’s own Profile. The panel mirrors the two-tab behavior (support + companion) and enforces cooldowns.
+  - Support tab posts to `/api/linkler/support` and shows the ticket confirmation banner or the 503/429 messaging when applicable.
+  - Companion tab maintains transcript + cooldowns and the “Send to support” handoff while targeting `/api/linkler/companion`.
+- **Mobile:** In the Expo app, verify the Linkler button floats above Home and the user’s own Profile. The panel mirrors the two-tab behavior (support + companion) and enforces cooldowns against `/api/linkler/*`.
 
-## 5. Owner-Only Prompt + Model Controls
+## 8. Owner-only prompt + model controls
 
 All prompt + model edits use the new `ai_prompts`, `ai_prompt_versions`, and `ai_settings` tables. These checks assume you are connected to the Supabase project via the SQL editor or `psql`.
 
@@ -146,4 +163,15 @@ returning key, updated_at, updated_by;
 
 1. Edit the prompt via `/admin/linkler` (or the SQL step above) and add a recognizable phrase such as `Linkler internal prompt test`.
 2. Immediately call the support intake endpoint (Section 2). The response payload includes `prompt.key` and `prompt.updatedAt`. The minted phrase should now appear inside the AI-generated summary, proving the live runtime picked up the DB copy.
-3. Use `/api/ai/ping` to confirm the `models.guard` / `models.assistant` fields match the latest values from `ai_settings`.
+3. Use `/api/ai/ping` (authenticated as the owner) to confirm the `models.guard` / `models.assistant` fields match the latest values from `ai_settings`.
+
+## 9. Admin & Owner diagnostics card
+
+1. Sign in as the owner and open `/admin/linkler`. The **Linkler Status** card should appear above the editor with:
+   - Health (`online`/`offline`) and the latest latency in milliseconds.
+   - Kill switch indicator (`Enabled` vs `Disabled`).
+   - 24h usage counts for support tickets and companion chats.
+   - The most recent AI error message, or “No AI errors recorded.”
+2. Visit `/owner` and confirm the same card renders under the Linkler Prompt summary.
+3. Use the **Refresh** button to confirm the timestamp, usage counts, and health state update on demand.
+4. Optionally flip the `linkler_enabled` feature flag off via `/owner/feature-flags`, then refresh the card to see the Kill Switch badge switch to `Disabled`.

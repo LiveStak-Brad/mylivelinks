@@ -7,6 +7,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import AgeVerificationModal from '@/components/AgeVerificationModal';
 import NavigationWrapper from '@/components/NavigationWrapper';
 import { GlobalLiveFloatingButton } from '@/components/LiveFloatingButton';
+import PullToRefresh from '@/components/PullToRefresh';
 import { IMProvider } from '@/components/im';
 import { NotiesProvider } from '@/components/noties';
 import { MessagesProvider } from '@/components/messages';
@@ -66,6 +67,7 @@ export default function RootLayout({
                   <Suspense fallback={null}>
                     <NavigationWrapper />
                   </Suspense>
+                  <PullToRefresh />
                   <GlobalLiveFloatingButton />
                   <AgeVerificationModal />
                   <IMProvider />

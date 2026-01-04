@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pingOllama } from '@/lib/ai/ollama';
 import { getLinklerRuntimeConfig } from '@/lib/linkler/prompt';
+import { requireOwner } from '@/lib/rbac';
+
+function authFailure(error: Error) {
+  const status = error.message === 'FORBIDDEN' ? 403 : 401;
+  const message = status === 403 ? 'Forbidden' : 'Unauthorized';
+  return NextResponse.json(
+    { ok: false, error: message },
+    {
+      status,
+    }
+  );
+}
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireOwner(request);
+  } catch (error: any) {
+    return authFailure(error instanceof Error ? error : new Error('UNAUTHORIZED'));
+  }
+
   const url = new URL(request.url);
   const modelParam = url.searchParams.get('model')?.trim() || undefined;
 

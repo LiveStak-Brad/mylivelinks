@@ -86,7 +86,7 @@ export async function linklerSupportIntake(
   accessToken: string | null
 ) {
   return fetchAuthed(
-    '/api/support/intake',
+    '/api/linkler/support',
     {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -96,11 +96,11 @@ export async function linklerSupportIntake(
 }
 
 export async function linklerCompanionChat(
-  payload: { message: string; sessionId?: string },
+  payload: { message: string; sessionId?: string; context?: Record<string, unknown> },
   accessToken: string | null
 ) {
   return fetchAuthed(
-    '/api/support/companion',
+    '/api/linkler/companion',
     {
       method: 'POST',
       body: JSON.stringify(payload),

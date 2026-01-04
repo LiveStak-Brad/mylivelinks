@@ -81,7 +81,6 @@
 - `OLLAMA_ASSISTANT_MODEL` – JSON-capable assistant model such as `llama3.3:latest`.
 - `OLLAMA_GUARD_MODEL` – classification model (default `llama-guard3:latest`).
 - `OLLAMA_TIMEOUT_MS` – millisecond cap for Ollama calls (e.g., `20000`).
-- `OWNER_PROFILE_ID` – UUID that owns auto-assigned support tickets.
-- `COMPANION_DAILY_LIMIT` – per-profile cap for Linkler Companion messages (default `25`).
-- `COMPANION_COOLDOWN_SECONDS` – seconds between companion sends (default `30`).
-- `EXPO_PUBLIC_API_URL` – base URL that the Expo app uses for calling `/api/support/*`.
+- `OWNER_PROFILE_ID` / `OWNER_PROFILE_IDS` – UUID(s) from Supabase auth (`auth.users.id`, which also matches `profiles.id`) that should be treated as platform owners for Linkler tooling. Provide a single ID via `OWNER_PROFILE_ID` or a comma-separated list via `OWNER_PROFILE_IDS`; values are deduped at runtime.
+- `COMPANION_COOLDOWN_SECONDS` – seconds between companion sends (default `5`).
+- `EXPO_PUBLIC_API_URL` – base URL that the Expo app uses for calling `/api/linkler/*`.

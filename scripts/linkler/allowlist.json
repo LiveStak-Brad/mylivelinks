@@ -1,0 +1,34 @@
+{
+  "remote": [
+    {
+      "url": "https://www.mylivelinks.com/",
+      "title": "MyLiveLinks Homepage",
+      "stripSelectors": ["header", "nav", "footer", ".site-footer", ".global-nav", ".cookies-banner"]
+    },
+    {
+      "url": "https://www.mylivelinks.com/features",
+      "title": "Platform Features",
+      "stripSelectors": ["header", "nav", "footer", ".site-footer", ".global-nav", ".cookies-banner"]
+    },
+    {
+      "url": "https://www.mylivelinks.com/creators",
+      "title": "Creator Programs",
+      "stripSelectors": ["header", "nav", "footer", ".site-footer", ".global-nav", ".cookies-banner"]
+    }
+  ],
+  "local": [
+    {
+      "path": "README.md",
+      "title": "Repository README"
+    },
+    {
+      "path": "README_DEV.md",
+      "title": "Developer README"
+    },
+    {
+      "glob": "docs/**/*.md",
+      "ignore": ["docs/archive/**"]
+    }
+  ],
+  "blockedPathPatterns": ["login", "auth", "account", "owner", "admin"]
+}

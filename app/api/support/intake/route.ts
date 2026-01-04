@@ -7,11 +7,21 @@ import {
   getLinklerPrompt,
   getLinklerRuntimeConfig,
 } from '@/lib/linkler/prompt';
+import { isLinklerEnabled, LINKLER_DISABLED_MESSAGE } from '@/lib/linkler/flags';
 
 const bodySchema = z.object({
   message: z.string().min(4, 'message is required'),
   context: z.record(z.any()).optional(),
 });
+
+const SUPPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+function toPositiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const SUPPORT_COOLDOWN_SECONDS = toPositiveInt(process.env.SUPPORT_COOLDOWN_SECONDS, 120);
 
 type SupportAIShape = {
   summary: string;
@@ -30,6 +40,10 @@ function sanitizeContext(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isLinklerEnabled()) {
+    return NextResponse.json({ ok: false, error: LINKLER_DISABLED_MESSAGE }, { status: 503 });
+  }
+
   const supabase = createRouteHandlerClient(request);
   const {
     data: { user },
@@ -52,6 +66,33 @@ export async function POST(request: NextRequest) {
 
   const context = sanitizeContext(parsed.context);
   const assignedTo = process.env.OWNER_PROFILE_ID ?? null;
+
+  const sinceIso = new Date(Date.now() - SUPPORT_WINDOW_MS).toISOString();
+  const { data: recentTickets } = await supabase
+    .from('support_tickets')
+    .select('created_at')
+    .eq('reporter_profile_id', user.id)
+    .eq('source', 'support')
+    .gte('created_at', sinceIso)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  const lastTicket = recentTickets?.[0];
+  if (lastTicket?.created_at) {
+    const lastAt = new Date(lastTicket.created_at).getTime();
+    const diffSeconds = (Date.now() - lastAt) / 1000;
+    if (diffSeconds < SUPPORT_COOLDOWN_SECONDS) {
+      const retryAfterSeconds = Math.max(1, Math.ceil(SUPPORT_COOLDOWN_SECONDS - diffSeconds));
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Please wait ${retryAfterSeconds}s before sending another support request.`,
+          retryAfterSeconds,
+        },
+        { status: 429 }
+      );
+    }
+  }
 
   const config = await getLinklerRuntimeConfig().catch((err) => {
     console.warn('[Linkler][support-intake] failed to load config, using fallback:', err);

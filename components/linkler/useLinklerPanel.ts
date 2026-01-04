@@ -13,13 +13,9 @@ export type CompanionEntry = {
     exposureTips?: string[];
     featureIdeas?: string[];
     suggestSendToHuman?: boolean;
+    recommendHuman?: boolean;
+    degraded?: boolean;
   };
-};
-
-export type LinklerUsage = {
-  usedToday: number;
-  remainingToday: number;
-  dailyLimit: number;
 };
 
 export type LinklerPanelState = {
@@ -35,8 +31,13 @@ export type LinklerPanelState = {
   cooldownRemaining: number;
   lastTicket: { id: string; created_at?: string } | null;
   setLastTicket: (ticket: { id: string; created_at?: string }) => void;
-  usage: LinklerUsage | null;
-  setUsage: (usage: LinklerUsage | null) => void;
+  supportSessionId: string;
+  setSupportSessionId: (sessionId: string) => void;
+  supportMessages: CompanionEntry[];
+  appendSupportMessage: (entry: CompanionEntry) => void;
+  resetSupportConversation: () => void;
+  supportForceEscalate: boolean;
+  setSupportForceEscalate: (value: boolean) => void;
 };
 
 const STORAGE_KEYS = {
@@ -44,6 +45,8 @@ const STORAGE_KEYS = {
   MESSAGES: 'linkler.transcript',
   LAST_TICKET: 'linkler.lastTicket',
   COOLDOWN: 'linkler.cooldownEndsAt',
+  SUPPORT_SESSION_ID: 'linkler.support.sessionId',
+  SUPPORT_MESSAGES: 'linkler.support.transcript',
 };
 
 function isBrowser() {
@@ -58,6 +61,8 @@ function safeParseJSON<T>(value: string | null, fallback: T): T {
     return fallback;
   }
 }
+
+const MAX_COOLDOWN_MS = 15_000;
 
 function generateSessionId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -89,10 +94,24 @@ export function useLinklerPanel(): LinklerPanelState {
     const value = window.localStorage.getItem(STORAGE_KEYS.COOLDOWN);
     if (!value) return null;
     const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
+    if (!Number.isFinite(parsed)) return null;
+    const remainingMs = parsed - Date.now();
+    if (remainingMs <= 0 || remainingMs > MAX_COOLDOWN_MS) {
+      return null;
+    }
+    return parsed;
   });
-  const [usage, setUsage] = useState<LinklerUsage | null>(null);
   const [heartbeat, setHeartbeat] = useState(Date.now());
+  const [supportSessionId, setSupportSessionIdState] = useState(() => {
+    if (!isBrowser()) return generateSessionId();
+    const stored = window.localStorage.getItem(STORAGE_KEYS.SUPPORT_SESSION_ID);
+    return stored || generateSessionId();
+  });
+  const [supportMessages, setSupportMessages] = useState<CompanionEntry[]>(() => {
+    if (!isBrowser()) return [];
+    return safeParseJSON<CompanionEntry[]>(window.localStorage.getItem(STORAGE_KEYS.SUPPORT_MESSAGES), []);
+  });
+  const [supportForceEscalate, setSupportForceEscalate] = useState(false);
 
   useEffect(() => {
     if (!isBrowser()) return;
@@ -101,8 +120,18 @@ export function useLinklerPanel(): LinklerPanelState {
 
   useEffect(() => {
     if (!isBrowser()) return;
+    window.localStorage.setItem(STORAGE_KEYS.SUPPORT_SESSION_ID, supportSessionId);
+  }, [supportSessionId]);
+
+  useEffect(() => {
+    if (!isBrowser()) return;
     window.localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
   }, [messages]);
+
+  useEffect(() => {
+    if (!isBrowser()) return;
+    window.localStorage.setItem(STORAGE_KEYS.SUPPORT_MESSAGES, JSON.stringify(supportMessages));
+  }, [supportMessages]);
 
   useEffect(() => {
     if (!isBrowser()) return;
@@ -127,6 +156,13 @@ export function useLinklerPanel(): LinklerPanelState {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!cooldownEndsAt) return;
+    if (cooldownEndsAt - Date.now() <= 0) {
+      setCooldownEndsAt(null);
+    }
+  }, [cooldownEndsAt, heartbeat]);
+
   const cooldownRemaining = useMemo(() => {
     if (!cooldownEndsAt) return 0;
     const diff = cooldownEndsAt - heartbeat;
@@ -144,11 +180,23 @@ export function useLinklerPanel(): LinklerPanelState {
     });
   }, []);
 
+  const appendSupportMessage = useCallback((entry: CompanionEntry) => {
+    setSupportMessages((prev) => {
+      const next = [...prev, entry].slice(-40);
+      return next;
+    });
+  }, []);
+
   const resetConversation = useCallback(() => {
     setMessages([]);
     setSessionIdState(generateSessionId());
     setCooldownEndsAt(null);
-    setUsage(null);
+  }, []);
+
+  const resetSupportConversation = useCallback(() => {
+    setSupportMessages([]);
+    setSupportSessionIdState(generateSessionId());
+    setSupportForceEscalate(false);
   }, []);
 
   const setCooldownFromSeconds = useCallback((seconds: number) => {
@@ -156,7 +204,8 @@ export function useLinklerPanel(): LinklerPanelState {
       setCooldownEndsAt(null);
       return;
     }
-    setCooldownEndsAt(Date.now() + seconds * 1000);
+    const clampedSeconds = Math.min(seconds, MAX_COOLDOWN_MS / 1000);
+    setCooldownEndsAt(Date.now() + clampedSeconds * 1000);
   }, []);
 
   const setLastTicket = useCallback((ticket: { id: string; created_at?: string }) => {
@@ -176,7 +225,12 @@ export function useLinklerPanel(): LinklerPanelState {
     cooldownRemaining,
     lastTicket,
     setLastTicket,
-    usage,
-    setUsage,
+    supportSessionId,
+    setSupportSessionId: setSupportSessionIdState,
+    supportMessages,
+    appendSupportMessage,
+    resetSupportConversation,
+    supportForceEscalate,
+    setSupportForceEscalate,
   };
 }

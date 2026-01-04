@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireOwner } from '@/lib/rbac';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -7,12 +8,32 @@ function getBaseUrl() {
   return (process.env.OLLAMA_BASE_URL ?? '').trim().replace(/\/$/, '');
 }
 
-export async function GET() {
+function authFailure(error: Error) {
+  const status = error.message === 'FORBIDDEN' ? 403 : 401;
+  const message = status === 403 ? 'Forbidden' : 'Unauthorized';
+  return NextResponse.json(
+    { ok: false, error: message },
+    {
+      status,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
+    }
+  );
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    await requireOwner(request);
+  } catch (error: any) {
+    return authFailure(error instanceof Error ? error : new Error('UNAUTHORIZED'));
+  }
+
   const baseUrl = getBaseUrl();
 
   if (!baseUrl) {
     return NextResponse.json(
-      { ok: false, baseUrl: null, tagsOk: false, tagsStatus: null, error: 'OLLAMA_BASE_URL not set' },
+      { ok: false, tagsOk: false, tagsStatus: null, error: 'OLLAMA_BASE_URL not set' },
       {
         status: 500,
         headers: {
@@ -36,7 +57,6 @@ export async function GET() {
   return NextResponse.json(
     {
       ok: true,
-      baseUrl,
       tagsOk,
       tagsStatus,
     },

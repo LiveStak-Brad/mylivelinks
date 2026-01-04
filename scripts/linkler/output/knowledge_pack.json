@@ -1,0 +1,1177 @@
+{
+  "generated_at": "2026-01-04T20:28:39.565Z",
+  "source_count": 15,
+  "sources": [
+    {
+      "kind": "remote",
+      "title": "MyLiveLinks Homepage",
+      "source": "https://www.mylivelinks.com/",
+      "headings": [],
+      "summary": "Share your links, make posts, go live, and get paid! Join the MyLiveLinks community.",
+      "key_facts": [
+        "Share your links, make posts, go live, and get paid! Join the MyLiveLinks community."
+      ]
+    },
+    {
+      "kind": "remote",
+      "title": "Platform Features",
+      "source": "https://www.mylivelinks.com/features",
+      "headings": [],
+      "summary": "Share your links, make posts, go live, and get paid! Join the MyLiveLinks community.",
+      "key_facts": [
+        "Share your links, make posts, go live, and get paid! Join the MyLiveLinks community."
+      ]
+    },
+    {
+      "kind": "remote",
+      "title": "Creator Programs",
+      "source": "https://www.mylivelinks.com/creators",
+      "headings": [],
+      "summary": "Share your links, make posts, go live, and get paid! Join the MyLiveLinks community.",
+      "key_facts": [
+        "Share your links, make posts, go live, and get paid! Join the MyLiveLinks community."
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "Repository README",
+      "source": "README.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "MyLiveLinks - Group Live Streaming Platform",
+          "slug": "mylivelinks---group-live-streaming-platform"
+        },
+        {
+          "level": 2,
+          "text": "Overview",
+          "slug": "overview"
+        },
+        {
+          "level": 2,
+          "text": "Core Features",
+          "slug": "core-features"
+        },
+        {
+          "level": 3,
+          "text": "🎥 Group Live Room",
+          "slug": "group-live-room"
+        },
+        {
+          "level": 3,
+          "text": "📺 Demand-Based Publishing (Cost-Efficient)",
+          "slug": "demand-based-publishing-cost-efficient"
+        },
+        {
+          "level": 3,
+          "text": "💰 Monetization",
+          "slug": "monetization"
+        },
+        {
+          "level": 3,
+          "text": "🏆 Leaderboards",
+          "slug": "leaderboards"
+        },
+        {
+          "level": 3,
+          "text": "👤 Profiles",
+          "slug": "profiles"
+        },
+        {
+          "level": 2,
+          "text": "Database Schema",
+          "slug": "database-schema"
+        },
+        {
+          "level": 3,
+          "text": "Key Production Features",
+          "slug": "key-production-features"
+        },
+        {
+          "level": 3,
+          "text": "Key Tables",
+          "slug": "key-tables"
+        },
+        {
+          "level": 2,
+          "text": "Coin Packs",
+          "slug": "coin-packs"
+        },
+        {
+          "level": 2,
+          "text": "Architecture Highlights",
+          "slug": "architecture-highlights"
+        },
+        {
+          "level": 3,
+          "text": "Supabase Auth Integration",
+          "slug": "supabase-auth-integration"
+        },
+        {
+          "level": 3,
+          "text": "Ledger-Based Coin System",
+          "slug": "ledger-based-coin-system"
+        },
+        {
+          "level": 3,
+          "text": "Demand-Based Publishing Flow",
+          "slug": "demand-based-publishing-flow"
+        },
+        {
+          "level": 3,
+          "text": "Purchase Idempotency",
+          "slug": "purchase-idempotency"
+        },
+        {
+          "level": 3,
+          "text": "Revenue Split",
+          "slug": "revenue-split"
+        },
+        {
+          "level": 2,
+          "text": "Tech Stack Requirements",
+          "slug": "tech-stack-requirements"
+        },
+        {
+          "level": 3,
+          "text": "Frontend",
+          "slug": "frontend"
+        },
+        {
+          "level": 3,
+          "text": "Backend",
+          "slug": "backend"
+        },
+        {
+          "level": 3,
+          "text": "Live Video",
+          "slug": "live-video"
+        },
+        {
+          "level": 2,
+          "text": "Database Setup",
+          "slug": "database-setup"
+        },
+        {
+          "level": 3,
+          "text": "Prerequisites",
+          "slug": "prerequisites"
+        },
+        {
+          "level": 3,
+          "text": "Installation",
+          "slug": "installation"
+        },
+        {
+          "level": 3,
+          "text": "Verification",
+          "slug": "verification"
+        },
+        {
+          "level": 2,
+          "text": "Critical RPC Functions",
+          "slug": "critical-rpc-functions"
+        },
+        {
+          "level": 3,
+          "text": "update_coin_balance_via_ledger()",
+          "slug": "update_coin_balance_via_ledger"
+        },
+        {
+          "level": 3,
+          "text": "process_coin_purchase()",
+          "slug": "process_coin_purchase"
+        },
+        {
+          "level": 3,
+          "text": "process_gift()",
+          "slug": "process_gift"
+        },
+        {
+          "level": 3,
+          "text": "update_publish_state_from_viewers()",
+          "slug": "update_publish_state_from_viewers"
+        },
+        {
+          "level": 3,
+          "text": "cleanup_stale_viewers()",
+          "slug": "cleanup_stale_viewers"
+        },
+        {
+          "level": 2,
+          "text": "Version 1 Requirements",
+          "slug": "version-1-requirements"
+        },
+        {
+          "level": 2,
+          "text": "Production Checklist",
+          "slug": "production-checklist"
+        },
+        {
+          "level": 2,
+          "text": "Important Notes",
+          "slug": "important-notes"
+        },
+        {
+          "level": 2,
+          "text": "Support",
+          "slug": "support"
+        }
+      ],
+      "summary": "One link. Every live. MyLiveLinks is a production-grade, monetized, enterprise-scale web platform for group live streaming.",
+      "key_facts": [
+        "12 video boxes always visible (6×2 grid)",
+        "All users share one global room",
+        "Heavy chat presence",
+        "Competitive, fast-moving environment",
+        "Streamers marked \"live-available\" when pressing \"Go Live\"",
+        "Video/audio publishes only when viewers are watching",
+        "When last viewer leaves → unpublish",
+        "Streamer remains live-available",
+        "Eliminates wasted minutes and reduces idle costs",
+        "Coin System : Purchase-only coins (never earned for free)"
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "Developer README",
+      "source": "README_DEV.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "MyLiveLinks - Development Guide",
+          "slug": "mylivelinks---development-guide"
+        },
+        {
+          "level": 2,
+          "text": "Profile + Login MVP",
+          "slug": "profile-login-mvp"
+        },
+        {
+          "level": 2,
+          "text": "Environment Variables",
+          "slug": "environment-variables"
+        },
+        {
+          "level": 3,
+          "text": "Required for Supabase (when enabled):",
+          "slug": "required-for-supabase-when-enabled"
+        },
+        {
+          "level": 3,
+          "text": "Optional:",
+          "slug": "optional"
+        },
+        {
+          "level": 2,
+          "text": "Database Setup",
+          "slug": "database-setup"
+        },
+        {
+          "level": 2,
+          "text": "Mock Mode",
+          "slug": "mock-mode"
+        },
+        {
+          "level": 2,
+          "text": "Features",
+          "slug": "features"
+        },
+        {
+          "level": 3,
+          "text": "Login Page ( /login )",
+          "slug": "login-page-login"
+        },
+        {
+          "level": 3,
+          "text": "Public Profile ( /[username] )",
+          "slug": "public-profile-username"
+        },
+        {
+          "level": 3,
+          "text": "Profile Settings ( /settings/profile )",
+          "slug": "profile-settings-settingsprofile"
+        },
+        {
+          "level": 2,
+          "text": "Media Handling",
+          "slug": "media-handling"
+        },
+        {
+          "level": 2,
+          "text": "Database Tables Used",
+          "slug": "database-tables-used"
+        },
+        {
+          "level": 2,
+          "text": "Testing",
+          "slug": "testing"
+        },
+        {
+          "level": 2,
+          "text": "Notes",
+          "slug": "notes"
+        }
+      ],
+      "summary": "This MVP includes: /login - Authentication page (email + password) /[username] - Public profile page (Linktree-style)",
+      "key_facts": [
+        "/login - Authentication page (email + password)",
+        "/[username] - Public profile page (Linktree-style)",
+        "/settings/profile - Profile editing page (owner only)",
+        "Block 1 : database_schema.sql - Main schema",
+        "Block 2 : schema_extensions_coins_diamonds.sql - Extensions",
+        "Block 3 : seed_owner_and_data.sql - Owner account & seed data",
+        "Block 4 : withdrawal_system.sql - Withdrawal system",
+        "Block 5 : blocking_system.sql - Blocking system",
+        "Block 6 : pinned_posts_schema.sql - Pinned posts table",
+        "All database queries return empty/mock data"
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/linkler-lite-ui-plan.md",
+      "source": "docs\\linkler-lite-ui-plan.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "Linkler Lite UI Wiring Plan",
+          "slug": "linkler-lite-ui-wiring-plan"
+        },
+        {
+          "level": 2,
+          "text": "Surfaces & Entry Points",
+          "slug": "surfaces-entry-points"
+        },
+        {
+          "level": 2,
+          "text": "Panel Structure",
+          "slug": "panel-structure"
+        },
+        {
+          "level": 2,
+          "text": "Support Intake Tab",
+          "slug": "support-intake-tab"
+        },
+        {
+          "level": 2,
+          "text": "Companion Chat Tab",
+          "slug": "companion-chat-tab"
+        },
+        {
+          "level": 2,
+          "text": "Anti-spam / Safety",
+          "slug": "anti-spam-safety"
+        },
+        {
+          "level": 2,
+          "text": "Ticket Confirmation + Hand-off",
+          "slug": "ticket-confirmation-hand-off"
+        },
+        {
+          "level": 2,
+          "text": "Future Moderation Hook",
+          "slug": "future-moderation-hook"
+        }
+      ],
+      "summary": "Floating Linkler button lives in the shared top-level layout so both the home feed ( app/page.tsx ) and the user's own profile ( components/ProfileHeader.tsx once loaded) render it. Reuse the existing floating action pattern (same z-index as components/GlobalHeader.tsx modals) and display linkler.png inside a circular button with a subtle glow when unread tickets exist. Respect feature flags via useFeatureFlags so the button can be toggled remotely.",
+      "key_facts": [
+        "Floating Linkler button lives in the shared top-level layout so both the home feed ( app/page.tsx ) and the user's own profile ( components/ProfileHeader.tsx once loaded) render it. Reuse the existing floating action pattern (same z-index as components/GlobalHeader.tsx modals) and display linkler.png inside a circular button with a subtle glow when unread tickets exist.",
+        "Respect feature flags via useFeatureFlags so the button can be toggled remotely. When hidden, no background polling or AI calls should occur (prevents unsolicited responses).",
+        "Place the button near the lower-right corner on desktop and above the tab bar on mobile web. Use CSS vars already defined in styles/globals.css for spacing so it matches the rest of the floating controls.",
+        "Open a lightweight panel component under components/support/LinklerPanel.tsx . Keep it mounted but hidden to preserve chat state.",
+        "Header: Linkler avatar, title (“Need a hand?”), short subtitle (“Choose support or companion mode”). Include an always-visible Send to human support link anchored to the right; clicking it focuses the Support tab immediately.",
+        "Provide two equal-width CTA buttons at the top of the panel: Report / Get Support → toggles the Support Intake tab. Chat with Linkler → toggles the Companion Chat tab.",
+        "Report / Get Support → toggles the Support Intake tab.",
+        "Chat with Linkler → toggles the Companion Chat tab.",
+        "Tabs share the same textarea + send button component ( components/support/MessageComposer.tsx ). Add optional pill to show “Human reviewed” copy referencing moderation guidelines.",
+        "Textarea (minimum 3 lines) with placeholder “Describe the issue…”."
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/linkler-lite-verification.md",
+      "source": "docs\\linkler-lite-verification.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "Linkler Lite Verification Commands",
+          "slug": "linkler-lite-verification-commands"
+        },
+        {
+          "level": 2,
+          "text": "1. Infrastructure guard (no public leakage)",
+          "slug": "1-infrastructure-guard-no-public-leakage"
+        },
+        {
+          "level": 2,
+          "text": "2. Support intake ticket ( /api/linkler/support )",
+          "slug": "2-support-intake-ticket-apilinklersupport"
+        },
+        {
+          "level": 2,
+          "text": "3. Rate-limit & cooldown proofs",
+          "slug": "3-rate-limit-cooldown-proofs"
+        },
+        {
+          "level": 2,
+          "text": "4. Kill switch ( LINKLER_ENABLED=false )",
+          "slug": "4-kill-switch-linkler_enabledfalse"
+        },
+        {
+          "level": 2,
+          "text": "5. Moderation classification",
+          "slug": "5-moderation-classification"
+        },
+        {
+          "level": 2,
+          "text": "6. Companion chat sanity ( /api/linkler/companion )",
+          "slug": "6-companion-chat-sanity-apilinklercompanion"
+        },
+        {
+          "level": 2,
+          "text": "7. UI sanity (web + mobile)",
+          "slug": "7-ui-sanity-web-mobile"
+        },
+        {
+          "level": 2,
+          "text": "8. Owner-only prompt + model controls",
+          "slug": "8-owner-only-prompt-model-controls"
+        },
+        {
+          "level": 3,
+          "text": "a. Non-owner update (should fail)",
+          "slug": "a-non-owner-update-should-fail"
+        },
+        {
+          "level": 3,
+          "text": "b. Owner update (should succeed)",
+          "slug": "b-owner-update-should-succeed"
+        },
+        {
+          "level": 3,
+          "text": "c. Runtime effect check",
+          "slug": "c-runtime-effect-check"
+        },
+        {
+          "level": 2,
+          "text": "9. Admin & Owner diagnostics card",
+          "slug": "9-admin-owner-diagnostics-card"
+        }
+      ],
+      "summary": "All endpoints run under the Next.js dev server ( npm run dev ) on http://localhost:3000 . The Linkler APIs require a valid Supabase session token; grab one from localStorage.getItem('sb-access-token') in an authenticated browser tab (owner profile for the admin-only routes) or issue a service token for testing. /api/ollama/* and /api/ai/ping are now owner-gated; public calls must fail.",
+      "key_facts": [
+        "Web: Log in, open the floating Linkler button on Home and on app/[username]/modern-page . Confirm both tabs work: Support tab posts to /api/linkler/support and shows the ticket confirmation banner or the 503/429 messaging when applicable. Companion tab maintains transcript + cooldowns and the “Send to support” handoff while targeting /api/linkler/companion .",
+        "Support tab posts to /api/linkler/support and shows the ticket confirmation banner or the 503/429 messaging when applicable.",
+        "Companion tab maintains transcript + cooldowns and the “Send to support” handoff while targeting /api/linkler/companion .",
+        "Mobile: In the Expo app, verify the Linkler button floats above Home and the user’s own Profile. The panel mirrors the two-tab behavior (support + companion) and enforces cooldowns against /api/linkler/* .",
+        "Edit the prompt via /admin/linkler (or the SQL step above) and add a recognizable phrase such as Linkler internal prompt test .",
+        "Immediately call the support intake endpoint (Section 2). The response payload includes prompt.key and prompt.updatedAt . The minted phrase should now appear inside the AI-generated summary, proving the live runtime picked up the DB copy.",
+        "Use /api/ai/ping (authenticated as the owner) to confirm the models.guard / models.assistant fields match the latest values from ai_settings .",
+        "Sign in as the owner and open /admin/linkler . The Linkler Status card should appear above the editor with: Health ( online / offline ) and the latest latency in milliseconds. Kill switch indicator ( Enabled vs Disabled ). 24h usage counts for support tickets and companion chats. The most recent AI error message, or “No AI errors recorded.”",
+        "Health ( online / offline ) and the latest latency in milliseconds.",
+        "Kill switch indicator ( Enabled vs Disabled )."
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/Linkler_System.md",
+      "source": "docs\\Linkler_System.md",
+      "headings": [
+        {
+          "level": 2,
+          "text": "1. Identity Definition",
+          "slug": "1-identity-definition"
+        },
+        {
+          "level": 2,
+          "text": "2. Tone & Communication Rules",
+          "slug": "2-tone-communication-rules"
+        },
+        {
+          "level": 2,
+          "text": "3. Hard Constraints (Non-Negotiable)",
+          "slug": "3-hard-constraints-non-negotiable"
+        },
+        {
+          "level": 2,
+          "text": "4. Knowledge Scope (What Linkler Knows)",
+          "slug": "4-knowledge-scope-what-linkler-knows"
+        },
+        {
+          "level": 2,
+          "text": "5. Uncertainty Handling",
+          "slug": "5-uncertainty-handling"
+        },
+        {
+          "level": 2,
+          "text": "6. Support & Escalation Rules",
+          "slug": "6-support-escalation-rules"
+        },
+        {
+          "level": 2,
+          "text": "7. Safety & Trust Boundaries",
+          "slug": "7-safety-trust-boundaries"
+        },
+        {
+          "level": 2,
+          "text": "8. Canonical Response Pattern",
+          "slug": "8-canonical-response-pattern"
+        },
+        {
+          "level": 2,
+          "text": "9. Example User Questions & Model-Perfect Responses",
+          "slug": "9-example-user-questions-model-perfect-responses"
+        },
+        {
+          "level": 2,
+          "text": "10. Version Lock",
+          "slug": "10-version-lock"
+        },
+        {
+          "level": 2,
+          "text": "11. Runtime Configuration (Environment Variables)",
+          "slug": "11-runtime-configuration-environment-variables"
+        }
+      ],
+      "summary": "You are Linkler, MyLiveLinks’ in-app assistant and first-contact guide for members using the real product experience. You exist to explain how current features behave, point out limitations, and keep people oriented without inventing anything that is not live in the app. Treat the user as the account holder interacting with the logged-in product experience; never impersonate other users or staff.",
+      "key_facts": [
+        "You are Linkler, MyLiveLinks’ in-app assistant and first-contact guide for members using the real product experience.",
+        "You exist to explain how current features behave, point out limitations, and keep people oriented without inventing anything that is not live in the app.",
+        "Treat the user as the account holder interacting with the logged-in product experience; never impersonate other users or staff.",
+        "Human support owns account reviews, policy calls, and manual fixes; you only triage, explain, and escalate with the approved language below.",
+        "Keep responses under 90 words unless summarizing multiple steps; prefer 2 short sentences.",
+        "Write in calm, plain language with neutral empathy (no hype, no slang, no emojis).",
+        "Vary sentence length between 8–16 words; avoid bullet lists unless the user explicitly asks.",
+        "Mirror the user’s terminology when it matches product names (LiveTV, Teams, Wallet, Link, Noties).",
+        "Ask at most one clarifying question when a necessary detail is missing; otherwise proceed with the best verified guidance.",
+        "Never sound legalistic, robotic, sarcastic, or like a policy enforcer."
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/Linkler_Training.md",
+      "source": "docs\\Linkler_Training.md",
+      "headings": [
+        {
+          "level": 2,
+          "text": "1. Mission & Identity",
+          "slug": "1-mission-identity"
+        },
+        {
+          "level": 2,
+          "text": "2. Personality & Tone",
+          "slug": "2-personality-tone"
+        },
+        {
+          "level": 2,
+          "text": "3. What Linkler Can Do",
+          "slug": "3-what-linkler-can-do"
+        },
+        {
+          "level": 2,
+          "text": "4. What Linkler Cannot Do",
+          "slug": "4-what-linkler-cannot-do"
+        },
+        {
+          "level": 2,
+          "text": "5. Behavioral Guardrails & “Don’t Guess” Rules",
+          "slug": "5-behavioral-guardrails-dont-guess-rules"
+        },
+        {
+          "level": 2,
+          "text": "6. AI-First Support Flow",
+          "slug": "6-ai-first-support-flow"
+        },
+        {
+          "level": 2,
+          "text": "7. Sensitive Issue Routing & Escalation Triggers",
+          "slug": "7-sensitive-issue-routing-escalation-triggers"
+        },
+        {
+          "level": 2,
+          "text": "8. Navigation Map & Common FAQs",
+          "slug": "8-navigation-map-common-faqs"
+        },
+        {
+          "level": 3,
+          "text": "Home & Live",
+          "slug": "home-live"
+        },
+        {
+          "level": 3,
+          "text": "Teams",
+          "slug": "teams"
+        },
+        {
+          "level": 3,
+          "text": "Feed & Posts",
+          "slug": "feed-posts"
+        },
+        {
+          "level": 3,
+          "text": "Wallet & Gifting",
+          "slug": "wallet-gifting"
+        },
+        {
+          "level": 3,
+          "text": "Messaging",
+          "slug": "messaging"
+        },
+        {
+          "level": 3,
+          "text": "Link (Dating & Auto-Link)",
+          "slug": "link-dating-auto-link"
+        },
+        {
+          "level": 3,
+          "text": "Search & Noties",
+          "slug": "search-noties"
+        },
+        {
+          "level": 3,
+          "text": "Profile & Settings",
+          "slug": "profile-settings"
+        },
+        {
+          "level": 2,
+          "text": "9. Troubleshooting Scripts (Use verbatim + customize specifics)",
+          "slug": "9-troubleshooting-scripts-use-verbatim-customize-specifics"
+        },
+        {
+          "level": 2,
+          "text": "10. Response Templates",
+          "slug": "10-response-templates"
+        },
+        {
+          "level": 2,
+          "text": "11. Safety & Trust Handling",
+          "slug": "11-safety-trust-handling"
+        },
+        {
+          "level": 2,
+          "text": "12. Version Scope & References",
+          "slug": "12-version-scope-references"
+        }
+      ],
+      "summary": "Linkler is the in-app companion for real, logged-in MyLiveLinks members. Primary job: describe the product exactly as it works today, orient people with on-screen menus/buttons, and surface when rollout is limited. Linkler triages; human support owns account reviews, policy calls, billing, safety, and any irreversible actions.",
+      "key_facts": [
+        "Linkler is the in-app companion for real, logged-in MyLiveLinks members.",
+        "Primary job: describe the product exactly as it works today, orient people with on-screen menus/buttons, and surface when rollout is limited.",
+        "Linkler triages; human support owns account reviews, policy calls, billing, safety, and any irreversible actions.",
+        "Calm, plain language with neutral empathy; no hype, slang, jokes, or emojis.",
+        "Default to two short sentences (8–16 words each) under 90 total words.",
+        "Mirror UI names exactly (LiveTV, Teams, Wallet, Noties, Link, Live Central).",
+        "Ask one clarifying question only when a factual answer is blocked.",
+        "Acknowledge friction (“I get why that feels stuck”) and immediately steer to guidance.",
+        "Explain current behavior of live features, Teams, Feed, Wallet, Link, Messaging, Search, Notifications, and Profile settings.",
+        "Guide navigation using only visible UI affordances (banners, icons, profile menu, buttons, tabs)."
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/MUSIC_UPLOAD_RULES.md",
+      "source": "docs\\MUSIC_UPLOAD_RULES.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "Music Upload Rules (Tracks)",
+          "slug": "music-upload-rules-tracks"
+        },
+        {
+          "level": 2,
+          "text": "Bucket",
+          "slug": "bucket"
+        },
+        {
+          "level": 2,
+          "text": "Canonical paths",
+          "slug": "canonical-paths"
+        },
+        {
+          "level": 2,
+          "text": "Public vs signed URLs",
+          "slug": "public-vs-signed-urls"
+        }
+      ],
+      "summary": "This document defines the canonical Supabase Storage conventions for profile music tracks so web + mobile can generate stable URLs and keep media organized. Bucket : profile-media (canonical bucket already used for profile media uploads) Use these stable paths (track IDs are UUIDs from public.profile_music_tracks.id ):",
+      "key_facts": [
+        "Bucket : profile-media (canonical bucket already used for profile media uploads)",
+        "Track audio : profile-media/{profile_id}/music/tracks/{track_id}/audio",
+        "Track cover art : profile-media/{profile_id}/music/tracks/{track_id}/cover",
+        "{profile_id} is the profile’s UUID ( public.profiles.id ).",
+        "{track_id} is the track row UUID ( public.profile_music_tracks.id ).",
+        "Re-uploads should overwrite the same path (stable URLs; no “random” filenames).",
+        "supabase.storage.from('profile-media').getPublicUrl(path)",
+        "supabase.storage.from('profile-media').createSignedUrl(path, expiresInSeconds)",
+        "This document defines the canonical Supabase Storage conventions for profile music tracks so web + mobile can generate stable URLs and keep media organized.",
+        "Use these stable paths (track IDs are UUIDs from public.profile_music_tracks.id ):"
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/NOTIES_ACTIONURL_SPEC.md",
+      "source": "docs\\NOTIES_ACTIONURL_SPEC.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "NOTIES actionUrl spec (canonical)",
+          "slug": "noties-actionurl-spec-canonical"
+        },
+        {
+          "level": 2,
+          "text": "Goals",
+          "slug": "goals"
+        },
+        {
+          "level": 2,
+          "text": "Notie types currently emitted",
+          "slug": "notie-types-currently-emitted"
+        },
+        {
+          "level": 2,
+          "text": "Canonical actionUrl formats",
+          "slug": "canonical-actionurl-formats"
+        },
+        {
+          "level": 3,
+          "text": "Profile",
+          "slug": "profile"
+        },
+        {
+          "level": 3,
+          "text": "Live",
+          "slug": "live"
+        },
+        {
+          "level": 3,
+          "text": "Wallet",
+          "slug": "wallet"
+        },
+        {
+          "level": 3,
+          "text": "My Analytics",
+          "slug": "my-analytics"
+        },
+        {
+          "level": 3,
+          "text": "Rooms",
+          "slug": "rooms"
+        },
+        {
+          "level": 3,
+          "text": "Messages",
+          "slug": "messages"
+        },
+        {
+          "level": 3,
+          "text": "Noties",
+          "slug": "noties"
+        },
+        {
+          "level": 3,
+          "text": "Gifter Levels",
+          "slug": "gifter-levels"
+        },
+        {
+          "level": 3,
+          "text": "Settings: Profile",
+          "slug": "settings-profile"
+        },
+        {
+          "level": 2,
+          "text": "Resolver contract",
+          "slug": "resolver-contract"
+        },
+        {
+          "level": 2,
+          "text": "Mobile navigation contract",
+          "slug": "mobile-navigation-contract"
+        }
+      ],
+      "summary": "This document defines the canonical actionUrl formats emitted/consumed for notifications (“Noties”), and how they map to existing routes on web + mobile. Provide a single, deterministic mapping for both web + mobile. Keep actionUrl values portable : they may be a relative path ( /wallet ), a site URL ( https://mylivelinks.com/wallet ), or a mobile deep-link ( mylivelinks://wallet ).",
+      "key_facts": [
+        "Provide a single, deterministic mapping for both web + mobile.",
+        "Keep actionUrl values portable : they may be a relative path ( /wallet ), a site URL ( https://mylivelinks.com/wallet ), or a mobile deep-link ( mylivelinks://wallet ).",
+        "Avoid leaking private data via actionUrl query parameters.",
+        "follow",
+        "live",
+        "gift",
+        "purchase",
+        "conversion",
+        "mention",
+        "comment"
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/search-data-sources.md",
+      "source": "docs\\search-data-sources.md",
+      "headings": [
+        {
+          "level": 2,
+          "text": "Search data sources",
+          "slug": "search-data-sources"
+        },
+        {
+          "level": 2,
+          "text": "Manual verification checklist",
+          "slug": "manual-verification-checklist"
+        }
+      ],
+      "summary": "lib/search.ts contains the shared fetchSearchResults helper used by both the dropdown ( GlobalSearchTrigger ) and /search pages. It queries Supabase tables: profiles for People and Live tabs (columns: id , username , display_name , avatar_url , is_live , follower_count , verification flags, bio , viewer_count ).",
+      "key_facts": [
+        "lib/search.ts contains the shared fetchSearchResults helper used by both the dropdown ( GlobalSearchTrigger ) and /search pages. It queries Supabase tables: profiles for People and Live tabs (columns: id , username , display_name , avatar_url , is_live , follower_count , verification flags, bio , viewer_count ). posts for Posts tab ( id , text_content , created_at , media_url , reaction + comment counts, plus the profiles join for author info). team_feed_posts for team activity (joined with teams + profiles so team posts show up alongside global posts). teams for Teams tab ( id , name , slug , description , icon_url , banner_url , approved_member_count ).",
+        "profiles for People and Live tabs (columns: id , username , display_name , avatar_url , is_live , follower_count , verification flags, bio , viewer_count ).",
+        "posts for Posts tab ( id , text_content , created_at , media_url , reaction + comment counts, plus the profiles join for author info).",
+        "team_feed_posts for team activity (joined with teams + profiles so team posts show up alongside global posts).",
+        "teams for Teams tab ( id , name , slug , description , icon_url , banner_url , approved_member_count ).",
+        "Nearby People continues to use the existing rpc_profiles_nearby Supabase RPC inside SearchPage .",
+        "No additional API routes were created; dropdown and page components call Supabase directly through the shared helper so the data contract stays identical in both experiences.",
+        "Result links resolve to: People → /${username} (fallback /profiles/${id} ) Posts → /feed?focusPostId={postId} for global posts or /teams/{slug}?postId={postId} for team activity Teams → /teams/{slug||id} Live → /live/{username||id}",
+        "People → /${username} (fallback /profiles/${id} )",
+        "Posts → /feed?focusPostId={postId} for global posts or /teams/{slug}?postId={postId} for team activity"
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/TEAMS_LAUNCH_SPEC.md",
+      "source": "docs\\TEAMS_LAUNCH_SPEC.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "Teams Feature Launch Specification",
+          "slug": "teams-feature-launch-specification"
+        },
+        {
+          "level": 2,
+          "text": "Overview",
+          "slug": "overview"
+        },
+        {
+          "level": 2,
+          "text": "1. CURRENT STATE",
+          "slug": "1-current-state"
+        },
+        {
+          "level": 3,
+          "text": "1.1 UI Components (COMPLETE)",
+          "slug": "11-ui-components-complete"
+        },
+        {
+          "level": 3,
+          "text": "1.2 Database Schema (COMPLETE)",
+          "slug": "12-database-schema-complete"
+        },
+        {
+          "level": 3,
+          "text": "1.3 Presence System (COMPLETE)",
+          "slug": "13-presence-system-complete"
+        },
+        {
+          "level": 2,
+          "text": "2. WORK REQUIRED",
+          "slug": "2-work-required"
+        },
+        {
+          "level": 3,
+          "text": "2.1 Create React Hooks for Data Fetching",
+          "slug": "21-create-react-hooks-for-data-fetching"
+        },
+        {
+          "level": 3,
+          "text": "2.2 Wire UI Components to Hooks",
+          "slug": "22-wire-ui-components-to-hooks"
+        },
+        {
+          "level": 3,
+          "text": "2.3 Implement Team Chat (NEW WORK REQUIRED)",
+          "slug": "23-implement-team-chat-new-work-required"
+        },
+        {
+          "level": 3,
+          "text": "2.4 Implement Presence Heartbeat",
+          "slug": "24-implement-presence-heartbeat"
+        },
+        {
+          "level": 3,
+          "text": "2.5 Create Team Page Route",
+          "slug": "25-create-team-page-route"
+        },
+        {
+          "level": 3,
+          "text": "2.6 Implement Thread Voting System",
+          "slug": "26-implement-thread-voting-system"
+        },
+        {
+          "level": 3,
+          "text": "2.7 Implement Polls",
+          "slug": "27-implement-polls"
+        },
+        {
+          "level": 3,
+          "text": "2.8 Role Mapping",
+          "slug": "28-role-mapping"
+        },
+        {
+          "level": 3,
+          "text": "2.9 Storage Buckets",
+          "slug": "29-storage-buckets"
+        },
+        {
+          "level": 2,
+          "text": "3. IMPLEMENTATION ORDER",
+          "slug": "3-implementation-order"
+        },
+        {
+          "level": 3,
+          "text": "Phase 1: Core Data Layer (1-2 days)",
+          "slug": "phase-1-core-data-layer-1-2-days"
+        },
+        {
+          "level": 3,
+          "text": "Phase 2: Interactivity (1-2 days)",
+          "slug": "phase-2-interactivity-1-2-days"
+        },
+        {
+          "level": 3,
+          "text": "Phase 3: Chat System (2-3 days)",
+          "slug": "phase-3-chat-system-2-3-days"
+        },
+        {
+          "level": 3,
+          "text": "Phase 4: Presence System (1 day)",
+          "slug": "phase-4-presence-system-1-day"
+        },
+        {
+          "level": 3,
+          "text": "Phase 5: Advanced Features (2-3 days)",
+          "slug": "phase-5-advanced-features-2-3-days"
+        },
+        {
+          "level": 3,
+          "text": "Phase 6: Polish (1-2 days)",
+          "slug": "phase-6-polish-1-2-days"
+        },
+        {
+          "level": 2,
+          "text": "4. TESTING CHECKLIST",
+          "slug": "4-testing-checklist"
+        },
+        {
+          "level": 3,
+          "text": "Authentication",
+          "slug": "authentication"
+        },
+        {
+          "level": 3,
+          "text": "Feed",
+          "slug": "feed"
+        },
+        {
+          "level": 3,
+          "text": "Chat",
+          "slug": "chat"
+        },
+        {
+          "level": 3,
+          "text": "Live",
+          "slug": "live"
+        },
+        {
+          "level": 3,
+          "text": "Members",
+          "slug": "members"
+        },
+        {
+          "level": 3,
+          "text": "Settings",
+          "slug": "settings"
+        },
+        {
+          "level": 2,
+          "text": "5. ENVIRONMENT VARIABLES",
+          "slug": "5-environment-variables"
+        },
+        {
+          "level": 2,
+          "text": "6. FILES TO CREATE/MODIFY",
+          "slug": "6-files-to-createmodify"
+        },
+        {
+          "level": 3,
+          "text": "New Files:",
+          "slug": "new-files"
+        },
+        {
+          "level": 3,
+          "text": "Modify:",
+          "slug": "modify"
+        },
+        {
+          "level": 2,
+          "text": "7. NOTES FOR BACKEND DEVELOPER",
+          "slug": "7-notes-for-backend-developer"
+        },
+        {
+          "level": 2,
+          "text": "8. QUICK START FOR DEVELOPER",
+          "slug": "8-quick-start-for-developer"
+        }
+      ],
+      "summary": "This document specifies the complete work required to launch the Teams feature. The UI is complete (sandbox at /teams/sandbox ). The database schema and RPC functions exist (see migrations).",
+      "key_facts": [
+        "Team Home - Dashboard with presence strip, pinned announcement, momentum bar, content stack",
+        "Team Feed - Posts, threads, polls, clips with Hot/New/Top sorting",
+        "Team Chat - Discord-style messages with reactions, system messages, live jump buttons",
+        "Team Live - Live room grid, scheduled events, Go Live CTA",
+        "Team Members - Roster with search, filters (All/Live/Online), role grouping",
+        "Team Settings - Role-gated settings (Leader/Core only)",
+        "teams - Team metadata (name, slug, tag, description, icon, banner, theme, member counts)",
+        "team_memberships - Member status/role (requested/approved/rejected/banned/left)",
+        "team_bans - Ban records with expiry",
+        "team_mutes - Mute records with scope (team_chat/team_live_chat/all)"
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/UI_GOLDEN_RULES.md",
+      "source": "docs\\UI_GOLDEN_RULES.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "UI Golden Rules",
+          "slug": "ui-golden-rules"
+        },
+        {
+          "level": 2,
+          "text": "🚫 The \"Never Do\" List",
+          "slug": "the-never-do-list"
+        },
+        {
+          "level": 3,
+          "text": "1. Never Use Raw HTML Elements",
+          "slug": "1-never-use-raw-html-elements"
+        },
+        {
+          "level": 3,
+          "text": "2. Never Use Hex Colors or RGB",
+          "slug": "2-never-use-hex-colors-or-rgb"
+        },
+        {
+          "level": 3,
+          "text": "3. Never Use One-Off Spacing Values",
+          "slug": "3-never-use-one-off-spacing-values"
+        },
+        {
+          "level": 3,
+          "text": "4. Never Hardcode Modal Sizes",
+          "slug": "4-never-hardcode-modal-sizes"
+        },
+        {
+          "level": 3,
+          "text": "5. Never Skip PageShell",
+          "slug": "5-never-skip-pageshell"
+        },
+        {
+          "level": 2,
+          "text": "✅ The \"Always Do\" List",
+          "slug": "the-always-do-list"
+        },
+        {
+          "level": 3,
+          "text": "1. Always Use Design System Components",
+          "slug": "1-always-use-design-system-components"
+        },
+        {
+          "level": 3,
+          "text": "2. Always Use CSS Tokens",
+          "slug": "2-always-use-css-tokens"
+        },
+        {
+          "level": 3,
+          "text": "3. Always Choose the Right Shell",
+          "slug": "3-always-choose-the-right-shell"
+        },
+        {
+          "level": 3,
+          "text": "4. Always Use Page Patterns for Common Layouts",
+          "slug": "4-always-use-page-patterns-for-common-layouts"
+        },
+        {
+          "level": 3,
+          "text": "5. Always Match Skeleton Dimensions",
+          "slug": "5-always-match-skeleton-dimensions"
+        },
+        {
+          "level": 2,
+          "text": "Modal Size Reference",
+          "slug": "modal-size-reference"
+        },
+        {
+          "level": 2,
+          "text": "Spacing Scale Reference",
+          "slug": "spacing-scale-reference"
+        },
+        {
+          "level": 2,
+          "text": "File Organization",
+          "slug": "file-organization"
+        },
+        {
+          "level": 2,
+          "text": "Enforcement",
+          "slug": "enforcement"
+        },
+        {
+          "level": 2,
+          "text": "Quick Reference Card",
+          "slug": "quick-reference-card"
+        }
+      ],
+      "summary": "MANDATORY guidelines for all UI development on MyLiveLinks. Violations will cause design drift and technical debt. Need",
+      "key_facts": [
+        "❌ Raw <button> , <input> , <textarea> elements",
+        "❌ Hex colors (#xxx, #xxxxxx)",
+        "❌ One-off pixel values (px values not in token scale)",
+        "❌ Inline styles with hardcoded colors",
+        "MANDATORY guidelines for all UI development on MyLiveLinks. Violations will cause design drift and technical debt.",
+        "All modals are full-screen on mobile (< 640px).",
+        "Run the drift detector before committing:",
+        "This checks for:"
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "docs/navigation/route-inventory.md",
+      "source": "docs\\navigation\\route-inventory.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "Navigation Route Inventory",
+          "slug": "navigation-route-inventory"
+        },
+        {
+          "level": 2,
+          "text": "Needs-Build / Missing Surface",
+          "slug": "needs-build-missing-surface"
+        },
+        {
+          "level": 2,
+          "text": "Classification Summary",
+          "slug": "classification-summary"
+        }
+      ],
+      "summary": "Source of truth for all Next.js App Router pages under /app . Each row includes the current purpose and where (if anywhere) the page should surface in navigation. Route",
+      "key_facts": [
+        "Purchases / Orders : Referenced in legacy user menu but no page exists yet. Keep disabled with “Coming soon” toast until implemented.",
+        "Discover entry: No dedicated /discover route; rely on /trending + /link until product defines page.",
+        "App Menu candidates: / , /feed , /trending , /liveTV , /teams , /leaderboards , /gifter-levels , /link , /search (overlay action), /policies , /policies/terms-of-service , /policies/privacy-policy .",
+        "User Menu candidates: Profile ( /[username] ), /settings/profile , /settings/account , /settings/password , /wallet , /noties , /messages , /referrals , /me/analytics , /link/profile , /link/mutuals , /composer , /live/host , /logout .",
+        "Deep-link only: Dynamic content surfaces such as /room/[slug] , /teams/[slug] , /composer/[projectId] , /link/*/swipe .",
+        "Admin/Internal: /admin/* , /owner/* , /u/[username]/analytics , /ui-kit .",
+        "System/Auth flows (never in menu): /login , /signup , /reset-password , /join , /oauth/consent , /onboarding .",
+        "Source of truth for all Next.js App Router pages under /app . Each row includes the current purpose and where (if anywhere) the page should surface in navigation."
+      ]
+    }
+  ]
+}

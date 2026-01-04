@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Loader2, RefreshCcw, Save } from 'lucide-react';
 import { Button, Badge, Card, CardContent, CardHeader, CardTitle, Input, Textarea } from '@/components/ui';
 import { useToast } from '@/components/ui/Toast';
+import { useLinklerDiagnostics } from '@/hooks/useLinklerDiagnostics';
+import { LinklerStatusCard } from '@/components/linkler/LinklerStatusCard';
 
 type PromptRecord = {
   key: string;
@@ -43,6 +45,12 @@ export default function LinklerPromptAdminPage() {
   const [serverSettings, setServerSettings] = useState<ModelSettings | null>(null);
   const [assistantModel, setAssistantModel] = useState('');
   const [guardModel, setGuardModel] = useState('');
+  const {
+    diagnostics,
+    loading: diagnosticsLoading,
+    error: diagnosticsError,
+    refresh: refreshDiagnostics,
+  } = useLinklerDiagnostics();
 
   const loadPrompt = useCallback(
     async (refresh = false) => {
@@ -231,6 +239,12 @@ export default function LinklerPromptAdminPage() {
 
     return (
       <div className="space-y-6">
+        <LinklerStatusCard
+          diagnostics={diagnostics}
+          loading={diagnosticsLoading}
+          error={diagnosticsError}
+          onRefresh={refreshDiagnostics}
+        />
         <Card>
           <CardHeader className="gap-2">
             <div className="flex items-center justify-between">

@@ -12,7 +12,8 @@
     "lint": "next lint",
     "lint:ui": "node scripts/ui-drift-detector.js",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "generate:knowledge-pack": "node scripts/linkler/generate-knowledge-pack.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -38,14 +39,20 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.0",
+    "cheerio": "^1.0.0-rc.12",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.0.0",
+    "fast-glob": "^3.3.2",
+    "gray-matter": "^4.0.3",
     "jest": "^29.7.0",
     "jest-environment-node": "^29.7.0",
     "postcss": "^8.4.0",
+    "remark-parse": "^11.0.0",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.3.0",
     "ts-jest": "^29.1.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "unified": "^11.0.4",
+    "unist-util-visit": "^5.0.0"
   }
 }

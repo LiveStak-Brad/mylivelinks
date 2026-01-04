@@ -19,7 +19,7 @@
 
 1. Textarea (minimum 3 lines) with placeholder “Describe the issue…”.
 2. Secondary field for optional context JSON (collapsible `<details>` if advanced users want to add extra metadata).
-3. Send button posts to `POST /api/support/intake`. Disable button until textarea has >3 characters.
+3. Send button posts to `POST /api/linkler/support`. Disable button until textarea has >3 characters.
 4. After successful submission:
    - Show inline confirmation (ticket ID + timestamp).
    - Provide CTA “View status” that links to `/support` (future) or copies the ticket ID.
@@ -30,10 +30,8 @@
 
 ## Companion Chat Tab
 
-- Message composer + conversation list (simple bubble layout stored in local state). Messages read from `/api/support/companion` response.
-- Respect rate limits:
-  - Disable send button for the cooldown duration returned by the API; show a small countdown (“Linkler recharges in 18s”).
-  - Show chip for “Daily limit: X/Y” using `usage.usedToday/usage.dailyLimit`.
+- Message composer + conversation list (simple bubble layout stored in local state). Messages read from `/api/linkler/companion` response.
+- Respect the cooldown returned by the API and show a subtle countdown (“Hang on a sec… 4s”) while the send button is disabled.
 - Each Linkler reply includes optional arrays:
   - `exposureTips[]` → render as inline bullet list.
   - `featureIdeas[]` → render as tappable chips linking to relevant pages (feed, live, referrals).
@@ -43,7 +41,6 @@
 ## Anti-spam / Safety
 
 - UI enforces cooldown by reading `cooldownSeconds` from the API response. When disabled, show tooltip explaining the wait.
-- Daily limit chip turns red when `remainingToday` ≤ 2 to warn the user.
 - No background polling—Linkler never sends messages on its own. Only respond immediately after the user presses send (mirrors the backend contract).
 
 ## Ticket Confirmation + Hand-off

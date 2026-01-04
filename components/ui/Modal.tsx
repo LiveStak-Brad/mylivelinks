@@ -33,6 +33,8 @@ export interface ModalProps {
   className?: string;
   /** Footer content - uses consistent padding */
   footer?: ReactNode;
+  /** Allow callers to disable internal body scrolling */
+  scrollableContent?: boolean;
 }
 
 // Maps to CSS tokens
@@ -57,6 +59,7 @@ function Modal({
   disableMobileFullScreen = false,
   className = '',
   footer,
+  scrollableContent = true,
 }: ModalProps) {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -181,8 +184,8 @@ function Modal({
         )}
         
         {/* Content - scrollable */}
-        <div 
-          className="flex-1 overflow-y-auto custom-scrollbar"
+        <div
+          className={`flex-1 ${scrollableContent ? 'overflow-y-auto custom-scrollbar' : 'overflow-hidden'}`}
           style={{ padding: contentPadding }}
         >
           {children}

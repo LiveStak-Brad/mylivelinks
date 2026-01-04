@@ -8,6 +8,7 @@ import {
   getLinklerPrompt,
   getLinklerRuntimeConfig,
 } from '@/lib/linkler/prompt';
+import { isLinklerEnabled, LINKLER_DISABLED_MESSAGE } from '@/lib/linkler/flags';
 
 const bodySchema = z.object({
   message: z.string().min(1, 'message is required').max(1000),
@@ -22,8 +23,8 @@ type CompanionAIShape = {
   suggestSendToHuman?: boolean;
 };
 
-const DEFAULT_DAILY_LIMIT = Number(process.env.COMPANION_DAILY_LIMIT ?? 25);
-const DEFAULT_COOLDOWN_SECONDS = Number(process.env.COMPANION_COOLDOWN_SECONDS ?? 30);
+const DEFAULT_COOLDOWN_SECONDS = Number(process.env.COMPANION_COOLDOWN_SECONDS ?? 5);
+const COMPANION_TIMEOUT_MS = Number(process.env.LINKLER_COMPANION_TIMEOUT_MS ?? 25_000);
 
 function sanitizeContext(value: unknown) {
   if (!value || typeof value !== 'object') return null;
@@ -35,6 +36,10 @@ function sanitizeContext(value: unknown) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isLinklerEnabled()) {
+    return NextResponse.json({ ok: false, error: LINKLER_DISABLED_MESSAGE }, { status: 503 });
+  }
+
   const supabase = createRouteHandlerClient(request);
   const {
     data: { user },
@@ -54,7 +59,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const dailyLimit = DEFAULT_DAILY_LIMIT;
   const cooldownSeconds = DEFAULT_COOLDOWN_SECONDS;
   const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -66,19 +70,7 @@ export async function POST(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(100);
 
-  const sentToday = (recentMessages ?? []).filter((item) => item.role === 'user');
-  if (sentToday.length >= dailyLimit) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: 'Daily companion chat limit reached',
-        retryAfterSeconds: 3600,
-      },
-      { status: 429 }
-    );
-  }
-
-  const lastUserMessage = sentToday[0];
+  const lastUserMessage = (recentMessages ?? []).find((item) => item.role === 'user');
   if (lastUserMessage) {
     const lastAt = new Date(lastUserMessage.created_at).getTime();
     const diffSeconds = (Date.now() - lastAt) / 1000;
@@ -86,7 +78,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          error: `Please wait ${Math.ceil(cooldownSeconds - diffSeconds)}s before sending another message.`,
+          error: 'Hang on a sec... Try again in a few seconds.',
           retryAfterSeconds: Math.ceil(cooldownSeconds - diffSeconds),
         },
         { status: 429 }
@@ -148,17 +140,21 @@ export async function POST(request: NextRequest) {
     traceLabel: 'companion-chat',
     maxRetries: 1,
     model: linklerSettings.assistantModel,
+    timeoutMs: COMPANION_TIMEOUT_MS,
   });
 
-  const fallbackReply =
-    'Linkler is processing a lot right now. Please tap "Send to human support" and our team will help directly.';
+  const fallbackReply = 'Linkler is temporarily unavailable.';
 
   const replyPayload = aiResult.ok && aiResult.output ? aiResult.output : null;
+  const parsedReply = replyPayload?.reply?.trim();
 
-  const finalReply = replyPayload?.reply?.trim() || fallbackReply;
   const exposureTips = replyPayload?.exposureTips ?? [];
   const featureIdeas = replyPayload?.featureIdeas ?? [];
-  const suggestHuman = replyPayload?.suggestSendToHuman !== false;
+  const recommendHumanFromAi = replyPayload?.suggestSendToHuman === true;
+
+  const degraded = !aiResult.ok || !parsedReply;
+  const finalReply = degraded ? fallbackReply : parsedReply!;
+  const recommendHuman = degraded ? false : recommendHumanFromAi;
 
   await supabase.from('support_companion_messages').insert({
     profile_id: user.id,
@@ -168,7 +164,9 @@ export async function POST(request: NextRequest) {
     metadata: {
       exposureTips,
       featureIdeas,
-      suggestSendToHuman: suggestHuman,
+      suggestSendToHuman: recommendHuman,
+      recommendHuman,
+      degraded,
       model: aiResult.model,
       ms: aiResult.ms,
       error: aiResult.ok ? null : aiResult.error,
@@ -177,27 +175,28 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(
-    {
-      ok: true,
-      sessionId,
-      reply: finalReply,
-      exposureTips,
-      featureIdeas,
-      suggestSendToHuman: suggestHuman,
-      cooldownSeconds,
-      usage: {
-        usedToday: sentToday.length + 1,
-        remainingToday: Math.max(0, dailyLimit - (sentToday.length + 1)),
-        dailyLimit,
-      },
-      ai: {
-        ok: aiResult.ok,
-        model: aiResult.model,
-        ms: aiResult.ms,
-        error: aiResult.ok ? undefined : aiResult.error,
-      },
+  const responseBody = {
+    ok: !degraded,
+    degraded,
+    sessionId,
+    reply: finalReply,
+    exposureTips,
+    featureIdeas,
+    recommendHuman,
+    suggestSendToHuman: recommendHuman,
+    cooldownSeconds,
+    ai: {
+      ok: aiResult.ok,
+      model: aiResult.model,
+      ms: aiResult.ms,
+      error: aiResult.ok ? undefined : aiResult.error,
     },
-    { status: aiResult.ok ? 200 : 207 }
-  );
+    ...(degraded
+      ? {
+          error: fallbackReply,
+        }
+      : {}),
+  };
+
+  return NextResponse.json(responseBody, { status: degraded ? 207 : 200 });
 }

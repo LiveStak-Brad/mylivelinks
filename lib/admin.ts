@@ -4,6 +4,7 @@ import type { User } from '@supabase/supabase-js';
 import { createRouteHandlerClient, createServerSupabaseClient } from '@/lib/supabase-server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
+import { getOwnerProfileIds, isOwnerProfile } from '@/lib/owner-ids';
 
 export function generateReqId() {
   try {
@@ -95,17 +96,12 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
 }
 
 export async function requireOwner(request?: NextRequest): Promise<AdminAuthResult> {
-  const ownerProfileId = process.env.OWNER_PROFILE_ID?.trim();
-  if (!ownerProfileId) {
-    throw new Error('FORBIDDEN');
-  }
-
   const user = await getSessionUser(request);
   if (!user) {
     throw new Error('UNAUTHORIZED');
   }
 
-  if (user.id !== ownerProfileId) {
+  if (!isOwnerProfile(user.id)) {
     throw new Error('FORBIDDEN');
   }
 

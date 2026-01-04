@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
@@ -162,6 +162,17 @@ export default function LandingPage() {
     };
   }, [currentUser?.id, supabase]);
 
+  const fetchNewTeams = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('teams')
+      .select('id, slug, name, banner_url, icon_url, created_at')
+      .order('created_at', { ascending: false })
+      .limit(12);
+
+    if (error) throw error;
+    setNewTeams(((data as any) ?? []) as any);
+  }, [supabase]);
+
   useEffect(() => {
     if (!currentUser?.id) return;
     let cancelled = false;
@@ -218,14 +229,7 @@ export default function LandingPage() {
 
     const run = async () => {
       try {
-        const { data, error } = await supabase
-          .from('teams')
-          .select('id, slug, name, banner_url, icon_url, created_at')
-          .order('created_at', { ascending: false })
-          .limit(12);
-
-        if (error) throw error;
-        if (!cancelled) setNewTeams(((data as any) ?? []) as any);
+        await fetchNewTeams();
       } catch (error) {
         console.error('[home][teams] new teams fetch error:', error);
         if (!cancelled) setNewTeams([]);
@@ -236,7 +240,19 @@ export default function LandingPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [fetchNewTeams]);
+
+  useEffect(() => {
+    const onRefresh = () => {
+      void checkUser();
+      void fetchNewTeams();
+    };
+
+    window.addEventListener('mll:refresh', onRefresh);
+    return () => {
+      window.removeEventListener('mll:refresh', onRefresh);
+    };
+  }, [fetchNewTeams]);
 
   const primaryTeamSlug = ownedTeamSlug || memberTeamSlug;
 

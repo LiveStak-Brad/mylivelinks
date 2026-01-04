@@ -259,6 +259,17 @@ export default function PublicFeedClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
 
+  useEffect(() => {
+    const onRefresh = () => {
+      void loadFeed('replace');
+    };
+
+    window.addEventListener('mll:refresh', onRefresh);
+    return () => {
+      window.removeEventListener('mll:refresh', onRefresh);
+    };
+  }, [loadFeed]);
+
   const exportFilteredImage = useCallback(
     async (file: File, cssFilter: string, filterId: PhotoFilterId): Promise<File> => {
       if (cssFilter === 'none') return file;

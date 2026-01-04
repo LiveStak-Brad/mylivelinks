@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-01-01T00:00:00.000Z",
+  "source_count": 2,
+  "sources": [
+    {
+      "kind": "remote",
+      "title": "MyLiveLinks Homepage",
+      "source": "https://www.mylivelinks.com/",
+      "headings": [],
+      "summary": "Share your links, make posts, go live, and get paid! Join the MyLiveLinks community.",
+      "key_facts": [
+        "MyLiveLinks is the unified home for live streaming, profiles, and feeds.",
+        "Creators can link out, host live rooms, and monetize through coin packs."
+      ]
+    },
+    {
+      "kind": "local",
+      "title": "Repository README",
+      "source": "README.md",
+      "headings": [
+        {
+          "level": 1,
+          "text": "MyLiveLinks - Group Live Streaming Platform",
+          "slug": "mylivelinks---group-live-streaming-platform"
+        },
+        {
+          "level": 2,
+          "text": "Core Features",
+          "slug": "core-features"
+        }
+      ],
+      "summary": "One link. Every live. MyLiveLinks is a production-grade, monetized, enterprise-scale web platform for group live streaming.",
+      "key_facts": [
+        "12 video boxes (6×2 grid) keep every participant visible.",
+        "Demand-based publishing only streams when viewers are present.",
+        "Coins are purchase-only; no free drip or passive accrual."
+      ]
+    }
+  ]
+}
