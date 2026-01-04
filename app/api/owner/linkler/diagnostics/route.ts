@@ -20,13 +20,11 @@ type UsageInfo = {
   companionMessages: number;
 };
 
-type LastErrorInfo =
-  | {
-      source: 'support' | 'companion';
-      message: string;
-      occurredAt: string;
-    }
-  | null;
+type LastErrorInfo = {
+  source: 'support' | 'companion';
+  message: string;
+  occurredAt: string;
+};
 
 const WINDOW_HOURS = 24;
 const WINDOW_MS = WINDOW_HOURS * 60 * 60 * 1000;
@@ -172,7 +170,7 @@ export async function GET(request: NextRequest) {
   }
 
   lastErrors.sort((a, b) => (a.occurredAt > b.occurredAt ? -1 : 1));
-  const lastError = lastErrors[0] ?? null;
+  const lastError: LastErrorInfo | null = lastErrors[0] ?? null;
 
   const killSwitch: KillSwitchInfo = {
     disabled: envKillSwitchDisabled || (killSwitchRow ? killSwitchRow.enabled === false : false),
