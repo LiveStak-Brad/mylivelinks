@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
     lastErrors.push({
       source: 'support',
       message: supportErrorMessage,
-      occurredAt: supportError.data.updated_at ?? checkedAt,
+      occurredAt: supportError.data?.updated_at ?? checkedAt,
     });
   }
 
