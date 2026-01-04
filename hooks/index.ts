@@ -11,6 +11,7 @@ export { useIsMobileWeb } from './useIsMobileWeb';
 export { useOrientation } from './useOrientation';
 export { useOwnerPanelData } from './useOwnerPanelData';
 export { useOwnerLiveOpsData } from './useOwnerLiveOpsData';
+export { useSupportBadgeCounts, useOwnerSupportTickets } from './useOwnerSupportInbox';
 export { useTeamChatStyle } from './useTeamChatStyle';
 export type { TeamChatStyle } from './useTeamChatStyle';
 

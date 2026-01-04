@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useOwnerPanelData } from '@/hooks/useOwnerPanelData';
 import {
   StatCard,
@@ -9,11 +10,13 @@ import {
   Card,
   CardHeader,
   CardBody,
+  Badge,
 } from '@/components/owner/ui-kit';
 import { LiveNowTable } from '@/components/owner/LiveNowTable';
 import { RecentReportsTable } from '@/components/owner/RecentReportsTable';
 import { PlatformHealthCard } from '@/components/owner/PlatformHealthCard';
 import { AnalyticsChart, type ChartDataPoint } from '@/components/analytics';
+import { useSupportBadgeCounts } from '@/hooks/useOwnerSupportInbox';
 import {
   Users,
   Radio,
@@ -29,6 +32,11 @@ import {
 
 export default function OwnerDashboard() {
   const { data, loading, error, refetch } = useOwnerPanelData();
+  const {
+    counts: supportCounts,
+    loading: supportLoading,
+    error: supportError,
+  } = useSupportBadgeCounts();
 
   // ============================================================================
   // ERROR STATE
@@ -123,6 +131,60 @@ export default function OwnerDashboard() {
         <p className="text-muted-foreground">
           Welcome to Mission Control. Monitor your platform at a glance.
         </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border border-primary/30 bg-primary/5">
+          <CardHeader
+            title="Linkler Prompt"
+            subtitle="Edit the runtime system prompt without redeploying."
+          />
+          <CardBody>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <p className="text-sm text-muted-foreground">
+                Keep Linkler’s answers accurate by updating the training prompt in real time. Changes apply immediately
+                to all new conversations.
+              </p>
+              <Button asChild variant="primary">
+                <Link href="/admin/linkler">Open Linkler Editor</Link>
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Support Inbox"
+            subtitle={supportError ? 'Counts unavailable' : 'Monitor Linkler & support tickets in one place'}
+          />
+          <CardBody>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-3">
+                <Badge variant="info" size="md" dot>
+                  <span className="font-medium">Open</span>
+                  <span className="font-semibold">
+                    {supportLoading ? '...' : supportCounts?.open ?? 0}
+                  </span>
+                </Badge>
+                <Badge variant="warning" size="md" dot>
+                  <span className="font-medium">Escalated</span>
+                  <span className="font-semibold">
+                    {supportLoading ? '...' : supportCounts?.escalated ?? 0}
+                  </span>
+                </Badge>
+                <Badge variant="destructive" size="md" dot>
+                  <span className="font-medium">High Severity</span>
+                  <span className="font-semibold">
+                    {supportLoading ? '...' : supportCounts?.highSeverity ?? 0}
+                  </span>
+                </Badge>
+              </div>
+              <Button asChild variant="primary" disabled={supportLoading && !supportCounts}>
+                <Link href="/owner/support">Open Inbox</Link>
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
       </div>
 
       {/* Top KPI Row - 6 StatCards */}
