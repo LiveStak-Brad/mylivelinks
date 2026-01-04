@@ -61,7 +61,9 @@ function mapAiSummary(value: any): SupportAISummary | null {
   const summary = typeof value.summary === 'string' ? value.summary : null;
   const category = typeof value.category === 'string' ? value.category : null;
   const severity = typeof value.severity === 'string' ? (value.severity.toLowerCase() as SupportTicketSeverity) : null;
-  const followups = Array.isArray(value.followups) ? value.followups.filter((item) => typeof item === 'string') : [];
+  const followups = Array.isArray(value.followups)
+    ? value.followups.filter((item: unknown): item is string => typeof item === 'string')
+    : [];
 
   return {
     summary,
@@ -169,7 +171,7 @@ async function selectTickets(params: {
   };
 }
 
-async function countFromQuery(promise: Promise<{ count: number | null; error: any }>): Promise<number> {
+async function countFromQuery(promise: any): Promise<number> {
   try {
     const { count, error } = await promise;
     if (error) {

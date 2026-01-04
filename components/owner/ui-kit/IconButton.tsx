@@ -1,4 +1,4 @@
-import { ReactNode, ButtonHTMLAttributes } from 'react';
+import { Children, cloneElement, isValidElement, ReactNode, ButtonHTMLAttributes } from 'react';
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: React.ComponentType<{ className?: string }>;
@@ -58,6 +58,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
   variant?: 'default' | 'primary' | 'secondary' | 'destructive' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
+  asChild?: boolean;
   leftIcon?: React.ComponentType<{ className?: string }>;
   rightIcon?: React.ComponentType<{ className?: string }>;
   loading?: boolean;
@@ -68,6 +69,7 @@ export function Button({
   children,
   variant = 'default',
   size = 'md',
+  asChild = false,
   leftIcon: LeftIcon,
   rightIcon: RightIcon,
   loading = false,
@@ -96,20 +98,42 @@ export function Button({
     lg: 'w-5 h-5',
   };
 
-  return (
-    <button
-      type="button"
-      disabled={disabled || loading}
-      className={`
+  const computedClassName = `
         inline-flex items-center justify-center gap-2 rounded-lg font-medium
         transition-colors duration-200
         disabled:opacity-50 disabled:cursor-not-allowed
         ${variantClasses[variant]}
         ${sizeClasses[size]}
         ${className}
-      `}
-      {...props}
-    >
+      `;
+
+  if (asChild) {
+    const onlyChild = Children.only(children);
+    if (!isValidElement(onlyChild)) {
+      return null;
+    }
+
+    const childProps: any = (onlyChild as any).props ?? {};
+    const isDisabled = disabled || loading;
+
+    return cloneElement(onlyChild as any, {
+      className: `${computedClassName} ${childProps.className ?? ''}`.trim(),
+      'aria-disabled': isDisabled ? true : undefined,
+      tabIndex: isDisabled ? -1 : childProps.tabIndex,
+      onClick: (event: any) => {
+        if (isDisabled) {
+          event?.preventDefault?.();
+          event?.stopPropagation?.();
+          return;
+        }
+        childProps.onClick?.(event);
+        (props as any).onClick?.(event);
+      },
+    });
+  }
+
+  return (
+    <button type="button" disabled={disabled || loading} className={computedClassName} {...props}>
       {loading ? (
         <svg
           className={`animate-spin ${iconSizes[size]}`}

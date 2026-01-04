@@ -53,7 +53,7 @@ export function LinklerPanel({ state, onEscalateToSupport }: LinklerPanelProps) 
         toast({
           title: 'Support request failed',
           description: result.data?.error || result.error || 'Please try again.',
-          variant: 'destructive',
+          variant: 'error',
         });
         return;
       }
@@ -107,7 +107,7 @@ export function LinklerPanel({ state, onEscalateToSupport }: LinklerPanelProps) 
       toast({
         title: 'Linkler is busy',
         description: result.data?.error || result.error || 'Please try again in a moment.',
-        variant: 'destructive',
+        variant: 'error',
       });
       return;
     }

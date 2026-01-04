@@ -46,8 +46,11 @@ export async function fetchSearchResults({
   const likePattern = `%${escapeLikePattern(trimmed.toLowerCase())}%`;
   const resolvedLimits = { ...DEFAULT_LIMITS, ...limits };
 
-  const postsLimit = resolvedLimits.posts ?? DEFAULT_LIMITS.posts;
+  const postsLimit = resolvedLimits.posts ?? DEFAULT_LIMITS.posts ?? 5;
   const postsFetchCap = Math.max(postsLimit * 2, postsLimit + 2);
+  const peopleLimit = resolvedLimits.people ?? DEFAULT_LIMITS.people ?? 5;
+  const teamsLimit = resolvedLimits.teams ?? DEFAULT_LIMITS.teams ?? 5;
+  const liveLimit = resolvedLimits.live ?? DEFAULT_LIMITS.live ?? 5;
 
   const [peopleResponse, postsResponse, teamPostsResponse, teamsResponse, liveResponse] = await Promise.all([
     supabase
@@ -55,7 +58,7 @@ export async function fetchSearchResults({
       .select('id, username, display_name, avatar_url, is_live, follower_count, adult_verified_at, bio')
       .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
       .order('follower_count', { ascending: false })
-      .limit(resolvedLimits.people ?? DEFAULT_LIMITS.people),
+      .limit(peopleLimit),
     supabase
       .from('posts')
       .select(
@@ -122,14 +125,14 @@ export async function fetchSearchResults({
       .select('id, name, slug, description, icon_url, banner_url, approved_member_count')
       .or(`name.ilike.${likePattern},description.ilike.${likePattern}`)
       .order('approved_member_count', { ascending: false })
-      .limit(resolvedLimits.teams ?? DEFAULT_LIMITS.teams),
+      .limit(teamsLimit),
     supabase
       .from('profiles')
       .select('id, username, display_name, avatar_url, is_live')
       .eq('is_live', true)
       .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
       .order('username')
-      .limit(resolvedLimits.live ?? DEFAULT_LIMITS.live),
+      .limit(liveLimit),
   ]);
 
   validateResponse(peopleResponse.error, 'profiles');

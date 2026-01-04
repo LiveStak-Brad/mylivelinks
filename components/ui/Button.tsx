@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, ButtonHTMLAttributes, ReactNode } from 'react';
+import { Children, cloneElement, forwardRef, isValidElement, ButtonHTMLAttributes, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 
 /* =============================================================================
@@ -23,6 +23,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'destructive' | 'outline' | 'link' | 'gradient';
   /** Size of the button */
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  asChild?: boolean;
   /** Show loading spinner and disable interactions */
   isLoading?: boolean;
   /** Icon to show before the label */
@@ -40,6 +41,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       className = '',
       variant = 'primary',
       size = 'md',
+      asChild = false,
       isLoading = false,
       leftIcon,
       rightIcon,
@@ -84,16 +86,43 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       xl: 'w-6 h-6',
     };
 
-    return (
-      <button
-        ref={ref}
-        className={`
+    const computedClassName = `
           ${baseStyles} 
           ${variantStyles[variant]} 
           ${sizeStyles[size]} 
           ${fullWidth ? 'w-full' : ''}
           ${className}
-        `}
+        `;
+
+    if (asChild) {
+      const onlyChild = Children.only(children);
+      if (!isValidElement(onlyChild)) {
+        return null;
+      }
+
+      const childProps: any = (onlyChild as any).props ?? {};
+      const isDisabled = disabled || isLoading;
+
+      return cloneElement(onlyChild as any, {
+        className: `${computedClassName} ${childProps.className ?? ''}`.trim(),
+        'aria-disabled': isDisabled ? true : undefined,
+        tabIndex: isDisabled ? -1 : childProps.tabIndex,
+        onClick: (event: any) => {
+          if (isDisabled) {
+            event?.preventDefault?.();
+            event?.stopPropagation?.();
+            return;
+          }
+          childProps.onClick?.(event);
+          (props as any).onClick?.(event);
+        },
+      });
+    }
+
+    return (
+      <button
+        ref={ref}
+        className={computedClassName}
         disabled={disabled || isLoading}
         {...props}
       >
