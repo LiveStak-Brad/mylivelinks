@@ -66,6 +66,7 @@ import VlogReelsClient from '@/components/profile/VlogReelsClient';
 import { ReferralProgressModule } from '@/components/referral';
 import ReportModal from '@/components/ReportModal';
 import { LocationBadge } from '@/components/location/LocationBadge';
+import LinklerSupportButton from '@/components/linkler/LinklerSupportButton';
 import type { ProfileLocation } from '@/lib/location';
 
 interface ProfileData {
@@ -941,6 +942,7 @@ export default function ModernProfilePage() {
     url: profileUrl,
     surface: 'profile_page',
   });
+  const isProfileLiveContext = Boolean(profile.is_live && liveStreamId);
   
   return (
     <div className={`min-h-screen overflow-y-auto overflow-x-hidden ${fontClass}`}>
@@ -1770,6 +1772,14 @@ export default function ModernProfilePage() {
           reportedUserId={profile.id}
           reportedUsername={profile.username}
           contextDetails={reportProfileContextDetails}
+        />
+      )}
+
+      {isOwnProfile && (
+        <LinklerSupportButton
+          variant="compact"
+          disableDuringLive
+          isLiveContext={isProfileLiveContext}
         />
       )}
     </div>

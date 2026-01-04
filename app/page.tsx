@@ -25,6 +25,7 @@ import { Button, Card, CardContent, Skeleton } from '@/components/ui';
 import { ReferralCard } from '@/components/referral';
 import { PolicyFooter } from '@/components/PolicyFooter';
 import PwaInstallButton from '@/components/PwaInstallButton';
+import LinklerSupportButton from '@/components/linkler/LinklerSupportButton';
 
 // Exact reactions available in the app (from components/feed/ReactionPicker.tsx)
 const LIVE_REACTIONS = [
@@ -778,6 +779,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <PolicyFooter />
+      {!loading && <LinklerSupportButton />}
     </main>
   );
 }
