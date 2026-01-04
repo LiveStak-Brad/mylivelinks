@@ -258,9 +258,13 @@ export function LinklerPanel({ state, ticketsOpen, onCloseTickets }: LinklerPane
     }
   }, [escalationKey]);
 
+  const supportCountRef = useRef(state.supportMessages.length);
   useEffect(() => {
-    notifySupportContent();
-  }, [state.supportMessages, notifySupportContent]);
+    if (state.supportMessages.length > supportCountRef.current) {
+      notifySupportContent();
+    }
+    supportCountRef.current = state.supportMessages.length;
+  }, [state.supportMessages.length, notifySupportContent]);
 
   return (
     <div className="flex h-full min-h-[420px] flex-col gap-4 sm:min-h-[520px] sm:h-[80vh] sm:max-h-[640px]">
