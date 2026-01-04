@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { Button, Input, Modal, PageShell, BottomNav } from '../components/ui';
+import { LinklerFab } from '../components/LinklerFab';
 import { LegalFooter } from '../components/LegalFooter';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../contexts/AuthContext';
@@ -1351,7 +1352,16 @@ export function ProfileScreen({
         useNewHeader
         edges={['top']}
         onNavigateHome={() => navigation.navigate('Home')}
-        onNavigateToProfile={(username) => navigation.push('Profile', { username })}
+        onNavigateToProfile={(uname) => {
+          const cleaned = typeof uname === 'string' ? uname.trim() : '';
+          if (!cleaned) return;
+          const parent = navigation.getParent?.();
+          if (parent?.navigate) {
+            parent.navigate('MainTabs', { screen: 'Profile', params: { username: cleaned } });
+            return;
+          }
+          navigation.navigate('Profile', { username: cleaned });
+        }}
         onNavigateToRooms={() => navigation.getParent?.()?.navigate?.('Rooms')}
       >
         <View style={styles.centerContainer}>
@@ -1369,7 +1379,16 @@ export function ProfileScreen({
         useNewHeader
         edges={['top']}
         onNavigateHome={() => navigation.navigate('Home')}
-        onNavigateToProfile={(username) => navigation.push('Profile', { username })}
+        onNavigateToProfile={(uname) => {
+          const cleaned = typeof uname === 'string' ? uname.trim() : '';
+          if (!cleaned) return;
+          const parent = navigation.getParent?.();
+          if (parent?.navigate) {
+            parent.navigate('MainTabs', { screen: 'Profile', params: { username: cleaned } });
+            return;
+          }
+          navigation.navigate('Profile', { username: cleaned });
+        }}
         onNavigateToRooms={() => navigation.getParent?.()?.navigate?.('Rooms')}
       >
         <View style={styles.centerContainer}>
@@ -1478,8 +1497,18 @@ export function ProfileScreen({
       useNewHeader
       edges={['top']}
       onNavigateHome={() => navigation.navigate('Home')}
-      onNavigateToProfile={(username) => navigation.push('Profile', { username })}
+      onNavigateToProfile={(uname) => {
+        const cleaned = typeof uname === 'string' ? uname.trim() : '';
+        if (!cleaned) return;
+        const parent = navigation.getParent?.();
+        if (parent?.navigate) {
+          parent.navigate('MainTabs', { screen: 'Profile', params: { username: cleaned } });
+          return;
+        }
+        navigation.navigate('Profile', { username: cleaned });
+      }}
       onNavigateToRooms={() => navigation.getParent?.()?.navigate?.('Rooms')}
+      floatingContent={isOwnProfile ? <LinklerFab show /> : null}
     >
       {/* FULL-SCREEN BACKGROUND IMAGE (like web) */}
       <View style={styles.backgroundContainer}>

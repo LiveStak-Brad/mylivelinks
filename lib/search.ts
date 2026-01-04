@@ -1,0 +1,249 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase';
+import type {
+  LiveResult,
+  PersonResult,
+  PostResult,
+  SearchResultsBundle,
+  TeamResult,
+} from '@/types/search';
+
+const PERSON_GRADIENTS = [
+  'from-pink-500 to-rose-500',
+  'from-purple-500 to-indigo-500',
+  'from-amber-500 to-orange-500',
+  'from-teal-500 to-emerald-500',
+  'from-blue-500 to-cyan-500',
+  'from-fuchsia-500 to-purple-500',
+];
+
+const DEFAULT_LIMITS: SearchResultsLimits = {
+  people: 5,
+  posts: 5,
+  teams: 5,
+  live: 5,
+};
+
+export type SearchResultsLimits = Partial<Record<keyof SearchResultsBundle, number>>;
+
+export interface SearchFetchOptions {
+  term: string;
+  client?: SupabaseClient;
+  limits?: SearchResultsLimits;
+}
+
+export async function fetchSearchResults({
+  term,
+  client,
+  limits,
+}: SearchFetchOptions): Promise<SearchResultsBundle> {
+  const trimmed = term.trim();
+  if (!trimmed) {
+    return emptyResults();
+  }
+
+  const supabase = client ?? createClient();
+  const likePattern = `%${escapeLikePattern(trimmed.toLowerCase())}%`;
+  const resolvedLimits = { ...DEFAULT_LIMITS, ...limits };
+
+  const postsLimit = resolvedLimits.posts ?? DEFAULT_LIMITS.posts;
+  const postsFetchCap = Math.max(postsLimit * 2, postsLimit + 2);
+
+  const [peopleResponse, postsResponse, teamPostsResponse, teamsResponse, liveResponse] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_url, is_live, follower_count, adult_verified_at, bio')
+      .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
+      .order('follower_count', { ascending: false })
+      .limit(resolvedLimits.people ?? DEFAULT_LIMITS.people),
+    supabase
+      .from('posts')
+      .select(
+        `
+        id,
+        text_content,
+        created_at,
+        media_url,
+        like_count,
+        comment_count,
+        author:profiles!posts_author_id_fkey (
+          id,
+          username,
+          display_name,
+          avatar_url
+        )
+      `
+      )
+      .or(
+        [
+          `text_content.ilike.${likePattern}`,
+          `author.username.ilike.${likePattern}`,
+          `author.display_name.ilike.${likePattern}`,
+        ].join(',')
+      )
+      .order('created_at', { ascending: false })
+      .limit(postsFetchCap),
+    supabase
+      .from('team_feed_posts')
+      .select(
+        `
+        id,
+        text_content,
+        created_at,
+        media_url,
+        comment_count,
+        reaction_count,
+        team:teams!team_feed_posts_team_id_fkey (
+          id,
+          name,
+          slug
+        ),
+        author:profiles!team_feed_posts_author_id_fkey (
+          id,
+          username,
+          display_name,
+          avatar_url
+        )
+      `
+      )
+      .or(
+        [
+          `text_content.ilike.${likePattern}`,
+          `team.name.ilike.${likePattern}`,
+          `team.slug.ilike.${likePattern}`,
+          `author.username.ilike.${likePattern}`,
+          `author.display_name.ilike.${likePattern}`,
+        ].join(',')
+      )
+      .order('created_at', { ascending: false })
+      .limit(postsFetchCap),
+    supabase
+      .from('teams')
+      .select('id, name, slug, description, icon_url, banner_url, approved_member_count')
+      .or(`name.ilike.${likePattern},description.ilike.${likePattern}`)
+      .order('approved_member_count', { ascending: false })
+      .limit(resolvedLimits.teams ?? DEFAULT_LIMITS.teams),
+    supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_url, is_live')
+      .eq('is_live', true)
+      .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
+      .order('username')
+      .limit(resolvedLimits.live ?? DEFAULT_LIMITS.live),
+  ]);
+
+  validateResponse(peopleResponse.error, 'profiles');
+  validateResponse(postsResponse.error, 'posts');
+  validateResponse(teamPostsResponse.error, 'team_feed_posts');
+  validateResponse(teamsResponse.error, 'teams');
+  validateResponse(liveResponse.error, 'live');
+
+  const combinedPosts = [
+    ...(postsResponse.data ?? []).map((row) => mapGlobalPostRow(row)),
+    ...(teamPostsResponse.data ?? []).map((row) => mapTeamPostRow(row)),
+  ]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, postsLimit);
+
+  return {
+    people: (peopleResponse.data ?? []).map((row, index) => mapProfileRow(row, index)),
+    posts: combinedPosts,
+    teams: (teamsResponse.data ?? []).map((row) => mapTeamRow(row)),
+    live: (liveResponse.data ?? []).map((row) => mapLiveRow(row)),
+  };
+}
+
+export function escapeLikePattern(value: string) {
+  return value.replace(/[%_]/g, (char) => `\\${char}`);
+}
+
+function mapProfileRow(row: any, index: number): PersonResult {
+  return {
+    id: row.id,
+    name: row.display_name || row.username || 'Unknown creator',
+    handle: row.username ? `@${row.username}` : '',
+    avatarUrl: row.avatar_url,
+    mutualCount: Number(row.follower_count ?? 0),
+    verified: Boolean(row.is_verified ?? row.verified ?? row.adult_verified_at),
+    location: null,
+    online: Boolean(row.is_live),
+    status: row.bio ?? undefined,
+    avatarColor: PERSON_GRADIENTS[index % PERSON_GRADIENTS.length],
+    following: false,
+  };
+}
+
+function mapGlobalPostRow(row: any): PostResult {
+  return {
+    id: row.id,
+    text: row.text_content ?? '',
+    createdAt: row.created_at ?? new Date().toISOString(),
+    mediaUrl: row.media_url,
+    likeCount: Number(row.like_count ?? 0),
+    commentCount: Number(row.comment_count ?? 0),
+    author: row.author?.display_name || row.author?.username || 'Unknown',
+    authorHandle: row.author?.username ? `@${row.author.username}` : '',
+    authorAvatarUrl: row.author?.avatar_url,
+    source: 'global',
+  };
+}
+
+function mapTeamPostRow(row: any): PostResult {
+  const teamName = row.team?.name ?? 'Team post';
+  const teamSlug = row.team?.slug ?? null;
+
+  return {
+    id: row.id,
+    text: row.text_content ?? '',
+    createdAt: row.created_at ?? new Date().toISOString(),
+    mediaUrl: row.media_url,
+    likeCount: Number(row.reaction_count ?? 0),
+    commentCount: Number(row.comment_count ?? 0),
+    author: row.author?.display_name || row.author?.username || 'Unknown',
+    authorHandle: row.author?.username ? `@${row.author.username}` : '',
+    authorAvatarUrl: row.author?.avatar_url,
+    source: 'team',
+    contextLabel: teamSlug ? `Team • ${teamName}` : 'Team post',
+    contextHref: teamSlug ? `/teams/${teamSlug}?postId=${row.id}` : undefined,
+    teamSlug,
+    teamName,
+  };
+}
+
+function mapTeamRow(row: any): TeamResult {
+  return {
+    id: row.id,
+    name: row.name ?? 'New team',
+    slug: row.slug ?? row.id,
+    description: row.description,
+    avatarUrl: row.icon_url || row.banner_url || null,
+    memberCount: Number(row.approved_member_count ?? 0),
+  };
+}
+
+function mapLiveRow(row: any): LiveResult {
+  return {
+    id: row.id,
+    username: row.username || 'unknown',
+    displayName: row.display_name || row.username || 'Live creator',
+    avatarUrl: row.avatar_url,
+    viewerCount: Number(row.viewer_count ?? row.current_viewer_count ?? 0),
+    isLive: Boolean(row.is_live),
+  };
+}
+
+function validateResponse(error: any, source: string) {
+  if (error) {
+    const message = error.message ?? 'Unknown Supabase error';
+    throw new Error(`Search query failed for ${source}: ${message}`);
+  }
+}
+
+function emptyResults(): SearchResultsBundle {
+  return {
+    people: [],
+    posts: [],
+    teams: [],
+    live: [],
+  };
+}

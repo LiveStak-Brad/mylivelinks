@@ -51,12 +51,14 @@ import { ReferralsLeaderboardScreen } from './screens/ReferralsLeaderboardScreen
 import { OwnerPanelScreen } from './screens/OwnerPanelScreen';
 import { OwnerReferralsScreen } from './screens/OwnerReferralsScreen';
 import { OwnerRevenueScreen } from './screens/OwnerRevenueScreen';
+import { OwnerCoinsRevenueScreen } from './screens/OwnerCoinsRevenueScreen';
 import { OwnerFeatureFlagsScreen } from './screens/OwnerFeatureFlagsScreen';
 import { OwnerReportsScreen } from './screens/OwnerReportsScreen';
 import { LiveOpsScreen } from './screens/LiveOpsScreen';
 import { ModerationPanelScreen } from './screens/ModerationPanelScreen';
 import { AdminApplicationsScreen } from './screens/AdminApplicationsScreen';
 import { AdminGiftsScreen } from './screens/AdminGiftsScreen';
+import { AdminLinklerPromptScreen } from './screens/AdminLinklerPromptScreen';
 import { ComposerListScreen } from './screens/ComposerListScreen';
 import { ComposerEditorScreen } from './screens/ComposerEditorScreen';
 import { ApplyForRoomScreen } from './screens/ApplyForRoomScreen';
@@ -153,13 +155,14 @@ function AppNavigation() {
             <Stack.Screen name="OwnerPanel" component={OwnerPanelScreen} />
             <Stack.Screen name="OwnerReferrals" component={OwnerReferralsScreen} />
             <Stack.Screen name="OwnerRevenue" component={OwnerRevenueScreen} />
-            <Stack.Screen name="OwnerCoinsRevenue" component={OwnerRevenueScreen} />
+            <Stack.Screen name="OwnerCoinsRevenue" component={OwnerCoinsRevenueScreen} />
             <Stack.Screen name="OwnerFeatureFlags" component={OwnerFeatureFlagsScreen} />
             <Stack.Screen name="OwnerReports" component={OwnerReportsScreen} />
             <Stack.Screen name="LiveOps" component={LiveOpsScreen} />
             <Stack.Screen name="ModerationPanel" component={ModerationPanelScreen} />
             <Stack.Screen name="AdminApplications" component={AdminApplicationsScreen} />
             <Stack.Screen name="AdminGifts" component={AdminGiftsScreen} />
+            <Stack.Screen name="AdminLinklerPrompt" component={AdminLinklerPromptScreen} />
             <Stack.Screen name="ComposerList" component={ComposerListScreen} />
             <Stack.Screen name="ComposerEditor" component={ComposerEditorScreen} />
             <Stack.Screen name="ApplyForRoom" component={ApplyForRoomScreen} />

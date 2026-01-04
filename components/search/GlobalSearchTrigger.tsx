@@ -1,10 +1,11 @@
 'use client';
 
-import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowUpRight,
+  AlertCircle,
   Clock,
   Command,
   CornerDownLeft,
@@ -16,14 +17,17 @@ import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
-import {
-  MOCK_SUGGESTED_QUERIES,
-  PRIMARY_TABS,
-  QUICK_JUMP_TARGETS,
-  SearchTab,
-  SEARCH_RECENTS_STORAGE_KEY,
-  TAB_TO_ROUTE,
-} from './constants';
+import { createClient } from '@/lib/supabase';
+import { fetchSearchResults } from '@/lib/search';
+import type {
+  LiveResult,
+  PersonResult,
+  PostResult,
+  SearchResultCategory,
+  SearchResultsBundle,
+  TeamResult,
+} from '@/types/search';
+import { PRIMARY_TABS, QUICK_JUMP_TARGETS, SearchTab, SEARCH_RECENTS_STORAGE_KEY, TAB_TO_ROUTE } from './constants';
 
 interface GlobalSearchTriggerProps {
   className?: string;
@@ -33,6 +37,15 @@ interface GlobalSearchTriggerProps {
 }
 
 const RECENT_LIMIT = 10;
+
+type TypeaheadStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+const EMPTY_RESULTS: SearchResultsBundle = {
+  people: [],
+  posts: [],
+  teams: [],
+  live: [],
+};
 
 export function GlobalSearchTrigger({
   className,
@@ -44,9 +57,12 @@ export function GlobalSearchTrigger({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isMobileWeb = useIsMobileWeb();
+  const supabase = useMemo(() => createClient(), []);
 
   const desktopInputRef = useRef<HTMLInputElement>(null);
   const overlayInputRef = useRef<HTMLInputElement>(null);
+  const pendingTypeaheadRef = useRef(0);
+  const isRoutingRef = useRef(false);
 
   const urlQuery = searchParams?.get('q') ?? '';
 
@@ -55,6 +71,9 @@ export function GlobalSearchTrigger({
   const [internalOverlayOpen, setInternalOverlayOpen] = useState(false);
   const [recents, setRecents] = useState<string[]>(() => getStoredRecents());
   const [isMounted, setIsMounted] = useState(false);
+  const [typeaheadResults, setTypeaheadResults] = useState<SearchResultsBundle>(EMPTY_RESULTS);
+  const [typeaheadStatus, setTypeaheadStatus] = useState<TypeaheadStatus>('idle');
+  const [typeaheadError, setTypeaheadError] = useState<string | null>(null);
 
   const effectiveOverlayOpen = overlayOpen ?? internalOverlayOpen;
   const setOverlayOpen = onOverlayOpenChange ?? setInternalOverlayOpen;
@@ -109,12 +128,6 @@ export function GlobalSearchTrigger({
     return () => window.removeEventListener('keydown', handler);
   }, [isMobileWeb]);
 
-  const suggestions = useMemo(() => {
-    if (!query) return MOCK_SUGGESTED_QUERIES;
-    const lower = query.toLowerCase();
-    return MOCK_SUGGESTED_QUERIES.filter((s) => s.toLowerCase().includes(lower));
-  }, [query]);
-
   const quickJumpRows = useMemo(() => {
     if (!query) return [];
     return QUICK_JUMP_TARGETS.map((tab) => {
@@ -126,27 +139,97 @@ export function GlobalSearchTrigger({
     });
   }, [query]);
 
-  const handleSubmit = (value: string, targetTab: SearchTab = 'top') => {
-    const trimmed = value.trim();
+  useEffect(() => {
+    const trimmed = query.trim();
     if (!trimmed) {
+      pendingTypeaheadRef.current += 1;
+      setTypeaheadResults(EMPTY_RESULTS);
+      setTypeaheadStatus('idle');
+      setTypeaheadError(null);
       return;
     }
 
-    persistRecents(trimmed, recents, setRecents);
+    const requestId = ++pendingTypeaheadRef.current;
+    setTypeaheadStatus('loading');
+    setTypeaheadError(null);
+    const timeout = window.setTimeout(async () => {
+      try {
+        const results = await fetchSearchResults({
+          term: trimmed,
+          client: supabase,
+          limits: { people: 4, posts: 3, teams: 3, live: 3 },
+        });
 
-    const params = new URLSearchParams();
-    params.set('q', trimmed);
-    params.set('tab', targetTab);
+        if (pendingTypeaheadRef.current !== requestId) {
+          return;
+        }
 
-    const nextPath = TAB_TO_ROUTE[targetTab] ?? '/search';
-    router.push(`${nextPath}?${params.toString()}`);
-    setDropdownOpen(false);
-    setOverlayOpen(false);
+        setTypeaheadResults(results);
+        setTypeaheadStatus('ready');
+        setTypeaheadError(null);
+      } catch (error) {
+        if (pendingTypeaheadRef.current !== requestId) {
+          return;
+        }
+        setTypeaheadStatus('error');
+        setTypeaheadError(error instanceof Error ? error.message : 'Unable to load suggestions');
+      }
+    }, 250);
 
-    if (pathname?.startsWith('/search')) {
-      desktopInputRef.current?.blur();
-    }
-  };
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [query, supabase]);
+
+  const handleSubmit = useCallback(
+    (value: string, targetTab: SearchTab = 'top') => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return;
+      }
+
+      persistRecents(trimmed, recents, setRecents);
+
+      const params = new URLSearchParams();
+      params.set('q', trimmed);
+      params.set('tab', targetTab);
+
+      const nextPath = TAB_TO_ROUTE[targetTab] ?? '/search';
+      const destination = `${nextPath}?${params.toString()}`;
+
+      isRoutingRef.current = true;
+      router.push(destination);
+      window.requestAnimationFrame(() => {
+        isRoutingRef.current = false;
+        setDropdownOpen(false);
+        setOverlayOpen(false);
+      });
+
+      if (pathname?.startsWith('/search')) {
+        desktopInputRef.current?.blur();
+      }
+    },
+    [pathname, recents, router, setOverlayOpen]
+  );
+
+  const handleResultNavigate = useCallback(
+    (href: string) => {
+      if (!href) return;
+      const trimmed = query.trim();
+      if (trimmed) {
+        persistRecents(trimmed, recents, setRecents);
+      }
+
+      isRoutingRef.current = true;
+      router.push(href);
+      window.requestAnimationFrame(() => {
+        isRoutingRef.current = false;
+        setDropdownOpen(false);
+        setOverlayOpen(false);
+      });
+    },
+    [query, recents, router, setOverlayOpen]
+  );
 
   const handleRecentRemove = (value: string) => {
     const next = recents.filter((item) => item !== value);
@@ -180,7 +263,17 @@ export function GlobalSearchTrigger({
             }}
             onFocus={() => setDropdownOpen(true)}
             onBlur={() => {
-              window.setTimeout(() => setDropdownOpen(false), 150);
+              window.setTimeout(() => {
+                if (!isRoutingRef.current) {
+                  setDropdownOpen(false);
+                }
+              }, 150);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                handleSubmit(query, 'top');
+              }
             }}
             placeholder="Search MyLiveLinks"
             className="h-11 rounded-full pl-11 pr-16 bg-muted/60 border-transparent backdrop-blur"
@@ -195,11 +288,14 @@ export function GlobalSearchTrigger({
           {dropdownOpen && (
             <DesktopDropdown
               recents={recents}
-              suggestions={suggestions}
               query={query}
               quickJumps={quickJumpRows}
+              results={typeaheadResults}
+              status={typeaheadStatus}
+              error={typeaheadError}
               onSelect={(value, tab) => handleSubmit(value, tab)}
               onRemoveRecent={handleRecentRemove}
+              onNavigateResult={handleResultNavigate}
             />
           )}
         </div>
@@ -229,11 +325,16 @@ export function GlobalSearchTrigger({
               inputRef={overlayInputRef}
               value={query}
               recents={recents}
-              suggestions={suggestions}
+              quickJumps={quickJumpRows}
+              results={typeaheadResults}
+              status={typeaheadStatus}
+              error={typeaheadError}
               onChange={setQuery}
               onClose={() => setOverlayOpen(false)}
               onSubmit={(value) => handleSubmit(value, 'top')}
               onRecentSelect={(value) => handleSubmit(value, 'top')}
+              onQuickJump={(tab) => handleSubmit(query, tab)}
+              onNavigateResult={handleResultNavigate}
               onClearRecents={handleClearRecents}
               onRemoveRecent={handleRecentRemove}
             />,
@@ -246,18 +347,24 @@ export function GlobalSearchTrigger({
 
 function DesktopDropdown({
   recents,
-  suggestions,
   quickJumps,
   query,
+  results,
+  status,
+  error,
   onSelect,
   onRemoveRecent,
+  onNavigateResult,
 }: {
   recents: string[];
-  suggestions: string[];
   quickJumps: Array<{ tab: SearchTab; label: string }>;
   query: string;
+  results: SearchResultsBundle;
+  status: TypeaheadStatus;
+  error: string | null;
   onSelect: (value: string, tab?: SearchTab) => void;
   onRemoveRecent: (value: string) => void;
+  onNavigateResult: (href: string) => void;
 }) {
   return (
     <Card className="absolute left-0 right-0 top-12 z-[120] border border-border/80 bg-card shadow-xl">
@@ -278,17 +385,6 @@ function DesktopDropdown({
           )}
         </DropdownSection>
 
-        <DropdownSection title="Suggested">
-          {suggestions.map((suggestion) => (
-            <DropdownRow
-              key={suggestion}
-              label={suggestion}
-              icon={<Sparkles className="h-4 w-4 text-primary" />}
-              onClick={() => onSelect(suggestion)}
-            />
-          ))}
-        </DropdownSection>
-
         {quickJumps.length > 0 && (
           <DropdownSection title="Quick jump">
             {quickJumps.map((jump) => (
@@ -299,6 +395,25 @@ function DesktopDropdown({
                 onClick={() => onSelect(query, jump.tab)}
               />
             ))}
+          </DropdownSection>
+        )}
+
+        {query ? (
+          <TypeaheadResultsList
+            variant="desktop"
+            query={query}
+            results={results}
+            status={status}
+            error={error}
+            onNavigate={onNavigateResult}
+          />
+        ) : (
+          <DropdownSection title="Live search">
+            <DropdownRow
+              disabled
+              label="Start typing to see live results"
+              icon={<Sparkles className="h-4 w-4 text-primary" />}
+            />
           </DropdownSection>
         )}
       </div>
@@ -332,6 +447,9 @@ function DropdownRow({
     <button
       type="button"
       onClick={onClick}
+      onMouseDown={(event) => {
+        event.preventDefault();
+      }}
       disabled={disabled}
       className={cn(
         'flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors',
@@ -358,26 +476,310 @@ function DropdownRow({
   );
 }
 
+const CATEGORY_LABELS: Record<SearchResultCategory, string> = {
+  people: 'People',
+  posts: 'Posts',
+  teams: 'Teams',
+  live: 'Live',
+};
+
+const CATEGORY_ORDER: SearchResultCategory[] = ['people', 'posts', 'teams', 'live'];
+
+function TypeaheadResultsList({
+  query,
+  results,
+  status,
+  error,
+  onNavigate,
+  variant = 'desktop',
+}: {
+  query: string;
+  results: SearchResultsBundle;
+  status: TypeaheadStatus;
+  error: string | null;
+  onNavigate: (href: string) => void;
+  variant?: 'desktop' | 'mobile';
+}) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (status === 'loading' || status === 'idle') {
+    return (
+      <DropdownSection title="Searching">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div
+            key={`loading-${variant}-${index}`}
+            className="h-11 w-full animate-pulse rounded-xl bg-muted/50"
+          />
+        ))}
+      </DropdownSection>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <DropdownSection title="Suggestions">
+        <DropdownRow
+          disabled
+          label={error ?? 'Unable to load suggestions'}
+          icon={<AlertCircle className="h-4 w-4 text-destructive" />}
+        />
+      </DropdownSection>
+    );
+  }
+
+  const hasResults = CATEGORY_ORDER.some((category) => results[category].length > 0);
+
+  if (!hasResults) {
+    return (
+      <DropdownSection title="Live results">
+        <DropdownRow
+          disabled
+          label={`No matches for “${trimmed}” yet`}
+          icon={<Search className="h-4 w-4 text-muted-foreground" />}
+        />
+      </DropdownSection>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {CATEGORY_ORDER.map((category) => {
+        const items = results[category];
+        if (!items.length) return null;
+        return (
+          <DropdownSection key={category} title={CATEGORY_LABELS[category]}>
+            {items.map((item) => (
+              <TypeaheadResultRow
+                key={`${category}-${item.id}`}
+                category={category}
+                item={item}
+                query={trimmed}
+                variant={variant}
+                onNavigate={onNavigate}
+              />
+            ))}
+          </DropdownSection>
+        );
+      })}
+    </div>
+  );
+}
+
+function TypeaheadResultRow({
+  category,
+  item,
+  query,
+  onNavigate,
+  variant,
+}: {
+  category: SearchResultCategory;
+  item: PersonResult | PostResult | TeamResult | LiveResult;
+  query: string;
+  onNavigate: (href: string) => void;
+  variant: 'desktop' | 'mobile';
+}) {
+  const href = buildResultHref(category, item);
+  if (!href) {
+    return null;
+  }
+
+  const { title, subtitle, meta, avatar } = getResultPresentation(category, item);
+
+  return (
+    <button
+      type="button"
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => onNavigate(href)}
+      className={cn(
+        'flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors hover:bg-muted/80',
+        variant === 'mobile' && 'px-4 py-3'
+      )}
+    >
+      <span className="flex items-center gap-3">
+        {avatar}
+        <span className="flex flex-col text-sm">
+          <span className="font-semibold">{highlightMatches(title, query)}</span>
+          {subtitle && (
+            <span className="text-xs text-muted-foreground line-clamp-1">
+              {highlightMatches(subtitle, query)}
+            </span>
+          )}
+        </span>
+      </span>
+      {meta && <span className="text-xs text-muted-foreground">{meta}</span>}
+    </button>
+  );
+}
+
+function getResultPresentation(
+  category: SearchResultCategory,
+  item: PersonResult | PostResult | TeamResult | LiveResult
+) {
+  switch (category) {
+    case 'people': {
+      const person = item as PersonResult;
+      return {
+        title: person.name,
+        subtitle: person.handle,
+        meta: person.online ? 'Live now' : undefined,
+        avatar: (
+          <ResultAvatar
+            src={person.avatarUrl}
+            fallbackText={person.name.slice(0, 2).toUpperCase()}
+          />
+        ),
+      };
+    }
+    case 'posts': {
+      const post = item as PostResult;
+      return {
+        title: post.author,
+        subtitle: buildPostSnippet(post.text),
+        meta: post.contextLabel || 'Post',
+        avatar: (
+          <ResultAvatar
+            src={post.authorAvatarUrl}
+            fallbackText={post.author.slice(0, 2).toUpperCase()}
+          />
+        ),
+      };
+    }
+    case 'teams': {
+      const team = item as TeamResult;
+      return {
+        title: team.name,
+        subtitle: team.description ?? `${team.memberCount.toLocaleString()} members`,
+        meta: 'Team',
+        avatar: (
+          <ResultAvatar
+            src={team.avatarUrl}
+            fallbackText={team.name.slice(0, 2).toUpperCase()}
+          />
+        ),
+      };
+    }
+    case 'live':
+    default: {
+      const live = item as LiveResult;
+      return {
+        title: live.displayName,
+        subtitle: `@${live.username}`,
+        meta: live.isLive ? `${live.viewerCount.toLocaleString()} watching` : undefined,
+        avatar: (
+          <ResultAvatar
+            src={live.avatarUrl}
+            fallbackText={live.displayName.slice(0, 2).toUpperCase()}
+          />
+        ),
+      };
+    }
+  }
+}
+
+function ResultAvatar({ src, fallbackText }: { src?: string | null; fallbackText: string }) {
+  const label = fallbackText?.trim() || '??';
+  return (
+    <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted text-sm font-semibold">
+      {src ? <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" /> : label}
+    </span>
+  );
+}
+
+function highlightMatches(text: string, query: string) {
+  if (!query) return text;
+  const regex = new RegExp(`(${escapeRegExp(query)})`, 'ig');
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, index) =>
+        index % 2 === 1 ? (
+          <mark key={`${part}-${index}`} className="rounded bg-primary/15 text-primary">
+            {part}
+          </mark>
+        ) : (
+          <span key={`${part}-${index}`}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildPostSnippet(text: string) {
+  const trimmed = text.trim();
+  if (trimmed.length <= 80) return trimmed || 'Post details';
+  return `${trimmed.slice(0, 77)}…`;
+}
+
+function buildResultHref(
+  category: SearchResultCategory,
+  item: PersonResult | PostResult | TeamResult | LiveResult
+) {
+  switch (category) {
+    case 'people': {
+      const person = item as PersonResult;
+      const username = person.handle.replace(/^@/, '');
+      if (username) {
+        return `/${username}`;
+      }
+      return `/profiles/${person.id}`;
+    }
+    case 'posts': {
+      const post = item as PostResult;
+      if (post.contextHref) {
+        return post.contextHref;
+      }
+      return `/feed?focusPostId=${post.id}`;
+    }
+    case 'teams': {
+      const team = item as TeamResult;
+      return `/teams/${team.slug || team.id}`;
+    }
+    case 'live':
+    default: {
+      const live = item as LiveResult;
+      const slug = live.username || live.id;
+      return `/live/${slug}`;
+    }
+  }
+}
+
 function MobileOverlay({
   inputRef,
   value,
   recents,
-  suggestions,
+  quickJumps,
+  results,
+  status,
+  error,
   onChange,
   onSubmit,
   onClose,
   onRecentSelect,
+  onQuickJump,
+  onNavigateResult,
   onClearRecents,
   onRemoveRecent,
 }: {
   inputRef: React.RefObject<HTMLInputElement>;
   value: string;
   recents: string[];
-  suggestions: string[];
+  quickJumps: Array<{ tab: SearchTab; label: string }>;
+  results: SearchResultsBundle;
+  status: TypeaheadStatus;
+  error: string | null;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
   onClose: () => void;
   onRecentSelect: (value: string) => void;
+  onQuickJump: (tab: SearchTab) => void;
+  onNavigateResult: (href: string) => void;
   onClearRecents: () => void;
   onRemoveRecent: (value: string) => void;
 }) {
@@ -464,26 +866,38 @@ function MobileOverlay({
             </div>
           )}
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Suggested
-              </span>
+          {value && quickJumps.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Quick jump
+                </span>
+              </div>
+              <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
+                {quickJumps.map((jump) => (
+                  <button
+                    key={jump.tab}
+                    type="button"
+                    className="flex items-center justify-between px-4 py-3 text-left"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => onQuickJump(jump.tab)}
+                  >
+                    <span className="text-sm font-medium">{jump.label}</span>
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-col divide-y divide-border rounded-2xl border border-border">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  className="flex items-center justify-between px-4 py-3 text-left"
-                  onClick={() => onSubmit(suggestion)}
-                >
-                  <span className="text-sm">{suggestion}</span>
-                  <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
+
+          <TypeaheadResultsList
+            variant="mobile"
+            query={value}
+            results={results}
+            status={status}
+            error={error}
+            onNavigate={onNavigateResult}
+          />
         </div>
       </div>
     </div>

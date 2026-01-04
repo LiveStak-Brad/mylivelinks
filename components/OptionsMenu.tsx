@@ -334,6 +334,13 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
                     >
                       Manage Gift Types / Coin Packs
                     </a>
+                    <a
+                      href="/admin/linkler"
+                      onClick={() => setShowMenu(false)}
+                      className="block px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition"
+                    >
+                      Linkler Prompt Editor
+                    </a>
                     <button
                       onClick={handleEndAllStreams}
                       disabled={endingAllStreams}

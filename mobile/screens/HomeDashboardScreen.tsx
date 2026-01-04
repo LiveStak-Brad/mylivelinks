@@ -34,6 +34,7 @@ import { RoomsCarousel } from '../components/RoomsCarousel';
 import type { MainTabsParamList } from '../types/navigation';
 import { supabase } from '../lib/supabase';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { LinklerFab } from '../components/LinklerFab';
 
 type Props = { navigation: any };
 
@@ -192,6 +193,7 @@ export function HomeDashboardScreen({ navigation }: Props) {
       onNavigateToAnalytics={handleNavigateToAnalytics}
       onNavigateToApply={handleApplyPress}
       onNavigateToRooms={handleNavigateToRooms}
+      floatingContent={<LinklerFab show />}
     >
       {/* Page Header: Home icon + Home */}
       <PageHeader icon="home" iconColor="#8b5cf6" title="Home" />

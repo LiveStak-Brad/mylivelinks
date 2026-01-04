@@ -30,11 +30,8 @@ import {
   SearchFilterKey,
   SearchTab,
   TAB_TO_ROUTE,
-  type PersonResult,
-  type PostResult,
-  type TeamResult,
-  type LiveResult,
 } from './constants';
+import type { PersonResult, PostResult, TeamResult, LiveResult } from '@/types/search';
 import {
   LiveResultCard,
   PersonResultCard,
@@ -42,6 +39,7 @@ import {
   TeamResultCard,
 } from './SearchResultCards';
 import { createClient } from '@/lib/supabase';
+import { fetchSearchResults } from '@/lib/search';
 import { LocationEditor } from '@/components/location/LocationEditor';
 import { Modal } from '@/components/ui/Modal';
 import { useProfileLocation } from '@/hooks/useProfileLocation';
@@ -64,8 +62,6 @@ const PERSON_GRADIENTS = [
   'from-blue-500 to-cyan-500',
   'from-fuchsia-500 to-purple-500',
 ];
-
-const escapeLikePattern = (value: string) => value.replace(/[%_]/g, (char) => `\\${char}`);
 
 interface SearchPageProps {
   initialTab: SearchTab;
@@ -167,8 +163,6 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
       return;
     }
 
-    const searchLower = trimmedQuery.toLowerCase();
-    const likePattern = `%${escapeLikePattern(searchLower)}%`;
     const peopleLimit = activeTab === 'people' ? 20 : 5;
     const postsLimit = activeTab === 'posts' ? 20 : 5;
     const teamsLimit = activeTab === 'teams' ? 20 : 5;
@@ -179,110 +173,26 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
 
     const fetchResults = async () => {
       try {
-        const [
-          peopleResponse,
-          postsResponse,
-          teamsResponse,
-          liveResponse,
-        ] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('id, username, display_name, avatar_url, is_live, follower_count')
-            .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
-            .order('follower_count', { ascending: false })
-            .limit(peopleLimit),
-          supabase
-            .from('posts')
-            .select(
-              `
-              id,
-              text_content,
-              created_at,
-              media_url,
-              author:profiles!posts_author_id_fkey (
-                id,
-                username,
-                display_name,
-                avatar_url
-              )
-            `
-            )
-            .ilike('text_content', likePattern)
-            .order('created_at', { ascending: false })
-            .limit(postsLimit),
-          supabase
-            .from('teams')
-            .select('id, name, slug, team_tag, description, banner_url, icon_url, approved_member_count')
-            .or(`name.ilike.${likePattern},description.ilike.${likePattern}`)
-            .order('approved_member_count', { ascending: false })
-            .limit(teamsLimit),
-          supabase
-            .from('profiles')
-            .select('id, username, display_name, avatar_url, is_live')
-            .eq('is_live', true)
-            .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
-            .order('username')
-            .limit(liveLimit),
-        ]);
+        const results = await fetchSearchResults({
+          term: trimmedQuery,
+          client: supabase,
+          limits: {
+            people: peopleLimit,
+            posts: postsLimit,
+            teams: teamsLimit,
+            live: liveLimit,
+          },
+        });
 
         if (cancelled) return;
 
-        if (peopleResponse.error) throw peopleResponse.error;
-        if (postsResponse.error) throw postsResponse.error;
-        if (teamsResponse.error) throw teamsResponse.error;
-        if (liveResponse.error) throw liveResponse.error;
-
-        const mappedPeople: PersonResult[] = (peopleResponse.data ?? []).map((row: any, index: number) => ({
-          id: row.id,
-          name: row.display_name || row.username || 'Unknown creator',
-          handle: row.username ? `@${row.username}` : '',
-          avatarUrl: row.avatar_url,
-          mutualCount: Number(row.follower_count ?? 0),
-          verified: false,
-          location: null,
-          online: Boolean(row.is_live),
-          status: undefined,
-          avatarColor: PERSON_GRADIENTS[index % PERSON_GRADIENTS.length],
-          following: false,
-        }));
-
-        const mappedPosts: PostResult[] = (postsResponse.data ?? []).map((row: any) => ({
-          id: row.id,
-          text: row.text_content ?? '',
-          createdAt: row.created_at ?? new Date().toISOString(),
-          mediaUrl: row.media_url,
-          likeCount: 0,
-          commentCount: 0,
-          author: row.author?.display_name || row.author?.username || 'Unknown',
-          authorHandle: row.author?.username ? `@${row.author.username}` : '',
-          authorAvatarUrl: row.author?.avatar_url,
-        }));
-
-        const mappedTeams: TeamResult[] = (teamsResponse.data ?? []).map((team: any) => ({
-          id: team.id,
-          name: team.name,
-          slug: team.slug,
-          description: team.description,
-          avatarUrl: team.icon_url || team.banner_url || null,
-          memberCount: Number(team.approved_member_count ?? 0),
-        }));
-
-        const mappedLive: LiveResult[] = (liveResponse.data ?? []).map((row: any) => ({
-          id: row.id,
-          username: row.username || 'unknown',
-          displayName: row.display_name || row.username || 'Live creator',
-          avatarUrl: row.avatar_url,
-          viewerCount: Number(row.viewer_count ?? row.current_viewer_count ?? 0),
-          isLive: Boolean(row.is_live),
-        }));
-
-        setPeopleResults(mappedPeople);
-        setPostResults(mappedPosts);
-        setTeamResults(mappedTeams);
-        setLiveResults(mappedLive);
+        setPeopleResults(results.people);
+        setPostResults(results.posts);
+        setTeamResults(results.teams);
+        setLiveResults(results.live);
 
         const totalMatches =
-          mappedPeople.length + mappedPosts.length + mappedTeams.length + mappedLive.length;
+          results.people.length + results.posts.length + results.teams.length + results.live.length;
         setStatus(totalMatches > 0 ? 'results' : 'empty');
       } catch (error) {
         if (cancelled) return;

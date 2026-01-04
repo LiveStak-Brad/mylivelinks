@@ -93,3 +93,21 @@ export async function requireAdmin(request?: NextRequest): Promise<AdminAuthResu
     throw new Error('FORBIDDEN');
   }
 }
+
+export async function requireOwner(request?: NextRequest): Promise<AdminAuthResult> {
+  const ownerProfileId = process.env.OWNER_PROFILE_ID?.trim();
+  if (!ownerProfileId) {
+    throw new Error('FORBIDDEN');
+  }
+
+  const user = await getSessionUser(request);
+  if (!user) {
+    throw new Error('UNAUTHORIZED');
+  }
+
+  if (user.id !== ownerProfileId) {
+    throw new Error('FORBIDDEN');
+  }
+
+  return { user, profileId: user.id };
+}

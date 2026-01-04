@@ -3,10 +3,14 @@ import { registerRootComponent } from 'expo';
 require('react-native-url-polyfill/auto');
 require('react-native-get-random-values');
 
-if (process.env.EXPO_PUBLIC_DEBUG_ENV_BOOT === '1') {
+const envBootDebug =
+  typeof process !== 'undefined' && process?.env ? process.env.EXPO_PUBLIC_DEBUG_ENV_BOOT === '1' : false;
+
+if (envBootDebug) {
   console.log('[ENV_BOOT]', {
-    EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
-    SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL ? 'set' : 'missing',
+    EXPO_PUBLIC_API_URL: typeof process !== 'undefined' && process?.env ? process.env.EXPO_PUBLIC_API_URL : undefined,
+    SUPABASE_URL:
+      typeof process !== 'undefined' && process?.env && process.env.EXPO_PUBLIC_SUPABASE_URL ? 'set' : 'missing',
   });
 }
 

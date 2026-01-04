@@ -19,6 +19,7 @@ import {
   StyleSheet,
   Modal,
   Pressable,
+  Alert,
   TextInput,
   ScrollView,
   ActivityIndicator,
@@ -200,7 +201,12 @@ export function SearchModal({
                   <Ionicons name="chevron-forward" size={20} color={theme.colors.mutedText} />
                 </Pressable>
 
-                <Pressable style={styles.quickLinkButton}>
+                <Pressable
+                  style={styles.quickLinkButton}
+                  onPress={() => {
+                    Alert.alert('Coming soon', 'Leaderboards are coming soon.');
+                  }}
+                >
                   <Ionicons name="trophy-outline" size={20} color="#f59e0b" />
                   <Text style={styles.quickLinkText}>View Leaderboards</Text>
                   <Ionicons name="chevron-forward" size={20} color={theme.colors.mutedText} />

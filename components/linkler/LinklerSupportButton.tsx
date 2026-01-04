@@ -1,18 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Tooltip, Modal } from '@/components/ui';
-
-type LinklerSupportContext = {
-  /** Optional override for the primary CTA destination */
-  supportHref?: string;
-  /** Optional override for the safety resources destination */
-  safetyHref?: string;
-  /** Notify the host app whenever Linkler opens */
-  onOpenSupport?: () => void;
-};
+import { Tooltip, Modal } from '@/components/ui';
+import { LinklerPanel } from './LinklerPanel';
+import { useLinklerPanel } from './useLinklerPanel';
 
 export interface LinklerSupportButtonProps {
   variant?: 'default' | 'compact';
@@ -22,7 +15,6 @@ export interface LinklerSupportButtonProps {
   isLiveContext?: boolean;
   /** Allow pages to forcibly hide Linkler (e.g. custom flows) */
   forceHidden?: boolean;
-  context?: LinklerSupportContext;
 }
 
 const BLOCKED_ROUTE_PREFIXES = [
@@ -59,10 +51,9 @@ export function LinklerSupportButton({
   disableDuringLive = false,
   isLiveContext = false,
   forceHidden = false,
-  context,
 }: LinklerSupportButtonProps) {
-  const router = useRouter();
   const pathname = usePathname();
+  const linklerState = useLinklerPanel();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPointerFine, setIsPointerFine] = useState(false);
 
@@ -94,46 +85,31 @@ export function LinklerSupportButton({
     return null;
   }
 
-  const supportHref = context?.supportHref ?? '/messages?intent=support';
-  const safetyHref = context?.safetyHref ?? '/policies';
-
   const handleOpenPanel = () => {
     setIsModalOpen(true);
-    context?.onOpenSupport?.();
-  };
-
-  const handleSupportClick = () => {
-    if (supportHref.startsWith('http') || supportHref.startsWith('mailto:')) {
-      window.open(supportHref, '_blank');
-      return;
-    }
-    router.push(supportHref);
-  };
-
-  const handleSafetyClick = () => {
-    if (safetyHref.startsWith('http')) {
-      window.open(safetyHref, '_blank');
-      return;
-    }
-    router.push(safetyHref);
   };
 
   const buttonSizeClasses =
     variant === 'compact'
-      ? 'w-11 h-11 sm:w-12 sm:h-12'
-      : 'w-12 h-12 sm:w-14 sm:h-14';
+      ? 'w-24 h-24 sm:w-28 sm:h-28'
+      : 'w-28 h-28 sm:w-32 sm:h-32';
+
+  const imageSizeClasses =
+    variant === 'compact'
+      ? 'w-20 h-20 sm:w-24 sm:h-24'
+      : 'w-24 h-24 sm:w-28 sm:h-28';
 
   const tooltipContent = (
     <div className="space-y-0.5">
       <p className="text-sm font-semibold">Linkler</p>
-      <p className="text-xs text-muted-foreground">Support &amp; Safety Assistant</p>
+      <p className="text-xs text-muted-foreground">AI Support &amp; Companion</p>
     </div>
   );
 
   return (
     <>
       <div
-        className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6"
+        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6"
         style={{
           zIndex: 60,
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -146,13 +122,11 @@ export function LinklerSupportButton({
             onClick={handleOpenPanel}
             className={`
               ${buttonSizeClasses}
-              rounded-full bg-white/90 dark:bg-gray-900/90
-              border border-white/70 dark:border-gray-800/70
-              shadow-lg shadow-primary/20
+              rounded-full bg-transparent
               flex items-center justify-center overflow-hidden
               transition-transform duration-200
-              hover:-translate-y-0.5 hover:shadow-xl
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2
+              hover:-translate-y-0.5
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background
               active:scale-95
             `}
             aria-label="Open Linkler support panel"
@@ -162,7 +136,7 @@ export function LinklerSupportButton({
               alt="Linkler mascot"
               width={56}
               height={56}
-              className="object-contain w-10 h-10 sm:w-12 sm:h-12"
+              className={`object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.25)] ${imageSizeClasses}`}
               priority={false}
               draggable={false}
             />
@@ -174,69 +148,10 @@ export function LinklerSupportButton({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Linkler"
-        description="Support & Safety Assistant"
+        description="AI support + companion chat"
         size="md"
       >
-        <div className="space-y-6">
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">AI-assisted. Human-reviewed.</p>
-            <p className="text-sm text-muted-foreground">
-              Linkler connects you to human moderators and safety tools whenever you need a hand.
-            </p>
-          </div>
-
-          <div className="space-y-3 rounded-2xl bg-muted/40 p-4 border border-muted/40">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Quick actions</p>
-              <p className="text-base font-semibold text-foreground mt-1">How can we help?</p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                className="flex-1"
-                onClick={handleSupportClick}
-                variant="gradient"
-              >
-                Contact Support
-              </Button>
-              <Button
-                className="flex-1"
-                variant="outline"
-                onClick={handleSafetyClick}
-              >
-                View Safety Center
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 rounded-xl border border-dashed border-muted/60 p-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <Image
-                  src="/images/linkler.png"
-                  alt="Linkler mascot"
-                  width={48}
-                  height={48}
-                  className="object-contain w-10 h-10"
-                  priority={false}
-                />
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Linkler keeps an eye on support requests, referral issues, and safety escalations so the human team can jump in faster.
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Need immediate assistance? Email{' '}
-              <button
-                type="button"
-                className="font-semibold text-primary underline-offset-2 hover:underline"
-                onClick={() => window.open('mailto:support@mylivelinks.com')}
-              >
-                support@mylivelinks.com
-              </button>
-              .
-            </p>
-          </div>
-        </div>
+        <LinklerPanel state={linklerState} />
       </Modal>
     </>
   );

@@ -300,6 +300,30 @@ export default function AdminDashboardPage() {
               </Card>
             </Link>
 
+            {/* Linkler Prompt */}
+            <Link href="/admin/linkler">
+              <Card className="group hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 cursor-pointer">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 rounded-xl bg-indigo-500/10 group-hover:bg-indigo-500/20 transition-colors">
+                      <Settings className="w-6 h-6 text-indigo-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+                        Linkler Prompt
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Edit Linkler’s runtime instructions without redeploying the platform.
+                      </p>
+                      <Badge variant="secondary" size="sm">
+                        Runtime
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
             {/* Users (Coming Soon) */}
             <Card className="opacity-60">
               <CardContent className="p-6">

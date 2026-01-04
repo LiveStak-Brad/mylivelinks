@@ -27,6 +27,7 @@ type PageShellProps = {
   // Auto-hide support
   headerVisible?: boolean;
   headerAnimatedValue?: Animated.Value;
+  floatingContent?: React.ReactNode;
 };
 
 export function PageShell({ 
@@ -48,6 +49,7 @@ export function PageShell({
   useNewHeader = false,
   headerVisible = true,
   headerAnimatedValue,
+  floatingContent,
 }: PageShellProps) {
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -88,7 +90,10 @@ export function PageShell({
           <View style={legacyStyles.side}>{right}</View>
         </Animated.View>
       ) : null}
-      <View style={[styles.content, contentStyle]}>{children}</View>
+      <View style={[styles.content, contentStyle]}>
+        {children}
+        {floatingContent}
+      </View>
     </SafeAreaView>
   );
 }

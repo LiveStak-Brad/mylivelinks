@@ -17,6 +17,7 @@ import {
   FileText,
   Lock,
   X,
+  Crown,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -29,7 +30,7 @@ type AppMenuItem = {
   action?: 'search';
 };
 
-const APP_MENU_ITEMS: AppMenuItem[] = [
+const BASE_MENU_ITEMS: AppMenuItem[] = [
   { label: 'Home', href: '/', icon: Home },
   { label: 'Feed', href: '/feed', icon: Rss },
   { label: 'Trending', href: '/trending', icon: Flame },
@@ -48,10 +49,12 @@ export default function AppMenuDrawer({
   isOpen,
   onClose,
   onOpenSearch,
+  isOwner = false,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onOpenSearch: () => void;
+  isOwner?: boolean;
 }) {
   useEffect(() => {
     if (!isOpen) return;
@@ -99,7 +102,7 @@ export default function AppMenuDrawer({
 
         <nav className="p-2">
           <div className="flex flex-col">
-            {APP_MENU_ITEMS.map((item) => {
+            {(isOwner ? [{ label: 'Owner Panel', href: '/owner', icon: Crown }, ...BASE_MENU_ITEMS] : BASE_MENU_ITEMS).map((item) => {
               const row = <MenuItemRow icon={item.icon} label={item.label} />;
 
               if (item.href) {

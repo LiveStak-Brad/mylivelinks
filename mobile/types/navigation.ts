@@ -41,6 +41,7 @@ export type RootStackParamList = {
   ModerationPanel: undefined;
   AdminApplications: undefined;
   AdminGifts: undefined;
+  AdminLinklerPrompt: undefined;
   ComposerList: undefined;
   ComposerEditor: { draftId?: string | null; clipData?: any } | undefined;
   Profile: { username?: string };

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com').replace(/\/+$/, '');
+import { getRuntimeEnv } from '../lib/env';
+
+const API_BASE_URL = (getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com').replace(/\/+$/, '');
 
 type UseActiveViewerCountOptions = {
   liveStreamId?: number | null;

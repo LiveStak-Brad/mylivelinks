@@ -442,6 +442,7 @@ export default function GlobalHeader() {
           isOpen={appMenuOpen}
           onClose={() => setAppMenuOpen(false)}
           onOpenSearch={() => setMobileSearchOpen(true)}
+          isOwner={isOwner}
         />
       </header>
 

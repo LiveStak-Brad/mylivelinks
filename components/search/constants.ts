@@ -11,6 +11,7 @@ import {
   HeartHandshake,
   MessagesSquare,
 } from 'lucide-react';
+import type { PersonResult, PostResult, TeamResult, LiveResult } from '@/types/search';
 
 export type SearchTab =
   | 'top'
@@ -108,51 +109,6 @@ export const FILTER_TOGGLES: SearchFilterToggle[] = [
   { id: 'live', label: 'Live Now', appliesTo: ['live'] },
   { id: 'following', label: 'Following Only', appliesTo: 'all' },
 ];
-
-export interface PersonResult {
-  id: string;
-  name: string;
-  handle: string;
-  avatarUrl?: string | null;
-  mutualCount: number;
-  verified: boolean;
-  location?: string | null;
-  online: boolean;
-  status?: string | null;
-  avatarColor: string;
-  following?: boolean;
-}
-
-export interface PostResult {
-  id: string;
-  author: string;
-  authorHandle: string;
-  authorAvatarUrl?: string | null;
-  text: string;
-  createdAt: string;
-  likeCount: number;
-  commentCount: number;
-  mediaUrl?: string | null;
-}
-
-export interface TeamResult {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  avatarUrl?: string | null;
-  memberCount: number;
-}
-
-export interface LiveResult {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarUrl?: string | null;
-  viewerCount: number;
-  isLive: boolean;
-  startsAt?: string | null;
-}
 
 export const SEARCH_RECENTS_STORAGE_KEY = 'mylivelinks.search.recents';
 

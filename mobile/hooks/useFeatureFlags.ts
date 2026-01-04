@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { getRuntimeEnv } from '../lib/env';
+
 export type FeatureFlagsMap = Record<string, boolean>;
 
 type UseFeatureFlagsState = {
@@ -9,7 +11,7 @@ type UseFeatureFlagsState = {
 };
 
 function getApiBaseUrl() {
-  const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
+  const raw = getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com';
   return raw.replace(/\/+$/, '');
 }
 

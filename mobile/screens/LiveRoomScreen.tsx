@@ -33,9 +33,10 @@ import { useThemeMode } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { OptionsMenu } from '../components/OptionsMenu';
 import { MixerModal } from '../components/MixerModal';
+import { getRuntimeEnv } from '../lib/env';
 
 const SWIPE_THRESHOLD = 50;
-const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
+const DEBUG = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVE') === '1';
 const ROOM_NAME = 'live_central';
 const ROOM_SCOPE_ID = 'live-central';
 

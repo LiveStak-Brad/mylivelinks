@@ -6,8 +6,10 @@
 
 import * as SecureStore from 'expo-secure-store';
 
+import { getRuntimeEnv } from './env';
+
 const DEVICE_ID_KEY = 'mylivelinks_device_id';
-const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
+const DEBUG = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVE') === '1';
 
 // In-memory cache (fallback if SecureStore fails)
 let cachedDeviceId: string | null = null;
