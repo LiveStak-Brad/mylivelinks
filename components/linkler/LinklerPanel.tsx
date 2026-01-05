@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState, useLayoutEffect, useRef, type KeyboardEvent } from 'react';
-import { Button, Badge, Textarea } from '@/components/ui';
+import { Button, Badge, Textarea, Input } from '@/components/ui';
 import { useToast } from '@/components/ui/Toast';
 import { type LinklerPanelState, type CompanionEntry } from './useLinklerPanel';
 import { postCompanionMessage, submitSupportTicket } from '@/lib/api/linkler';
@@ -22,6 +22,8 @@ const COOLDOWN_HINT = 'Hang on a sec... Try again in a few seconds.';
 const UNAVAILABLE_COPY = 'Linkler is temporarily unavailable.';
 const LINKLER_AVATAR_SRC = '/linklerprofile.png';
 const USER_FALLBACK_AVATAR = '/no-profile-pic.png';
+const SUPPORT_CATEGORIES = ['Account help', 'Payments & billing', 'Technical issue', 'Other'];
+const REPORT_CATEGORIES = ['Report user', 'Report post', 'Report live stream', 'Safety concern'];
 
 type LinklerPanelProps = {
   state: LinklerPanelState;
@@ -39,8 +41,24 @@ export function LinklerPanel({ state, ticketsOpen, onCloseTickets }: LinklerPane
   const [supportEscalationReason, setSupportEscalationReason] = useState<LinklerEscalationReason | null>(null);
   const [supportFailureReason, setSupportFailureReason] = useState<LinklerEscalationReason | null>(null);
   const [supportAsking, setSupportAsking] = useState(false);
-  const [supportEscalating, setSupportEscalating] = useState(false);
   const [viewerAvatar, setViewerAvatar] = useState<string | null>(null);
+  const [showEscalationForm, setShowEscalationForm] = useState(false);
+  const [escalationType, setEscalationType] = useState<'support' | 'report'>('support');
+  const [escalationCategory, setEscalationCategory] = useState(SUPPORT_CATEGORIES[0]);
+  const [escalationContact, setEscalationContact] = useState('');
+  const [escalationDetails, setEscalationDetails] = useState('');
+  const [escalationError, setEscalationError] = useState<string | null>(null);
+  const [escalationSubmitting, setEscalationSubmitting] = useState(false);
+  const currentCategoryOptions = useMemo(
+    () => (escalationType === 'report' ? REPORT_CATEGORIES : SUPPORT_CATEGORIES),
+    [escalationType]
+  );
+
+  useEffect(() => {
+    if (!currentCategoryOptions.includes(escalationCategory)) {
+      setEscalationCategory(currentCategoryOptions[0]);
+    }
+  }, [currentCategoryOptions, escalationCategory]);
 
   const {
     containerRef: supportScrollContainer,
@@ -177,20 +195,26 @@ export function LinklerPanel({ state, ticketsOpen, onCloseTickets }: LinklerPane
     }
   }, [state, supportMessage]);
 
-  const handleSupportEscalation = useCallback(async () => {
+  const handleOpenEscalationForm = useCallback(() => {
+    setShowEscalationForm(true);
+    setEscalationError(null);
+    setSupportMessage('');
     setSupportError(null);
+  }, []);
 
-    let messageBody = supportMessage.trim();
-    if (!messageBody) {
-      messageBody = lastSupportUserMessage?.text?.trim() ?? '';
-    }
-
-    if (!messageBody) {
-      setSupportError('Share a quick summary before contacting support.');
+  const handleEscalationFormSubmit = useCallback(async () => {
+    setEscalationError(null);
+    const trimmedDetails = escalationDetails.trim();
+    if (!trimmedDetails) {
+      setEscalationError('Add a quick summary before sending.');
       return;
     }
 
     const reason = supportEscalationReason ?? supportFailureReason ?? 'user_requested';
+    const summaryPrefix = escalationType === 'report' ? 'Report' : 'Support';
+    const messageBody = `[${summaryPrefix} - ${escalationCategory}] ${trimmedDetails}\nContact: ${
+      escalationContact || 'Not provided'
+    }`;
 
     const contextPayload = buildLinklerEscalationContext({
       sessionId: state.supportSessionId,
@@ -198,20 +222,19 @@ export function LinklerPanel({ state, ticketsOpen, onCloseTickets }: LinklerPane
       lastLinklerReply: lastSupportAssistantMessage?.text,
       reason,
       metadata: {
-        channel: 'support-tab',
+        requestType: escalationType,
+        category: escalationCategory,
+        contact: escalationContact || undefined,
+        channel: 'support-form',
       },
     });
 
-    setSupportEscalating(true);
+    setEscalationSubmitting(true);
     const result = await submitSupportTicket({ message: messageBody, context: contextPayload });
-    setSupportEscalating(false);
+    setEscalationSubmitting(false);
 
     if (!result.ok || !result.data?.ok || !result.data.ticket) {
-      toast({
-        title: 'Escalation failed',
-        description: result.data?.error || result.error || 'Please try again.',
-        variant: 'error',
-      });
+      setEscalationError(result.data?.error || result.error || 'Failed to send to the human team. Try again.');
       return;
     }
 
@@ -225,38 +248,27 @@ export function LinklerPanel({ state, ticketsOpen, onCloseTickets }: LinklerPane
     setSupportLinklerError(null);
     setSupportEscalationReason(null);
     setSupportFailureReason(null);
+    setEscalationDetails('');
+    setEscalationContact('');
+    setShowEscalationForm(false);
 
     toast({
       title: 'Sent to human support',
       description: 'Our team will follow up via Linkler or Noties.',
     });
   }, [
+    escalationCategory,
+    escalationContact,
+    escalationDetails,
+    escalationType,
     lastSupportAssistantMessage,
-    lastSupportUserMessage,
     state,
     supportEscalationReason,
     supportFailureReason,
-    supportMessage,
     toast,
   ]);
 
   const cooldownDisabled = state.cooldownRemaining > 0;
-  const escalationKey = supportEscalationReason ?? supportFailureReason;
-  const escalationHint = useMemo(() => {
-    switch (escalationKey) {
-      case 'emergency':
-        return 'This sounds urgent. We will route this straight to human support.';
-      case 'ai_recommended':
-        return 'Linkler flagged this for a human follow-up.';
-      case 'ai_unavailable':
-      case 'timeout':
-        return 'Linkler could not finish, so we can escalate it manually.';
-      case 'linkler_disabled':
-        return 'Linkler is offline, but our human team can still help.';
-      default:
-        return null;
-    }
-  }, [escalationKey]);
 
   const supportCountRef = useRef(state.supportMessages.length);
   useEffect(() => {
@@ -329,44 +341,111 @@ export function LinklerPanel({ state, ticketsOpen, onCloseTickets }: LinklerPane
         className="rounded-xl border border-muted/70 bg-background/70 p-3 shadow-sm"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)' }}
       >
-        <div className="space-y-2">
-          <ComposerInput
-            value={supportMessage}
-            onChange={setSupportMessage}
-            placeholder="Describe the issue or question..."
-            disabled={supportAsking || cooldownDisabled}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                void handleAskLinklerSupport();
-              }
-            }}
-          />
-          {supportError ? <p className="text-sm text-destructive">{supportError}</p> : null}
-          <div className="flex w-full gap-3">
-            <Button
-              type="button"
-              className="basis-1/2"
-              onClick={() => void handleAskLinklerSupport()}
-              disabled={supportAsking || cooldownDisabled}
-            >
-              {supportAsking ? 'Sending...' : cooldownDisabled ? COOLDOWN_COPY : 'Send'}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="basis-1/2"
-              onClick={() => void handleSupportEscalation()}
-              disabled={supportEscalating}
-            >
-              {supportEscalating ? 'Escalating...' : 'Contact Support'}
-            </Button>
+        {showEscalationForm ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground">Contact Support</p>
+              <Button variant="ghost" size="sm" onClick={() => setShowEscalationForm(false)}>
+                Cancel
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Linkler will pause here. Share details so our human team can take over.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(['support', 'report'] as const).map((type) => (
+                <Button
+                  key={type}
+                  variant={escalationType === type ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setEscalationType(type)}
+                >
+                  {type === 'support' ? 'Support' : 'Report'}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {currentCategoryOptions.map((category) => (
+                <Button
+                  key={category}
+                  variant={escalationCategory === category ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => setEscalationCategory(category)}
+                >
+                  {category}
+                </Button>
+              ))}
+            </div>
+            <Input
+              value={escalationContact}
+              onChange={(event) => setEscalationContact(event.target.value)}
+              placeholder="Best way to contact you (optional)"
+            />
+            <Textarea
+              value={escalationDetails}
+              onChange={(event) => setEscalationDetails(event.target.value)}
+              placeholder="Describe what’s going on..."
+              rows={4}
+            />
+            {escalationError ? <p className="text-sm text-destructive">{escalationError}</p> : null}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => void handleEscalationFormSubmit()}
+                disabled={escalationSubmitting}
+              >
+                {escalationSubmitting ? 'Sending…' : 'Send to human team'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowEscalationForm(false)}
+                disabled={escalationSubmitting}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-          {cooldownDisabled && !supportLinklerError ? (
-            <p className="text-xs text-muted-foreground">{COOLDOWN_HINT}</p>
-          ) : null}
-        </div>
-        {escalationHint ? <p className="mt-4 text-xs text-muted-foreground">{escalationHint}</p> : null}
+        ) : (
+          <div className="space-y-2">
+            <ComposerInput
+              value={supportMessage}
+              onChange={setSupportMessage}
+              placeholder="Describe the issue or question..."
+              disabled={supportAsking || cooldownDisabled}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  void handleAskLinklerSupport();
+                }
+              }}
+            />
+            {supportError ? <p className="text-sm text-destructive">{supportError}</p> : null}
+            <div className="flex w-full gap-3">
+              <Button
+                type="button"
+                className="basis-1/2"
+                onClick={() => void handleAskLinklerSupport()}
+                disabled={supportAsking || cooldownDisabled}
+              >
+                {supportAsking ? 'Sending...' : cooldownDisabled ? COOLDOWN_COPY : 'Send'}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="basis-1/2"
+                onClick={handleOpenEscalationForm}
+              >
+                Contact Support
+              </Button>
+            </div>
+            {cooldownDisabled && !supportLinklerError ? (
+              <p className="text-xs text-muted-foreground">{COOLDOWN_HINT}</p>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <LinklerTicketsModal open={ticketsOpen} onClose={onCloseTickets} />
