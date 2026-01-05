@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { MessageCircle, Search, Gift, Send } from 'lucide-react';
 import GiftPickerMini from '@/components/messages/GiftPickerMini';
 import { Input, EmptyState } from '@/components/ui';
@@ -17,11 +18,13 @@ import ReportModal from '@/components/ReportModal';
  * Route: /messages
  */
 function MessagesPageContent() {
+  const searchParams = useSearchParams();
   const { 
     conversations, 
     activeConversationId,
     setActiveConversationId,
     messages,
+    openConversationWith,
     sendMessage,
     sendGift,
     sendImage,
@@ -80,6 +83,12 @@ function MessagesPageContent() {
       };
     }
   }, []);
+
+  useEffect(() => {
+    const target = searchParams.get('with');
+    if (!target) return;
+    void openConversationWith(target);
+  }, [openConversationWith, searchParams]);
 
   return (
     <main 

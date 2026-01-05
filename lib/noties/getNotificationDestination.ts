@@ -78,6 +78,21 @@ export function getNotificationDestination(input: {
   const meta = input.metadata ?? {};
 
   switch (type) {
+    case 'support': {
+      const supportAppId =
+        (process.env.MYLIVELINKS_APP_ID && process.env.MYLIVELINKS_APP_ID.trim()) ||
+        '0b47a2d7-43fb-4d38-b321-2d5d0619aabf';
+      return {
+        kind: 'internal',
+        href: `/messages?with=${encodeURIComponent(supportAppId)}`,
+        toast: {
+          title: 'Support replied',
+          description: 'Open messages to view the response.',
+          variant: 'info',
+        },
+      };
+    }
+
     case 'follow':
     case 'follow_link': {
       const username = safeString(input.actor_username || meta.username || meta.actor_username).replace(/^@/, '');

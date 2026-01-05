@@ -9,6 +9,7 @@ export type NotieType =
   | 'follow'
   | 'follow_link'
   | 'live'
+  | 'support'
   | 'mention'
   | 'comment'
   | 'like_post'
@@ -397,8 +398,9 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       } catch {
       }
 
-      // Load team invite notifications from the notifications table
+      // Load notifications from the notifications table
       let teamInviteNoties: Notie[] = [];
+      let supportNoties: Notie[] = [];
       try {
         const { data: teamNotifs } = await supabase
           .from('notifications')
@@ -496,7 +498,55 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
         console.error('[Noties] Team invite error:', err);
       }
 
-      const combined = [...followNoties, ...liveNoties, ...giftNoties, ...purchaseNoties, ...conversionNoties, ...teamInviteNoties]
+      try {
+        const { data: rawSupport } = await supabase
+          .from('notifications')
+          .select('id, actor_id, type, entity_type, entity_id, message, read, created_at')
+          .eq('recipient_id', user.id)
+          .eq('type', 'support')
+          .order('created_at', { ascending: false })
+          .limit(25);
+
+        if (rawSupport && rawSupport.length > 0) {
+          const actorIds = [...new Set(rawSupport.map((n: any) => n.actor_id).filter(Boolean))];
+          const { data: actorProfiles } = actorIds.length
+            ? await supabase.from('profiles').select('id, username, avatar_url, display_name').in('id', actorIds)
+            : { data: [] as any[] };
+
+          const actorById = new Map<string, any>();
+          for (const p of actorProfiles || []) {
+            if (p?.id) actorById.set(String(p.id), p);
+          }
+
+          supportNoties = rawSupport.map((n: any) => {
+            const id = `notif:${n.id}`;
+            const actor = actorById.get(String(n.actor_id));
+            const username = actor?.username || 'Support';
+            const displayName = actor?.display_name || username;
+            const avatarFallback = (displayName?.[0] || 'S').toUpperCase();
+            return {
+              id,
+              type: 'support' as NotieType,
+              title: 'Support replied',
+              message: n.message || 'Support replied',
+              avatarUrl: actor?.avatar_url,
+              avatarFallback,
+              isRead: readIds.has(id) || n.read,
+              createdAt: new Date(n.created_at),
+              actionUrl: '/noties',
+              metadata: {
+                actor_id: n.actor_id,
+                entity_type: n.entity_type,
+                entity_id: n.entity_id,
+              },
+            };
+          });
+        }
+      } catch (err) {
+        console.error('[Noties] Support noties error:', err);
+      }
+
+      const combined = [...followNoties, ...liveNoties, ...giftNoties, ...purchaseNoties, ...conversionNoties, ...teamInviteNoties, ...supportNoties]
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, 100);
 

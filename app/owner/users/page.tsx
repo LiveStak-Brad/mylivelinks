@@ -52,6 +52,12 @@ interface User {
 type AdminUsersApi = {
   users: any[];
   total?: number;
+  counts?: {
+    total?: number;
+    active?: number;
+    banned?: number;
+    verified?: number;
+  };
   limit: number;
   offset: number;
 };
@@ -73,6 +79,9 @@ export default function UsersPage() {
 
   const [users, setUsers] = useState<User[]>([]);
   const [usersTotal, setUsersTotal] = useState(0);
+  const [activeUsersTotal, setActiveUsersTotal] = useState(0);
+  const [bannedUsersTotal, setBannedUsersTotal] = useState(0);
+  const [verifiedUsersTotal, setVerifiedUsersTotal] = useState(0);
 
   const loadUsers = async (q: string) => {
     setLoading(true);
@@ -82,7 +91,15 @@ export default function UsersPage() {
       if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
       const json = (await res.json()) as AdminUsersApi;
 
-      setUsersTotal(safeNumber(json.total ?? (json.users ?? []).length));
+      const total = safeNumber(json.counts?.total ?? json.total ?? (json.users ?? []).length);
+      const banned = safeNumber(json.counts?.banned);
+      const active = safeNumber(json.counts?.active ?? (total - banned));
+      const verified = safeNumber(json.counts?.verified);
+
+      setUsersTotal(total);
+      setActiveUsersTotal(active);
+      setBannedUsersTotal(banned);
+      setVerifiedUsersTotal(verified);
 
       const mapped: User[] = (json.users ?? []).map((p: any) => {
         const username = String(p?.username ?? 'unknown');
@@ -121,6 +138,9 @@ export default function UsersPage() {
       console.error('[Owner Users] load failed:', e);
       setUsers([]);
       setUsersTotal(0);
+      setActiveUsersTotal(0);
+      setBannedUsersTotal(0);
+      setVerifiedUsersTotal(0);
     } finally {
       setLoading(false);
     }
@@ -150,9 +170,9 @@ export default function UsersPage() {
   }, [users, filterStatus, searchQuery]);
 
   const totalUsers = usersTotal;
-  const activeUsers = users.filter((u) => !u.isBanned).length;
-  const bannedUsers = users.filter((u) => u.isBanned).length;
-  const verifiedUsers = users.filter((u) => u.isVerified).length;
+  const activeUsers = activeUsersTotal;
+  const bannedUsers = bannedUsersTotal;
+  const verifiedUsers = verifiedUsersTotal;
 
   const columns = [
     { key: 'user', label: 'User', width: 'flex-1' },
