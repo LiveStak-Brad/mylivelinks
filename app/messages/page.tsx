@@ -85,6 +85,7 @@ function MessagesPageContent() {
   }, []);
 
   useEffect(() => {
+    if (!searchParams) return;
     const target = searchParams.get('with');
     if (!target) return;
     void openConversationWith(target);
