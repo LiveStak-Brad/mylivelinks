@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireOwner, assertOwnerProfile } from '@/lib/rbac';
+import { requireAdmin } from '@/lib/admin';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { getSupportTicketDetail, updateSupportTicket } from '@/lib/owner/support';
 
@@ -15,8 +15,7 @@ const patchSchema = z.object({
 
 export async function GET(request: NextRequest, context: { params: { ticketId: string } }) {
   try {
-    const user = await requireOwner(request);
-    assertOwnerProfile(user.id);
+    await requireAdmin(request);
 
     const params = ticketParamsSchema.safeParse(context.params);
     if (!params.success) {
@@ -46,8 +45,7 @@ export async function GET(request: NextRequest, context: { params: { ticketId: s
 
 export async function PATCH(request: NextRequest, context: { params: { ticketId: string } }) {
   try {
-    const user = await requireOwner(request);
-    assertOwnerProfile(user.id);
+    await requireAdmin(request);
 
     const params = ticketParamsSchema.safeParse(context.params);
     if (!params.success) {

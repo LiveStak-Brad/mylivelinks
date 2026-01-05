@@ -36,7 +36,9 @@ export default function FollowersModal({
   const limit = 20;
   
   useEffect(() => {
-    loadUsers();
+    setUsers([]);
+    setHasMore(true);
+    setOffset(0);
   }, [profileId, type]);
   
   const loadUsers = async () => {
@@ -59,17 +61,21 @@ export default function FollowersModal({
       
       const newUsers = data[type] || [];
       setUsers(prev => offset === 0 ? newUsers : [...prev, ...newUsers]);
-      setHasMore(newUsers.length === limit);
+      const total = typeof data.total === 'number' ? data.total : null;
+      setHasMore(total !== null ? offset + newUsers.length < total : newUsers.length === limit);
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadUsers();
+  }, [profileId, type, offset]);
   
   const loadMore = () => {
     setOffset(prev => prev + limit);
-    setTimeout(loadUsers, 100);
   };
   
   const getTitle = () => {

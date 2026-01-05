@@ -356,7 +356,7 @@ export function LinklerPanel({ state, ticketsOpen, onCloseTickets }: LinklerPane
               {(['support', 'report'] as const).map((type) => (
                 <Button
                   key={type}
-                  variant={escalationType === type ? 'default' : 'outline'}
+                  variant={escalationType === type ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => setEscalationType(type)}
                 >

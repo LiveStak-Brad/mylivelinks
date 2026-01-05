@@ -51,6 +51,7 @@ interface User {
 
 type AdminUsersApi = {
   users: any[];
+  total?: number;
   limit: number;
   offset: number;
 };
@@ -71,6 +72,7 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   const [users, setUsers] = useState<User[]>([]);
+  const [usersTotal, setUsersTotal] = useState(0);
 
   const loadUsers = async (q: string) => {
     setLoading(true);
@@ -79,6 +81,8 @@ export default function UsersPage() {
       const res = await fetch(`/api/owner/users${qs}`, { method: 'GET', credentials: 'include', cache: 'no-store' });
       if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
       const json = (await res.json()) as AdminUsersApi;
+
+      setUsersTotal(safeNumber(json.total ?? (json.users ?? []).length));
 
       const mapped: User[] = (json.users ?? []).map((p: any) => {
         const username = String(p?.username ?? 'unknown');
@@ -116,6 +120,7 @@ export default function UsersPage() {
     } catch (e) {
       console.error('[Owner Users] load failed:', e);
       setUsers([]);
+      setUsersTotal(0);
     } finally {
       setLoading(false);
     }
@@ -144,7 +149,7 @@ export default function UsersPage() {
       });
   }, [users, filterStatus, searchQuery]);
 
-  const totalUsers = users.length;
+  const totalUsers = usersTotal;
   const activeUsers = users.filter((u) => !u.isBanned).length;
   const bannedUsers = users.filter((u) => u.isBanned).length;
   const verifiedUsers = users.filter((u) => u.isVerified).length;

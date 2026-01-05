@@ -12,8 +12,8 @@
     "postinstall": "node ./scripts/patch-expo-dev-menu.js"
   },
   "dependencies": {
-    "@livekit/react-native": "^2.0.0",
-    "@livekit/react-native-webrtc": "^137.0.0",
+    "@livekit/react-native": "^2.0.2",
+    "@livekit/react-native-webrtc": "^114.0.0",
     "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-native-community/datetimepicker": "7.7.0",
     "@react-native-community/slider": "^4.5.5",
@@ -39,9 +39,9 @@
     "livekit-client": "^2.0.0",
     "react": "18.2.0",
     "react-native": "0.73.6",
-    "react-native-iap": "13.0.4",
     "react-native-gesture-handler": "~2.14.0",
     "react-native-get-random-values": "~1.8.0",
+    "react-native-iap": "13.0.4",
     "react-native-image-filter-kit": "^0.7.3",
     "react-native-reanimated": "~3.6.2",
     "react-native-safe-area-context": "4.8.2",

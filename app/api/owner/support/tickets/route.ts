@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireOwner, assertOwnerProfile } from '@/lib/rbac';
+import { requireAdmin } from '@/lib/admin';
 import { createRouteHandlerClient } from '@/lib/supabase-server';
 import { fetchSupportBadges, listSupportTickets } from '@/lib/owner/support';
 import type { SupportTicketFilters } from '@/types/support';
@@ -17,8 +17,7 @@ const querySchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireOwner(request);
-    assertOwnerProfile(user.id);
+    await requireAdmin(request);
 
     const url = new URL(request.url);
     const rawParams = Object.fromEntries(url.searchParams.entries());
