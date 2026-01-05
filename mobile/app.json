@@ -2,11 +2,12 @@
   "expo": {
     "name": "MyLiveLinks",
     "slug": "mylivelinks-mobile",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "scheme": "mylivelinks",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "jsEngine": "jsc",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
@@ -15,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mylivelinks.app",
-      "buildNumber": "16",
+      "buildNumber": "43",
       "associatedDomains": [
         "applinks:www.mylivelinks.com"
       ],
@@ -23,6 +24,10 @@
         "NSCameraUsageDescription": "This app needs camera access for live streaming (future feature).",
         "NSMicrophoneUsageDescription": "This app needs microphone access for live streaming (future feature).",
         "ITSAppUsesNonExemptEncryption": false,
+        "UIApplicationSupportsMultipleScenes": false,
+        "UIApplicationSceneManifest": {
+          "UIApplicationSupportsMultipleScenes": false
+        },
         "UISupportedInterfaceOrientations": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationLandscapeLeft",
@@ -70,13 +75,6 @@
     "plugins": [
       "expo-dev-client",
       "expo-secure-store",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#000000",
-          "imageWidth": 200
-        }
-      ],
       "./plugins/withNoApsEnvironment"
     ],
     "extra": {

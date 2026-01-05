@@ -17,7 +17,7 @@
 // Mobile Owner Panel Parity: Revenue + Feature Flags
 // Mobile Owner Panel: Reports Parity (canonical commit)
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Linking } from 'react-native';
@@ -27,6 +27,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useThemeMode } from './contexts/ThemeContext';
+import { SafeAppBoundary } from './components/SafeAppBoundary';
+import { StartupDebugOverlay } from './components/StartupDebugOverlay';
 
 import type { RootStackParamList } from './types/navigation';
 import { GateScreen } from './screens/GateScreen';
@@ -65,8 +67,12 @@ import { ApplyForRoomScreen } from './screens/ApplyForRoomScreen';
 import { SoloStreamViewerScreen } from './screens/SoloStreamViewerScreen';
 import { SoloHostStreamScreen } from './screens/SoloHostStreamScreen';
 import { setPendingReferralCode } from './lib/referrals';
+import { initGlobalErrorHandlers, logStartupBreadcrumb } from './lib/startupTrace';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+initGlobalErrorHandlers();
+logStartupBreadcrumb('APP_MODULE_LOADED');
 
 function extractReferralCode(url: string): string | null {
   const match = url.match(/[?&]ref=([^&#]+)/i);
@@ -83,6 +89,9 @@ function extractReferralCode(url: string): string | null {
 
 function AppNavigation() {
   const { navigationTheme, mode } = useThemeMode();
+  useEffect(() => {
+    logStartupBreadcrumb('APP_NAVIGATION_MOUNT', { mode });
+  }, [mode]);
 
   const handleReferralFromUrl = useCallback(async (url: string | null | undefined) => {
     if (!url) return;
@@ -126,11 +135,15 @@ function AppNavigation() {
     };
   }, [handleReferralFromUrl]);
 
+  const handleNavReady = useCallback(() => {
+    logStartupBreadcrumb('NAV_READY');
+  }, []);
+
   return (
     <>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <AuthProvider>
-        <NavigationContainer theme={navigationTheme} linking={linking}>
+        <NavigationContainer theme={navigationTheme} linking={linking} onReady={handleNavReady}>
           <Stack.Navigator initialRouteName="Gate" screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Gate" component={GateScreen} />
             <Stack.Screen name="Auth" component={AuthScreen} />
@@ -179,11 +192,18 @@ function AppNavigation() {
 ============================================================================= */
 
 export default function App() {
+  useEffect(() => {
+    logStartupBreadcrumb('APP_START');
+  }, []);
+
   return (
-    <ThemeProvider>
-      <SafeAreaProvider>
-        <AppNavigation />
-      </SafeAreaProvider>
-    </ThemeProvider>
+    <SafeAppBoundary>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <AppNavigation />
+          <StartupDebugOverlay />
+        </SafeAreaProvider>
+      </ThemeProvider>
+    </SafeAppBoundary>
   );
 }

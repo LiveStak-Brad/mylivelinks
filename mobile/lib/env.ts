@@ -1,7 +1,13 @@
 import Constants from 'expo-constants';
 
+import { logStartupBreadcrumb } from './startupTrace';
+
 const expoExtra: Record<string, any> =
   (Constants.expoConfig?.extra as any) ?? (Constants as any).manifest?.extra ?? (Constants as any).manifest2?.extra ?? {};
+
+logStartupBreadcrumb('ENV_LOADED', {
+  extraKeys: typeof expoExtra === 'object' && expoExtra ? Object.keys(expoExtra).length : 0,
+});
 
 export function getRuntimeEnv(key: string): string | undefined {
   try {
