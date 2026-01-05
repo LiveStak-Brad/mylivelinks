@@ -21,7 +21,7 @@ function toPositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-const SUPPORT_COOLDOWN_SECONDS = toPositiveInt(process.env.SUPPORT_COOLDOWN_SECONDS, 120);
+const SUPPORT_COOLDOWN_SECONDS = toPositiveInt(process.env.SUPPORT_COOLDOWN_SECONDS, 1);
 
 type SupportAIShape = {
   summary: string;
