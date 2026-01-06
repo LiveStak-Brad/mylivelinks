@@ -383,9 +383,15 @@ function MessageInputWithGift({
   );
 }
 
+import { Suspense } from 'react';
+
 export default function MessagesPage() {
   // Note: MessagesProvider is already in the root layout
   // We just use the context directly
-  return <MessagesPageContent />;
+  return (
+    <Suspense>
+      <MessagesPageContent />
+    </Suspense>
+  );
 }
 
