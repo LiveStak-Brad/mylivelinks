@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { EmailSignupCard } from '@/components/EmailSignupCard';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import Link from 'next/link';
@@ -784,11 +785,9 @@ export default function LandingPage() {
             </CardContent>
           </Card>
 
-          {/* Coming Soon Strip (Inline, minimal) */}
-          <div className="text-center py-2">
-            <p className="text-xs text-white/40">
-              Coming soon: Live streaming • New gifts
-            </p>
+          {/* Coming Soon Email Signup */}
+          <div className="flex justify-center py-4">
+            <EmailSignupCard placement="banner" />
           </div>
         </div>
       </div>

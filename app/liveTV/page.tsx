@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { EmailSignupCard } from '@/components/EmailSignupCard';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -209,6 +210,10 @@ export default function LiveTVPage() {
       id="main"
       className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 pb-24 md:pb-8 relative overflow-hidden flex flex-col"
     >
+      {/* Mobile App Waitlist Banner */}
+      <div className="flex justify-center py-4">
+        <EmailSignupCard placement="banner" />
+      </div>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse" />
         <div
