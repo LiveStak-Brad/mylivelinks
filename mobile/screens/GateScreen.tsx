@@ -8,6 +8,7 @@ import type { RootStackParamList } from '../types/navigation';
 import { BrandLogo } from '../components/ui/BrandLogo';
 import { LegalFooter } from '../components/LegalFooter';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { logStartupBreadcrumb } from '../lib/startupTrace';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Gate'>;
 
@@ -23,6 +24,19 @@ export function GateScreen({ navigation }: Props) {
   const lastTargetRef = React.useRef<Target | null>(null);
 
   React.useEffect(() => {
+    logStartupBreadcrumb('SCREEN_MOUNT_Gate');
+  }, []);
+
+  React.useEffect(() => {
+    console.log(`[GATE][${new Date().toISOString()}] effect tick`, {
+      authLoading,
+      hasSession: !!session,
+      userId: session?.user?.id,
+      profileLoading,
+      needsOnboarding,
+      isComplete,
+    });
+
     if (authLoading) return;
 
     let target: Target;
@@ -30,12 +44,28 @@ export function GateScreen({ navigation }: Props) {
     if (!session) {
       target = 'Auth';
     } else if (profileLoading) {
+      console.log('[NAV] GateScreen waiting on profile load (showing gate spinner)');
       return;
     } else if (needsOnboarding || !isComplete) {
       target = 'CreateProfile';
     } else {
       target = 'MainTabs';
     }
+
+    logStartupBreadcrumb('GATE_NAV_DECISION', {
+      target,
+      hasSession: !!session,
+      profileLoading,
+      needsOnboarding,
+      isComplete,
+    });
+
+    console.log(`[GATE][${new Date().toISOString()}] nav decision`, {
+      target,
+      lastTarget: lastTargetRef.current,
+    });
+
+    console.log('[NAV] GateScreen resetting to target route:', target);
 
     if (lastTargetRef.current === target) return;
     lastTargetRef.current = target;

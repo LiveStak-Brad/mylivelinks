@@ -9,7 +9,8 @@ import {
 } from '../lib/startupTrace';
 
 export function StartupDebugOverlay() {
-  if (!__DEV__) return null;
+  const forced = (globalThis as any)?.__FORCE_STARTUP_OVERLAY__ === true;
+  if (!__DEV__ && !forced) return null;
 
   const [crumbs, setCrumbs] = React.useState<StartupBreadcrumb[]>(() => getStartupBreadcrumbs());
 

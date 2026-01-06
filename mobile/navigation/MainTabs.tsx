@@ -18,7 +18,7 @@
  * - Noties: Bell icon (Amber #f59e0b)
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -34,6 +34,7 @@ import { NotiesScreen } from '../screens/NotiesScreen';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { canUserGoLive } from '../lib/livekit-constants';
+import { logStartupBreadcrumb } from '../lib/startupTrace';
 import { Modal } from '../components/ui';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
@@ -43,6 +44,12 @@ export function MainTabs() {
   const { user } = useAuthContext();
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);
   const isOwner = useMemo(() => canUserGoLive(user ? { id: user.id, email: user.email } : null), [user?.email, user?.id]);
+
+  useEffect(() => {
+    logStartupBreadcrumb('SCREEN_MOUNT_MainTabs');
+    console.log('[NAV] MainTabs mounted (AppStack equivalent). Initial tab route is first declared Tab.Screen: Home');
+  }, []);
+
   const tabBarStyle = useMemo(
     () => ({
       backgroundColor: theme.colors.tabBar,

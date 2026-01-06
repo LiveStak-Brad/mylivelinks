@@ -1,5 +1,7 @@
 // CRITICAL: Set up global error handler FIRST (before any other imports)
 if (typeof ErrorUtils !== 'undefined') {
+  // Ensure all downstream error handlers know not to rethrow into RN's fatal abort path during boot.
+  global.__DISABLE_RN_FATAL_ABORT__ = true;
   const originalHandler = ErrorUtils.getGlobalHandler();
   ErrorUtils.setGlobalHandler((error, isFatal) => {
     console.error('🔴 GLOBAL ERROR CAUGHT:', {
@@ -8,10 +10,8 @@ if (typeof ErrorUtils !== 'undefined') {
       isFatal,
       name: error?.name,
     });
-    // Still call original handler
-    if (originalHandler) {
-      originalHandler(error, isFatal);
-    }
+    global.__BOOT_FATAL_ERROR__ = error;
+    // Avoid calling the original handler so React Native doesn't abort the process.
   });
 }
 
@@ -28,6 +28,11 @@ require('react-native-get-random-values');
 const envBootDebug =
   typeof process !== 'undefined' && process?.env ? process.env.EXPO_PUBLIC_DEBUG_ENV_BOOT === '1' : false;
 
+const envStartupOverlay =
+  typeof process !== 'undefined' && process?.env ? process.env.EXPO_PUBLIC_STARTUP_OVERLAY === '1' : false;
+
+global.__FORCE_STARTUP_OVERLAY__ = envStartupOverlay;
+
 if (envBootDebug) {
   console.log('[ENV_BOOT]', {
     EXPO_PUBLIC_API_URL: typeof process !== 'undefined' && process?.env ? process.env.EXPO_PUBLIC_API_URL : undefined,
@@ -42,15 +47,18 @@ if (global.TextEncoder == null) global.TextEncoder = TextEncoder;
 if (global.TextDecoder == null) global.TextDecoder = TextDecoder;
 
 if (global.__LIVEKIT_GLOBALS_REGISTERED__ !== true) {
+  console.log("[BOOT] before registerGlobals");
   try {
     const { registerGlobals } = require('@livekit/react-native');
     registerGlobals();
+    console.log("[BOOT] after registerGlobals");
     global.__LIVEKIT_GLOBALS_REGISTERED__ = true;
-  } catch (error) {
-    console.warn('[LIVEKIT] registerGlobals failed (non-blocking):', error);
-    // Live features will be unavailable but app can still launch
+  } catch (e) {
+    console.log("[BOOT] registerGlobals threw", e);
+    // Non-blocking failure for diagnostic purposes
     global.__LIVEKIT_GLOBALS_REGISTERED__ = false;
   }
+  console.log("[BOOT] after try/catch");
 }
 
 // CRITICAL: Catch any errors during App import
@@ -60,6 +68,7 @@ try {
   console.log('[INDEX] App.tsx loaded successfully');
 } catch (error) {
   console.error('[INDEX] FATAL: Failed to load App.tsx:', error);
+  global.__BOOT_FATAL_ERROR__ = error;
   // Create a minimal error screen
   const React = require('react');
   const { View, Text, ScrollView, StyleSheet } = require('react-native');
@@ -69,7 +78,7 @@ try {
     React.createElement(Text, { style: { color: '#fff', fontSize: 14, marginBottom: 10 } }, 'Failed to load App.tsx:'),
     React.createElement(ScrollView, { style: { maxHeight: 400 } },
       React.createElement(Text, { style: { color: '#ff0', fontSize: 12, fontFamily: 'monospace' } }, 
-        error?.message || String(error))
+        (error?.stack || error?.message || String(error)))
     )
   );
 }
