@@ -1,0 +1,14 @@
+# Mobile App Waitlist Tracking
+
+This project now tracks the mobile waitlist in Supabase table `waitlist_mobile`.
+
+## Owner Panel
+
+Go to `/owner/waitlist-mobile` to see:
+- total / active / unsubscribed counts
+- copy/paste email list
+
+## API
+
+- Capture: `POST /api/waitlist/mobile` `{ email }`
+- Owner list: `GET /api/owner/waitlist/mobile`
