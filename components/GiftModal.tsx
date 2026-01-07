@@ -236,16 +236,6 @@ export default function GiftModal({
         });
       }
 
-      // Track gift for trending (after successful send, fire-and-forget)
-      if (liveStreamId) {
-        trackLiveGift({
-          streamId: liveStreamId,
-          amountValue: selectedGift.coin_cost
-        }).catch(err => {
-          console.warn('[Trending] Gift tracking failed:', err);
-        });
-      }
-
       onGiftSent();
       onClose();
     } catch (err: any) {

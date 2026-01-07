@@ -621,13 +621,14 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
 
   // CRITICAL: Use useCallback to prevent stale closures
   const loadMessageWithProfile = useCallback(async (message: any) => {
+    const msgIdStr = String(message?.id ?? '');
     if (!message.profile_id) {
       // System message
       setMessages((prev) => {
         // Check if message already exists (prevent duplicates)
-        if (prev.some(m => m.id === message.id)) return prev;
+        if (prev.some((m) => String(m.id) === msgIdStr)) return prev;
         const nextMsg: ChatMessage = {
-          id: message.id,
+          id: msgIdStr,
           profile_id: null,
           message_type: message.message_type,
           content: message.content,
@@ -672,7 +673,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       });
 
       const newMsg = {
-        id: message.id,
+        id: msgIdStr,
         profile_id: message.profile_id,
         username: (profile as any)?.username || 'Unknown',
         avatar_url: (profile as any)?.avatar_url,
@@ -699,7 +700,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       }
       
       setMessages((prev) => {
-        if (prev.some(m => m.id === newMsg.id)) return prev;
+        if (prev.some((m) => String(m.id) === String(newMsg.id))) return prev;
 
         const optimisticIndex = prev.findIndex((m: any) =>
           typeof m.id === 'string' &&
@@ -727,9 +728,9 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       console.error('Error loading message profile:', error);
       // Add message without profile data if query fails
       setMessages((prev) => {
-        if (prev.some(m => m.id === message.id)) return prev;
+        if (prev.some((m) => String(m.id) === msgIdStr)) return prev;
         return [...prev, {
-          id: message.id,
+          id: msgIdStr,
           profile_id: message.profile_id,
           username: 'Unknown',
           avatar_url: undefined,
