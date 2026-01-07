@@ -596,6 +596,12 @@ export default function SoloHostStream() {
             console.log('[SoloHostStream] Remote track subscribed:', track.kind, 'from', participant.identity);
           }
           
+          // IMPORTANT: Skip guest tracks - they go to GuestVideoOverlay, not host's main video
+          if (participant.identity.startsWith('guest_')) {
+            console.log('[SoloHostStream] Skipping GUEST track (handled by GuestVideoOverlay):', participant.identity);
+            return;
+          }
+          
           if (track.kind === Track.Kind.Video && videoRef.current) {
             track.attach(videoRef.current);
             
