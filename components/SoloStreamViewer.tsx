@@ -194,6 +194,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   // Guest publishing state
   const [isAcceptedGuest, setIsAcceptedGuest] = useState(false);
   const [isPublishingAsGuest, setIsPublishingAsGuest] = useState(false);
+  const [guestStatus, setGuestStatus] = useState<string>(''); // Visual feedback for debugging
   const guestRequestIdRef = useRef<number | null>(null);
   const [streamEnded, setStreamEnded] = useState(false);
   const [countdown, setCountdown] = useState(5);
@@ -993,6 +994,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           console.log('[SoloStreamViewer] Guest status update:', payload.eventType, record.status);
 
           if (payload.eventType === 'UPDATE' && record.status === 'accepted') {
+            setGuestStatus('You were accepted!');
             setIsAcceptedGuest(true);
             guestRequestIdRef.current = record.id;
             
@@ -1023,6 +1025,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
       if (data) {
         console.log('[SoloStreamViewer] Already accepted as guest, starting publishing');
+        setGuestStatus('Accepted! Starting...');
         setIsAcceptedGuest(true);
         guestRequestIdRef.current = data.id;
         await startGuestPublishing();
@@ -1047,13 +1050,17 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       currentUserId 
     });
     
+    setGuestStatus('Starting guest mode...');
+    
     if (isPublishingAsGuest) {
       console.log('[SoloStreamViewer] Already publishing as guest, skipping');
+      setGuestStatus('Already publishing');
       return;
     }
 
     try {
       console.log('[SoloStreamViewer] Getting guest token...');
+      setGuestStatus('Getting token...');
       
       // Get a new token with canPublish: true
       const tokenRes = await fetch(TOKEN_ENDPOINT, {
@@ -1073,11 +1080,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       if (!tokenRes.ok) {
         const errorText = await tokenRes.text();
         console.error('[SoloStreamViewer] Failed to get guest token:', tokenRes.status, errorText);
+        setGuestStatus(`Token error: ${tokenRes.status}`);
         return;
       }
 
       const { token, url } = await tokenRes.json();
       console.log('[SoloStreamViewer] Got guest token, connecting to room...');
+      setGuestStatus('Connecting to room...');
 
       // Create a new room or use existing
       let room = roomRef.current;
@@ -1095,13 +1104,16 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       console.log('[SoloStreamViewer] Connecting to room as guest...');
       await room.connect(url, token);
       console.log('[SoloStreamViewer] Connected! Enabling camera and mic...');
+      setGuestStatus('Enabling camera...');
 
       // Enable camera and microphone
       try {
         await room.localParticipant.setCameraEnabled(true);
         console.log('[SoloStreamViewer] Camera enabled');
+        setGuestStatus('Camera on! Enabling mic...');
       } catch (camErr) {
         console.error('[SoloStreamViewer] Failed to enable camera:', camErr);
+        setGuestStatus(`Camera error: ${camErr}`);
       }
       
       try {
@@ -1112,9 +1124,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       }
 
       setIsPublishingAsGuest(true);
+      setGuestStatus('🎥 LIVE AS GUEST!');
       console.log('[SoloStreamViewer] Guest publishing started successfully!');
     } catch (err) {
       console.error('[SoloStreamViewer] Error starting guest publishing:', err);
+      setGuestStatus(`Error: ${err}`);
     }
   }, [isPublishingAsGuest, streamer?.username, username, currentUserId]);
 
@@ -1360,6 +1374,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
   return (
     <div className={containerClass}>
+      {/* Guest Status Indicator - Shows on guest's screen when becoming a guest */}
+      {guestStatus && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-purple-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg animate-pulse">
+          {guestStatus}
+        </div>
+      )}
+      
       {/* Main Content Area - Fullscreen on all screen sizes */}
       <div className="flex relative h-screen pt-0 overflow-hidden">
         {/* Left/Center: Video Player */}
