@@ -224,10 +224,6 @@ export default function GuestVideoOverlay({
         <div
           key={guest.id}
           className="relative w-28 h-40 md:w-32 md:h-44 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 bg-black"
-          style={{
-            // Slight offset for visual interest
-            transform: index === 1 ? 'translateX(-8px)' : undefined,
-          }}
         >
           {/* Fallback Avatar (shown behind video when no video track) */}
           <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-pink-600 z-0">
