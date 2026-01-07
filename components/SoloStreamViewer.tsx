@@ -653,6 +653,14 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         // CRITICAL: Manually attach existing tracks (for when we join AFTER host is already live)
         room.remoteParticipants.forEach((participant) => {
           console.log('[SoloStreamViewer] 🔍 Checking existing participant:', participant.identity);
+          
+          // IMPORTANT: Skip guest participants - they go to GuestVideoOverlay
+          const isGuest = participant.identity.startsWith('guest_');
+          if (isGuest) {
+            console.log('[SoloStreamViewer] 🚫 Skipping GUEST participant tracks:', participant.identity);
+            return;
+          }
+          
           participant.trackPublications.forEach((publication) => {
             console.log('[SoloStreamViewer] 📹 Found existing track publication:', {
               kind: publication.kind,
@@ -662,7 +670,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             });
             
             if (publication.track && publication.kind === Track.Kind.Video && videoRef.current) {
-              console.log('[SoloStreamViewer] 🎥 Attaching EXISTING video track to video element');
+              console.log('[SoloStreamViewer] 🎥 Attaching EXISTING HOST video track to video element');
               publication.track.attach(videoRef.current);
               
               // Detect aspect ratio
@@ -712,6 +720,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             sid: track.sid,
           });
 
+          // IMPORTANT: Skip guest tracks - they go to GuestVideoOverlay, not main player
+          const isGuestTrack = participant.identity.startsWith('guest_');
+          if (isGuestTrack) {
+            console.log('[SoloStreamViewer] 🚫 Skipping GUEST track (handled by GuestVideoOverlay):', participant.identity);
+            return;
+          }
+
           if (DEBUG_LIVEKIT) {
             console.log('[SoloStreamViewer] Track subscribed:', {
               kind: track.kind,
@@ -720,9 +735,9 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             });
           }
 
-          // Attach video + audio tracks
+          // Attach video + audio tracks (HOST only, not guests)
           if (track.kind === Track.Kind.Video && videoRef.current) {
-            console.log('[SoloStreamViewer] 🎥 Attaching VIDEO track to video element');
+            console.log('[SoloStreamViewer] 🎥 Attaching HOST VIDEO track to video element');
             track.attach(videoRef.current);
             
             // Detect aspect ratio
@@ -1114,18 +1129,24 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         
         console.log('[SoloStreamViewer] Reconnected, waiting for tracks to resubscribe...');
         
-        // Wait a moment for tracks to be available, then re-attach host video
+        // Wait a moment for tracks to be available, then re-attach host video (NOT guest tracks)
         setTimeout(() => {
           if (room && videoRef.current && audioRef.current) {
             room.remoteParticipants.forEach((participant) => {
-              console.log('[SoloStreamViewer] Checking participant for reattach:', participant.identity);
+              // Skip guest participants - they go to GuestVideoOverlay
+              if (participant.identity.startsWith('guest_')) {
+                console.log('[SoloStreamViewer] Skipping guest for reattach:', participant.identity);
+                return;
+              }
+              
+              console.log('[SoloStreamViewer] Reattaching HOST participant:', participant.identity);
               participant.trackPublications.forEach((pub) => {
                 if (pub.track) {
                   if (pub.kind === 'video') {
-                    console.log('[SoloStreamViewer] Reattaching video track');
+                    console.log('[SoloStreamViewer] Reattaching HOST video track');
                     pub.track.attach(videoRef.current!);
                   } else if (pub.kind === 'audio') {
-                    console.log('[SoloStreamViewer] Reattaching audio track');
+                    console.log('[SoloStreamViewer] Reattaching HOST audio track');
                     pub.track.attach(audioRef.current!);
                   }
                 }
