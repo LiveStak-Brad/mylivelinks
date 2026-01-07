@@ -45,9 +45,16 @@ import ViewersModal from './ViewersModal';
 import TrendingModal from './TrendingModal';
 import StreamGiftersModal from './StreamGiftersModal';
 import MiniProfileModal from './MiniProfileModal';
+import HostStreamSettingsModal from './HostStreamSettingsModal';
+import CoHostInviteModal from './CoHostInviteModal';
+import GuestRequestsModal from './GuestRequestsModal';
+import StreamFiltersModal from './StreamFiltersModal';
+import BattleInviteModal from './BattleInviteModal';
+import GuestVideoOverlay from './GuestVideoOverlay';
 import { useIM } from '@/components/im';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
 import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
+import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
 
 interface StreamerData {
   id: string;
@@ -157,6 +164,7 @@ export default function SoloHostStream() {
   const { resolvedTheme } = useTheme();
   const supabase = useMemo(() => createClient(), []);
   const { openChat: openIM } = useIM();
+  const isMobileWeb = useIsMobileWeb();
   
   const [streamer, setStreamer] = useState<StreamerData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -172,6 +180,11 @@ export default function SoloHostStream() {
   const [showStreamGifters, setShowStreamGifters] = useState(false);
   const [showTrending, setShowTrending] = useState(false);
   const [showMiniProfile, setShowMiniProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showCoHost, setShowCoHost] = useState(false);
+  const [showGuests, setShowGuests] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showBattle, setShowBattle] = useState(false);
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
   const [trendingRank, setTrendingRank] = useState<number | null>(null);
   
@@ -709,8 +722,13 @@ export default function SoloHostStream() {
 
   const isPortraitVideo = videoAspectRatio < 1;
 
+  // Mobile container class for full-bleed layout on phone widths
+  const containerClass = isMobileWeb
+    ? 'mobile-live-container mobile-live-v3'
+    : 'min-h-screen bg-gray-50 dark:bg-gray-900 lg:bg-gray-50 lg:dark:bg-gray-900 overflow-hidden lg:overflow-auto';
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 lg:bg-gray-50 lg:dark:bg-gray-900 overflow-hidden lg:overflow-auto">
+    <div className={containerClass}>
       {/* Stream Setup Modal */}
       {showSetupModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -1112,6 +1130,19 @@ export default function SoloHostStream() {
                 />
               </div>
             )}
+
+            {/* Guest Video Overlay - Floating boxes for up to 2 guests */}
+            <GuestVideoOverlay
+              liveStreamId={streamer.live_stream_id}
+              hostId={currentUserId || undefined}
+              currentUserId={currentUserId || undefined}
+              isHost={true}
+              room={roomRef.current}
+              onGuestLeave={() => {
+                // Host doesn't leave as guest, but this handles the realtime update
+                console.log('[SoloHostStream] Guest removed');
+              }}
+            />
           </div>
 
           {/* Bottom Streamer Options Bar - Floating at bottom, spread wide */}
@@ -1167,41 +1198,41 @@ export default function SoloHostStream() {
             
             <div className="flex items-center justify-around bg-black/50 backdrop-blur-md rounded-full px-4 py-1 shadow-lg max-w-4xl mx-auto">
               <button
-                className="flex flex-col items-center gap-1 text-white hover:text-purple-400 transition-colors"
+                onClick={() => setShowBattle(true)}
+                className="flex flex-col items-center gap-1 text-white hover:text-orange-400 transition-colors"
                 title="Battle"
-                disabled
               >
                 <Swords className="w-6 h-6" />
               </button>
               
               <button
+                onClick={() => setShowCoHost(true)}
                 className="flex flex-col items-center gap-1 text-white hover:text-purple-400 transition-colors"
                 title="Co-Host"
-                disabled
               >
                 <UserPlus className="w-6 h-6" />
               </button>
               
               <button
-                className="flex flex-col items-center gap-1 text-white hover:text-purple-400 transition-colors"
+                onClick={() => setShowGuests(true)}
+                className="flex flex-col items-center gap-1 text-white hover:text-green-400 transition-colors"
                 title="Guests"
-                disabled
               >
                 <Users className="w-6 h-6" />
               </button>
               
               <button
-                className="flex flex-col items-center gap-1 text-white hover:text-purple-400 transition-colors"
+                onClick={() => setShowSettings(true)}
+                className="flex flex-col items-center gap-1 text-white hover:text-blue-400 transition-colors"
                 title="Settings"
-                disabled
               >
                 <Settings className="w-6 h-6" />
               </button>
               
               <button
-                className="flex flex-col items-center gap-1 text-white hover:text-purple-400 transition-colors"
+                onClick={() => setShowFilters(true)}
+                className="flex flex-col items-center gap-1 text-white hover:text-cyan-400 transition-colors"
                 title="Filters"
-                disabled
               >
                 <Filter className="w-6 h-6" />
               </button>
@@ -1285,6 +1316,38 @@ export default function SoloHostStream() {
           // Host can't report themselves, but keeping interface consistent
           setShowMiniProfile(false);
         }}
+      />
+
+      {/* Host Stream Settings Modal */}
+      <HostStreamSettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
+
+      {/* Co-Host Invite Modal */}
+      <CoHostInviteModal
+        isOpen={showCoHost}
+        onClose={() => setShowCoHost(false)}
+      />
+
+      {/* Guest Requests Modal */}
+      <GuestRequestsModal
+        isOpen={showGuests}
+        onClose={() => setShowGuests(false)}
+        liveStreamId={streamer.live_stream_id}
+        hostId={currentUserId || undefined}
+      />
+
+      {/* Stream Filters Modal */}
+      <StreamFiltersModal
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+      />
+
+      {/* Battle Invite Modal */}
+      <BattleInviteModal
+        isOpen={showBattle}
+        onClose={() => setShowBattle(false)}
       />
     </div>
   );

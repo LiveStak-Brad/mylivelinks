@@ -46,9 +46,12 @@ import ViewersModal from './ViewersModal';
 import TrendingModal from './TrendingModal';
 import MiniProfileModal from './MiniProfileModal';
 import StreamGiftersModal from './StreamGiftersModal';
+import RequestGuestModal from './RequestGuestModal';
+import GuestVideoOverlay from './GuestVideoOverlay';
 import { useIM } from '@/components/im';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
 import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
+import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
 
 interface SoloStreamViewerProps {
   username: string;
@@ -160,6 +163,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const { resolvedTheme } = useTheme();
   const supabase = useMemo(() => createClient(), []);
   const { openChat: openIM } = useIM();
+  const isMobileWeb = useIsMobileWeb();
 
   // Per-tab identifier used to detect duplicate heartbeat/connect loops in logs.
   const viewerSessionIdRef = useRef<string>(
@@ -183,6 +187,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [showStreamGifters, setShowStreamGifters] = useState(false);
   const [showTrending, setShowTrending] = useState(false);
   const [showMiniProfile, setShowMiniProfile] = useState(false);
+  const [showRequestGuest, setShowRequestGuest] = useState(false);
   const [recommendedStreams, setRecommendedStreams] = useState<RecommendedStream[]>([]);
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
   const [streamEnded, setStreamEnded] = useState(false);
@@ -1157,8 +1162,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
   const isPortraitVideo = videoAspectRatio < 1;
 
+  // Mobile container class for full-bleed layout on phone widths
+  const containerClass = isMobileWeb
+    ? 'mobile-live-container mobile-live-v3'
+    : 'min-h-screen bg-black overflow-hidden';
+
   return (
-    <div className="min-h-screen bg-black overflow-hidden">
+    <div className={containerClass}>
       {/* Main Content Area - Fullscreen on all screen sizes */}
       <div className="flex relative h-screen pt-0 overflow-hidden">
         {/* Left/Center: Video Player */}
@@ -1540,6 +1550,26 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                 />
               </div>
             )}
+
+            {/* Guest Video Overlay - Floating boxes for up to 2 guests */}
+            <GuestVideoOverlay
+              liveStreamId={streamer.live_stream_id}
+              hostId={streamer.profile_id}
+              currentUserId={currentUserId || undefined}
+              isHost={false}
+              room={roomRef.current}
+              onGuestLeave={() => {
+                // Stop publishing if guest was publishing
+                if (roomRef.current?.localParticipant) {
+                  roomRef.current.localParticipant.trackPublications.forEach((pub) => {
+                    if (pub.track) {
+                      roomRef.current?.localParticipant.unpublishTrack(pub.track);
+                    }
+                  });
+                }
+                console.log('[SoloStreamViewer] Guest left, stopped publishing');
+              }}
+            />
           </div>
 
         </div>
@@ -1601,10 +1631,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                   onGiftClick={() => setShowGiftModal(true)}
                   onShareClick={handleShare}
                   onSettingsClick={() => setShowChatSettings(true)}
-                  onRequestGuestClick={() => {
-                    // TODO: Implement guest request functionality
-                    alert('Guest request feature coming soon! This will send a request to the host to join as a guest.');
-                  }}
+                  onRequestGuestClick={() => setShowRequestGuest(true)}
                   showRequestGuestButton={currentUserId !== null && currentUserId !== streamer.profile_id}
                   alwaysAutoScroll={true}
                 />
@@ -1692,6 +1719,19 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         onGifterClick={(profileId, username) => {
           setShowStreamGifters(false);
           setShowMiniProfile(true);
+        }}
+      />
+
+      {/* Request Guest Modal */}
+      <RequestGuestModal
+        isOpen={showRequestGuest}
+        onClose={() => setShowRequestGuest(false)}
+        streamerUsername={streamer.display_name || streamer.username}
+        liveStreamId={streamer.live_stream_id}
+        hostId={streamer.profile_id}
+        currentUserId={currentUserId || undefined}
+        onRequestSent={() => {
+          console.log('[SoloStreamViewer] Guest request sent');
         }}
       />
     </div>
