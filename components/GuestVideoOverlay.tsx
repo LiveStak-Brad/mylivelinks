@@ -5,7 +5,7 @@ import { X, Volume2 } from 'lucide-react';
 import Image from 'next/image';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { createClient } from '@/lib/supabase';
-import { Room, RoomEvent, RemoteParticipant, RemoteTrack, Track, TrackPublication } from 'livekit-client';
+import { Room, RoomEvent, RemoteParticipant, RemoteTrack, Track, TrackPublication, LocalTrackPublication } from 'livekit-client';
 
 interface GuestVideoOverlayProps {
   liveStreamId?: number;
@@ -40,9 +40,12 @@ export default function GuestVideoOverlay({
   const supabase = useMemo(() => createClient(), []);
   const [activeGuests, setActiveGuests] = useState<ActiveGuest[]>([]);
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const [showVolumeSlider, setShowVolumeSlider] = useState<string | null>(null); // Track which guest's slider is open
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [guestsWithVideo, setGuestsWithVideo] = useState<Set<string>>(new Set()); // Track which guests have video attached
+  const [isCurrentUserGuest, setIsCurrentUserGuest] = useState(false);
+  const [hasLocalVideo, setHasLocalVideo] = useState(false);
 
   // Track window width for responsive positioning
   useEffect(() => {
@@ -129,6 +132,45 @@ export default function GuestVideoOverlay({
       channel.unsubscribe();
     };
   }, [liveStreamId, supabase]);
+
+  // Check if current user is an accepted guest and attach their local video
+  useEffect(() => {
+    if (!room || !currentUserId || isHost) return;
+
+    // Check if current user is in the accepted guests list
+    const isGuest = activeGuests.some(g => g.requesterId === currentUserId);
+    setIsCurrentUserGuest(isGuest);
+
+    if (isGuest && localVideoRef.current) {
+      // Attach local video track
+      const localParticipant = room.localParticipant;
+      if (localParticipant) {
+        localParticipant.trackPublications.forEach((pub) => {
+          if (pub.track && pub.kind === Track.Kind.Video && localVideoRef.current) {
+            console.log('[GuestVideoOverlay] Attaching LOCAL video for self-preview');
+            pub.track.attach(localVideoRef.current);
+            setHasLocalVideo(true);
+          }
+        });
+
+        // Also listen for when local track is published
+        const handleLocalTrackPublished = () => {
+          localParticipant.trackPublications.forEach((pub) => {
+            if (pub.track && pub.kind === Track.Kind.Video && localVideoRef.current) {
+              pub.track.attach(localVideoRef.current);
+              setHasLocalVideo(true);
+            }
+          });
+        };
+
+        room.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
+        
+        return () => {
+          room.off(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
+        };
+      }
+    }
+  }, [room, currentUserId, isHost, activeGuests]);
 
   // Attach video tracks from LiveKit room
   useEffect(() => {
@@ -266,7 +308,16 @@ export default function GuestVideoOverlay({
     }
   };
 
-  if (activeGuests.length === 0) return null;
+  // Show if there are remote guests OR if current user is a guest (for self-preview)
+  const hasRemoteGuests = activeGuests.filter(g => g.requesterId !== currentUserId).length > 0;
+  const shouldShow = hasRemoteGuests || isCurrentUserGuest;
+  
+  if (!shouldShow) return null;
+
+  // Get the current user's guest info for their own box
+  const selfGuestInfo = activeGuests.find(g => g.requesterId === currentUserId);
+  // Other guests (not self)
+  const otherGuests = activeGuests.filter(g => g.requesterId !== currentUserId).slice(0, isCurrentUserGuest ? 1 : 2);
 
   return (
     <div 
@@ -277,7 +328,48 @@ export default function GuestVideoOverlay({
           : { top: '50%', transform: 'translateY(-50%)' } // Desktop: vertically centered
       }
     >
-      {activeGuests.slice(0, 2).map((guest, index) => (
+      {/* Self preview for guest (local video) */}
+      {isCurrentUserGuest && selfGuestInfo && (
+        <div
+          className="relative w-28 h-40 md:w-32 md:h-44 rounded-2xl overflow-hidden shadow-2xl border-2 border-green-500/50 bg-black"
+        >
+          {/* Local Video Element */}
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted={true} // Mute self to prevent echo
+            className="absolute inset-0 w-full h-full object-cover z-10"
+            style={{ transform: 'scaleX(-1)' }} // Mirror for self-view
+          />
+
+          {/* Fallback if no video yet */}
+          {!hasLocalVideo && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-green-600 to-teal-600 z-0">
+              <p className="text-white/70 text-xs">Starting camera...</p>
+            </div>
+          )}
+
+          {/* You label */}
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 z-20">
+            <p className="text-white text-xs font-medium truncate text-center">
+              You (Guest)
+            </p>
+          </div>
+
+          {/* Leave button */}
+          <button
+            onClick={() => selfGuestInfo && handleRemoveGuest(selfGuestInfo.id, selfGuestInfo.requesterId)}
+            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/80 hover:bg-red-600 flex items-center justify-center transition-colors z-20"
+            title="Leave as Guest"
+          >
+            <X className="w-4 h-4 text-white" />
+          </button>
+        </div>
+      )}
+
+      {/* Other guests (remote video) */}
+      {otherGuests.map((guest) => (
         <div
           key={guest.id}
           className="relative w-28 h-40 md:w-32 md:h-44 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 bg-black"
