@@ -51,8 +51,10 @@ import {
 } from '@/components/ui';
 import { Textarea } from '@/components/ui/Textarea';
 import { useToast } from '@/components/ui/Toast';
+import { Modal } from '@/components/ui/Modal';
 import { useTeamContext, Surface, TeamLiveVisibility, TeamLiveRoomState } from '@/contexts/TeamContext';
 import { deleteTeamAsset, uploadTeamAsset } from '@/lib/teamAssets';
+import { uploadPostMedia } from '@/lib/storage';
 import type { PendingTeamInvite } from '@/lib/teamInvites';
 import {
   useTeam,
@@ -543,8 +545,7 @@ export default function TeamPageContent() {
         </div>
       </header>
 
-      {/* pb-40 accounts for: 68px bottom nav + ~56px DockedChatBar + safe area */}
-      <div className="mx-auto max-w-5xl px-4 pb-40 md:pb-6">
+      <div className="mx-auto max-w-5xl px-4 pb-6">
         {/* ══════════════════════════════════════════════════════════════════════
             NAVIGATION TABS
             ══════════════════════════════════════════════════════════════════════ */}
@@ -594,6 +595,7 @@ export default function TeamPageContent() {
               onSortChange={setFeedSort}
               topRange={topRange}
               onTopRangeChange={setTopRange}
+              teamId={teamId}
               teamSlug={teamSlug ?? ''}
               canPost={permissions.canPost}
               isMuted={permissions.isMuted}
@@ -633,16 +635,6 @@ export default function TeamPageContent() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════
-          DOCKED CHAT BAR (visible on all surfaces except Chat)
-          ══════════════════════════════════════════════════════════════════════ */}
-      {currentSurface !== 'chat' && (
-        <DockedChatBar
-          onOpenChat={() => setSurface('chat')}
-          priority={currentSurface === 'feed' && sortedFeed.length === 0 ? 'subtle' : 'default'}
-        />
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
           INVITE MEMBERS MODAL
           ══════════════════════════════════════════════════════════════════════ */}
       {showInviteModal && team?.slug && (
@@ -664,34 +656,6 @@ export default function TeamPageContent() {
           onDismiss={dismissPendingInvite}
         />
       )}
-    </div>
-  );
-}
-
-function DockedChatBar({ onOpenChat, priority = 'default' }: { onOpenChat: () => void; priority?: 'default' | 'subtle' }) {
-  const isSubtle = priority === 'subtle';
-
-  return (
-    <div
-      className={`fixed inset-x-0 z-40 border-t ${
-        isSubtle ? 'border-white/5 bg-black/70 backdrop-blur' : 'border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl'
-      }`}
-      style={{ bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))' }}
-    >
-      <div className="mx-auto max-w-5xl px-4 py-2">
-        <button
-          onClick={onOpenChat}
-          className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${
-            isSubtle ? 'bg-white/5 text-white/80 hover:bg-white/10' : 'bg-white/5 hover:bg-white/10'
-          }`}
-        >
-          <MessageCircle className={`h-5 w-5 ${isSubtle ? 'text-white/50' : 'text-purple-400'}`} />
-          <div className="flex-1 min-w-0">
-            <p className={`text-sm font-medium ${isSubtle ? 'text-white/80' : 'text-white'}`}>Team Chat</p>
-            <p className={`truncate text-xs ${isSubtle ? 'text-white/40' : 'text-white/50'}`}>Tap to open chat</p>
-          </div>
-        </button>
-      </div>
     </div>
   );
 }
@@ -1397,6 +1361,7 @@ function FeedScreen({
   onSortChange,
   topRange,
   onTopRangeChange,
+  teamId,
   teamSlug,
   canPost,
   isMuted,
@@ -1413,6 +1378,7 @@ function FeedScreen({
   onSortChange: (sort: FeedSort) => void;
   topRange: TopRange;
   onTopRangeChange: (range: TopRange) => void;
+  teamId: string | null;
   teamSlug: string;
   canPost: boolean;
   isMuted: boolean;
@@ -1429,6 +1395,10 @@ function FeedScreen({
     return await reactToPost(postId);
   }, [reactToPost]);
   const [postText, setPostText] = useState('');
+  const [postMediaUrl, setPostMediaUrl] = useState<string | null>(null);
+  const [postMediaFileName, setPostMediaFileName] = useState<string | null>(null);
+  const [isUploadingPostMedia, setIsUploadingPostMedia] = useState(false);
+  const postMediaInputRef = useRef<HTMLInputElement>(null);
   const [showPollCreator, setShowPollCreator] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
@@ -1437,6 +1407,129 @@ function FeedScreen({
   const deletePost = useDeletePost();
   const pinPost = usePinPost();
   const isFeedEmpty = feedItems.length === 0;
+  const supabase = useMemo(() => createClient(), []);
+
+  const [poolGiftOpen, setPoolGiftOpen] = useState(false);
+  const [poolGiftActiveCount, setPoolGiftActiveCount] = useState<number | null>(null);
+  const [poolGiftSuggestions, setPoolGiftSuggestions] = useState<number[]>([]);
+  const [poolGiftLoading, setPoolGiftLoading] = useState(false);
+  const [poolGiftSending, setPoolGiftSending] = useState(false);
+  const [poolGiftAmount, setPoolGiftAmount] = useState('');
+
+  const openPoolGift = async () => {
+    if (!teamId) {
+      toast({ title: 'Team not loaded yet', variant: 'error' });
+      return;
+    }
+    setPoolGiftOpen(true);
+    setPoolGiftLoading(true);
+    setPoolGiftActiveCount(null);
+    setPoolGiftSuggestions([]);
+    setPoolGiftAmount('');
+
+    try {
+      const { data, error } = await supabase.rpc('rpc_get_team_pool_gift_quote_24h', {
+        p_team_id: teamId,
+      });
+      if (error) throw error;
+
+      const res = data as any;
+      if (!res?.success) throw new Error(res?.error || 'Failed to load pool gift options');
+
+      const activeCount = Number(res.active_count ?? 0);
+      let suggestionsRaw: any = res.suggestions;
+      if (typeof suggestionsRaw === 'string') {
+        try {
+          suggestionsRaw = JSON.parse(suggestionsRaw);
+        } catch {
+          suggestionsRaw = [];
+        }
+      }
+      // Force client-side generation so WEB always shows base tiers × activeCount (excluding sender).
+      // Requirements:
+      // - base tiers: [10, 100, 1000, 10000]
+      // - if activeCount is 0: show no other active members (no gifting)
+      // - clamp to keep values within JS safe integer range (display + parsing).
+      const baseTiers = [10, 100, 1000, 10000] as const;
+      const maxBaseTier = baseTiers[baseTiers.length - 1];
+      const maxActiveCount = Math.floor(Number.MAX_SAFE_INTEGER / maxBaseTier);
+      const clampedActiveCount = activeCount > 0 ? Math.min(activeCount, maxActiveCount) : 0;
+      const suggestions = clampedActiveCount > 0
+        ? baseTiers.map((t) => t * clampedActiveCount)
+        : [];
+
+      console.log('[PoolGift] quote', { activeCount, suggestions });
+
+      setPoolGiftActiveCount(activeCount);
+      setPoolGiftSuggestions(suggestions);
+      if (suggestions.length > 0) {
+        setPoolGiftAmount(String(suggestions[0]));
+      } else if (activeCount > 0) {
+        setPoolGiftAmount(String(activeCount));
+      }
+    } catch (err: any) {
+      toast({ title: 'Pool gift unavailable', description: err?.message || 'Unknown error', variant: 'error' });
+      setPoolGiftOpen(false);
+    } finally {
+      setPoolGiftLoading(false);
+    }
+  };
+
+  const parsedPoolGiftAmount = useMemo(() => {
+    const n = Number(poolGiftAmount);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return null;
+    return n;
+  }, [poolGiftAmount]);
+
+  const poolGiftDivisor = poolGiftActiveCount ?? 0;
+  const poolGiftDivisible = useMemo(() => {
+    if (!parsedPoolGiftAmount) return false;
+    if (!poolGiftDivisor || poolGiftDivisor <= 0) return false;
+    return parsedPoolGiftAmount % poolGiftDivisor === 0;
+  }, [parsedPoolGiftAmount, poolGiftDivisor]);
+
+  const submitPoolGift = async () => {
+    if (!teamId) return;
+    if (!parsedPoolGiftAmount) {
+      toast({ title: 'Enter a valid amount', variant: 'error' });
+      return;
+    }
+    if (!poolGiftDivisible) {
+      toast({ title: 'Amount must be divisible', description: `Must be a multiple of ${poolGiftDivisor}`, variant: 'error' });
+      return;
+    }
+
+    try {
+      setPoolGiftSending(true);
+      const { data, error } = await supabase.rpc('rpc_send_team_pool_gift_24h', {
+        p_team_id: teamId,
+        p_diamonds_amount: parsedPoolGiftAmount,
+        p_request_id: null,
+      });
+      if (error) throw error;
+
+      const res = data as any;
+      if (!res?.success) {
+        throw new Error(res?.error || 'Pool gift failed');
+      }
+
+      if (!res.gift_id) {
+        throw new Error('Pool gift incomplete: missing gift_id');
+      }
+
+      toast({
+        title: 'Pool gift sent',
+        description: `${res.active_count} active · ${res.diamonds_amount_each} each${res.post_id ? ` · post ${String(res.post_id).slice(0, 8)}…` : ''}`,
+        variant: 'success',
+      });
+      onPostCreated?.();
+      setPoolGiftOpen(false);
+    } catch (err: any) {
+      toast({ title: 'Pool gift failed', description: err?.message || 'Unknown error', variant: 'error' });
+    } finally {
+      setPoolGiftSending(false);
+    }
+  };
   
   const handleAddPollOption = () => {
     if (pollOptions.length < 10) {
@@ -1499,9 +1592,12 @@ function FeedScreen({
   
   const handleSubmitPost = async () => {
     if (!postText.trim() || !canPost) return;
+    if (isUploadingPostMedia) return;
     try {
-      const result = await createPost.mutate({ text: postText });
+      const result = await createPost.mutate({ text: postText, mediaUrl: postMediaUrl ?? undefined });
       setPostText('');
+      setPostMediaUrl(null);
+      setPostMediaFileName(null);
       // Refetch feed to show new post immediately
       onPostCreated?.();
       toast({
@@ -1517,6 +1613,31 @@ function FeedScreen({
         description: err?.message || 'Something went wrong. Please try again.',
         variant: 'error',
       });
+    }
+  };
+
+  const handleSelectPostMedia = async (file: File) => {
+    try {
+      setIsUploadingPostMedia(true);
+      const { data: auth } = await supabase.auth.getUser();
+      const profileId = auth.user?.id;
+      if (!profileId) {
+        throw new Error('unauthorized');
+      }
+
+      const url = await uploadPostMedia(profileId, file);
+      setPostMediaUrl(url);
+      setPostMediaFileName(file.name || 'Media');
+      toast({ title: 'Media attached', variant: 'success' });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err?.message || 'Unknown error', variant: 'error' });
+      setPostMediaUrl(null);
+      setPostMediaFileName(null);
+    } finally {
+      setIsUploadingPostMedia(false);
+      if (postMediaInputRef.current) {
+        postMediaInputRef.current.value = '';
+      }
     }
   };
 
@@ -1548,12 +1669,62 @@ function FeedScreen({
                   placeholder="Share something with the team..."
                   className="min-h-[88px] w-full resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/50 focus:border-purple-400/60 focus:ring-0"
                 />
+
+                <input
+                  ref={postMediaInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  disabled={isUploadingPostMedia}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleSelectPostMedia(file);
+                  }}
+                  className="hidden"
+                />
+
+                {postMediaUrl ? (
+                  <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-white/80">
+                        {postMediaFileName ?? 'Media attached'}
+                      </div>
+                      <div className="text-[10px] text-white/45">Attached</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPostMediaUrl(null);
+                        setPostMediaFileName(null);
+                      }}
+                      className="rounded-xl border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-white/70 transition hover:border-white/25 hover:bg-white/10 hover:text-white"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
+
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex gap-2">
-                    <button className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white">
+                    <button
+                      type="button"
+                      onClick={() => postMediaInputRef.current?.click()}
+                      disabled={isUploadingPostMedia}
+                      className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
                       <span className="flex items-center gap-2">
                         <ImageIcon className="h-4 w-4" />
-                        Media
+                        {isUploadingPostMedia ? 'Uploading…' : 'Media'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void openPoolGift()}
+                      disabled={!teamId}
+                      className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/60 transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Gift className="h-4 w-4" />
+                        Pool Gift
                       </span>
                     </button>
                     <button 
@@ -1572,7 +1743,7 @@ function FeedScreen({
                       size="sm" 
                       className="rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(167,139,250,0.35)] hover:from-purple-400 hover:to-pink-400"
                       onClick={handleSubmitPost}
-                      disabled={!postText.trim() || createPost.isLoading}
+                      disabled={!postText.trim() || createPost.isLoading || isUploadingPostMedia}
                     >
                       {createPost.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Post'}
                     </Button>
@@ -1756,6 +1927,100 @@ function FeedScreen({
           ) : null}
         </div>
       )}
+
+      <Modal
+        isOpen={poolGiftOpen}
+        onClose={() => {
+          if (!poolGiftSending) setPoolGiftOpen(false);
+        }}
+        title="Pool Gift"
+        description={
+          poolGiftLoading
+            ? 'Calculating active members…'
+            : poolGiftActiveCount && poolGiftActiveCount > 0
+            ? `${poolGiftActiveCount} other active members in the last 24 hours`
+            : 'No other active members in the last 24 hours'
+        }
+        size="md"
+      >
+        {poolGiftLoading ? (
+          <div className="flex items-center justify-center py-10 text-white/60">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="ml-2 text-sm">Loading…</span>
+          </div>
+        ) : poolGiftActiveCount && poolGiftActiveCount > 0 ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Suggested</div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {poolGiftSuggestions.slice(0, 10).map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setPoolGiftAmount(String(amt))}
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                      String(amt) === poolGiftAmount
+                        ? 'border-primary/50 bg-primary/15 text-foreground ring-1 ring-primary/30'
+                        : 'border-border bg-muted/40 text-foreground hover:bg-muted/70'
+                    }`}
+                  >
+                    {amt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Custom amount</div>
+              <Input
+                value={poolGiftAmount}
+                onChange={(e) => setPoolGiftAmount(e.target.value)}
+                inputSize="lg"
+                placeholder={`Multiple of ${poolGiftActiveCount}`}
+                className="rounded-2xl border border-border bg-card text-foreground placeholder:text-muted-foreground"
+              />
+              {!poolGiftDivisible ? (
+                <div className="text-xs text-amber-600 dark:text-amber-300">
+                  Must be a multiple of {poolGiftActiveCount}
+                </div>
+              ) : (
+                <div className="text-xs text-emerald-600 dark:text-emerald-300">
+                  Valid · {poolGiftActiveCount} people will receive {poolGiftDivisor ? (parsedPoolGiftAmount ?? 0) / poolGiftDivisor : 0} each
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setPoolGiftOpen(false)}
+                disabled={poolGiftSending}
+                className="border-border text-foreground"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => void submitPoolGift()}
+                disabled={poolGiftSending || !poolGiftDivisible}
+                className="bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+              >
+                {poolGiftSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send Pool Gift'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              No other members have been active in this team within the last 24 hours.
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => setPoolGiftOpen(false)} variant="secondary">
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </>
   );
 }
@@ -1786,8 +2051,13 @@ function FeedCard({
   const [showComments, setShowComments] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [commentMediaUrl, setCommentMediaUrl] = useState<string | null>(null);
+  const [commentMediaFileName, setCommentMediaFileName] = useState<string | null>(null);
+  const [isUploadingCommentMedia, setIsUploadingCommentMedia] = useState(false);
+  const commentMediaInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const giftPickerRef = useRef<HTMLDivElement>(null);
+  const supabase = useMemo(() => createClient(), []);
   
   // Local optimistic state for reactions
   const [localIsReacted, setLocalIsReacted] = useState(item.isReacted ?? false);
@@ -1871,14 +2141,42 @@ function FeedCard({
   
   const handleSubmitComment = async () => {
     if (!commentText.trim()) return;
+    if (isUploadingCommentMedia) return;
     try {
-      await createComment(item.id, commentText.trim());
+      await createComment(item.id, commentText.trim(), undefined, commentMediaUrl);
       setCommentText('');
+      setCommentMediaUrl(null);
+      setCommentMediaFileName(null);
       refetchComments();
       onRefresh?.(); // Refresh to update comment count
       toast({ title: 'Comment added' });
     } catch (err: any) {
       toast({ title: 'Failed to add comment', description: err?.message, variant: 'error' });
+    }
+  };
+
+  const handleSelectCommentMedia = async (file: File) => {
+    try {
+      setIsUploadingCommentMedia(true);
+      const { data: auth } = await supabase.auth.getUser();
+      const profileId = auth.user?.id;
+      if (!profileId) {
+        throw new Error('unauthorized');
+      }
+
+      const url = await uploadPostMedia(profileId, file);
+      setCommentMediaUrl(url);
+      setCommentMediaFileName(file.name || 'Media');
+      toast({ title: 'Media attached', variant: 'success' });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err?.message || 'Unknown error', variant: 'error' });
+      setCommentMediaUrl(null);
+      setCommentMediaFileName(null);
+    } finally {
+      setIsUploadingCommentMedia(false);
+      if (commentMediaInputRef.current) {
+        commentMediaInputRef.current.value = '';
+      }
     }
   };
   
@@ -2085,6 +2383,26 @@ function FeedCard({
               {/* Comment Composer */}
               <div className="flex gap-2 mb-3">
                 <input
+                  ref={commentMediaInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  disabled={isUploadingCommentMedia}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleSelectCommentMedia(file);
+                  }}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => commentMediaInputRef.current?.click()}
+                  disabled={isUploadingCommentMedia}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/70 transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Attach media"
+                >
+                  <ImageIcon className="h-4 w-4" />
+                </button>
+                <input
                   type="text"
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
@@ -2094,12 +2412,33 @@ function FeedCard({
                 />
                 <button
                   onClick={handleSubmitComment}
-                  disabled={!commentText.trim() || isCreatingComment}
+                  disabled={!commentText.trim() || isCreatingComment || isUploadingCommentMedia}
                   className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50"
                 >
                   {isCreatingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                 </button>
               </div>
+
+              {commentMediaUrl ? (
+                <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold text-white/80">
+                      {commentMediaFileName ?? 'Media attached'}
+                    </div>
+                    <div className="text-[10px] text-white/45">Attached</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCommentMediaUrl(null);
+                      setCommentMediaFileName(null);
+                    }}
+                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-white/70 transition hover:border-white/25 hover:bg-white/10 hover:text-white"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : null}
               
               {/* Comments List */}
               {commentsLoading ? (
@@ -2170,6 +2509,11 @@ function CommentRow({
           <span className="text-[10px] text-white/40">{formatTime(comment.createdAt)}</span>
         </div>
         <p className="text-sm text-white/80 mt-0.5">{comment.textContent}</p>
+        {comment.mediaUrl ? (
+          <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+            <Image src={comment.mediaUrl} alt="" width={520} height={320} className="w-full object-cover" />
+          </div>
+        ) : null}
         <div className="mt-1 flex items-center gap-3">
           <button className="text-[10px] text-white/40 hover:text-white">Like</button>
           <button className="text-[10px] text-white/40 hover:text-white">Reply</button>
@@ -2208,10 +2552,12 @@ type PendingMessage = {
   id: string;
   text: string;
   createdAt: number;
+  mediaUrl?: string | null;
   serverId?: string | null;
 };
 
 function ChatScreen({ teamId, members, canChat }: { teamId: string | null; members: TeamMember[]; canChat: boolean }) {
+  const { toast } = useToast();
   const { membership } = useTeamContext();
   // #region agent log
   fetch('http://127.0.0.1:7242/ingest/3509c317-d888-4424-833f-1b9a779736e0',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TeamPageContent.tsx:1546',message:'ChatScreen MOUNT',data:{teamId,hasMembership:!!membership},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H5'})}).catch(()=>{});
@@ -2223,8 +2569,13 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
   const { mutate: sendMessage, isLoading: isSending } = useSendChatMessage(teamId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [inputText, setInputText] = useState('');
+  const [chatMediaUrl, setChatMediaUrl] = useState<string | null>(null);
+  const [chatMediaFileName, setChatMediaFileName] = useState<string | null>(null);
+  const [isUploadingChatMedia, setIsUploadingChatMedia] = useState(false);
+  const chatMediaInputRef = useRef<HTMLInputElement>(null);
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+  const supabase = useMemo(() => createClient(), []);
 
   const viewerProfileId = membership?.profileId ?? null;
 
@@ -2257,6 +2608,7 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
       id: pending.id,
       author: fallbackMember,
       text: pending.text,
+      mediaUrl: pending.mediaUrl ?? null,
       timestamp: pending.createdAt,
       reactions: [],
       isSystem: false,
@@ -2302,15 +2654,18 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
 
   const handleSend = async () => {
     if (!inputText.trim() || !canChat || isSending) return;
+    if (isUploadingChatMedia) return;
 
     const text = inputText.trim();
     const optimisticId = `pending-${Date.now()}`;
     setInputText('');
     setIsPinnedToBottom(true);
-    setPendingMessages((prev) => [...prev, { id: optimisticId, text, createdAt: Date.now() }]);
+    setPendingMessages((prev) => [...prev, { id: optimisticId, text, createdAt: Date.now(), mediaUrl: chatMediaUrl }]);
+    setChatMediaUrl(null);
+    setChatMediaFileName(null);
 
     try {
-      const result = await sendMessage({ content: text });
+      const result = await sendMessage({ content: text, mediaUrl: chatMediaUrl });
       const serverId = result?.message_id ? String(result.message_id) : null;
       if (serverId) {
         setPendingMessages((prev) =>
@@ -2324,6 +2679,31 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
       setPendingMessages((prev) => prev.filter((msg) => msg.id !== optimisticId));
       setInputText(text);
       console.error('Failed to send message:', err);
+    }
+  };
+
+  const handleSelectChatMedia = async (file: File) => {
+    try {
+      setIsUploadingChatMedia(true);
+      const { data: auth } = await supabase.auth.getUser();
+      const profileId = auth.user?.id;
+      if (!profileId) {
+        throw new Error('unauthorized');
+      }
+
+      const url = await uploadPostMedia(profileId, file);
+      setChatMediaUrl(url);
+      setChatMediaFileName(file.name || 'Media');
+      toast({ title: 'Media attached', variant: 'success' });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err?.message || 'Unknown error', variant: 'error' });
+      setChatMediaUrl(null);
+      setChatMediaFileName(null);
+    } finally {
+      setIsUploadingChatMedia(false);
+      if (chatMediaInputRef.current) {
+        chatMediaInputRef.current.value = '';
+      }
     }
   };
 
@@ -2378,19 +2758,61 @@ function ChatScreen({ teamId, members, canChat }: { teamId: string | null; membe
 
       {/* Composer - fixed at bottom, doesn't scroll */}
       <div className="mt-2 shrink-0 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur chat-bottom-safe">
+        <input
+          ref={chatMediaInputRef}
+          type="file"
+          accept="image/*,video/*"
+          disabled={isUploadingChatMedia}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void handleSelectChatMedia(file);
+          }}
+          className="hidden"
+        />
+
+        {chatMediaUrl ? (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+            <div className="min-w-0">
+              <div className="truncate text-xs font-semibold text-white/80">
+                {chatMediaFileName ?? 'Media attached'}
+              </div>
+              <div className="text-[10px] text-white/45">Attached</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setChatMediaUrl(null);
+                setChatMediaFileName(null);
+              }}
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-semibold text-white/70 transition hover:border-white/25 hover:bg-white/10 hover:text-white"
+            >
+              Remove
+            </button>
+          </div>
+        ) : null}
+
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => chatMediaInputRef.current?.click()}
+            disabled={!canChat || isSending || isUploadingChatMedia}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/70 transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Attach media"
+          >
+            <ImageIcon className="h-4 w-4" />
+          </button>
           <Input
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={canChat ? 'Say hi 👋' : 'You cannot chat in this team'}
-            disabled={!canChat || isSending}
+            disabled={!canChat || isSending || isUploadingChatMedia}
             className="flex-1 border-0 bg-transparent text-white placeholder:text-white/40 focus:ring-0"
           />
           <Button
             size="sm"
             className="bg-purple-500 hover:bg-purple-600"
-            disabled={!canChat || !inputText.trim() || isSending}
+            disabled={!canChat || !inputText.trim() || isSending || isUploadingChatMedia}
             onClick={handleSend}
           >
             {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -2429,6 +2851,11 @@ function ChatMessageRow({ message }: { message: ChatMessage & { _isPending?: boo
           <span className="text-[10px] text-white/40">{formatTime(message.timestamp)}</span>
         </div>
         <p className="text-sm text-white/80 mt-0.5">{message.text}</p>
+        {message.mediaUrl ? (
+          <div className="mt-2 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+            <Image src={message.mediaUrl} alt="" width={520} height={320} className="w-full object-cover" />
+          </div>
+        ) : null}
         {message.reactions && message.reactions.length > 0 && (
           <div className="mt-1 flex gap-1">
             {message.reactions.map((r, i) => (

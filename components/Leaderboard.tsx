@@ -56,7 +56,8 @@ export default function Leaderboard({ roomSlug, roomName }: LeaderboardProps = {
       }, 1000); // Wait 1 second before reloading (debounce)
     };
 
-    const entryTypeFilter = type === 'top_streamers' ? 'entry_type=eq.diamond_earn' : 'entry_type=eq.coin_spend_gift';
+    // Use prefix matching to catch both regular and pool gifts (e.g. coin_spend_gift AND coin_spend_team_pool_gift)
+    const entryTypeFilter = type === 'top_streamers' ? 'entry_type=like.diamond_earn%' : 'entry_type=like.coin_spend%';
 
     const ledgerChannel = supabase
       .channel('leaderboard-ledger-updates')

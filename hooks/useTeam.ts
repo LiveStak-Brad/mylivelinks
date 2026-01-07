@@ -53,6 +53,7 @@ export interface PostComment {
   authorDisplayName: string | null;
   authorAvatarUrl: string | null;
   textContent: string;
+  mediaUrl?: string | null;
   parentCommentId: string | null;
   createdAt: number;
   giftCount: number;
@@ -64,6 +65,7 @@ export interface ChatMessage {
   id: string;
   author: TeamMember;
   text: string;
+  mediaUrl?: string | null;
   timestamp: number;
   reactions?: { emoji: string; count: number }[];
   isSystem?: boolean;
@@ -428,6 +430,12 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
           };
 
           const isPinned = !!r.is_pinned;
+          const rawText = String(r.text_content ?? '');
+          const announcementParts = isPinned ? rawText.split(/\n\n+/) : null;
+          const announcementTitle = isPinned ? String(announcementParts?.[0] ?? '').trim() : undefined;
+          const announcementBody = isPinned
+            ? String((announcementParts ?? []).slice(1).join('\n\n')).trim()
+            : rawText;
           const hotScore = Math.round((upvotes * 2 + comments * 3) / Math.max(1, (Date.now() - createdAtMs) / 36e5));
 
           return {
@@ -435,7 +443,8 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
             authorId: String(r.author_id),
             type: r.is_poll ? 'poll' : (isPinned ? 'announcement' : 'post'),
             author,
-            body: String(r.text_content ?? ''),
+            title: isPinned && announcementTitle ? announcementTitle : undefined,
+            body: announcementBody,
             media: r.media_url ? String(r.media_url) : undefined,
             createdAt: createdAtMs,
             hotScore,
@@ -501,6 +510,12 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
           const upvotes = Number(r.reaction_count ?? 0);
           const comments = Number(r.comment_count ?? 0);
           const isPinned = !!r.is_pinned;
+          const rawText = String(r.text_content ?? '');
+          const announcementParts = isPinned ? rawText.split(/\n\n+/) : null;
+          const announcementTitle = isPinned ? String(announcementParts?.[0] ?? '').trim() : undefined;
+          const announcementBody = isPinned
+            ? String((announcementParts ?? []).slice(1).join('\n\n')).trim()
+            : rawText;
           const hotScore = Math.round((upvotes * 2 + comments * 3) / Math.max(1, (Date.now() - createdAtMs) / 36e5));
           const author: TeamMember = {
             id: String(r.author_id),
@@ -515,7 +530,8 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
             authorId: String(r.author_id),
             type: r.is_poll ? 'poll' : (isPinned ? 'announcement' : 'post'),
             author,
-            body: String(r.text_content ?? ''),
+            title: isPinned && announcementTitle ? announcementTitle : undefined,
+            body: announcementBody,
             media: r.media_url ? String(r.media_url) : undefined,
             createdAt: createdAtMs,
             hotScore,
@@ -861,6 +877,7 @@ export function useTeamChat(teamId: string | null) {
             team_id,
             author_id,
             content,
+            media_url,
             is_system,
             is_deleted,
             created_at,
@@ -888,6 +905,7 @@ export function useTeamChat(teamId: string | null) {
             activity: 'offline' as MemberActivity,
           },
           text: m.is_deleted ? '[Message deleted]' : m.content,
+          mediaUrl: m.media_url ? String(m.media_url) : null,
           timestamp: new Date(m.created_at).getTime(),
           reactions: [],  // Can add later if needed
           isSystem: m.is_system,
@@ -947,6 +965,7 @@ export function useTeamChat(teamId: string | null) {
               activity: 'offline',
             },
             text: newMsg.content,
+            mediaUrl: newMsg.media_url ? String(newMsg.media_url) : null,
             timestamp: new Date(newMsg.created_at).getTime(),
             reactions: [],
             isSystem: newMsg.is_system,
@@ -976,7 +995,7 @@ export function useSendChatMessage(teamId: string | null) {
   const [error, setError] = useState<Error | null>(null);
 
   const mutate = useCallback(
-    async ({ content, replyToId }: { content: string; replyToId?: string }) => {
+    async ({ content, replyToId, mediaUrl }: { content: string; replyToId?: string; mediaUrl?: string | null }) => {
       if (!teamId) throw new Error('No team ID');
 
       setIsLoading(true);
@@ -987,6 +1006,7 @@ export function useSendChatMessage(teamId: string | null) {
           p_team_id: teamId,
           p_content: content,
           p_reply_to_id: replyToId || null,
+          p_media_url: mediaUrl ?? null,
         });
 
         if (rpcError) throw rpcError;
@@ -1399,6 +1419,7 @@ export function usePostComments(postId: string | null) {
         authorDisplayName: c.author_display_name ? String(c.author_display_name) : null,
         authorAvatarUrl: c.author_avatar_url ? String(c.author_avatar_url) : null,
         textContent: String(c.text_content ?? ''),
+        mediaUrl: c.media_url ? String(c.media_url) : null,
         parentCommentId: c.parent_comment_id ? String(c.parent_comment_id) : null,
         createdAt: new Date(c.created_at).getTime(),
         giftCount: Number(c.gift_count ?? 0),
@@ -1425,7 +1446,7 @@ export function useCreateComment() {
   const [error, setError] = useState<Error | null>(null);
 
   const createComment = useCallback(
-    async (postId: string, textContent: string, parentCommentId?: string) => {
+    async (postId: string, textContent: string, parentCommentId?: string, mediaUrl?: string | null) => {
       setIsLoading(true);
       setError(null);
 
@@ -1434,6 +1455,7 @@ export function useCreateComment() {
           p_post_id: postId,
           p_text_content: textContent,
           p_parent_comment_id: parentCommentId ?? null,
+          p_media_url: mediaUrl ?? null,
         });
 
         if (rpcError) throw rpcError;
