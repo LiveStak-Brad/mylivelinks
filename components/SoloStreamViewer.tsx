@@ -1063,12 +1063,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       setGuestStatus('Getting token...');
       
       // Get a new token with canPublish: true
+      // Use LIVEKIT_ROOM_NAME (live_central) - same room everyone connects to
       const tokenRes = await fetch(TOKEN_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          roomName: `solo_${streamer?.username || username}`,
+          roomName: LIVEKIT_ROOM_NAME,  // Must use the same room everyone is in
           participantName: `guest_${currentUserId}`,
           canPublish: true,  // GUEST MODE - can publish
           canSubscribe: true,
