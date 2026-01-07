@@ -145,10 +145,10 @@ function AppNavigation() {
             <Stack.Screen name="CreateProfile" getComponent={() => require('./screens/CreateProfileScreen').CreateProfileScreen} />
             <Stack.Screen name="SafetyPolicies" getComponent={() => require('./screens/SafetyPoliciesScreen').SafetyPoliciesScreen} />
             <Stack.Screen name="PolicyDetail" getComponent={() => require('./screens/PolicyDetailScreen').PolicyDetailScreen} />
-            <Stack.Screen name="Rooms" getComponent={() => require('./screens/LiveTVScreen').LiveTVScreen} />
+            <Stack.Screen name="Rooms" getComponent={() => require('./screens/LiveTVScreen').default} />
             <Stack.Screen name="MainTabs" getComponent={() => require('./navigation/MainTabs').default} />
             <Stack.Screen name="SoloStreamViewer" getComponent={() => require('./screens/SoloStreamViewerScreen').SoloStreamViewerScreen} />
-            <Stack.Screen name="SoloHostStream" getComponent={() => require('./screens/SoloHostStreamScreen').SoloHostStreamScreen} />
+            <Stack.Screen name="SoloHostStream" getComponent={() => require('./screens/SoloHostStreamScreen').default} />
             <Stack.Screen name="Wallet" getComponent={() => require('./screens/WalletScreen').WalletScreen} />
             <Stack.Screen name="Transactions" getComponent={() => require('./screens/TransactionsScreen').TransactionsScreen} />
             <Stack.Screen name="MyAnalytics" getComponent={() => require('./screens/MyAnalyticsScreen').MyAnalyticsScreen} />

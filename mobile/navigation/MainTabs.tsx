@@ -106,7 +106,7 @@ export default function MainTabs() {
       <Tab.Screen
         name="GoLive"
         // Lazy-load live host screen so LiveKit modules never evaluate during normal boot.
-        getComponent={() => require('../screens/SoloHostStreamScreen').SoloHostStreamScreen}
+        getComponent={() => require('../screens/SoloHostStreamScreen').default}
         listeners={{
           tabPress: (e) => {
             if (isOwner) return;

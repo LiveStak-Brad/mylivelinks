@@ -32,7 +32,6 @@ import { useChatMessages } from '../hooks/useChatMessages';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
-import { Tile } from '../components/live/Tile';
 import type { Participant } from '../types/live';
 import { canUserGoLive } from '../lib/livekit-constants';
 import { Modal, Input } from '../components/ui';
@@ -52,7 +51,7 @@ type LeaderboardRank = {
   next_rank: number;
 };
 
-export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
+export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
   useKeepAwake();
   
   const insets = useSafeAreaInsets();
@@ -61,6 +60,8 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
   const { height: windowHeight } = useWindowDimensions();
 
   const isOwner = useMemo(() => canUserGoLive(user ? { id: user.id, email: user.email } : null), [user?.email, user?.id]);
+  const [TileComponent, setTileComponent] = useState<null | React.ComponentType<any>>(null);
+  const [tileLoadError, setTileLoadError] = useState<string | null>(null);
   
   const [currentUser, setCurrentUser] = useState<{ id: string; username: string; display_name?: string | null; avatar_url?: string | null } | null>(null);
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
@@ -111,6 +112,31 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
     fallbackCount: fallbackViewerCount,
   });
   const displayViewerCount = liveStreamId ? viewerCount : fallbackViewerCount;
+
+  // Lazy-load Tile so @livekit/react-native is never evaluated during normal boot.
+  // If this fails (e.g. native module/class init issue), render a safe placeholder UI instead of crashing.
+  useEffect(() => {
+    if (!isOwner) return;
+    if (TileComponent) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setTileLoadError(null);
+        const mod = await import('../components/live/Tile');
+        const Comp = (mod as any)?.Tile;
+        if (!Comp) throw new Error('Tile export missing');
+        if (!cancelled) setTileComponent(() => Comp);
+      } catch (e: any) {
+        const msg = e?.message ? String(e.message) : String(e);
+        if (!cancelled) setTileLoadError(msg);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [TileComponent, isOwner]);
 
   // Load current user
   useEffect(() => {
@@ -488,13 +514,26 @@ export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.videoStage}>
         <View style={styles.videoStageInner}>
-          <Tile
-            item={{ id: tileParticipant.identity, participant: tileParticipant, isAutofill: false }}
-            isEditMode={false}
-            isFocused={false}
-            isMinimized={false}
-            room={room as any}
-          />
+          {TileComponent ? (
+            <TileComponent
+              item={{ id: tileParticipant.identity, participant: tileParticipant, isAutofill: false }}
+              isEditMode={false}
+              isFocused={false}
+              isMinimized={false}
+              room={room as any}
+            />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
+                {tileLoadError ? 'Live video unavailable' : 'Loading video…'}
+              </Text>
+              {tileLoadError ? (
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600', paddingHorizontal: 18, textAlign: 'center' }}>
+                  {tileLoadError}
+                </Text>
+              ) : null}
+            </View>
+          )}
         </View>
 
         <View pointerEvents="none" style={styles.videoTopShade} />
