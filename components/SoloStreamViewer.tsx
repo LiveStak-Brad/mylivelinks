@@ -1438,8 +1438,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             <div className="absolute top-0 left-0 right-0 h-28 bg-gradient-to-b from-black via-black/70 to-transparent z-[15] pointer-events-none" />
             <div className="absolute bottom-0 left-0 right-0 h-56 bg-gradient-to-t from-black via-black/90 to-transparent z-[15] pointer-events-none" />
             
-            {/* Viewers count - Top center on desktop, slightly right on mobile (with safe area support on mobile) */}
-            <div className="absolute z-50 lg:top-4 lg:left-1/2 lg:-translate-x-1/2 left-[55%] -translate-x-1/2" style={{ top: 'max(1rem, env(safe-area-inset-top))' }}>
+            {/* Viewers count - Top center on desktop, closer to right on mobile (with safe area support on mobile) */}
+            <div className="absolute z-50 lg:top-4 lg:left-1/2 lg:-translate-x-1/2 left-[65%] -translate-x-1/2" style={{ top: 'max(1rem, env(safe-area-inset-top))' }}>
               <button
                 onClick={() => {
                   console.log('[ViewerButton] Clicked! Opening viewers modal');
