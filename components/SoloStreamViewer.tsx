@@ -190,6 +190,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [showRequestGuest, setShowRequestGuest] = useState(false);
   const [recommendedStreams, setRecommendedStreams] = useState<RecommendedStream[]>([]);
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
+  
+  // Guest publishing state
+  const [isAcceptedGuest, setIsAcceptedGuest] = useState(false);
+  const [isPublishingAsGuest, setIsPublishingAsGuest] = useState(false);
+  const guestRequestIdRef = useRef<number | null>(null);
   const [streamEnded, setStreamEnded] = useState(false);
   const [countdown, setCountdown] = useState(5);
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
@@ -953,6 +958,145 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
     return () => clearInterval(interval);
   }, [streamEnded, router]);
+
+  // ============================================================================
+  // GUEST PUBLISHING: Monitor guest status and start publishing when accepted
+  // ============================================================================
+  useEffect(() => {
+    if (!streamer?.live_stream_id || !currentUserId || currentUserId === streamer.profile_id) return;
+
+    // Subscribe to guest request status changes for this user
+    const guestChannel = supabase
+      .channel(`guest-status-${currentUserId}-${streamer.live_stream_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'guest_requests',
+          filter: `requester_id=eq.${currentUserId}`,
+        },
+        async (payload) => {
+          const record = (payload.new || payload.old) as any;
+          if (!record || record.live_stream_id !== streamer.live_stream_id) return;
+
+          console.log('[SoloStreamViewer] Guest status update:', payload.eventType, record.status);
+
+          if (payload.eventType === 'UPDATE' && record.status === 'accepted') {
+            setIsAcceptedGuest(true);
+            guestRequestIdRef.current = record.id;
+            
+            // Start publishing as guest
+            await startGuestPublishing();
+          } else if (payload.eventType === 'DELETE' || record.status === 'cancelled' || record.status === 'declined') {
+            // Guest session ended
+            setIsAcceptedGuest(false);
+            guestRequestIdRef.current = null;
+            await stopGuestPublishing();
+          }
+        }
+      )
+      .subscribe();
+
+    // Check if already an accepted guest on load
+    const checkExistingGuest = async () => {
+      const { data } = await supabase
+        .from('guest_requests')
+        .select('id, status')
+        .eq('live_stream_id', streamer.live_stream_id)
+        .eq('requester_id', currentUserId)
+        .eq('status', 'accepted')
+        .maybeSingle();
+
+      if (data) {
+        console.log('[SoloStreamViewer] Already accepted as guest, starting publishing');
+        setIsAcceptedGuest(true);
+        guestRequestIdRef.current = data.id;
+        await startGuestPublishing();
+      }
+    };
+
+    checkExistingGuest();
+
+    return () => {
+      guestChannel.unsubscribe();
+    };
+  }, [streamer?.live_stream_id, streamer?.profile_id, currentUserId, supabase]);
+
+  // Start publishing camera/mic as guest
+  const startGuestPublishing = useCallback(async () => {
+    if (!roomRef.current || isPublishingAsGuest) return;
+
+    try {
+      console.log('[SoloStreamViewer] Starting guest publishing...');
+      
+      // Get a new token with canPublish: true
+      const tokenRes = await fetch(TOKEN_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          roomName: `solo_${streamer?.username || username}`,
+          participantName: `guest_${currentUserId}`,
+          canPublish: true,  // GUEST MODE - can publish
+          canSubscribe: true,
+          deviceType: 'web',
+          role: 'guest',
+        }),
+      });
+
+      if (!tokenRes.ok) {
+        console.error('[SoloStreamViewer] Failed to get guest token');
+        return;
+      }
+
+      const { token, url } = await tokenRes.json();
+
+      // Disconnect current room and reconnect with new permissions
+      const room = roomRef.current;
+      if (room.state === 'connected') {
+        console.log('[SoloStreamViewer] Reconnecting with guest permissions...');
+        await room.disconnect();
+        await room.connect(url, token);
+      }
+
+      // Enable camera and microphone
+      await room.localParticipant.setCameraEnabled(true);
+      await room.localParticipant.setMicrophoneEnabled(true);
+
+      setIsPublishingAsGuest(true);
+      console.log('[SoloStreamViewer] Guest publishing started successfully');
+    } catch (err) {
+      console.error('[SoloStreamViewer] Error starting guest publishing:', err);
+    }
+  }, [isPublishingAsGuest, streamer?.username, username, currentUserId]);
+
+  // Stop publishing as guest
+  const stopGuestPublishing = useCallback(async () => {
+    if (!roomRef.current || !isPublishingAsGuest) return;
+
+    try {
+      console.log('[SoloStreamViewer] Stopping guest publishing...');
+      const room = roomRef.current;
+
+      // Disable camera and microphone
+      await room.localParticipant.setCameraEnabled(false);
+      await room.localParticipant.setMicrophoneEnabled(false);
+
+      // Unpublish all tracks
+      room.localParticipant.trackPublications.forEach((pub) => {
+        if (pub.track) {
+          room.localParticipant.unpublishTrack(pub.track);
+        }
+      });
+
+      setIsPublishingAsGuest(false);
+      setIsAcceptedGuest(false);
+      console.log('[SoloStreamViewer] Guest publishing stopped');
+    } catch (err) {
+      console.error('[SoloStreamViewer] Error stopping guest publishing:', err);
+    }
+  }, [isPublishingAsGuest]);
 
   // Load recommended streams
   useEffect(() => {
