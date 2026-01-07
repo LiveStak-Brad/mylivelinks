@@ -73,6 +73,7 @@ export default function GuestVideoOverlay({
           `)
           .eq('live_stream_id', liveStreamId)
           .eq('status', 'accepted')
+          .order('created_at', { ascending: true })
           .limit(2);
 
         if (error) {
@@ -184,19 +185,42 @@ export default function GuestVideoOverlay({
   const handleRemoveGuest = async (guestId: number, guestRequesterId: string) => {
     const isLeavingAsGuest = currentUserId === guestRequesterId;
     
+    console.log('[GuestVideoOverlay] handleRemoveGuest called:', { guestId, guestRequesterId, isHost, isLeavingAsGuest, currentUserId });
+    
     // Only host or the guest themselves can remove
-    if (!isHost && !isLeavingAsGuest) return;
+    if (!isHost && !isLeavingAsGuest) {
+      console.log('[GuestVideoOverlay] Not authorized to remove guest');
+      return;
+    }
 
     try {
       // DELETE the record so they can request again cleanly
-      const { error } = await supabase
+      console.log('[GuestVideoOverlay] Attempting to delete guest request:', guestId);
+      const { error, count } = await supabase
         .from('guest_requests')
         .delete()
-        .eq('id', guestId);
+        .eq('id', guestId)
+        .select();
+
+      console.log('[GuestVideoOverlay] Delete result:', { error, count });
 
       if (error) {
         console.error('[GuestVideoOverlay] Error removing guest:', error);
+        // Try update as fallback if delete fails due to RLS
+        console.log('[GuestVideoOverlay] Trying update to cancelled as fallback...');
+        const { error: updateError } = await supabase
+          .from('guest_requests')
+          .update({ status: 'cancelled' })
+          .eq('id', guestId);
+        
+        if (updateError) {
+          console.error('[GuestVideoOverlay] Update fallback also failed:', updateError);
+        } else {
+          console.log('[GuestVideoOverlay] Update fallback succeeded');
+          setActiveGuests((prev) => prev.filter((g) => g.id !== guestId));
+        }
       } else {
+        console.log('[GuestVideoOverlay] Delete succeeded');
         setActiveGuests((prev) => prev.filter((g) => g.id !== guestId));
         
         // If this guest is leaving, call the callback to stop publishing
