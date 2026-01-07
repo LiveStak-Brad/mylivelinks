@@ -963,7 +963,17 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   // GUEST PUBLISHING: Monitor guest status and start publishing when accepted
   // ============================================================================
   useEffect(() => {
-    if (!streamer?.live_stream_id || !currentUserId || currentUserId === streamer.profile_id) return;
+    console.log('[SoloStreamViewer] Guest effect check:', { 
+      liveStreamId: streamer?.live_stream_id, 
+      currentUserId, 
+      hostId: streamer?.profile_id,
+      isHost: currentUserId === streamer?.profile_id
+    });
+    
+    if (!streamer?.live_stream_id || !currentUserId || currentUserId === streamer.profile_id) {
+      console.log('[SoloStreamViewer] Guest effect skipped - missing data or is host');
+      return;
+    }
 
     // Subscribe to guest request status changes for this user
     const guestChannel = supabase

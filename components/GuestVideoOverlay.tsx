@@ -55,7 +55,11 @@ export default function GuestVideoOverlay({
 
   // Load accepted guests from database
   useEffect(() => {
-    if (!liveStreamId) return;
+    console.log('[GuestVideoOverlay] Effect running, liveStreamId:', liveStreamId);
+    if (!liveStreamId) {
+      console.log('[GuestVideoOverlay] No liveStreamId, skipping');
+      return;
+    }
 
     const loadAcceptedGuests = async () => {
       try {
