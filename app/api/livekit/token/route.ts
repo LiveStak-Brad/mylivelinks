@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
       }
 
       const wantsPublish = canPublish === true || body?.role === 'publisher';
+      const isGuestRole = body?.role === 'guest';
       
       // Check if this is a "main" room (live_central, live-central, or similar)
       const isMainRoom = !roomName || 
@@ -272,8 +273,32 @@ export async function POST(request: NextRequest) {
         return false;
       });
       
-      // For launch: publish is granted only when explicitly requested AND admin-gated.
-      const effectiveCanPublish = wantsPublish && canGoLive;
+      // Check if user is an accepted guest (can publish even if not on go-live list)
+      let isAcceptedGuest = false;
+      if (isGuestRole && wantsPublish) {
+        try {
+          const adminClient = getSupabaseAdmin();
+          const { data: guestRequest } = await adminClient
+            .from('guest_requests')
+            .select('id, status')
+            .eq('requester_id', user.id)
+            .eq('status', 'accepted')
+            .limit(1)
+            .maybeSingle();
+          
+          if (guestRequest) {
+            isAcceptedGuest = true;
+            console.log('[LIVEKIT_TOKEN] User is an accepted guest, allowing publish', { userId: user.id });
+          }
+        } catch (err) {
+          console.log('[LIVEKIT_TOKEN] Error checking guest status:', err);
+        }
+      }
+
+      // For launch: publish is granted when:
+      // 1. Explicitly requested AND admin-gated (regular streamers), OR
+      // 2. User is an accepted guest
+      const effectiveCanPublish = (wantsPublish && canGoLive) || isAcceptedGuest;
 
       if (wantsPublish && !effectiveCanPublish) {
         console.log('[LIVEKIT_TOKEN] publish_denied', { reqId, userId: user.id, roomName, isMainRoom, canGoLive });
