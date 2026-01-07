@@ -4,14 +4,13 @@ import {
   getLinklerModelSettings,
   __resetLinklerPromptCacheForTests,
 } from './prompt';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
 jest.mock('@/lib/supabase-admin', () => {
   return {
     getSupabaseAdmin: jest.fn(),
   };
 });
-
-const { getSupabaseAdmin } = require('@/lib/supabase-admin');
 
 function mockSupabaseWithResponse(response: { data: any; error: any }) {
   const queryBuilder = {

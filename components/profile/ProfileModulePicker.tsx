@@ -203,15 +203,15 @@ export default function ProfileModulePicker({
       {enabledList.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {enabledList.map((moduleId) => {
-            const module = OPTIONAL_MODULES[moduleId];
-            if (!module) return null;
+            const moduleMeta = OPTIONAL_MODULES[moduleId];
+            if (!moduleMeta) return null;
             return (
               <div
                 key={moduleId}
                 className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-full text-sm"
               >
                 <span className="text-blue-900 dark:text-blue-100 font-medium">
-                  {module.label}
+                  {moduleMeta.label}
                 </span>
                 <button
                   onClick={() => removeModule(moduleId)}
@@ -269,8 +269,8 @@ export default function ProfileModulePicker({
                     </h4>
                     <div className="space-y-2">
                       {categoryModules.map((moduleId) => {
-                        const module = OPTIONAL_MODULES[moduleId];
-                        if (!module) return null;
+                        const moduleMeta = OPTIONAL_MODULES[moduleId];
+                        if (!moduleMeta) return null;
                         const isEnabled = enabledModules.has(moduleId);
 
                         return (
@@ -286,10 +286,10 @@ export default function ProfileModulePicker({
                             />
                             <div className="flex-1">
                               <div className="font-medium text-gray-900 dark:text-white">
-                                {module.label}
+                                {moduleMeta.label}
                               </div>
                               <div className="text-sm text-gray-600 dark:text-gray-400">
-                                {module.description}
+                                {moduleMeta.description}
                               </div>
                             </div>
                           </label>
