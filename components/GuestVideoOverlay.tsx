@@ -132,9 +132,12 @@ export default function GuestVideoOverlay({
     const attachGuestTracks = () => {
       activeGuests.forEach((guest) => {
         // Find participant by identity matching guest's user ID
+        // Guests connect with identity like "guest_<userId>" or "u_<userId>:..."
         const participant = Array.from(room.remoteParticipants.values()).find(
-          (p) => p.identity.includes(guest.requesterId)
+          (p) => p.identity.includes(guest.requesterId) || p.identity === `guest_${guest.requesterId}`
         );
+        
+        console.log('[GuestVideoOverlay] Looking for participant:', guest.requesterId, 'Found:', participant?.identity);
 
         if (participant) {
           participant.trackPublications.forEach((publication) => {
@@ -159,8 +162,10 @@ export default function GuestVideoOverlay({
       participant: RemoteParticipant
     ) => {
       const guest = activeGuests.find((g) =>
-        participant.identity.includes(g.requesterId)
+        participant.identity.includes(g.requesterId) || participant.identity === `guest_${g.requesterId}`
       );
+      
+      console.log('[GuestVideoOverlay] Track subscribed:', participant.identity, track.kind, 'Guest match:', !!guest);
       if (guest) {
         const videoEl = videoRefs.current[guest.requesterId];
         if (track.kind === Track.Kind.Video && videoEl) {
