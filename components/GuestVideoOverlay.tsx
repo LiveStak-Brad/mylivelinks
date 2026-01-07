@@ -42,6 +42,7 @@ export default function GuestVideoOverlay({
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
   const [showVolumeSlider, setShowVolumeSlider] = useState<string | null>(null); // Track which guest's slider is open
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [guestsWithVideo, setGuestsWithVideo] = useState<Set<string>>(new Set()); // Track which guests have video attached
 
   // Track window width for responsive positioning
   useEffect(() => {
@@ -127,7 +128,18 @@ export default function GuestVideoOverlay({
 
   // Attach video tracks from LiveKit room
   useEffect(() => {
-    if (!room || activeGuests.length === 0) return;
+    if (!room || activeGuests.length === 0) {
+      console.log('[GuestVideoOverlay] No room or no guests:', { hasRoom: !!room, guestCount: activeGuests.length });
+      return;
+    }
+
+    // Log all participants for debugging
+    console.log('[GuestVideoOverlay] All remote participants:', 
+      Array.from(room.remoteParticipants.values()).map(p => ({
+        identity: p.identity,
+        tracks: Array.from(p.trackPublications.values()).map(t => ({ kind: t.kind, subscribed: t.isSubscribed }))
+      }))
+    );
 
     const attachGuestTracks = () => {
       activeGuests.forEach((guest) => {
@@ -141,10 +153,13 @@ export default function GuestVideoOverlay({
 
         if (participant) {
           participant.trackPublications.forEach((publication) => {
+            console.log('[GuestVideoOverlay] Track publication:', publication.kind, 'isSubscribed:', publication.isSubscribed, 'hasTrack:', !!publication.track);
             if (publication.track) {
               const videoEl = videoRefs.current[guest.requesterId];
               if (publication.kind === Track.Kind.Video && videoEl) {
+                console.log('[GuestVideoOverlay] Attaching video track to element');
                 publication.track.attach(videoEl);
+                setGuestsWithVideo(prev => new Set(prev).add(guest.requesterId));
               }
             }
           });
@@ -154,6 +169,12 @@ export default function GuestVideoOverlay({
 
     // Initial attach
     attachGuestTracks();
+
+    // Also try attaching when participants join
+    const handleParticipantConnected = (participant: RemoteParticipant) => {
+      console.log('[GuestVideoOverlay] Participant connected:', participant.identity);
+      setTimeout(attachGuestTracks, 500); // Small delay to allow tracks to be published
+    };
 
     // Listen for new tracks
     const handleTrackSubscribed = (
@@ -169,7 +190,9 @@ export default function GuestVideoOverlay({
       if (guest) {
         const videoEl = videoRefs.current[guest.requesterId];
         if (track.kind === Track.Kind.Video && videoEl) {
+          console.log('[GuestVideoOverlay] Attaching subscribed video track');
           track.attach(videoEl);
+          setGuestsWithVideo(prev => new Set(prev).add(guest.requesterId));
         }
       }
     };
@@ -178,10 +201,12 @@ export default function GuestVideoOverlay({
       track.detach();
     };
 
+    room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
     room.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
     room.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
 
     return () => {
+      room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
       room.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       room.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
     };
@@ -254,18 +279,21 @@ export default function GuestVideoOverlay({
           key={guest.id}
           className="relative w-28 h-40 md:w-32 md:h-44 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 bg-black"
         >
-          {/* Fallback Avatar (shown behind video when no video track) */}
-          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-pink-600 z-0">
-            <Image
-              src={getAvatarUrl(guest.avatarUrl)}
-              alt={guest.username}
-              width={48}
-              height={48}
-              className="rounded-full"
-            />
-          </div>
+          {/* Fallback Avatar (only shown when no video track attached) */}
+          {!guestsWithVideo.has(guest.requesterId) && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-pink-600 z-0">
+              <Image
+                src={getAvatarUrl(guest.avatarUrl)}
+                alt={guest.username}
+                width={48}
+                height={48}
+                className="rounded-full"
+              />
+              <p className="absolute bottom-12 text-white/70 text-xs">Connecting...</p>
+            </div>
+          )}
 
-          {/* Video Element (in front of avatar) */}
+          {/* Video Element */}
           <video
             ref={(el) => {
               videoRefs.current[guest.requesterId] = el;
@@ -273,7 +301,7 @@ export default function GuestVideoOverlay({
             autoPlay
             playsInline
             muted={false}
-            className="absolute inset-0 w-full h-full object-cover z-10"
+            className={`absolute inset-0 w-full h-full object-cover z-10 ${guestsWithVideo.has(guest.requesterId) ? 'opacity-100' : 'opacity-0'}`}
           />
 
           {/* Username Label */}
