@@ -47,10 +47,19 @@ export default function RequestGuestModal({
   useEffect(() => {
     if (!isOpen || !liveStreamId || !currentUserId) return;
 
+    // P0 FIX: Reset state when liveStreamId changes (host restarted stream)
+    // This ensures we don't show stale pending state from old stream
+    console.log('[RequestGuest] Effect triggered with liveStreamId:', liveStreamId, 'currentUserId:', currentUserId);
+    setExistingRequest(null);
+    setRequestStatus('idle');
+    setPendingInvites([]);
+
     const loadData = async () => {
       try {
-        // Check if user already has a pending request
-        const { data: existingReq } = await supabase
+        console.log('[RequestGuest] Loading data for stream:', liveStreamId);
+        
+        // Check if user already has a pending request FOR THIS STREAM
+        const { data: existingReq, error: existingReqError } = await supabase
           .from('guest_requests')
           .select('id, status, created_at')
           .eq('live_stream_id', liveStreamId)
@@ -58,6 +67,8 @@ export default function RequestGuestModal({
           .eq('type', 'request')
           .eq('status', 'pending')
           .maybeSingle();
+
+        console.log('[RequestGuest] Existing request check:', { existingReq, error: existingReqError });
 
         if (existingReq) {
           setExistingRequest(existingReq);
@@ -144,10 +155,12 @@ export default function RequestGuestModal({
 
   const handleSendRequest = async () => {
     if (!liveStreamId || !currentUserId || !hostId) {
-      alert('Unable to send request. Please try again.');
+      console.error('[RequestGuest] Missing required data:', { liveStreamId, currentUserId, hostId });
+      alert('Unable to send request. Please refresh and try again.');
       return;
     }
 
+    console.log('[RequestGuest] Sending request:', { liveStreamId, currentUserId, hostId });
     setRequestStatus('sending');
     
     try {
@@ -166,15 +179,58 @@ export default function RequestGuestModal({
         .single();
 
       if (error) {
+        console.error('[RequestGuest] Insert error:', error);
         if (error.code === '23505') {
-          // Duplicate - already has a pending request
-          setRequestStatus('pending');
+          // Duplicate - already has a pending request, try to fetch it
+          console.log('[RequestGuest] Duplicate detected, fetching existing request...');
+          const { data: existingReq } = await supabase
+            .from('guest_requests')
+            .select('id, status, created_at')
+            .eq('live_stream_id', liveStreamId)
+            .eq('requester_id', currentUserId)
+            .eq('type', 'request')
+            .eq('status', 'pending')
+            .maybeSingle();
+          
+          if (existingReq) {
+            setExistingRequest(existingReq);
+            setRequestStatus('pending');
+          } else {
+            // Unique constraint hit but no pending request found - stale state
+            // Try to clean up and retry
+            console.log('[RequestGuest] Stale state detected, cleaning up...');
+            await supabase.rpc('reset_my_guest_request', { p_live_stream_id: liveStreamId });
+            // Retry the insert
+            const { data: retryData, error: retryError } = await supabase
+              .from('guest_requests')
+              .insert({
+                live_stream_id: liveStreamId,
+                requester_id: currentUserId,
+                host_id: hostId,
+                type: 'request',
+                status: 'pending',
+                has_camera: hasCamera,
+                has_mic: hasMic,
+              })
+              .select()
+              .single();
+            
+            if (retryError) {
+              console.error('[RequestGuest] Retry failed:', retryError);
+              setRequestStatus('error');
+              alert('Failed to send request. Please refresh the page.');
+            } else {
+              setExistingRequest(retryData);
+              setRequestStatus('pending');
+              if (onRequestSent) onRequestSent();
+            }
+          }
         } else {
-          console.error('[RequestGuest] Error sending request:', error);
           setRequestStatus('error');
           alert('Failed to send request: ' + error.message);
         }
       } else {
+        console.log('[RequestGuest] Request sent successfully:', data);
         setExistingRequest(data);
         setRequestStatus('pending');
         if (onRequestSent) {
@@ -188,22 +244,70 @@ export default function RequestGuestModal({
   };
 
   const handleCancelRequest = async () => {
-    if (!existingRequest) return;
+    // P0 FIX: Always reset UI even if request is already missing
+    // Handle edge case where existingRequest might be stale/null
+    const requestId = existingRequest?.id;
+    
+    console.log('[RequestGuest] handleCancelRequest called:', { requestId, existingRequest });
+
+    // If no request ID, just reset local state (request might already be gone)
+    if (!requestId) {
+      console.log('[RequestGuest] No request ID, resetting local state');
+      setExistingRequest(null);
+      setRequestStatus('idle');
+      return;
+    }
 
     try {
-      const { error } = await supabase
+      // P0 FIX: Try DELETE first (cleanest), then UPDATE fallback
+      console.log('[RequestGuest] Attempting DELETE for request:', requestId);
+      const { error: deleteError } = await supabase
         .from('guest_requests')
-        .update({ status: 'cancelled' })
-        .eq('id', existingRequest.id);
+        .delete()
+        .eq('id', requestId);
 
-      if (error) {
-        console.error('[RequestGuest] Error cancelling request:', error);
+      if (deleteError) {
+        console.warn('[RequestGuest] DELETE failed, trying UPDATE fallback:', deleteError);
+        
+        // Fallback: Try UPDATE status to 'cancelled'
+        const { error: updateError } = await supabase
+          .from('guest_requests')
+          .update({ status: 'cancelled' })
+          .eq('id', requestId);
+        
+        if (updateError) {
+          console.warn('[RequestGuest] UPDATE fallback failed:', updateError);
+          
+          // Last resort: Try the reset RPC function if available
+          if (liveStreamId && currentUserId) {
+            console.log('[RequestGuest] Trying RPC reset fallback...');
+            try {
+              await supabase.rpc('reset_my_guest_request', { p_live_stream_id: liveStreamId });
+            } catch (rpcErr) {
+              console.warn('[RequestGuest] RPC reset failed (non-blocking):', rpcErr);
+            }
+          }
+          
+          // Even if all DB ops fail, the row might already be gone
+          // Reset local state anyway to unblock the user
+          console.log('[RequestGuest] All cancel attempts failed, but resetting local state anyway');
+        }
       } else {
-        setExistingRequest(null);
-        setRequestStatus('idle');
+        console.log('[RequestGuest] DELETE succeeded');
       }
+      
+      // P0 FIX: ALWAYS reset local state after cancel attempt
+      // This ensures viewer is never stuck in "Pending" state
+      setExistingRequest(null);
+      setRequestStatus('idle');
+      
     } catch (err) {
-      console.error('[RequestGuest] Error:', err);
+      console.error('[RequestGuest] Unexpected error during cancel:', err);
+      // P0 FIX: Even on exception, reset local state to unblock user
+      // Show error but don't leave user stuck
+      setExistingRequest(null);
+      setRequestStatus('idle');
+      alert('Request may not have been cancelled. Please refresh the page to confirm.');
     }
   };
 

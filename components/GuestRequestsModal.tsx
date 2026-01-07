@@ -51,13 +51,18 @@ export default function GuestRequestsModal({ isOpen, onClose, liveStreamId, host
 
     const loadRequests = async () => {
       setLoading(true);
+      console.log('[GuestRequests] Loading requests for stream:', liveStreamId, 'host:', hostId);
       try {
+        // First, clean up any stale pending requests (older than 5 min)
+        await supabase.rpc('cleanup_stale_guest_requests', { p_live_stream_id: liveStreamId });
+        
         // Fetch pending requests from viewers
         const { data, error } = await supabase
           .from('guest_requests')
           .select(`
             id,
             requester_id,
+            host_id,
             type,
             status,
             has_camera,
@@ -77,6 +82,7 @@ export default function GuestRequestsModal({ isOpen, onClose, liveStreamId, host
         if (error) {
           console.error('[GuestRequests] Error fetching requests:', error);
         } else {
+          console.log('[GuestRequests] Loaded requests:', data?.length || 0, data);
           const mapped = (data || []).map((r: any) => ({
             ...r,
             profile: r.profiles,

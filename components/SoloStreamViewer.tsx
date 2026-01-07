@@ -541,6 +541,120 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
     loadStreamer();
   }, [username, currentUserId, supabase]);
+
+  // ============================================================================
+  // P0 FIX: Stream restart detection
+  // Subscribe to new live_streams by the same host profile
+  // When host restarts stream (new live_stream_id), auto-update viewer state
+  // ============================================================================
+  useEffect(() => {
+    if (!streamer?.profile_id) return;
+
+    const hostProfileId = streamer.profile_id;
+    const currentStreamId = streamer.live_stream_id;
+    
+    console.log('[SoloStreamViewer] 🔄 Setting up stream restart detection for host:', hostProfileId, 'current stream:', currentStreamId);
+
+    const streamChannel = supabase
+      .channel(`live-streams-host-${hostProfileId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_streams',
+          filter: `profile_id=eq.${hostProfileId}`,
+        },
+        (payload) => {
+          const newStream = payload.new as any;
+          console.log('[SoloStreamViewer] 🆕 New stream detected:', newStream);
+          
+          // Only switch if it's a live solo stream and different from current
+          if (
+            newStream.streaming_mode === 'solo' &&
+            newStream.live_available === true &&
+            newStream.id !== currentStreamId
+          ) {
+            console.log('[SoloStreamViewer] ✅ Switching to new stream:', newStream.id);
+            setStreamer(prev => prev ? {
+              ...prev,
+              live_stream_id: newStream.id,
+              live_available: true,
+              id: newStream.id.toString(),
+            } : prev);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'live_streams',
+          filter: `profile_id=eq.${hostProfileId}`,
+        },
+        (payload) => {
+          const updatedStream = payload.new as any;
+          
+          // If current stream goes offline, check for a new active stream
+          if (updatedStream.id === currentStreamId && updatedStream.live_available === false) {
+            console.log('[SoloStreamViewer] ⚠️ Current stream ended, checking for new active stream...');
+            
+            // Small delay to allow new stream to be created
+            setTimeout(async () => {
+              const { data: newActiveStream } = await supabase
+                .from('live_streams')
+                .select('id, live_available, streaming_mode')
+                .eq('profile_id', hostProfileId)
+                .eq('streaming_mode', 'solo')
+                .eq('live_available', true)
+                .order('started_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              
+              if (newActiveStream && newActiveStream.id !== currentStreamId) {
+                console.log('[SoloStreamViewer] ✅ Found new active stream:', newActiveStream.id);
+                setStreamer(prev => prev ? {
+                  ...prev,
+                  live_stream_id: newActiveStream.id,
+                  live_available: true,
+                  id: newActiveStream.id.toString(),
+                } : prev);
+              } else {
+                // No new stream, just mark current as offline
+                setStreamer(prev => prev ? {
+                  ...prev,
+                  live_available: false,
+                } : prev);
+              }
+            }, 500);
+          }
+          
+          // If a different stream becomes live, switch to it
+          if (
+            updatedStream.id !== currentStreamId &&
+            updatedStream.streaming_mode === 'solo' &&
+            updatedStream.live_available === true
+          ) {
+            console.log('[SoloStreamViewer] ✅ Different stream went live, switching:', updatedStream.id);
+            setStreamer(prev => prev ? {
+              ...prev,
+              live_stream_id: updatedStream.id,
+              live_available: true,
+              id: updatedStream.id.toString(),
+            } : prev);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[SoloStreamViewer] Stream restart subscription status:', status);
+      });
+
+    return () => {
+      console.log('[SoloStreamViewer] 🔄 Cleaning up stream restart subscription');
+      streamChannel.unsubscribe();
+    };
+  }, [streamer?.profile_id, streamer?.live_stream_id, supabase]);
  
   // Bind Top 3 gifter bubbles to the same aggregated source used by the modal
   useEffect(() => {
@@ -952,6 +1066,52 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       streamChannel.unsubscribe();
     };
   }, [streamer?.live_stream_id, supabase]);
+
+  // P0 FIX: Subscribe to host starting a NEW stream (new live_stream_id)
+  // This handles the case where host restarts stream and viewers need to update
+  useEffect(() => {
+    if (!streamer?.profile_id) return;
+
+    console.log('[SoloStreamViewer] Setting up stream restart detection for profile:', streamer.profile_id);
+
+    const newStreamChannel = supabase
+      .channel(`host-new-stream:${streamer.profile_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_streams',
+          filter: `profile_id=eq.${streamer.profile_id}`,
+        },
+        (payload: any) => {
+          const newStream = payload.new as any;
+          
+          // Only update if this is a new ACTIVE solo stream
+          if (newStream.live_available === true && newStream.streaming_mode === 'solo') {
+            console.log('[SoloStreamViewer] 🔄 Host started NEW stream! Updating live_stream_id:', newStream.id);
+            
+            // Clear stream ended state if it was set
+            setStreamEnded(false);
+            
+            // Update streamer state with new live_stream_id
+            setStreamer(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                live_stream_id: newStream.id,
+                live_available: true,
+              };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      newStreamChannel.unsubscribe();
+    };
+  }, [streamer?.profile_id, supabase]);
 
   // Countdown timer for auto-redirect after stream ends
   useEffect(() => {

@@ -28,7 +28,9 @@ import {
   Camera,
   Wand2,
   Share2,
-  Filter
+  Filter,
+  Monitor,
+  MonitorOff
 } from 'lucide-react';
 import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication, LocalTrackPublication } from 'livekit-client';
@@ -45,7 +47,7 @@ import ViewersModal from './ViewersModal';
 import TrendingModal from './TrendingModal';
 import StreamGiftersModal from './StreamGiftersModal';
 import MiniProfileModal from './MiniProfileModal';
-import HostStreamSettingsModal from './HostStreamSettingsModal';
+import HostStreamSettingsModal, { loadSavedDevices } from './HostStreamSettingsModal';
 import CoHostInviteModal from './CoHostInviteModal';
 import GuestRequestsModal from './GuestRequestsModal';
 import StreamFiltersModal from './StreamFiltersModal';
@@ -55,6 +57,13 @@ import { useIM } from '@/components/im';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
 import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
 import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
+import { 
+  useVideoFilterPipeline, 
+  VideoFilterSettings, 
+  DEFAULT_FILTER_SETTINGS, 
+  loadFilterSettings,
+  saveFilterSettings 
+} from '@/hooks/useVideoFilterPipeline';
 
 interface StreamerData {
   id: string;
@@ -203,6 +212,42 @@ export default function SoloHostStream() {
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
   const [viewerCount, setViewerCount] = useState<number>(0);
+  
+  // Active device tracking for live switching
+  const [activeVideoDeviceId, setActiveVideoDeviceId] = useState<string | undefined>(undefined);
+  const [activeAudioDeviceId, setActiveAudioDeviceId] = useState<string | undefined>(undefined);
+
+  // Screen share state
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenShareSupported] = useState(() => 
+    typeof navigator !== 'undefined' && 
+    'mediaDevices' in navigator && 
+    'getDisplayMedia' in navigator.mediaDevices
+  );
+  const screenShareStreamRef = useRef<MediaStream | null>(null);
+
+  // Filter pipeline state
+  const [filterSettings, setFilterSettings] = useState<VideoFilterSettings>(DEFAULT_FILTER_SETTINGS);
+  const filterPipeline = useVideoFilterPipeline({ maxWidth: 1280, maxHeight: 720, frameRate: 30 });
+  const rawCameraTrackRef = useRef<MediaStreamTrack | null>(null);
+
+  // Load saved devices and filters on mount
+  useEffect(() => {
+    const saved = loadSavedDevices();
+    if (saved.videoDeviceId) {
+      setActiveVideoDeviceId(saved.videoDeviceId);
+      console.log('[SoloHostStream] Loaded saved video device:', saved.videoDeviceId);
+    }
+    if (saved.audioDeviceId) {
+      setActiveAudioDeviceId(saved.audioDeviceId);
+      console.log('[SoloHostStream] Loaded saved audio device:', saved.audioDeviceId);
+    }
+    
+    // Load saved filter settings
+    const savedFilters = loadFilterSettings();
+    setFilterSettings(savedFilters);
+    console.log('[SoloHostStream] Loaded saved filter settings:', savedFilters);
+  }, []);
  
   // Stream-scoped Top Gifters (polling; safe for launch)
   const { gifters: streamTopGifters } = useStreamTopGifters({
@@ -697,6 +742,439 @@ export default function SoloHostStream() {
     router.push('/');
   };
 
+  // Live device switching - switch camera while streaming
+  const handleSwitchCamera = async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room || room.state !== 'connected') {
+      console.log('[SoloHostStream] Cannot switch camera - room not connected');
+      throw new Error('Room not connected');
+    }
+
+    const localParticipant = room.localParticipant;
+    
+    // Find current camera publication
+    const cameraPublication = Array.from(localParticipant.trackPublications.values())
+      .find(pub => pub.source === Track.Source.Camera && pub.track);
+    
+    if (cameraPublication && cameraPublication.track) {
+      console.log('[SoloHostStream] Switching camera to:', deviceId);
+      
+      try {
+        // Stop filter pipeline first
+        filterPipeline.stopPipeline();
+        
+        // Unpublish current track
+        await localParticipant.unpublishTrack(cameraPublication.track);
+        cameraPublication.track.stop();
+        
+        // Stop old raw camera track
+        if (rawCameraTrackRef.current) {
+          rawCameraTrackRef.current.stop();
+          rawCameraTrackRef.current = null;
+        }
+        
+        // Create new track with new device
+        const { createLocalTracks } = await import('livekit-client');
+        const [newVideoTrack] = await createLocalTracks({
+          video: {
+            deviceId: { exact: deviceId },
+            width: { ideal: 1920, max: 1920, min: 1280 },
+            height: { ideal: 1080, max: 1080, min: 720 },
+            frameRate: { ideal: 30, max: 30 },
+          },
+          audio: false,
+        });
+        
+        // Store reference to raw track for filters
+        rawCameraTrackRef.current = newVideoTrack.mediaStreamTrack;
+        
+        // Check if filters are active
+        const isFiltersDefault = (
+          filterSettings.blur === DEFAULT_FILTER_SETTINGS.blur &&
+          filterSettings.smoothing === DEFAULT_FILTER_SETTINGS.smoothing &&
+          filterSettings.brightness === DEFAULT_FILTER_SETTINGS.brightness &&
+          filterSettings.contrast === DEFAULT_FILTER_SETTINGS.contrast &&
+          filterSettings.saturation === DEFAULT_FILTER_SETTINGS.saturation
+        );
+        
+        if (!isFiltersDefault) {
+          // Re-apply filters with new camera track
+          console.log('[SoloHostStream] Re-applying filters to new camera');
+          setActiveVideoDeviceId(deviceId);
+          // Small delay then re-apply filters
+          setTimeout(() => handleApplyFilters(filterSettings), 100);
+          return; // handleApplyFilters will handle publishing
+        }
+        
+        // Publish new track (no filters)
+        await localParticipant.publishTrack(newVideoTrack, {
+          videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
+          simulcast: true,
+        });
+        
+        // Attach to video element
+        if (videoRef.current) {
+          newVideoTrack.attach(videoRef.current);
+        }
+        
+        setActiveVideoDeviceId(deviceId);
+        console.log('[SoloHostStream] Camera switched successfully');
+      } catch (err) {
+        console.error('[SoloHostStream] Error switching camera:', err);
+        throw err;
+      }
+    } else {
+      // No camera currently publishing - just update the state for next start
+      setActiveVideoDeviceId(deviceId);
+    }
+  };
+
+  // Live device switching - switch microphone while streaming
+  const handleSwitchMicrophone = async (deviceId: string) => {
+    const room = roomRef.current;
+    if (!room || room.state !== 'connected') {
+      console.log('[SoloHostStream] Cannot switch mic - room not connected');
+      throw new Error('Room not connected');
+    }
+
+    const localParticipant = room.localParticipant;
+    
+    // Find current microphone publication
+    const micPublication = Array.from(localParticipant.trackPublications.values())
+      .find(pub => pub.source === Track.Source.Microphone && pub.track);
+    
+    if (micPublication && micPublication.track) {
+      console.log('[SoloHostStream] Switching microphone to:', deviceId);
+      
+      try {
+        // Unpublish current track
+        await localParticipant.unpublishTrack(micPublication.track);
+        micPublication.track.stop();
+        
+        // Create new track with new device
+        const { createLocalTracks } = await import('livekit-client');
+        const [newAudioTrack] = await createLocalTracks({
+          audio: {
+            deviceId: { exact: deviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false,
+        });
+        
+        // Publish new track
+        await localParticipant.publishTrack(newAudioTrack, {
+          audioEncoding: { maxBitrate: 64_000 },
+        });
+        
+        setActiveAudioDeviceId(deviceId);
+        console.log('[SoloHostStream] Microphone switched successfully');
+      } catch (err) {
+        console.error('[SoloHostStream] Error switching microphone:', err);
+        throw err;
+      }
+    } else {
+      // No mic currently publishing - just update the state for next start
+      setActiveAudioDeviceId(deviceId);
+    }
+  };
+
+  // Start screen sharing - replaces camera video with screen
+  const handleStartScreenShare = async () => {
+    if (!screenShareSupported) {
+      console.log('[SoloHostStream] Screen share not supported on this device');
+      return;
+    }
+
+    const room = roomRef.current;
+    if (!room || room.state !== 'connected') {
+      console.log('[SoloHostStream] Cannot start screen share - room not connected');
+      return;
+    }
+
+    try {
+      console.log('[SoloHostStream] Starting screen share...');
+      
+      // Request screen share with system audio if supported
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          width: { ideal: 1920, max: 1920 },
+          height: { ideal: 1080, max: 1080 },
+          frameRate: { ideal: 30, max: 30 },
+        },
+        audio: true, // Request system audio (Chrome only)
+      });
+
+      screenShareStreamRef.current = screenStream;
+      const localParticipant = room.localParticipant;
+
+      // Find and unpublish current camera track
+      const cameraPublication = Array.from(localParticipant.trackPublications.values())
+        .find(pub => pub.source === Track.Source.Camera && pub.track);
+      
+      if (cameraPublication && cameraPublication.track) {
+        console.log('[SoloHostStream] Unpublishing camera track...');
+        await localParticipant.unpublishTrack(cameraPublication.track);
+        cameraPublication.track.stop();
+      }
+
+      // Import LiveKit classes
+      const { LocalVideoTrack, LocalAudioTrack } = await import('livekit-client');
+
+      // Create and publish screen share video track
+      const screenVideoTrack = screenStream.getVideoTracks()[0];
+      if (screenVideoTrack) {
+        const localVideoTrack = new LocalVideoTrack(screenVideoTrack, undefined, false);
+        localVideoTrack.source = Track.Source.ScreenShare;
+        
+        await localParticipant.publishTrack(localVideoTrack, {
+          videoEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 },
+          simulcast: true,
+        });
+        
+        // Attach to preview
+        if (videoRef.current) {
+          localVideoTrack.attach(videoRef.current);
+        }
+        
+        console.log('[SoloHostStream] Screen share video published');
+      }
+
+      // Handle system audio if available (Chrome only)
+      const screenAudioTrack = screenStream.getAudioTracks()[0];
+      if (screenAudioTrack) {
+        console.log('[SoloHostStream] System audio available, publishing...');
+        const localAudioTrack = new LocalAudioTrack(screenAudioTrack, undefined, false);
+        localAudioTrack.source = Track.Source.ScreenShareAudio;
+        
+        await localParticipant.publishTrack(localAudioTrack, {
+          audioEncoding: { maxBitrate: 128_000 },
+        });
+        console.log('[SoloHostStream] System audio published');
+      } else {
+        console.log('[SoloHostStream] No system audio available (Safari/Firefox limitation)');
+      }
+
+      // Listen for browser "Stop Sharing" event
+      screenVideoTrack.onended = () => {
+        console.log('[SoloHostStream] Screen share ended by browser');
+        handleStopScreenShare();
+      };
+
+      setIsScreenSharing(true);
+      console.log('[SoloHostStream] Screen share started successfully');
+      
+    } catch (err: any) {
+      console.error('[SoloHostStream] Error starting screen share:', err);
+      if (err.name === 'NotAllowedError') {
+        // User cancelled - silently ignore
+        console.log('[SoloHostStream] User cancelled screen share');
+      }
+    }
+  };
+
+  // Stop screen sharing - reverts to camera
+  const handleStopScreenShare = async () => {
+    const room = roomRef.current;
+    if (!room || room.state !== 'connected') {
+      setIsScreenSharing(false);
+      return;
+    }
+
+    try {
+      console.log('[SoloHostStream] Stopping screen share...');
+      const localParticipant = room.localParticipant;
+
+      // Find and unpublish screen share tracks
+      const screenPublications = Array.from(localParticipant.trackPublications.values())
+        .filter(pub => 
+          (pub.source === Track.Source.ScreenShare || pub.source === Track.Source.ScreenShareAudio) && 
+          pub.track
+        );
+      
+      for (const pub of screenPublications) {
+        if (pub.track) {
+          console.log('[SoloHostStream] Unpublishing screen share track:', pub.source);
+          await localParticipant.unpublishTrack(pub.track);
+          pub.track.stop();
+        }
+      }
+
+      // Stop the screen share stream
+      if (screenShareStreamRef.current) {
+        screenShareStreamRef.current.getTracks().forEach(track => track.stop());
+        screenShareStreamRef.current = null;
+      }
+
+      // Re-publish camera
+      console.log('[SoloHostStream] Re-publishing camera...');
+      const { createLocalTracks } = await import('livekit-client');
+      
+      const [newVideoTrack] = await createLocalTracks({
+        video: activeVideoDeviceId 
+          ? { 
+              deviceId: { exact: activeVideoDeviceId },
+              width: { ideal: 1920, max: 1920, min: 1280 },
+              height: { ideal: 1080, max: 1080, min: 720 },
+              frameRate: { ideal: 30, max: 30 },
+            }
+          : {
+              facingMode: 'user',
+              width: { ideal: 1920, max: 1920, min: 1280 },
+              height: { ideal: 1080, max: 1080, min: 720 },
+              frameRate: { ideal: 30, max: 30 },
+            },
+        audio: false,
+      });
+
+      await localParticipant.publishTrack(newVideoTrack, {
+        videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
+        simulcast: true,
+      });
+
+      // Attach to preview
+      if (videoRef.current) {
+        newVideoTrack.attach(videoRef.current);
+      }
+
+      setIsScreenSharing(false);
+      console.log('[SoloHostStream] Reverted to camera successfully');
+      
+    } catch (err) {
+      console.error('[SoloHostStream] Error stopping screen share:', err);
+      setIsScreenSharing(false);
+    }
+  };
+
+  // Toggle screen share
+  const handleToggleScreenShare = () => {
+    if (isScreenSharing) {
+      handleStopScreenShare();
+    } else {
+      handleStartScreenShare();
+    }
+  };
+
+  // Apply video filters using canvas pipeline
+  const handleApplyFilters = async (settings: VideoFilterSettings) => {
+    console.log('[SoloHostStream] Applying filters:', settings);
+    
+    // Save settings
+    setFilterSettings(settings);
+    saveFilterSettings(settings);
+    
+    const room = roomRef.current;
+    if (!room || room.state !== 'connected') {
+      console.log('[SoloHostStream] Room not connected, filters will apply on next publish');
+      return;
+    }
+    
+    // Don't apply filters during screen share
+    if (isScreenSharing) {
+      console.log('[SoloHostStream] Screen sharing active, skipping filter application');
+      return;
+    }
+    
+    const localParticipant = room.localParticipant;
+    
+    // Find current camera publication
+    const cameraPublication = Array.from(localParticipant.trackPublications.values())
+      .find(pub => pub.source === Track.Source.Camera && pub.track);
+    
+    if (!cameraPublication || !cameraPublication.track) {
+      console.log('[SoloHostStream] No camera track to filter');
+      return;
+    }
+    
+    // Check if filters are all default (no processing needed)
+    const isDefault = (
+      settings.blur === DEFAULT_FILTER_SETTINGS.blur &&
+      settings.smoothing === DEFAULT_FILTER_SETTINGS.smoothing &&
+      settings.brightness === DEFAULT_FILTER_SETTINGS.brightness &&
+      settings.contrast === DEFAULT_FILTER_SETTINGS.contrast &&
+      settings.saturation === DEFAULT_FILTER_SETTINGS.saturation
+    );
+    
+    try {
+      if (isDefault) {
+        // Revert to raw camera track
+        console.log('[SoloHostStream] Filters at default, reverting to raw camera');
+        filterPipeline.stopPipeline();
+        
+        // Get raw camera track if we have it
+        if (rawCameraTrackRef.current && rawCameraTrackRef.current.readyState === 'live') {
+          // Unpublish current and republish raw
+          await localParticipant.unpublishTrack(cameraPublication.track);
+          
+          const { LocalVideoTrack } = await import('livekit-client');
+          const rawLocalTrack = new LocalVideoTrack(rawCameraTrackRef.current, undefined, false);
+          await localParticipant.publishTrack(rawLocalTrack, {
+            videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
+            simulcast: true,
+          });
+          
+          if (videoRef.current) {
+            rawLocalTrack.attach(videoRef.current);
+          }
+          console.log('[SoloHostStream] Reverted to raw camera track');
+        }
+      } else {
+        // Apply filters via canvas pipeline
+        console.log('[SoloHostStream] Applying canvas filter pipeline');
+        
+        // Get the underlying MediaStreamTrack
+        let sourceTrack: MediaStreamTrack;
+        
+        // Use raw camera track as source if available
+        if (rawCameraTrackRef.current && rawCameraTrackRef.current.readyState === 'live') {
+          sourceTrack = rawCameraTrackRef.current;
+        } else {
+          // Get track from current publication
+          sourceTrack = cameraPublication.track.mediaStreamTrack;
+          // Clone and store as raw
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: activeVideoDeviceId 
+              ? { deviceId: { exact: activeVideoDeviceId } }
+              : { facingMode: 'user' },
+            audio: false,
+          });
+          rawCameraTrackRef.current = stream.getVideoTracks()[0];
+          sourceTrack = rawCameraTrackRef.current;
+        }
+        
+        // Update filter settings in pipeline
+        filterPipeline.updateFilters(settings);
+        
+        // Start pipeline - wait for processed track via Promise
+        const processedTrack = await filterPipeline.startPipeline(sourceTrack, settings);
+        
+        if (processedTrack) {
+          // Unpublish current track
+          await localParticipant.unpublishTrack(cameraPublication.track);
+          
+          // Publish processed track
+          const { LocalVideoTrack } = await import('livekit-client');
+          const filteredLocalTrack = new LocalVideoTrack(processedTrack, undefined, false);
+          await localParticipant.publishTrack(filteredLocalTrack, {
+            videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
+            simulcast: true,
+          });
+          
+          if (videoRef.current) {
+            filteredLocalTrack.attach(videoRef.current);
+          }
+          
+          console.log('[SoloHostStream] Published filtered track');
+        } else {
+          console.log('[SoloHostStream] Pipeline returned null (filters at default)');
+        }
+      }
+    } catch (err) {
+      console.error('[SoloHostStream] Error applying filters:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -729,9 +1207,10 @@ export default function SoloHostStream() {
   const isPortraitVideo = videoAspectRatio < 1;
 
   // Mobile container class for full-bleed layout on phone widths
+  // CRITICAL: Start with black background to prevent white flash during SSR/hydration
   const containerClass = isMobileWeb
     ? 'mobile-live-container mobile-live-v3'
-    : 'min-h-screen bg-gray-50 dark:bg-gray-900 lg:bg-gray-50 lg:dark:bg-gray-900 overflow-hidden lg:overflow-auto';
+    : 'min-h-screen bg-black lg:bg-gray-50 lg:dark:bg-gray-900 overflow-hidden lg:overflow-auto';
 
   return (
     <div className={containerClass}>
@@ -839,7 +1318,8 @@ export default function SoloHostStream() {
       )}
 
       {/* Main Content Area - Fullscreen with overlay UI on all screen sizes */}
-      <div className="flex relative h-screen pt-0 overflow-hidden">
+      {/* bg-black ensures no white flash during SSR/hydration */}
+      <div className="flex relative h-screen pt-0 overflow-hidden bg-black">
         {/* Left/Center: Video Player */}
         <div 
           className="flex-1 flex flex-col bg-black"
@@ -1060,6 +1540,7 @@ export default function SoloHostStream() {
             </div>
 
             {/* Video element - always rendered for host */}
+            {/* Mirror on mobile for natural selfie-style preview; viewers see non-mirrored */}
             <video
               ref={videoRef}
               autoPlay
@@ -1073,7 +1554,9 @@ export default function SoloHostStream() {
               style={{
                 display: isPublishing ? 'block' : 'none',
                 position: 'relative',
-                zIndex: 10
+                zIndex: 10,
+                // Mirror on mobile for camera preview, but NOT for screen share
+                transform: isMobileWeb && !isScreenSharing ? 'scaleX(-1)' : undefined,
               }}
             />
 
@@ -1242,6 +1725,39 @@ export default function SoloHostStream() {
               >
                 <Filter className="w-6 h-6" />
               </button>
+              
+              {/* Screen Share Button */}
+              <button
+                onClick={handleToggleScreenShare}
+                disabled={!isPublishing || (isMobileWeb && !screenShareSupported)}
+                className={`flex flex-col items-center gap-1 transition-colors relative ${
+                  !isPublishing 
+                    ? 'text-gray-500 cursor-not-allowed opacity-50' 
+                    : isMobileWeb && !screenShareSupported
+                    ? 'text-gray-500 cursor-not-allowed opacity-50'
+                    : isScreenSharing 
+                    ? 'text-green-400 hover:text-green-300' 
+                    : 'text-white hover:text-green-400'
+                }`}
+                title={
+                  !isPublishing 
+                    ? 'Go live first to share screen' 
+                    : isMobileWeb && !screenShareSupported 
+                    ? 'Screen share not supported on mobile' 
+                    : isScreenSharing 
+                    ? 'Stop Screen Share' 
+                    : 'Share Screen'
+                }
+              >
+                {isScreenSharing ? (
+                  <>
+                    <Monitor className="w-6 h-6" />
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  </>
+                ) : (
+                  <Monitor className="w-6 h-6" />
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -1328,6 +1844,10 @@ export default function SoloHostStream() {
       <HostStreamSettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
+        onSwitchCamera={handleSwitchCamera}
+        onSwitchMicrophone={handleSwitchMicrophone}
+        activeVideoDeviceId={activeVideoDeviceId}
+        activeAudioDeviceId={activeAudioDeviceId}
       />
 
       {/* Co-Host Invite Modal */}
@@ -1348,6 +1868,8 @@ export default function SoloHostStream() {
       <StreamFiltersModal
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
+        onApply={handleApplyFilters}
+        currentSettings={filterSettings}
       />
 
       {/* Battle Invite Modal */}

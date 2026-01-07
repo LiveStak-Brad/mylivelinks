@@ -1287,7 +1287,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       <div
         ref={messagesContainerRef}
         onScroll={updateAutoScrollFlag}
-        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar flex flex-col justify-end"
+        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar flex flex-col justify-end touch-pan-y"
       >
         {loading ? (
           <div className="space-y-2">

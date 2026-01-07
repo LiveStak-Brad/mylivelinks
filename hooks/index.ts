@@ -9,6 +9,14 @@ export { useRoomPresence } from './useRoomPresence';
 export { useViewerHeartbeat } from './useViewerHeartbeat';
 export { useIsMobileWeb } from './useIsMobileWeb';
 export { useOrientation } from './useOrientation';
+export { 
+  useVideoFilterPipeline, 
+  loadFilterSettings, 
+  saveFilterSettings, 
+  areFiltersDefault,
+  DEFAULT_FILTER_SETTINGS 
+} from './useVideoFilterPipeline';
+export type { VideoFilterSettings } from './useVideoFilterPipeline';
 export { useOwnerPanelData } from './useOwnerPanelData';
 export { useOwnerLiveOpsData } from './useOwnerLiveOpsData';
 export { useSupportBadgeCounts, useOwnerSupportTickets } from './useOwnerSupportInbox';

@@ -434,7 +434,7 @@ BEGIN
   FROM live_streams ls
   INNER JOIN profiles p ON ls.profile_id = p.id
   WHERE ls.live_available = TRUE
-    AND p.is_live = TRUE -- Double check profile is_live flag
+    AND ls.streaming_mode = 'solo'
   ORDER BY ls.trending_score DESC, ls.started_at DESC
   LIMIT p_limit
   OFFSET p_offset;

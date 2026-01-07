@@ -29,6 +29,28 @@ interface ActiveGuest {
   participant?: RemoteParticipant;
 }
 
+// Helper to get localStorage key for guest volume persistence
+const getVolumeStorageKey = (liveStreamId: number, guestId: string) => 
+  `guestVolume_${liveStreamId}_${guestId}`;
+
+// Helper to load all saved volumes for a stream from localStorage
+const loadSavedVolumes = (liveStreamId: number): { [key: string]: number } => {
+  if (typeof window === 'undefined') return {};
+  const volumes: { [key: string]: number } = {};
+  const prefix = `guestVolume_${liveStreamId}_`;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(prefix)) {
+      const guestId = key.replace(prefix, '');
+      const value = parseFloat(localStorage.getItem(key) || '1');
+      if (!isNaN(value)) {
+        volumes[guestId] = value;
+      }
+    }
+  }
+  return volumes;
+};
+
 export default function GuestVideoOverlay({
   liveStreamId,
   hostId,
@@ -39,9 +61,15 @@ export default function GuestVideoOverlay({
 }: GuestVideoOverlayProps) {
   const supabase = useMemo(() => createClient(), []);
   const [activeGuests, setActiveGuests] = useState<ActiveGuest[]>([]);
+  const activeGuestsRef = useRef<ActiveGuest[]>([]); // Ref to avoid stale closures in event handlers
   const videoRefs = useRef<{ [key: string]: HTMLVideoElement | null }>({});
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const [showVolumeSlider, setShowVolumeSlider] = useState<string | null>(null); // Track which guest's slider is open
+  // Initialize volumes from localStorage for this stream
+  const [guestVolumes, setGuestVolumes] = useState<{ [key: string]: number }>(() => 
+    liveStreamId ? loadSavedVolumes(liveStreamId) : {}
+  );
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const [guestsWithVideo, setGuestsWithVideo] = useState<Set<string>>(new Set()); // Track which guests have video attached
   const [isCurrentUserGuest, setIsCurrentUserGuest] = useState(false);
@@ -55,6 +83,28 @@ export default function GuestVideoOverlay({
   }, []);
 
   const isMobileSize = windowWidth < 768;
+
+  // Keep activeGuestsRef in sync with state (avoids stale closures in event handlers)
+  useEffect(() => {
+    activeGuestsRef.current = activeGuests;
+  }, [activeGuests]);
+
+  // Reload saved volumes when liveStreamId changes and apply to existing audio elements
+  useEffect(() => {
+    if (!liveStreamId) return;
+    
+    const savedVolumes = loadSavedVolumes(liveStreamId);
+    setGuestVolumes(savedVolumes);
+    
+    // Apply saved volumes to any existing audio elements
+    Object.entries(savedVolumes).forEach(([guestId, volume]) => {
+      const audioEl = audioRefs.current[guestId];
+      if (audioEl) {
+        audioEl.volume = volume;
+        console.log('[GuestVideoOverlay] Applied saved volume to guest:', guestId, volume);
+      }
+    });
+  }, [liveStreamId]);
 
   // Load accepted guests from database
   useEffect(() => {
@@ -189,23 +239,26 @@ export default function GuestVideoOverlay({
     };
   }, [room, currentUserId, isHost, activeGuests]);
 
-  // Attach video tracks from LiveKit room
+  // Attach video tracks from LiveKit room + handle disconnect events
+  // Uses activeGuestsRef to avoid re-registering handlers on every activeGuests change
   useEffect(() => {
-    if (!room || activeGuests.length === 0) {
-      console.log('[GuestVideoOverlay] No room or no guests:', { hasRoom: !!room, guestCount: activeGuests.length });
+    if (!room) {
       return;
     }
 
-    // Log all participants for debugging
-    console.log('[GuestVideoOverlay] All remote participants:', 
-      Array.from(room.remoteParticipants.values()).map(p => ({
-        identity: p.identity,
-        tracks: Array.from(p.trackPublications.values()).map(t => ({ kind: t.kind, subscribed: t.isSubscribed }))
-      }))
-    );
-
+    // Function to attach tracks - uses ref to get current guests
     const attachGuestTracks = () => {
-      activeGuests.forEach((guest) => {
+      const guests = activeGuestsRef.current;
+      if (guests.length === 0) return;
+
+      console.log('[GuestVideoOverlay] All remote participants:', 
+        Array.from(room.remoteParticipants.values()).map(p => ({
+          identity: p.identity,
+          tracks: Array.from(p.trackPublications.values()).map(t => ({ kind: t.kind, subscribed: t.isSubscribed }))
+        }))
+      );
+
+      guests.forEach((guest) => {
         // Find participant by identity - guests have identity "guest_<userId>"
         const participant = Array.from(room.remoteParticipants.values()).find(
           (p) => p.identity === `guest_${guest.requesterId}`
@@ -218,10 +271,19 @@ export default function GuestVideoOverlay({
             console.log('[GuestVideoOverlay] Track publication:', publication.kind, 'isSubscribed:', publication.isSubscribed, 'hasTrack:', !!publication.track);
             if (publication.track) {
               const videoEl = videoRefs.current[guest.requesterId];
+              const audioEl = audioRefs.current[guest.requesterId];
               if (publication.kind === Track.Kind.Video && videoEl) {
                 console.log('[GuestVideoOverlay] Attaching video track to element');
                 publication.track.attach(videoEl);
                 setGuestsWithVideo(prev => new Set(prev).add(guest.requesterId));
+              }
+              if (publication.kind === Track.Kind.Audio && audioEl) {
+                console.log('[GuestVideoOverlay] 🔊 Attaching AUDIO track to element for guest:', guest.requesterId);
+                publication.track.attach(audioEl);
+                // Apply saved volume or default to 1.0
+                const savedVolume = guestVolumes[guest.requesterId] ?? 1.0;
+                audioEl.volume = savedVolume;
+                console.log('[GuestVideoOverlay] Applied volume to guest:', guest.requesterId, savedVolume);
               }
             }
           });
@@ -238,23 +300,33 @@ export default function GuestVideoOverlay({
       setTimeout(attachGuestTracks, 500); // Small delay to allow tracks to be published
     };
 
-    // Listen for new tracks
+    // Listen for new tracks - uses ref to get current guests
     const handleTrackSubscribed = (
       track: RemoteTrack,
       publication: TrackPublication,
       participant: RemoteParticipant
     ) => {
-      const guest = activeGuests.find((g) =>
+      const guests = activeGuestsRef.current;
+      const guest = guests.find((g) =>
         participant.identity === `guest_${g.requesterId}`
       );
       
       console.log('[GuestVideoOverlay] Track subscribed:', participant.identity, track.kind, 'Guest match:', !!guest);
       if (guest) {
         const videoEl = videoRefs.current[guest.requesterId];
+        const audioEl = audioRefs.current[guest.requesterId];
         if (track.kind === Track.Kind.Video && videoEl) {
           console.log('[GuestVideoOverlay] Attaching subscribed video track');
           track.attach(videoEl);
           setGuestsWithVideo(prev => new Set(prev).add(guest.requesterId));
+        }
+        if (track.kind === Track.Kind.Audio && audioEl) {
+          console.log('[GuestVideoOverlay] 🔊 Attaching subscribed AUDIO track for guest:', guest.requesterId);
+          track.attach(audioEl);
+          // Apply saved volume or default to 1.0
+          const savedVolume = guestVolumes[guest.requesterId] ?? 1.0;
+          audioEl.volume = savedVolume;
+          console.log('[GuestVideoOverlay] Applied volume to guest:', guest.requesterId, savedVolume);
         }
       }
     };
@@ -263,16 +335,162 @@ export default function GuestVideoOverlay({
       track.detach();
     };
 
+    // P0 FIX: Handle guest disconnect (tab close, network loss)
+    // Uses ref to avoid stale closure - handlers registered once per room
+    const handleParticipantDisconnected = (participant: RemoteParticipant) => {
+      const identity = participant.identity;
+      console.log('[GuestVideoOverlay] ParticipantDisconnected:', identity);
+
+      // Check if this is a guest participant (identity format: "guest_<userId>")
+      if (!identity.startsWith('guest_')) {
+        console.log('[GuestVideoOverlay] Not a guest participant, ignoring');
+        return;
+      }
+
+      // Extract requesterId from identity
+      const requesterId = identity.replace('guest_', '');
+      
+      // Find matching guest in activeGuests - USE REF to get current value
+      const guests = activeGuestsRef.current;
+      const disconnectedGuest = guests.find(g => g.requesterId === requesterId);
+      
+      if (!disconnectedGuest) {
+        console.log('[GuestVideoOverlay] Guest not in activeGuests list, already cleaned up');
+        return;
+      }
+
+      console.log('[GuestVideoOverlay] Guest disconnected, cleaning up:', { 
+        guestId: disconnectedGuest.id, 
+        requesterId, 
+        isHost 
+      });
+
+      // Perform cleanup based on role
+      if (isHost) {
+        // HOST: Clean DB + local state (host is sole authority for DB cleanup)
+        performHostCleanup(disconnectedGuest.id, requesterId);
+      } else {
+        // VIEWER/GUEST: Clean local state only (host handles DB)
+        performLocalCleanup(requesterId);
+      }
+    };
+
     room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
     room.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
     room.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+    room.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
 
     return () => {
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
       room.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       room.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      room.off(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
     };
-  }, [room, activeGuests]);
+  }, [room, isHost]); // Removed activeGuests - using ref instead to avoid re-registering handlers
+
+  // Re-attach tracks when activeGuests changes (separate from handler registration)
+  useEffect(() => {
+    if (!room || activeGuests.length === 0) return;
+
+    // Re-attach tracks for any new guests
+    activeGuests.forEach((guest) => {
+      const participant = Array.from(room.remoteParticipants.values()).find(
+        (p) => p.identity === `guest_${guest.requesterId}`
+      );
+      
+      if (participant) {
+        participant.trackPublications.forEach((publication) => {
+          if (publication.track) {
+            const videoEl = videoRefs.current[guest.requesterId];
+            const audioEl = audioRefs.current[guest.requesterId];
+            if (publication.kind === Track.Kind.Video && videoEl && !videoEl.srcObject) {
+              publication.track.attach(videoEl);
+              setGuestsWithVideo(prev => new Set(prev).add(guest.requesterId));
+            }
+            if (publication.kind === Track.Kind.Audio && audioEl && !audioEl.srcObject) {
+              publication.track.attach(audioEl);
+              const savedVolume = guestVolumes[guest.requesterId] ?? 1.0;
+              audioEl.volume = savedVolume;
+            }
+          }
+        });
+      }
+    });
+  }, [room, activeGuests, guestVolumes]);
+
+  // HOST-ONLY: Perform DB cleanup when guest disconnects
+  const performHostCleanup = async (guestId: number, requesterId: string) => {
+    console.log('[GuestVideoOverlay] performHostCleanup (host-only):', { guestId, requesterId });
+    
+    try {
+      // Step 1: Attempt DELETE (preferred)
+      const { error: deleteError } = await supabase
+        .from('guest_requests')
+        .delete()
+        .eq('id', guestId);
+
+      if (deleteError) {
+        console.warn('[GuestVideoOverlay] DELETE failed, trying UPDATE fallback:', deleteError);
+        
+        // Step 2: Fallback to UPDATE status='cancelled'
+        const { error: updateError } = await supabase
+          .from('guest_requests')
+          .update({ status: 'cancelled' })
+          .eq('id', guestId);
+        
+        if (updateError) {
+          console.error('[GuestVideoOverlay] UPDATE fallback also failed:', updateError);
+        }
+      } else {
+        console.log('[GuestVideoOverlay] DELETE succeeded for disconnected guest');
+      }
+    } catch (err) {
+      console.error('[GuestVideoOverlay] performHostCleanup error:', err);
+    }
+
+    // Step 3: Always update local state immediately
+    setActiveGuests(prev => prev.filter(g => g.requesterId !== requesterId));
+
+    // Step 4: Clear refs
+    if (videoRefs.current[requesterId]) {
+      videoRefs.current[requesterId] = null;
+    }
+    if (audioRefs.current[requesterId]) {
+      audioRefs.current[requesterId] = null;
+    }
+
+    // Step 5: Clear from guestsWithVideo set
+    setGuestsWithVideo(prev => {
+      const next = new Set(prev);
+      next.delete(requesterId);
+      return next;
+    });
+  };
+
+  // VIEWER/GUEST: Perform local UI cleanup only (no DB operations)
+  const performLocalCleanup = (requesterId: string) => {
+    console.log('[GuestVideoOverlay] performLocalCleanup (viewer/guest):', { requesterId });
+    
+    // Only update local state - no DB operations (host handles DB)
+    setActiveGuests(prev => prev.filter(g => g.requesterId !== requesterId));
+
+    // Clear refs
+    if (videoRefs.current[requesterId]) {
+      videoRefs.current[requesterId] = null;
+    }
+    if (audioRefs.current[requesterId]) {
+      audioRefs.current[requesterId] = null;
+    }
+
+    // Clear from guestsWithVideo set
+    setGuestsWithVideo(prev => {
+      const next = new Set(prev);
+      next.delete(requesterId);
+      return next;
+    });
+    
+    // Note: Realtime subscription will soon receive DB update from host
+  };
 
   const handleRemoveGuest = async (guestId: number, guestRequesterId: string) => {
     const isLeavingAsGuest = currentUserId === guestRequesterId;
@@ -348,7 +566,7 @@ export default function GuestVideoOverlay({
       {/* Self preview for guest (local video) */}
       {isCurrentUserGuest && selfGuestInfo && (
         <div
-          className="relative w-28 h-40 md:w-32 md:h-44 rounded-2xl overflow-hidden shadow-2xl border-2 border-green-500/50 bg-black"
+          className="relative w-24 h-28 md:w-28 md:h-32 rounded-xl overflow-hidden shadow-2xl border-2 border-green-500/50 bg-black"
         >
           {/* Local Video Element */}
           <video
@@ -389,7 +607,7 @@ export default function GuestVideoOverlay({
       {otherGuests.map((guest) => (
         <div
           key={guest.id}
-          className="relative w-28 h-40 md:w-32 md:h-44 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 bg-black"
+          className="relative w-24 h-28 md:w-28 md:h-32 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 bg-black"
         >
           {/* Fallback Avatar (only shown when no video track attached) */}
           {!guestsWithVideo.has(guest.requesterId) && (
@@ -412,8 +630,17 @@ export default function GuestVideoOverlay({
             }}
             autoPlay
             playsInline
-            muted={false}
+            muted={true} // Video element is muted; audio comes from separate audio element
             className={`absolute inset-0 w-full h-full object-cover z-10 ${guestsWithVideo.has(guest.requesterId) ? 'opacity-100' : 'opacity-0'}`}
+          />
+
+          {/* Audio Element - Separate from video for proper audio track handling */}
+          <audio
+            ref={(el) => {
+              audioRefs.current[guest.requesterId] = el;
+            }}
+            autoPlay
+            playsInline
           />
 
           {/* Username Label */}
@@ -443,11 +670,21 @@ export default function GuestVideoOverlay({
                     min="0"
                     max="1"
                     step="0.05"
-                    defaultValue="0.7"
+                    value={guestVolumes[guest.requesterId] ?? 1.0}
                     onChange={(e) => {
-                      const videoEl = videoRefs.current[guest.requesterId];
-                      if (videoEl) {
-                        videoEl.volume = parseFloat(e.target.value);
+                      const newVolume = parseFloat(e.target.value);
+                      // Update state to track volume
+                      setGuestVolumes(prev => ({ ...prev, [guest.requesterId]: newVolume }));
+                      // Apply to audio element immediately
+                      const audioEl = audioRefs.current[guest.requesterId];
+                      if (audioEl) {
+                        audioEl.volume = newVolume;
+                      }
+                      // Persist to localStorage for this stream + guest
+                      if (liveStreamId) {
+                        const key = getVolumeStorageKey(liveStreamId, guest.requesterId);
+                        localStorage.setItem(key, newVolume.toString());
+                        console.log('[GuestVideoOverlay] Saved volume:', key, newVolume);
                       }
                     }}
                     className="w-20 h-1 accent-white cursor-pointer origin-left -rotate-90 translate-y-10"
