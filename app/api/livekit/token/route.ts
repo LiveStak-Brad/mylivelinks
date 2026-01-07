@@ -326,7 +326,8 @@ export async function POST(request: NextRequest) {
           const effectiveSessionId = sessionId || Date.now().toString();
 
           // P0 FIX: Stable identity per profile to prevent duplicate LiveKit participants
-          const identity = `u_${userId}`;
+          // For guests, use guest_ prefix so their tracks can be filtered to guest boxes only
+          const identity = isAcceptedGuest ? `guest_${userId}` : `u_${userId}`;
 
           const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
             identity,
