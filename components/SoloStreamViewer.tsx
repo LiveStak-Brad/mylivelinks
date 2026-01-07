@@ -1010,7 +1010,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
     // Check if already an accepted guest on load
     const checkExistingGuest = async () => {
-      const { data } = await supabase
+      console.log('[SoloStreamViewer] Checking for existing accepted guest request...');
+      const { data, error } = await supabase
         .from('guest_requests')
         .select('id, status')
         .eq('live_stream_id', streamer.live_stream_id)
@@ -1018,11 +1019,15 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         .eq('status', 'accepted')
         .maybeSingle();
 
+      console.log('[SoloStreamViewer] Existing guest check result:', { data, error });
+
       if (data) {
         console.log('[SoloStreamViewer] Already accepted as guest, starting publishing');
         setIsAcceptedGuest(true);
         guestRequestIdRef.current = data.id;
         await startGuestPublishing();
+      } else {
+        console.log('[SoloStreamViewer] Not currently an accepted guest');
       }
     };
 
@@ -1035,10 +1040,20 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
   // Start publishing camera/mic as guest
   const startGuestPublishing = useCallback(async () => {
-    if (!roomRef.current || isPublishingAsGuest) return;
+    console.log('[SoloStreamViewer] startGuestPublishing called', { 
+      hasRoom: !!roomRef.current, 
+      isPublishingAsGuest,
+      streamerUsername: streamer?.username,
+      currentUserId 
+    });
+    
+    if (isPublishingAsGuest) {
+      console.log('[SoloStreamViewer] Already publishing as guest, skipping');
+      return;
+    }
 
     try {
-      console.log('[SoloStreamViewer] Starting guest publishing...');
+      console.log('[SoloStreamViewer] Getting guest token...');
       
       // Get a new token with canPublish: true
       const tokenRes = await fetch(TOKEN_ENDPOINT, {
@@ -1056,26 +1071,48 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       });
 
       if (!tokenRes.ok) {
-        console.error('[SoloStreamViewer] Failed to get guest token');
+        const errorText = await tokenRes.text();
+        console.error('[SoloStreamViewer] Failed to get guest token:', tokenRes.status, errorText);
         return;
       }
 
       const { token, url } = await tokenRes.json();
+      console.log('[SoloStreamViewer] Got guest token, connecting to room...');
 
-      // Disconnect current room and reconnect with new permissions
-      const room = roomRef.current;
-      if (room.state === 'connected') {
-        console.log('[SoloStreamViewer] Reconnecting with guest permissions...');
+      // Create a new room or use existing
+      let room = roomRef.current;
+      
+      if (room && room.state === 'connected') {
+        console.log('[SoloStreamViewer] Disconnecting existing room...');
         await room.disconnect();
-        await room.connect(url, token);
       }
+      
+      // Create new room instance for guest mode
+      const { Room } = await import('livekit-client');
+      room = new Room();
+      roomRef.current = room;
+      
+      console.log('[SoloStreamViewer] Connecting to room as guest...');
+      await room.connect(url, token);
+      console.log('[SoloStreamViewer] Connected! Enabling camera and mic...');
 
       // Enable camera and microphone
-      await room.localParticipant.setCameraEnabled(true);
-      await room.localParticipant.setMicrophoneEnabled(true);
+      try {
+        await room.localParticipant.setCameraEnabled(true);
+        console.log('[SoloStreamViewer] Camera enabled');
+      } catch (camErr) {
+        console.error('[SoloStreamViewer] Failed to enable camera:', camErr);
+      }
+      
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+        console.log('[SoloStreamViewer] Microphone enabled');
+      } catch (micErr) {
+        console.error('[SoloStreamViewer] Failed to enable microphone:', micErr);
+      }
 
       setIsPublishingAsGuest(true);
-      console.log('[SoloStreamViewer] Guest publishing started successfully');
+      console.log('[SoloStreamViewer] Guest publishing started successfully!');
     } catch (err) {
       console.error('[SoloStreamViewer] Error starting guest publishing:', err);
     }
