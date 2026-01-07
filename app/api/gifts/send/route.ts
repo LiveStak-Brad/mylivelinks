@@ -82,13 +82,35 @@ export async function POST(request: NextRequest) {
       streamId,
     });
 
+    // Resolve stream ID (WEB Solo Live): required for stream-scoped chat + top gifters.
+    // If client doesn't send it, derive from recipient's most recent active solo stream.
+    const resolvedStreamId = (() => {
+      const n = typeof streamId === 'number' ? streamId : Number(streamId);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })();
+
+    let finalStreamId: number | null = resolvedStreamId;
+    if (!finalStreamId) {
+      const { data: liveRow } = await adminSupabase
+        .from('live_streams')
+        .select('id')
+        .eq('profile_id', toUserId)
+        .eq('live_available', true)
+        .eq('streaming_mode', 'solo')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const id = (liveRow as any)?.id;
+      if (typeof id === 'number' && id > 0) finalStreamId = id;
+    }
+
     // Call RPC function (gifts are 1:1 coins->diamonds)
     const { data, error: rpcError } = await adminSupabase.rpc('send_gift_v2', {
       p_sender_id: user.id,
       p_recipient_id: toUserId,
       p_coins_amount: coinsAmount,
       p_gift_type_id: giftTypeId || null,
-      p_stream_id: streamId || null,
+      p_stream_id: finalStreamId,
       p_request_id: requestId,
       p_room_id: resolvedRoomSlug, // For room-specific leaderboards
     });
@@ -113,6 +135,41 @@ export async function POST(request: NextRequest) {
       result: data,
     });
 
+    // Insert a stream-scoped chat announcement (service role; bypasses RLS).
+    // StreamChat filters on: live_stream_id=<id> AND room_id IS NULL
+    let chatInserted = false;
+    if (finalStreamId) {
+      try {
+        const [{ data: senderP }, { data: recipientP }, { data: giftTypeP }] = await Promise.all([
+          adminSupabase.from('profiles').select('username').eq('id', user.id).maybeSingle(),
+          adminSupabase.from('profiles').select('username').eq('id', toUserId).maybeSingle(),
+          giftTypeId
+            ? adminSupabase.from('gift_types').select('name').eq('id', giftTypeId).maybeSingle()
+            : Promise.resolve({ data: null } as any),
+        ]);
+
+        const senderUsername = (senderP as any)?.username || 'Someone';
+        const recipientUsername = (recipientP as any)?.username || 'someone';
+        const giftName = (giftTypeP as any)?.name || 'a gift';
+        const diamondsAwarded =
+          typeof (data as any)?.diamonds_awarded === 'number'
+            ? (data as any).diamonds_awarded
+            : (typeof (data as any)?.diamondsAwarded === 'number' ? (data as any).diamondsAwarded : null);
+        const diamondsSuffix = typeof diamondsAwarded === 'number' ? ` 💎+${diamondsAwarded}` : '';
+
+        const { error: chatErr } = await adminSupabase.from('chat_messages').insert({
+          profile_id: user.id,
+          content: `${senderUsername} sent "${giftName}" to ${recipientUsername}${diamondsSuffix}`,
+          message_type: 'gift',
+          live_stream_id: finalStreamId,
+          room_id: null,
+        });
+        if (!chatErr) chatInserted = true;
+      } catch (e) {
+        console.warn('[GIFT] Failed to insert gift chat announcement', { requestId, err: String(e) });
+      }
+    }
+
     // Get updated sender balance
     const { data: senderProfile } = await adminSupabase
       .from('profiles')
@@ -126,6 +183,8 @@ export async function POST(request: NextRequest) {
       coinsSpent: data.coins_spent,
       diamondsAwarded: data.diamonds_awarded,
       platformFee: data.platform_fee,
+      chatInserted,
+      streamId: finalStreamId,
       senderBalance: {
         coins: senderProfile?.coin_balance || 0,
         diamonds: senderProfile?.earnings_balance || 0,

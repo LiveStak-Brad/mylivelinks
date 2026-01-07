@@ -47,8 +47,8 @@ import TrendingModal from './TrendingModal';
 import MiniProfileModal from './MiniProfileModal';
 import StreamGiftersModal from './StreamGiftersModal';
 import { useIM } from '@/components/im';
-import { useViewerHeartbeat } from '@/hooks/useViewerHeartbeat';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
+import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
 
 interface SoloStreamViewerProps {
   username: string;
@@ -93,11 +93,78 @@ interface LeaderboardRank {
   next_rank: number;
 }
 
+function computeRankFromLeaderboardRows(profileId: string, rows: any[]): LeaderboardRank {
+  const list = Array.isArray(rows) ? rows : [];
+  const mapped = list
+    .map((r: any) => ({
+      profile_id: String(r?.profile_id ?? ''),
+      rank: Number(r?.rank ?? 0),
+      metric_value: Number(r?.metric_value ?? 0),
+    }))
+    .filter((r) => r.profile_id && r.rank > 0)
+    .sort((a, b) => a.rank - b.rank);
+
+  const total_entries = mapped.length;
+  // If nobody has scored today yet, still show the live streamer as #1 (0 diamonds).
+  if (total_entries === 0) {
+    return {
+      current_rank: 1,
+      total_entries: 0,
+      metric_value: 0,
+      rank_tier: 'Diamond',
+      points_to_next_rank: 0,
+      next_rank: 2,
+    };
+  }
+  const meIdx = mapped.findIndex((r) => r.profile_id === profileId);
+  if (meIdx < 0) {
+    return {
+      current_rank: 0,
+      total_entries,
+      metric_value: 0,
+      rank_tier: null,
+      points_to_next_rank: 0,
+      next_rank: 0,
+    };
+  }
+
+  const me = mapped[meIdx];
+  const above = me.rank > 1 ? mapped.find((r) => r.rank === me.rank - 1) : null;
+  const rank2 = me.rank === 1 ? mapped.find((r) => r.rank === 2) : null;
+
+  if (me.rank === 1) {
+    const lead = Math.max(0, Number(me.metric_value ?? 0) - Number(rank2?.metric_value ?? 0));
+    return {
+      current_rank: 1,
+      total_entries,
+      metric_value: Number(me.metric_value ?? 0),
+      rank_tier: 'Diamond',
+      points_to_next_rank: lead,
+      next_rank: 2,
+    };
+  }
+
+  const points = Math.max(1, Number(above?.metric_value ?? 0) - Number(me.metric_value ?? 0) + 1);
+  return {
+    current_rank: me.rank,
+    total_entries,
+    metric_value: Number(me.metric_value ?? 0),
+    rank_tier: null,
+    points_to_next_rank: points,
+    next_rank: Math.max(1, me.rank - 1),
+  };
+}
+
 export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const router = useRouter();
   const { resolvedTheme } = useTheme();
   const supabase = useMemo(() => createClient(), []);
   const { openChat: openIM } = useIM();
+
+  // Per-tab identifier used to detect duplicate heartbeat/connect loops in logs.
+  const viewerSessionIdRef = useRef<string>(
+    (globalThis.crypto as any)?.randomUUID?.() ?? `vs_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+  );
   
   const [streamer, setStreamer] = useState<StreamerData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,6 +189,14 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [countdown, setCountdown] = useState(5);
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
   const [trendingRank, setTrendingRank] = useState<number | null>(null);
+ 
+  // Stream-scoped Top Gifters (polling; safe for launch)
+  const { gifters: streamTopGifters } = useStreamTopGifters({
+    liveStreamId: streamer?.live_stream_id ?? null,
+    enabled: !!(streamer?.live_stream_id && streamer?.live_available),
+    pollIntervalMs: 7000,
+    limit: 20,
+  });
   
   // Like system for trending
   const { isLiked, likesCount, toggleLike, isLoading: isLikeLoading } = useLiveLike({
@@ -243,22 +318,10 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     [setIsRoomConnected]
   );
 
-  // Viewer heartbeat + live viewer count updates
-  const watchSessionKey = useMemo(() => {
-    if (!streamer?.live_stream_id || !currentUserId) return null;
-    return `solo:${currentUserId}:${streamer.live_stream_id}`;
-  }, [currentUserId, streamer?.live_stream_id]);
-
-  useViewerHeartbeat({
-    liveStreamId: streamer?.live_stream_id || 0,
-    isActive: !!(streamer?.live_available && isRoomConnected && !streamEnded),
-    isUnmuted: !isMuted,
-    isVisible: true,
-    isSubscribed: !!isRoomConnected,
-    enabled: !!(streamer?.live_stream_id && streamer?.live_available),
-    slotIndex: 0,
-    watchSessionKey: watchSessionKey || undefined,
-  });
+  // NOTE (P0 stability): Solo Viewer previously ran TWO heartbeat mechanisms:
+  // 1) client-side supabase.rpc('update_viewer_heartbeat') via useViewerHeartbeat
+  // 2) service-role POST /api/active-viewers/heartbeat
+  // We keep ONLY the service-role heartbeat to avoid duplicate work + timing jank.
 
   useEffect(() => {
     if (!streamer?.live_stream_id) return;
@@ -305,6 +368,14 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
     const ping = async (is_active = true) => {
       try {
+        if (DEBUG_LIVEKIT) {
+          console.log('[SoloStreamViewer][HEARTBEAT] ping_start', {
+            viewerSessionId: viewerSessionIdRef.current,
+            live_stream_id: streamer.live_stream_id,
+            viewer_id: currentUserId,
+            is_active,
+          });
+        }
         await fetch('/api/active-viewers/heartbeat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -317,6 +388,14 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             is_subscribed: true,
           }),
         });
+        if (DEBUG_LIVEKIT) {
+          console.log('[SoloStreamViewer][HEARTBEAT] ping_done', {
+            viewerSessionId: viewerSessionIdRef.current,
+            live_stream_id: streamer.live_stream_id,
+            viewer_id: currentUserId,
+            is_active,
+          });
+        }
       } catch (err) {
         console.error('[SoloStreamViewer] Service heartbeat failed:', err);
       }
@@ -372,16 +451,29 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           return;
         }
 
-        // Fetch live stream data - get the most recent active solo stream
-        const { data: liveStreams } = await supabase
+        // Prefer the ACTIVE solo stream (live_available=true). If none, fall back to most recent.
+        const { data: activeStream } = await supabase
           .from('live_streams')
-          .select('id, live_available')
+          .select('id, live_available, started_at')
           .eq('profile_id', profile.id)
-          .eq('streaming_mode', 'solo') // Only solo mode streams
+          .eq('streaming_mode', 'solo')
+          .eq('live_available', true)
           .order('started_at', { ascending: false })
-          .limit(1);
+          .limit(1)
+          .maybeSingle();
 
-        const liveStream = liveStreams?.[0] || null;
+        const { data: latestStream } = activeStream
+          ? ({ data: null } as any)
+          : await supabase
+              .from('live_streams')
+              .select('id, live_available, started_at')
+              .eq('profile_id', profile.id)
+              .eq('streaming_mode', 'solo')
+              .order('started_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+        const liveStream = activeStream ?? latestStream ?? null;
 
         // Fetch gifter status
         const gifterStatuses = await fetchGifterStatuses([profile.id]);
@@ -411,75 +503,21 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         setStreamer(streamerData);
         setLoading(false);
 
-        // Fetch top 3 gifters for this streamer
-        const { data: giftersData } = await supabase
-          .from('gifts')
-          .select(`
-            sender_id,
-            coin_value,
-            profiles!gifts_sender_id_fkey (
-              username,
-              avatar_url
-            )
-          `)
-          .eq('recipient_id', profile.id)
-          .order('created_at', { ascending: false })
-          .limit(100); // Get recent gifts to calculate totals
-
-        if (giftersData && giftersData.length > 0) {
-          // Aggregate by sender and get top 3
-          const gifterTotals = giftersData.reduce((acc: Record<string, any>, gift: any) => {
-            const senderId = gift.sender_id;
-            if (!acc[senderId]) {
-              acc[senderId] = {
-                profile_id: senderId,
-                username: gift.profiles?.username || 'Unknown',
-                avatar_url: gift.profiles?.avatar_url,
-                total_coins: 0,
-              };
-            }
-            acc[senderId].total_coins += gift.coin_value || 0;
-            return acc;
-          }, {});
-
-          const top3 = Object.values(gifterTotals)
-            .sort((a: any, b: any) => b.total_coins - a.total_coins)
-            .slice(0, 3) as TopGifter[];
-
-          setTopGifters(top3);
-        } else {
-          // TEMPORARY: Mock data for testing UI
-          setTopGifters([
-            {
-              profile_id: 'mock1',
-              username: 'TopSupporter',
-              avatar_url: undefined,
-              total_coins: 5000,
-            },
-            {
-              profile_id: 'mock2',
-              username: 'MegaFan',
-              avatar_url: undefined,
-              total_coins: 3500,
-            },
-            {
-              profile_id: 'mock3',
-              username: 'GiftKing',
-              avatar_url: undefined,
-              total_coins: 2000,
-            },
-          ]);
-        }
+        // Top gifters are stream-scoped and loaded via `useStreamTopGifters` (polling).
 
         // Check follow status if user is logged in
         if (currentUserId && currentUserId !== profile.id) {
-          const { data: followData } = await supabase
+          const { data: followData, error: followErr } = await supabase
             .from('follows')
             .select('id')
             .eq('follower_id', currentUserId)
             .eq('following_id', profile.id)
-            .single();
-          
+            .maybeSingle();
+
+          if (followErr) {
+            console.warn('[SoloStreamViewer] Follow status lookup failed:', followErr);
+          }
+
           setIsFollowing(!!followData);
         }
 
@@ -492,6 +530,19 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
     loadStreamer();
   }, [username, currentUserId, supabase]);
+ 
+  // Bind Top 3 gifter bubbles to the same aggregated source used by the modal
+  useEffect(() => {
+    const top3: TopGifter[] = (streamTopGifters ?? [])
+      .slice(0, 3)
+      .map((g) => ({
+        profile_id: g.profile_id,
+        username: g.username,
+        avatar_url: g.avatar_url ?? undefined,
+        total_coins: g.total_coins,
+      }));
+    setTopGifters(top3);
+  }, [streamTopGifters]);
 
   // Connect to LiveKit room - SINGLE CONNECTION GUARD
   // CRITICAL: Minimal stable deps to prevent reconnection loops
@@ -936,28 +987,28 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       if (!streamer?.profile_id) return;
 
       try {
-        // Fetch rank for daily top streamers leaderboard
-        const { data, error } = await supabase
-          .rpc('rpc_get_leaderboard_rank', {
-            p_profile_id: streamer.profile_id,
-            p_leaderboard_type: 'top_streamers_daily'
-          });
+        // Canonical source: get_leaderboard (same as LeaderboardModal)
+        const { data, error } = await supabase.rpc('get_leaderboard', {
+          p_type: 'top_streamers',
+          p_period: 'daily',
+          p_limit: 100,
+          p_room_id: null,
+        });
 
         if (error) {
-          console.error('[SoloStreamViewer] Error fetching leaderboard rank:', error);
+          console.error('[SoloStreamViewer] Error fetching leaderboard rows:', error);
           return;
         }
 
-        if (data && data.length > 0) {
-          setLeaderboardRank(data[0]);
-        }
+        const rank = computeRankFromLeaderboardRows(streamer.profile_id, Array.isArray(data) ? data : []);
+        setLeaderboardRank(rank);
       } catch (err) {
         console.error('[SoloStreamViewer] Error loading leaderboard rank:', err);
       }
     };
 
     const loadTrendingRank = async () => {
-      if (!streamer?.live_stream_id || !streamer?.live_available) return;
+      if (!streamer?.live_stream_id) return;
 
       try {
         // Fetch trending streams and find this stream's rank
@@ -977,7 +1028,8 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           if (rank !== -1) {
             setTrendingRank(rank + 1); // 1-indexed
           } else {
-            setTrendingRank(null);
+            // Show 0 instead of a dash when live but not ranked
+            setTrendingRank(0);
           }
         }
       } catch (err) {
@@ -1214,7 +1266,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                             className="flex items-center gap-1 hover:text-white transition-colors"
                           >
                             <Flame className="w-4 h-4 text-orange-500" />
-                            <span className="font-semibold text-sm">{trendingRank ?? '—'}</span>
+                            <span className="font-semibold text-sm">{trendingRank ?? 0}</span>
                           </button>
                           <span className="text-white/40">•</span>
                           <button 
@@ -1226,7 +1278,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                           >
                             <Trophy className="w-4 h-4 text-yellow-500" />
                             <span className="font-semibold text-sm">
-                              {leaderboardRank?.current_rank || '-'}
+                              {leaderboardRank?.current_rank ?? 0}
                             </span>
                           </button>
                         </div>
@@ -1256,7 +1308,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                   </div>
 
                   {/* Rank badge hanging BELOW the bubble - ABSOLUTE positioned */}
-                  {leaderboardRank && leaderboardRank.current_rank <= 100 && (
+                  {leaderboardRank && leaderboardRank.current_rank > 0 && leaderboardRank.current_rank <= 100 && (
                     <div className="absolute top-full left-2 mt-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-yellow-500/90 to-orange-500/90 border-2 border-yellow-400/50 shadow-lg shadow-yellow-500/30 backdrop-blur-md w-fit z-10">
                       <span className={`text-[13px] font-bold ${
                         leaderboardRank.current_rank === 1 
@@ -1271,18 +1323,12 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                       }`}>
                         {leaderboardRank.current_rank}<sup className="text-[8px]">{leaderboardRank.current_rank === 1 ? 'st' : leaderboardRank.current_rank === 2 ? 'nd' : leaderboardRank.current_rank === 3 ? 'rd' : 'th'}</sup>
                       </span>
-                      {leaderboardRank.current_rank === 1 && leaderboardRank.points_to_next_rank > 0 && (
+                      {leaderboardRank.current_rank === 1 && leaderboardRank.points_to_next_rank >= 0 && (
                         <>
                           <span className="text-white/60 text-[10px]">•</span>
                           <Trophy className="w-3.5 h-3.5 text-yellow-300" />
                           <span className="text-white/60 text-[10px]">•</span>
                           <span className="text-[10px] text-white/90 font-medium">+{leaderboardRank.points_to_next_rank.toLocaleString()}</span>
-                        </>
-                      )}
-                      {leaderboardRank.current_rank === 1 && leaderboardRank.points_to_next_rank === 0 && (
-                        <>
-                          <span className="text-white/60 text-[10px]">•</span>
-                          <Trophy className="w-3.5 h-3.5 text-yellow-300" />
                         </>
                       )}
                       {leaderboardRank.current_rank > 1 && leaderboardRank.points_to_next_rank >= 1 && (
@@ -1560,6 +1606,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                     alert('Guest request feature coming soon! This will send a request to the host to join as a guest.');
                   }}
                   showRequestGuestButton={currentUserId !== null && currentUserId !== streamer.profile_id}
+                  alwaysAutoScroll={true}
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-white/60">

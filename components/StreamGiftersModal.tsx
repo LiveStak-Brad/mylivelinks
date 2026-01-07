@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Gift, Crown, Medal, Award } from 'lucide-react';
-import { createClient } from '@/lib/supabase';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import Image from 'next/image';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
+import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
 
 interface StreamGiftersModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ interface TopGifter {
   username: string;
   display_name?: string;
   avatar_url?: string;
-  total_diamonds: number;
+  total_coins: number;
   gifter_status?: GifterStatus | null;
   rank: number;
 }
@@ -36,84 +36,51 @@ export default function StreamGiftersModal({
 }: StreamGiftersModalProps) {
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const { gifters } = useStreamTopGifters({
+    liveStreamId,
+    enabled: isOpen && !!liveStreamId,
+    pollIntervalMs: 7000,
+    limit: 20,
+  });
 
   useEffect(() => {
     if (!isOpen || !liveStreamId) return;
 
-    const fetchTopGifters = async () => {
+    let cancelled = false;
+    const hydrateBadges = async () => {
       setLoading(true);
-
       try {
-        // Get top gifters for this stream
-        const { data: giftsData, error } = await supabase
-          .from('gifts')
-          .select(`
-            sender_id,
-            coin_value,
-            sender:profiles!gifts_sender_id_fkey(
-              id,
-              username,
-              display_name,
-              avatar_url
-            )
-          `)
-          .eq('live_stream_id', liveStreamId)
-          .not('sender_id', 'is', null);
+        const next: TopGifter[] = (gifters ?? []).map((g) => ({
+          profile_id: g.profile_id,
+          username: g.username,
+          display_name: g.display_name ?? undefined,
+          avatar_url: g.avatar_url ?? undefined,
+          total_coins: g.total_coins,
+          gifter_status: null,
+          rank: g.rank,
+        }));
 
-        if (error) throw error;
-
-        // Aggregate gifts by sender
-        const gifterMap = new Map<string, { total: number; profile: any }>();
-        
-        giftsData?.forEach((gift: any) => {
-          if (gift.sender) {
-            const existing = gifterMap.get(gift.sender_id);
-            if (existing) {
-              existing.total += gift.coin_value || 0;
-            } else {
-              gifterMap.set(gift.sender_id, {
-                total: gift.coin_value || 0,
-                profile: gift.sender,
-              });
-            }
-          }
-        });
-
-        // Sort by total diamonds and get top 20
-        const sortedGifters: TopGifter[] = Array.from(gifterMap.entries())
-          .sort((a, b) => b[1].total - a[1].total)
-          .slice(0, 20)
-          .map(([senderId, data], index) => ({
-            profile_id: senderId,
-            username: data.profile.username,
-            display_name: data.profile.display_name,
-            avatar_url: data.profile.avatar_url,
-            total_diamonds: data.total,
-            gifter_status: null,
-            rank: index + 1,
-          }));
-
-        // Fetch gifter statuses
-        if (sortedGifters.length > 0) {
-          const profileIds = sortedGifters.map((g) => g.profile_id);
-          const statuses = await fetchGifterStatuses(profileIds);
-          
-          sortedGifters.forEach((gifter) => {
-            gifter.gifter_status = statuses[gifter.profile_id];
+        if (next.length > 0) {
+          const statuses = await fetchGifterStatuses(next.map((g) => g.profile_id));
+          next.forEach((g) => {
+            g.gifter_status = statuses[g.profile_id];
           });
         }
 
-        setTopGifters(sortedGifters);
-      } catch (error) {
-        console.error('[StreamGiftersModal] Error fetching top gifters:', error);
+        if (!cancelled) setTopGifters(next);
+      } catch (e) {
+        console.error('[StreamGiftersModal] Error hydrating top gifters:', e);
+        if (!cancelled) setTopGifters([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchTopGifters();
-  }, [isOpen, liveStreamId, supabase]);
+    void hydrateBadges();
+    return () => {
+      cancelled = true;
+    };
+  }, [gifters, isOpen, liveStreamId]);
 
   if (!isOpen) return null;
 
@@ -234,10 +201,10 @@ export default function StreamGiftersModal({
                     {/* Diamonds */}
                     <div className="text-right flex-shrink-0">
                       <div className="text-xl font-bold text-purple-600">
-                        {gifter.total_diamonds.toLocaleString()}
+                        {gifter.total_coins.toLocaleString()}
                       </div>
                       <div className="text-xs text-gray-500 font-semibold">
-                        💎 Diamonds
+                        💰 Coins
                       </div>
                     </div>
                   </div>

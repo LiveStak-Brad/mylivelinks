@@ -47,6 +47,7 @@ import StreamGiftersModal from './StreamGiftersModal';
 import MiniProfileModal from './MiniProfileModal';
 import { useIM } from '@/components/im';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
+import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
 
 interface StreamerData {
   id: string;
@@ -77,6 +78,68 @@ interface LeaderboardRank {
   rank_tier: string | null;
   points_to_next_rank: number;
   next_rank: number;
+}
+
+function computeRankFromLeaderboardRows(profileId: string, rows: any[]): LeaderboardRank {
+  const list = Array.isArray(rows) ? rows : [];
+  const mapped = list
+    .map((r: any) => ({
+      profile_id: String(r?.profile_id ?? ''),
+      rank: Number(r?.rank ?? 0),
+      metric_value: Number(r?.metric_value ?? 0),
+    }))
+    .filter((r) => r.profile_id && r.rank > 0)
+    .sort((a, b) => a.rank - b.rank);
+
+  const total_entries = mapped.length;
+  // If nobody has scored today yet, still show the live streamer as #1 (0 diamonds).
+  if (total_entries === 0) {
+    return {
+      current_rank: 1,
+      total_entries: 0,
+      metric_value: 0,
+      rank_tier: 'Diamond',
+      points_to_next_rank: 0,
+      next_rank: 2,
+    };
+  }
+  const meIdx = mapped.findIndex((r) => r.profile_id === profileId);
+  if (meIdx < 0) {
+    return {
+      current_rank: 0,
+      total_entries,
+      metric_value: 0,
+      rank_tier: null,
+      points_to_next_rank: 0,
+      next_rank: 0,
+    };
+  }
+
+  const me = mapped[meIdx];
+  const above = me.rank > 1 ? mapped.find((r) => r.rank === me.rank - 1) : null;
+  const rank2 = me.rank === 1 ? mapped.find((r) => r.rank === 2) : null;
+
+  if (me.rank === 1) {
+    const lead = Math.max(0, Number(me.metric_value ?? 0) - Number(rank2?.metric_value ?? 0));
+    return {
+      current_rank: 1,
+      total_entries,
+      metric_value: Number(me.metric_value ?? 0),
+      rank_tier: 'Diamond',
+      points_to_next_rank: lead,
+      next_rank: 2,
+    };
+  }
+
+  const points = Math.max(1, Number(above?.metric_value ?? 0) - Number(me.metric_value ?? 0) + 1);
+  return {
+    current_rank: me.rank,
+    total_entries,
+    metric_value: Number(me.metric_value ?? 0),
+    rank_tier: null,
+    points_to_next_rank: points,
+    next_rank: Math.max(1, me.rank - 1),
+  };
 }
 
 /**
@@ -127,6 +190,14 @@ export default function SoloHostStream() {
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
   const [viewerCount, setViewerCount] = useState<number>(0);
+ 
+  // Stream-scoped Top Gifters (polling; safe for launch)
+  const { gifters: streamTopGifters } = useStreamTopGifters({
+    liveStreamId: streamer?.live_stream_id ?? null,
+    enabled: !!streamer?.live_stream_id,
+    pollIntervalMs: 7000,
+    limit: 20,
+  });
 
   // Get current user
   useEffect(() => {
@@ -212,76 +283,34 @@ export default function SoloHostStream() {
           return;
         }
 
-        const { data: liveStream } = await supabase
+        // Prefer the ACTIVE solo stream (live_available=true). If none, fall back to most recent.
+        const { data: activeStream } = await supabase
           .from('live_streams')
           .select('id, live_available, started_at')
           .eq('profile_id', profile.id)
-          .eq('streaming_mode', 'solo') // Only solo mode streams
+          .eq('streaming_mode', 'solo')
+          .eq('live_available', true)
           .order('started_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
+        const { data: latestStream } = activeStream
+          ? ({ data: null } as any)
+          : await supabase
+              .from('live_streams')
+              .select('id, live_available, started_at')
+              .eq('profile_id', profile.id)
+              .eq('streaming_mode', 'solo') // Only solo mode streams
+              .order('started_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+        const liveStream = activeStream ?? latestStream;
+
         const gifterStatuses = await fetchGifterStatuses([profile.id]);
         const gifterStatus = gifterStatuses[profile.id] || null;
 
-        // Load top 3 gifters for this streamer
-        const { data: giftersData } = await supabase
-          .from('gifts')
-          .select(`
-            sender_id,
-            coin_value,
-            profiles!gifts_sender_id_fkey (
-              username,
-              avatar_url
-            )
-          `)
-          .eq('recipient_id', profile.id)
-          .order('created_at', { ascending: false })
-          .limit(100);
-
-        if (giftersData && giftersData.length > 0) {
-          const gifterTotals = giftersData.reduce((acc: Record<string, any>, gift: any) => {
-            const senderId = gift.sender_id;
-            if (!acc[senderId]) {
-              acc[senderId] = {
-                profile_id: senderId,
-                username: gift.profiles?.username || 'Unknown',
-                avatar_url: gift.profiles?.avatar_url,
-                total_coins: 0,
-              };
-            }
-            acc[senderId].total_coins += gift.coin_value || 0;
-            return acc;
-          }, {});
-
-          const top3 = Object.values(gifterTotals)
-            .sort((a: any, b: any) => b.total_coins - a.total_coins)
-            .slice(0, 3) as TopGifter[];
-
-          setTopGifters(top3);
-        } else {
-          // Mock data for testing
-          setTopGifters([
-            {
-              profile_id: 'mock1',
-              username: 'TopSupporter',
-              avatar_url: undefined,
-              total_coins: 5000,
-            },
-            {
-              profile_id: 'mock2',
-              username: 'MegaFan',
-              avatar_url: undefined,
-              total_coins: 3500,
-            },
-            {
-              profile_id: 'mock3',
-              username: 'GiftKing',
-              avatar_url: undefined,
-              total_coins: 2000,
-            },
-          ]);
-        }
+        // Top gifters are stream-scoped and loaded via `useStreamTopGifters` (polling).
 
         const streamerData: StreamerData = {
           id: liveStream?.id?.toString() || '0',
@@ -298,6 +327,8 @@ export default function SoloHostStream() {
           live_stream_id: liveStream?.id,
         };
 
+        console.log('[SoloHostStream] Using live_stream_id for chat/gifts:', streamerData.live_stream_id);
+
         setStreamer(streamerData);
         setStreamTitle(''); // Default empty
         setLoading(false);
@@ -311,6 +342,19 @@ export default function SoloHostStream() {
 
     loadStreamer();
   }, [currentUserId, supabase]);
+ 
+  // Bind Top 3 gifter bubbles to the same aggregated source used by the modal
+  useEffect(() => {
+    const top3: TopGifter[] = (streamTopGifters ?? [])
+      .slice(0, 3)
+      .map((g) => ({
+        profile_id: g.profile_id,
+        username: g.username,
+        avatar_url: g.avatar_url ?? undefined,
+        total_coins: g.total_coins,
+      }));
+    setTopGifters(top3);
+  }, [streamTopGifters]);
 
   // Load leaderboard rank for host
   useEffect(() => {
@@ -318,28 +362,27 @@ export default function SoloHostStream() {
       if (!currentUserId) return;
 
       try {
-        // Fetch rank for daily top streamers leaderboard
-        const { data, error } = await supabase
-          .rpc('rpc_get_leaderboard_rank', {
-            p_profile_id: currentUserId,
-            p_leaderboard_type: 'top_streamers_daily'
-          });
+        const { data, error } = await supabase.rpc('get_leaderboard', {
+          p_type: 'top_streamers',
+          p_period: 'daily',
+          p_limit: 100,
+          p_room_id: null,
+        });
 
         if (error) {
-          console.error('[SoloHostStream] Error fetching leaderboard rank:', error);
+          console.error('[SoloHostStream] Error fetching leaderboard rows:', error);
           return;
         }
 
-        if (data && data.length > 0) {
-          setLeaderboardRank(data[0]);
-        }
+        const rank = computeRankFromLeaderboardRows(currentUserId, Array.isArray(data) ? data : []);
+        setLeaderboardRank(rank);
       } catch (err) {
         console.error('[SoloHostStream] Error loading leaderboard rank:', err);
       }
     };
 
     const loadTrendingRank = async () => {
-      if (!streamer?.live_stream_id || !streamer?.live_available) return;
+      if (!streamer?.live_stream_id) return;
 
       try {
         // Fetch trending streams and find this stream's rank
@@ -359,7 +402,7 @@ export default function SoloHostStream() {
           if (rank !== -1) {
             setTrendingRank(rank + 1); // 1-indexed
           } else {
-            setTrendingRank(null);
+            setTrendingRank(0);
           }
         }
       } catch (err) {
@@ -845,7 +888,7 @@ export default function SoloHostStream() {
                           type="button"
                         >
                           <Flame className="w-4 h-4 text-orange-500" />
-                          <span className="font-semibold text-sm">{trendingRank ?? '—'}</span>
+                          <span className="font-semibold text-sm">{trendingRank ?? 0}</span>
                         </button>
                         <span className="text-white/40">•</span>
                         <button 
@@ -855,7 +898,7 @@ export default function SoloHostStream() {
                         >
                           <Trophy className="w-4 h-4 text-yellow-500" />
                           <span className="font-semibold text-sm">
-                            {leaderboardRank?.current_rank || '-'}
+                            {leaderboardRank?.current_rank ?? 0}
                           </span>
                         </button>
                       </div>
@@ -864,7 +907,7 @@ export default function SoloHostStream() {
                 </div>
 
                 {/* Rank badge hanging BELOW the bubble - ABSOLUTE positioned */}
-                {leaderboardRank && leaderboardRank.current_rank <= 100 && (
+                {leaderboardRank && leaderboardRank.current_rank > 0 && leaderboardRank.current_rank <= 100 && (
                   <div className="absolute top-full left-2 mt-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-yellow-500/90 to-orange-500/90 border-2 border-yellow-400/50 shadow-lg shadow-yellow-500/30 backdrop-blur-md w-fit z-10">
                     <span className={`text-[13px] font-bold ${
                       leaderboardRank.current_rank === 1 
@@ -879,18 +922,12 @@ export default function SoloHostStream() {
                     }`}>
                       {leaderboardRank.current_rank}<sup className="text-[8px]">{leaderboardRank.current_rank === 1 ? 'st' : leaderboardRank.current_rank === 2 ? 'nd' : leaderboardRank.current_rank === 3 ? 'rd' : 'th'}</sup>
                     </span>
-                    {leaderboardRank.current_rank === 1 && leaderboardRank.points_to_next_rank > 0 && (
+                    {leaderboardRank.current_rank === 1 && leaderboardRank.points_to_next_rank >= 0 && (
                       <>
                         <span className="text-white/60 text-[10px]">•</span>
                         <Trophy className="w-3.5 h-3.5 text-yellow-300" />
                         <span className="text-white/60 text-[10px]">•</span>
                         <span className="text-[10px] text-white/90 font-medium">+{leaderboardRank.points_to_next_rank.toLocaleString()}</span>
-                      </>
-                    )}
-                    {leaderboardRank.current_rank === 1 && leaderboardRank.points_to_next_rank === 0 && (
-                      <>
-                        <span className="text-white/60 text-[10px]">•</span>
-                        <Trophy className="w-3.5 h-3.5 text-yellow-300" />
                       </>
                     )}
                     {leaderboardRank.current_rank > 1 && leaderboardRank.points_to_next_rank >= 1 && (
@@ -1103,7 +1140,7 @@ export default function SoloHostStream() {
                     console.log('🆕🆕🆕 [SoloHostStream] Updating streamer state with NEW live_stream_id');
                     setStreamer(prev => {
                       console.log('🆕🆕🆕 [SoloHostStream] Previous streamer:', prev);
-                      const updated = prev ? { ...prev, live_stream_id: liveStreamId } : prev;
+                      const updated = prev ? { ...prev, live_stream_id: liveStreamId, live_available: true } : prev;
                       console.log('🆕🆕🆕 [SoloHostStream] Updated streamer:', updated);
                       return updated;
                     });

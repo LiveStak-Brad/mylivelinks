@@ -10,6 +10,7 @@ import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
 import { isBlockedBidirectional } from '@/lib/blocks';
 import ReportModal from '@/components/ReportModal';
+import { Gift as GiftIcon } from 'lucide-react';
 
 interface ChatMessage {
   id: number | string;
@@ -40,6 +41,13 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   console.log('[STREAMCHAT] 📊 Current messages in state:', messages.length);
+  const [giftPopup, setGiftPopup] = useState<{
+    message: string;
+    emoji: string;
+    createdAt: string;
+  } | null>(null);
+  const giftPopupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastGiftPopupMsgIdRef = useRef<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -69,6 +77,8 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+  const loadMessagesInFlightRef = useRef(false);
+  const MAX_MESSAGES = 80;
   // CRITICAL: Memoize Supabase client to prevent recreation on every render
   const supabase = useMemo(() => createClient(), []);
   // CRITICAL: Track subscription to prevent duplicates
@@ -76,6 +86,115 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   
   // CACHE: Store profile styling to avoid stale data from database cache
   const profileCacheRef = useRef<Record<string, { chat_bubble_color?: string; chat_font?: string }>>({});
+
+  // Typography parity: Host uses readOnly StreamChat; viewer uses interactive StreamChat.
+  // User requested Host font be bigger to match Viewer, so we scale up readOnly chat text.
+  const usernameTextClass = readOnly ? 'text-base' : 'text-xs';
+  const timeTextClass = readOnly ? 'text-sm' : 'text-[10px]';
+  const messageTextClass = readOnly ? 'text-lg' : 'text-sm';
+
+  const showGiftPopup = useCallback((msg: ChatMessage) => {
+    if (!msg || msg.message_type !== 'gift') return;
+    const raw = String(msg.content || '').slice(0, 220);
+    if (!raw) return;
+
+    const parseGift = (content: string) => {
+      // Expected format: `${sender} sent "${giftName}" to ${recipient} 💎+N`
+      const sentIdx = content.indexOf(' sent "');
+      if (sentIdx < 0) return null;
+      const sender = content.slice(0, sentIdx).trim();
+      const rest = content.slice(sentIdx + ' sent "'.length);
+      const endGiftIdx = rest.indexOf('" to ');
+      if (endGiftIdx < 0) return null;
+      const giftName = rest.slice(0, endGiftIdx).trim();
+      let recipientPart = rest.slice(endGiftIdx + '" to '.length);
+      // strip diamonds suffix if present
+      const diamondsIdx = recipientPart.indexOf(' 💎+');
+      if (diamondsIdx >= 0) recipientPart = recipientPart.slice(0, diamondsIdx);
+      const recipient = recipientPart.trim();
+      return { sender, giftName, recipient };
+    };
+
+    const getGiftEmoji = (name: string) => {
+      const emojiMap: Record<string, string> = {
+        Poo: '💩',
+        Rose: '🌹',
+        Heart: '❤️',
+        Star: '⭐',
+        Diamond: '💎',
+        'Super Star': '🌟',
+        Crown: '👑',
+        Platinum: '💠',
+        Legendary: '🏆',
+        Fire: '🔥',
+        Rocket: '🚀',
+        Rainbow: '🌈',
+        Unicorn: '🦄',
+        Party: '🎉',
+        Confetti: '🎊',
+        Champagne: '🍾',
+        Money: '💰',
+        Cash: '💵',
+        Gold: '🥇',
+        Silver: '🥈',
+        Bronze: '🥉',
+        Kiss: '💋',
+        Hug: '🤗',
+        Love: '💕',
+        Sparkle: '✨',
+        Gem: '💎',
+        Crystal: '🔮',
+        Music: '🎵',
+        Microphone: '🎤',
+        Camera: '📸',
+        Clap: '👏',
+        'Thumbs Up': '👍',
+        Wave: '👋',
+        Flex: '💪',
+        Cool: '😎',
+        Hot: '🥵',
+        VIP: '🎯',
+        King: '🤴',
+        Queen: '👸',
+        Angel: '😇',
+        Devil: '😈',
+      };
+      return emojiMap[name] || '🎁';
+    };
+
+    const parsed = parseGift(raw);
+    const message = parsed ? `${parsed.sender} sent ${parsed.giftName} to ${parsed.recipient}` : raw;
+    const giftEmoji = parsed ? getGiftEmoji(parsed.giftName) : '🎁';
+
+    // prevent duplicate popups for the same message (realtime + reload)
+    const msgId = String((msg as any)?.id ?? '');
+    if (msgId && lastGiftPopupMsgIdRef.current === msgId) return;
+    if (msgId) lastGiftPopupMsgIdRef.current = msgId;
+
+    // Clear existing timer
+    if (giftPopupTimerRef.current) clearTimeout(giftPopupTimerRef.current);
+
+    setGiftPopup({
+      message,
+      emoji: giftEmoji,
+      createdAt: msg.created_at,
+    });
+
+    giftPopupTimerRef.current = setTimeout(() => {
+      setGiftPopup(null);
+      giftPopupTimerRef.current = null;
+    }, 3500);
+  }, []);
+
+  // Cleanup popup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (giftPopupTimerRef.current) {
+        clearTimeout(giftPopupTimerRef.current);
+        giftPopupTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // CRITICAL: Listen for chat settings updates via BroadcastChannel
   useEffect(() => {
@@ -220,6 +339,10 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
 
   // CRITICAL: Use useCallback to prevent stale closures and ensure stable reference
   const loadMessages = useCallback(async () => {
+    // Prevent overlapping loads (polling + realtime can race and overwrite state).
+    if (loadMessagesInFlightRef.current) return;
+    loadMessagesInFlightRef.current = true;
+
     // Use functional update to get current messages state
     let isInitialLoad = false;
     setMessages((currentMessages) => {
@@ -251,14 +374,18 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         `)
         .eq('live_stream_id', liveStreamId)
         .is('room_id', null)
-        .order('created_at', { ascending: true })
+        // IMPORTANT: fetch most recent messages; we'll reverse for chronological display
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
 
+      // Reverse to chronological order for UI rendering
+      const chronological = Array.isArray(data) ? [...data].reverse() : [];
+
       const me = currentUserIdRef.current;
       const uniqueProfileIds = Array.from(
-        new Set<string>((data || []).map((m: any) => m?.profile_id).filter((id: any): id is string => typeof id === 'string'))
+        new Set<string>(chronological.map((m: any) => m?.profile_id).filter((id: any): id is string => typeof id === 'string'))
       ).filter((id) => (me ? id !== me : true));
 
       const blockedChecks = await Promise.all(
@@ -276,11 +403,11 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         if (blockedChecks[idx]) blockedPeerIdsRef.current.add(pid);
       });
 
-      console.log('[STREAMCHAT] 📊 Raw data from database:', data);
-      console.log('[STREAMCHAT] 📊 Number of messages loaded:', data?.length || 0);
+      console.log('[STREAMCHAT] 📊 Raw data from database:', chronological);
+      console.log('[STREAMCHAT] 📊 Number of messages loaded:', chronological?.length || 0);
 
       // Get unique profile IDs and fetch chat settings
-      const profileIds = Array.from(new Set((data || []).map((msg: any) => msg.profile_id).filter(Boolean)));
+      const profileIds = Array.from(new Set((chronological || []).map((msg: any) => msg.profile_id).filter(Boolean)));
       
       // Fetch chat settings for all profiles in one query
       // Add timestamp to bypass Supabase cache
@@ -301,7 +428,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         chatSettingsMap,
       });
 
-      const messagesWithBadges: Array<ChatMessage | null> = (data || []).map((msg: any) => {
+      const messagesWithBadges: Array<ChatMessage | null> = (chronological || []).map((msg: any) => {
         if (msg?.profile_id && blockedPeerIdsRef.current.has(msg.profile_id)) {
           return null;
         }
@@ -339,7 +466,16 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       setGifterStatusMap(statusMap);
 
       console.log('[STREAMCHAT] ✅ Setting messages state with', visibleMessages.length, 'messages');
-      setMessages(visibleMessages);
+      setMessages((prev) => {
+        // Merge-by-id to avoid overwriting newer realtime messages (fixes flash/revert).
+        const merged = new Map<string, ChatMessage>();
+        for (const m of prev) merged.set(String(m.id), m);
+        for (const m of visibleMessages) merged.set(String(m.id), m);
+        const arr = Array.from(merged.values()).sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        return arr.slice(-MAX_MESSAGES);
+      });
 
       if (isInitialLoad) {
         requestAnimationFrame(() => scrollToBottom('auto'));
@@ -364,12 +500,14 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         `)
         .eq('live_stream_id', liveStreamId)
         .is('room_id', null)
-        .order('created_at', { ascending: true })
+        // IMPORTANT: fetch most recent messages; we'll reverse for chronological display
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (!fallbackError && fallbackData) {
+        const chronologicalFallback = Array.isArray(fallbackData) ? [...fallbackData].reverse() : [];
         // Get unique profile IDs
-        const profileIds = Array.from(new Set(fallbackData.map((msg: any) => msg.profile_id).filter(Boolean)));
+        const profileIds = Array.from(new Set(chronologicalFallback.map((msg: any) => msg.profile_id).filter(Boolean)));
         
         // Fetch chat settings for all profiles in one query
         // Add order to bypass Supabase cache
@@ -390,7 +528,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           chatSettingsMap,
         });
 
-        const messagesWithProfiles = fallbackData.map((msg: any) => {
+        const messagesWithProfiles = chronologicalFallback.map((msg: any) => {
           const profile = msg.profiles;
           const chatSettings = chatSettingsMap[msg.profile_id];
 
@@ -425,7 +563,15 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           return mappedMsg;
         });
         
-        setMessages(messagesWithProfiles);
+        setMessages((prev) => {
+          const merged = new Map<string, any>();
+          for (const m of prev) merged.set(String(m.id), m);
+          for (const m of messagesWithProfiles) merged.set(String(m.id), m);
+          const arr = Array.from(merged.values()).sort(
+            (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          return arr.slice(-MAX_MESSAGES);
+        });
 
         const gifterProfileIds = Array.from(
           new Set<string>(
@@ -438,7 +584,15 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         setGifterStatusMap(statusMap);
 
         console.log('[STREAMCHAT] ✅ Setting messages state (fallback) with', messagesWithProfiles.length, 'messages');
-        setMessages(messagesWithProfiles);
+        setMessages((prev) => {
+          const merged = new Map<string, any>();
+          for (const m of prev) merged.set(String(m.id), m);
+          for (const m of messagesWithProfiles) merged.set(String(m.id), m);
+          const arr = Array.from(merged.values()).sort(
+            (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          return arr.slice(-MAX_MESSAGES);
+        });
 
         if (isInitialLoad) {
           requestAnimationFrame(() => scrollToBottom('auto'));
@@ -446,8 +600,24 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       }
     } finally {
       setLoading(false);
+      loadMessagesInFlightRef.current = false;
     }
   }, [supabase, scrollToBottom]); // Only depend on stable references
+
+  // Fallback polling (P0 reliability): if realtime misses events, this keeps Host+Viewer consistent.
+  useEffect(() => {
+    if (!liveStreamId) return;
+    let cancelled = false;
+    const interval = setInterval(() => {
+      if (cancelled) return;
+      // Best-effort refresh without showing a spinner (isInitialLoad will be false if we already have messages)
+      void loadMessages();
+    }, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [liveStreamId, loadMessages]);
 
   // CRITICAL: Use useCallback to prevent stale closures
   const loadMessageWithProfile = useCallback(async (message: any) => {
@@ -456,13 +626,16 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       setMessages((prev) => {
         // Check if message already exists (prevent duplicates)
         if (prev.some(m => m.id === message.id)) return prev;
-        return [...prev, {
+        const nextMsg: ChatMessage = {
           id: message.id,
           profile_id: null,
           message_type: message.message_type,
           content: message.content,
           created_at: message.created_at,
-        }];
+        };
+        // Gift popup (if gift announcements are system messages)
+        showGiftPopup(nextMsg);
+        return [...prev, nextMsg];
       });
       if (shouldAutoScrollRef.current || alwaysAutoScroll) {
         requestAnimationFrame(() => scrollToBottom('smooth'));
@@ -517,6 +690,9 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         chat_font: newMsg.chat_font,
         profile_id: newMsg.profile_id,
       });
+ 
+      // Gift popup (Host + Viewer)
+      showGiftPopup(newMsg as any);
 
       if (status) {
         setGifterStatusMap((prev) => ({ ...prev, [message.profile_id]: status }));
@@ -563,7 +739,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         }];
       });
     });
-  }, [supabase, scrollToBottom]); // Only depend on stable references
+  }, [supabase, scrollToBottom, showGiftPopup, alwaysAutoScroll]); // include popup + autoscroll controls
 
   // CRITICAL: Store loadMessageWithProfile in ref to avoid stale closures in subscription
   const loadMessageWithProfileRef = useRef(loadMessageWithProfile);
@@ -584,15 +760,24 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         },
         (payload: any) => {
           const updatedProfileId = payload.new.id;
-          
-          // Update all messages from this user with new styling
-          setMessages((prev) => 
-            prev.map((msg) => 
+ 
+          // IMPORTANT: profiles rows update frequently (e.g., coin_balance / earnings_balance).
+          // Only treat this as a "chat style changed" signal if the style fields actually changed.
+          const oldColor = payload?.old?.chat_bubble_color ?? null;
+          const newColor = payload?.new?.chat_bubble_color ?? null;
+          const oldFont = payload?.old?.chat_font ?? null;
+          const newFont = payload?.new?.chat_font ?? null;
+ 
+          const styleChanged = oldColor !== newColor || oldFont !== newFont;
+          if (!styleChanged) return;
+ 
+          setMessages((prev) =>
+            prev.map((msg) =>
               msg.profile_id === updatedProfileId
                 ? {
                     ...msg,
-                    chat_bubble_color: payload.new.chat_bubble_color,
-                    chat_font: payload.new.chat_font,
+                    chat_bubble_color: payload?.new?.chat_bubble_color,
+                    chat_font: payload?.new?.chat_font,
                   }
                 : msg
             )
@@ -644,7 +829,13 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
 
             if (pid) {
               const meNow = currentUserIdRef.current;
-              if (!meNow) return;
+              // If we don't yet know the current user, do NOT drop realtime messages.
+              // We'll skip block checks until auth loads; polling/loadMessages will reconcile.
+              if (!meNow) {
+                console.log('[STREAMCHAT] ⚠️ currentUserId not loaded yet; accepting realtime message without block check');
+                loadMessageWithProfileRef.current(payload.new as any);
+                return;
+              }
               void isBlockedBidirectional(supabase as any, meNow, pid).then((blocked) => {
                 if (blocked) {
                   blockedPeerIdsRef.current.add(pid);
@@ -765,6 +956,16 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       requestAnimationFrame(() => scrollToBottom('smooth'));
     }
   }, [messages.length, scrollToBottom]);
+
+  // Ensure gift popup shows on both Host + Viewer even if the gift arrives via full reload (not realtime).
+  // Also force-scroll for gifts to match host "instant" behavior.
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.message_type !== 'gift') return;
+    showGiftPopup(last);
+    requestAnimationFrame(() => scrollToBottom('smooth'));
+  }, [messages, showGiftPopup, scrollToBottom]);
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1011,7 +1212,27 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   );
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-transparent">
+    <div className="flex flex-col h-full min-h-0 bg-transparent relative">
+      {/* Gift Popup (Host + Viewer) */}
+      {giftPopup && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          {/* Larger "real gift" popup */}
+          <div className="flex items-center gap-3 bg-black/75 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-white/10 max-w-[92vw]">
+            <div className={`${readOnly ? 'w-16 h-16 text-5xl' : 'w-14 h-14 text-4xl'} rounded-2xl bg-white/10 flex items-center justify-center`}>
+              <span className="leading-none">{giftPopup.emoji}</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2 text-pink-200">
+                <GiftIcon className={readOnly ? 'w-5 h-5' : 'w-4 h-4'} />
+                <span className={`${readOnly ? 'text-base' : 'text-sm'} font-bold uppercase tracking-wide`}>Gift</span>
+              </div>
+              <div className={`${readOnly ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'} font-extrabold truncate`}>
+                {giftPopup.message}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Messages - Flexible height with scroll, no header */}
       <div
         ref={messagesContainerRef}
@@ -1068,12 +1289,12 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                               });
                             }
                           }}
-                          className="font-semibold text-xs text-white hover:text-blue-300 transition cursor-pointer leading-tight"
+                          className={`font-semibold ${usernameTextClass} text-white hover:text-blue-300 transition cursor-pointer leading-tight`}
                           style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
                         >
                           {msg.username}
                         </button>
-                        <span className="text-[10px] text-white/50 leading-tight">
+                        <span className={`${timeTextClass} text-white/50 leading-tight`}>
                           {formatTime(msg.created_at)}
                         </span>
                         {msg.message_type !== 'system' && msg.profile_id && (
@@ -1095,7 +1316,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                           // No badge - just show message
                           return (
                             <div
-                              className="text-sm text-white/90 break-words leading-snug"
+                              className={`${messageTextClass} text-white/90 break-words leading-snug`}
                               style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
                             >
                               <SafeRichText text={msg.content} />
@@ -1111,7 +1332,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                               size="sm"
                             />
                             <div
-                              className="text-sm text-white/90 break-words leading-snug flex-1 min-w-0"
+                              className={`${messageTextClass} text-white/90 break-words leading-snug flex-1 min-w-0`}
                               style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
                             >
                               <SafeRichText text={msg.content} />

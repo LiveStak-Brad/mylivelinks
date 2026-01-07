@@ -18,6 +18,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'live_stream_id and viewer_id are required' }, { status: 400 });
     }
 
+    // CRITICAL: active_viewers.streamer_id is NOT NULL in production.
+    // Always resolve streamer_id from live_streams.profile_id.
+    const { data: liveStreamRow, error: liveStreamErr } = await supabase
+      .from('live_streams')
+      .select('profile_id')
+      .eq('id', live_stream_id)
+      .maybeSingle();
+
+    const streamer_id = (liveStreamRow as any)?.profile_id as string | undefined;
+
+    // If we cannot resolve streamer_id, NEVER hard-fail this endpoint.
+    // Return 200 and skip so viewer playback isn't impacted by periodic errors.
+    if (liveStreamErr || !streamer_id) {
+      console.warn('[active-viewers/heartbeat] Skipping upsert: unable to resolve streamer_id', {
+        live_stream_id,
+        hasViewerId: !!viewer_id,
+        liveStreamErr: liveStreamErr ? { code: (liveStreamErr as any).code, message: liveStreamErr.message } : null,
+        hasStreamerId: !!streamer_id,
+      });
+      return NextResponse.json({ success: true, skipped: true }, { status: 200 });
+    }
+
     const is_active = body?.is_active ?? true;
     const is_unmuted = body?.is_unmuted ?? true;
     const is_visible = body?.is_visible ?? true;
@@ -25,6 +47,7 @@ export async function POST(req: Request) {
 
     const { error } = await supabase.from('active_viewers').upsert(
       {
+        streamer_id,
         live_stream_id,
         viewer_id,
         is_active,
@@ -38,12 +61,14 @@ export async function POST(req: Request) {
 
     if (error) {
       console.error('[active-viewers/heartbeat] Upsert error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // NEVER hard-fail this endpoint; treat as best-effort.
+      return NextResponse.json({ success: false, error: error.message }, { status: 200 });
     }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error('[active-viewers/heartbeat] Exception:', err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    // NEVER hard-fail this endpoint; treat as best-effort.
+    return NextResponse.json({ success: false, error: String(err) }, { status: 200 });
   }
 }

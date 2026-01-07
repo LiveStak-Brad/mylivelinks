@@ -199,19 +199,30 @@ export default function GiftModal({
           console.error('[GiftModal] Failed to create gift comment:', commentError);
         }
       } else {
-        // Otherwise post to chat messages (for live streams)
-        const { data: senderProfile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', user.id)
-          .single();
-        
-        if (senderProfile) {
-          await supabase.from('chat_messages').insert({
-            profile_id: user.id,
-            content: `${senderProfile.username} sent "${selectedGift.name}" to ${recipientUsername}${diamondsSuffix}`,
-            message_type: 'gift',
-          });
+        // Live gift chat announcement is inserted server-side in POST /api/gifts/send (service role)
+        // to avoid client RLS failures and ensure correct stream scoping.
+        // Fallback: if server reports it did NOT insert, try a best-effort client insert (may fail under RLS).
+        try {
+          const inserted = Boolean((data as any)?.chatInserted);
+          const effectiveStreamId = (data as any)?.streamId ?? liveStreamId ?? null;
+          if (!inserted && effectiveStreamId) {
+            const { data: senderProfile } = await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', user.id)
+              .maybeSingle();
+
+            const senderUsername = (senderProfile as any)?.username || 'Someone';
+            await supabase.from('chat_messages').insert({
+              profile_id: user.id,
+              content: `${senderUsername} sent "${selectedGift.name}" to ${recipientUsername}${diamondsSuffix}`,
+              message_type: 'gift',
+              live_stream_id: effectiveStreamId,
+              room_id: null,
+            });
+          }
+        } catch {
+          // ignore - server insert should handle it; this is only a fallback
         }
       }
 
