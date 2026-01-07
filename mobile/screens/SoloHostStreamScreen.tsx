@@ -27,12 +27,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLiveRoomParticipants } from '../hooks/useLiveRoomParticipants';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
-import type { Participant } from '../types/live';
 import { canUserGoLive } from '../lib/livekit-constants';
 import { Modal, Input } from '../components/ui';
 import { useActiveViewerCount } from '../hooks/useActiveViewerCount';
@@ -51,17 +49,178 @@ type LeaderboardRank = {
   next_rank: number;
 };
 
+// Local minimal participant type to avoid importing any LiveKit-linked types in this screen.
+type TileParticipant = {
+  identity: string;
+  username: string;
+  isSpeaking: boolean;
+  isCameraEnabled: boolean;
+  isMicEnabled: boolean;
+  isLocal: boolean;
+  viewerCount?: number;
+};
+
+type LiveKitDeps = {
+  useLiveRoomParticipants: null | ((opts: { enabled: boolean }) => any);
+  Tile: null | React.ComponentType<any>;
+};
+
+const LK: LiveKitDeps = {
+  useLiveRoomParticipants: null,
+  Tile: null,
+};
+
+let liveKitReady = false;
+let liveKitReadyInFlight: Promise<void> | null = null;
+
+async function ensureLiveKitReady() {
+  if (liveKitReady) return;
+  if (liveKitReadyInFlight) return liveKitReadyInFlight;
+
+  liveKitReadyInFlight = (async () => {
+    const mod: any = await import('@livekit/react-native');
+    const registerGlobals = mod?.registerGlobals;
+    if (typeof registerGlobals !== 'function') {
+      throw new Error('LiveKit registerGlobals not available');
+    }
+    registerGlobals();
+    liveKitReady = true;
+  })();
+
+  try {
+    await liveKitReadyInFlight;
+  } finally {
+    // allow retry if it failed
+    if (!liveKitReady) liveKitReadyInFlight = null;
+  }
+}
+
 export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
   useKeepAwake();
-  
+
+  const insets = useSafeAreaInsets();
+  const { theme } = useThemeMode();
+  const { user } = useAuthContext();
+
+  const isOwner = useMemo(() => canUserGoLive(user ? { id: user.id, email: user.email } : null), [user?.email, user?.id]);
+  const [ready, setReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+
+  // Safe-shell rule: DO NOT evaluate LiveKit until after mount and after registerGlobals().
+  useEffect(() => {
+    if (!isOwner) return;
+    if (ready) return;
+
+    let mounted = true;
+    (async () => {
+      try {
+        setInitError(null);
+        await ensureLiveKitReady();
+
+        // Import LiveKit-dependent modules ONLY after registerGlobals is complete.
+        const hookMod: any = await import('../hooks/useLiveRoomParticipants');
+        const tileMod: any = await import('../components/live/Tile');
+
+        const useLiveRoomParticipants = hookMod?.useLiveRoomParticipants;
+        const Tile = tileMod?.Tile;
+        if (typeof useLiveRoomParticipants !== 'function') {
+          throw new Error('useLiveRoomParticipants missing');
+        }
+        if (!Tile) {
+          throw new Error('Tile export missing');
+        }
+
+        LK.useLiveRoomParticipants = useLiveRoomParticipants;
+        LK.Tile = Tile;
+
+        if (mounted) setReady(true);
+      } catch (e: any) {
+        const msg = e?.message ? String(e.message) : String(e);
+        if (mounted) setInitError(msg);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isOwner, ready]);
+
+  if (!isOwner) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: (insets.top || 0) + 24 }]}>
+        <View style={styles.centered}>
+          <Text style={[styles.subtleText, { color: theme.colors.textSecondary, textAlign: 'center' }]}>
+            Go Live is currently limited to the owner account.
+          </Text>
+          <TouchableOpacity
+            style={[styles.goLiveButton, { backgroundColor: theme.colors.accent }]}
+            onPress={() => {
+              onExit?.();
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.goLiveButtonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (initError) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: (insets.top || 0) + 24 }]}>
+        <View style={styles.centered}>
+          <Text style={[{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '900', marginBottom: 10, textAlign: 'center' }]}>
+            LiveKit failed to load
+          </Text>
+          <Text style={[styles.subtleText, { color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 16 }]}>
+            {initError}
+          </Text>
+          <TouchableOpacity
+            style={[styles.goLiveButton, { backgroundColor: theme.colors.accent }]}
+            onPress={() => onExit?.()}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.goLiveButtonText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: (insets.top || 0) + 24 }]}>
+        <View style={styles.centered}>
+          <Text style={[{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '900', marginBottom: 10 }]}>
+            Preparing LiveKit…
+          </Text>
+          <Text style={[styles.subtleText, { color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 18 }]}>
+            Loading video system. This should only take a moment.
+          </Text>
+          <View style={{ width: '100%', maxWidth: 320, aspectRatio: 9 / 16, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.15)', marginBottom: 18 }} />
+          <TouchableOpacity
+            style={[styles.goLiveButton, { backgroundColor: theme.colors.cardSurface }]}
+            onPress={() => onExit?.()}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.goLiveButtonText, { color: theme.colors.textPrimary }]}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return <SoloHostStreamScreenLive onExit={onExit} />;
+}
+
+function SoloHostStreamScreenLive({ onExit }: SoloHostStreamScreenProps) {
   const insets = useSafeAreaInsets();
   const { theme } = useThemeMode();
   const { user } = useAuthContext();
   const { height: windowHeight } = useWindowDimensions();
 
   const isOwner = useMemo(() => canUserGoLive(user ? { id: user.id, email: user.email } : null), [user?.email, user?.id]);
-  const [TileComponent, setTileComponent] = useState<null | React.ComponentType<any>>(null);
-  const [tileLoadError, setTileLoadError] = useState<string | null>(null);
   
   const [currentUser, setCurrentUser] = useState<{ id: string; username: string; display_name?: string | null; avatar_url?: string | null } | null>(null);
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
@@ -76,6 +235,7 @@ export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenPro
   const [permissionsRequested, setPermissionsRequested] = useState(false);
   
   // LiveKit streaming
+  const useLiveRoomParticipants = LK.useLiveRoomParticipants as any;
   const {
     goLive,
     stopLive,
@@ -112,31 +272,6 @@ export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenPro
     fallbackCount: fallbackViewerCount,
   });
   const displayViewerCount = liveStreamId ? viewerCount : fallbackViewerCount;
-
-  // Lazy-load Tile so @livekit/react-native is never evaluated during normal boot.
-  // If this fails (e.g. native module/class init issue), render a safe placeholder UI instead of crashing.
-  useEffect(() => {
-    if (!isOwner) return;
-    if (TileComponent) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        setTileLoadError(null);
-        const mod = await import('../components/live/Tile');
-        const Comp = (mod as any)?.Tile;
-        if (!Comp) throw new Error('Tile export missing');
-        if (!cancelled) setTileComponent(() => Comp);
-      } catch (e: any) {
-        const msg = e?.message ? String(e.message) : String(e);
-        if (!cancelled) setTileLoadError(msg);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [TileComponent, isOwner]);
 
   // Load current user
   useEffect(() => {
@@ -356,7 +491,7 @@ export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenPro
 
   const localParticipant = participants.find((p) => p.isLocal) || null;
 
-  const tileParticipant: Participant = {
+  const tileParticipant: TileParticipant = {
     identity: localParticipant?.identity || currentUser?.id || 'local',
     username: currentUser?.display_name || currentUser?.username || 'You',
     isSpeaking: false,
@@ -514,8 +649,8 @@ export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenPro
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.videoStage}>
         <View style={styles.videoStageInner}>
-          {TileComponent ? (
-            <TileComponent
+          {LK.Tile ? (
+            <LK.Tile
               item={{ id: tileParticipant.identity, participant: tileParticipant, isAutofill: false }}
               isEditMode={false}
               isFocused={false}
@@ -525,13 +660,8 @@ export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenPro
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
-                {tileLoadError ? 'Live video unavailable' : 'Loading video…'}
+                Loading video…
               </Text>
-              {tileLoadError ? (
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600', paddingHorizontal: 18, textAlign: 'center' }}>
-                  {tileLoadError}
-                </Text>
-              ) : null}
             </View>
           )}
         </View>
