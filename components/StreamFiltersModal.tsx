@@ -42,13 +42,16 @@ function FilterSlider({
   formatValue 
 }: FilterSliderProps) {
   const displayValue = formatValue ? formatValue(value) : `${value}${unit}`;
-  const isDefault = value === defaultValue;
+  const isDefault = Math.abs(value - defaultValue) < 0.001;
+  
+  // Calculate percentage for track fill
+  const percentage = ((value - min) / (max - min)) * 100;
   
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
             isDefault 
               ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400' 
               : 'bg-cyan-500/20 text-cyan-500'
@@ -59,7 +62,7 @@ function FilterSlider({
             {label}
           </span>
         </div>
-        <span className={`text-sm font-mono ${
+        <span className={`text-sm font-mono min-w-[60px] text-right ${
           isDefault 
             ? 'text-gray-500 dark:text-gray-400' 
             : 'text-cyan-500'
@@ -67,15 +70,35 @@ function FilterSlider({
           {displayValue}
         </span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-      />
+      {/* Custom slider with visual track */}
+      <div className="relative h-6 flex items-center">
+        {/* Track background */}
+        <div className="absolute inset-x-0 h-2 rounded-full bg-gray-200 dark:bg-gray-700" />
+        {/* Filled track */}
+        <div 
+          className="absolute left-0 h-2 rounded-full bg-cyan-500"
+          style={{ width: `${percentage}%` }}
+        />
+        {/* Invisible range input on top for interaction */}
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="absolute inset-0 w-full opacity-0 cursor-pointer z-10"
+        />
+        {/* Custom thumb */}
+        <div 
+          className="absolute w-5 h-5 bg-cyan-500 rounded-full border-2 border-white shadow-lg pointer-events-none"
+          style={{ 
+            left: `calc(${percentage}% - 10px)`,
+            top: '50%',
+            transform: 'translateY(-50%)'
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -87,39 +110,44 @@ export default function StreamFiltersModal({
   currentSettings 
 }: StreamFiltersModalProps) {
   const [settings, setSettings] = useState<VideoFilterSettings>(DEFAULT_FILTER_SETTINGS);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [initialSettings, setInitialSettings] = useState<VideoFilterSettings>(DEFAULT_FILTER_SETTINGS);
 
   // Load settings on mount or when modal opens
   useEffect(() => {
     if (isOpen) {
       const saved = currentSettings || loadFilterSettings();
       setSettings(saved);
-      setHasChanges(false);
+      setInitialSettings(saved);
     }
   }, [isOpen, currentSettings]);
 
+  // Live preview: apply changes immediately as user adjusts sliders
   const updateSetting = useCallback(<K extends keyof VideoFilterSettings>(
     key: K, 
     value: VideoFilterSettings[K]
   ) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
-    setHasChanges(true);
-  }, []);
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    // Apply immediately for live preview
+    onApply?.(newSettings);
+  }, [settings, onApply]);
 
   const handleReset = useCallback(() => {
     setSettings(DEFAULT_FILTER_SETTINGS);
-    setHasChanges(true);
-  }, []);
+    onApply?.(DEFAULT_FILTER_SETTINGS);
+  }, [onApply]);
 
-  const handleApply = useCallback(() => {
+  const handleDone = useCallback(() => {
+    // Save and close
     saveFilterSettings(settings);
-    onApply?.(settings);
     onClose();
-  }, [settings, onApply, onClose]);
+  }, [settings, onClose]);
 
   const handleCancel = useCallback(() => {
+    // Revert to initial settings
+    onApply?.(initialSettings);
     onClose();
-  }, [onClose]);
+  }, [initialSettings, onApply, onClose]);
 
   // Check if current settings are all default
   const isAllDefault = (
@@ -133,21 +161,28 @@ export default function StreamFiltersModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[85vh] overflow-hidden flex flex-col modal-fullscreen-mobile">
+    <>
+      {/* Semi-transparent backdrop - click to close */}
+      <div 
+        className="fixed inset-0 z-40 bg-black/30"
+        onClick={handleDone}
+      />
+      
+      {/* Side panel - positioned on the right, half screen */}
+      <div className="fixed right-0 top-0 bottom-0 z-50 w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 mobile-safe-top">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-purple-500 rounded-full flex items-center justify-center">
-              <Wand2 className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 to-purple-500 rounded-full flex items-center justify-center">
+              <Wand2 className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Stream Filters</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Beauty Lite</p>
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">Filters</h2>
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">Live Preview</p>
             </div>
           </div>
           <button
-            onClick={handleCancel}
+            onClick={handleDone}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             aria-label="Close"
           >
@@ -156,31 +191,33 @@ export default function StreamFiltersModal({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-5 overflow-y-auto flex-1">
+        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {/* Reset button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleReset}
+              disabled={isAllDefault}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                isAllDefault
+                  ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+              }`}
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset All
+            </button>
+          </div>
+
           {/* Beauty Filters Section */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                Beauty Lite
-              </h3>
-              <button
-                onClick={handleReset}
-                disabled={isAllDefault}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  isAllDefault
-                    ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Reset All
-              </button>
-            </div>
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Beauty
+            </h3>
 
             {/* Smoothing (Beauty Lite) */}
             <FilterSlider
               label="Smoothing"
-              icon={<Sparkles className="w-4 h-4" />}
+              icon={<Sparkles className="w-3.5 h-3.5" />}
               value={settings.smoothing}
               min={0}
               max={3}
@@ -193,7 +230,7 @@ export default function StreamFiltersModal({
             {/* Blur */}
             <FilterSlider
               label="Blur"
-              icon={<Focus className="w-4 h-4" />}
+              icon={<Focus className="w-3.5 h-3.5" />}
               value={settings.blur}
               min={0}
               max={4}
@@ -205,15 +242,15 @@ export default function StreamFiltersModal({
           </div>
 
           {/* Adjustments Section */}
-          <div className="space-y-4 pt-2 border-t border-gray-200 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+          <div className="space-y-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Adjustments
             </h3>
 
             {/* Brightness */}
             <FilterSlider
               label="Brightness"
-              icon={<Sun className="w-4 h-4" />}
+              icon={<Sun className="w-3.5 h-3.5" />}
               value={settings.brightness}
               min={0.5}
               max={1.5}
@@ -229,7 +266,7 @@ export default function StreamFiltersModal({
             {/* Contrast */}
             <FilterSlider
               label="Contrast"
-              icon={<Contrast className="w-4 h-4" />}
+              icon={<Contrast className="w-3.5 h-3.5" />}
               value={settings.contrast}
               min={0.5}
               max={1.5}
@@ -245,7 +282,7 @@ export default function StreamFiltersModal({
             {/* Saturation */}
             <FilterSlider
               label="Saturation"
-              icon={<Droplet className="w-4 h-4" />}
+              icon={<Droplet className="w-3.5 h-3.5" />}
               value={settings.saturation}
               min={0}
               max={2}
@@ -261,33 +298,29 @@ export default function StreamFiltersModal({
           </div>
 
           {/* Info Note */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 mt-4">
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2.5 mt-3">
+            <p className="text-[10px] text-gray-500 dark:text-gray-400 text-center">
               ✨ More filters coming soon.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex gap-3 p-5 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 mobile-safe-bottom">
+        <div className="flex gap-2 p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
           <button
             onClick={handleCancel}
-            className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium"
+            className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium text-sm"
           >
             Cancel
           </button>
           <button
-            onClick={handleApply}
-            className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-all ${
-              hasChanges
-                ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white hover:from-cyan-600 hover:to-purple-600 shadow-lg shadow-cyan-500/25'
-                : 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white opacity-80'
-            }`}
+            onClick={handleDone}
+            className="flex-1 px-3 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg hover:from-cyan-600 hover:to-purple-600 transition-all font-medium text-sm shadow-lg shadow-cyan-500/25"
           >
-            Apply Filters
+            Done
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }
