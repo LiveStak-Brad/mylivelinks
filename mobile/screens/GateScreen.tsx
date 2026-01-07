@@ -17,7 +17,7 @@ type Target = keyof RootStackParamList;
 export function GateScreen({ navigation }: Props) {
   const { session, loading: authLoading } = useAuthContext();
   const userId = session?.user?.id ?? null;
-  const { loading: profileLoading, needsOnboarding, isComplete } = useProfile(userId);
+  const { loading: profileLoading, needsOnboarding, isComplete, error: profileError } = useProfile(userId);
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
@@ -33,29 +33,35 @@ export function GateScreen({ navigation }: Props) {
       hasSession: !!session,
       userId: session?.user?.id,
       profileLoading,
+      profileError,
       needsOnboarding,
       isComplete,
     });
 
     if (authLoading) return;
 
+    // Authoritative rule (P0):
+    // - No session -> Auth
+    // - Session exists -> immediately route to MainTabs (Home)
+    // - In parallel, once profile is loaded, redirect to CreateProfile if missing/incomplete
+    // - If profile query fails, stay in MainTabs (do not block / do not black screen)
     let target: Target;
 
     if (!session) {
       target = 'Auth';
-    } else if (profileLoading) {
-      console.log('[NAV] GateScreen waiting on profile load (showing gate spinner)');
-      return;
-    } else if (needsOnboarding || !isComplete) {
-      target = 'CreateProfile';
     } else {
       target = 'MainTabs';
+    }
+
+    if (session && !profileLoading && !profileError && (needsOnboarding || !isComplete)) {
+      target = 'CreateProfile';
     }
 
     logStartupBreadcrumb('GATE_NAV_DECISION', {
       target,
       hasSession: !!session,
       profileLoading,
+      profileError,
       needsOnboarding,
       isComplete,
     });
@@ -74,7 +80,7 @@ export function GateScreen({ navigation }: Props) {
       index: 0,
       routes: [{ name: target }],
     });
-  }, [authLoading, isComplete, needsOnboarding, navigation, profileLoading, session]);
+  }, [authLoading, isComplete, navigation, needsOnboarding, profileError, profileLoading, session]);
 
   return (
     <ImageBackground
