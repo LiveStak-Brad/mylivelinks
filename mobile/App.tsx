@@ -21,6 +21,7 @@ import React, { useCallback, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Linking, StyleSheet, Text, View } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 
 import { NavigationContainer, createNavigationContainerRef, type LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -113,6 +114,28 @@ function AppNavigation() {
 
   const handleNavReady = useCallback(() => {
     logStartupBreadcrumb('NAV_READY');
+
+    // P0: If iOS is stuck on the native splash, we need an explicit, logged hide call.
+    // This is safe even if SplashScreen was not manually prevented from auto-hiding.
+    logStartupBreadcrumb('SPLASH_HIDE_CALLED', {
+      at: Date.now(),
+      iso: new Date().toISOString(),
+    });
+    void SplashScreen.hideAsync()
+      .then(() => {
+        logStartupBreadcrumb('SPLASH_HIDE_OK', {
+          at: Date.now(),
+          iso: new Date().toISOString(),
+        });
+      })
+      .catch((err: any) => {
+        logStartupBreadcrumb('SPLASH_HIDE_FAIL', {
+          at: Date.now(),
+          iso: new Date().toISOString(),
+          message: err?.message ?? String(err),
+        });
+      });
+
     dumpRouteNames();
   }, []);
 
