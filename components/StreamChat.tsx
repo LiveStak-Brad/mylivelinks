@@ -445,7 +445,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         });
         
         const mapped: ChatMessage = {
-          id: msg.id,
+          id: String(msg.id),
           profile_id: msg.profile_id,
           username: profile?.username || 'Unknown',
           avatar_url: profile?.avatar_url,
@@ -471,9 +471,31 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
         const merged = new Map<string, ChatMessage>();
         for (const m of prev) merged.set(String(m.id), m);
         for (const m of visibleMessages) merged.set(String(m.id), m);
-        const arr = Array.from(merged.values()).sort(
+        let arr = Array.from(merged.values()).sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
+
+        // IMPORTANT: Prune optimistic (temp-*) messages once the real DB message exists.
+        // Without this, users can see "double send" (temp + real) if replacement matching misses.
+        const hasReal = new Set<string>();
+        for (const m of arr) {
+          const idStr = String(m.id);
+          if (!idStr.startsWith('temp-') && m.profile_id && m.content) {
+            hasReal.add(`${m.profile_id}:${m.content}`);
+          }
+        }
+        const nowMs = Date.now();
+        arr = arr.filter((m) => {
+          const idStr = String(m.id);
+          if (!idStr.startsWith('temp-')) return true;
+          const sig = m.profile_id && m.content ? `${m.profile_id}:${m.content}` : '';
+          if (sig && hasReal.has(sig)) return false;
+          // Safety: drop very old temp messages
+          const ageMs = nowMs - new Date(m.created_at).getTime();
+          if (Number.isFinite(ageMs) && ageMs > 60_000) return false;
+          return true;
+        });
+
         return arr.slice(-MAX_MESSAGES);
       });
 
@@ -540,7 +562,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           });
 
           const mappedMsg = {
-            id: msg.id,
+            id: String(msg.id),
             profile_id: msg.profile_id,
             username: profile?.username || 'Unknown',
             avatar_url: profile?.avatar_url,
@@ -567,9 +589,26 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           const merged = new Map<string, any>();
           for (const m of prev) merged.set(String(m.id), m);
           for (const m of messagesWithProfiles) merged.set(String(m.id), m);
-          const arr = Array.from(merged.values()).sort(
+          let arr = Array.from(merged.values()).sort(
             (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
+          const hasReal = new Set<string>();
+          for (const m of arr) {
+            const idStr = String(m.id);
+            if (!idStr.startsWith('temp-') && m.profile_id && m.content) {
+              hasReal.add(`${m.profile_id}:${m.content}`);
+            }
+          }
+          const nowMs = Date.now();
+          arr = arr.filter((m: any) => {
+            const idStr = String(m.id);
+            if (!idStr.startsWith('temp-')) return true;
+            const sig = m.profile_id && m.content ? `${m.profile_id}:${m.content}` : '';
+            if (sig && hasReal.has(sig)) return false;
+            const ageMs = nowMs - new Date(m.created_at).getTime();
+            if (Number.isFinite(ageMs) && ageMs > 60_000) return false;
+            return true;
+          });
           return arr.slice(-MAX_MESSAGES);
         });
 
@@ -588,9 +627,26 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           const merged = new Map<string, any>();
           for (const m of prev) merged.set(String(m.id), m);
           for (const m of messagesWithProfiles) merged.set(String(m.id), m);
-          const arr = Array.from(merged.values()).sort(
+          let arr = Array.from(merged.values()).sort(
             (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
+          const hasReal = new Set<string>();
+          for (const m of arr) {
+            const idStr = String(m.id);
+            if (!idStr.startsWith('temp-') && m.profile_id && m.content) {
+              hasReal.add(`${m.profile_id}:${m.content}`);
+            }
+          }
+          const nowMs = Date.now();
+          arr = arr.filter((m: any) => {
+            const idStr = String(m.id);
+            if (!idStr.startsWith('temp-')) return true;
+            const sig = m.profile_id && m.content ? `${m.profile_id}:${m.content}` : '';
+            if (sig && hasReal.has(sig)) return false;
+            const ageMs = nowMs - new Date(m.created_at).getTime();
+            if (Number.isFinite(ageMs) && ageMs > 60_000) return false;
+            return true;
+          });
           return arr.slice(-MAX_MESSAGES);
         });
 
@@ -700,23 +756,16 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       }
       
       setMessages((prev) => {
-        if (prev.some((m) => String(m.id) === String(newMsg.id))) return prev;
+        // If the real message arrives, drop any matching optimistic temp message (same sender + content).
+        const cleaned = prev.filter((m: any) => {
+          const idStr = String(m?.id ?? '');
+          if (!idStr.startsWith('temp-')) return true;
+          return !(m?.profile_id === newMsg.profile_id && m?.content === newMsg.content);
+        });
 
-        const optimisticIndex = prev.findIndex((m: any) =>
-          typeof m.id === 'string' &&
-          m.id.startsWith('temp-') &&
-          m.profile_id === newMsg.profile_id &&
-          m.content === newMsg.content &&
-          Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 8000
-        );
+        if (cleaned.some((m) => String(m.id) === String(newMsg.id))) return cleaned;
 
-        if (optimisticIndex >= 0) {
-          const next = [...prev];
-          next[optimisticIndex] = newMsg;
-          return next;
-        }
-
-        return [...prev, newMsg];
+        return [...cleaned, newMsg];
       });
 
       if (shouldAutoScrollRef.current || alwaysAutoScroll) {
