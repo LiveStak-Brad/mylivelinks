@@ -46,20 +46,12 @@ const { TextDecoder, TextEncoder } = require('text-encoding');
 if (global.TextEncoder == null) global.TextEncoder = TextEncoder;
 if (global.TextDecoder == null) global.TextDecoder = TextDecoder;
 
-if (global.__LIVEKIT_GLOBALS_REGISTERED__ !== true) {
-  console.log("[BOOT] before registerGlobals");
-  try {
-    const { registerGlobals } = require('@livekit/react-native');
-    registerGlobals();
-    console.log("[BOOT] after registerGlobals");
-    global.__LIVEKIT_GLOBALS_REGISTERED__ = true;
-  } catch (e) {
-    console.log("[BOOT] registerGlobals threw", e);
-    // Non-blocking failure for diagnostic purposes
-    global.__LIVEKIT_GLOBALS_REGISTERED__ = false;
-  }
-  console.log("[BOOT] after try/catch");
+// P0: LiveKit/WebRTC globals MUST NOT be initialized at app startup.
+// Live screens call `ensureLivekitGlobals()` lazily if/when user enters live features.
+if (global.__LIVEKIT_GLOBALS_REGISTERED__ == null) {
+  global.__LIVEKIT_GLOBALS_REGISTERED__ = false;
 }
+console.log('[BOOT] LiveKit globals init: lazy (skipped at startup)');
 
 // CRITICAL: Catch any errors during App import
 let App;

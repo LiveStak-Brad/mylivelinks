@@ -409,6 +409,13 @@ export default function LandingPage() {
                           loading="lazy"
                         />
                       ) : null}
+                      {!imageUrl && card.kind === 'team' ? (
+                        <div className="absolute inset-0 flex items-center justify-center px-3 text-center">
+                          <div className="line-clamp-2 text-[13px] font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
+                            {team?.name ?? 'Team'}
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="absolute top-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white">
                         NEW
                       </div>
@@ -496,6 +503,13 @@ export default function LandingPage() {
                         className="absolute inset-0 h-full w-full object-cover"
                         loading="lazy"
                       />
+                    ) : null}
+                    {!imageUrl && card.kind === 'team' ? (
+                      <div className="absolute inset-0 flex items-center justify-center px-3 text-center">
+                        <div className="line-clamp-2 text-sm font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
+                          {team?.name ?? 'Team'}
+                        </div>
+                      </div>
                     ) : null}
                     <div className="absolute top-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white">
                       NEW

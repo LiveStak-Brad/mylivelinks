@@ -23,10 +23,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+console.log('[NAV] MainTabs module loaded');
+
 import type { MainTabsParamList } from '../types/navigation';
 import { HomeDashboardScreen } from '../screens/HomeDashboardScreen';
 import { FeedScreen } from '../screens/FeedScreen';
-import { SoloHostStreamScreen } from '../screens/SoloHostStreamScreen';
 import { TeamsTabScreen } from '../screens/TeamsTabScreen';
 import { ProfileTabScreen } from '../screens/ProfileTabScreen';
 import { MessagesScreen } from '../screens/MessagesScreen';
@@ -39,7 +40,7 @@ import { Modal } from '../components/ui';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
-export function MainTabs() {
+export default function MainTabs() {
   const { theme } = useThemeMode();
   const { user } = useAuthContext();
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);
@@ -104,7 +105,8 @@ export function MainTabs() {
       />
       <Tab.Screen
         name="GoLive"
-        component={SoloHostStreamScreen}
+        // Lazy-load live host screen so LiveKit modules never evaluate during normal boot.
+        getComponent={() => require('../screens/SoloHostStreamScreen').SoloHostStreamScreen}
         listeners={{
           tabPress: (e) => {
             if (isOwner) return;

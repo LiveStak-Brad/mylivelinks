@@ -23,6 +23,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { createWebRequestHeaders } from '../lib/webSession';
 
 import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT, canUserGoLive } from '../lib/livekit-constants';
+import { ensureLivekitGlobals } from '../lib/livekitGlobals';
 import { getRuntimeEnv } from '../lib/env';
 
 const DEBUG = DEBUG_LIVEKIT;
@@ -300,6 +301,11 @@ export function useLiveRoomParticipants(
       if ((global as any).TextDecoder == null) (global as any).TextDecoder = TextDecoder;
     } catch {
       // ignore
+    }
+    // P0: Initialize LiveKit/WebRTC globals lazily *only* when entering live features.
+    // If this fails, do not attempt to load livekit-client (it may crash under Hermes/WebRTC mismatch).
+    if (!ensureLivekitGlobals()) {
+      throw new Error('LIVEKIT_GLOBALS_INIT_FAILED');
     }
     // Lazy-load so app boot doesn't evaluate livekit-client unless LiveRoom is entered.
     // eslint-disable-next-line @typescript-eslint/no-var-requires

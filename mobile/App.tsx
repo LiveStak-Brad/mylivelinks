@@ -146,7 +146,7 @@ function AppNavigation() {
             <Stack.Screen name="SafetyPolicies" getComponent={() => require('./screens/SafetyPoliciesScreen').SafetyPoliciesScreen} />
             <Stack.Screen name="PolicyDetail" getComponent={() => require('./screens/PolicyDetailScreen').PolicyDetailScreen} />
             <Stack.Screen name="Rooms" getComponent={() => require('./screens/LiveTVScreen').LiveTVScreen} />
-            <Stack.Screen name="MainTabs" getComponent={() => require('./navigation/MainTabs').MainTabs} />
+            <Stack.Screen name="MainTabs" getComponent={() => require('./navigation/MainTabs').default} />
             <Stack.Screen name="SoloStreamViewer" getComponent={() => require('./screens/SoloStreamViewerScreen').SoloStreamViewerScreen} />
             <Stack.Screen name="SoloHostStream" getComponent={() => require('./screens/SoloHostStreamScreen').SoloHostStreamScreen} />
             <Stack.Screen name="Wallet" getComponent={() => require('./screens/WalletScreen').WalletScreen} />

@@ -90,16 +90,13 @@ export default function TeamAvatar({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div
-            className="w-full h-full flex items-center justify-center text-xs font-bold text-white"
-            style={
-              teamColor
-                ? { backgroundColor: teamColor }
-                : { backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))' }
-            }
-          >
-            {alt.slice(0, 2).toUpperCase()}
-          </div>
+          <Image
+            src="/no-profile-pic.png"
+            alt={alt}
+            width={sizeConfig.size}
+            height={sizeConfig.size}
+            className="w-full h-full object-cover"
+          />
         )}
       </div>
 
@@ -163,6 +160,8 @@ interface TeamAvatarStackProps {
   maxVisible?: number;
   size?: AvatarContext;
   className?: string;
+  showOverflowCount?: boolean;
+  overlapClassName?: string;
 }
 
 export function TeamAvatarStack({
@@ -170,6 +169,8 @@ export function TeamAvatarStack({
   maxVisible = 5,
   size = 'compact',
   className,
+  showOverflowCount = true,
+  overlapClassName,
 }: TeamAvatarStackProps) {
   const visible = avatars.slice(0, maxVisible);
   const remaining = avatars.length - maxVisible;
@@ -178,7 +179,7 @@ export function TeamAvatarStack({
   return (
     <div className={clsx('flex items-center', className)}>
       {/* Overlapping avatars */}
-      <div className="flex -space-x-2">
+      <div className={clsx('flex', overlapClassName ?? '-space-x-2')}>
         {visible.map((avatar, i) => (
           <TeamAvatar
             key={i}
@@ -193,7 +194,7 @@ export function TeamAvatarStack({
       </div>
 
       {/* Overflow count */}
-      {remaining > 0 && (
+      {showOverflowCount && remaining > 0 && (
         <span
           className={clsx(
             sizeConfig.className,

@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowUpRight, Check, Compass, Loader2, Mail, Search, Users, X, Plus } from 'lucide-react';
 import { PageShell } from '@/components/layout';
-import { Button, Chip, Input } from '@/components/ui';
+import { Button, Chip, Input, Modal } from '@/components/ui';
 import { useToast } from '@/components/ui/Toast';
 import DiscoverTeamsOverlay from '@/components/teams/DiscoverTeamsOverlay';
 import { createClient } from '@/lib/supabase';
@@ -51,6 +52,14 @@ type NewTeamsCard =
 
 type TeamDiscoveryStatus = 'NEW' | 'PRIVATE' | 'INVITED' | 'REQUESTED' | 'LIVE';
 
+type TeamMemberListItem = {
+  profile_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  role: string;
+};
+
 function teamRoleLabel(role: string | null | undefined): string {
   switch (role) {
     case 'Team_Admin':
@@ -83,6 +92,11 @@ export default function TeamsIndexPage() {
   const [processingInviteId, setProcessingInviteId] = useState<number | null>(null);
   const [teamMemberPreview, setTeamMemberPreview] = useState<Record<string, AvatarSample[]>>({});
   const previewLoadedRef = useRef<Set<string>>(new Set());
+
+  const [membersModalOpen, setMembersModalOpen] = useState(false);
+  const [membersModalTeam, setMembersModalTeam] = useState<{ slug: string; name: string } | null>(null);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersList, setMembersList] = useState<TeamMemberListItem[]>([]);
 
   const loadTeamPreviews = useCallback(
     async (teamIds: string[]) => {
@@ -137,6 +151,55 @@ export default function TeamsIndexPage() {
     },
     [supabase]
   );
+
+  const openMembersModal = useCallback(
+    async (teamSlug: string, teamName: string) => {
+      setMembersModalTeam({ slug: teamSlug, name: teamName });
+      setMembersModalOpen(true);
+      setMembersLoading(true);
+      setMembersList([]);
+
+      try {
+        const { data, error } = await supabase.rpc('rpc_get_team_members', {
+          p_team_slug: teamSlug,
+          p_status: 'approved',
+          p_role: null,
+          p_search: null,
+          p_limit: 200,
+        });
+
+        if (error) throw error;
+
+        const mapped = ((data as any[]) ?? []).map((row) => ({
+          profile_id: String(row.profile_id ?? ''),
+          username: String(row.username ?? ''),
+          display_name: (row.display_name as string | null) ?? null,
+          avatar_url: (row.avatar_url as string | null) ?? null,
+          role: String(row.role ?? ''),
+        }));
+
+        setMembersList(mapped);
+      } catch {
+        toast({
+          title: 'Members hidden',
+          description: 'This team roster is private. Join the team to view members.',
+          variant: 'warning',
+        });
+        setMembersModalOpen(false);
+        setMembersModalTeam(null);
+      } finally {
+        setMembersLoading(false);
+      }
+    },
+    [supabase, toast]
+  );
+
+  const closeMembersModal = useCallback(() => {
+    setMembersModalOpen(false);
+    setMembersModalTeam(null);
+    setMembersList([]);
+    setMembersLoading(false);
+  }, []);
 
   // Check onboarding status and if user has a team, redirect to it
   useEffect(() => {
@@ -680,6 +743,7 @@ export default function TeamsIndexPage() {
                     invitedSlugs={invitedTeamSlugs}
                     requestedSlugs={requestedTeamSlugs}
                     memberPreview={card.kind === 'team' ? teamMemberPreview[card.team.id] : undefined}
+                    onOpenMembers={openMembersModal}
                   />
                 ))}
           </div>
@@ -866,6 +930,7 @@ export default function TeamsIndexPage() {
                   key={`${row.team_id}:${row.status}`}
                   row={row}
                   memberPreview={teamMemberPreview[row.team?.id ?? '']}
+                  onOpenMembers={openMembersModal}
                 />
               ))}
             </div>
@@ -877,15 +942,60 @@ export default function TeamsIndexPage() {
       {discoveryEnabled && (
         <DiscoverTeamsOverlay isOpen={showDiscover} onClose={() => setShowDiscover(false)} />
       )}
+
+      <Modal
+        isOpen={membersModalOpen}
+        onClose={closeMembersModal}
+        title={membersModalTeam ? membersModalTeam.name : 'Members'}
+        description={membersModalTeam ? `@${membersModalTeam.slug}` : undefined}
+        size="md"
+      >
+        {membersLoading ? (
+          <div className="flex items-center justify-center py-10 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="ml-2 text-sm">Loading members…</span>
+          </div>
+        ) : membersList.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">No members to show.</div>
+        ) : (
+          <div className="space-y-2">
+            {membersList.map((member) => (
+              <div
+                key={member.profile_id}
+                className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3"
+              >
+                <div className="h-10 w-10 overflow-hidden rounded-full bg-muted">
+                  <Image
+                    src={member.avatar_url || '/no-profile-pic.png'}
+                    alt={membersDisplayName(member)}
+                    width={40}
+                    height={40}
+                    className="h-10 w-10 object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-foreground">
+                    {membersDisplayName(member)}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">@{member.username}</div>
+                </div>
+                <div className="text-xs font-semibold text-muted-foreground">
+                  {roleShortLabel(member.role)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </>
   );
 }
 
 const CARD_GRADIENTS = [
-  'from-pink-500/25 via-purple-500/20 to-indigo-500/20',
-  'from-emerald-500/20 via-teal-500/10 to-cyan-500/20',
-  'from-orange-500/20 via-rose-500/15 to-amber-500/20',
-  'from-blue-500/20 via-sky-500/10 to-indigo-500/20',
+  'from-pink-500/40 via-purple-500/35 to-indigo-500/40',
+  'from-fuchsia-500/40 via-violet-500/35 to-sky-500/35',
+  'from-rose-500/40 via-pink-500/30 to-purple-500/40',
+  'from-indigo-500/40 via-purple-500/30 to-pink-500/35',
 ];
 
 const DISCOVERY_STATUS_CLASSES: Record<TeamDiscoveryStatus, string> = {
@@ -913,12 +1023,14 @@ function NewTeamTile({
   invitedSlugs,
   requestedSlugs,
   memberPreview,
+  onOpenMembers,
 }: {
   card: NewTeamsCard;
   index: number;
   invitedSlugs: Set<string>;
   requestedSlugs: Set<string>;
   memberPreview?: AvatarSample[];
+  onOpenMembers: (teamSlug: string, teamName: string) => void;
 }) {
   const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
 
@@ -944,7 +1056,7 @@ function NewTeamTile({
   return (
     <Link
       href={`/teams/${team.slug}`}
-      className="group block w-28 shrink-0 snap-start rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:w-36"
+      className="group block w-24 shrink-0 snap-start rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:w-32"
     >
       <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10">
         <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
@@ -957,11 +1069,9 @@ function NewTeamTile({
           />
         )}
         {!hasImage && (
-          <div className="absolute inset-0 flex items-center justify-center p-3">
-            <div className="max-w-full rounded-2xl bg-black/35 px-3 py-2 backdrop-blur-xs ring-1 ring-white/15">
-              <div className="max-h-[3.25rem] overflow-hidden text-center text-[13px] font-extrabold tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.75)]">
-                {teamName}
-              </div>
+          <div className="absolute inset-0 flex items-center justify-center px-2 text-center">
+            <div className="line-clamp-2 text-[13px] font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
+              {teamName}
             </div>
           </div>
         )}
@@ -971,15 +1081,26 @@ function NewTeamTile({
           {statusLabel}
         </span>
       </div>
-      <div className="space-y-1">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-lg font-semibold text-white truncate">{team.name}</p>
-          <span className="text-xs text-white/50">/{team.slug}</span>
-        </div>
-        <div className="mt-2 space-y-2">
-          <p className="text-[12px] font-semibold leading-tight text-white/90 line-clamp-2">{team.name}</p>
-          <TeamAvatarStack avatars={avatars} maxVisible={3} size="compact" />
-        </div>
+      <div className="mt-2 space-y-2">
+        <p className="text-[11px] font-semibold leading-tight text-white/90 line-clamp-2">{teamName}</p>
+        <button
+          type="button"
+          className="block text-left"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpenMembers(team.slug, teamName);
+          }}
+          aria-label={`View members of ${teamName}`}
+        >
+          <TeamAvatarStack
+            avatars={avatars}
+            maxVisible={3}
+            size="chat"
+            showOverflowCount={false}
+            overlapClassName="-space-x-1.5"
+          />
+        </button>
       </div>
     </Link>
   );
@@ -987,7 +1108,7 @@ function NewTeamTile({
 
 function NewTeamSkeleton() {
   return (
-    <div className="w-28 shrink-0 snap-start sm:w-36">
+    <div className="w-24 shrink-0 snap-start sm:w-32">
       <div className="aspect-square w-full rounded-2xl bg-white/10 animate-pulse" />
       <div className="mt-2 space-y-2">
         <div className="h-3 w-2/3 rounded-full bg-white/10 animate-pulse" />
@@ -1000,9 +1121,11 @@ function NewTeamSkeleton() {
 function TeamCard({
   row,
   memberPreview,
+  onOpenMembers,
 }: {
   row: MyTeamRow & { team: NonNullable<MyTeamRow['team']> };
   memberPreview?: AvatarSample[];
+  onOpenMembers: (teamSlug: string, teamName: string) => void;
 }) {
   const { team } = row;
   const isOwner = row.role === 'Team_Admin';
@@ -1029,7 +1152,7 @@ function TeamCard({
           <img
             src={imageUrl}
             alt={teamName}
-            className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
+            className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
           />
         )}
@@ -1052,13 +1175,42 @@ function TeamCard({
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
           <p className="text-lg font-semibold text-white truncate">{team.name}</p>
-          <span className="text-xs text-white/50">/{team.slug}</span>
         </div>
         <p className="text-xs text-white/50">{memberCount} members</p>
       </div>
-      <TeamAvatarStack avatars={avatars} maxVisible={4} size="compact" />
+      <button
+        type="button"
+        className="block text-left"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onOpenMembers(team.slug, teamName);
+        }}
+        aria-label={`View members of ${teamName}`}
+      >
+        <TeamAvatarStack
+          avatars={avatars}
+          maxVisible={3}
+          size="chat"
+          showOverflowCount={false}
+          overlapClassName="-space-x-1.5"
+        />
+      </button>
     </Link>
   );
+}
+
+function roleShortLabel(role: string) {
+  if (role === 'Team_Admin') return 'Owner';
+  if (role === 'Team_Moderator') return 'Mod';
+  if (role === 'Team_Member') return 'Member';
+  return role;
+}
+
+function membersDisplayName(member: TeamMemberListItem) {
+  const name = member.display_name?.trim();
+  if (name) return name;
+  return member.username;
 }
 
 function HeroSkeleton() {
