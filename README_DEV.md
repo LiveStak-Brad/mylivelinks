@@ -1,5 +1,10 @@
 # MyLiveLinks - Development Guide
 
+## Branch policy (P0)
+
+- Only `main` is allowed.
+- Before committing, run: `npm run precommit:branch`
+
 ## Profile + Login MVP
 
 This MVP includes:

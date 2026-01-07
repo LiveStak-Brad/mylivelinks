@@ -645,25 +645,28 @@ export default function TeamsIndexPage() {
             )}
           </div>
           <div
-            className="flex gap-4 overflow-x-auto pb-4 touch-pan-x snap-x snap-mandatory"
+            className="flex gap-3 overflow-x-auto overflow-y-hidden pb-3 touch-pan-x overscroll-x-contain snap-x snap-mandatory"
             aria-label="New teams"
           >
             {showCreateTeamCta && (
               <Link
                 href="/teams/setup"
-                className="group relative block flex w-[34vw] max-w-[10rem] shrink-0 snap-start flex-col justify-between rounded-3xl border border-dashed border-white/20 bg-gradient-to-br from-purple-500/20 via-pink-500/10 to-indigo-500/20 p-4 text-white transition hover:-translate-y-1 hover:border-white/40 sm:w-60"
+                className="group block w-28 shrink-0 snap-start rounded-2xl border border-dashed border-white/20 bg-gradient-to-br from-purple-500/20 via-pink-500/10 to-indigo-500/20 p-3 text-white transition hover:-translate-y-0.5 hover:border-white/40 sm:w-36"
               >
-                <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.35em] text-white/70">
-                  <span>Create</span>
-                  <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white">NEW</span>
+                <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10">
+                  <div className="absolute inset-0 bg-gradient-to-br from-pink-500/30 via-purple-500/25 to-indigo-500/25" />
+                  <div className="absolute left-3 top-3 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                    NEW
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center px-3 text-center">
+                    <div className="text-[13px] font-extrabold leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
+                      Create a team
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-6 space-y-2">
-                  <p className="text-xl font-bold leading-tight">Start your own team</p>
-                  <p className="text-sm text-white/70">Invite members, host live rooms, and share updates.</p>
-                </div>
-                <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold">
-                  <Plus className="h-4 w-4" />
-                  Create Team
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-[12px] font-semibold text-white/90 truncate">Your team</p>
+                  <Plus className="h-4 w-4 text-white/70" />
                 </div>
               </Link>
             )}
@@ -893,6 +896,17 @@ const DISCOVERY_STATUS_CLASSES: Record<TeamDiscoveryStatus, string> = {
   LIVE: 'bg-red-500/40 text-white',
 };
 
+function hasTeamImage(team: { banner_url?: string | null; icon_url?: string | null } | null | undefined): boolean {
+  return Boolean(team?.banner_url || team?.icon_url);
+}
+
+function displayName(team: { name?: string | null; slug?: string | null } | null | undefined): string {
+  const name = team?.name?.trim();
+  if (name) return name;
+  const slug = team?.slug?.trim();
+  return slug ? slug : 'Team';
+}
+
 function NewTeamTile({
   card,
   index,
@@ -915,7 +929,9 @@ function NewTeamTile({
   }
 
   const team = card.team;
-  const imageUrl = team.banner_url || team.icon_url || undefined;
+  const teamName = displayName(team);
+  const hasImage = hasTeamImage(team);
+  const imageUrl = hasImage ? team.banner_url || team.icon_url || undefined : undefined;
   const memberCount = team.approved_member_count ?? 0;
   const avatars = buildAvatarItemsFromSamples(memberPreview, team.slug, memberCount);
   let statusLabel: TeamDiscoveryStatus = 'NEW';
@@ -928,17 +944,26 @@ function NewTeamTile({
   return (
     <Link
       href={`/teams/${team.slug}`}
-      className="group block flex w-[34vw] max-w-[10rem] shrink-0 snap-start flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4 transition hover:-translate-y-1 hover:border-white/30 sm:w-60"
+      className="group block w-28 shrink-0 snap-start rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 sm:w-36"
     >
-      <div className="relative h-32 w-full overflow-hidden rounded-2xl border border-white/10">
+      <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10">
         <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
         {imageUrl && (
           <img
             src={imageUrl}
-            alt={team.name}
-            className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
+            alt={teamName}
+            className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
           />
+        )}
+        {!hasImage && (
+          <div className="absolute inset-0 flex items-center justify-center p-3">
+            <div className="max-w-full rounded-2xl bg-black/35 px-3 py-2 backdrop-blur-xs ring-1 ring-white/15">
+              <div className="max-h-[3.25rem] overflow-hidden text-center text-[13px] font-extrabold tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.75)]">
+                {teamName}
+              </div>
+            </div>
+          </div>
         )}
         <span
           className={`absolute left-3 top-3 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${DISCOVERY_STATUS_CLASSES[statusLabel]}`}
@@ -946,12 +971,15 @@ function NewTeamTile({
           {statusLabel}
         </span>
       </div>
-      <div className="mt-4 space-y-2">
+      <div className="space-y-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-base font-semibold text-white truncate">{team.name}</p>
-          <span className="text-xs text-white/60">/{team.slug}</span>
+          <p className="text-lg font-semibold text-white truncate">{team.name}</p>
+          <span className="text-xs text-white/50">/{team.slug}</span>
         </div>
-        <TeamAvatarStack avatars={avatars} maxVisible={4} size="compact" className="mt-2" />
+        <div className="mt-2 space-y-2">
+          <p className="text-[12px] font-semibold leading-tight text-white/90 line-clamp-2">{team.name}</p>
+          <TeamAvatarStack avatars={avatars} maxVisible={3} size="compact" />
+        </div>
       </div>
     </Link>
   );
@@ -959,11 +987,11 @@ function NewTeamTile({
 
 function NewTeamSkeleton() {
   return (
-    <div className="glass-panel glass-panel--muted w-[85vw] max-w-[18rem] shrink-0 snap-start p-4 sm:w-60">
-      <div className="h-32 w-full rounded-2xl bg-white/10 animate-pulse" />
-      <div className="mt-4 space-y-2">
-        <div className="h-4 w-2/3 rounded-full bg-white/10 animate-pulse" />
-        <div className="h-3 w-1/3 rounded-full bg-white/5 animate-pulse" />
+    <div className="w-28 shrink-0 snap-start sm:w-36">
+      <div className="aspect-square w-full rounded-2xl bg-white/10 animate-pulse" />
+      <div className="mt-2 space-y-2">
+        <div className="h-3 w-2/3 rounded-full bg-white/10 animate-pulse" />
+        <div className="h-6 w-20 rounded-full bg-white/5 animate-pulse" />
       </div>
     </div>
   );
@@ -978,7 +1006,9 @@ function TeamCard({
 }) {
   const { team } = row;
   const isOwner = row.role === 'Team_Admin';
-  const imageUrl = team.banner_url || team.icon_url || undefined;
+  const teamName = displayName(team);
+  const hasImage = hasTeamImage(team);
+  const imageUrl = hasImage ? team.banner_url || team.icon_url || undefined : undefined;
   const statusLabel =
     row.status === 'requested'
       ? 'REQUESTED'
@@ -998,10 +1028,19 @@ function TeamCard({
         {imageUrl && (
           <img
             src={imageUrl}
-            alt={team.name}
+            alt={teamName}
             className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
             loading="lazy"
           />
+        )}
+        {!hasImage && (
+          <div className="absolute inset-0 flex items-center justify-center p-3">
+            <div className="max-w-full rounded-2xl bg-black/35 px-3 py-2 backdrop-blur-xs ring-1 ring-white/15">
+              <div className="max-h-[3.25rem] overflow-hidden text-center text-[14px] font-extrabold tracking-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.75)]">
+                {teamName}
+              </div>
+            </div>
+          </div>
         )}
         <div className="absolute left-3 top-3 flex flex-wrap gap-2">
           {statusLabel && (
