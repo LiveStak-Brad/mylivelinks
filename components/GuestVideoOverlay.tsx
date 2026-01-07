@@ -141,35 +141,52 @@ export default function GuestVideoOverlay({
     const isGuest = activeGuests.some(g => g.requesterId === currentUserId);
     setIsCurrentUserGuest(isGuest);
 
-    if (isGuest && localVideoRef.current) {
-      // Attach local video track
+    if (!isGuest) return;
+
+    const attachLocalVideo = () => {
       const localParticipant = room.localParticipant;
-      if (localParticipant) {
-        localParticipant.trackPublications.forEach((pub) => {
-          if (pub.track && pub.kind === Track.Kind.Video && localVideoRef.current) {
-            console.log('[GuestVideoOverlay] Attaching LOCAL video for self-preview');
+      if (!localParticipant || !localVideoRef.current) {
+        console.log('[GuestVideoOverlay] Cannot attach local video yet:', { 
+          hasParticipant: !!localParticipant, 
+          hasVideoRef: !!localVideoRef.current 
+        });
+        return;
+      }
+
+      localParticipant.trackPublications.forEach((pub) => {
+        if (pub.track && pub.kind === Track.Kind.Video) {
+          console.log('[GuestVideoOverlay] Attaching LOCAL video for self-preview');
+          if (localVideoRef.current) {
             pub.track.attach(localVideoRef.current);
             setHasLocalVideo(true);
           }
-        });
+        }
+      });
+    };
 
-        // Also listen for when local track is published
-        const handleLocalTrackPublished = () => {
-          localParticipant.trackPublications.forEach((pub) => {
-            if (pub.track && pub.kind === Track.Kind.Video && localVideoRef.current) {
-              pub.track.attach(localVideoRef.current);
-              setHasLocalVideo(true);
-            }
-          });
-        };
+    // Try to attach immediately
+    attachLocalVideo();
 
-        room.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
-        
-        return () => {
-          room.off(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
-        };
+    // Also try after a short delay (for timing issues)
+    const timeout = setTimeout(attachLocalVideo, 500);
+    const timeout2 = setTimeout(attachLocalVideo, 1500);
+
+    // Listen for when local track is published
+    const handleLocalTrackPublished = (publication: LocalTrackPublication) => {
+      console.log('[GuestVideoOverlay] LocalTrackPublished event:', publication.kind);
+      if (publication.kind === Track.Kind.Video && publication.track && localVideoRef.current) {
+        publication.track.attach(localVideoRef.current);
+        setHasLocalVideo(true);
       }
-    }
+    };
+
+    room.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
+    
+    return () => {
+      clearTimeout(timeout);
+      clearTimeout(timeout2);
+      room.off(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
+    };
   }, [room, currentUserId, isHost, activeGuests]);
 
   // Attach video tracks from LiveKit room
