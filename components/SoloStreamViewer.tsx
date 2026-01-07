@@ -1086,26 +1086,56 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       }
 
       const { token, url } = await tokenRes.json();
-      console.log('[SoloStreamViewer] Got guest token, connecting to room...');
-      setGuestStatus('Connecting to room...');
+      console.log('[SoloStreamViewer] Got guest token');
+      setGuestStatus('Enabling camera...');
 
-      // Create a new room or use existing
+      // Get existing room - DON'T disconnect, we need to keep watching the host!
       let room = roomRef.current;
       
-      if (room && room.state === 'connected') {
-        console.log('[SoloStreamViewer] Disconnecting existing room...');
+      if (!room || room.state !== 'connected') {
+        // If no room connection, create one
+        console.log('[SoloStreamViewer] No existing room, creating new connection...');
+        const { Room } = await import('livekit-client');
+        room = new Room();
+        roomRef.current = room;
+        await room.connect(url, token);
+      } else {
+        // Room exists and is connected - we need to reconnect with new permissions
+        // But we must preserve the subscription to the host's tracks
+        console.log('[SoloStreamViewer] Room exists, reconnecting with guest permissions...');
+        
+        // Store current subscriptions
+        const hostParticipants = Array.from(room.remoteParticipants.values());
+        console.log('[SoloStreamViewer] Current participants:', hostParticipants.map(p => p.identity));
+        
+        // Disconnect and reconnect with new token
         await room.disconnect();
+        await room.connect(url, token);
+        
+        console.log('[SoloStreamViewer] Reconnected, waiting for tracks to resubscribe...');
+        
+        // Wait a moment for tracks to be available, then re-attach host video
+        setTimeout(() => {
+          if (room && videoRef.current && audioRef.current) {
+            room.remoteParticipants.forEach((participant) => {
+              console.log('[SoloStreamViewer] Checking participant for reattach:', participant.identity);
+              participant.trackPublications.forEach((pub) => {
+                if (pub.track) {
+                  if (pub.kind === 'video') {
+                    console.log('[SoloStreamViewer] Reattaching video track');
+                    pub.track.attach(videoRef.current!);
+                  } else if (pub.kind === 'audio') {
+                    console.log('[SoloStreamViewer] Reattaching audio track');
+                    pub.track.attach(audioRef.current!);
+                  }
+                }
+              });
+            });
+          }
+        }, 1000);
       }
       
-      // Create new room instance for guest mode
-      const { Room } = await import('livekit-client');
-      room = new Room();
-      roomRef.current = room;
-      
-      console.log('[SoloStreamViewer] Connecting to room as guest...');
-      await room.connect(url, token);
       console.log('[SoloStreamViewer] Connected! Enabling camera and mic...');
-      setGuestStatus('Enabling camera...');
 
       // Enable camera and microphone
       try {
