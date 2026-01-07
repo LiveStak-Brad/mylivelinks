@@ -1310,6 +1310,27 @@ export function ProfileScreen({
   const profileType = (profileData?.profile?.profile_type || 'default') as ProfileType; // Get profile type, default to 'default'
   const enabledTabs = useMemo(() => getEnabledTabs(profileType), [profileType]);
 
+  // IMPORTANT (P0): This must be declared BEFORE any early returns below.
+  // Otherwise hook order changes between "loading" render vs "loaded" render.
+  const manualLocation = useMemo(() => {
+    const data = (profileData?.profile ?? null) as any;
+    if (!data) return null;
+    if (data.location_hidden && !isOwnProfile) {
+      return null;
+    }
+    const label = String(data.location_label ?? '').trim();
+    if (label.length > 0) {
+      return label;
+    }
+    const city = String(data.location_city ?? '').trim();
+    const region = String(data.location_region ?? '').trim();
+    const parts = [city, region].filter((part) => part.length > 0);
+    if (parts.length > 0) {
+      return parts.join(', ');
+    }
+    return null;
+  }, [profileData?.profile, isOwnProfile]);
+
   // Load business module data (business profiles only)
   useEffect(() => {
     const pid = profileData?.profile?.id;
@@ -1419,23 +1440,6 @@ export function ProfileScreen({
     'large': 24
   }[profile.card_border_radius || 'medium'] || 18;
   const accentColor = profile.accent_color || theme.colors.accent;
-  const manualLocation = useMemo(() => {
-    const data = profile as any;
-    if (data.location_hidden && !isOwnProfile) {
-      return null;
-    }
-    const label = String(data.location_label ?? '').trim();
-    if (label.length > 0) {
-      return label;
-    }
-    const city = String(data.location_city ?? '').trim();
-    const region = String(data.location_region ?? '').trim();
-    const parts = [city, region].filter((part) => part.length > 0);
-    if (parts.length > 0) {
-      return parts.join(', ');
-    }
-    return null;
-  }, [profile, isOwnProfile]);
 
   // Card style to apply to all cards
   const customCardStyle = {

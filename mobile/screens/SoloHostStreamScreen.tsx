@@ -35,6 +35,7 @@ import { canUserGoLive } from '../lib/livekit-constants';
 import { Modal, Input } from '../components/ui';
 import { useActiveViewerCount } from '../hooks/useActiveViewerCount';
 import { useGiftFeed } from '../hooks/useGiftFeed';
+import { ensureLiveKitReady } from '../lib/livekit/ensureLiveKitReady';
 
 type SoloHostStreamScreenProps = {
   onExit?: () => void;
@@ -69,31 +70,6 @@ const LK: LiveKitDeps = {
   useLiveRoomParticipants: null,
   Tile: null,
 };
-
-let liveKitReady = false;
-let liveKitReadyInFlight: Promise<void> | null = null;
-
-async function ensureLiveKitReady() {
-  if (liveKitReady) return;
-  if (liveKitReadyInFlight) return liveKitReadyInFlight;
-
-  liveKitReadyInFlight = (async () => {
-    const mod: any = await import('@livekit/react-native');
-    const registerGlobals = mod?.registerGlobals;
-    if (typeof registerGlobals !== 'function') {
-      throw new Error('LiveKit registerGlobals not available');
-    }
-    registerGlobals();
-    liveKitReady = true;
-  })();
-
-  try {
-    await liveKitReadyInFlight;
-  } finally {
-    // allow retry if it failed
-    if (!liveKitReady) liveKitReadyInFlight = null;
-  }
-}
 
 export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
   useKeepAwake();

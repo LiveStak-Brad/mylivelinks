@@ -6,25 +6,11 @@ let attempted = false;
  */
 export function ensureLivekitGlobals(): boolean {
   const g: any = globalThis as any;
+  // DEPRECATED: `registerGlobals()` must only be called via `ensureLiveKitReady()`.
+  // This function now only reports whether LiveKit globals have been registered.
   if (g.__LIVEKIT_GLOBALS_REGISTERED__ === true) return true;
   if (attempted) return false;
-
   attempted = true;
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const livekit = require('@livekit/react-native');
-    const fn = livekit?.registerGlobals;
-    if (typeof fn === 'function') {
-      fn();
-    }
-    g.__LIVEKIT_GLOBALS_REGISTERED__ = true;
-    console.log('[LIVEKIT] registerGlobals OK (lazy)');
-    return true;
-  } catch (e: any) {
-    g.__LIVEKIT_GLOBALS_REGISTERED__ = false;
-    console.log('[LIVEKIT] registerGlobals failed (lazy)', e?.message ?? e);
-    return false;
-  }
+  return false;
 }
 
