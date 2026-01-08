@@ -211,6 +211,7 @@ export function getNotificationDestination(input: {
     }
 
     case 'live': {
+      // Priority 1: Use actionUrl if provided (already includes streaming_mode logic)
       if (input.actionUrl) {
         const normalized = normalizeActionUrl(input.actionUrl);
         if (normalized.kind === 'external') return { kind: 'external', url: normalized.url };
@@ -218,6 +219,21 @@ export function getNotificationDestination(input: {
         if (pathOnly) return { kind: 'internal', href: normalized.path };
       }
 
+      // Priority 2: Check metadata for username and streaming_mode
+      const streamingMode = safeString(meta.streaming_mode);
+      const username = safeString(input.actor_username || meta.username).replace(/^@/, '');
+      
+      if (streamingMode === 'solo' && username) {
+        // Solo stream - route to /live/{username}
+        return { kind: 'internal', href: `/live/${encodeURIComponent(username)}` };
+      }
+      
+      if (username) {
+        // Has username but unknown mode - try solo stream first (most common)
+        return { kind: 'internal', href: `/live/${encodeURIComponent(username)}` };
+      }
+
+      // Fallback: Go to LiveTV browse page
       return { kind: 'internal', href: '/liveTV' };
     }
 

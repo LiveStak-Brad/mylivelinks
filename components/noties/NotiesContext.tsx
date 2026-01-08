@@ -201,10 +201,11 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
         .limit(500);
       const followeeIds = Array.from(new Set((following || []).map((r: any) => String(r.followee_id)).filter(Boolean)));
 
+      // Fetch live streams with streaming_mode to determine correct routing
       const { data: liveStreams } = followeeIds.length
         ? await supabase
             .from('live_streams')
-            .select('id, profile_id, live_available, started_at')
+            .select('id, profile_id, live_available, started_at, streaming_mode')
             .in('profile_id', followeeIds)
             .eq('live_available', true)
             .order('started_at', { ascending: false, nullsFirst: false })
@@ -230,6 +231,15 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
         const username = String(p?.username ?? 'Someone');
         const displayName = String(p?.display_name ?? '') || username;
         const avatarFallback = (displayName?.[0] ?? username?.[0] ?? '?').toUpperCase();
+        const streamingMode = String(ls.streaming_mode ?? 'group');
+        
+        // Route to correct destination based on streaming mode:
+        // - Solo streams: /live/{username} (user's solo stream page)
+        // - Group streams: /room/live-central (group live room)
+        const actionUrl = streamingMode === 'solo' 
+          ? `/live/${encodeURIComponent(username)}`
+          : '/room/live-central';
+        
         return {
           id,
           type: 'live',
@@ -239,8 +249,13 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
           avatarFallback,
           isRead: readIds.has(id),
           createdAt: ls.started_at ? new Date(ls.started_at) : new Date(),
-          actionUrl: '/room/live-central',
-          metadata: { profile_id: String(ls.profile_id), live_stream_id: String(ls.id) },
+          actionUrl,
+          metadata: { 
+            profile_id: String(ls.profile_id), 
+            live_stream_id: String(ls.id),
+            streaming_mode: streamingMode,
+            username,
+          },
         };
       });
 
