@@ -116,11 +116,6 @@ export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCar
           </div>
         )}
 
-        {/* LIVE Badge - Bottom Right */}
-        <div className="absolute bottom-1.5 right-1.5 sm:bottom-3 sm:right-3 flex items-center gap-1 sm:gap-1.5 bg-red-600/90 backdrop-blur-md text-white text-[9px] sm:text-xs font-bold px-1.5 py-0.5 sm:px-3 sm:py-1.5 rounded-md sm:rounded-lg border border-white/10 shadow-lg sm:shadow-xl">
-          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-pulse" />
-          <span className="font-black tracking-wider">LIVE</span>
-        </div>
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-accent/0 group-hover:from-primary/10 group-hover:to-accent/10 transition-all duration-300" />
