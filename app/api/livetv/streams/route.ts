@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+// Default avatar fallback for streams without profile pictures
+const DEFAULT_AVATAR = '/no-profile-pic.png';
+
 export async function GET() {
   try {
     const admin = getSupabaseAdmin();
@@ -23,7 +26,7 @@ export async function GET() {
         id: String(stream.stream_id),
         slug: stream.username,
         streamer_display_name: stream.display_name || stream.username || 'Unknown',
-        thumbnail_url: stream.avatar_url || null,
+        thumbnail_url: stream.avatar_url || DEFAULT_AVATAR,
         viewer_count: stream.views_count || 0,
         category: null,
         stream_type: null,
@@ -74,7 +77,7 @@ export async function GET() {
         id: String(stream.id),
         slug: profile?.username || 'unknown',
         streamer_display_name: profile?.display_name || profile?.username || 'Unknown',
-        thumbnail_url: profile?.avatar_url || null,
+        thumbnail_url: profile?.avatar_url || DEFAULT_AVATAR,
         viewer_count: stream.views_count || 0,
         category: null,
         stream_type: null,
