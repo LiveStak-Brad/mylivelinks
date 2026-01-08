@@ -127,8 +127,10 @@ export default function LiveTVPage() {
   const streamsByGender = useMemo(() => applyGenderFilter(streams), [applyGenderFilter, streams]);
   const roomsByGender = useMemo(() => applyGenderFilter(rooms), [applyGenderFilter, rooms]);
 
-  const allStreamsSortedByPopularity = useMemo(
-    () => streamsByGender.slice().sort((a, b) => b.viewer_count - a.viewer_count),
+  // Sort by trending rank (from API) - NOT by viewer_count
+  // The API returns streams ordered by trending_score DESC with trendingRank field
+  const allStreamsSortedByTrending = useMemo(
+    () => streamsByGender.slice().sort((a, b) => (a.trendingRank ?? 999) - (b.trendingRank ?? 999)),
     [streamsByGender]
   );
 
@@ -372,7 +374,7 @@ export default function LiveTVPage() {
                               />
                             ))}
                           </div>
-                        ) : allStreamsSortedByPopularity.length === 0 && roomsByGender.length === 0 ? (
+                        ) : allStreamsSortedByTrending.length === 0 && roomsByGender.length === 0 ? (
                           <div className="rounded-2xl bg-gradient-to-br from-card via-card/95 to-card/90 border-2 border-dashed border-border/50 p-8 relative overflow-hidden">
                             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(239,68,68,0.08),transparent)]" />
                             <div className="relative space-y-3">
@@ -385,13 +387,13 @@ export default function LiveTVPage() {
                               </p>
                             </div>
                           </div>
-                        ) : allStreamsSortedByPopularity.length === 0 ? (
+                        ) : allStreamsSortedByTrending.length === 0 ? (
                           <div className="text-center py-4 text-muted-foreground text-sm">
                             No individual streams right now. Check out the live rooms above!
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                            {allStreamsSortedByPopularity.map((stream) => (
+                            {allStreamsSortedByTrending.map((stream) => (
                               <StreamCard key={stream.id} stream={stream} flexibleWidth />
                             ))}
                           </div>
