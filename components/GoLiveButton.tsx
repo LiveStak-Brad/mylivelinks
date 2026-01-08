@@ -320,9 +320,11 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         return;
       }
 
+      // MOBILE FIX: Use 'ideal' instead of 'exact' for deviceId to prevent failures
+      // when device IDs change (common on mobile devices)
       const constraints: MediaStreamConstraints = {
         video: videoDeviceId ? {
-          deviceId: { exact: videoDeviceId },
+          deviceId: { ideal: videoDeviceId },
           width: { ideal: 1920, max: 1920, min: 1280 },
           height: { ideal: 1080, max: 1080, min: 720 },
           frameRate: { ideal: 30, max: 30 },
@@ -335,7 +337,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
           facingMode: 'user',
         },
         audio: audioDeviceId ? {
-          deviceId: { exact: audioDeviceId },
+          deviceId: { ideal: audioDeviceId },
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
@@ -350,7 +352,17 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
         },
       };
 
-      const stream = existingStream || await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream;
+      try {
+        stream = existingStream || await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (constraintErr: any) {
+        console.warn('Device constraint failed, trying fallback:', constraintErr);
+        // Fallback without specific device IDs
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+      }
       setPreviewStream(stream);
 
       // Attach to video element

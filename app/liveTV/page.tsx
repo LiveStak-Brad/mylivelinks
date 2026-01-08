@@ -208,13 +208,13 @@ export default function LiveTVPage() {
   return (
     <main
       id="main"
-      className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 pb-24 md:pb-8 relative overflow-hidden flex flex-col"
+      className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 pb-24 md:pb-8 relative flex flex-col"
     >
       {/* Mobile App Waitlist Banner */}
       <div className="flex justify-center py-4">
         <EmailSignupCard placement="banner" />
       </div>
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse" />
         <div
           className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl animate-pulse"
@@ -222,7 +222,7 @@ export default function LiveTVPage() {
         />
       </div>
 
-      <div className="mx-auto max-w-[1600px] relative z-10 w-full flex flex-col h-screen">
+      <div className="mx-auto max-w-[1600px] relative z-10 w-full flex-1 flex flex-col">
         <div className="sticky top-0 z-20 bg-background/98 backdrop-blur-2xl border-b-2 border-border/30 shadow-xl flex-shrink-0">
           <div className="px-4 sm:px-6 pt-3 pb-2 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/8 via-accent/8 to-primary/8 opacity-60" />
@@ -335,8 +335,8 @@ export default function LiveTVPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="py-2">
+        <div className="flex-1">
+          <div className="py-2 pb-8">
             {railItems.map((item) => {
               switch (item.key) {
                 case 'TrendingGrid':

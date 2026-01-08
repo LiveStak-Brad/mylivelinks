@@ -209,24 +209,17 @@ export function useLiveKitPublisher({
           tracks.push(localAudioTrack);
         } else if (audioDeviceId) {
           // Fallback to microphone for audio
+          // MOBILE FIX: Use 'ideal' instead of 'exact' for deviceId
           console.log('Screen share has no audio, using microphone...');
           const audioTracks = await createTracks({
-            audio: audioDeviceId
-              ? {
-                  deviceId: { exact: audioDeviceId },
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                  sampleRate: 48000,
-                  channelCount: 1,
-                }
-              : {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true,
-                  sampleRate: 48000,
-                  channelCount: 1,
-                },
+            audio: {
+              deviceId: { ideal: audioDeviceId },
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000,
+              channelCount: 1,
+            },
             video: false,
           });
           tracks.push(...audioTracks);
@@ -235,9 +228,11 @@ export function useLiveKitPublisher({
         console.log('Screen share tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
       } else {
         // Use camera
+        // MOBILE FIX: Use 'ideal' instead of 'exact' for deviceId to prevent failures
+        // when device IDs change (common on mobile devices)
         const trackOptions: any = {
           audio: audioDeviceId ? { 
-            deviceId: { exact: audioDeviceId },
+            deviceId: { ideal: audioDeviceId },
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
@@ -252,7 +247,7 @@ export function useLiveKitPublisher({
           },
           video: videoDeviceId 
             ? { 
-                deviceId: { exact: videoDeviceId },
+                deviceId: { ideal: videoDeviceId },
                 width: { ideal: 1920, max: 1920, min: 1280 },
                 height: { ideal: 1080, max: 1080, min: 720 },
                 frameRate: { ideal: 30, max: 30 },
@@ -267,9 +262,35 @@ export function useLiveKitPublisher({
               },
         };
 
-        console.log('Requesting camera tracks...');
-        tracks = await createTracks(trackOptions);
-        console.log('Camera tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
+        console.log('Requesting camera tracks with options:', { 
+          hasAudio: !!trackOptions.audio, 
+          hasVideo: !!trackOptions.video,
+          audioDeviceId,
+          videoDeviceId,
+        });
+        
+        try {
+          tracks = await createTracks(trackOptions);
+          console.log('Camera tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
+        } catch (trackError: any) {
+          console.error('Error creating tracks with device IDs, trying fallback:', trackError);
+          // Fallback: try without specific device IDs
+          const fallbackOptions = {
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: {
+              facingMode: 'user',
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30 },
+            },
+          };
+          tracks = await createTracks(fallbackOptions);
+          console.log('Fallback tracks created:', { count: tracks.length, types: tracks.map(t => t.kind) });
+        }
       }
 
       tracksRef.current = tracks;
