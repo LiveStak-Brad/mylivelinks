@@ -56,6 +56,14 @@ export const ROOM_OPTIONS = {
 
 export const LIVE_LAUNCH_ENABLED = process.env.NEXT_PUBLIC_LIVE_LAUNCH_ENABLED === 'true';
 
+/**
+ * SOLO LIVE KILL-SWITCH
+ * Emergency OFF switch for Solo Live feature.
+ * Default: ON (enabled for all authenticated users)
+ * Set NEXT_PUBLIC_SOLO_LIVE_ENABLED=false to disable
+ */
+export const SOLO_LIVE_ENABLED = process.env.NEXT_PUBLIC_SOLO_LIVE_ENABLED !== 'false';
+
 export const LIVE_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'] as const;
 export const LIVE_OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'] as const;
 
@@ -78,11 +86,16 @@ export function canUserGoLiveGroup(user: { id?: string; email?: string | null } 
 
 /**
  * Check if user can go live in SOLO mode (1:1 streams)
- * SOLO LIVE IS STILL PAUSED/OWNER-ONLY
+ * SOLO LIVE IS NOW OPEN TO ALL AUTHENTICATED USERS!
+ * Kill-switch: NEXT_PUBLIC_SOLO_LIVE_ENABLED=false to disable
  */
 export function canUserGoLiveSolo(user: { id?: string; email?: string | null } | null | undefined) {
-  // Solo live is still owner-only
-  return isLiveOwnerUser(user);
+  // If kill-switch is OFF, only allow owners
+  if (!SOLO_LIVE_ENABLED) {
+    return isLiveOwnerUser(user);
+  }
+  // Solo live is open to all authenticated users
+  return !!user?.id;
 }
 
 /**

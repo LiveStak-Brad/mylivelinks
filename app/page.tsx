@@ -582,7 +582,7 @@ export default function LandingPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50">Live feature</p>
                 <h2 className="text-2xl font-extrabold text-white">Live is happening</h2>
                 <p className="text-sm text-white/80">
-                  Join Live Central to go live together or hang out. Solo live streams are coming next.
+                  Join Live Central to go live together, or start your own Solo Live stream!
                 </p>
                 <p className="text-xs text-white/60">
                   Discover live rooms on LiveTV. Trending and Discovery help streams get seen.

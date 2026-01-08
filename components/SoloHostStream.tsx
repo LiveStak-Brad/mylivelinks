@@ -338,7 +338,7 @@ export default function SoloHostStream() {
 
       const canLive = canUserGoLiveSolo({ id: user.id, email: user.email });
       if (!canLive) {
-        setError('Solo Live is currently paused. Try Group Live in Live Central!');
+        setError('Solo Live is temporarily disabled. Try Group Live in Live Central!');
         setLoading(false);
         return;
       }

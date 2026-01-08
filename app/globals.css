@@ -606,3 +606,71 @@ main, #main, [role="main"] {
   .gifter-badge-diamond { animation: none; }
   .gifter-badge-diamond::before { animation: none; background: rgba(255,255,255,0.1); }
 }
+
+/* =============================================================================
+   VERTICAL VOLUME SLIDER (Battle Grid Tiles)
+   ============================================================================ */
+
+.volume-slider-vertical {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Track styling */
+.volume-slider-vertical::-webkit-slider-runnable-track {
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to top, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+  border-radius: 2px;
+}
+
+.volume-slider-vertical::-moz-range-track {
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to top, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.1) 100%);
+  border-radius: 2px;
+}
+
+/* Thumb styling */
+.volume-slider-vertical::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-left: -6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  transition: transform 0.15s ease;
+}
+
+.volume-slider-vertical::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  transition: transform 0.15s ease;
+}
+
+.volume-slider-vertical::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.volume-slider-vertical::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* Focus state */
+.volume-slider-vertical:focus {
+  outline: none;
+}
+
+.volume-slider-vertical:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.4), 0 2px 6px rgba(0,0,0,0.4);
+}

@@ -341,11 +341,11 @@ export default function LiveTVPage() {
               switch (item.key) {
                 case 'TrendingGrid':
                   return (
-                    <div key="trending-grid" className="space-y-6">
+                    <div key="trending-grid" className="space-y-1">
                       {/* Live Rooms Section */}
                       {roomsByGender.length > 0 && (
-                        <div className="px-4 py-2">
-                          <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mb-3 flex items-center gap-2.5">
+                        <div className="px-4 pt-1 pb-2">
+                          <h2 className="text-lg sm:text-xl font-black text-foreground tracking-tight mb-2 flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 animate-pulse shadow-lg shadow-purple-500/50" />
                             Live Rooms
                           </h2>
@@ -358,8 +358,8 @@ export default function LiveTVPage() {
                       )}
                       
                       {/* Trending Streams */}
-                      <div className="px-4 py-2">
-                        <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight mb-3 flex items-center gap-2.5">
+                      <div className="px-4 pt-1 pb-2">
+                        <h2 className="text-lg sm:text-xl font-black text-foreground tracking-tight mb-2 flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-red-500 to-red-600 animate-pulse shadow-lg shadow-red-500/50" />
                           Trending Now
                         </h2>
