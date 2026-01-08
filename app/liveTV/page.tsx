@@ -487,9 +487,8 @@ export default function LiveTVPage() {
                                       {stream.streamer_display_name}
                                     </h3>
                                     <div className="flex items-center gap-1.5 bg-black/20 px-3 py-1 rounded-full">
-                                      <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
                                       <span className="text-xs font-bold text-foreground">
-                                        {Math.floor((stream.total_views || 0) * 0.6)}
+                                        {Math.floor((stream.total_views || 0) * 0.6)} views
                                       </span>
                                     </div>
                                   </div>
@@ -510,9 +509,8 @@ export default function LiveTVPage() {
                                       Opponent
                                     </h3>
                                     <div className="flex items-center gap-1.5 bg-black/20 px-3 py-1 rounded-full">
-                                      <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
                                       <span className="text-xs font-bold text-foreground">
-                                        {Math.floor((stream.total_views || 0) * 0.4)}
+                                        {Math.floor((stream.total_views || 0) * 0.4)} views
                                       </span>
                                     </div>
                                   </div>
@@ -523,7 +521,7 @@ export default function LiveTVPage() {
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <span className="text-2xl">⚔️</span>
-                                    <span className="text-xs sm:text-sm font-black text-muted-foreground">LIVE BATTLE</span>
+                                    <span className="text-xs sm:text-sm font-black text-muted-foreground">BATTLE</span>
                                   </div>
                                   <div className="flex items-center gap-2 bg-background/50 px-3 py-1 rounded-lg">
                                     <span className="text-xs font-bold text-muted-foreground">Total Views:</span>
