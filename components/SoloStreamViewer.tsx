@@ -1735,39 +1735,6 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                 paddingRight: '1rem'
               }}
             >
-              {/* Mobile: Top gifters vertical stack on the left */}
-              {topGifters.length > 0 && (
-                <div className="md:hidden absolute left-2 top-24 flex flex-col gap-px z-30">
-                  {topGifters.slice(0, 3).map((gifter, index) => {
-                    const colors = [
-                      { border: 'ring-yellow-400', bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600' },
-                      { border: 'ring-gray-300', bg: 'bg-gradient-to-br from-gray-300 to-gray-400' },
-                      { border: 'ring-orange-600', bg: 'bg-gradient-to-br from-orange-600 to-orange-800' },
-                    ];
-                    const color = colors[index];
-
-                    return (
-                      <button
-                        key={gifter.profile_id}
-                        onClick={() => setShowStreamGifters(true)}
-                        className={`flex items-center justify-center ${color.bg} rounded-full p-[2px] w-9 h-9 hover:scale-110 transition-transform cursor-pointer`}
-                        title={`${gifter.username} - ${gifter.total_coins.toLocaleString()} coins`}
-                      >
-                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-                          <Image
-                            src={getAvatarUrl(gifter.avatar_url)}
-                            alt={gifter.username}
-                            width={28}
-                            height={28}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
               <div className="flex items-center gap-1">
                 {/* Back Button - ALL THE WAY LEFT */}
                 <button
@@ -1905,6 +1872,38 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                       </span>
                       <span className="text-[10px] text-white/80 font-medium">→ Top 100</span>
                     </div>
+                    </div>
+                  )}
+
+                  {/* Top 3 Gifters - positioned to the right of leaderboard pill */}
+                  {topGifters.length > 0 && (
+                    <div className="absolute top-full left-[250px] mt-1 flex items-center gap-1 z-10">
+                      {topGifters.slice(0, 3).map((gifter, index) => {
+                        const colors = [
+                          { bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600' },
+                          { bg: 'bg-gradient-to-br from-gray-300 to-gray-400' },
+                          { bg: 'bg-gradient-to-br from-orange-600 to-orange-800' },
+                        ];
+                        const color = colors[index];
+                        return (
+                          <button
+                            key={gifter.profile_id}
+                            onClick={() => setShowStreamGifters(true)}
+                            className={`flex items-center justify-center ${color.bg} rounded-full p-[2px] w-9 h-9 hover:scale-110 transition-transform cursor-pointer shadow-lg`}
+                            title={`${gifter.username} - ${gifter.total_coins.toLocaleString()} coins`}
+                          >
+                            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+                              <Image
+                                src={getAvatarUrl(gifter.avatar_url)}
+                                alt={gifter.username}
+                                width={28}
+                                height={28}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

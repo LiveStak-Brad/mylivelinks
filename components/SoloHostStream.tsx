@@ -253,6 +253,8 @@ export default function SoloHostStream() {
   // When entering a battle, unpublish from solo room to free camera for battle room
   // When exiting a battle, show a message that they can resume or auto-resume
   const prevIsInActiveSessionRef = useRef(false);
+  const wasPublishingBeforeSessionRef = useRef(false);
+  const resetConnectionRef = useRef<(() => Promise<void>) | null>(null);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   
   useEffect(() => {
@@ -263,6 +265,7 @@ export default function SoloHostStream() {
     if (!wasInSession && isNowInSession && roomRef.current && isPublishing) {
       // Entering a battle - unpublish local tracks from solo room
       console.log('[SoloHostStream] Entering battle - unpublishing from solo room');
+      wasPublishingBeforeSessionRef.current = true;
       const room = roomRef.current;
       room.localParticipant.trackPublications.forEach((pub) => {
         if (pub.track) {
@@ -274,11 +277,25 @@ export default function SoloHostStream() {
     }
     
     if (wasInSession && !isNowInSession) {
-      // Exiting battle - for now, keep the stream ended and let user manually restart
-      // This is simpler and avoids camera conflicts
-      console.log('[SoloHostStream] Exiting battle - solo stream remains paused');
-      setIsPublishing(false);
-      setShowResumePrompt(true);
+      // Exiting battle/cohost session - restore solo publishing if we were live before
+      console.log('[SoloHostStream] Exiting battle - restoring solo publishing');
+      const shouldResume = wasPublishingBeforeSessionRef.current;
+      wasPublishingBeforeSessionRef.current = false;
+
+      if (shouldResume) {
+        // Re-init and republish tracks into the SOLO room so viewers don't see black/profile-photo.
+        // This uses the existing track reset logic (camera+mic re-publish + re-attach).
+        resetConnectionRef.current?.()
+          .then(() => {
+            setShowResumePrompt(false);
+          })
+          .catch((err) => {
+            console.error('[SoloHostStream] Failed to restore solo publishing:', err);
+            setShowResumePrompt(true);
+          });
+      } else {
+        setShowResumePrompt(true);
+      }
     }
   }, [isInActiveSession, isPublishing]);
   
@@ -944,6 +961,15 @@ export default function SoloHostStream() {
     }
   };
 
+  const handleLeaveSession = async () => {
+    try {
+      await endCurrentSession();
+      await refreshBattleSession();
+    } catch (err) {
+      console.error('[SoloHostStream] Failed to leave session:', err);
+    }
+  };
+
   const handleStartStream = async () => {
     if (!streamTitle.trim()) {
       alert('Please enter a stream title');
@@ -1249,6 +1275,8 @@ export default function SoloHostStream() {
       setIsResetting(false);
     }
   };
+
+  resetConnectionRef.current = handleResetConnection;
 
   // Start screen sharing - replaces camera video with screen
   const handleStartScreenShare = async () => {
@@ -1719,44 +1747,23 @@ export default function SoloHostStream() {
             
             {/* Top row - all screen sizes (with safe area support on mobile) */}
             <div className="absolute z-20 flex items-center justify-between lg:top-4 lg:left-4 lg:right-4" style={{ top: 'max(1rem, env(safe-area-inset-top))', left: '1rem', right: '1rem' }}>
-              {/* Mobile: Top gifters vertical stack on the left */}
-              {topGifters.length > 0 && (
-                <div className="md:hidden absolute left-2 top-24 flex flex-col gap-px z-30">
-                  {topGifters.slice(0, 3).map((gifter, index) => {
-                    const colors = [
-                      { border: 'ring-yellow-400', bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600' },
-                      { border: 'ring-gray-300', bg: 'bg-gradient-to-br from-gray-300 to-gray-400' },
-                      { border: 'ring-orange-600', bg: 'bg-gradient-to-br from-orange-600 to-orange-800' },
-                    ];
-                    const color = colors[index];
+              <div className="flex items-center gap-1">
+                {isInActiveSession && (
+                  <button
+                    onClick={handleLeaveSession}
+                    className="text-white hover:opacity-80 transition-opacity"
+                    title="Leave Battle/Cohost"
+                    type="button"
+                  >
+                    <ChevronLeft className="w-7 h-7" />
+                  </button>
+                )}
 
-                    return (
-                      <button
-                        key={gifter.profile_id}
-                        onClick={() => setShowStreamGifters(true)}
-                        className={`flex items-center justify-center ${color.bg} rounded-full p-[2px] w-9 h-9 hover:scale-110 transition-transform cursor-pointer`}
-                        title={`${gifter.username} - ${gifter.total_coins.toLocaleString()} coins`}
-                      >
-                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-                          <Image
-                            src={getAvatarUrl(gifter.avatar_url)}
-                            alt={gifter.username}
-                            width={28}
-                            height={28}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Left: Streamer name bubble with hanging rank badge */}
-              <div className="relative flex flex-col">
-                {/* Main profile bubble */}
-                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5">
-                  <div className="flex items-center gap-2">
+                {/* Left: Streamer name bubble */}
+                <div className="relative flex flex-col">
+                  {/* Main profile bubble */}
+                  <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5">
+                    <div className="flex items-center gap-2">
                     <Image
                       src={getAvatarUrl(streamer.avatar_url)}
                       alt={streamer.username}
@@ -1800,9 +1807,38 @@ export default function SoloHostStream() {
                   </div>
                 </div>
 
-                {/* Rank badge hanging BELOW the bubble - ABSOLUTE positioned */}
+                </div>
+              </div>
+              
+            {/* Viewer count - centered on desktop, positioned right (near X) on mobile to avoid collision with username */}
+              <button
+                onClick={() => setShowViewers(true)}
+                className="absolute right-14 md:right-auto md:left-1/2 md:-translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5 md:px-4 md:py-2 shadow-lg flex items-center gap-1.5 hover:bg-black/50 transition-colors cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-white" />
+              <span className="text-white font-bold text-sm">{viewerCount.toLocaleString()}</span>
+              </button>
+              
+              {/* Right: Top 3 Gifters + X + Share (vertical stack) */}
+              <div className="flex items-center gap-2">
+                {/* X Button - inline with gifters */}
+                <button
+                  onClick={handleExit}
+                  className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
+                  title="Exit Stream"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div
+              className="absolute z-30 left-4 right-4 flex items-center justify-between pointer-events-none"
+              style={{ top: 'calc(max(1rem, env(safe-area-inset-top)) + 3.25rem)' }}
+            >
+              <div className="flex items-center gap-2 pointer-events-auto">
                 {leaderboardRank && leaderboardRank.current_rank > 0 && leaderboardRank.current_rank <= 100 && (
-                  <div className="absolute top-full left-2 mt-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-yellow-500/90 to-orange-500/90 border-2 border-yellow-400/50 shadow-lg shadow-yellow-500/30 backdrop-blur-md w-fit z-10">
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-yellow-500/90 to-orange-500/90 border-2 border-yellow-400/50 shadow-lg shadow-yellow-500/30 backdrop-blur-md w-fit">
                     <span className={`text-[13px] font-bold ${
                       leaderboardRank.current_rank === 1 
                         ? 'text-white' 
@@ -1842,9 +1878,8 @@ export default function SoloHostStream() {
                     )}
                   </div>
                 )}
-                
                 {leaderboardRank && leaderboardRank.current_rank > 100 && (
-                  <div className="absolute top-full left-2 mt-1 flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-600/90 to-gray-700/90 border-2 border-gray-500/50 shadow-lg backdrop-blur-md w-fit z-10">
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-gray-600/90 to-gray-700/90 border-2 border-gray-500/50 shadow-lg backdrop-blur-md w-fit">
                     <div className="flex items-center gap-0.5">
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 2L4 7L2 14L12 22L22 14L20 7L12 2Z" fill="currentColor" className="text-cyan-400"/>
@@ -1858,69 +1893,45 @@ export default function SoloHostStream() {
                   </div>
                 )}
               </div>
-              
-            {/* Viewer count - centered on desktop, positioned right (near X) on mobile to avoid collision with username */}
+
+              {topGifters.length > 0 && (
+                <div className="flex items-center gap-1 pointer-events-auto">
+                  {topGifters.slice(0, 3).map((gifter, index) => {
+                    const colors = [
+                      { border: 'ring-yellow-400', bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600' },
+                      { border: 'ring-gray-300', bg: 'bg-gradient-to-br from-gray-300 to-gray-400' },
+                      { border: 'ring-orange-600', bg: 'bg-gradient-to-br from-orange-600 to-orange-800' },
+                    ];
+                    const color = colors[index];
+                    return (
+                      <button
+                        key={gifter.profile_id}
+                        onClick={() => setShowStreamGifters(true)}
+                        className={`flex items-center justify-center ${color.bg} rounded-full p-[2px] w-9 h-9 hover:scale-110 transition-transform cursor-pointer`}
+                        title={`${gifter.username} - ${gifter.total_coins.toLocaleString()} coins`}
+                      >
+                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+                          <Image
+                            src={getAvatarUrl(gifter.avatar_url)}
+                            alt={gifter.username}
+                            width={28}
+                            height={28}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <button
-                onClick={() => setShowViewers(true)}
-                className="absolute right-14 md:right-auto md:left-1/2 md:-translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5 md:px-4 md:py-2 shadow-lg flex items-center gap-1.5 hover:bg-black/50 transition-colors cursor-pointer"
+                onClick={handleShare}
+                className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors pointer-events-auto"
+                title="Share"
               >
-                <Eye className="w-4 h-4 text-white" />
-              <span className="text-white font-bold text-sm">{viewerCount.toLocaleString()}</span>
+                <Share2 className="w-5 h-5" />
               </button>
-              
-              {/* Right: Top 3 Gifters + X + Share (vertical stack) */}
-              <div className="flex items-center gap-2">
-                {/* Top 3 Gifters - small bubbles */}
-                {topGifters.length > 0 && (
-                  <div className="hidden md:flex items-center gap-1">
-                    {topGifters.map((gifter, index) => {
-                      const colors = [
-                        { border: 'ring-yellow-400', bg: 'bg-gradient-to-br from-yellow-400 to-yellow-600' }, // Gold
-                        { border: 'ring-gray-300', bg: 'bg-gradient-to-br from-gray-300 to-gray-400' },       // Silver
-                        { border: 'ring-orange-600', bg: 'bg-gradient-to-br from-orange-600 to-orange-800' }, // Bronze
-                      ];
-                      const color = colors[index];
-                      
-                      return (
-                        <button
-                          key={gifter.profile_id}
-                          onClick={() => setShowStreamGifters(true)}
-                          className={`flex items-center justify-center ${color.bg} rounded-full p-[2px] w-9 h-9 hover:scale-110 transition-transform cursor-pointer`}
-                          title={`${gifter.username} - ${gifter.total_coins.toLocaleString()} coins`}
-                        >
-                          <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-                            <Image
-                              src={getAvatarUrl(gifter.avatar_url)}
-                              alt={gifter.username}
-                              width={28}
-                              height={28}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {/* X Button - inline with gifters */}
-                <button
-                  onClick={handleExit}
-                  className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
-                  title="Exit Stream"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-                
-                {/* Share Button - Below X, positioned absolutely */}
-                <button
-                  onClick={handleShare}
-                  className="absolute top-14 right-0 p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
-                  title="Share"
-                >
-                  <Share2 className="w-5 h-5" />
-                </button>
-              </div>
             </div>
 
             {/* Video element OR Battle Grid */}
@@ -1932,7 +1943,7 @@ export default function SoloHostStream() {
                 currentUserName={streamer.display_name || streamer.username}
                 canPublish={true}
                 remainingSeconds={battleRemainingSeconds}
-                className="w-full h-full box-border pt-24 pb-[30vh]"
+                className="w-full h-full box-border pt-32 pb-[38vh]"
               />
             ) : (
               /* Solo video element - normal host view */

@@ -110,10 +110,14 @@ export function useBattleSession({
       
       // Update remaining seconds
       if (activeSession) {
-        const timeField = activeSession.status === 'cooldown' 
-          ? activeSession.cooldown_ends_at 
-          : activeSession.ends_at;
-        setRemainingSeconds(getRemainingSeconds(timeField));
+        if (activeSession.type === 'cohost') {
+          setRemainingSeconds(0);
+        } else {
+          const timeField = activeSession.status === 'cooldown' 
+            ? activeSession.cooldown_ends_at 
+            : activeSession.ends_at;
+          setRemainingSeconds(getRemainingSeconds(timeField));
+        }
       } else {
         setRemainingSeconds(0);
       }
@@ -217,7 +221,8 @@ export function useBattleSession({
   
   // Timer countdown effect
   useEffect(() => {
-    if (!session || remainingSeconds <= 0) {
+    // Cohost sessions are indefinite (no countdown/cooldown transitions)
+    if (!session || session.type === 'cohost' || remainingSeconds <= 0) {
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -229,7 +234,7 @@ export function useBattleSession({
       setRemainingSeconds(prev => {
         if (prev <= 1) {
           // Timer expired - if we're in active state, transition to cooldown
-          if (session.status === 'active' && isParticipant) {
+          if (session.type === 'battle' && session.status === 'active' && isParticipant) {
             transitionToCooldown().catch(console.error);
           } else if (session.status === 'cooldown') {
             // Cooldown expired - refresh to see ended state

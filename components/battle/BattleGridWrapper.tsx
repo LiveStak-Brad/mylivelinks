@@ -71,6 +71,38 @@ export default function BattleGridWrapper({
     getSessionRoomName(session.session_id, session.type), 
     [session.session_id, session.type]
   );
+
+  // Host metadata should not force LiveKit reconnection when only session.status/timers change.
+  // We derive a stable host snapshot based on identity fields.
+  const hostSnapshot = useMemo(() => {
+    return {
+      hostA: {
+        id: session.host_a.id,
+        username: session.host_a.username,
+        display_name: session.host_a.display_name,
+        avatar_url: session.host_a.avatar_url,
+      },
+      hostB: {
+        id: session.host_b.id,
+        username: session.host_b.username,
+        display_name: session.host_b.display_name,
+        avatar_url: session.host_b.avatar_url,
+      },
+      type: session.type,
+      session_id: session.session_id,
+    };
+  }, [
+    session.host_a.id,
+    session.host_a.username,
+    session.host_a.display_name,
+    session.host_a.avatar_url,
+    session.host_b.id,
+    session.host_b.username,
+    session.host_b.display_name,
+    session.host_b.avatar_url,
+    session.type,
+    session.session_id,
+  ]);
   
   // Map LiveKit participants to grid participants
   const updateParticipants = useCallback(() => {
@@ -86,8 +118,8 @@ export default function BattleGridWrapper({
       const audioTrack = local.getTrackPublication(Track.Source.Microphone)?.track;
       
       // Determine if this is host_a or host_b
-      const isHostA = currentUserId === session.host_a.id;
-      const hostInfo = isHostA ? session.host_a : session.host_b;
+      const isHostA = currentUserId === hostSnapshot.hostA.id;
+      const hostInfo = isHostA ? hostSnapshot.hostA : hostSnapshot.hostB;
       
       gridParticipants.push({
         id: currentUserId,
@@ -120,9 +152,9 @@ export default function BattleGridWrapper({
       });
       
       // Determine participant info from session
-      const isHostA = userId === session.host_a.id;
-      const isHostB = userId === session.host_b.id;
-      const hostInfo = isHostA ? session.host_a : isHostB ? session.host_b : null;
+      const isHostA = userId === hostSnapshot.hostA.id;
+      const isHostB = userId === hostSnapshot.hostB.id;
+      const hostInfo = isHostA ? hostSnapshot.hostA : isHostB ? hostSnapshot.hostB : null;
       
       if (hostInfo) {
         gridParticipants.push({
@@ -148,7 +180,7 @@ export default function BattleGridWrapper({
       });
       return newVolumes;
     });
-  }, [canPublish, currentUserId, session]);
+  }, [canPublish, currentUserId, hostSnapshot]);
   
   // Connect to battle/cohost room
   useEffect(() => {
@@ -195,11 +227,22 @@ export default function BattleGridWrapper({
           }
         });
         
-        room.on(RoomEvent.Disconnected, () => {
-          console.log('[BattleGridWrapper] Room disconnected');
+        room.on(RoomEvent.Disconnected, (reason) => {
+          console.log('[BattleGridWrapper] Room disconnected', { reason });
           if (isActive) {
             setIsConnected(false);
             onRoomDisconnected?.();
+          }
+        });
+
+        room.on(RoomEvent.Reconnecting, () => {
+          console.log('[BattleGridWrapper] Room reconnecting:', roomName);
+        });
+
+        room.on(RoomEvent.Reconnected, () => {
+          console.log('[BattleGridWrapper] Room reconnected:', roomName);
+          if (isActive) {
+            updateParticipants();
           }
         });
         
