@@ -248,17 +248,9 @@ export function useLiveKitPublisher({
           video: videoDeviceId 
             ? { 
                 deviceId: { ideal: videoDeviceId },
-                width: { ideal: 1920, max: 1920, min: 1280 },
-                height: { ideal: 1080, max: 1080, min: 720 },
-                frameRate: { ideal: 30, max: 30 },
-                aspectRatio: 16/9,
               }
             : {
-                facingMode: 'user',
-                width: { ideal: 1920, max: 1920, min: 1280 },
-                height: { ideal: 1080, max: 1080, min: 720 },
-                frameRate: { ideal: 30, max: 30 },
-                aspectRatio: 16/9,
+                facingMode: 'user' as const,
               },
         };
 
@@ -282,10 +274,7 @@ export function useLiveKitPublisher({
               autoGainControl: true,
             },
             video: {
-              facingMode: 'user',
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              frameRate: { ideal: 30 },
+              facingMode: 'user' as const,
             },
           };
           tracks = await createTracks(fallbackOptions);
