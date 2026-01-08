@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication, LocalTrackPublication } from 'livekit-client';
-import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT, canUserGoLiveSolo } from '@/lib/livekit-constants';
+import { DEBUG_LIVEKIT, TOKEN_ENDPOINT, canUserGoLiveSolo } from '@/lib/livekit-constants';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
@@ -660,7 +660,19 @@ export default function SoloHostStream() {
 
         roomRef.current = room;
 
-        // Get LiveKit token - HOST MODE
+        // SOLO STREAM FIX: Use unique room name per profile_id to prevent host collision
+        // Each solo streamer gets their own dedicated room: solo_${profile_id}
+        // This ensures Account A (computer) and Account B (phone) NEVER collide
+        const soloRoomName = `solo_${currentUserId}`;
+        
+        console.log('[SoloHostStream] 🔑 TOKEN REQUEST:', {
+          profileId: currentUserId,
+          liveStreamId: streamer?.live_stream_id,
+          soloRoomName,
+          role: 'host',
+        });
+
+        // Get LiveKit token - HOST MODE with unique solo room
         const tokenResponse = await fetch(TOKEN_ENDPOINT, {
           method: 'POST',
           headers: {
@@ -668,7 +680,7 @@ export default function SoloHostStream() {
           },
           credentials: 'include',
           body: JSON.stringify({
-            roomName: LIVEKIT_ROOM_NAME,
+            roomName: soloRoomName,
             participantName: `host_${currentUserId}`,
             canPublish: true,  // ✅ HOST MODE
             canSubscribe: true,
@@ -683,11 +695,21 @@ export default function SoloHostStream() {
           throw new Error(`Failed to get token: ${tokenResponse.status}`);
         }
 
-        const { token, url } = await tokenResponse.json();
+        const tokenData = await tokenResponse.json();
+        const { token, url, roomName: mintedRoomName, identity: mintedIdentity, canPublish: mintedCanPublish } = tokenData;
 
         if (!token || !url) {
           throw new Error('Invalid token response');
         }
+
+        // 🔍 DEBUG: Log token details to verify unique room/identity
+        console.log('[SoloHostStream] ✅ TOKEN RECEIVED:', {
+          mintedRoomName,
+          mintedIdentity,
+          mintedCanPublish,
+          expectedRoomName: soloRoomName,
+          url,
+        });
 
         if (DEBUG_LIVEKIT) {
           console.log('[SoloHostStream] Token received, canPublish=true, role=host');

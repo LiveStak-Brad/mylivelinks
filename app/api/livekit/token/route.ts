@@ -186,24 +186,48 @@ export async function POST(request: NextRequest) {
         return sendJson(400, { error: 'roomName and participantName are required', stage: 'body_parse' }, 'body_parse');
       }
 
-      // LAUNCH GATE: single-room only
-      // Production launch mode is Live Central only; block arbitrary room joins.
-      if (roomName !== 'live_central' && roomName !== 'live-central') {
+      // ROOM GATE: Allow live_central (group mode) and solo_* (solo streams)
+      // Solo streams use unique room names:
+      // - solo_${live_stream_id} (numeric) - e.g. solo_12345
+      // - solo_${profile_id} (UUID) - e.g. solo_abc123-def456-...
+      const isLiveCentralRoom = roomName === 'live_central' || roomName === 'live-central';
+      const isSoloRoom = /^solo_[a-f0-9-]+$/i.test(roomName); // solo_ followed by alphanumeric/dashes (covers both IDs)
+      
+      if (!isLiveCentralRoom && !isSoloRoom) {
+        console.log('[LIVEKIT_TOKEN] Room gate blocked:', { roomName, isLiveCentralRoom, isSoloRoom });
         return sendJson(403, { error: 'Room not available', stage: 'room_gate' }, 'room_gate');
       }
+      
+      console.log('[LIVEKIT_TOKEN] Room gate passed:', { roomName, isLiveCentralRoom, isSoloRoom });
 
       const wantsPublish = canPublish === true || body?.role === 'publisher';
       const isGuestRole = body?.role === 'guest';
+      const isHostRole = body?.role === 'host';
       
-      // Check if this is a "main" room (live_central, live-central, or similar)
-      const isMainRoom = !roomName || 
-        roomName === 'live_central' || 
-        roomName === 'live-central' || 
-        roomName.toLowerCase().includes('live_central') ||
-        roomName.toLowerCase().includes('live-central');
+      // Check room type for permission logic
+      const isMainRoom = roomName === 'live_central' || roomName === 'live-central';
+      const isSoloStreamRoom = /^solo_[a-f0-9-]+$/i.test(roomName);
       
       const canGoLive = await runStage('can_user_go_live', 2_000, async () => {
         try {
+          // SOLO STREAM ROOMS: Use canUserGoLiveSolo permission check
+          // Solo rooms are format: solo_${live_stream_id}
+          if (isSoloStreamRoom) {
+            // Import canUserGoLiveSolo dynamically to check solo permissions
+            const { canUserGoLiveSolo } = await import('@/lib/livekit-constants');
+            const allowed = canUserGoLiveSolo({ id: user.id, email: user.email });
+            console.log('[LIVEKIT_TOKEN] Solo room permission check:', {
+              userId: user.id,
+              roomName,
+              isSoloStreamRoom: true,
+              isHostRole,
+              allowed,
+              wantsPublish,
+            });
+            return allowed;
+          }
+          
+          // MAIN ROOM (live_central): Use canUserGoLive permission check
           if (isMainRoom) {
             const allowed = canUserGoLive({ id: user.id, email: user.email });
             console.log('[LIVEKIT_TOKEN] Main room permission check:', {
@@ -269,7 +293,7 @@ export async function POST(request: NextRequest) {
           // Fall through to default
         }
 
-        // Default fallback: for launch we only support Live Central anyway.
+        // Default fallback
         return false;
       });
       
@@ -361,10 +385,28 @@ export async function POST(request: NextRequest) {
           }
 
           const token = await at.toJwt();
-          return { token, wsUrl };
+          
+          console.log('[LIVEKIT_TOKEN] Token minted successfully:', {
+            reqId,
+            identity,
+            roomName,
+            canPublish: effectiveCanPublish,
+            isSoloStreamRoom,
+            isMainRoom,
+          });
+          
+          return { token, wsUrl, identity, roomName, canPublish: effectiveCanPublish };
         });
 
-        return sendJson(200, { token: tokenResult.token, url: tokenResult.wsUrl }, 'token_sign');
+        // Return roomName and identity in response for client-side debugging
+        return sendJson(200, { 
+          token: tokenResult.token, 
+          url: tokenResult.wsUrl,
+          // Debug fields - helps verify correct room/identity on client
+          roomName: tokenResult.roomName,
+          identity: tokenResult.identity,
+          canPublish: tokenResult.canPublish,
+        }, 'token_sign');
       } catch (err: any) {
         if (err instanceof StageTimeoutError) {
           return sendJson(504, { error: 'Request timed out', stage: err.stage }, err.stage);

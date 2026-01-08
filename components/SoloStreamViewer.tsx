@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication } from 'livekit-client';
-import { LIVEKIT_ROOM_NAME, DEBUG_LIVEKIT, TOKEN_ENDPOINT } from '@/lib/livekit-constants';
+import { DEBUG_LIVEKIT, TOKEN_ENDPOINT } from '@/lib/livekit-constants';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
@@ -761,11 +761,16 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           ? `${currentUserId}_viewer_${Date.now()}` 
           : (currentUserId || `anon_${Date.now()}`);
         
-        console.log('[SoloStreamViewer] Connecting as viewer:', { 
+        // SOLO STREAM FIX: Join the streamer's dedicated solo room
+        // Room name is based on streamer's profile_id, ensuring no collision
+        const soloRoomName = `solo_${streamer.profile_id}`;
+        
+        console.log('[SoloStreamViewer] 🔑 Connecting as viewer:', { 
           viewerIdentity, 
           isOwnStream, 
           currentUserId, 
-          streamerProfileId: streamer.profile_id 
+          streamerProfileId: streamer.profile_id,
+          soloRoomName,
         });
 
         const tokenResponse = await fetch(TOKEN_ENDPOINT, {
@@ -775,7 +780,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           },
           credentials: 'include',
           body: JSON.stringify({
-            roomName: LIVEKIT_ROOM_NAME,
+            roomName: soloRoomName,
             participantName: `viewer_${viewerIdentity}`,
             canPublish: false,  // VIEWER MODE - never publish
             canSubscribe: true,
@@ -790,7 +795,15 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           throw new Error(`Failed to get token: ${tokenResponse.status}`);
         }
 
-        const { token, url } = await tokenResponse.json();
+        const tokenData = await tokenResponse.json();
+        const { token, url, roomName: mintedRoomName, identity: mintedIdentity } = tokenData;
+        
+        // 🔍 DEBUG: Log token details to verify correct room
+        console.log('[SoloStreamViewer] ✅ TOKEN RECEIVED:', {
+          mintedRoomName,
+          mintedIdentity,
+          expectedRoomName: soloRoomName,
+        });
 
         if (!token || !url) {
           throw new Error('Invalid token response');
@@ -1285,14 +1298,16 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       console.log('[SoloStreamViewer] Getting guest token...');
       setGuestStatus('Getting token...');
       
-      // Get a new token with canPublish: true
-      // Use LIVEKIT_ROOM_NAME (live_central) - same room everyone connects to
+      // SOLO STREAM FIX: Use streamer's solo room for guest publishing
+      const soloRoomName = `solo_${streamer?.profile_id}`;
+      
+      // Get a new token with canPublish: true for the streamer's solo room
       const tokenRes = await fetch(TOKEN_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          roomName: LIVEKIT_ROOM_NAME,  // Must use the same room everyone is in
+          roomName: soloRoomName,  // Must use the same solo room the host is in
           participantName: `guest_${currentUserId}`,
           canPublish: true,  // GUEST MODE - can publish
           canSubscribe: true,

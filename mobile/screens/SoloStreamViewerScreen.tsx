@@ -169,7 +169,14 @@ function SoloStreamViewerScreenLive({ navigation, route, TileComponent }: Props 
 
   const { giftingEnabled } = useFeatureFlags();
 
-  const { participants, isConnected, room, connectionError } = useLiveRoomParticipants({ enabled: true });
+  // SOLO STREAM FIX: Join the streamer's dedicated solo room
+  // Wait until streamer profile is loaded to get their profile_id for room name
+  const soloRoomName = streamer?.id ? `solo_${streamer.id}` : undefined;
+  
+  const { participants, isConnected, room, connectionError } = useLiveRoomParticipants({ 
+    enabled: !!streamer?.id, // Only enable once we know the streamer's room
+    roomName: soloRoomName,
+  });
 
   useEffect(() => {
     let cancelled = false;

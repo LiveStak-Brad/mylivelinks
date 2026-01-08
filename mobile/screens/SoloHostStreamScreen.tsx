@@ -210,8 +210,11 @@ function SoloHostStreamScreenLive({ onExit }: SoloHostStreamScreenProps) {
   const [requestingPermissions, setRequestingPermissions] = useState(false);
   const [permissionsRequested, setPermissionsRequested] = useState(false);
   
-  // LiveKit streaming
+  // LiveKit streaming - SOLO STREAM FIX: Use unique room per user profile
   const useLiveRoomParticipants = LK.useLiveRoomParticipants as any;
+  // Each solo host gets their own dedicated room: solo_${profile_id}
+  const soloRoomName = user?.id ? `solo_${user.id}` : undefined;
+  
   const {
     goLive,
     stopLive,
@@ -232,7 +235,7 @@ function SoloHostStreamScreenLive({ onExit }: SoloHostStreamScreenProps) {
     lastConnectError,
     lastTokenError,
     isPublishing,
-  } = useLiveRoomParticipants({ enabled: true });
+  } = useLiveRoomParticipants({ enabled: true, roomName: soloRoomName });
 
   const { messages, loading: loadingMessages, retryMessage } = useChatMessages({
     liveStreamId: liveStreamId ?? undefined,

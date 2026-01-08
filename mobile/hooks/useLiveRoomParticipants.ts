@@ -111,6 +111,7 @@ interface UseLiveRoomParticipantsReturn {
 
 interface UseLiveRoomParticipantsOptions {
   enabled?: boolean; // gate connect until login/device/env ready
+  roomName?: string; // optional custom room name (e.g., solo_${profile_id} for solo streams)
 }
 
 /**
@@ -121,8 +122,10 @@ interface UseLiveRoomParticipantsOptions {
 export function useLiveRoomParticipants(
   options: UseLiveRoomParticipantsOptions = {}
 ): UseLiveRoomParticipantsReturn {
-  const { enabled = false } = options;
-  if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked');
+  const { enabled = false, roomName: customRoomName } = options;
+  // Use custom room name if provided, otherwise default to ROOM_NAME (live_central)
+  const effectiveRoomName = customRoomName || ROOM_NAME;
+  if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked', { effectiveRoomName, customRoomName });
 
   const { user } = useAuthContext();
   // IMPORTANT: Do not import the LiveKit client at module scope. Any runtime usage
@@ -415,7 +418,7 @@ export function useLiveRoomParticipants(
       }
 
       const requestBody = {
-        roomName: ROOM_NAME,
+        roomName: effectiveRoomName, // Use custom room name for solo streams
         participantName: params.participantName,
         canPublish: params.canPublish,
         canSubscribe: params.canSubscribe,
