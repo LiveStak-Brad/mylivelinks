@@ -1497,10 +1497,10 @@ export default function SoloHostStream() {
                 )}
               </div>
               
-            {/* Center: Viewer count */}
+            {/* Viewer count - centered on desktop, positioned right (near X) on mobile to avoid collision with username */}
               <button
                 onClick={() => setShowViewers(true)}
-                className="absolute left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full px-4 py-2 shadow-lg flex items-center gap-1.5 hover:bg-black/50 transition-colors cursor-pointer"
+                className="absolute right-14 md:right-auto md:left-1/2 md:-translate-x-1/2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5 md:px-4 md:py-2 shadow-lg flex items-center gap-1.5 hover:bg-black/50 transition-colors cursor-pointer"
               >
                 <Eye className="w-4 h-4 text-white" />
               <span className="text-white font-bold text-sm">{viewerCount.toLocaleString()}</span>
