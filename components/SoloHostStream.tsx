@@ -248,6 +248,22 @@ export default function SoloHostStream() {
     setFilterSettings(savedFilters);
     console.log('[SoloHostStream] Loaded saved filter settings:', savedFilters);
   }, []);
+
+  // Apply CSS filter to video element when filterSettings change (for preview)
+  useEffect(() => {
+    if (videoRef.current && isPublishing) {
+      const buildFilter = (s: VideoFilterSettings): string => {
+        const filters: string[] = [];
+        const totalBlur = s.blur + (s.smoothing * 0.35);
+        if (totalBlur > 0) filters.push(`blur(${totalBlur}px)`);
+        if (s.brightness !== 1) filters.push(`brightness(${s.brightness})`);
+        if (s.contrast !== 1) filters.push(`contrast(${s.contrast})`);
+        if (s.saturation !== 1) filters.push(`saturate(${s.saturation})`);
+        return filters.length > 0 ? filters.join(' ') : 'none';
+      };
+      videoRef.current.style.filter = buildFilter(filterSettings);
+    }
+  }, [filterSettings, isPublishing]);
  
   // Stream-scoped Top Gifters (polling; safe for launch)
   const { gifters: streamTopGifters } = useStreamTopGifters({
@@ -1056,7 +1072,30 @@ export default function SoloHostStream() {
     }
   };
 
-  // Apply video filters using canvas pipeline
+  // Build CSS filter string for preview
+  const buildCssFilterString = useCallback((settings: VideoFilterSettings): string => {
+    const filters: string[] = [];
+    const totalBlur = settings.blur + (settings.smoothing * 0.35);
+    if (totalBlur > 0) filters.push(`blur(${totalBlur}px)`);
+    if (settings.brightness !== 1) filters.push(`brightness(${settings.brightness})`);
+    if (settings.contrast !== 1) filters.push(`contrast(${settings.contrast})`);
+    if (settings.saturation !== 1) filters.push(`saturate(${settings.saturation})`);
+    return filters.length > 0 ? filters.join(' ') : 'none';
+  }, []);
+
+  // Preview filters (lightweight - CSS only, no track replacement)
+  // Used for live preview while dragging sliders
+  const handlePreviewFilters = useCallback((settings: VideoFilterSettings) => {
+    setFilterSettings(settings);
+    // Apply CSS filter directly to video element for instant preview
+    if (videoRef.current) {
+      videoRef.current.style.filter = buildCssFilterString(settings);
+    }
+    // Also update the pipeline settings ref (for when pipeline is running)
+    filterPipeline.updateFilters(settings);
+  }, [filterPipeline, buildCssFilterString]);
+
+  // Apply video filters using canvas pipeline (full track replacement)
   const handleApplyFilters = async (settings: VideoFilterSettings) => {
     console.log('[SoloHostStream] Applying filters:', settings);
     
@@ -1869,6 +1908,7 @@ export default function SoloHostStream() {
         isOpen={showFilters}
         onClose={() => setShowFilters(false)}
         onApply={handleApplyFilters}
+        onPreview={handlePreviewFilters}
         currentSettings={filterSettings}
       />
 
