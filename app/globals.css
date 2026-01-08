@@ -50,6 +50,10 @@
   }
 
   /* Hide global header and bottom nav in stream view mode */
+  /* P0 FIX: Force black background on body to prevent white flash during SSR/hydration */
+  body.stream-view-mode {
+    background-color: #000 !important;
+  }
   body.stream-view-mode header {
     display: none !important;
   }

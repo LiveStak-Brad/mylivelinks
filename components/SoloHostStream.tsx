@@ -1235,8 +1235,9 @@ export default function SoloHostStream() {
 
   // Mobile container class for full-bleed layout on phone widths
   // CRITICAL: Start with black background to prevent white flash during SSR/hydration
+  // Always include bg-black as base class - mobile CSS will override with its own black bg
   const containerClass = isMobileWeb
-    ? 'mobile-live-container mobile-live-v3'
+    ? 'mobile-live-container mobile-live-v3 bg-black'
     : 'min-h-screen bg-black lg:bg-gray-50 lg:dark:bg-gray-900 overflow-hidden lg:overflow-auto';
 
   return (
