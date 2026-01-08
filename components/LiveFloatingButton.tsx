@@ -96,12 +96,17 @@ export function GlobalLiveFloatingButton() {
           return;
         }
 
-        const rows = (data ?? []) as { profile_id: string; profiles: { username: string } }[];
+        // Supabase returns joined tables as arrays
+        const rows = data ?? [];
 
         // Build map of live usernames
         const liveUsernames = new Set<string>();
         for (const row of rows) {
-          const username = row.profiles?.username?.toLowerCase();
+          // profiles is returned as an array from the join
+          const profilesArr = row.profiles as unknown as { username: string }[] | { username: string } | null;
+          const username = Array.isArray(profilesArr) 
+            ? profilesArr[0]?.username?.toLowerCase()
+            : profilesArr?.username?.toLowerCase();
           if (username) liveUsernames.add(username);
         }
 
