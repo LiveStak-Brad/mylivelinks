@@ -413,10 +413,10 @@ export default function ReportDetailPanel({
             </Button>
           </>
         )}
-        {(report.status === 'resolved' || report.status === 'dismissed') && (
+        {(report.status === 'actioned' || report.status === 'dismissed') && (
           <div className="flex-1 text-center py-2">
             <Badge variant={getStatusColor(report.status) as any}>
-              {report.status === 'resolved' ? 'Report Resolved' : 'Report Dismissed'}
+              {report.status === 'actioned' ? 'Report Actioned' : 'Report Dismissed'}
             </Badge>
           </div>
         )}
