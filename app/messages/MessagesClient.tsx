@@ -92,7 +92,7 @@ function MessagesPageContent() {
   return (
     <main
       id="main"
-      className="h-[calc(100dvh-4rem-4rem)] md:h-[calc(100vh-5rem)] bg-background overflow-hidden fixed top-16 bottom-16 inset-x-0 md:relative md:inset-auto md:top-auto md:bottom-auto"
+      className="h-[calc(100dvh-4rem-4rem)] md:h-[calc(100dvh-5rem)] bg-background overflow-hidden fixed top-16 bottom-16 inset-x-0 md:relative md:inset-auto md:top-auto md:bottom-auto"
     >
       <div className="h-full grid grid-cols-1 md:grid-cols-[480px_1fr]">
         {/* Conversations List - Left Panel */}

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useCallback, ReactNode } from 'react';
+import { useEffect, useCallback, useState, ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
+import { lockScroll, unlockScroll } from '@/lib/scrollLock';
 
 interface BottomSheetModalProps {
   open: boolean;
@@ -23,6 +23,29 @@ interface BottomSheetModalProps {
   containerClassName?: string;
   /** z-index override (default 50) */
   zIndex?: number;
+}
+
+/**
+ * Hook to detect if viewport is mobile-width for layout purposes.
+ * Uses simple width check (<=768px) - works in DevTools emulation.
+ */
+function useIsMobileLayout(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkWidth = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    // Initial check
+    checkWidth();
+    
+    // Listen for resize
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
+
+  return isMobile;
 }
 
 /**
@@ -53,9 +76,9 @@ export default function BottomSheetModal({
   containerClassName,
   zIndex = 50,
 }: BottomSheetModalProps) {
-  const isMobileWeb = useIsMobileWeb();
+  const isMobileLayout = useIsMobileLayout();
 
-  // ESC to close
+  // ESC to close + iOS-safe scroll lock
   useEffect(() => {
     if (!open) return;
 
@@ -67,18 +90,14 @@ export default function BottomSheetModal({
 
     document.addEventListener('keydown', handleEscape);
     
-    // Prevent body scroll on mobile when modal is open
-    if (isMobileWeb) {
-      document.body.style.overflow = 'hidden';
-    }
+    // iOS-safe scroll lock using fixed-body pattern
+    lockScroll();
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      if (isMobileWeb) {
-        document.body.style.overflow = '';
-      }
+      unlockScroll();
     };
-  }, [open, onClose, isMobileWeb]);
+  }, [open, onClose]);
 
   // Handle backdrop click
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
@@ -89,8 +108,8 @@ export default function BottomSheetModal({
 
   if (!open) return null;
 
-  // Mobile bottom sheet layout
-  if (isMobileWeb) {
+  // Mobile bottom sheet layout (width <= 768px)
+  if (isMobileLayout) {
     return (
       <div 
         className="fixed inset-0 flex flex-col justify-end bg-black/40"
@@ -108,7 +127,8 @@ export default function BottomSheetModal({
             ${containerClassName || ''}
           `}
           style={{
-            maxHeight: `min(${maxHeightVh}vh, calc(100vh - env(safe-area-inset-top) - 120px))`,
+            // Use dvh (dynamic viewport height) for better iOS Safari support
+            maxHeight: `min(${maxHeightVh}dvh, calc(100dvh - env(safe-area-inset-top) - 120px))`,
             paddingBottom: 'env(safe-area-inset-bottom)',
           }}
           onClick={(e) => e.stopPropagation()}

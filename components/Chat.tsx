@@ -854,7 +854,7 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
                 }
               }}
               placeholder="Type a message..."
-              className="flex-1 px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-w-0"
+              className="flex-1 px-4 py-2 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-w-0"
               maxLength={500}
             />
             

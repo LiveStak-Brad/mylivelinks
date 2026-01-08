@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { UserPlus, Search, Users, Clock } from 'lucide-react';
+import { UserPlus, Search, Users } from 'lucide-react';
 import BottomSheetModal from './BottomSheetModal';
 
 interface CoHostInviteModalProps {
@@ -34,22 +34,9 @@ export default function CoHostInviteModal({ isOpen, onClose }: CoHostInviteModal
         </div>
       }
     >
-      <div className="p-4 space-y-6">
-        {/* Coming Soon Banner */}
-        <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-6 text-center">
-          <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="w-8 h-8 text-purple-500" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-            Coming Soon!
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 text-sm">
-            Co-hosting feature is currently in development. Soon you&apos;ll be able to invite other streamers to join your broadcast!
-          </p>
-        </div>
-
-        {/* Feature Preview (Disabled) */}
-        <div className="opacity-50 pointer-events-none">
+      <div className="p-4 space-y-4">
+        {/* Search Users */}
+        <div>
           <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
             Search Users
           </label>
@@ -60,17 +47,16 @@ export default function CoHostInviteModal({ isOpen, onClose }: CoHostInviteModal
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by username..."
-              disabled
-              className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
+              className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
         </div>
 
-        {/* Placeholder Empty State */}
-        <div className="text-center py-8 opacity-50">
+        {/* Empty State */}
+        <div className="text-center py-6">
           <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
           <p className="text-gray-500 dark:text-gray-400 text-sm">
-            Search for users to invite as co-host
+            {searchQuery ? 'No users found' : 'Search for users to invite as co-host'}
           </p>
         </div>
       </div>

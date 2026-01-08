@@ -236,8 +236,9 @@ export default function IMChatWindow({
         top: isMobileSize ? 'auto' : position.y,
         bottom: isMobileSize ? '0.5rem' : 'auto',
         zIndex,
-        height: isMobileSize ? '50vh' : '400px',
-        maxHeight: 'calc(100vh - 100px)',
+        height: isMobileSize ? '50dvh' : '400px',
+        // Use dvh for better iOS Safari support
+        maxHeight: 'calc(100dvh - 100px)',
         maxWidth: isMobileSize ? 'calc(100vw - 1rem)' : '320px',
       }}
       onClick={onFocus}

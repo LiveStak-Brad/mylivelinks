@@ -392,7 +392,7 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
             </div>
           )}
 
-          {/* Text Input */}
+          {/* Text Input - text-base (16px) prevents iOS zoom on focus */}
           <input
             ref={inputRef}
             type="text"
@@ -400,7 +400,7 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
             onChange={(e) => setMessageInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="flex-1 bg-muted/50 border-none rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="flex-1 bg-muted/50 border-none rounded-full px-4 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             maxLength={1000}
             disabled={isSending}
           />

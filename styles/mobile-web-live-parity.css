@@ -17,6 +17,10 @@
   .mobile-live-container {
     position: fixed;
     inset: 0;
+    /* Use svh (small viewport height) for stable height on iOS after rotation */
+    width: 100%;
+    height: 100svh;
+    height: 100dvh; /* Fallback for browsers without svh */
     background: #000;
     display: flex;
     flex-direction: row;
@@ -25,6 +29,8 @@
     /* Prevent any scrolling or bounce */
     touch-action: none;
     overscroll-behavior: none;
+    /* Prevent zoom stuck after rotation */
+    -webkit-text-size-adjust: 100%;
   }
 
   .mobile-live-container.mobile-live-v3 {
@@ -399,7 +405,7 @@
   .mobile-live-container ~ div[class*="fixed inset-0"] > div {
     position: relative !important;
     margin: auto !important;
-    max-height: 90vh !important;
+    max-height: 90dvh !important;
     overflow-y: auto !important;
     /* Ensure modal doesn't clip on small screens */
     max-width: calc(100vw - 2rem) !important;
@@ -408,7 +414,7 @@
   /* Device modal in portrait mode - stack vertically */
   @media (orientation: portrait) {
     .mobile-live-container ~ div[class*="fixed inset-0"] > div {
-      max-height: 85vh !important;
+      max-height: 85dvh !important;
     }
   }
 
@@ -416,14 +422,14 @@
   @media (orientation: landscape) {
     .mobile-live-container ~ div[class*="fixed inset-0"] > div {
       max-width: min(28rem, calc(100vw - 4rem)) !important;
-      max-height: 90vh !important;
+      max-height: 90dvh !important;
     }
   }
 
   /* Ensure preview video doesn't overflow */
   .mobile-live-container ~ div[class*="fixed inset-0"] video {
     max-width: 100% !important;
-    max-height: 40vh !important;
+    max-height: 40dvh !important;
     object-fit: contain !important;
   }
 

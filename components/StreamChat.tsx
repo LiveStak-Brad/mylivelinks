@@ -1438,7 +1438,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                 }
               }}
               placeholder="Type a message..."
-              className="flex-1 px-3 py-2 md:px-4 md:py-3 text-sm md:text-base border border-white/30 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 text-white placeholder-white/60 min-w-0"
+              className="flex-1 px-3 py-2 md:px-4 md:py-3 text-base border border-white/30 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 text-white placeholder-white/60 min-w-0"
               maxLength={500}
             />
             {/* Request Guest Button - Left of Gift Button */}

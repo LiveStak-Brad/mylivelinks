@@ -179,8 +179,8 @@ export default function LeaderboardModal({ isOpen, onClose }: LeaderboardModalPr
           </div>
         </div>
 
-        {/* Content */}
-        <div className="modal-body overflow-y-auto max-h-[calc(100vh-16rem)] md:max-h-[calc(100vh-18rem)] lg:max-h-[calc(100vh-20rem)] p-4">
+        {/* Content - use dvh for better iOS Safari support */}
+        <div className="modal-body overflow-y-auto max-h-[calc(100dvh-16rem)] md:max-h-[calc(100dvh-18rem)] lg:max-h-[calc(100dvh-20rem)] p-4">
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 10 }).map((_, i) => (

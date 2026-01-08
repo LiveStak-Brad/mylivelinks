@@ -39,9 +39,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     },
     ref
   ) => {
+    // Use text-base (16px) on mobile to prevent iOS auto-zoom on input focus
+    // Desktop (sm: breakpoint) can use smaller text-sm (14px)
     const sizeStyles = {
-      sm: 'h-8 text-sm px-3',
-      md: 'h-10 text-sm px-3',
+      sm: 'h-8 text-base sm:text-sm px-3',
+      md: 'h-10 text-base sm:text-sm px-3',
       lg: 'h-12 text-base px-4',
     };
 

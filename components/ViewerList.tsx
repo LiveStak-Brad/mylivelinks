@@ -275,7 +275,8 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
       </div>
 
       {/* Viewer List - Scrollable, Takes Remaining Space */}
-      <div className="flex-1 overflow-y-auto p-2 min-h-0 custom-scrollbar" style={{ maxHeight: 'calc(100vh - 300px)' }}>
+      {/* Use dvh for better iOS Safari support */}
+      <div className="flex-1 overflow-y-auto p-2 min-h-0 custom-scrollbar" style={{ maxHeight: 'calc(100dvh - 300px)' }}>
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (

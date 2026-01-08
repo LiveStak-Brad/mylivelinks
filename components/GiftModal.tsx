@@ -4,7 +4,30 @@ import { useState, useEffect, useRef } from 'react';
 import { Gift, X, Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { trackLiveGift } from '@/lib/trending-hooks';
-import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
+import { lockScroll, unlockScroll } from '@/lib/scrollLock';
+
+/**
+ * Hook to detect if viewport is mobile-width for layout purposes.
+ * Uses simple width check (<=768px) - works in DevTools emulation.
+ */
+function useIsMobileLayout(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkWidth = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    // Initial check
+    checkWidth();
+    
+    // Listen for resize
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
+
+  return isMobile;
+}
 
 interface GiftType {
   id: number;
@@ -43,7 +66,7 @@ export default function GiftModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userCoinBalance, setUserCoinBalance] = useState<number>(0);
-  const isMobileWeb = useIsMobileWeb();
+  const isMobileLayout = useIsMobileLayout();
 
   const inFlightRef = useRef(false);
 
@@ -103,13 +126,20 @@ export default function GiftModal({
     loadUserBalance();
   }, []);
 
-  // ESC to close
+  // ESC to close + iOS-safe scroll lock
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    
+    // iOS-safe scroll lock
+    lockScroll();
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      unlockScroll();
+    };
   }, [onClose]);
 
   const loadGiftTypes = async () => {
@@ -257,8 +287,8 @@ export default function GiftModal({
     }
   };
 
-  // Mobile bottom sheet layout
-  if (isMobileWeb) {
+  // Mobile bottom sheet layout (width <= 768px)
+  if (isMobileLayout) {
     return (
       <div 
         className="fixed inset-0 flex flex-col justify-end bg-black/40"
@@ -268,7 +298,8 @@ export default function GiftModal({
         <div 
           className="bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 rounded-t-2xl rounded-b-none shadow-lg overflow-hidden flex flex-col border-t border-white/20 dark:border-white/10 animate-slide-up"
           style={{
-            maxHeight: 'min(50vh, calc(100vh - env(safe-area-inset-top) - 120px))',
+            // Use dvh (dynamic viewport height) for better iOS Safari support
+            maxHeight: 'min(50dvh, calc(100dvh - env(safe-area-inset-top) - 120px))',
             paddingBottom: 'env(safe-area-inset-bottom)',
           }}
           onClick={(e) => e.stopPropagation()}

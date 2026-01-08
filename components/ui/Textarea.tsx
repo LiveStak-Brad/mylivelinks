@@ -32,9 +32,11 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     },
     ref
   ) => {
+    // Use text-base (16px) on mobile to prevent iOS auto-zoom on input focus
+    // Desktop (sm: breakpoint) can use smaller text-sm (14px)
     const sizeStyles = {
-      sm: 'min-h-[60px] text-sm px-3 py-2',
-      md: 'min-h-[100px] text-sm px-3 py-2',
+      sm: 'min-h-[60px] text-base sm:text-sm px-3 py-2',
+      md: 'min-h-[100px] text-base sm:text-sm px-3 py-2',
       lg: 'min-h-[140px] text-base px-4 py-3',
     };
 

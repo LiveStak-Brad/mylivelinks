@@ -322,7 +322,8 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
       style={{ 
         top: `${modalPosition.top}px`,
         left: `${modalPosition.left}px`,
-        maxHeight: 'calc(100vh - 120px)' 
+        // Use dvh for better iOS Safari support
+        maxHeight: 'calc(100dvh - 120px)' 
       }}
     >
       {/* Header */}

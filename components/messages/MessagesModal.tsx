@@ -220,7 +220,8 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
         top: `${modalPosition.top}px`,
         left: `${modalPosition.left}px`,
         height: '550px', 
-        maxHeight: 'calc(100vh - 120px)' 
+        // Use dvh for better iOS Safari support
+        maxHeight: 'calc(100dvh - 120px)' 
       }}
     >
       <div className="grid grid-cols-[220px_400px_1fr] h-full">

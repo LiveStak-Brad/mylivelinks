@@ -177,19 +177,49 @@ export default function MobileWebWatchLayout({
   // Global mute state
   const [globalMuted, setGlobalMuted] = useState(false);
   
-  // Track orientation changes
+  // Track orientation changes with visualViewport for better accuracy
   useEffect(() => {
     const checkOrientation = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
+      // Use visualViewport if available (better for iOS Safari)
+      const vv = window.visualViewport;
+      const width = vv?.width ?? window.innerWidth;
+      const height = vv?.height ?? window.innerHeight;
+      setIsLandscape(width > height);
+    };
+    
+    // Handler for orientation changes with slight delay for iOS
+    const handleOrientationChange = () => {
+      // Small delay to ensure viewport has updated after rotation
+      setTimeout(checkOrientation, 100);
+      // Double-check after animation completes
+      setTimeout(checkOrientation, 300);
     };
     
     checkOrientation();
+    
+    // Prefer visualViewport events (more reliable on iOS)
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', checkOrientation);
+    }
+    
     window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    
+    // Use Screen Orientation API if available
+    if (screen?.orientation) {
+      screen.orientation.addEventListener('change', handleOrientationChange);
+    }
     
     return () => {
+      if (vv) {
+        vv.removeEventListener('resize', checkOrientation);
+      }
       window.removeEventListener('resize', checkOrientation);
-      window.removeEventListener('orientationchange', checkOrientation);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      if (screen?.orientation) {
+        screen.orientation.removeEventListener('change', handleOrientationChange);
+      }
     };
   }, []);
   
