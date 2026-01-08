@@ -23,3 +23,8 @@ export type { BattleMode, BattleParticipantState } from './BattleTileOverlay';
 
 // Battle Score Slider (top bar showing score distribution)
 export { default as BattleScoreSlider } from './BattleScoreSlider';
+
+// NEW: Battle Session Components
+export { default as BattleTimer } from './BattleTimer';
+export { default as CooldownSheet } from './CooldownSheet';
+export { default as BattleGridWrapper } from './BattleGridWrapper';

@@ -22,6 +22,30 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+/**
+ * Convert a database datetime value to ISO 8601 format with timezone.
+ * Handles PostgreSQL formats like "2024-01-01 12:00:00" or "2024-01-01T12:00:00"
+ * and ensures they have the required Z suffix for Zod datetime validation.
+ */
+function toIsoDateTime(value: unknown): string {
+  if (!value) return nowIso();
+  const str = String(value);
+  // If already ends with Z or has timezone offset, return as-is
+  if (/Z$|[+-]\d{2}:\d{2}$/.test(str)) {
+    return str;
+  }
+  // Try parsing as a date and converting to ISO
+  const parsed = new Date(str.replace(' ', 'T'));
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+  // Fallback: append Z if it looks like an ISO date without timezone
+  if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(str)) {
+    return str.replace(' ', 'T') + 'Z';
+  }
+  return nowIso();
+}
+
 function logJson(level: 'info' | 'warn' | 'error', params: Record<string, unknown>) {
   try {
     console.log(JSON.stringify({ level, ...params }));
@@ -345,8 +369,8 @@ async function buildReports(reqId: string, limit: number, offset: number): Promi
         report_reason: String(r?.report_reason ?? 'unknown'),
         report_details: r?.report_details ?? null,
         status: mapReportStatus(r?.status),
-        created_at: r?.created_at ?? nowIso(),
-        reviewed_at: r?.reviewed_at ?? null,
+        created_at: toIsoDateTime(r?.created_at),
+        reviewed_at: r?.reviewed_at ? toIsoDateTime(r.reviewed_at) : null,
         reviewed_by: r?.reviewed_by ?? null,
         admin_notes: r?.admin_notes ?? null,
         reporter: r?.reporter
@@ -395,7 +419,7 @@ async function buildFeatureFlags(reqId: string, limit: number, offset: number): 
         scope: (['global', 'web', 'mobile', 'server'].includes(String(r?.scope)) ? String(r.scope) : 'global') as FeatureFlag['scope'],
         enabled: r?.enabled === true,
         value_json: r?.value_json ?? null,
-        updated_at: r?.updated_at ?? nowIso(),
+        updated_at: toIsoDateTime(r?.updated_at),
       })),
       dataSource: 'supabase',
     };
@@ -461,8 +485,8 @@ async function buildLiveStreams(reqId: string, limit: number, offset: number): P
           room_slug: null,
           title: r?.room_name ?? null,
           status: mappedStatus,
-          started_at: r?.started_at ?? nowIso(),
-          ended_at: r?.ended_at ?? null,
+          started_at: toIsoDateTime(r?.started_at),
+          ended_at: r?.ended_at ? toIsoDateTime(r.ended_at) : null,
           host_profile_id: String(host?.id ?? r?.profile_id ?? ''),
           host_username: String(host?.username ?? 'unknown'),
           host_display_name: host?.display_name ?? null,

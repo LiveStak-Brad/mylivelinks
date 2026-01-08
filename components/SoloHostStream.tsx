@@ -51,6 +51,11 @@ import GuestRequestsModal from './GuestRequestsModal';
 import StreamFiltersModal from './StreamFiltersModal';
 import BattleInviteModal from './BattleInviteModal';
 import GuestVideoOverlay from './GuestVideoOverlay';
+import IncomingInviteSheet from './IncomingInviteSheet';
+import BattleGridWrapper from './battle/BattleGridWrapper';
+import CooldownSheet from './battle/CooldownSheet';
+import { useBattleSession } from '@/hooks/useBattleSession';
+import { joinBattlePool, endSession, startRematch } from '@/lib/battle-session';
 import { useIM } from '@/components/im';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
 import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
@@ -193,8 +198,85 @@ export default function SoloHostStream() {
   const [showGuests, setShowGuests] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showBattle, setShowBattle] = useState(false);
+  const [showCooldown, setShowCooldown] = useState(false);
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
   const [trendingRank, setTrendingRank] = useState<number | null>(null);
+  
+  // Battle/Cohost session state
+  const {
+    session: battleSession,
+    pendingInvites,
+    remainingSeconds: battleRemainingSeconds,
+    isParticipant: isBattleParticipant,
+    roomName: battleRoomName,
+    acceptInvite,
+    declineInvite,
+    endCurrentSession,
+    transitionToCooldown,
+    triggerRematch,
+    refresh: refreshBattleSession,
+  } = useBattleSession({ profileId: currentUserId });
+  
+  // Show cooldown sheet when session enters cooldown
+  const [currentInvite, setCurrentInvite] = useState<typeof pendingInvites[0] | null>(null);
+  
+  // Handle incoming invites - show the first pending one
+  useEffect(() => {
+    if (pendingInvites.length > 0 && !currentInvite) {
+      setCurrentInvite(pendingInvites[0]);
+    }
+  }, [pendingInvites, currentInvite]);
+  
+  // Show cooldown sheet when battle enters cooldown
+  useEffect(() => {
+    if (battleSession?.status === 'cooldown') {
+      setShowCooldown(true);
+    } else {
+      setShowCooldown(false);
+    }
+  }, [battleSession?.status]);
+  
+  // Check if we're in an active battle/cohost session (show grid instead of solo video)
+  const isInActiveSession = battleSession && (battleSession.status === 'active' || battleSession.status === 'cooldown');
+  
+  // When entering a battle, unpublish from solo room to free camera for battle room
+  // When exiting a battle, show a message that they can resume or auto-resume
+  const prevIsInActiveSessionRef = useRef(false);
+  const [showResumePrompt, setShowResumePrompt] = useState(false);
+  
+  useEffect(() => {
+    const wasInSession = prevIsInActiveSessionRef.current;
+    const isNowInSession = !!isInActiveSession;
+    prevIsInActiveSessionRef.current = isNowInSession;
+    
+    if (!wasInSession && isNowInSession && roomRef.current && isPublishing) {
+      // Entering a battle - unpublish local tracks from solo room
+      console.log('[SoloHostStream] Entering battle - unpublishing from solo room');
+      const room = roomRef.current;
+      room.localParticipant.trackPublications.forEach((pub) => {
+        if (pub.track) {
+          room.localParticipant.unpublishTrack(pub.track);
+        }
+      });
+      // Mark that we were publishing before battle
+      setShowResumePrompt(false);
+    }
+    
+    if (wasInSession && !isNowInSession) {
+      // Exiting battle - for now, keep the stream ended and let user manually restart
+      // This is simpler and avoids camera conflicts
+      console.log('[SoloHostStream] Exiting battle - solo stream remains paused');
+      setIsPublishing(false);
+      setShowResumePrompt(true);
+    }
+  }, [isInActiveSession, isPublishing]);
+  
+  // Get opponent info for cooldown sheet
+  const battleOpponent = useMemo(() => {
+    if (!battleSession || !currentUserId) return null;
+    const isHostA = battleSession.host_a.id === currentUserId;
+    return isHostA ? battleSession.host_b : battleSession.host_a;
+  }, [battleSession, currentUserId]);
   
   // Stream setup modal
   const [showSetupModal, setShowSetupModal] = useState(true);
@@ -1829,26 +1911,38 @@ export default function SoloHostStream() {
               </div>
             </div>
 
-            {/* Video element - always rendered for host */}
-            {/* Mirror on mobile for natural selfie-style preview; viewers see non-mirrored */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted={true}
-              className={`
-                w-full h-full object-cover
-                lg:max-w-full lg:max-h-full lg:object-contain
-                ${isPortraitVideo ? 'lg:h-full lg:w-auto' : 'lg:w-full lg:h-auto'}
-              `}
-              style={{
-                display: isPublishing ? 'block' : 'none',
-                position: 'relative',
-                zIndex: 10,
-                // Mirror on mobile for camera preview, but NOT for screen share
-                transform: isMobileWeb && !isScreenSharing ? 'scaleX(-1)' : undefined,
-              }}
-            />
+            {/* Video element OR Battle Grid */}
+            {isInActiveSession && battleSession && currentUserId && streamer ? (
+              /* Battle/Cohost Grid - replaces solo video during active session */
+              <BattleGridWrapper
+                session={battleSession}
+                currentUserId={currentUserId}
+                currentUserName={streamer.display_name || streamer.username}
+                canPublish={true}
+                remainingSeconds={battleRemainingSeconds}
+                className="w-full h-full"
+              />
+            ) : (
+              /* Solo video element - normal host view */
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted={true}
+                className={`
+                  w-full h-full object-cover
+                  lg:max-w-full lg:max-h-full lg:object-contain
+                  ${isPortraitVideo ? 'lg:h-full lg:w-auto' : 'lg:w-full lg:h-auto'}
+                `}
+                style={{
+                  display: isPublishing ? 'block' : 'none',
+                  position: 'relative',
+                  zIndex: 10,
+                  // Mirror on mobile for camera preview, but NOT for screen share
+                  transform: isMobileWeb && !isScreenSharing ? 'scaleX(-1)' : undefined,
+                }}
+              />
+            )}
 
             {/* Offline placeholder */}
             {!isPublishing && (
@@ -2138,7 +2232,51 @@ export default function SoloHostStream() {
       <BattleInviteModal
         isOpen={showBattle}
         onClose={() => setShowBattle(false)}
+        onSessionStarted={(sessionId) => {
+          console.log('[SoloHostStream] Battle session started:', sessionId);
+          refreshBattleSession();
+        }}
       />
+      
+      {/* Incoming Invite Sheet */}
+      <IncomingInviteSheet
+        invite={currentInvite}
+        onAccepted={(sessionId) => {
+          console.log('[SoloHostStream] Invite accepted, session:', sessionId);
+          setCurrentInvite(null);
+          refreshBattleSession();
+        }}
+        onDeclined={() => {
+          setCurrentInvite(null);
+        }}
+        onClose={() => {
+          setCurrentInvite(null);
+        }}
+      />
+      
+      {/* Cooldown Sheet */}
+      {battleSession && battleOpponent && (
+        <CooldownSheet
+          isOpen={showCooldown}
+          mode={battleSession.mode}
+          remainingSeconds={battleRemainingSeconds}
+          opponentName={battleOpponent.display_name || battleOpponent.username}
+          onRematch={async () => {
+            await triggerRematch();
+            setShowCooldown(false);
+          }}
+          onBackToPool={async () => {
+            await endCurrentSession();
+            await joinBattlePool();
+            setShowCooldown(false);
+          }}
+          onQuit={async () => {
+            await endCurrentSession();
+            setShowCooldown(false);
+          }}
+          onClose={() => setShowCooldown(false)}
+        />
+      )}
     </div>
   );
 }

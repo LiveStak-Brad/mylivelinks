@@ -48,6 +48,8 @@ import MiniProfileModal from './MiniProfileModal';
 import StreamGiftersModal from './StreamGiftersModal';
 import RequestGuestModal from './RequestGuestModal';
 import GuestVideoOverlay from './GuestVideoOverlay';
+import BattleGridWrapper from './battle/BattleGridWrapper';
+import { useBattleSession } from '@/hooks/useBattleSession';
 import { useIM } from '@/components/im';
 import { useLiveLike, useLiveViewTracking } from '@/lib/trending-hooks';
 import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
@@ -200,6 +202,23 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [countdown, setCountdown] = useState(5);
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
   const [trendingRank, setTrendingRank] = useState<number | null>(null);
+  
+  // Battle/Cohost session detection for the streamer we're watching
+  const {
+    session: battleSession,
+    remainingSeconds: battleRemainingSeconds,
+    roomName: battleRoomName,
+    refresh: refreshBattleSession,
+  } = useBattleSession({ 
+    watchHostId: streamer?.profile_id || null,
+    autoFetch: !!streamer?.profile_id,
+  });
+  
+  // Check if streamer is in an active battle/cohost session
+  const isInActiveSession = battleSession && (battleSession.status === 'active' || battleSession.status === 'cooldown');
+  
+  // Track previous session state for cleanup
+  const prevIsInActiveSessionRef = useRef(false);
  
   // Stream-scoped Top Gifters (realtime + fallback polling)
   const { gifters: streamTopGifters } = useStreamTopGifters({
@@ -327,6 +346,30 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     },
     [setIsRoomConnected]
   );
+
+  // Track if we need to force reconnect after battle ends
+  const [forceReconnectAfterBattle, setForceReconnectAfterBattle] = useState(0);
+  
+  // When entering a battle, disconnect from solo room to let BattleGridWrapper handle connection
+  // When exiting a battle, trigger a reconnection to solo room
+  useEffect(() => {
+    const wasInSession = prevIsInActiveSessionRef.current;
+    const isNowInSession = !!isInActiveSession;
+    prevIsInActiveSessionRef.current = isNowInSession;
+    
+    if (!wasInSession && isNowInSession && roomRef.current) {
+      // Entering a battle - disconnect from solo room
+      console.log('[SoloStreamViewer] Entering battle - disconnecting from solo room');
+      disconnectRoom('battle_start');
+    }
+    
+    if (wasInSession && !isNowInSession) {
+      // Exiting battle - trigger reconnection to solo room
+      console.log('[SoloStreamViewer] Exiting battle - will reconnect to solo room');
+      // Increment to trigger the main connection effect
+      setForceReconnectAfterBattle(prev => prev + 1);
+    }
+  }, [isInActiveSession, disconnectRoom]);
 
   // NOTE (P0 stability): Solo Viewer previously ran TWO heartbeat mechanisms:
   // 1) client-side supabase.rpc('update_viewer_heartbeat') via useViewerHeartbeat
@@ -728,6 +771,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     if (isConnectingRef.current || connectedUsernameRef.current === targetUsername) {
       return;
     }
+    
+    // Don't connect to solo room if we're in an active battle session
+    // BattleGridWrapper handles the battle room connection
+    if (isInActiveSession) {
+      console.log('[SoloStreamViewer] Skipping solo room connect - in active battle session');
+      return;
+    }
 
     isConnectingRef.current = true;
     connectedUsernameRef.current = streamer.username;
@@ -1002,7 +1052,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       }
       void disconnectRoom('effect_cleanup');
     };
-  }, [disconnectRoom, resumePlayback, streamer?.live_available, streamer?.profile_id, streamer?.username, currentUserId, extractUserId]); // STABLE DEPS: only reconnect if these change
+  }, [disconnectRoom, resumePlayback, streamer?.live_available, streamer?.profile_id, streamer?.username, currentUserId, extractUserId, forceReconnectAfterBattle, isInActiveSession]); // STABLE DEPS: only reconnect if these change
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1908,18 +1958,32 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
             {streamer.live_available ? (
               <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted={isMuted}
-                  className={`
-                    w-full h-full object-cover
-                    lg:max-w-full lg:max-h-full lg:object-contain
-                    ${isPortraitVideo ? 'lg:h-full lg:w-auto' : 'lg:w-full lg:h-auto'}
-                  `}
-                />
-                <audio ref={audioRef} autoPlay playsInline muted={isMuted} />
+                {/* Show Battle Grid if streamer is in active session, else show solo video */}
+                {isInActiveSession && battleSession && currentUserId ? (
+                  <BattleGridWrapper
+                    session={battleSession}
+                    currentUserId={currentUserId}
+                    currentUserName={streamer.display_name || streamer.username}
+                    canPublish={false}
+                    remainingSeconds={battleRemainingSeconds}
+                    className="w-full h-full"
+                  />
+                ) : (
+                  <>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted={isMuted}
+                      className={`
+                        w-full h-full object-cover
+                        lg:max-w-full lg:max-h-full lg:object-contain
+                        ${isPortraitVideo ? 'lg:h-full lg:w-auto' : 'lg:w-full lg:h-auto'}
+                      `}
+                    />
+                    <audio ref={audioRef} autoPlay playsInline muted={isMuted} />
+                  </>
+                )}
               </>
             ) : (
               <>

@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * GridTile - Simple placeholder tile for MultiHostGrid
+ * GridTile - Video tile for MultiHostGrid
  * 
- * This is a UI-only component. No streaming logic.
- * Will be wired to actual video tracks later.
+ * Renders a participant's video track with controls.
  * 
  * Features:
  * - Per-tile volume control (for non-self tiles)
  * - Vertical slider on left side
  * - Mute/unmute toggle
+ * - Video track attachment
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { User, Volume2, VolumeX, VideoOff, Video } from 'lucide-react';
 
 export interface GridTileParticipant {
@@ -20,6 +20,8 @@ export interface GridTileParticipant {
   name: string;
   isHost?: boolean;
   avatarUrl?: string;
+  videoTrack?: any; // LiveKit video track
+  audioTrack?: any; // LiveKit audio track
 }
 
 interface GridTileProps {
@@ -143,6 +145,51 @@ export default function GridTile({
   // Determine effective volume state
   const effectiveVolume = isMuted ? 0 : volume;
   const VolumeIcon = isMuted || effectiveVolume === 0 ? VolumeX : Volume2;
+  
+  // Video element ref for track attachment
+  const videoElementRef = useRef<HTMLVideoElement>(null);
+  const audioElementRef = useRef<HTMLAudioElement>(null);
+  
+  // Track if we have active video
+  const hasVideoTrack = !!participant.videoTrack;
+  const hasAudioTrack = !!participant.audioTrack;
+  
+  // Attach video track when available
+  useEffect(() => {
+    const videoEl = videoElementRef.current;
+    const track = participant.videoTrack;
+    
+    if (videoEl && track) {
+      // Attach the track to the video element
+      track.attach(videoEl);
+      return () => {
+        track.detach(videoEl);
+      };
+    }
+  }, [participant.videoTrack]);
+  
+  // Attach audio track when available
+  useEffect(() => {
+    const audioEl = audioElementRef.current;
+    const track = participant.audioTrack;
+    
+    if (audioEl && track) {
+      // Attach the track to the audio element
+      track.attach(audioEl);
+      audioEl.volume = effectiveVolume;
+      return () => {
+        track.detach(audioEl);
+      };
+    }
+  }, [participant.audioTrack, effectiveVolume]);
+  
+  // Update audio volume when it changes
+  useEffect(() => {
+    const audioEl = audioElementRef.current;
+    if (audioEl) {
+      audioEl.volume = effectiveVolume;
+    }
+  }, [effectiveVolume]);
 
   return (
     <div
@@ -162,44 +209,65 @@ export default function GridTile({
       data-emphasis={emphasis}
       onClick={handleTileClick}
     >
-      {/* Placeholder content - will be replaced with video */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {isVideoHidden ? (
-          /* Video hidden state - show logo/avatar with overlay */
-          <div className="flex flex-col items-center gap-2">
-            <div className={`
-              rounded-full bg-gradient-to-br from-gray-600 to-gray-700
-              flex items-center justify-center
-              ${isPrimary ? 'w-20 h-20' : 'w-12 h-12'}
-            `}>
-              <VideoOff className={isPrimary ? 'w-10 h-10' : 'w-6 h-6'} color="white" opacity={0.5} />
-            </div>
-            <span className="text-[10px] text-white/50">Video Hidden</span>
-          </div>
-        ) : (
-          /* Normal avatar placeholder */
-          <>
-            {participant.avatarUrl ? (
-              <img
-                src={participant.avatarUrl}
-                alt={participant.name}
-                className={`rounded-full object-cover ${
-                  isPrimary ? 'w-24 h-24' : 'w-16 h-16'
-                }`}
-              />
-            ) : (
-              <div className={`
-                rounded-full bg-gradient-to-br from-purple-500 to-pink-500
-                flex items-center justify-center
-                ${isPrimary ? 'w-24 h-24' : 'w-16 h-16'}
-              `}>
-                <User className={isPrimary ? 'w-12 h-12' : 'w-8 h-8'} color="white" />
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      {/* Video element - rendered when track is available */}
+      {hasVideoTrack && !isVideoHidden && (
+        <video
+          ref={videoElementRef}
+          className="absolute inset-0 w-full h-full object-cover"
+          autoPlay
+          playsInline
+          muted
+        />
+      )}
       
+      {/* Audio element for remote audio */}
+      {hasAudioTrack && !isSelf && (
+        <audio
+          ref={audioElementRef}
+          autoPlay
+          playsInline
+        />
+      )}
+      
+      {/* Placeholder content - shown when no video track or video hidden */}
+      {(!hasVideoTrack || isVideoHidden) && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          {isVideoHidden ? (
+            /* Video hidden state - show logo/avatar with overlay */
+            <div className="flex flex-col items-center gap-2">
+              <div className={`
+                rounded-full bg-gradient-to-br from-gray-600 to-gray-700
+                flex items-center justify-center
+                ${isPrimary ? 'w-20 h-20' : 'w-12 h-12'}
+              `}>
+                <VideoOff className={isPrimary ? 'w-10 h-10' : 'w-6 h-6'} color="white" opacity={0.5} />
+              </div>
+              <span className="text-[10px] text-white/50">Video Hidden</span>
+            </div>
+          ) : (
+            /* Normal avatar placeholder */
+            <>
+              {participant.avatarUrl ? (
+                <img
+                  src={participant.avatarUrl}
+                  alt={participant.name}
+                  className={`rounded-full object-cover ${
+                    isPrimary ? 'w-24 h-24' : 'w-16 h-16'
+                  }`}
+                />
+              ) : (
+                <div className={`
+                  rounded-full bg-gradient-to-br from-purple-500 to-pink-500
+                  flex items-center justify-center
+                  ${isPrimary ? 'w-24 h-24' : 'w-16 h-16'}
+                `}>
+                  <User className={isPrimary ? 'w-12 h-12' : 'w-8 h-8'} color="white" />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
       
       {/* Top-left controls area */}
       <div className="absolute top-1.5 left-1.5 z-20 flex flex-col items-start gap-1">
@@ -247,13 +315,6 @@ export default function GridTile({
           </div>
         </div>
       )}
-
-      {/* Placeholder video element (hidden, for future wiring) */}
-      <video
-        className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
-        playsInline
-        muted
-      />
 
       {/* Battle Overlay Slot */}
       {renderOverlay && (
