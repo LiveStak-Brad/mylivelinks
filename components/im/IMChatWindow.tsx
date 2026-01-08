@@ -86,9 +86,18 @@ export default function IMChatWindow({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [messageInput, setMessageInput] = useState('');
   const [showGiftPicker, setShowGiftPicker] = useState(false);
+  const [isMobileSize, setIsMobileSize] = useState(false);
   const windowRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Detect mobile size for responsive layout
+  useEffect(() => {
+    const checkMobile = () => setIsMobileSize(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -217,16 +226,19 @@ export default function IMChatWindow({
   }
 
   // Full chat window
+  // On mobile (< 640px), use full width anchored to bottom; on desktop use draggable fixed position
   return (
     <div
       ref={windowRef}
-      className="fixed w-80 bg-card border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col"
+      className="fixed bg-card border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col w-[calc(100vw-1rem)] sm:w-80"
       style={{ 
-        left: position.x, 
-        top: position.y, 
+        left: isMobileSize ? '0.5rem' : position.x, 
+        top: isMobileSize ? 'auto' : position.y,
+        bottom: isMobileSize ? '0.5rem' : 'auto',
         zIndex,
-        height: '400px',
+        height: isMobileSize ? '50vh' : '400px',
         maxHeight: 'calc(100vh - 100px)',
+        maxWidth: isMobileSize ? 'calc(100vw - 1rem)' : '320px',
       }}
       onClick={onFocus}
     >
