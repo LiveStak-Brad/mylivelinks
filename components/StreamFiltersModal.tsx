@@ -138,10 +138,11 @@ export default function StreamFiltersModal({
   }, [onApply]);
 
   const handleDone = useCallback(() => {
-    // Save and close
+    // Save and apply final state, then close
     saveFilterSettings(settings);
+    onApply?.(settings);
     onClose();
-  }, [settings, onClose]);
+  }, [settings, onApply, onClose]);
 
   const handleCancel = useCallback(() => {
     // Revert to initial settings
