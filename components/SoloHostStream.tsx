@@ -1943,7 +1943,7 @@ export default function SoloHostStream() {
                 currentUserName={streamer.display_name || streamer.username}
                 canPublish={true}
                 remainingSeconds={battleRemainingSeconds}
-                className="w-full h-full box-border pt-32 pb-[38vh]"
+                className="w-full h-full box-border pt-28 pb-[38vh]"
               />
             ) : (
               /* Solo video element - normal host view */
@@ -2145,7 +2145,7 @@ export default function SoloHostStream() {
           transition-all duration-300
           fixed
           block
-          bottom-20 left-0 right-0
+          bottom-16 left-0 right-0
           w-full
           h-[30vh]
           bg-transparent

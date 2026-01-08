@@ -34,9 +34,14 @@ interface ChatProps {
   // Request Guest button props (optional - for solo viewer mode)
   onRequestGuestClick?: () => void;
   showRequestGuestButton?: boolean;
+  // Like button props (optional - for viewer mode)
+  onLikeClick?: () => void;
+  isLiked?: boolean;
+  likesCount?: number;
+  showLikePop?: boolean;
 }
 
-export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, onSettingsClick, readOnly = false, alwaysAutoScroll = false, onRequestGuestClick, showRequestGuestButton = false }: ChatProps) {
+export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, onSettingsClick, readOnly = false, alwaysAutoScroll = false, onRequestGuestClick, showRequestGuestButton = false, onLikeClick, isLiked = false, likesCount = 0, showLikePop = false }: ChatProps) {
   console.log('[STREAMCHAT] 🎬 StreamChat rendered with liveStreamId:', liveStreamId, 'readOnly:', readOnly, 'alwaysAutoScroll:', alwaysAutoScroll);
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -88,10 +93,10 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   const profileCacheRef = useRef<Record<string, { chat_bubble_color?: string; chat_font?: string }>>({});
 
   // Typography parity: Host uses readOnly StreamChat; viewer uses interactive StreamChat.
-  // User requested Host font be bigger to match Viewer, so we scale up readOnly chat text.
-  const usernameTextClass = readOnly ? 'text-base' : 'text-xs';
-  const timeTextClass = readOnly ? 'text-sm' : 'text-[10px]';
-  const messageTextClass = readOnly ? 'text-lg' : 'text-sm';
+  // Use same font sizes for both host and viewer
+  const usernameTextClass = 'text-xs';
+  const timeTextClass = 'text-[10px]';
+  const messageTextClass = 'text-sm';
 
   const showGiftPopup = useCallback((msg: ChatMessage) => {
     if (!msg || msg.message_type !== 'gift') return;
@@ -1290,7 +1295,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       <div
         ref={messagesContainerRef}
         onScroll={updateAutoScrollFlag}
-        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0 custom-scrollbar flex flex-col justify-end touch-pan-y"
+        className="flex-1 overflow-y-auto p-3 pb-0 -mb-2 space-y-2 min-h-0 custom-scrollbar flex flex-col justify-end touch-pan-y"
       >
         {loading ? (
           <div className="space-y-2">
@@ -1476,21 +1481,19 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                 </svg>
               </button>
             )}
-            {/* Share Button */}
-            {onShareClick && (
+            {/* Like Button */}
+            {onLikeClick && (
               <button
                 type="button"
-                onClick={onShareClick}
-                className="p-2 md:p-2.5 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/30 transition flex-shrink-0 mobile-touch-target"
-                title="Share"
-                aria-label="Share"
+                onClick={onLikeClick}
+                className={`p-2 md:p-2.5 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/30 transition flex-shrink-0 mobile-touch-target ${
+                  showLikePop ? 'scale-110' : 'scale-100'
+                }`}
+                title="Like Stream"
+                aria-label="Like Stream"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="18" cy="5" r="3"></circle>
-                  <circle cx="6" cy="12" r="3"></circle>
-                  <circle cx="18" cy="19" r="3"></circle>
-                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 md:w-5 md:h-5 ${isLiked ? 'fill-red-500 stroke-red-500' : 'fill-none'}`} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                 </svg>
               </button>
             )}

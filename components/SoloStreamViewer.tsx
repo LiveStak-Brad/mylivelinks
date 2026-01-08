@@ -1944,13 +1944,22 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                   </div>
                 )}
                 
-                {/* Report button only - Follow button moved to bottom action bar */}
+                {/* Report button */}
                 <button
                   onClick={() => setShowReportModal(true)}
                   className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
                   title="Report"
                 >
                   <Flag className="w-5 h-5" />
+                </button>
+                
+                {/* Share button */}
+                <button
+                  onClick={handleShare}
+                  className="p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
+                  title="Share"
+                >
+                  <Share2 className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -1965,7 +1974,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                     currentUserName={streamer.display_name || streamer.username}
                     canPublish={false}
                     remainingSeconds={battleRemainingSeconds}
-                    className="w-full h-full box-border pt-24 pb-[40vh]"
+                    className="w-full h-full box-border pt-28 pb-[40vh]"
                   />
                 ) : (
                   <>
@@ -2139,40 +2148,6 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           z-20
           pb-0
         `}>
-          {/* Like Button - Top Right of Chat */}
-          {currentUserId && streamer?.live_stream_id && (
-            <button
-              onClick={() => {
-                if (!isLikeLoading) {
-                  // First tap: count for trending (DB)
-                  if (!isLiked) {
-                    toggleLike();
-                  }
-                  // Every tap: increment fidget counter (visual only)
-                  setFidgetLikeCount(prev => prev + 1);
-                  setShowLikePop(true);
-                  setTimeout(() => setShowLikePop(false), 300);
-                }
-              }}
-              disabled={isLikeLoading}
-              className={`
-                absolute -top-16 right-4 z-30
-                flex flex-col items-center gap-1
-                transition-all
-                ${showLikePop ? 'scale-110' : 'scale-100'}
-              `}
-            >
-              <Heart 
-                className={`w-10 h-10 drop-shadow-lg ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`}
-                strokeWidth={2}
-              />
-              {(likesCount + fidgetLikeCount) > 0 && (
-                <span className="text-white text-sm font-bold drop-shadow-lg">
-                  {(likesCount + fidgetLikeCount) > 999 ? '999+' : (likesCount + fidgetLikeCount)}
-                </span>
-              )}
-            </button>
-          )}
 
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-hidden">
@@ -2184,6 +2159,19 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                   onSettingsClick={() => setShowChatSettings(true)}
                   onRequestGuestClick={() => setShowRequestGuest(true)}
                   showRequestGuestButton={currentUserId !== null && currentUserId !== streamer.profile_id}
+                  onLikeClick={() => {
+                    if (!isLikeLoading) {
+                      if (!isLiked) {
+                        toggleLike();
+                      }
+                      setFidgetLikeCount(prev => prev + 1);
+                      setShowLikePop(true);
+                      setTimeout(() => setShowLikePop(false), 300);
+                    }
+                  }}
+                  isLiked={isLiked}
+                  likesCount={likesCount + fidgetLikeCount}
+                  showLikePop={showLikePop}
                   alwaysAutoScroll={true}
                 />
               ) : (
