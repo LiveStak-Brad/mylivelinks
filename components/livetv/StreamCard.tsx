@@ -11,7 +11,7 @@ export interface Stream {
   slug?: string;
   streamer_display_name: string;
   thumbnail_url: string | null;
-  viewer_count: number;
+  total_views: number;
   category: string | null;
   stream_type?: string | null;
   badges?: StreamBadge[];
@@ -116,32 +116,39 @@ export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCar
           </div>
         )}
 
-        {/* Viewer Count Badge - Bottom Right */}
-        {stream.viewer_count > 0 && (
-          <div className="absolute bottom-1.5 right-1.5 sm:bottom-3 sm:right-3 flex items-center gap-1 sm:gap-1.5 bg-black/80 backdrop-blur-md text-white text-[9px] sm:text-xs font-bold px-1.5 py-0.5 sm:px-3 sm:py-1.5 rounded-md sm:rounded-lg border border-white/10 shadow-lg sm:shadow-xl">
-            <Eye className="w-2.5 h-2.5 sm:w-4 sm:h-4" />
-            <span className="font-black">
-              {stream.viewer_count >= 1000
-                ? `${(stream.viewer_count / 1000).toFixed(1)}K`
-                : stream.viewer_count}
-            </span>
-          </div>
-        )}
+        {/* LIVE Badge - Bottom Right */}
+        <div className="absolute bottom-1.5 right-1.5 sm:bottom-3 sm:right-3 flex items-center gap-1 sm:gap-1.5 bg-red-600/90 backdrop-blur-md text-white text-[9px] sm:text-xs font-bold px-1.5 py-0.5 sm:px-3 sm:py-1.5 rounded-md sm:rounded-lg border border-white/10 shadow-lg sm:shadow-xl">
+          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-white animate-pulse" />
+          <span className="font-black tracking-wider">LIVE</span>
+        </div>
 
         {/* Hover Overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-accent/0 group-hover:from-primary/10 group-hover:to-accent/10 transition-all duration-300" />
       </div>
 
       {/* Content */}
-      <div className={`py-1 px-1.5 flex items-center justify-center relative overflow-hidden rounded-b-xl sm:rounded-b-2xl ${
+      <div className={`py-1.5 px-2 flex flex-col items-center justify-center relative overflow-hidden rounded-b-xl sm:rounded-b-2xl ${
         isTopTrending ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-400 bg-[length:200%_100%] animate-flame-flow' : ''
       }`}>
-        {/* Streamer Name - Standard size for up to 15 chars */}
+        {/* Streamer Name - Title */}
         <span className={`font-black text-lg sm:text-2xl leading-tight text-center transition-colors relative z-10 ${
           isTopTrending ? 'text-gray-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]' : 'text-foreground group-hover:text-primary'
         }`}>
           {stream.streamer_display_name}
         </span>
+        {/* Total Views */}
+        {stream.total_views > 0 && (
+          <div className={`flex items-center gap-1 mt-0.5 ${
+            isTopTrending ? 'text-gray-400' : 'text-muted-foreground'
+          }`}>
+            <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <span className="text-[10px] sm:text-xs font-medium">
+              {stream.total_views >= 1000
+                ? `${(stream.total_views / 1000).toFixed(1)}K`
+                : stream.total_views} views
+            </span>
+          </div>
+        )}
       </div>
     </>
   );

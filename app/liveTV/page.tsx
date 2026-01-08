@@ -140,7 +140,7 @@ export default function LiveTVPage() {
   );
 
   const battlesStreams = useMemo(
-    () => streamsByGender.filter((s) => s.category === 'Battles').sort((a, b) => b.viewer_count - a.viewer_count),
+    () => streamsByGender.filter((s) => s.category === 'Battles').sort((a, b) => (b.total_views || 0) - (a.total_views || 0)),
     [streamsByGender]
   );
 
@@ -180,7 +180,7 @@ export default function LiveTVPage() {
   const categoryNearbyRail = useMemo(() => {
     if (!CATEGORY_FILTERS.includes(activeQuickFilter)) return [];
     const categoryStreams = getCategoryStreams(activeQuickFilter);
-    return categoryStreams.slice().sort((a, b) => b.viewer_count - a.viewer_count).slice(0, 8);
+    return categoryStreams.slice().sort((a, b) => (b.total_views || 0) - (a.total_views || 0)).slice(0, 8);
   }, [activeQuickFilter, getCategoryStreams]);
 
   const railItems = useMemo((): RailItem[] => {
@@ -489,7 +489,7 @@ export default function LiveTVPage() {
                                     <div className="flex items-center gap-1.5 bg-black/20 px-3 py-1 rounded-full">
                                       <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
                                       <span className="text-xs font-bold text-foreground">
-                                        {Math.floor(stream.viewer_count * 0.6)}
+                                        {Math.floor((stream.total_views || 0) * 0.6)}
                                       </span>
                                     </div>
                                   </div>
@@ -512,7 +512,7 @@ export default function LiveTVPage() {
                                     <div className="flex items-center gap-1.5 bg-black/20 px-3 py-1 rounded-full">
                                       <div className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
                                       <span className="text-xs font-bold text-foreground">
-                                        {Math.floor(stream.viewer_count * 0.4)}
+                                        {Math.floor((stream.total_views || 0) * 0.4)}
                                       </span>
                                     </div>
                                   </div>
@@ -526,8 +526,8 @@ export default function LiveTVPage() {
                                     <span className="text-xs sm:text-sm font-black text-muted-foreground">LIVE BATTLE</span>
                                   </div>
                                   <div className="flex items-center gap-2 bg-background/50 px-3 py-1 rounded-lg">
-                                    <span className="text-xs font-bold text-muted-foreground">Total:</span>
-                                    <span className="text-sm font-black text-foreground">{stream.viewer_count}</span>
+                                    <span className="text-xs font-bold text-muted-foreground">Total Views:</span>
+                                    <span className="text-sm font-black text-foreground">{stream.total_views || 0}</span>
                                   </div>
                                 </div>
                               </div>
