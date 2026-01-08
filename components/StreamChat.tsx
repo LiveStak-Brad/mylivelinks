@@ -463,7 +463,8 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
 
       const gifterProfileIds = Array.from(new Set<string>(visibleMessages.map((m: any) => m.profile_id).filter((id: any): id is string => typeof id === 'string')));
       const statusMap = await fetchGifterStatuses(gifterProfileIds);
-      setGifterStatusMap(statusMap);
+      // P0 FIX: MERGE with existing map instead of replacing (prevents losing new message statuses)
+      setGifterStatusMap(prev => ({ ...prev, ...statusMap }));
 
       console.log('[STREAMCHAT] ✅ Setting messages state with', visibleMessages.length, 'messages');
       setMessages((prev) => {
@@ -620,7 +621,8 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           )
         );
         const statusMap = await fetchGifterStatuses(gifterProfileIds);
-        setGifterStatusMap(statusMap);
+        // P0 FIX: MERGE with existing map instead of replacing (prevents losing new message statuses)
+        setGifterStatusMap(prev => ({ ...prev, ...statusMap }));
 
         console.log('[STREAMCHAT] ✅ Setting messages state (fallback) with', messagesWithProfiles.length, 'messages');
         setMessages((prev) => {

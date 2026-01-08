@@ -28,9 +28,7 @@ import {
   Camera,
   Wand2,
   Share2,
-  Filter,
-  Monitor,
-  MonitorOff
+  Filter
 } from 'lucide-react';
 import Image from 'next/image';
 import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublication, LocalTrackPublication } from 'livekit-client';
@@ -1753,39 +1751,6 @@ export default function SoloHostStream() {
                 title="Filters"
               >
                 <Filter className="w-6 h-6" />
-              </button>
-              
-              {/* Screen Share Button */}
-              <button
-                onClick={handleToggleScreenShare}
-                disabled={!isPublishing || (isMobileWeb && !screenShareSupported)}
-                className={`flex flex-col items-center gap-1 transition-colors relative ${
-                  !isPublishing 
-                    ? 'text-gray-500 cursor-not-allowed opacity-50' 
-                    : isMobileWeb && !screenShareSupported
-                    ? 'text-gray-500 cursor-not-allowed opacity-50'
-                    : isScreenSharing 
-                    ? 'text-green-400 hover:text-green-300' 
-                    : 'text-white hover:text-green-400'
-                }`}
-                title={
-                  !isPublishing 
-                    ? 'Go live first to share screen' 
-                    : isMobileWeb && !screenShareSupported 
-                    ? 'Screen share not supported on mobile' 
-                    : isScreenSharing 
-                    ? 'Stop Screen Share' 
-                    : 'Share Screen'
-                }
-              >
-                {isScreenSharing ? (
-                  <>
-                    <Monitor className="w-6 h-6" />
-                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  </>
-                ) : (
-                  <Monitor className="w-6 h-6" />
-                )}
               </button>
             </div>
           </div>
