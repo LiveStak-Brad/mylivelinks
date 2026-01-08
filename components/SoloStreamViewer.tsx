@@ -1022,7 +1022,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         lastVideoProgressAtRef.current = Date.now();
         void resumePlayback('watchdog');
       }
-    }, 2000);
+    }, 5000); // Increased from 2s to 5s - video events handle most cases
 
     return () => {
       clearInterval(interval);
@@ -1462,11 +1462,11 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     loadLeaderboardRank();
     loadTrendingRank();
     
-    // Refresh rank every 30 seconds while streaming
+    // Refresh rank every 60 seconds (fallback-only, ranks don't need real-time accuracy)
     const interval = setInterval(() => {
       loadLeaderboardRank();
       loadTrendingRank();
-    }, 30000);
+    }, 60000);
     
     return () => clearInterval(interval);
   }, [streamer?.profile_id, streamer?.live_stream_id, streamer?.live_available, supabase]);

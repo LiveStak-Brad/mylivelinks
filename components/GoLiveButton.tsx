@@ -16,6 +16,8 @@ interface GoLiveButtonProps {
   publishAllowed?: boolean;
   mode?: 'solo' | 'group'; // Streaming mode: 'solo' for 1:1 streams, 'group' for multi-user grid
   buttonRef?: React.RefObject<HTMLButtonElement>; // External ref for programmatic triggering
+  // Share guard - when true, skip visibility-based disconnect (host is using share sheet)
+  isShareGuardActiveRef?: React.MutableRefObject<boolean>;
 }
 
 interface DeviceInfo {
@@ -33,7 +35,7 @@ function isScreenShareSupported(): boolean {
          'getDisplayMedia' in navigator.mediaDevices;
 }
 
-export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, publishAllowed = true, mode = 'group', buttonRef }: GoLiveButtonProps) {
+export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLiveStatusChange, onPublishingChange, onGoLive, publishAllowed = true, mode = 'group', buttonRef, isShareGuardActiveRef }: GoLiveButtonProps) {
   const [isLive, setIsLive] = useState(false);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -210,10 +212,17 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
   }, []);
 
   // BANDWIDTH SAVING: Stop publishing if user leaves the page while streaming
+  // EXCEPTION: Skip if share guard is active (host is using share sheet)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const handleVisibilityChange = async () => {
+      // Check share guard first - if host is sharing, don't disconnect
+      if (isShareGuardActiveRef?.current) {
+        console.log('[GO_LIVE] Page hidden but share guard active - skipping disconnect');
+        return;
+      }
+
       // Use ref to check current publishing state (avoids stale closure)
       if (document.hidden && isPublishingRef.current && stopPublishingRef.current) {
         console.log('[GO_LIVE] Page hidden while publishing - stopping stream');
@@ -252,12 +261,17 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [supabase]);
+  }, [supabase, isShareGuardActiveRef]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handlePageHide = () => {
+      // Skip if share guard is active
+      if (isShareGuardActiveRef?.current) {
+        console.log('[GO_LIVE] Page hide but share guard active - skipping cleanup beacon');
+        return;
+      }
       if (isPublishingRef.current) {
         sendStreamCleanupBeacon('pagehide');
       }
@@ -270,7 +284,7 @@ export default function GoLiveButton({ sharedRoom, isRoomConnected = false, onLi
       window.removeEventListener('pagehide', handlePageHide);
       window.removeEventListener('beforeunload', handlePageHide);
     };
-  }, []);
+  }, [isShareGuardActiveRef]);
 
   useEffect(() => {
     return () => {

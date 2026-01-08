@@ -663,6 +663,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
   }, [supabase, scrollToBottom]); // Only depend on stable references
 
   // Fallback polling (P0 reliability): if realtime misses events, this keeps Host+Viewer consistent.
+  // Primary updates come from realtime subscription; this is safety net only.
   useEffect(() => {
     if (!liveStreamId) return;
     let cancelled = false;
@@ -670,7 +671,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       if (cancelled) return;
       // Best-effort refresh without showing a spinner (isInitialLoad will be false if we already have messages)
       void loadMessages();
-    }, 4000);
+    }, 30000); // Increased from 4s to 30s - realtime is primary
     return () => {
       cancelled = true;
       clearInterval(interval);

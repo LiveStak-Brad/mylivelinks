@@ -235,6 +235,56 @@ export default function SoloHostStream() {
   const [guestOverlayKey, setGuestOverlayKey] = useState(0);
   const lastResetRef = useRef<number>(0);
 
+  // Share guard - prevents stream disconnect when using Share button
+  // Valid for 30 seconds after share is initiated
+  const isShareActiveRef = useRef<boolean>(false);
+  const shareStartTimeRef = useRef<number>(0);
+  const SHARE_GUARD_TIMEOUT_MS = 30000; // 30 seconds
+
+  // Check if share is currently active (within timeout window)
+  const isShareGuardActive = useCallback(() => {
+    if (!isShareActiveRef.current) return false;
+    const elapsed = Date.now() - shareStartTimeRef.current;
+    if (elapsed > SHARE_GUARD_TIMEOUT_MS) {
+      // Share guard expired
+      isShareActiveRef.current = false;
+      return false;
+    }
+    return true;
+  }, []);
+
+  // Handle share button click
+  const handleShare = useCallback(async () => {
+    if (!navigator.share) {
+      console.log('[SoloHostStream] Web Share API not supported');
+      return;
+    }
+
+    console.log('[SoloHostStream] Share initiated - enabling share guard');
+    isShareActiveRef.current = true;
+    shareStartTimeRef.current = Date.now();
+
+    try {
+      await navigator.share({
+        title: `Watch ${streamer?.display_name || streamer?.username} live!`,
+        url: window.location.href,
+      });
+      console.log('[SoloHostStream] Share completed successfully');
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('[SoloHostStream] Share cancelled by user');
+      } else {
+        console.error('[SoloHostStream] Share error:', err);
+      }
+    }
+
+    // Clear share guard after a short delay (user has returned)
+    setTimeout(() => {
+      console.log('[SoloHostStream] Clearing share guard');
+      isShareActiveRef.current = false;
+    }, 1000);
+  }, [streamer?.display_name, streamer?.username]);
+
   // Load saved devices and filters on mount
   useEffect(() => {
     const saved = loadSavedDevices();
@@ -491,11 +541,11 @@ export default function SoloHostStream() {
     loadLeaderboardRank();
     loadTrendingRank();
     
-    // Refresh rank every 30 seconds while streaming
+    // Refresh rank every 60 seconds (fallback-only, ranks don't need real-time accuracy)
     const interval = setInterval(() => {
       loadLeaderboardRank();
       loadTrendingRank();
-    }, 30000);
+    }, 60000);
     
     return () => clearInterval(interval);
   }, [currentUserId, streamer?.live_stream_id, streamer?.live_available, supabase]);
@@ -1703,15 +1753,7 @@ export default function SoloHostStream() {
                 
                 {/* Share Button - Below X, positioned absolutely */}
                 <button
-                  onClick={() => {
-                    // Share functionality
-                    if (navigator.share) {
-                      navigator.share({
-                        title: `Watch ${streamer.display_name || streamer.username} live!`,
-                        url: window.location.href,
-                      });
-                    }
-                  }}
+                  onClick={handleShare}
                   className="absolute top-14 right-0 p-2 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-colors"
                   title="Share"
                 >
@@ -1835,6 +1877,7 @@ export default function SoloHostStream() {
                   console.log('[SoloHostStream] GoLiveButton publishing state changed:', publishing);
                   setIsPublishing(publishing);
                 }}
+                isShareGuardActiveRef={isShareActiveRef}
                 onGoLive={(liveStreamId, profileId) => {
                   console.log('🆕🆕🆕 [SoloHostStream] NEW STREAM CREATED! live_stream_id:', liveStreamId);
                   console.log('🆕🆕🆕 [SoloHostStream] Profile ID:', profileId);
