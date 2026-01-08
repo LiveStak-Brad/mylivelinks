@@ -1957,7 +1957,7 @@ export default function SoloHostStream() {
             )}
 
             {/* Offline placeholder */}
-            {!isPublishing && (
+            {!isPublishing && !isInActiveSession && (
               <>
                 {/* Desktop: Centered offline message */}
                 <div className="hidden md:block text-center text-white">
