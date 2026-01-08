@@ -1621,13 +1621,15 @@ export default function SoloHostStream() {
                         className={`flex items-center justify-center ${color.bg} rounded-full p-[2px] w-9 h-9 hover:scale-110 transition-transform cursor-pointer`}
                         title={`${gifter.username} - ${gifter.total_coins.toLocaleString()} coins`}
                       >
-                        <Image
-                          src={getAvatarUrl(gifter.avatar_url)}
-                          alt={gifter.username}
-                          width={28}
-                          height={28}
-                          className="rounded-full"
-                        />
+                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+                          <Image
+                            src={getAvatarUrl(gifter.avatar_url)}
+                            alt={gifter.username}
+                            width={28}
+                            height={28}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                       </button>
                     );
                   })}
@@ -1770,13 +1772,15 @@ export default function SoloHostStream() {
                           className={`flex items-center justify-center ${color.bg} rounded-full p-[2px] w-9 h-9 hover:scale-110 transition-transform cursor-pointer`}
                           title={`${gifter.username} - ${gifter.total_coins.toLocaleString()} coins`}
                         >
-                          <Image
-                            src={getAvatarUrl(gifter.avatar_url)}
-                            alt={gifter.username}
-                            width={28}
-                            height={28}
-                            className="rounded-full"
-                          />
+                          <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+                            <Image
+                              src={getAvatarUrl(gifter.avatar_url)}
+                              alt={gifter.username}
+                              width={28}
+                              height={28}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
                         </button>
                       );
                     })}
