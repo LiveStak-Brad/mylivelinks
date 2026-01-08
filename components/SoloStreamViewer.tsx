@@ -201,11 +201,10 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
   const [trendingRank, setTrendingRank] = useState<number | null>(null);
  
-  // Stream-scoped Top Gifters (polling; safe for launch)
+  // Stream-scoped Top Gifters (realtime + fallback polling)
   const { gifters: streamTopGifters } = useStreamTopGifters({
     liveStreamId: streamer?.live_stream_id ?? null,
     enabled: !!(streamer?.live_stream_id && streamer?.live_available),
-    pollIntervalMs: 7000,
     limit: 20,
   });
   
@@ -334,14 +333,16 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   // 2) service-role POST /api/active-viewers/heartbeat
   // We keep ONLY the service-role heartbeat to avoid duplicate work + timing jank.
 
+  // Viewer count: realtime subscription + fallback polling
   useEffect(() => {
     if (!streamer?.live_stream_id) return;
 
     let cancelled = false;
+    const liveStreamId = streamer.live_stream_id;
 
     const loadViewerCount = async () => {
       try {
-        const res = await fetch(`/api/active-viewers?live_stream_id=${streamer.live_stream_id}`);
+        const res = await fetch(`/api/active-viewers?live_stream_id=${liveStreamId}`);
         if (!res.ok) {
           console.error('[SoloStreamViewer] Viewer count fetch failed:', res.status);
           return;
@@ -362,14 +363,61 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       }
     };
 
+    // Initial load
     loadViewerCount();
-    const interval = setInterval(loadViewerCount, 15000);
+
+    // Realtime subscription on active_viewers for INSERT/DELETE events
+    const viewerChannel = supabase
+      .channel(`active-viewers-count-${liveStreamId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'active_viewers',
+          filter: `live_stream_id=eq.${liveStreamId}`,
+        },
+        () => {
+          // Viewer joined - increment count
+          if (!cancelled) {
+            setStreamer((prev) =>
+              prev ? { ...prev, viewer_count: (prev.viewer_count || 0) + 1 } : prev
+            );
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'active_viewers',
+          filter: `live_stream_id=eq.${liveStreamId}`,
+        },
+        () => {
+          // Viewer left - decrement count (floor at 0)
+          if (!cancelled) {
+            setStreamer((prev) =>
+              prev ? { ...prev, viewer_count: Math.max(0, (prev.viewer_count || 1) - 1) } : prev
+            );
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (DEBUG_LIVEKIT) {
+          console.log('[SoloStreamViewer] Viewer count realtime subscription:', status);
+        }
+      });
+
+    // Fallback polling every 60s (increased from 15s - realtime is primary)
+    const interval = setInterval(loadViewerCount, 60000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      viewerChannel.unsubscribe();
     };
-  }, [streamer?.live_stream_id]);
+  }, [streamer?.live_stream_id, supabase]);
 
   // Service-role heartbeat to ensure viewers are counted even if RLS blocks client RPC
   useEffect(() => {

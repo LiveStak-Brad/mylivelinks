@@ -319,11 +319,10 @@ export default function SoloHostStream() {
     }
   }, [filterSettings, isPublishing]);
  
-  // Stream-scoped Top Gifters (polling; safe for launch)
+  // Stream-scoped Top Gifters (realtime + fallback polling)
   const { gifters: streamTopGifters } = useStreamTopGifters({
     liveStreamId: streamer?.live_stream_id ?? null,
     enabled: !!streamer?.live_stream_id,
-    pollIntervalMs: 7000,
     limit: 20,
   });
 
@@ -349,7 +348,7 @@ export default function SoloHostStream() {
     initUser();
   }, [supabase]);
 
-  // Service-count for host view (bypasses client RLS)
+  // Viewer count: realtime subscription + fallback polling
   useEffect(() => {
     if (!streamer?.live_stream_id) {
       setViewerCount(0);
@@ -357,10 +356,11 @@ export default function SoloHostStream() {
     }
 
     let cancelled = false;
+    const liveStreamId = streamer.live_stream_id;
 
     const loadViewerCount = async () => {
       try {
-        const res = await fetch(`/api/active-viewers?live_stream_id=${streamer.live_stream_id}`);
+        const res = await fetch(`/api/active-viewers?live_stream_id=${liveStreamId}`);
         if (!res.ok) {
           console.error('[SoloHostStream] Viewer count fetch failed:', res.status);
           return;
@@ -374,14 +374,55 @@ export default function SoloHostStream() {
       }
     };
 
+    // Initial load
     loadViewerCount();
-    const interval = setInterval(loadViewerCount, 15000);
+
+    // Realtime subscription on active_viewers for INSERT/DELETE events
+    const viewerChannel = supabase
+      .channel(`active-viewers-host-${liveStreamId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'active_viewers',
+          filter: `live_stream_id=eq.${liveStreamId}`,
+        },
+        () => {
+          // Viewer joined - increment count
+          if (!cancelled) {
+            setViewerCount((prev) => prev + 1);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'active_viewers',
+          filter: `live_stream_id=eq.${liveStreamId}`,
+        },
+        () => {
+          // Viewer left - decrement count (floor at 0)
+          if (!cancelled) {
+            setViewerCount((prev) => Math.max(0, prev - 1));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[SoloHostStream] Viewer count realtime subscription:', status);
+      });
+
+    // Fallback polling every 60s (increased from 15s - realtime is primary)
+    const interval = setInterval(loadViewerCount, 60000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      viewerChannel.unsubscribe();
     };
-  }, [streamer?.live_stream_id]);
+  }, [streamer?.live_stream_id, supabase]);
 
   // Load streamer data (current user)
   useEffect(() => {

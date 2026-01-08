@@ -231,14 +231,17 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
         const username = String(p?.username ?? 'Someone');
         const displayName = String(p?.display_name ?? '') || username;
         const avatarFallback = (displayName?.[0] ?? username?.[0] ?? '?').toUpperCase();
-        const streamingMode = String(ls.streaming_mode ?? 'group');
+        // Default to 'solo' since that's the most common streaming mode
+        // NULL/undefined streaming_mode should route to solo stream
+        const streamingMode = String(ls.streaming_mode || 'solo');
         
         // Route to correct destination based on streaming mode:
         // - Solo streams: /live/{username} (user's solo stream page)
         // - Group streams: /room/live-central (group live room)
-        const actionUrl = streamingMode === 'solo' 
-          ? `/live/${encodeURIComponent(username)}`
-          : '/room/live-central';
+        // Default: solo stream (most common case)
+        const actionUrl = streamingMode === 'group' 
+          ? '/room/live-central'
+          : `/live/${encodeURIComponent(username)}`;
         
         return {
           id,

@@ -223,13 +223,14 @@ export function getNotificationDestination(input: {
       const streamingMode = safeString(meta.streaming_mode);
       const username = safeString(input.actor_username || meta.username).replace(/^@/, '');
       
-      if (streamingMode === 'solo' && username) {
-        // Solo stream - route to /live/{username}
-        return { kind: 'internal', href: `/live/${encodeURIComponent(username)}` };
+      // Only route to Live Central if explicitly 'group' mode
+      // Default to solo stream (most common case)
+      if (streamingMode === 'group') {
+        return { kind: 'internal', href: '/room/live-central' };
       }
       
       if (username) {
-        // Has username but unknown mode - try solo stream first (most common)
+        // Solo stream (or unknown mode with username) - route to /live/{username}
         return { kind: 'internal', href: `/live/${encodeURIComponent(username)}` };
       }
 

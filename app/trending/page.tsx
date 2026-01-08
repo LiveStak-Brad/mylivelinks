@@ -4,7 +4,7 @@
  * TRENDING LIVE STREAMS PAGE
  * 
  * Drop-in component for /app/trending/page.tsx
- * Shows top trending live streams with auto-refresh
+ * Shows top trending live streams with user-triggered refresh
  */
 
 import { useTrendingStreams } from '@/lib/trending-hooks';
@@ -14,9 +14,10 @@ import { RefreshCw, Eye, Heart, MessageCircle, Gift } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function TrendingPage() {
+  // No auto-refresh - user-triggered only (reduces polling load)
   const { streams, isLoading, error, refresh } = useTrendingStreams({
     limit: 20,
-    refreshInterval: 10000 // Auto-refresh every 10 seconds
+    // refreshInterval removed - manual refresh only
   });
 
   const [lastUpdate, setLastUpdate] = useState(new Date());
@@ -52,7 +53,7 @@ export default function TrendingPage() {
             🔥 Trending Live
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Top live streams right now · Updates every 10s
+            Top live streams right now
           </p>
         </div>
         
