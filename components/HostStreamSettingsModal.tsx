@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Camera, Mic, Video, RefreshCw, Check } from 'lucide-react';
+import { Camera, Mic, Video, RefreshCw, Check, Settings } from 'lucide-react';
+import BottomSheetModal from './BottomSheetModal';
 
 interface HostStreamSettingsModalProps {
   isOpen: boolean;
@@ -206,174 +207,15 @@ export default function HostStreamSettingsModal({
     handleCameraChange(videoDevices[nextIndex].deviceId);
   }, [videoDevices, selectedVideoDevice, handleCameraChange]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col modal-fullscreen-mobile">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 mobile-safe-top">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Stream Settings</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors mobile-touch-target"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="modal-body p-6 space-y-6 overflow-y-auto flex-1">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-            </div>
-          ) : (
-            <>
-              {/* Camera Selection */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                  <Camera className="w-4 h-4 text-purple-500" />
-                  Camera
-                  {switching === 'video' && (
-                    <span className="ml-2 text-xs text-purple-500 animate-pulse">Switching...</span>
-                  )}
-                </label>
-                <div className="space-y-2">
-                  {videoDevices.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">No cameras found</p>
-                  ) : (
-                    <>
-                      <select
-                        value={selectedVideoDevice}
-                        onChange={(e) => handleCameraChange(e.target.value)}
-                        disabled={switching === 'video'}
-                        className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
-                      >
-                        {videoDevices.map((device) => (
-                          <option key={device.deviceId} value={device.deviceId}>
-                            {device.label}
-                          </option>
-                        ))}
-                      </select>
-                      
-                      {videoDevices.length > 1 && (
-                        <button
-                          onClick={handleFlipCamera}
-                          disabled={switching === 'video'}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
-                        >
-                          <RefreshCw className={`w-4 h-4 ${switching === 'video' ? 'animate-spin' : ''}`} />
-                          Flip Camera
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Microphone Selection */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                  <Mic className="w-4 h-4 text-pink-500" />
-                  Microphone
-                  {switching === 'audio' && (
-                    <span className="ml-2 text-xs text-pink-500 animate-pulse">Switching...</span>
-                  )}
-                </label>
-                {audioDevices.length === 0 ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No microphones found</p>
-                ) : (
-                  <select
-                    value={selectedAudioDevice}
-                    onChange={(e) => handleMicrophoneChange(e.target.value)}
-                    disabled={switching === 'audio'}
-                    className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
-                  >
-                    {audioDevices.map((device) => (
-                      <option key={device.deviceId} value={device.deviceId}>
-                        {device.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* Stream Quality */}
-              <div>
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                  <Video className="w-4 h-4 text-blue-500" />
-                  Stream Quality
-                </label>
-                <div className="space-y-2">
-                  {[
-                    { value: 'auto', label: 'Auto (Recommended)', description: 'Automatically adjusts based on connection' },
-                    { value: '720p', label: '720p HD', description: 'Good balance of quality and bandwidth' },
-                    { value: '1080p', label: '1080p Full HD', description: 'Best quality, requires good connection' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setStreamQuality(option.value as any)}
-                      className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-                        streamQuality === option.value
-                          ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                          : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900 dark:text-white">{option.label}</span>
-                        {streamQuality === option.value && (
-                          <Check className="w-5 h-5 text-purple-500" />
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {option.description}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Info note */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  💡 Camera and microphone changes apply immediately while streaming. No need to restart your stream!
-                </p>
-              </div>
-
-              {/* Troubleshooting Section */}
-              {onResetConnection && (
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Troubleshooting</h3>
-                  <button
-                    onClick={onResetConnection}
-                    disabled={isResetting || switching !== null}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isResetting ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Resetting...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-4 h-4" />
-                        Reset Connection
-                      </>
-                    )}
-                  </button>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Use if audio/video stops working. Does not end your stream.
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0 mobile-safe-bottom">
+    <BottomSheetModal
+      open={isOpen}
+      onClose={onClose}
+      title="Stream Settings"
+      titleIcon={<Settings className="w-5 h-5 text-purple-500" />}
+      maxHeightVh={50}
+      footerContent={
+        <div className="flex gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all font-medium"
@@ -381,7 +223,155 @@ export default function HostStreamSettingsModal({
             Done
           </button>
         </div>
+      }
+    >
+      <div className="p-4 space-y-5">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+          </div>
+        ) : (
+          <>
+            {/* Camera Selection */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                <Camera className="w-4 h-4 text-purple-500" />
+                Camera
+                {switching === 'video' && (
+                  <span className="ml-2 text-xs text-purple-500 animate-pulse">Switching...</span>
+                )}
+              </label>
+              <div className="space-y-2">
+                {videoDevices.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No cameras found</p>
+                ) : (
+                  <>
+                    <select
+                      value={selectedVideoDevice}
+                      onChange={(e) => handleCameraChange(e.target.value)}
+                      disabled={switching === 'video'}
+                      className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
+                    >
+                      {videoDevices.map((device) => (
+                        <option key={device.deviceId} value={device.deviceId}>
+                          {device.label}
+                        </option>
+                      ))}
+                    </select>
+                    
+                    {videoDevices.length > 1 && (
+                      <button
+                        onClick={handleFlipCamera}
+                        disabled={switching === 'video'}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${switching === 'video' ? 'animate-spin' : ''}`} />
+                        Flip Camera
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Microphone Selection */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                <Mic className="w-4 h-4 text-pink-500" />
+                Microphone
+                {switching === 'audio' && (
+                  <span className="ml-2 text-xs text-pink-500 animate-pulse">Switching...</span>
+                )}
+              </label>
+              {audioDevices.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No microphones found</p>
+              ) : (
+                <select
+                  value={selectedAudioDevice}
+                  onChange={(e) => handleMicrophoneChange(e.target.value)}
+                  disabled={switching === 'audio'}
+                  className="w-full p-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
+                >
+                  {audioDevices.map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Stream Quality */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                <Video className="w-4 h-4 text-blue-500" />
+                Stream Quality
+              </label>
+              <div className="space-y-2">
+                {[
+                  { value: 'auto', label: 'Auto (Recommended)', description: 'Automatically adjusts based on connection' },
+                  { value: '720p', label: '720p HD', description: 'Good balance of quality and bandwidth' },
+                  { value: '1080p', label: '1080p Full HD', description: 'Best quality, requires good connection' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setStreamQuality(option.value as any)}
+                    className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                      streamQuality === option.value
+                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-900 dark:text-white text-sm">{option.label}</span>
+                      {streamQuality === option.value && (
+                        <Check className="w-4 h-4 text-purple-500" />
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {option.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Info note */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                💡 Camera and microphone changes apply immediately while streaming.
+              </p>
+            </div>
+
+            {/* Troubleshooting Section */}
+            {onResetConnection && (
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Troubleshooting</h3>
+                <button
+                  onClick={onResetConnection}
+                  disabled={isResetting || switching !== null}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isResetting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Reset Connection
+                    </>
+                  )}
+                </button>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Use if audio/video stops working. Does not end your stream.
+                </p>
+              </div>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    </BottomSheetModal>
   );
 }

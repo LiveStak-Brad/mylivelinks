@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Gift, Crown, Medal, Award } from 'lucide-react';
+import { Gift, Crown, Medal, Award } from 'lucide-react';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import Image from 'next/image';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
+import BottomSheetModal from './BottomSheetModal';
 
 interface StreamGiftersModalProps {
   isOpen: boolean;
@@ -82,8 +83,6 @@ export default function StreamGiftersModal({
     };
   }, [gifters, isOpen, liveStreamId]);
 
-  if (!isOpen) return null;
-
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
@@ -110,110 +109,104 @@ export default function StreamGiftersModal({
     }
   };
 
+  const headerContent = (
+    <div className="relative px-4 py-3 border-b border-white/20 bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500">
+      <div className="flex items-center justify-center gap-2">
+        <Gift className="w-5 h-5 text-white" />
+        <h2 className="text-lg font-bold text-white">Top Gifters</h2>
+      </div>
+      <p className="text-center text-white/80 text-sm mt-0.5">
+        {streamUsername}&apos;s Stream
+      </p>
+    </div>
+  );
+
   return (
-    <div
-      className="fixed inset-0 z-[200] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto"
-      onClick={onClose}
+    <BottomSheetModal
+      open={isOpen}
+      onClose={onClose}
+      maxHeightVh={50}
+      showGrabHandle={true}
+      showCloseButton={false}
+      headerContent={headerContent}
+      containerClassName="bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500"
+      zIndex={200}
     >
-      <div
-        className="bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 rounded-2xl shadow-2xl max-w-md w-full mt-4 animate-slide-down overflow-hidden flex flex-col modal-fullscreen-mobile"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="relative px-6 py-4 border-b border-white/20 flex-shrink-0 mobile-safe-top">
-          <div className="flex items-center justify-center gap-2">
-            <Gift className="w-6 h-6 text-white" />
-            <h2 className="text-2xl font-bold text-white">Top Gifters</h2>
+      <div className="p-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
           </div>
-          <p className="text-center text-white/80 text-sm mt-1">
-            {streamUsername}'s Stream
-          </p>
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition text-white mobile-touch-target"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        ) : topGifters.length === 0 ? (
+          <div className="text-center py-12 text-white/80">
+            <Gift className="w-12 h-12 mx-auto mb-3 opacity-50" />
+            <p className="text-lg font-semibold">No gifts yet</p>
+            <p className="text-sm mt-1">Be the first to send a gift!</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {topGifters.map((gifter) => (
+              <div
+                key={gifter.profile_id}
+                className={`rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all ${
+                  gifter.rank <= 3
+                    ? 'bg-white shadow-lg'
+                    : 'bg-white/90 hover:bg-white'
+                }`}
+                onClick={() => onGifterClick?.(gifter.profile_id, gifter.username)}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Rank */}
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0 ${getRankStyle(
+                      gifter.rank
+                    )}`}
+                  >
+                    {gifter.rank <= 3 ? getRankIcon(gifter.rank) : gifter.rank}
+                  </div>
 
-        {/* Content */}
-        <div className="modal-body p-4 max-h-[60vh] overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
-            </div>
-          ) : topGifters.length === 0 ? (
-            <div className="text-center py-12 text-white/80">
-              <Gift className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-semibold">No gifts yet</p>
-              <p className="text-sm mt-1">Be the first to send a gift!</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {topGifters.map((gifter) => (
-                <div
-                  key={gifter.profile_id}
-                  className={`rounded-xl p-3 cursor-pointer hover:scale-[1.02] transition-all ${
-                    gifter.rank <= 3
-                      ? 'bg-white shadow-lg'
-                      : 'bg-white/90 hover:bg-white'
-                  }`}
-                  onClick={() => onGifterClick?.(gifter.profile_id, gifter.username)}
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Rank */}
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0 ${getRankStyle(
-                        gifter.rank
-                      )}`}
-                    >
-                      {gifter.rank <= 3 ? getRankIcon(gifter.rank) : gifter.rank}
+                  {/* Avatar */}
+                  <Image
+                    src={getAvatarUrl(gifter.avatar_url)}
+                    alt={gifter.username}
+                    width={gifter.rank <= 3 ? 56 : 48}
+                    height={gifter.rank <= 3 ? 56 : 48}
+                    className={`rounded-full flex-shrink-0 ${
+                      gifter.rank <= 3 ? 'ring-4 ring-white' : ''
+                    }`}
+                  />
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-gray-900 truncate text-base">
+                      {gifter.display_name || gifter.username}
                     </div>
-
-                    {/* Avatar */}
-                    <Image
-                      src={getAvatarUrl(gifter.avatar_url)}
-                      alt={gifter.username}
-                      width={gifter.rank <= 3 ? 56 : 48}
-                      height={gifter.rank <= 3 ? 56 : 48}
-                      className={`rounded-full flex-shrink-0 ${
-                        gifter.rank <= 3 ? 'ring-4 ring-white' : ''
-                      }`}
-                    />
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-gray-900 truncate text-base">
-                        {gifter.display_name || gifter.username}
+                    {gifter.gifter_status && (
+                      <div className="mt-0.5">
+                        <TierBadge
+                          tier_key={gifter.gifter_status.tier_key}
+                          level={gifter.gifter_status.level_in_tier}
+                          size="sm"
+                        />
                       </div>
-                      {gifter.gifter_status && (
-                        <div className="mt-0.5">
-                          <TierBadge
-                            tier_key={gifter.gifter_status.tier_key}
-                            level={gifter.gifter_status.level_in_tier}
-                            size="sm"
-                          />
-                        </div>
-                      )}
+                    )}
+                  </div>
+
+                  {/* Diamonds */}
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-xl font-bold text-purple-600">
+                      {gifter.total_coins.toLocaleString()}
                     </div>
-
-                    {/* Diamonds */}
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xl font-bold text-purple-600">
-                        {gifter.total_coins.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-gray-500 font-semibold">
-                        💰 Coins
-                      </div>
+                    <div className="text-xs text-gray-500 font-semibold">
+                      💰 Coins
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </BottomSheetModal>
   );
 }

@@ -76,11 +76,13 @@ export function LiveTVRoomChannelCard({ room, onPress }: LiveTVRoomChannelCardPr
           </div>
         )}
         
-        {/* Live badge */}
-        <div className="absolute top-2 left-2 flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">
-          <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-          LIVE
-        </div>
+        {/* Live badge - only show if there are active streamers */}
+        {liveCount > 0 && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">
+            <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+            LIVE
+          </div>
+        )}
 
         {/* Viewer count */}
         {viewerCount > 0 && (

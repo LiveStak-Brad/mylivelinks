@@ -82,10 +82,13 @@ export function GlobalLiveFloatingButton() {
 
     const fetchLive = async () => {
       try {
+        // Check live_streams.live_available (source of truth) instead of profiles.is_live
+        // This ensures we only show the button when streamer is actually live
         const { data, error } = await supabase
-          .from('profiles')
-          .select('username, is_live')
-          .or(`username.ilike.${candidates[0]},username.ilike.${candidates[1]}`);
+          .from('live_streams')
+          .select('profile_id, profiles!inner(username)')
+          .eq('live_available', true)
+          .eq('streaming_mode', 'solo');
 
         if (cancelled) return;
         if (error) {
@@ -93,26 +96,21 @@ export function GlobalLiveFloatingButton() {
           return;
         }
 
-        const rows = (data ?? []) as LiveCandidate[];
+        const rows = (data ?? []) as { profile_id: string; profiles: { username: string } }[];
 
-        const byCandidate = new Map<string, boolean>();
+        // Build map of live usernames
+        const liveUsernames = new Set<string>();
         for (const row of rows) {
-          const key = String(row.username ?? '').toLowerCase();
-          if (!key) continue;
-          byCandidate.set(key, !!row.is_live);
+          const username = row.profiles?.username?.toLowerCase();
+          if (username) liveUsernames.add(username);
         }
 
-        const first = candidates[0];
-        const second = candidates[1];
-
-        if (byCandidate.get(first.toLowerCase())) {
-          setActiveUsername(first);
-          return;
-        }
-
-        if (byCandidate.get(second.toLowerCase())) {
-          setActiveUsername(second);
-          return;
+        // Check candidates in priority order
+        for (const candidate of candidates) {
+          if (liveUsernames.has(candidate.toLowerCase())) {
+            setActiveUsername(candidate);
+            return;
+          }
         }
 
         setActiveUsername(null);
@@ -123,10 +121,19 @@ export function GlobalLiveFloatingButton() {
 
     fetchLive();
 
+    // Refetch when tab becomes visible (user switches back)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLive();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     const interval = window.setInterval(fetchLive, 15000);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [candidates, shouldHide, supabase]);
 

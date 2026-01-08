@@ -12,6 +12,8 @@ export interface Stream {
   streamer_display_name: string;
   thumbnail_url: string | null;
   total_views: number;
+  /** Active viewers currently watching (realtime count) */
+  viewer_count?: number;
   category: string | null;
   stream_type?: string | null;
   badges?: StreamBadge[];
@@ -131,19 +133,28 @@ export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCar
         }`}>
           {stream.streamer_display_name}
         </span>
-        {/* Total Views */}
-        {stream.total_views > 0 && (
-          <div className={`flex items-center gap-1 mt-0.5 ${
-            isTopTrending ? 'text-gray-400' : 'text-muted-foreground'
-          }`}>
-            <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-            <span className="text-[10px] sm:text-xs font-medium">
-              {stream.total_views >= 1000
-                ? `${(stream.total_views / 1000).toFixed(1)}K`
-                : stream.total_views} views
-            </span>
-          </div>
-        )}
+        {/* Viewer Count - prefer active viewer_count, fallback to total_views */}
+        {(() => {
+          // Use active viewer count if available and > 0, otherwise fall back to total_views
+          const displayCount = (stream.viewer_count ?? 0) > 0 ? stream.viewer_count! : stream.total_views;
+          const isActiveCount = (stream.viewer_count ?? 0) > 0;
+          const label = isActiveCount ? 'watching' : 'views';
+          
+          if (displayCount <= 0) return null;
+          
+          return (
+            <div className={`flex items-center gap-1 mt-0.5 ${
+              isTopTrending ? 'text-gray-400' : 'text-muted-foreground'
+            }`}>
+              <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span className="text-[10px] sm:text-xs font-medium">
+                {displayCount >= 1000
+                  ? `${(displayCount / 1000).toFixed(1)}K`
+                  : displayCount} {label}
+              </span>
+            </div>
+          );
+        })()}
       </div>
     </>
   );

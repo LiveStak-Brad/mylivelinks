@@ -1,8 +1,44 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-admin';
 
+// Force dynamic rendering - never cache this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Default avatar fallback for streams without profile pictures
 const DEFAULT_AVATAR = '/no-profile-pic.png';
+
+// Helper to fetch active viewer counts for multiple streams
+async function getActiveViewerCounts(
+  admin: ReturnType<typeof getSupabaseAdmin>,
+  streamIds: number[]
+): Promise<Map<number, number>> {
+  if (streamIds.length === 0) return new Map();
+
+  const cutoffIso = new Date(Date.now() - 60_000).toISOString();
+
+  // Query active_viewers grouped by live_stream_id
+  const { data: rows, error } = await admin
+    .from('active_viewers')
+    .select('live_stream_id')
+    .in('live_stream_id', streamIds)
+    .eq('is_active', true)
+    .gt('last_active_at', cutoffIso);
+
+  if (error) {
+    console.error('[LiveTV API] Error fetching active viewers:', error);
+    return new Map();
+  }
+
+  // Count occurrences per stream
+  const countMap = new Map<number, number>();
+  for (const row of rows || []) {
+    const id = row.live_stream_id;
+    countMap.set(id, (countMap.get(id) || 0) + 1);
+  }
+
+  return countMap;
+}
 
 export async function GET() {
   try {
@@ -22,12 +58,18 @@ export async function GET() {
     // If RPC worked, use that data
     if (trendingStreams && trendingStreams.length > 0) {
       console.log('[LiveTV API] RPC returned streams:', trendingStreams.length);
+
+      // Get active viewer counts for all streams
+      const streamIds = trendingStreams.map((s: any) => Number(s.stream_id));
+      const viewerCounts = await getActiveViewerCounts(admin, streamIds);
+
       const normalized = trendingStreams.map((stream: any, index: number) => ({
         id: String(stream.stream_id),
         slug: stream.username,
         streamer_display_name: stream.display_name || stream.username || 'Unknown',
         thumbnail_url: stream.avatar_url || DEFAULT_AVATAR,
         total_views: stream.views_count || 0,
+        viewer_count: viewerCounts.get(Number(stream.stream_id)) || 0,
         category: null,
         stream_type: null,
         badges: (stream.trending_score || 0) > 100 ? ['Trending'] : [],
@@ -71,6 +113,10 @@ export async function GET() {
 
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
+    // Get active viewer counts for all streams
+    const streamIds = (liveStreams || []).map((s: any) => Number(s.id));
+    const viewerCounts = await getActiveViewerCounts(admin, streamIds);
+
     const normalized = (liveStreams || []).map((stream: any, index: number) => {
       const profile = profileMap.get(stream.profile_id);
       return {
@@ -79,6 +125,7 @@ export async function GET() {
         streamer_display_name: profile?.display_name || profile?.username || 'Unknown',
         thumbnail_url: profile?.avatar_url || DEFAULT_AVATAR,
         total_views: stream.views_count || 0,
+        viewer_count: viewerCounts.get(Number(stream.id)) || 0,
         category: null,
         stream_type: null,
         badges: (stream.trending_score || 0) > 100 ? ['Trending'] : [],

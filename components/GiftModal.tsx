@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Gift, X, Send, Ban } from 'lucide-react';
+import { Gift, X, Send } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { trackLiveGift } from '@/lib/trending-hooks';
+import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
 
 interface GiftType {
   id: number;
@@ -42,6 +43,7 @@ export default function GiftModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userCoinBalance, setUserCoinBalance] = useState<number>(0);
+  const isMobileWeb = useIsMobileWeb();
 
   const inFlightRef = useRef(false);
 
@@ -100,6 +102,15 @@ export default function GiftModal({
     loadGiftTypes();
     loadUserBalance();
   }, []);
+
+  // ESC to close
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
 
   const loadGiftTypes = async () => {
     const { data, error } = await supabase
@@ -246,10 +257,159 @@ export default function GiftModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4" style={{ zIndex: 99999 }} onClick={onClose}>
+  // Mobile bottom sheet layout
+  if (isMobileWeb) {
+    return (
       <div 
-        className="bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 rounded-[2rem] w-full max-w-md max-h-[85vh] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col border border-white/20 dark:border-white/10 animate-in zoom-in-95 duration-200" 
+        className="fixed inset-0 flex flex-col justify-end bg-black/40"
+        style={{ zIndex: 99999 }}
+        onClick={onClose}
+      >
+        <div 
+          className="bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 rounded-t-2xl rounded-b-none shadow-lg overflow-hidden flex flex-col border-t border-white/20 dark:border-white/10 animate-slide-up"
+          style={{
+            maxHeight: 'min(50vh, calc(100vh - env(safe-area-inset-top) - 120px))',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Grab Handle */}
+          <div className="flex justify-center pt-2 pb-1 flex-shrink-0">
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+          </div>
+
+          {/* Header */}
+          <div className="relative px-4 py-2 flex-shrink-0">
+            <button 
+              onClick={onClose} 
+              className="absolute top-2 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all" 
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 shadow-lg shadow-purple-500/30">
+                <Gift className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Send Gift</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">to <span className="font-medium text-gray-700 dark:text-gray-300">{recipientUsername}</span></p>
+              </div>
+            </div>
+          </div>
+
+          {/* Balance Banner */}
+          <div className="mx-4 mb-2 px-3 py-2 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/50 dark:to-yellow-950/50 rounded-xl border border-amber-200/50 dark:border-amber-800/30 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">Your Balance</span>
+              <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{userCoinBalance.toLocaleString()} 💰</span>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mx-4 mb-2 px-3 py-2 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 rounded-xl text-xs border border-red-200/50 dark:border-red-800/30 flex-shrink-0">
+              {error}
+            </div>
+          )}
+
+          {/* Gift Grid */}
+          <div className="px-4 pb-2 flex-1 overflow-y-auto min-h-0">
+            <div className="grid grid-cols-4 gap-2">
+              {giftTypes.map((gift) => {
+                const canAfford = userCoinBalance >= gift.coin_cost;
+                const isSelected = selectedGift?.id === gift.id;
+                return (
+                  <button
+                    key={gift.id}
+                    onClick={() => canAfford && setSelectedGift(gift)}
+                    disabled={!canAfford}
+                    className={`relative flex flex-col items-center p-2 rounded-xl transition-all duration-200 ${
+                      isSelected
+                        ? 'bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/50 dark:to-pink-900/50 scale-105 shadow-lg ring-2 ring-purple-400 dark:ring-purple-500'
+                        : canAfford
+                          ? 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 active:scale-95'
+                          : 'bg-gray-50/50 dark:bg-gray-800/30 opacity-40 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className={`text-2xl mb-0.5 transition-transform duration-200 ${isSelected ? 'scale-110' : ''}`}>
+                      {gift.icon_url ? (
+                        <img src={gift.icon_url} alt={gift.name} className="w-8 h-8 drop-shadow-md" />
+                      ) : (
+                        gift.emoji || getGiftEmoji(gift.name)
+                      )}
+                    </span>
+                    <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{gift.coin_cost}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected Gift & Send */}
+          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/80 border-t border-gray-200 dark:border-gray-800 flex-shrink-0">
+            {selectedGift ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/50 dark:to-pink-900/50 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xl">
+                      {selectedGift.icon_url ? (
+                        <img src={selectedGift.icon_url} alt={selectedGift.name} className="w-6 h-6" />
+                      ) : (
+                        selectedGift.emoji || getGiftEmoji(selectedGift.name)
+                      )}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-900 dark:text-white truncate text-sm">{selectedGift.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{selectedGift.coin_cost} coins → 💎 {selectedGift.coin_cost}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSendGift}
+                  disabled={loading || userCoinBalance < selectedGift.coin_cost}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg shadow-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                >
+                  {loading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      <span>Send</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <p className="text-center text-gray-400 dark:text-gray-500 py-1 text-sm">Tap a gift to select</p>
+            )}
+          </div>
+        </div>
+
+        <style jsx>{`
+          @keyframes slide-up {
+            from {
+              transform: translateY(100%);
+              opacity: 0.5;
+            }
+            to {
+              transform: translateY(0);
+              opacity: 1;
+            }
+          }
+          .animate-slide-up {
+            animation: slide-up 0.25s ease-out forwards;
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  // Desktop centered modal layout
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 99999 }} onClick={onClose}>
+      <div 
+        className="bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 rounded-2xl w-full max-w-md max-h-[85vh] shadow-xl overflow-hidden flex flex-col border border-white/20 dark:border-white/10 animate-in zoom-in-95 duration-200" 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Premium Header */}
@@ -362,4 +522,3 @@ export default function GiftModal({
     </div>
   );
 }
-

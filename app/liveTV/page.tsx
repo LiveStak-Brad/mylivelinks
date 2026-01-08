@@ -46,6 +46,37 @@ export default function LiveTVPage() {
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
 
+  // Reusable fetch functions for streams and rooms
+  const loadStreams = useCallback(async () => {
+    try {
+      setStreamsLoading(true);
+      const res = await fetch('/api/livetv/streams', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load');
+      const json = await res.json();
+      const next = Array.isArray(json?.streams) ? (json.streams as Stream[]) : [];
+      setStreams(next);
+    } catch {
+      setStreams([]);
+    } finally {
+      setStreamsLoading(false);
+    }
+  }, []);
+
+  const loadRooms = useCallback(async () => {
+    try {
+      setRoomsLoading(true);
+      const res = await fetch('/api/livetv/rooms', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load rooms');
+      const json = await res.json();
+      const next = Array.isArray(json?.rooms) ? (json.rooms as LiveTVRoomChannel[]) : [];
+      setRooms(next);
+    } catch {
+      setRooms([]);
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, []);
+
   // Sync from localStorage after mount to avoid hydration mismatch
   useEffect(() => {
     const saved = localStorage.getItem('livetv_active_filter');
@@ -75,46 +106,24 @@ export default function LiveTVPage() {
     }
   }, [activeQuickFilter, hasMounted]);
 
+  // Initial load on mount
   useEffect(() => {
-    let cancelled = false;
-
-    const loadStreams = async () => {
-      try {
-        setStreamsLoading(true);
-        const res = await fetch('/api/livetv/streams', { cache: 'no-store' });
-        if (!res.ok) throw new Error('Failed to load');
-        const json = await res.json();
-        const next = Array.isArray(json?.streams) ? (json.streams as Stream[]) : [];
-        if (!cancelled) setStreams(next);
-      } catch {
-        if (!cancelled) setStreams([]);
-      } finally {
-        if (!cancelled) setStreamsLoading(false);
-      }
-    };
-
-    const loadRooms = async () => {
-      try {
-        setRoomsLoading(true);
-        const res = await fetch('/api/livetv/rooms', { cache: 'no-store' });
-        if (!res.ok) throw new Error('Failed to load rooms');
-        const json = await res.json();
-        const next = Array.isArray(json?.rooms) ? (json.rooms as LiveTVRoomChannel[]) : [];
-        if (!cancelled) setRooms(next);
-      } catch {
-        if (!cancelled) setRooms([]);
-      } finally {
-        if (!cancelled) setRoomsLoading(false);
-      }
-    };
-
     void loadStreams();
     void loadRooms();
+  }, [loadStreams, loadRooms]);
 
-    return () => {
-      cancelled = true;
+  // Refetch when tab becomes visible (user switches back to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void loadStreams();
+        void loadRooms();
+      }
     };
-  }, []);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [loadStreams, loadRooms]);
 
   const applyGenderFilter = useCallback(
     <T extends { gender?: 'Men' | 'Women' }>(items: T[]) => {
