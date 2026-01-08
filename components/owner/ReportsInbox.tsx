@@ -75,7 +75,7 @@ export default function ReportsInbox({
         return <Clock className="w-4 h-4" />;
       case 'reviewed':
         return <AlertCircle className="w-4 h-4" />;
-      case 'resolved':
+      case 'actioned':
         return <CheckCircle2 className="w-4 h-4" />;
       case 'dismissed':
         return <XCircle className="w-4 h-4" />;
@@ -90,7 +90,7 @@ export default function ReportsInbox({
         return 'warning';
       case 'reviewed':
         return 'info';
-      case 'resolved':
+      case 'actioned':
         return 'success';
       case 'dismissed':
         return 'secondary';
@@ -211,7 +211,7 @@ export default function ReportsInbox({
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
                   <option value="reviewed">Reviewed</option>
-                  <option value="resolved">Resolved</option>
+                  <option value="actioned">Actioned</option>
                   <option value="dismissed">Dismissed</option>
                 </select>
               </div>

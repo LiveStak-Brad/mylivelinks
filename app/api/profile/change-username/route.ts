@@ -37,6 +37,13 @@ export async function POST(request: NextRequest) {
     
     if (error) {
       console.error('Username change error:', error);
+      const msg = (error as any)?.message as string | undefined;
+      if (msg && msg.startsWith('reserved_username:')) {
+        return NextResponse.json(
+          { error: 'Username is reserved' },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         { error: 'Failed to change username' },
         { status: 500 }

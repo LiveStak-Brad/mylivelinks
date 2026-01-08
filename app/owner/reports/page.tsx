@@ -28,6 +28,7 @@ import {
 } from '@/components/ui';
 import ReportsInbox from '@/components/owner/ReportsInbox';
 import ReportDetailPanel from '@/components/owner/ReportDetailPanel';
+import { useToast } from '@/components/ui/Toast';
 
 // Types
 export interface Report {
@@ -35,7 +36,7 @@ export interface Report {
   report_type: string;
   report_reason: string;
   report_details: string | null;
-  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  status: 'pending' | 'reviewed' | 'dismissed' | 'actioned';
   created_at: string;
   reviewed_at: string | null;
   reviewed_by: string | null;
@@ -53,16 +54,18 @@ export interface Report {
 }
 
 export type ReportSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type ReportStatus = 'all' | 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+export type ReportStatus = 'all' | 'pending' | 'reviewed' | 'dismissed' | 'actioned';
 export type ReportType = 'all' | 'user' | 'stream' | 'profile' | 'chat';
 
 export default function ReportsPage() {
   const supabase = createClient();
+  const { toast } = useToast();
   const [reports, setReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadRealtimeCount, setUnreadRealtimeCount] = useState(0);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,6 +81,72 @@ export default function ReportsPage() {
   useEffect(() => {
     loadReports();
   }, [statusFilter, currentPage]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('owner-reports-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'content_reports' },
+        async (payload) => {
+          const reportId = (payload as any)?.new?.id as string | undefined;
+          if (!reportId) return;
+
+          try {
+            const { data, error: fetchError } = await supabase
+              .from('content_reports')
+              .select(
+                'id, report_type, report_reason, report_details, status, created_at, reviewed_at, reviewed_by, admin_notes, context_details, reporter:profiles!content_reports_reporter_id_fkey(username, display_name), reported_user:profiles!content_reports_reported_user_id_fkey(id, username, display_name)'
+              )
+              .eq('id', reportId)
+              .limit(1);
+
+            if (fetchError) {
+              console.error('[OWNER_REPORTS] realtime_fetch_error', {
+                report_id: reportId,
+                message: fetchError.message,
+                code: (fetchError as any)?.code ?? null,
+              });
+              return;
+            }
+
+            const report = (data ?? [])[0] as any as Report | null;
+            if (!report) return;
+
+            setReports((prev) => {
+              if (prev.some((r) => r.id === report.id)) return prev;
+              return [report, ...prev];
+            });
+
+            setUnreadRealtimeCount((c) => c + 1);
+            toast({
+              title: 'New report received',
+              description: `${report.report_type} • ${String(report.report_reason).replace(/_/g, ' ')}`,
+              variant: 'warning',
+            });
+          } catch (e: any) {
+            console.error('[OWNER_REPORTS] realtime_handler_exception', {
+              report_id: reportId,
+              message: e?.message ?? String(e),
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') return;
+        if (status === 'CHANNEL_ERROR') {
+          console.error('[OWNER_REPORTS] realtime_channel_error');
+        }
+      });
+
+    return () => {
+      try {
+        supabase.removeChannel(channel);
+      } catch {
+        // ignore
+      }
+    };
+  }, [supabase, toast]);
 
   const loadReports = async () => {
     try {
@@ -114,6 +183,7 @@ export default function ReportsPage() {
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadReports();
+    setUnreadRealtimeCount(0);
     setRefreshing(false);
   };
 
@@ -176,10 +246,14 @@ export default function ReportsPage() {
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
+            {unreadRealtimeCount > 0 && (
+              <Badge variant="warning" className="ml-3">
+                {unreadRealtimeCount} new
+              </Badge>
+            )}
           </div>
         </div>
       </div>
-
       {/* Main Content */}
       <div className="max-w-[1800px] mx-auto px-6 py-6">
         <div className="flex gap-6">

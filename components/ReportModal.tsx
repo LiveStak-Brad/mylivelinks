@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, AlertTriangle, Check } from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -70,6 +71,7 @@ export default function ReportModal({
   reportedUsername,
   contextDetails,
 }: ReportModalProps) {
+  const { toast } = useToast();
   const [selectedReason, setSelectedReason] = useState('');
   const [details, setDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -81,7 +83,11 @@ export default function ReportModal({
 
   const handleSubmit = async () => {
     if (!selectedReason) {
-      alert('Please select a reason for reporting');
+      toast({
+        title: 'Select a reason',
+        description: 'Please choose a reason before submitting your report.',
+        variant: 'warning',
+      });
       return;
     }
 
@@ -109,22 +115,71 @@ export default function ReportModal({
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
 
       if (!response.ok) {
-        if (response.status === 401) {
-          alert('Please log in to submit a report');
-          return;
-        } else if (response.status === 429) {
-          alert('You have submitted too many reports recently. Please try again later.');
-          return;
-        } else {
-          alert(data.error || 'Failed to submit report. Please try again.');
+        const errCode = typeof data?.error === 'string' ? data.error : null;
+        if (response.status === 401 || errCode === 'UNAUTHORIZED') {
+          toast({
+            title: 'Sign in required',
+            description: 'Please log in to submit a report.',
+            variant: 'error',
+          });
           return;
         }
+
+        if (response.status === 429 || errCode === 'RATE_LIMITED') {
+          const retryAfterSeconds = typeof data?.retry_after_seconds === 'number' ? data.retry_after_seconds : null;
+          toast({
+            title: 'Rate limited',
+            description:
+              retryAfterSeconds != null
+                ? `Too many reports. Try again in ${retryAfterSeconds}s.`
+                : 'Too many reports. Please try again later.',
+            variant: 'warning',
+          });
+          return;
+        }
+
+        if (response.status === 400 || errCode === 'INVALID_TARGET') {
+          toast({
+            title: 'Unable to submit report',
+            description: 'Missing or invalid report target. Please try again.',
+            variant: 'error',
+          });
+          return;
+        }
+
+        toast({
+          title: 'Report failed',
+          description: errCode === 'DB_ERROR' ? 'Server error. Please try again.' : 'Failed to submit report. Please try again.',
+          variant: 'error',
+        });
+
+        return;
+      }
+
+      const reportId = typeof data?.report_id === 'string' ? data.report_id : null;
+      if (!reportId) {
+        toast({
+          title: 'Report failed',
+          description: 'Server did not return a report ID. Please try again.',
+          variant: 'error',
+        });
+        return;
       }
 
       setSubmitted(true);
+      toast({
+        title: 'Report submitted',
+        description: 'Thank you. Our team will review this report.',
+        variant: 'success',
+      });
       setTimeout(() => {
         onClose();
         // Reset state after modal closes
@@ -136,7 +191,11 @@ export default function ReportModal({
       }, 2000);
     } catch (error) {
       console.error('Error submitting report:', error);
-      alert('An error occurred. Please try again.');
+      toast({
+        title: 'Report failed',
+        description: 'Network error. Please try again.',
+        variant: 'error',
+      });
     } finally {
       setSubmitting(false);
     }
