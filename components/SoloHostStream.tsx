@@ -8,7 +8,7 @@
  * All UI modifications must be approved first.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
@@ -790,13 +790,11 @@ export default function SoloHostStream() {
         }
         
         // Create new track with new device
-        const { createLocalTracks } = await import('livekit-client');
+        const { createLocalTracks, VideoPresets } = await import('livekit-client');
         const [newVideoTrack] = await createLocalTracks({
           video: {
-            deviceId: { exact: deviceId },
-            width: { ideal: 1920, max: 1920, min: 1280 },
-            height: { ideal: 1080, max: 1080, min: 720 },
-            frameRate: { ideal: 30, max: 30 },
+            deviceId: deviceId,
+            resolution: VideoPresets.h1080,
           },
           audio: false,
         });
@@ -880,9 +878,7 @@ export default function SoloHostStream() {
         });
         
         // Publish new track
-        await localParticipant.publishTrack(newAudioTrack, {
-          audioEncoding: { maxBitrate: 64_000 },
-        });
+        await localParticipant.publishTrack(newAudioTrack);
         
         setActiveAudioDeviceId(deviceId);
         console.log('[SoloHostStream] Microphone switched successfully');
@@ -964,9 +960,7 @@ export default function SoloHostStream() {
         const localAudioTrack = new LocalAudioTrack(screenAudioTrack, undefined, false);
         localAudioTrack.source = Track.Source.ScreenShareAudio;
         
-        await localParticipant.publishTrack(localAudioTrack, {
-          audioEncoding: { maxBitrate: 128_000 },
-        });
+        await localParticipant.publishTrack(localAudioTrack);
         console.log('[SoloHostStream] System audio published');
       } else {
         console.log('[SoloHostStream] No system audio available (Safari/Firefox limitation)');
@@ -1025,21 +1019,17 @@ export default function SoloHostStream() {
 
       // Re-publish camera
       console.log('[SoloHostStream] Re-publishing camera...');
-      const { createLocalTracks } = await import('livekit-client');
+      const { createLocalTracks, VideoPresets } = await import('livekit-client');
       
       const [newVideoTrack] = await createLocalTracks({
         video: activeVideoDeviceId 
           ? { 
-              deviceId: { exact: activeVideoDeviceId },
-              width: { ideal: 1920, max: 1920, min: 1280 },
-              height: { ideal: 1080, max: 1080, min: 720 },
-              frameRate: { ideal: 30, max: 30 },
+              deviceId: activeVideoDeviceId,
+              resolution: VideoPresets.h1080,
             }
           : {
               facingMode: 'user',
-              width: { ideal: 1920, max: 1920, min: 1280 },
-              height: { ideal: 1080, max: 1080, min: 720 },
-              frameRate: { ideal: 30, max: 30 },
+              resolution: VideoPresets.h1080,
             },
         audio: false,
       });
