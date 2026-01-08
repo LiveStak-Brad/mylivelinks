@@ -326,7 +326,7 @@ export default function BattleInviteModal({ isOpen, onClose, onSessionStarted }:
                 className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
               >
                 <Image
-                  src={getAvatarUrl(user.avatar_url, user.username)}
+                  src={getAvatarUrl(user.avatar_url)}
                   alt={user.username}
                   width={40}
                   height={40}

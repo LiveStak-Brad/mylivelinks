@@ -128,7 +128,7 @@ export default function IncomingInviteSheet({
             {/* Inviter Info */}
             <div className="flex items-center gap-4">
               <Image
-                src={getAvatarUrl(inviter.avatar_url, inviter.username)}
+                src={getAvatarUrl(inviter.avatar_url)}
                 alt={inviter.username}
                 width={64}
                 height={64}
