@@ -1407,20 +1407,20 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
       {!readOnly && (
         <form 
           onSubmit={sendMessage} 
-          className="sticky bottom-0 px-3 py-2.5 bg-transparent shadow-lg z-40 flex-shrink-0"
+          className="sticky bottom-0 px-2 py-2 md:px-3 md:py-2.5 bg-transparent shadow-lg z-40 flex-shrink-0"
         >
         <div className="w-full max-w-3xl mx-auto">
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-1.5 md:gap-2 items-center">
             {/* Settings Button */}
             {onSettingsClick && (
               <button
                 type="button"
                 onClick={onSettingsClick}
-                className="p-2.5 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/30 transition flex-shrink-0 mobile-touch-target"
+                className="p-2 md:p-2.5 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/30 transition flex-shrink-0 mobile-touch-target"
                 title="Chat Settings"
                 aria-label="Chat Settings"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
                   <circle cx="12" cy="12" r="3"></circle>
                 </svg>
@@ -1437,7 +1437,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                 }
               }}
               placeholder="Type a message..."
-              className="flex-1 px-4 py-3 text-base border border-white/30 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 text-white placeholder-white/60 min-w-0"
+              className="flex-1 px-3 py-2 md:px-4 md:py-3 text-sm md:text-base border border-white/30 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/10 text-white placeholder-white/60 min-w-0"
               maxLength={500}
             />
             {/* Request Guest Button - Left of Gift Button */}
@@ -1445,11 +1445,11 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
               <button
                 type="button"
                 onClick={onRequestGuestClick}
-                className="p-2.5 bg-purple-500 text-white rounded-full hover:bg-purple-600 transition flex-shrink-0 mobile-touch-target"
+                className="p-2 md:p-2.5 bg-purple-500 text-white rounded-full hover:bg-purple-600 transition flex-shrink-0 mobile-touch-target"
                 title="Request to Join as Guest"
                 aria-label="Request to Join as Guest"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
                   <circle cx="9" cy="7" r="4"></circle>
                   <line x1="19" y1="8" x2="19" y2="14"></line>
@@ -1462,11 +1462,11 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
               <button
                 type="button"
                 onClick={onGiftClick}
-                className="p-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:from-purple-600 hover:to-pink-600 transition flex-shrink-0 mobile-touch-target"
+                className="p-2 md:p-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full hover:from-purple-600 hover:to-pink-600 transition flex-shrink-0 mobile-touch-target"
                 title="Send Gift"
                 aria-label="Send Gift"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 12 20 22 4 22 4 12"></polyline>
                   <rect x="2" y="7" width="20" height="5"></rect>
                   <line x1="12" y1="22" x2="12" y2="7"></line>
@@ -1480,11 +1480,11 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
               <button
                 type="button"
                 onClick={onShareClick}
-                className="p-2.5 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/30 transition flex-shrink-0 mobile-touch-target"
+                className="p-2 md:p-2.5 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/30 transition flex-shrink-0 mobile-touch-target"
                 title="Share"
                 aria-label="Share"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 md:w-5 md:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="18" cy="5" r="3"></circle>
                   <circle cx="6" cy="12" r="3"></circle>
                   <circle cx="18" cy="19" r="3"></circle>
