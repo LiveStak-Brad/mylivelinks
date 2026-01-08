@@ -1966,7 +1966,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                     currentUserName={streamer.display_name || streamer.username}
                     canPublish={false}
                     remainingSeconds={battleRemainingSeconds}
-                    className="w-full h-full"
+                    className="w-full h-full box-border pt-24 pb-[40vh]"
                   />
                 ) : (
                   <>
@@ -2101,24 +2101,26 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
             )}
 
             {/* Guest Video Overlay - Floating boxes for up to 2 guests */}
-            <GuestVideoOverlay
-              liveStreamId={streamer.live_stream_id}
-              hostId={streamer.profile_id}
-              currentUserId={currentUserId || undefined}
-              isHost={false}
-              room={roomRef.current}
-              onGuestLeave={() => {
-                // Stop publishing if guest was publishing
-                if (roomRef.current?.localParticipant) {
-                  roomRef.current.localParticipant.trackPublications.forEach((pub) => {
-                    if (pub.track) {
-                      roomRef.current?.localParticipant.unpublishTrack(pub.track);
-                    }
-                  });
-                }
-                console.log('[SoloStreamViewer] Guest left, stopped publishing');
-              }}
-            />
+            {streamer.live_available && streamer.live_stream_id ? (
+              <GuestVideoOverlay
+                liveStreamId={streamer.live_stream_id}
+                hostId={streamer.profile_id}
+                currentUserId={currentUserId || undefined}
+                isHost={false}
+                room={roomRef.current}
+                onGuestLeave={() => {
+                  // Stop publishing if guest was publishing
+                  if (roomRef.current?.localParticipant) {
+                    roomRef.current.localParticipant.trackPublications.forEach((pub) => {
+                      if (pub.track) {
+                        roomRef.current?.localParticipant.unpublishTrack(pub.track);
+                      }
+                    });
+                  }
+                  console.log('[SoloStreamViewer] Guest left, stopped publishing');
+                }}
+              />
+            ) : null}
           </div>
 
         </div>

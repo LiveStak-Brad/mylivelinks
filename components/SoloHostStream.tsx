@@ -222,10 +222,21 @@ export default function SoloHostStream() {
   
   // Handle incoming invites - show the first pending one
   useEffect(() => {
+    if (!isPublishing) {
+      if (currentInvite) setCurrentInvite(null);
+      return;
+    }
     if (pendingInvites.length > 0 && !currentInvite) {
       setCurrentInvite(pendingInvites[0]);
     }
-  }, [pendingInvites, currentInvite]);
+  }, [pendingInvites, currentInvite, isPublishing]);
+
+  // When we start publishing a new stream, clear any stale invite sheet
+  useEffect(() => {
+    if (isPublishing) {
+      setCurrentInvite(null);
+    }
+  }, [isPublishing]);
   
   // Show cooldown sheet when battle enters cooldown
   useEffect(() => {
@@ -941,6 +952,7 @@ export default function SoloHostStream() {
 
     console.log('[SoloHostStream] User clicked Go Live from modal');
     setShowSetupModal(false);
+    setCurrentInvite(null);
     
     // Click the hidden GoLiveButton
     setTimeout(() => {
@@ -1920,7 +1932,7 @@ export default function SoloHostStream() {
                 currentUserName={streamer.display_name || streamer.username}
                 canPublish={true}
                 remainingSeconds={battleRemainingSeconds}
-                className="w-full h-full"
+                className="w-full h-full box-border pt-24 pb-[30vh]"
               />
             ) : (
               /* Solo video element - normal host view */
@@ -2005,18 +2017,20 @@ export default function SoloHostStream() {
             )}
 
             {/* Guest Video Overlay - Floating boxes for up to 2 guests */}
-            <GuestVideoOverlay
-              key={guestOverlayKey}
-              liveStreamId={streamer.live_stream_id}
-              hostId={currentUserId || undefined}
-              currentUserId={currentUserId || undefined}
-              isHost={true}
-              room={roomRef.current}
-              onGuestLeave={() => {
-                // Host doesn't leave as guest, but this handles the realtime update
-                console.log('[SoloHostStream] Guest removed');
-              }}
-            />
+            {isPublishing && streamer.live_stream_id ? (
+              <GuestVideoOverlay
+                key={guestOverlayKey}
+                liveStreamId={streamer.live_stream_id}
+                hostId={currentUserId || undefined}
+                currentUserId={currentUserId || undefined}
+                isHost={true}
+                room={roomRef.current}
+                onGuestLeave={() => {
+                  // Host doesn't leave as guest, but this handles the realtime update
+                  console.log('[SoloHostStream] Guest removed');
+                }}
+              />
+            ) : null}
           </div>
 
           {/* Bottom Streamer Options Bar - Floating at bottom, spread wide */}

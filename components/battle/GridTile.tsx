@@ -159,13 +159,18 @@ export default function GridTile({
     const videoEl = videoElementRef.current;
     const track = participant.videoTrack;
     
-    if (videoEl && track) {
+    if (!videoEl) return;
+
+    if (track) {
       // Attach the track to the video element
       track.attach(videoEl);
       return () => {
         track.detach(videoEl);
       };
     }
+
+    // No track: clear any previous media
+    (videoEl as any).srcObject = null;
   }, [participant.videoTrack]);
   
   // Attach audio track when available
@@ -173,7 +178,9 @@ export default function GridTile({
     const audioEl = audioElementRef.current;
     const track = participant.audioTrack;
     
-    if (audioEl && track) {
+    if (!audioEl) return;
+
+    if (track) {
       // Attach the track to the audio element
       track.attach(audioEl);
       audioEl.volume = effectiveVolume;
@@ -181,6 +188,9 @@ export default function GridTile({
         track.detach(audioEl);
       };
     }
+
+    // No track: clear any previous media
+    (audioEl as any).srcObject = null;
   }, [participant.audioTrack, effectiveVolume]);
   
   // Update audio volume when it changes
