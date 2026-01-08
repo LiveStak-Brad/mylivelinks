@@ -40,13 +40,13 @@ export function LiveTVFindResultRow({ stream, onPress }: LiveTVFindResultRowProp
         )}
       </div>
 
-      {/* Viewer Count with gradient background */}
+      {/* Total Views with gradient background */}
       <div className="flex items-center gap-2 text-muted-foreground text-sm font-bold bg-muted/50 px-3 py-2 rounded-xl group-hover:bg-primary/10 group-hover:text-primary transition-all">
         <Eye className="w-4 h-4" />
         <span className="font-black">
-          {stream.viewer_count >= 1000
-            ? `${(stream.viewer_count / 1000).toFixed(1)}K`
-            : stream.viewer_count}
+          {(stream.total_views || 0) >= 1000
+            ? `${((stream.total_views || 0) / 1000).toFixed(1)}K`
+            : stream.total_views || 0}
         </span>
       </div>
     </>
