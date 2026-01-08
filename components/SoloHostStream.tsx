@@ -60,7 +60,8 @@ import {
   VideoFilterSettings, 
   DEFAULT_FILTER_SETTINGS, 
   loadFilterSettings,
-  saveFilterSettings 
+  saveFilterSettings,
+  areFiltersDefault 
 } from '@/hooks/useVideoFilterPipeline';
 
 interface StreamerData {
@@ -228,6 +229,11 @@ export default function SoloHostStream() {
   const [filterSettings, setFilterSettings] = useState<VideoFilterSettings>(DEFAULT_FILTER_SETTINGS);
   const filterPipeline = useVideoFilterPipeline({ maxWidth: 1280, maxHeight: 720, frameRate: 30 });
   const rawCameraTrackRef = useRef<MediaStreamTrack | null>(null);
+
+  // Reset connection state
+  const [isResetting, setIsResetting] = useState(false);
+  const [guestOverlayKey, setGuestOverlayKey] = useState(0);
+  const lastResetRef = useRef<number>(0);
 
   // Load saved devices and filters on mount
   useEffect(() => {
@@ -887,6 +893,153 @@ export default function SoloHostStream() {
     } else {
       // No mic currently publishing - just update the state for next start
       setActiveAudioDeviceId(deviceId);
+    }
+  };
+
+  // Reset connection - soft media reinit without ending stream
+  const handleResetConnection = async () => {
+    const now = Date.now();
+    // Debounce: 5 second cooldown between resets
+    if (isResetting || now - lastResetRef.current < 5000) {
+      console.log('[SoloHostStream] Reset blocked - already resetting or cooldown active');
+      return;
+    }
+    lastResetRef.current = now;
+
+    const room = roomRef.current;
+    if (!room || room.state !== 'connected') {
+      console.log('[SoloHostStream] Cannot reset - room not connected');
+      return;
+    }
+
+    console.log('[SoloHostStream] Starting connection reset...');
+    setIsResetting(true);
+
+    try {
+      const localParticipant = room.localParticipant;
+
+      // 1. Snapshot current state
+      const currentVideoDevice = activeVideoDeviceId;
+      const currentAudioDevice = activeAudioDeviceId;
+      const currentFilters = { ...filterSettings };
+      const wasScreenSharing = isScreenSharing;
+
+      // 2. Stop filter pipeline
+      filterPipeline.stopPipeline();
+
+      // 3. Find and unpublish camera and mic tracks
+      const publications = Array.from(localParticipant.trackPublications.values());
+      const camPub = publications.find(p => p.source === Track.Source.Camera && p.track);
+      const micPub = publications.find(p => p.source === Track.Source.Microphone && p.track);
+
+      if (camPub?.track && !wasScreenSharing) {
+        console.log('[SoloHostStream] Unpublishing camera track');
+        await localParticipant.unpublishTrack(camPub.track);
+        camPub.track.stop();
+      }
+      if (micPub?.track) {
+        console.log('[SoloHostStream] Unpublishing mic track');
+        await localParticipant.unpublishTrack(micPub.track);
+        micPub.track.stop();
+      }
+
+      // 4. Stop raw camera track if it exists
+      if (rawCameraTrackRef.current) {
+        rawCameraTrackRef.current.stop();
+        rawCameraTrackRef.current = null;
+      }
+
+      // 5. Small delay to ensure devices are released
+      await new Promise(r => setTimeout(r, 300));
+
+      // 6. Recreate tracks
+      const { createLocalTracks, LocalVideoTrack } = await import('livekit-client');
+      
+      // Only recreate camera if not screen sharing
+      const trackOptions: any = {
+        audio: {
+          deviceId: currentAudioDevice ? { ideal: currentAudioDevice } : undefined,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      };
+
+      if (!wasScreenSharing) {
+        trackOptions.video = {
+          deviceId: currentVideoDevice ? { ideal: currentVideoDevice } : undefined,
+          width: { ideal: 1920, max: 1920, min: 1280 },
+          height: { ideal: 1080, max: 1080, min: 720 },
+          frameRate: { ideal: 30, max: 30 },
+        };
+      }
+
+      console.log('[SoloHostStream] Creating new tracks...', { 
+        hasVideo: !!trackOptions.video, 
+        hasAudio: !!trackOptions.audio 
+      });
+      
+      const tracks = await createLocalTracks(trackOptions);
+
+      const audioTrack = tracks.find(t => t.kind === 'audio');
+      const videoTrack = tracks.find(t => t.kind === 'video');
+
+      // 7. Publish mic first
+      if (audioTrack) {
+        console.log('[SoloHostStream] Publishing new mic track');
+        await localParticipant.publishTrack(audioTrack);
+      }
+
+      // 8. Publish camera (with or without filters)
+      if (videoTrack && !wasScreenSharing) {
+        rawCameraTrackRef.current = videoTrack.mediaStreamTrack;
+
+        // Check if filters are non-default
+        if (!areFiltersDefault(currentFilters)) {
+          console.log('[SoloHostStream] Re-applying filters after reset');
+          const processedTrack = await filterPipeline.startPipeline(
+            videoTrack.mediaStreamTrack, 
+            currentFilters
+          );
+
+          if (processedTrack) {
+            const filteredLocalTrack = new LocalVideoTrack(processedTrack, undefined, false);
+            await localParticipant.publishTrack(filteredLocalTrack, {
+              videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
+              simulcast: true,
+            });
+          } else {
+            // Fallback to raw track if filter pipeline fails
+            await localParticipant.publishTrack(videoTrack, {
+              videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
+              simulcast: true,
+            });
+          }
+        } else {
+          console.log('[SoloHostStream] Publishing raw camera track (no filters)');
+          await localParticipant.publishTrack(videoTrack, {
+            videoEncoding: { maxBitrate: 2_500_000, maxFramerate: 30 },
+            simulcast: true,
+          });
+        }
+
+        // Attach to preview
+        if (videoRef.current) {
+          videoTrack.attach(videoRef.current);
+        }
+      }
+
+      // 9. Force GuestVideoOverlay remount to re-attach remote tracks
+      setGuestOverlayKey(k => k + 1);
+
+      console.log('[SoloHostStream] ✅ Connection reset successful');
+      // Could add toast here: "Connection reset"
+
+    } catch (err) {
+      console.error('[SoloHostStream] ❌ Connection reset failed:', err);
+      // Could add error toast here: "Reset failed — try restarting stream"
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -1650,6 +1803,7 @@ export default function SoloHostStream() {
 
             {/* Guest Video Overlay - Floating boxes for up to 2 guests */}
             <GuestVideoOverlay
+              key={guestOverlayKey}
               liveStreamId={streamer.live_stream_id}
               hostId={currentUserId || undefined}
               currentUserId={currentUserId || undefined}
@@ -1843,6 +1997,8 @@ export default function SoloHostStream() {
         onSwitchMicrophone={handleSwitchMicrophone}
         activeVideoDeviceId={activeVideoDeviceId}
         activeAudioDeviceId={activeAudioDeviceId}
+        onResetConnection={handleResetConnection}
+        isResetting={isResetting}
       />
 
       {/* Co-Host Invite Modal */}

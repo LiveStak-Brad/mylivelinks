@@ -12,6 +12,9 @@ interface HostStreamSettingsModalProps {
   // Current active devices (for highlighting)
   activeVideoDeviceId?: string;
   activeAudioDeviceId?: string;
+  // Reset connection (troubleshooting)
+  onResetConnection?: () => Promise<void>;
+  isResetting?: boolean;
 }
 
 interface DeviceInfo {
@@ -46,6 +49,8 @@ export default function HostStreamSettingsModal({
   onSwitchMicrophone,
   activeVideoDeviceId,
   activeAudioDeviceId,
+  onResetConnection,
+  isResetting = false,
 }: HostStreamSettingsModalProps) {
   const [videoDevices, setVideoDevices] = useState<DeviceInfo[]>([]);
   const [audioDevices, setAudioDevices] = useState<DeviceInfo[]>([]);
@@ -336,6 +341,33 @@ export default function HostStreamSettingsModal({
                   💡 Camera and microphone changes apply immediately while streaming. No need to restart your stream!
                 </p>
               </div>
+
+              {/* Troubleshooting Section */}
+              {onResetConnection && (
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Troubleshooting</h3>
+                  <button
+                    onClick={onResetConnection}
+                    disabled={isResetting || switching !== null}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isResetting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Resetting...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        Reset Connection
+                      </>
+                    )}
+                  </button>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Use if audio/video stops working. Does not end your stream.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>
