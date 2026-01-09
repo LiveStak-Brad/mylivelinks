@@ -1342,7 +1342,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                         <div className="flex items-center gap-1 flex-wrap">
                           <UserNameWithBadges
                             profileId={msg.profile_id}
-                            name={msg.display_name || msg.username}
+                            name={msg.display_name || msg.username || 'Unknown'}
                             gifterStatus={msg.gifter_tier_key && Number(msg.lifetime_coins ?? 0) > 0 ? {
                               tier_key: msg.gifter_tier_key,
                               level_in_tier: msg.gifter_level ?? 1,
