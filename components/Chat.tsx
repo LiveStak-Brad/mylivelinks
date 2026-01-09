@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import { GifterBadge as TierBadge } from '@/components/gifter';
-import MllProBadge, { shouldShowMllProBadge } from '@/components/mll/MllProBadge';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
@@ -734,8 +734,14 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
                     />
 
                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <button
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <UserNameWithBadges
+                          profileId={msg.profile_id}
+                          name={msg.username || 'Unknown'}
+                          gifterStatus={gifterStatusMap[msg.profile_id]}
+                          textSize="text-xs"
+                          nameClassName="text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition"
+                          clickable
                           onClick={() => {
                             if (msg.profile_id && msg.username) {
                               setSelectedProfile({
@@ -747,46 +753,18 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
                               });
                             }
                           }}
-                          className="font-semibold text-xs text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition cursor-pointer leading-tight"
-                          style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                        >
-                          {msg.username}
-                        </button>
+                        />
                         <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
                           {formatTime(msg.created_at)}
                         </span>
                       </div>
 
-                      {(() => {
-                        const status = msg.profile_id ? gifterStatusMap[msg.profile_id] : null;
-                        if (!status || Number(status.lifetime_coins ?? 0) <= 0) {
-                          // No badge - just show message
-                          return (
-                            <div
-                              className="text-sm text-gray-900 dark:text-white break-words leading-snug"
-                              style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                            >
-                              <SafeRichText text={msg.content} />
-                            </div>
-                          );
-                        }
-                        // Show tier badge + message
-                        return (
-                          <div className="flex items-start gap-2">
-                            <TierBadge
-                              tier_key={status.tier_key}
-                              level={status.level_in_tier}
-                              size="sm"
-                            />
-                            <div
-                              className="text-sm text-gray-900 dark:text-white break-words leading-snug flex-1 min-w-0"
-                              style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                            >
-                              <SafeRichText text={msg.content} />
-                            </div>
-                          </div>
-                        );
-                      })()}
+                      <div
+                        className="text-sm text-gray-900 dark:text-white break-words leading-snug"
+                        style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                      >
+                        <SafeRichText text={msg.content} />
+                      </div>
                     </div>
                   </div>
                 )}
