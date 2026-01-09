@@ -122,7 +122,7 @@ export default function MllProApplicationsPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 min-h-screen bg-gray-900">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-white mb-2">MLL PRO Applications</h1>
         <p className="text-gray-400">Review and manage MLL PRO program applications</p>
@@ -130,7 +130,7 @@ export default function MllProApplicationsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Applications List */}
-        <div className="bg-white/5 rounded-xl p-6">
+        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <h2 className="text-xl font-bold text-white mb-4">
             Applications ({applications.length})
           </h2>
@@ -146,7 +146,7 @@ export default function MllProApplicationsPage() {
                   className={`p-4 rounded-lg border-2 cursor-pointer transition ${
                     selectedApp?.id === app.id
                       ? 'bg-purple-500/20 border-purple-500'
-                      : 'bg-white/5 border-white/10 hover:border-white/30'
+                      : 'bg-gray-700 border-gray-600 hover:border-gray-500'
                   }`}
                 >
                   <div className="flex items-start justify-between mb-2">
@@ -167,7 +167,7 @@ export default function MllProApplicationsPage() {
         </div>
 
         {/* Application Detail */}
-        <div className="bg-white/5 rounded-xl p-6">
+        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           {!selectedApp ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-400">
               <Eye className="w-12 h-12 mb-4 opacity-50" />
