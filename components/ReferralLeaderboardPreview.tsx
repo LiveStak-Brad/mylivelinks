@@ -98,7 +98,7 @@ export default function ReferralLeaderboardPreview({
     };
 
     void load();
-      return () => {
+    return () => {
       mounted = false;
     };
   }, [showCurrentUser, limit]);
@@ -216,13 +216,14 @@ export default function ReferralLeaderboardPreview({
 
             {/* Username */}
             <div className="flex-1 min-w-0">
-              <UserNameWithBadges
-                profileId={entry.profileId}
-                name={entry.username}
-                textSize="text-base"
-                nameClassName="font-medium text-gray-900 dark:text-white truncate"
-                showGifterBadge={false}
-              >
+              <div className="flex items-center">
+                <UserNameWithBadges
+                  profileId={entry.profileId}
+                  name={entry.username}
+                  textSize="text-base"
+                  nameClassName="font-medium text-gray-900 dark:text-white truncate"
+                  showGifterBadge={false}
+                />
                 {entry.isCurrentUser && (
                   <span className="ml-2 text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">
                     YOU
