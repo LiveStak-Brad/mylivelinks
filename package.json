@@ -21,6 +21,7 @@
     "@supabase/supabase-js": "^2.38.0",
     "@vercel/og": "^0.8.6",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "livekit-client": "^2.16.1",
     "livekit-server-sdk": "^2.15.0",
