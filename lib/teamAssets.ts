@@ -68,12 +68,14 @@ export async function uploadTeamAsset(
       return { success: false, error: uploadError.message };
     }
 
-    // Get public URL
+    // Get public URL with cache-busting timestamp
     const { data: urlData } = supabase.storage
       .from(BUCKET_NAME)
       .getPublicUrl(filePath);
 
-    const publicUrl = urlData.publicUrl;
+    // Add timestamp to bust browser/CDN cache
+    const timestamp = Date.now();
+    const publicUrl = `${urlData.publicUrl}?t=${timestamp}`;
 
     // Update team record with new URL
     const updateField = type === 'icon' ? 'icon_url' : 'banner_url';
@@ -87,6 +89,7 @@ export async function uploadTeamAsset(
       return { success: false, error: 'Failed to update team record' };
     }
 
+    console.log(`[teamAssets] ✅ Updated ${type} for team ${teamId}: ${publicUrl}`);
     return { success: true, url: publicUrl };
   } catch (err: any) {
     console.error('[teamAssets] Exception:', err);

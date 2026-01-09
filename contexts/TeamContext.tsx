@@ -256,41 +256,54 @@ export function TeamProvider({ teamSlug, children }: TeamProviderProps) {
   // ─────────────────────────────────────────────────────────────────────────
   // Fetch team data
   // ─────────────────────────────────────────────────────────────────────────
+  const fetchTeamTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const fetchTeam = useCallback(async () => {
     if (!teamSlug) return;
     
-    try {
-      const { data, error } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('slug', teamSlug)
-        .single();
-      
-      if (error) throw error;
-      if (!data) throw new Error('Team not found');
-      
-      setTeam({
-        id: data.id,
-        name: data.name,
-        slug: data.slug,
-        teamTag: data.team_tag,
-        description: data.description,
-        rules: data.rules,
-        iconUrl: data.icon_url,
-        bannerUrl: data.banner_url,
-        themeColor: data.theme_color,
-        approvedMemberCount: data.approved_member_count,
-        pendingRequestCount: data.pending_request_count,
-        createdBy: data.created_by,
-        createdAt: data.created_at,
-      });
-      setIsError(false);
-      setErrorMessage(null);
-    } catch (err) {
-      console.error('[TeamContext] fetchTeam error:', err);
-      setIsError(true);
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to load team');
+    // Clear any pending fetch to debounce rapid calls
+    if (fetchTeamTimeoutRef.current) {
+      clearTimeout(fetchTeamTimeoutRef.current);
     }
+    
+    // Debounce by 100ms to prevent race conditions
+    return new Promise<void>((resolve) => {
+      fetchTeamTimeoutRef.current = setTimeout(async () => {
+        try {
+          const { data, error } = await supabase
+            .from('teams')
+            .select('*')
+            .eq('slug', teamSlug)
+            .single();
+          
+          if (error) throw error;
+          if (!data) throw new Error('Team not found');
+          
+          setTeam({
+            id: data.id,
+            name: data.name,
+            slug: data.slug,
+            teamTag: data.team_tag,
+            description: data.description,
+            rules: data.rules,
+            iconUrl: data.icon_url,
+            bannerUrl: data.banner_url,
+            themeColor: data.theme_color,
+            approvedMemberCount: data.approved_member_count,
+            pendingRequestCount: data.pending_request_count,
+            createdBy: data.created_by,
+            createdAt: data.created_at,
+          });
+          setIsError(false);
+          setErrorMessage(null);
+        } catch (err) {
+          console.error('[TeamContext] fetchTeam error:', err);
+          setIsError(true);
+          setErrorMessage(err instanceof Error ? err.message : 'Failed to load team');
+        }
+        resolve();
+      }, 100);
+    });
   }, [supabase, teamSlug]);
   
   // ─────────────────────────────────────────────────────────────────────────
