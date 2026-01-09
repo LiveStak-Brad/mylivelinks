@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import { GifterBadge as TierBadge } from '@/components/gifter';
-import MllProBadge, { shouldShowMllProBadge } from '@/components/mll/MllProBadge';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
@@ -1310,7 +1310,6 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
           </div>
         ) : (
           messages.map((msg) => {
-            const showMllPro = shouldShowMllProBadge(msg.profile_id);
 
             return (
               <div
@@ -1339,8 +1338,18 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                       />
 
                       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1">
-                          <button
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <UserNameWithBadges
+                            profileId={msg.profile_id}
+                            name={msg.display_name || msg.username}
+                            gifterStatus={msg.gifter_tier_key && Number(msg.lifetime_coins ?? 0) > 0 ? {
+                              tier_key: msg.gifter_tier_key,
+                              level_in_tier: msg.gifter_level ?? 1,
+                              lifetime_coins: msg.lifetime_coins ?? 0
+                            } : undefined}
+                            textSize={usernameTextClass}
+                            nameClassName="text-white hover:text-blue-300 transition"
+                            clickable
                             onClick={() => {
                               if (msg.profile_id && msg.username) {
                                 setSelectedProfile({
@@ -1351,14 +1360,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                                 });
                               }
                             }}
-                            className={`font-semibold ${usernameTextClass} text-white hover:text-blue-300 transition cursor-pointer leading-tight`}
-                            style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                          >
-                            {msg.username}
-                          </button>
-                          {showMllPro && (
-                            <MllProBadge size="compact" className="ml-0.5" />
-                          )}
+                          />
                           <span className={`${timeTextClass} text-white/50 leading-tight`}>
                             {formatTime(msg.created_at)}
                           </span>
@@ -1375,36 +1377,12 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                           )}
                         </div>
 
-                        {(() => {
-                          const status = msg.profile_id ? gifterStatusMap[msg.profile_id] : null;
-                          if (!status || Number(status.lifetime_coins ?? 0) <= 0) {
-                            // No badge - just show message
-                            return (
-                              <div
-                                className={`${messageTextClass} text-white/90 break-words leading-snug`}
-                                style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                              >
-                                <SafeRichText text={msg.content} />
-                              </div>
-                            );
-                          }
-                          // Show tier badge + message
-                          return (
-                            <div className="flex items-start gap-2">
-                              <TierBadge
-                                tier_key={status.tier_key}
-                                level={status.level_in_tier}
-                                size="sm"
-                              />
-                              <div
-                                className={`${messageTextClass} text-white/90 break-words leading-snug flex-1 min-w-0`}
-                                style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                              >
-                                <SafeRichText text={msg.content} />
-                              </div>
-                            </div>
-                          );
-                        })()}
+                        <div
+                          className={`${messageTextClass} text-white/90 break-words leading-snug flex-1 min-w-0`}
+                          style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                        >
+                          <SafeRichText text={msg.content} />
+                        </div>
                       </div>
                     </div>
                   )}

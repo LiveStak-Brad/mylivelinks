@@ -30,6 +30,8 @@ interface BattleScoreSliderProps {
   hostId?: string;
   /** Additional className */
   className?: string;
+  /** Whether the score bar should use rounded corners */
+  rounded?: boolean;
 }
 
 interface ScoreSegment {
@@ -46,6 +48,7 @@ export default function BattleScoreSlider({
   height = 16,
   hostId = 'participant-1',
   className = '',
+  rounded = true,
 }: BattleScoreSliderProps) {
   // Calculate score segments - aggregate by team for team mode
   // Maintains original order to match participant positions (host first/left)
@@ -183,6 +186,8 @@ export default function BattleScoreSlider({
   // Find host segment color for styling the labels
   const hostSegment = segments.find(s => s.isHost);
 
+  const barShapeClass = rounded ? 'rounded-lg' : '';
+
   return (
     <div className={`w-full ${className}`}>
       {/* Labels above bar: Place on left, +/- diff on right */}
@@ -208,7 +213,7 @@ export default function BattleScoreSlider({
       
       {/* Slider bar - clean, no text */}
       <div 
-        className="w-full rounded-lg overflow-hidden flex"
+        className={`w-full ${barShapeClass} overflow-hidden flex`}
         style={{ height: `${height}px`, backgroundColor: 'rgba(0,0,0,0.4)' }}
       >
         {segments.map((seg) => {

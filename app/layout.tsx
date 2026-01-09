@@ -33,7 +33,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#8b5cf6" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         <meta name="msapplication-TileColor" content="#8b5cf6" />
-        <meta name="msapplication-TileImage" content="/branding/favicon/icon-144x144.png" />
+        <meta name="msapplication-TileImage" content="/androidpwa-144.png" />
         
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
@@ -50,12 +50,12 @@ export default function RootLayout({
         <meta name="twitter:description" content="Share your links, make posts, go live, and get paid! Join the MyLiveLinks community." />
         <meta name="twitter:image" content="/mylivelinksmeta.png" />
         
-        <link rel="icon" type="image/png" sizes="32x32" href="/branding/favicon/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/branding/favicon/favicon-16x16.png" />
-        <link rel="apple-touch-icon" href="/branding/favicon/apple-touch-icon.png" />
-        <link rel="apple-touch-icon" sizes="152x152" href="/branding/favicon/icon-152x152.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/branding/favicon/icon-180x180.png" />
-        <link rel="apple-touch-icon" sizes="167x167" href="/branding/favicon/icon-167x167.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/androidpwa-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/androidpwa-16.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/androidpwaicon.png" />
+        <link rel="apple-touch-icon" href="/appletouchicon-180.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/appletouchicon-152.png" />
+        <link rel="apple-touch-icon" sizes="167x167" href="/appletouchicon-167.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className={inter.className}>

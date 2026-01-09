@@ -549,54 +549,53 @@ export default function BattleGridWrapper({
   const showConnectingOverlay = !participantsReady && !allowEmptyState;
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`flex flex-col ${className}`}>
+      {/* Battle Score Bar - attached to top of grid, flat edges, full width */}
       {isBattleSession && battleStates.size > 0 && (
-        <div className="pointer-events-none absolute top-3 left-1/2 z-20 flex w-full max-w-sm -translate-x-1/2 flex-col items-center gap-2 px-3 sm:max-w-md">
+        <div className="w-full bg-black/60">
           <BattleScoreSlider
             battleStates={battleStates}
             battleMode={battleMode}
             height={20}
             hostId={hostSnapshot.hostA.id}
-            className="w-full drop-shadow-[0_0_12px_rgba(0,0,0,0.45)]"
-          />
-          <BattleTimer
-            remainingSeconds={remainingSeconds}
-            phase={session.status === 'cooldown' ? 'cooldown' : 'active'}
-            mode={session.mode}
-            compact
-          />
-        </div>
-      )}
-
-      {!isBattleSession && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
-          <BattleTimer
-            remainingSeconds={remainingSeconds}
-            phase={session.status === 'cooldown' ? 'cooldown' : 'active'}
-            mode={session.mode}
-            compact
+            rounded={false}
           />
         </div>
       )}
       
-      <MultiHostGrid
-        participants={participants}
-        mode="duo"
-        maxSlots={2}
-        currentUserId={currentUserId}
-        volumes={volumes}
-        onVolumeChange={handleVolumeChange}
-        onMuteToggle={handleMuteToggle}
-        isBattleMode={isBattleSession}
-        renderOverlay={isBattleSession ? renderBattleOverlay : undefined}
-      />
-      
-      {((!isConnected) || showConnectingOverlay) && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-2" />
-            <p className="text-white/60 text-sm">Connecting to session...</p>
+      {/* Grid */}
+      <div className="relative flex-1">
+        <MultiHostGrid
+          participants={participants}
+          mode="duo"
+          maxSlots={2}
+          currentUserId={currentUserId}
+          volumes={volumes}
+          onVolumeChange={handleVolumeChange}
+          onMuteToggle={handleMuteToggle}
+          isBattleMode={isBattleSession}
+          renderOverlay={isBattleSession ? renderBattleOverlay : undefined}
+        />
+        
+        {((!isConnected) || showConnectingOverlay) && !error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-30">
+            <div className="text-center">
+              <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-2" />
+              <p className="text-white/60 text-sm">Connecting to session...</p>
+            </div>
           </div>
+        )}
+      </div>
+
+      {/* Battle Controls Bar - timer centered below grid */}
+      {isBattleSession && (
+        <div className="w-full bg-black/60 backdrop-blur-sm py-2 flex items-center justify-center">
+          <BattleTimer
+            remainingSeconds={remainingSeconds}
+            phase={session.status === 'cooldown' ? 'cooldown' : 'active'}
+            mode={session.mode}
+            compact
+          />
         </div>
       )}
     </div>

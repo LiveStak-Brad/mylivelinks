@@ -51,7 +51,7 @@ import GuestRequestsModal from './GuestRequestsModal';
 import StreamFiltersModal from './StreamFiltersModal';
 import BattleInviteModal from './BattleInviteModal';
 import GuestVideoOverlay from './GuestVideoOverlay';
-import IncomingInviteSheet from './IncomingInviteSheet';
+import IncomingBattleRequestStack from './IncomingBattleRequestStack';
 import BattleGridWrapper from './battle/BattleGridWrapper';
 import CooldownSheet from './battle/CooldownSheet';
 import { useBattleSession } from '@/hooks/useBattleSession';
@@ -244,26 +244,7 @@ export default function SoloHostStream() {
     refresh: refreshBattleSession,
   } = useBattleSession({ profileId: currentUserId });
   
-  // Show cooldown sheet when session enters cooldown
-  const [currentInvite, setCurrentInvite] = useState<typeof pendingInvites[0] | null>(null);
-  
-  // Handle incoming invites - show the first pending one
-  useEffect(() => {
-    if (!isPublishing) {
-      if (currentInvite) setCurrentInvite(null);
-      return;
-    }
-    if (pendingInvites.length > 0 && !currentInvite) {
-      setCurrentInvite(pendingInvites[0]);
-    }
-  }, [pendingInvites, currentInvite, isPublishing]);
-
-  // When we start publishing a new stream, clear any stale invite sheet
-  useEffect(() => {
-    if (isPublishing) {
-      setCurrentInvite(null);
-    }
-  }, [isPublishing]);
+  // No longer need currentInvite state - stack handles all invites
   
   // Show cooldown sheet when battle enters cooldown
   useEffect(() => {
@@ -273,6 +254,13 @@ export default function SoloHostStream() {
       setShowCooldown(false);
     }
   }, [battleSession?.status]);
+
+  // Handle invite declined
+  const handleInviteDeclined = useCallback((inviteId: string) => {
+    declineInvite(inviteId).catch(err => {
+      console.error('[SoloHostStream] Decline invite error:', err);
+    });
+  }, [declineInvite]);
   
   // Check if we're in an active battle/cohost session (show grid instead of solo video)
   const isInActiveSession = battleSession && (battleSession.status === 'active' || battleSession.status === 'cooldown');
@@ -2301,21 +2289,17 @@ export default function SoloHostStream() {
         }}
       />
       
-      {/* Incoming Invite Sheet */}
-      <IncomingInviteSheet
-        invite={currentInvite}
-        onAccepted={(sessionId) => {
-          console.log('[SoloHostStream] Invite accepted, session:', sessionId);
-          setCurrentInvite(null);
-          refreshBattleSession();
-        }}
-        onDeclined={() => {
-          setCurrentInvite(null);
-        }}
-        onClose={() => {
-          setCurrentInvite(null);
-        }}
-      />
+      {/* Incoming Battle Request Stack */}
+      {isPublishing && pendingInvites.length > 0 && (
+        <IncomingBattleRequestStack
+          invites={pendingInvites}
+          onAccepted={(sessionId) => {
+            console.log('[SoloHostStream] Invite accepted, session:', sessionId);
+            refreshBattleSession();
+          }}
+          onDeclined={handleInviteDeclined}
+        />
+      )}
       
       {/* Cooldown Sheet */}
       {battleSession && battleOpponent && (
