@@ -2,8 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Eye } from 'lucide-react';
+import { Eye, Users } from 'lucide-react';
 import type { Stream } from './StreamCard';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface LiveTVFindResultRowProps {
   stream: Stream;
@@ -29,9 +30,13 @@ export function LiveTVFindResultRow({ stream, onPress }: LiveTVFindResultRowProp
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <h3 className="font-bold text-base text-foreground truncate group-hover:text-primary transition-colors">
-          {stream.streamer_display_name}
-        </h3>
+        <UserNameWithBadges
+          profileId={stream.streamer_profile_id}
+          name={stream.streamer_display_name}
+          textSize="text-base"
+          nameClassName="font-bold text-foreground truncate group-hover:text-primary transition-colors"
+          showGifterBadge={false}
+        />
         {stream.category && (
           <p className="text-sm text-muted-foreground truncate flex items-center gap-1.5">
             <span className="w-1 h-1 rounded-full bg-primary" />

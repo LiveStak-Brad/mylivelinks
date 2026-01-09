@@ -9,6 +9,7 @@ import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import { useStreamTopGifters } from '@/hooks/useStreamTopGifters';
 import BottomSheetModal from './BottomSheetModal';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface StreamGiftersModalProps {
   isOpen: boolean;
@@ -178,18 +179,14 @@ export default function StreamGiftersModal({
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-gray-900 truncate text-base">
-                      {gifter.display_name || gifter.username}
-                    </div>
-                    {gifter.gifter_status && (
-                      <div className="mt-0.5">
-                        <TierBadge
-                          tier_key={gifter.gifter_status.tier_key}
-                          level={gifter.gifter_status.level_in_tier}
-                          size="sm"
-                        />
-                      </div>
-                    )}
+                    <UserNameWithBadges
+                      profileId={gifter.profile_id}
+                      name={gifter.display_name || gifter.username}
+                      gifterStatus={gifter.gifter_status}
+                      textSize="text-base"
+                      nameClassName="font-bold text-gray-900 truncate"
+                      gifterBadgeSize="sm"
+                    />
                   </div>
 
                   {/* Diamonds */}

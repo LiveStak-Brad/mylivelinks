@@ -1,8 +1,8 @@
 /**
- * Battle Start API - Convert cohost session to battle
+ * Battle Accept API - Accept battle invite from cohost session
  * 
- * Called when a host in a cohost session wants to start a battle.
- * Creates a battle invite that the other host must accept.
+ * Called when a host accepts a battle invite sent during a cohost session.
+ * Converts the cohost session to an active battle.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,36 +19,39 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { session_id } = body;
+    const { invite_id } = body;
     
-    if (!session_id) {
+    if (!invite_id) {
       return NextResponse.json(
-        { error: 'Missing session_id' },
+        { error: 'Missing invite_id' },
         { status: 400 }
       );
     }
     
-    // Send battle invite to other host (they must accept)
-    const { data: inviteId, error: rpcError } = await supabase.rpc(
-      'rpc_send_battle_invite_from_cohost',
-      { p_session_id: session_id }
+    // Accept the battle invite and convert session
+    const { data, error: rpcError } = await supabase.rpc(
+      'rpc_accept_battle_invite_from_cohost',
+      { p_invite_id: invite_id }
     );
     
     if (rpcError) {
-      console.error('[battle/start] RPC error:', rpcError);
+      console.error('[battle/accept] RPC error:', rpcError);
       return NextResponse.json(
-        { error: rpcError.message || 'Failed to send battle invite' },
+        { error: rpcError.message || 'Failed to accept battle invite' },
         { status: 500 }
       );
     }
     
     return NextResponse.json({
       success: true,
-      invite_id: inviteId,
-      message: 'Battle invite sent. Waiting for other host to accept.',
+      session_id: data.session_id,
+      type: data.type,
+      started_at: data.started_at,
+      ends_at: data.ends_at,
+      message: 'Battle started!',
     });
   } catch (err: any) {
-    console.error('[battle/start] Error:', err);
+    console.error('[battle/accept] Error:', err);
     return NextResponse.json(
       { error: err.message || 'Internal server error' },
       { status: 500 }

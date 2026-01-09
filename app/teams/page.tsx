@@ -12,6 +12,7 @@ import DiscoverTeamsOverlay from '@/components/teams/DiscoverTeamsOverlay';
 import { createClient } from '@/lib/supabase';
 import { getMyTeamInvites, acceptTeamInvite, declineTeamInvite, TeamInvite } from '@/lib/teamInvites';
 import { TeamAvatarStack } from '@/components/teams/TeamAvatar';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 const TEAMS_DISCOVERY_ENABLED = process.env.NEXT_PUBLIC_ENABLE_TEAMS_DISCOVERY === 'true';
 const ONBOARDING_KEY = 'mylivelinks_teams_onboarding_completed';
@@ -974,9 +975,13 @@ export default function TeamsIndexPage() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-foreground">
-                    {membersDisplayName(member)}
-                  </div>
+                  <UserNameWithBadges
+                    profileId={member.profile_id}
+                    name={membersDisplayName(member)}
+                    textSize="text-sm"
+                    nameClassName="font-semibold text-foreground truncate"
+                    showGifterBadge={false}
+                  />
                   <div className="truncate text-xs text-muted-foreground">@{member.username}</div>
                 </div>
                 <div className="text-xs font-semibold text-muted-foreground">

@@ -38,6 +38,7 @@ import BattleTileOverlay, {
 import BattleCooldownControls from './BattleCooldownControls';
 import BoostRoundIndicator from './BoostRoundIndicator';
 import CohostStartBattleButton from './CohostStartBattleButton';
+import BattleInvitePopup from './BattleInvitePopup';
 import useBattleScores from '@/hooks/useBattleScores';
 import { createClient } from '@/lib/supabase';
 
@@ -93,6 +94,12 @@ export default function BattleGridWrapper({
     sessionId: isBattleSession ? session.session_id : null,
     autoFetch: isBattleSession,
   });
+  
+  // Battle invite state
+  const [battleInvite, setBattleInvite] = useState<{
+    id: string;
+    fromUsername: string;
+  } | null>(null);
 
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<{ video: any; audio: any }>({ video: null, audio: null });
@@ -619,17 +626,87 @@ export default function BattleGridWrapper({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: session.session_id,
-          mode: 'standard',
         }),
       });
       if (!response.ok) {
-        throw new Error('Failed to start battle');
+        throw new Error('Failed to send battle invite');
       }
-      // Invite sent, other host will see it and can accept
+      // Invite sent, other host will see popup
     } catch (err) {
       console.error('[BattleGridWrapper] Start battle error:', err);
     }
   }, [session.session_id]);
+  
+  const handleAcceptBattleInvite = useCallback(async (inviteId: string) => {
+    console.log('[BattleGridWrapper] Accept battle invite:', inviteId);
+    try {
+      const response = await fetch('/api/battle/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invite_id: inviteId }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to accept battle invite');
+      }
+      // Session will convert to battle via realtime
+      setBattleInvite(null);
+    } catch (err) {
+      console.error('[BattleGridWrapper] Accept battle error:', err);
+      throw err;
+    }
+  }, []);
+  
+  const handleDeclineBattleInvite = useCallback(async (inviteId: string) => {
+    console.log('[BattleGridWrapper] Decline battle invite:', inviteId);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc('rpc_decline_battle_invite_from_cohost', {
+        p_invite_id: inviteId,
+      });
+      if (error) {
+        throw error;
+      }
+      setBattleInvite(null);
+    } catch (err) {
+      console.error('[BattleGridWrapper] Decline battle error:', err);
+      throw err;
+    }
+  }, []);
+
+  // Listen for battle invites in cohost sessions
+  useEffect(() => {
+    if (!isCohostSession || !currentUserId) return;
+    
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`battle_invites_${session.session_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'live_session_invites',
+          filter: `session_id=eq.${session.session_id}`,
+        },
+        async (payload) => {
+          const invite = payload.new as any;
+          if (invite.to_host_id === currentUserId && invite.type === 'battle' && invite.status === 'pending') {
+            // Get sender username
+            const otherHostId = invite.from_host_id;
+            const otherHost = otherHostId === hostSnapshot.hostA.id ? hostSnapshot.hostA : hostSnapshot.hostB;
+            setBattleInvite({
+              id: invite.id,
+              fromUsername: otherHost.display_name || otherHost.username,
+            });
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isCohostSession, currentUserId, session.session_id, hostSnapshot]);
 
   return (
     <div className={`flex flex-col ${className}`}>
@@ -705,6 +782,17 @@ export default function BattleGridWrapper({
         <div className="w-full bg-black/60 backdrop-blur-sm py-3 flex items-center justify-center">
           <CohostStartBattleButton onStartBattle={handleStartBattle} />
         </div>
+      )}
+      
+      {/* Battle Invite Popup */}
+      {battleInvite && (
+        <BattleInvitePopup
+          inviteId={battleInvite.id}
+          fromUsername={battleInvite.fromUsername}
+          onAccept={handleAcceptBattleInvite}
+          onDecline={handleDeclineBattleInvite}
+          onClose={() => setBattleInvite(null)}
+        />
       )}
     </div>
   );

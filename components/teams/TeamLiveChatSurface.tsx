@@ -117,11 +117,15 @@ export default function TeamLiveChatSurface({
                     ...(selection === 'team' && teamTheme ? appliedBubbleStyle : {}),
                   }}
                 >
-                  <span
-                    className={clsx('text-xs font-semibold leading-tight', textClasses.username)}
-                  >
-                    {msg.username}
-                  </span>
+                  <div className={clsx('text-xs font-semibold leading-tight', textClasses.username)}>
+                    <UserNameWithBadges
+                      profileId={undefined}
+                      name={msg.username}
+                      textSize="text-xs"
+                      nameClassName="font-semibold leading-tight"
+                      showGifterBadge={false}
+                    />
+                  </div>
                   <span
                     className={clsx(
                       'text-sm leading-snug',

@@ -5,11 +5,13 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 export interface Stream {
   id: string;
   slug?: string;
   streamer_display_name: string;
+  streamer_profile_id?: string;
   thumbnail_url: string | null;
   total_views: number;
   /** Active viewers currently watching (realtime count) */
@@ -128,11 +130,17 @@ export function StreamCard({ stream, onPress, flexibleWidth = false }: StreamCar
         isTopTrending ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-400 bg-[length:200%_100%] animate-flame-flow' : ''
       }`}>
         {/* Streamer Name - Title */}
-        <span className={`font-black text-lg sm:text-2xl leading-tight text-center transition-colors relative z-10 ${
+        <div className={`font-black text-lg sm:text-2xl leading-tight text-center transition-colors relative z-10 ${
           isTopTrending ? 'text-gray-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]' : 'text-foreground group-hover:text-primary'
         }`}>
-          {stream.streamer_display_name}
-        </span>
+          <UserNameWithBadges
+            profileId={stream.streamer_profile_id}
+            name={stream.streamer_display_name}
+            textSize="text-lg sm:text-2xl"
+            nameClassName="font-black leading-tight"
+            showGifterBadge={false}
+          />
+        </div>
         {/* Viewer Count - prefer active viewer_count, fallback to total_views */}
         {(() => {
           // Use active viewer count if available and > 0, otherwise fall back to total_views

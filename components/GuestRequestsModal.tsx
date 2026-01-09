@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { createClient } from '@/lib/supabase';
 import BottomSheetModal from './BottomSheetModal';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface GuestRequestsModalProps {
   isOpen: boolean;
@@ -352,9 +353,13 @@ export default function GuestRequestsModal({ isOpen, onClose, liveStreamId, host
                     className="rounded-full"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 dark:text-white truncate">
-                      {request.profile?.display_name || request.profile?.username || 'Unknown'}
-                    </p>
+                    <UserNameWithBadges
+                      profileId={request.requester_id}
+                      name={request.profile?.display_name || request.profile?.username || 'Unknown'}
+                      textSize="text-base"
+                      nameClassName="font-semibold text-gray-900 dark:text-white truncate"
+                      showGifterBadge={false}
+                    />
                     <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                       <Clock className="w-3 h-3" />
                       <span>{formatTimeAgo(request.created_at)}</span>
@@ -421,9 +426,13 @@ export default function GuestRequestsModal({ isOpen, onClose, liveStreamId, host
                       className="rounded-full"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-white truncate">
-                        {viewer.display_name || viewer.username}
-                      </p>
+                      <UserNameWithBadges
+                        profileId={viewer.profile_id}
+                        name={viewer.display_name || viewer.username}
+                        textSize="text-base"
+                        nameClassName="font-medium text-gray-900 dark:text-white truncate"
+                        showGifterBadge={false}
+                      />
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         @{viewer.username}
                       </p>

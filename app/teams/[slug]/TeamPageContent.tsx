@@ -1,6 +1,7 @@
 'use client';
 
 import { CSSProperties, ReactNode, useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
@@ -2505,7 +2506,13 @@ function CommentRow({
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-white">{comment.authorDisplayName || comment.authorUsername}</span>
+          <UserNameWithBadges
+            profileId={comment.authorId}
+            name={comment.authorDisplayName || comment.authorUsername}
+            textSize="text-xs"
+            nameClassName="font-semibold text-white"
+            showGifterBadge={false}
+          />
           <span className="text-[10px] text-white/40">{formatTime(comment.createdAt)}</span>
         </div>
         <p className="text-sm text-white/80 mt-0.5">{comment.textContent}</p>
@@ -3710,9 +3717,13 @@ function InviteMembersModal({
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">
-                        {user.display_name || user.username}
-                      </p>
+                      <UserNameWithBadges
+                        profileId={user.id}
+                        name={user.display_name || user.username}
+                        textSize="text-sm"
+                        nameClassName="font-medium text-white truncate"
+                        showGifterBadge={false}
+                      />
                       <p className="text-xs text-white/50">@{user.username}</p>
                     </div>
 
