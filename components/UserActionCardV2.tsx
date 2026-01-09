@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { useIM } from '@/components/im';
 import Image from 'next/image';
@@ -386,15 +387,14 @@ export default function UserActionCardV2({
               )}
 
               {/* Gifter Badge */}
-              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
-                <div className="mt-2">
-                  <TierBadge
-                    tier_key={gifterStatus.tier_key}
-                    level={gifterStatus.level_in_tier}
-                    size="sm"
-                  />
-                </div>
-              )}
+              <UserNameWithBadges
+                profileId={profileId}
+                name={displayName || username}
+                gifterStatus={gifterStatus}
+                textSize="text-lg"
+                nameClassName="font-bold text-gray-900 dark:text-white truncate"
+                gifterBadgeSize="md"
+              />
             </div>
 
             {/* Close Button */}

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { GifterBadge as TierBadge } from '@/components/gifter';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { useIM } from '@/components/im';
 import LiveAvatar from '@/components/LiveAvatar';
@@ -392,7 +393,14 @@ export default function MiniProfile({
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-lg truncate">{displayName || username}</h3>
+                <UserNameWithBadges
+                  profileId={profileId}
+                  name={displayName || username}
+                  gifterStatus={gifterStatus}
+                  textSize="text-lg"
+                  nameClassName="font-semibold text-gray-900 dark:text-white truncate"
+                  gifterBadgeSize="md"
+                />
                 {isLive && (
                   <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-semibold rounded">
                     LIVE
@@ -400,20 +408,6 @@ export default function MiniProfile({
                 )}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 truncate">@{username}</p>
-              {/* Gifter Badge - supports both new gifterStatus and legacy props */}
-              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 ? (
-                <div className="mt-1">
-                  <TierBadge
-                    tier_key={gifterStatus.tier_key}
-                    level={gifterStatus.level_in_tier}
-                    size="sm"
-                  />
-                </div>
-              ) : gifterLevel && gifterLevel > 0 ? (
-                <div className="mt-1">
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full font-medium text-xs px-2 py-1"
-                    style={{
                       backgroundColor: `${badgeColor || '#94A3B8'}20`,
                       color: badgeColor || '#94A3B8',
                       border: `1px solid ${badgeColor || '#94A3B8'}40`,

@@ -738,7 +738,7 @@ export default function Chat({ roomSlug, liveStreamId, onGiftClick, onShareClick
                         <UserNameWithBadges
                           profileId={msg.profile_id}
                           name={msg.username || 'Unknown'}
-                          gifterStatus={gifterStatusMap[msg.profile_id]}
+                          gifterStatus={msg.profile_id ? gifterStatusMap[msg.profile_id] : undefined}
                           textSize="text-xs"
                           nameClassName="text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition"
                           clickable

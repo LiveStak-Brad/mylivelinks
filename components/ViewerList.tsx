@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { isBlockedBidirectional } from '@/lib/blocks';
 import { Eye } from 'lucide-react';
 import { GifterBadge as TierBadge } from '@/components/gifter';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import UserActionCardV2 from './UserActionCardV2';
@@ -341,10 +342,16 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
                 {/* Username + Badge */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <button
+                    <UserNameWithBadges
+                      profileId={viewer.profile_id}
+                      name={viewer.username}
+                      gifterStatus={gifterStatusMap[viewer.profile_id]}
+                      textSize="text-sm"
+                      nameClassName="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition truncate"
+                      clickable
                       onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
+                        e?.preventDefault();
+                        e?.stopPropagation();
                         setSelectedProfile({
                           profileId: viewer.profile_id,
                           username: viewer.username,
@@ -353,28 +360,7 @@ export default function ViewerList({ roomId, onDragStart }: ViewerListProps) {
                           isLive: viewer.is_live_available,
                         });
                       }}
-                      draggable={false}
-                      className={`text-sm font-medium truncate hover:text-blue-500 dark:hover:text-blue-400 transition cursor-pointer ${viewer.is_live_available ? 'text-red-600 dark:text-red-400' : ''}`}
-                    >
-                      {viewer.username}
-                    </button>
-                    {(() => {
-                      const status = gifterStatusMap[viewer.profile_id];
-                      if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
-                      return (
-                        <TierBadge
-                          tier_key={status.tier_key}
-                          level={status.level_in_tier}
-                          size="sm"
-                        />
-                      );
-                    })()}
-                    {/* Room Owner and Current User Badges */}
-                    {viewer.profile_id === roomOwnerId && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-purple-500 text-white rounded">
-                        Owner
-                      </span>
-                    )}
+                    />
                     {viewer.profile_id === currentUserId && viewer.profile_id !== roomOwnerId && (
                       <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded">
                         You
