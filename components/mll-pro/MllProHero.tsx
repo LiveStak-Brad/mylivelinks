@@ -1,13 +1,48 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Shield, Star, TrendingUp } from 'lucide-react';
 import Image from 'next/image';
 import newProBadge from '@/newprobadge.png';
+import { createClient } from '@/lib/supabase';
 
 export function MllProHero() {
   const router = useRouter();
+  const [userIsPro, setUserIsPro] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkProStatus = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setUserIsPro(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('is_mll_pro')
+        .eq('id', user.id)
+        .single();
+
+      setUserIsPro(data?.is_mll_pro === true);
+    };
+
+    void checkProStatus();
+  }, []);
+
+  // Don't show hero if user already has PRO
+  if (userIsPro === true) {
+    return null;
+  }
+
+  // Don't render until we know the status
+  if (userIsPro === null) {
+    return null;
+  }
 
   return (
     <div className="w-full bg-gradient-to-br from-purple-900 via-purple-800 to-pink-900 rounded-xl overflow-hidden shadow-lg mb-6">
