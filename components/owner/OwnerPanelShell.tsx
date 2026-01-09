@@ -20,6 +20,7 @@ import {
   Menu,
   X,
   Activity,
+  Shield,
 } from 'lucide-react';
 import { IconButton, ToastProvider } from '@/components/ui';
 
@@ -41,6 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Reports', href: '/owner/reports', icon: AlertTriangle },
   { label: 'Analytics', href: '/owner/analytics', icon: BarChart3 },
   { label: 'Referrals', href: '/owner/referrals', icon: Gift },
+  { label: 'MLL PRO Applications', href: '/owner/mll-pro-applications', icon: Shield },
   { label: 'Mobile Waitlist', href: '/owner/waitlist-mobile', icon: Mail },
   { label: 'Roles', href: '/owner/roles', icon: UserCog },
   { label: 'Settings', href: '/owner/settings', icon: Settings },

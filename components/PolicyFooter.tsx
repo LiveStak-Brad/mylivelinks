@@ -28,6 +28,9 @@ export function PolicyFooter() {
     <footer className="w-full border-t border-border bg-background">
       <div className="container mx-auto px-4 py-6 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+          <Link href="/mll-pro" className="hover:text-foreground font-semibold text-purple-400 hover:text-purple-300">
+            MLL PRO
+          </Link>
           <Link href="/policies" className="hover:text-foreground">
             Safety &amp; Policies
           </Link>
