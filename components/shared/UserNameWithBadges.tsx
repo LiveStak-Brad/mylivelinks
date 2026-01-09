@@ -74,17 +74,20 @@ export default function UserNameWithBadges({
     }
 
     const supabase = createClient();
-    supabase
-      .from('profiles')
-      .select('is_mll_pro')
-      .eq('id', profileId)
-      .single()
-      .then(({ data }) => {
+    const fetchMllPro = async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('is_mll_pro')
+          .eq('id', profileId)
+          .single();
         setIsMllPro(data?.is_mll_pro === true);
-      })
-      .catch(() => {
+      } catch {
         setIsMllPro(false);
-      });
+      }
+    };
+    
+    void fetchMllPro();
   }, [profileId]);
 
   const showMllPro = shouldShowMllProBadge(profileId, { is_mll_pro: isMllPro });
