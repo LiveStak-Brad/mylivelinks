@@ -12,6 +12,8 @@ interface UserNameWithBadgesProps {
   profileId?: string | null;
   /** Username or display name to render */
   name: string;
+  /** Optional pre-fetched MLL PRO status (avoids DB call if provided) */
+  isMllPro?: boolean;
   /** Optional gifter status for tier badge */
   gifterStatus?: GifterStatus | null;
   /** Text size class (e.g., 'text-sm', 'text-xs') - badge will match */
@@ -56,6 +58,7 @@ interface UserNameWithBadgesProps {
 export default function UserNameWithBadges({
   profileId,
   name,
+  isMllPro: isMllProProp,
   gifterStatus,
   textSize = 'text-sm',
   nameClassName = '',
@@ -66,12 +69,17 @@ export default function UserNameWithBadges({
   clickable = false,
   children,
 }: UserNameWithBadgesProps) {
-  const [isMllPro, setIsMllPro] = useState<boolean>(false);
+  const [isMllProFetched, setIsMllProFetched] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState(false);
 
   useEffect(() => {
+    // Only fetch if not provided as prop
+    if (isMllProProp !== undefined) {
+      return;
+    }
+
     if (!profileId) {
-      setIsMllPro(false);
+      setIsMllProFetched(false);
       return;
     }
 
@@ -83,15 +91,16 @@ export default function UserNameWithBadges({
           .select('is_mll_pro')
           .eq('id', profileId)
           .single();
-        setIsMllPro(data?.is_mll_pro === true);
+        setIsMllProFetched(data?.is_mll_pro === true);
       } catch {
-        setIsMllPro(false);
+        setIsMllProFetched(false);
       }
     };
     
     void fetchMllPro();
-  }, [profileId]);
+  }, [profileId, isMllProProp]);
 
+  const isMllPro = isMllProProp !== undefined ? isMllProProp : isMllProFetched;
   const showMllPro = shouldShowMllProBadge(profileId, { is_mll_pro: isMllPro });
   const hasGifterBadge = showGifterBadge && gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0;
 

@@ -16,6 +16,7 @@ interface TopFriend {
   avatar_url: string | null;
   bio: string | null;
   is_live: boolean;
+  is_mll_pro: boolean;
   follower_count: number;
   total_gifts_received: number;
   gifter_level: number;
@@ -215,6 +216,7 @@ export default function TopFriendsDisplay({
                   <UserNameWithBadges
                     profileId={friend.profile_id}
                     name={friend.display_name || friend.username}
+                    isMllPro={friend.is_mll_pro}
                     textSize="text-sm"
                     nameClassName="text-white font-bold truncate"
                     showGifterBadge={false}
