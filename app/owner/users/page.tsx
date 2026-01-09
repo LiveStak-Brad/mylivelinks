@@ -30,6 +30,7 @@ import {
   Badge,
   RowActions,
 } from '@/components/owner/ui-kit';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 // UI-only mock data structure (wire-ready)
 interface User {
@@ -41,6 +42,7 @@ interface User {
   isBanned: boolean;
   isVerified: boolean;
   hasLiveAccess: boolean;
+  isMllPro: boolean;
   coinBalance: number;
   diamondBalance: number;
   createdAt: string;
@@ -124,6 +126,7 @@ export default function UsersPage() {
           isBanned,
           isVerified,
           hasLiveAccess,
+          isMllPro: Boolean(p?.is_mll_pro),
           coinBalance,
           diamondBalance: earningsBalance,
           createdAt: String(p?.created_at ?? new Date().toISOString()),
@@ -210,9 +213,13 @@ export default function UsersPage() {
           />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-medium text-foreground">
-                {user.displayName || user.username}
-              </span>
+              <UserNameWithBadges
+                profileId={user.id}
+                name={user.displayName || user.username}
+                textSize="text-base"
+                nameClassName="font-medium text-foreground"
+                showGifterBadge={false}
+              />
               {user.isVerified && (
                 <Shield className="w-4 h-4 text-primary" />
               )}
@@ -273,6 +280,33 @@ export default function UsersPage() {
                 } catch (e) {
                   console.error('[Owner Users] live access toggle failed:', e);
                   alert('Failed to update live access');
+                }
+              },
+            },
+            {
+              label: user.isMllPro ? 'Remove PRO Badge' : 'Grant PRO Badge',
+              icon: Shield,
+              variant: user.isMllPro ? 'destructive' : 'default',
+              onClick: async () => {
+                const next = !user.isMllPro;
+                const ok = window.confirm(
+                  next
+                    ? `Grant MLL PRO badge to @${user.username}?`
+                    : `Remove MLL PRO badge from @${user.username}?`
+                );
+                if (!ok) return;
+
+                try {
+                  const res = await fetch('/api/admin/toggle-mll-pro', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profileId: user.id, isMllPro: next }),
+                  });
+                  if (!res.ok) throw new Error('Failed to toggle PRO badge');
+                  setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isMllPro: next } : u)));
+                } catch (e) {
+                  console.error('[Owner Users] PRO badge toggle failed:', e);
+                  alert('Failed to update PRO badge');
                 }
               },
             },

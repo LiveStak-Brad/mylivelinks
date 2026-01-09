@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 export interface TopUser {
   id: string;
@@ -119,9 +120,13 @@ export default function TopUsersTable({
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {user.displayName || user.username}
-                    </p>
+                    <UserNameWithBadges
+                      profileId={user.id}
+                      name={user.displayName || user.username}
+                      textSize="text-sm"
+                      nameClassName="font-medium text-foreground truncate"
+                      showGifterBadge={false}
+                    />
                     {user.displayName && (
                       <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
                     )}
