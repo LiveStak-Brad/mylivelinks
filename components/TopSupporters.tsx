@@ -6,6 +6,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import LiveAvatar from '@/components/LiveAvatar';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface Supporter {
   profile_id: string;
@@ -205,18 +206,13 @@ export default function TopSupporters() {
             {/* Username & Badge */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium truncate">{supporter.username}</span>
-                {(() => {
-                  const status = gifterStatusMap[supporter.profile_id];
-                  if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
-                  return (
-                    <TierBadge
-                      tier_key={status.tier_key}
-                      level={status.level_in_tier}
-                      size="sm"
-                    />
-                  );
-                })()}
+                <UserNameWithBadges
+                  profileId={supporter.profile_id}
+                  name={supporter.username}
+                  gifterStatus={gifterStatusMap[supporter.profile_id]}
+                  textSize="text-sm"
+                  nameClassName="font-medium truncate"
+                />
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {supporter.total_gifted.toLocaleString()} coins • {supporter.gift_count} {supporter.gift_count === 1 ? 'gift' : 'gifts'}

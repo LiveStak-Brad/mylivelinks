@@ -14,6 +14,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { User, Volume2, VolumeX, VideoOff, Video } from 'lucide-react';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 export interface GridTileParticipant {
   id: string;
@@ -22,6 +23,7 @@ export interface GridTileParticipant {
   avatarUrl?: string;
   videoTrack?: any; // LiveKit video track
   audioTrack?: any; // LiveKit audio track
+  gifterStatus?: any;
 }
 
 interface GridTileProps {
@@ -357,9 +359,16 @@ export default function GridTile({
         )}
         
         {/* Name - smaller, right aligned */}
-        <span className="text-[10px] sm:text-xs font-medium text-white drop-shadow-lg truncate max-w-[70%]">
-          {participant.name}
-        </span>
+        <div className="max-w-[70%]">
+          <UserNameWithBadges
+            profileId={participant.id}
+            name={participant.name}
+            gifterStatus={participant.gifterStatus}
+            textSize="text-[10px] sm:text-xs"
+            nameClassName="font-medium text-white drop-shadow-lg truncate"
+            showGifterBadge={false}
+          />
+        </div>
       </div>
     </div>
   );

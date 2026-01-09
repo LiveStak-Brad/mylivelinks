@@ -77,7 +77,7 @@ export default function UserNameWithBadges({
   );
 
   return (
-    <div className={`inline-flex items-center gap-1 ${className}`}>
+    <div className={`inline-flex items-center gap-1.5 ${textSize} ${className}`}>
       {nameElement}
       {showMllPro && (
         <MllProBadge size="compact" className="flex-shrink-0" />

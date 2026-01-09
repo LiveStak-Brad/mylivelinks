@@ -1767,46 +1767,47 @@ export default function SoloHostStream() {
                 {/* Left: Streamer name bubble */}
                 <div className="relative flex flex-col">
                   {/* Main profile bubble */}
-                  <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-1.5">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md rounded-full px-2.5 py-1">
+                    <div className="flex items-center gap-1.5">
                     <Image
                       src={getAvatarUrl(streamer.avatar_url)}
                       alt={streamer.username}
-                      width={28}
-                      height={28}
+                      width={24}
+                      height={24}
                       className="rounded-full cursor-pointer"
                       onClick={() => setShowMiniProfile(true)}
                     />
                     <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <UserNameWithBadges
                           profileId={streamer.profile_id}
                           name={streamer.display_name || streamer.username}
                           gifterStatus={streamer.gifter_status}
-                          textSize="text-sm"
+                          textSize="text-xs"
                           nameClassName="font-bold text-white"
                           clickable
                           onClick={() => setShowMiniProfile(true)}
+                          showGifterBadge={false}
                         />
                       </div>
                       {/* Trending/Leaderboard buttons row */}
-                      <div className="flex items-center gap-2 text-xs text-white/80">
+                      <div className="flex items-center gap-1.5 text-[10px] text-white/80">
                         <button 
                           onClick={() => setShowTrending(true)}
-                          className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
+                          className="flex items-center gap-0.5 hover:text-white transition-colors cursor-pointer"
                           type="button"
                         >
-                          <Flame className="w-4 h-4 text-orange-500" />
-                          <span className="font-semibold text-sm">{trendingRank ?? 0}</span>
+                          <Flame className="w-3 h-3 text-orange-500" />
+                          <span className="font-semibold text-[11px]">{trendingRank ?? 0}</span>
                         </button>
                         <span className="text-white/40">•</span>
                         <button 
                           onClick={() => setShowLeaderboard(true)}
-                          className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
+                          className="flex items-center gap-0.5 hover:text-white transition-colors cursor-pointer"
                           type="button"
                         >
-                          <Trophy className="w-4 h-4 text-yellow-500" />
-                          <span className="font-semibold text-sm">
+                          <Trophy className="w-3 h-3 text-yellow-500" />
+                          <span className="font-semibold text-[11px]">
                             {leaderboardRank?.current_rank ?? 0}
                           </span>
                         </button>

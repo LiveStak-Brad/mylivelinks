@@ -1,8 +1,10 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Gift } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import type { GifterStatus } from '@/lib/gifter-status';
 
 interface Supporter {
@@ -94,9 +96,13 @@ export default function TopSupportersWidget({
               </div>
               
               <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">
-                  {supporter.display_name || supporter.username}
-                </p>
+                <UserNameWithBadges
+                  profileId={supporter.id}
+                  name={supporter.display_name || supporter.username}
+                  textSize="text-base"
+                  nameClassName="font-semibold truncate"
+                  showGifterBadge={false}
+                />
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {supporter.total_gifted.toLocaleString()} coins
                 </p>

@@ -6,6 +6,7 @@ import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import LiveAvatar from '@/components/LiveAvatar';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface LeaderboardEntry {
   profile_id: string;
@@ -363,20 +364,13 @@ export default function Leaderboard({ roomSlug, roomName }: LeaderboardProps = {
               {/* User Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex flex-col gap-0.5">
-                  <span className="font-medium text-[11px] sm:text-sm truncate">{entry.username}</span>
-                  {(() => {
-                    const status = gifterStatusMap[entry.profile_id];
-                    if (!status || Number(status.lifetime_coins ?? 0) <= 0) return null;
-                    return (
-                      <div className="flex items-center scale-[0.85] sm:scale-95 lg:scale-100 origin-left">
-                        <TierBadge
-                          tier_key={status.tier_key}
-                          level={status.level_in_tier}
-                          size="sm"
-                        />
-                      </div>
-                    );
-                  })()}
+                  <UserNameWithBadges
+                    profileId={entry.profile_id}
+                    name={entry.username}
+                    gifterStatus={gifterStatusMap[entry.profile_id]}
+                    textSize="text-[11px] sm:text-sm"
+                    nameClassName="font-medium truncate"
+                  />
                 </div>
               </div>
 

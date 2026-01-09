@@ -35,6 +35,10 @@ import BattleTileOverlay, {
   BattleMode,
   TEAM_COLORS,
 } from './BattleTileOverlay';
+import BattleCooldownControls from './BattleCooldownControls';
+import BoostRoundIndicator from './BoostRoundIndicator';
+import CohostStartBattleButton from './CohostStartBattleButton';
+import useBattleScores from '@/hooks/useBattleScores';
 
 const normalizeParticipantId = (identity: string): string => {
   return identity
@@ -80,6 +84,14 @@ export default function BattleGridWrapper({
   const [error, setError] = useState<string | null>(null);
   
   const isBattleSession = session.type === 'battle';
+  const isCohostSession = session.type === 'cohost';
+  const isInCooldown = session.status === 'cooldown';
+  
+  // Battle scores hook (only for battle sessions)
+  const { scores, awardChatPoints } = useBattleScores({
+    sessionId: isBattleSession ? session.session_id : null,
+    autoFetch: isBattleSession,
+  });
 
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<{ video: any; audio: any }>({ video: null, audio: null });
@@ -125,33 +137,51 @@ export default function BattleGridWrapper({
 
   const battleMode: BattleMode = 'duel';
 
+  // Battle states with real scores and team-relative colors
   const battleStates = useMemo(() => {
-    if (!isBattleSession) {
+    if (!isBattleSession || !scores) {
       return new Map<string, BattleParticipantState>();
     }
 
     const states = new Map<string, BattleParticipantState>();
+    
+    // Determine if current user is host A or B
+    const isCurrentUserHostA = currentUserId === hostSnapshot.hostA.id;
+    
+    // Team-relative color assignment:
+    // Current user always sees THEIR color on their side
+    // For host A: they see pink (A) on left, blue (B) on right
+    // For host B: they see blue (B) on left, pink (A) on right (colors swap)
+    const currentUserColor = isCurrentUserHostA ? TEAM_COLORS.A : TEAM_COLORS.B;
+    const otherUserColor = isCurrentUserHostA ? TEAM_COLORS.B : TEAM_COLORS.A;
+    
+    const scoreA = scores.points.A || 0;
+    const scoreB = scores.points.B || 0;
+    const isALeading = scoreA >= scoreB;
 
-    states.set(hostSnapshot.hostA.id, {
-      participantId: hostSnapshot.hostA.id,
-      score: 0,
-      color: TEAM_COLORS.A,
-      teamId: 'A',
-      rank: 1,
-      isLeading: true,
+    // Current user state (always first in grid)
+    states.set(currentUserId, {
+      participantId: currentUserId,
+      score: isCurrentUserHostA ? scoreA : scoreB,
+      color: currentUserColor,
+      teamId: isCurrentUserHostA ? 'A' : 'B',
+      rank: isCurrentUserHostA ? (isALeading ? 1 : 2) : (isALeading ? 2 : 1),
+      isLeading: isCurrentUserHostA ? isALeading : !isALeading,
     });
 
-    states.set(hostSnapshot.hostB.id, {
-      participantId: hostSnapshot.hostB.id,
-      score: 0,
-      color: TEAM_COLORS.B,
-      teamId: 'B',
-      rank: 2,
-      isLeading: false,
+    // Other host state (second in grid)
+    const otherHostId = isCurrentUserHostA ? hostSnapshot.hostB.id : hostSnapshot.hostA.id;
+    states.set(otherHostId, {
+      participantId: otherHostId,
+      score: isCurrentUserHostA ? scoreB : scoreA,
+      color: otherUserColor,
+      teamId: isCurrentUserHostA ? 'B' : 'A',
+      rank: isCurrentUserHostA ? (isALeading ? 2 : 1) : (isALeading ? 1 : 2),
+      isLeading: isCurrentUserHostA ? !isALeading : isALeading,
     });
 
     return states;
-  }, [hostSnapshot.hostA.id, hostSnapshot.hostB.id, isBattleSession]);
+  }, [hostSnapshot.hostA.id, hostSnapshot.hostB.id, currentUserId, isBattleSession, scores]);
 
   const renderBattleOverlay = useCallback(
     (participant: GridTileParticipant) => {
@@ -548,6 +578,47 @@ export default function BattleGridWrapper({
   
   const showConnectingOverlay = !participantsReady && !allowEmptyState;
 
+  // Handle cooldown actions
+  const handleStayPaired = useCallback(async () => {
+    // Convert battle back to cohost
+    // This would call an API endpoint to update session type
+    console.log('[BattleGridWrapper] Stay Paired clicked');
+    // TODO: Implement API call
+  }, []);
+
+  const handleRematch = useCallback(async () => {
+    // Start a rematch
+    console.log('[BattleGridWrapper] Rematch clicked');
+    // TODO: Implement via useBattleSession.triggerRematch
+  }, []);
+
+  const handleLeave = useCallback(async () => {
+    // End session and disconnect
+    console.log('[BattleGridWrapper] Leave clicked');
+    // TODO: Implement via useBattleSession.endCurrentSession
+  }, []);
+
+  const handleStartBattle = useCallback(async () => {
+    // Send battle invite from cohost session
+    console.log('[BattleGridWrapper] Start Battle clicked');
+    try {
+      const response = await fetch('/api/battle/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: session.session_id,
+          mode: 'standard',
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to start battle');
+      }
+      // Invite sent, other host will see it and can accept
+    } catch (err) {
+      console.error('[BattleGridWrapper] Start battle error:', err);
+    }
+  }, [session.session_id]);
+
   return (
     <div className={`flex flex-col ${className}`}>
       {/* Battle Score Bar - attached to top of grid, flat edges, full width */}
@@ -557,7 +628,7 @@ export default function BattleGridWrapper({
             battleStates={battleStates}
             battleMode={battleMode}
             height={20}
-            hostId={hostSnapshot.hostA.id}
+            hostId={currentUserId}
             rounded={false}
           />
         </div>
@@ -585,17 +656,42 @@ export default function BattleGridWrapper({
             </div>
           </div>
         )}
+        
+        {/* Boost Round Indicator - overlay on grid */}
+        {isBattleSession && scores?.boost.active && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
+            <BoostRoundIndicator
+              active={scores.boost.active}
+              multiplier={scores.boost.multiplier}
+              endsAt={scores.boost.ends_at}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Battle Controls Bar - timer centered below grid */}
-      {isBattleSession && (
+      {/* Bottom Controls - varies by session type and status */}
+      {isBattleSession && !isInCooldown && (
         <div className="w-full bg-black/60 backdrop-blur-sm py-2 flex items-center justify-center">
           <BattleTimer
             remainingSeconds={remainingSeconds}
-            phase={session.status === 'cooldown' ? 'cooldown' : 'active'}
+            phase="active"
             mode={session.mode}
             compact
           />
+        </div>
+      )}
+      
+      {isBattleSession && isInCooldown && canPublish && (
+        <BattleCooldownControls
+          onStayPaired={handleStayPaired}
+          onRematch={handleRematch}
+          onLeave={handleLeave}
+        />
+      )}
+      
+      {isCohostSession && canPublish && (
+        <div className="w-full bg-black/60 backdrop-blur-sm py-3 flex items-center justify-center">
+          <CohostStartBattleButton onStartBattle={handleStartBattle} />
         </div>
       )}
     </div>

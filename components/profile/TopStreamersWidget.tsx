@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import { TrendingUp, Eye, Radio } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -95,12 +97,18 @@ export default function TopStreamersWidget({
               </div>
               
               <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate flex items-center gap-2">
-                  {streamer.display_name || streamer.username}
+                <div className="flex items-center gap-2">
+                  <UserNameWithBadges
+                    profileId={streamer.id}
+                    name={streamer.display_name || streamer.username}
+                    textSize="text-base"
+                    nameClassName="font-semibold truncate"
+                    showGifterBadge={false}
+                  />
                   {streamer.is_live && (
                     <span className="text-xs text-red-500 font-bold">LIVE</span>
                   )}
-                </p>
+                </div>
                 <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
                   <span className="flex items-center gap-1">
                     <Eye size={12} />

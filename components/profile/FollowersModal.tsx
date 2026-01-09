@@ -5,6 +5,7 @@ import { X, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface User {
   id: string;
@@ -145,9 +146,13 @@ export default function FollowersModal({
                   
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-lg truncate">
-                      {user.display_name || user.username}
-                    </p>
+                    <UserNameWithBadges
+                      profileId={user.id}
+                      name={user.display_name || user.username}
+                      textSize="text-lg"
+                      nameClassName="font-semibold truncate"
+                      showGifterBadge={false}
+                    />
                     <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                       @{user.username}
                     </p>

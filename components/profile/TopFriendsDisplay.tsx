@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Users, Settings } from 'lucide-react';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface TopFriend {
   id: string;
@@ -211,9 +212,13 @@ export default function TopFriendsDisplay({
 
                 {/* Name */}
                 <div className="absolute bottom-2 left-2 right-2">
-                  <p className="text-white font-bold text-sm truncate">
-                    {friend.display_name || friend.username}
-                  </p>
+                  <UserNameWithBadges
+                    profileId={friend.profile_id}
+                    name={friend.display_name || friend.username}
+                    textSize="text-sm"
+                    nameClassName="text-white font-bold truncate"
+                    showGifterBadge={false}
+                  />
                   <p className="text-white/80 text-xs truncate">
                     @{friend.username}
                   </p>

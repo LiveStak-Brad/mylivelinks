@@ -1827,6 +1827,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
                             gifterStatus={streamer.gifter_status}
                             textSize="text-sm"
                             nameClassName="font-bold text-white"
+                            showGifterBadge={false}
                           />
                         </div>
                         {/* Trending/Leaderboard buttons row */}

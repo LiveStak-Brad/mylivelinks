@@ -330,10 +330,10 @@ export default function TeamsIndexPage() {
       setLoadingNewTeams(true);
       try {
         const { data, error } = await supabase
-          .from('teams')
-          .select('id, slug, name, banner_url, icon_url, created_at, approved_member_count')
-          .order('created_at', { ascending: false })
-          .limit(12);
+          .rpc('rpc_get_teams_discovery_ordered', {
+            p_limit: 12,
+            p_offset: 0
+          });
 
         if (error) throw error;
         if (!cancelled) {

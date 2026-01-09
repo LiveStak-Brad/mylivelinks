@@ -8,6 +8,7 @@ import ClipActions from '@/components/ClipActions';
 import SafeRichText from '@/components/SafeRichText';
 import { PostReactions } from './PostReactions';
 import { ReactionPicker, REACTIONS, type ReactionType } from './ReactionPicker';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 /* =============================================================================
    FEED POST CARD COMPONENT
@@ -36,6 +37,8 @@ export type TopGifter = {
 };
 
 export interface FeedPostCardProps {
+  /** Author's profile ID */
+  authorProfileId?: string;
   /** Author's display name */
   authorName: string;
   /** Author's username handle (without @) */
@@ -44,6 +47,8 @@ export interface FeedPostCardProps {
   authorAvatarUrl?: string | null;
   /** Is author currently live */
   authorIsLive?: boolean;
+  /** Author's gifter status */
+  authorGifterStatus?: any;
   /** Post text content */
   content?: string;
   /** Timestamp as Date or ISO string */
@@ -202,10 +207,12 @@ function ActionButton({
 }
 
 const FeedPostCard = memo(function FeedPostCard({
+  authorProfileId,
   authorName,
   authorUsername,
   authorAvatarUrl,
   authorIsLive = false,
+  authorGifterStatus,
   content,
   timestamp,
   media,
@@ -285,13 +292,16 @@ const FeedPostCard = memo(function FeedPostCard({
           </div>
           
           <div className="flex-1 min-w-0 leading-tight">
-            <div 
-              className={`font-semibold text-[15px] text-foreground truncate ${onProfileClick ? 'cursor-pointer hover:underline' : ''}`}
-              onClick={onProfileClick}
-              role={onProfileClick ? 'button' : undefined}
-              tabIndex={onProfileClick ? 0 : undefined}
-            >
-              {authorName}
+            <div className="mb-0.5">
+              <UserNameWithBadges
+                profileId={authorProfileId}
+                name={authorName}
+                gifterStatus={authorGifterStatus}
+                textSize="text-[15px]"
+                nameClassName="font-semibold text-foreground"
+                clickable={!!onProfileClick}
+                onClick={onProfileClick}
+              />
             </div>
             <time className="text-[13px] text-muted-foreground">{formattedTimestamp}</time>
           </div>

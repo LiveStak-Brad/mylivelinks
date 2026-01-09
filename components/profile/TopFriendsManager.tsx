@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import Image from 'next/image';
 import { X, Search, Users, GripVertical, Trash2, Check } from 'lucide-react';
 
@@ -365,9 +366,13 @@ export default function TopFriendsManager({
                         )}
                       </div>
                       <div>
-                        <p className="font-semibold">
-                          {user.display_name || user.username}
-                        </p>
+                        <UserNameWithBadges
+                          profileId={user.id}
+                          name={user.display_name || user.username}
+                          textSize="text-base"
+                          nameClassName="font-semibold"
+                          showGifterBadge={false}
+                        />
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                           @{user.username}
                         </p>
@@ -456,9 +461,13 @@ export default function TopFriendsManager({
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold truncate">
-                          {friend.display_name || friend.username}
-                        </p>
+                        <UserNameWithBadges
+                          profileId={friend.friend_id}
+                          name={friend.display_name || friend.username}
+                          textSize="text-base"
+                          nameClassName="font-semibold truncate"
+                          showGifterBadge={false}
+                        />
                         <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                           @{friend.username}
                         </p>

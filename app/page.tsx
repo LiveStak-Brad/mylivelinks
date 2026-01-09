@@ -165,10 +165,10 @@ export default function LandingPage() {
 
   const fetchNewTeams = useCallback(async () => {
     const { data, error } = await supabase
-      .from('teams')
-      .select('id, slug, name, banner_url, icon_url, created_at')
-      .order('created_at', { ascending: false })
-      .limit(12);
+      .rpc('rpc_get_teams_discovery_ordered', {
+        p_limit: 12,
+        p_offset: 0
+      });
 
     if (error) throw error;
     setNewTeams(((data as any) ?? []) as any);

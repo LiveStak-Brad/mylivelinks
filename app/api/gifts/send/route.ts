@@ -170,6 +170,57 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check if recipient is in an active battle and award battle points
+    let battlePointsAwarded = null;
+    try {
+      const { data: activeSession } = await adminSupabase
+        .from('live_sessions')
+        .select('id, type, status, host_a, host_b')
+        .or(`host_a.eq.${toUserId},host_b.eq.${toUserId}`)
+        .eq('type', 'battle')
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (activeSession) {
+        // Get sender profile data for battle supporter tracking
+        const { data: senderProfile } = await adminSupabase
+          .from('profiles')
+          .select('username, display_name, avatar_url')
+          .eq('id', user.id)
+          .single();
+
+        // Award battle points via internal API
+        const battleScoreResponse = await fetch(`${request.nextUrl.origin}/api/battle/score`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': request.headers.get('Authorization') || '',
+          },
+          body: JSON.stringify({
+            session_id: activeSession.id,
+            recipient_id: toUserId,
+            sender_id: user.id,
+            sender_username: senderProfile?.username || 'Unknown',
+            sender_display_name: senderProfile?.display_name,
+            sender_avatar_url: senderProfile?.avatar_url,
+            coin_amount: coinsAmount,
+          }),
+        });
+
+        if (battleScoreResponse.ok) {
+          const battleData = await battleScoreResponse.json();
+          battlePointsAwarded = {
+            side: battleData.side,
+            points: battleData.points_awarded,
+            boost_applied: battleData.boost_applied,
+            boost_multiplier: battleData.boost_multiplier,
+          };
+        }
+      }
+    } catch (battleErr) {
+      console.warn('[GIFT] Battle scoring failed (non-fatal)', { requestId, err: String(battleErr) });
+    }
+
     // Get updated sender balance
     const { data: senderProfile } = await adminSupabase
       .from('profiles')
@@ -185,6 +236,7 @@ export async function POST(request: NextRequest) {
       platformFee: data.platform_fee,
       chatInserted,
       streamId: finalStreamId,
+      battlePoints: battlePointsAwarded,
       senderBalance: {
         coins: senderProfile?.coin_balance || 0,
         diamonds: senderProfile?.earnings_balance || 0,

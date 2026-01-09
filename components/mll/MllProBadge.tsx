@@ -6,9 +6,10 @@ import { getOwnerProfileIds } from '@/lib/owner-ids';
 
 export type MllProBadgeSize = 'default' | 'compact';
 
+// Use em units to scale with text size - 2em container to prevent any clipping
 const SIZE_CLASSES: Record<MllProBadgeSize, string> = {
-  default: 'h-16 w-16',
-  compact: 'h-5 w-5',
+  default: 'h-[2em] w-[2em]',
+  compact: 'h-[2em] w-[2em]',
 };
 
 const OWNER_IDS = new Set(getOwnerProfileIds());
@@ -36,11 +37,11 @@ export function MllProBadge({
   const sizeClass = SIZE_CLASSES[size] ?? SIZE_CLASSES.default;
 
   return (
-    <span className={clsx('inline-flex items-center justify-center relative overflow-hidden', sizeClass, className)}>
+    <span className={clsx('inline-flex items-center justify-center relative flex-shrink-0 pr-1.5', sizeClass, className)}>
       <img
         src={newProBadge.src}
         alt={altText}
-        className="absolute inset-0 h-full w-full object-contain scale-[1.35]"
+        className="absolute inset-0 h-full w-full object-contain scale-[1.3]"
       />
     </span>
   );

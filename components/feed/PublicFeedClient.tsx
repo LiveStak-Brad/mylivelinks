@@ -7,6 +7,7 @@ import { Button, Card, Textarea } from '@/components/ui';
 import { FeedPostWithLikes } from './FeedPostWithLikes';
 import PostMedia from './PostMedia';
 import SafeRichText from '@/components/SafeRichText';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import GiftModal from '@/components/GiftModal';
 import ReportModal from '@/components/ReportModal';
 import { createClient } from '@/lib/supabase';
@@ -849,6 +850,7 @@ export default function PublicFeedClient({
                 <FeedPostWithLikes
                   postId={post.id}
                   initialLikesCount={post.likes_count}
+                  authorProfileId={post.author.id}
                   authorName={post.author.username}
                   authorUsername={post.author.username}
                   authorAvatarUrl={post.author.avatar_url}
@@ -902,12 +904,15 @@ export default function PublicFeedClient({
                                 <div className="flex-1 min-w-0">
                                   {/* Facebook-style comment bubble */}
                                   <div className="inline-block bg-muted/60 hover:bg-muted/80 transition-colors rounded-2xl px-3 py-2 max-w-[85%]">
-                                    <Link 
-                                      href={`/${c.author.username}`} 
-                                      className="text-[13px] font-semibold text-foreground hover:underline"
-                                    >
-                                      {c.author.username}
-                                    </Link>
+                                    <UserNameWithBadges
+                                      profileId={c.author.id}
+                                      name={c.author.username}
+                                      textSize="text-[13px]"
+                                      nameClassName="font-semibold text-foreground"
+                                      clickable
+                                      onClick={() => window.location.href = `/${c.author.username}`}
+                                      showGifterBadge={false}
+                                    />
                                     <div className="text-[14px] text-foreground leading-[1.4] mt-0.5 break-words">
                                       <SafeRichText text={c.text_content} className="whitespace-pre-wrap" />
                                     </div>
@@ -1042,12 +1047,15 @@ export default function PublicFeedClient({
                                           {/* Reply Content */}
                                           <div className="flex-1 min-w-0">
                                             <div className="inline-block bg-muted/60 hover:bg-muted/80 transition-colors rounded-2xl px-3 py-2 max-w-[85%]">
-                                              <Link 
-                                                href={`/${reply.author.username}`} 
-                                                className="text-[13px] font-semibold text-foreground hover:underline"
-                                              >
-                                                {reply.author.username}
-                                              </Link>
+                                              <UserNameWithBadges
+                                                profileId={reply.author.id}
+                                                name={reply.author.username}
+                                                textSize="text-[13px]"
+                                                nameClassName="font-semibold text-foreground"
+                                                clickable
+                                                onClick={() => window.location.href = `/${reply.author.username}`}
+                                                showGifterBadge={false}
+                                              />
                                               <div className="text-[14px] text-foreground leading-[1.4] mt-0.5 break-words">
                                                 <SafeRichText text={reply.text_content} className="whitespace-pre-wrap" />
                                               </div>

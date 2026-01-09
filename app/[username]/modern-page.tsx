@@ -39,6 +39,7 @@ import ProfileLivePlayer from '@/components/ProfileLivePlayer';
 import ProfileTypeBadge, { ProfileType } from '@/components/profile/ProfileTypeBadge';
 import TopFriendsDisplay from '@/components/profile/TopFriendsDisplay';
 import TopFriendsManager from '@/components/profile/TopFriendsManager';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import {
   getEnabledTabs,
   isSectionEnabled,
@@ -1173,9 +1174,16 @@ export default function ModernProfilePage() {
               
               {/* Info */}
               <div className="flex-1 text-center md:text-left w-full">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 break-words">
-                  {profile.display_name || profile.username}
-                </h1>
+                <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                  <UserNameWithBadges
+                    profileId={profile.id}
+                    name={profile.display_name || profile.username}
+                    gifterStatus={profileData?.gifter_statuses?.[profile.id]}
+                    textSize="text-2xl sm:text-3xl md:text-4xl"
+                    nameClassName="font-bold break-words"
+                    gifterBadgeSize="lg"
+                  />
+                </div>
                 <div className="flex items-center justify-center md:justify-start gap-2 mb-3">
                   <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg">
                     @{profile.username}
