@@ -35,6 +35,7 @@ import { Room, RoomEvent, Track, RemoteTrack, RemoteParticipant, TrackPublicatio
 import { DEBUG_LIVEKIT, TOKEN_ENDPOINT, canUserGoLiveSolo } from '@/lib/livekit-constants';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { GifterBadge as TierBadge } from '@/components/gifter';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import Chat from './Chat';
@@ -993,7 +994,6 @@ export default function SoloHostStream() {
 
     console.log('[SoloHostStream] User clicked Go Live from modal');
     setShowSetupModal(false);
-    setCurrentInvite(null);
     
     // Click the hidden GoLiveButton
     setTimeout(() => {
@@ -1779,12 +1779,15 @@ export default function SoloHostStream() {
                     />
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <span 
-                          className="font-bold text-white text-sm cursor-pointer hover:opacity-80"
+                        <UserNameWithBadges
+                          profileId={streamer.profile_id}
+                          name={streamer.display_name || streamer.username}
+                          gifterStatus={streamer.gifter_status}
+                          textSize="text-sm"
+                          nameClassName="font-bold text-white"
+                          clickable
                           onClick={() => setShowMiniProfile(true)}
-                        >
-                          {streamer.display_name || streamer.username}
-                        </span>
+                        />
                       </div>
                       {/* Trending/Leaderboard buttons row */}
                       <div className="flex items-center gap-2 text-xs text-white/80">

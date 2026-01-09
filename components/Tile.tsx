@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Gift, Heart, Maximize2, Minimize2, Volume2, VolumeX, X } from 'lucide-react';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
-import MllProBadge, { shouldShowMllProBadge } from '@/components/mll/MllProBadge';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import GiftModal from './GiftModal';
 import MiniProfile from './MiniProfile';
 import GiftAnimation from './GiftAnimation';
@@ -94,7 +94,6 @@ export default function Tile({
   const supabase = createClient();
   const shouldUseCompact = false;
   const isSelfTile = !!user && user.id === streamerId;
-  const showMllProBadge = shouldShowMllProBadge(streamerId);
   const gridIconSizeClass = compactMode ? 'w-4 h-4' : 'w-5 h-5';
   const gridNameMaxWidthClass = compactMode ? 'max-w-[55%]' : 'max-w-[70%]';
 
@@ -1372,20 +1371,15 @@ export default function Tile({
           <div className="flex flex-col items-end gap-1">
             {/* Username and Badge - ALWAYS VISIBLE */}
             <div className="flex items-center gap-2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-              <button
+              <UserNameWithBadges
+                profileId={streamerId}
+                name={streamerUsername}
+                gifterStatus={gifterStatus}
+                textSize="text-sm"
+                nameClassName="text-white font-semibold hover:text-blue-200 transition"
+                clickable
                 onClick={() => setShowMiniProfile(true)}
-                className="text-white text-sm font-semibold hover:text-blue-200 transition"
-              >
-                {streamerUsername}
-              </button>
-              {showMllProBadge && <MllProBadge size="compact" className="ml-0.5" />}
-              {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
-                <TierBadge
-                  tier_key={gifterStatus.tier_key}
-                  level={gifterStatus.level_in_tier}
-                  size="sm"
-                />
-              )}
+              />
             </div>
             
             {/* Leaderboard Rank - ALWAYS VISIBLE - Prestigious Display */}
@@ -1571,22 +1565,23 @@ export default function Tile({
                   <Gift className={gridIconSizeClass} />
                 </button>
               )}
-              <button
-                type="button"
+              <UserNameWithBadges
+                profileId={streamerId}
+                name={streamerUsername}
+                gifterStatus={gifterStatus}
+                textSize={compactMode ? 'text-[10px]' : 'text-xs'}
+                nameClassName={`text-white font-semibold drop-shadow min-w-0 ${
+                  compactMode
+                    ? 'leading-tight whitespace-normal break-words overflow-hidden max-h-7'
+                    : 'truncate flex-1'
+                }`}
+                clickable
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowMiniProfile(true);
                 }}
-                className={`text-white font-semibold drop-shadow min-w-0 ${
-                  compactMode
-                    ? 'text-[10px] leading-tight whitespace-normal break-words overflow-hidden max-h-7'
-                    : 'text-xs truncate flex-1'
-                }`}
-                title={streamerUsername}
-              >
-                {streamerUsername}
-              </button>
-              {showMllProBadge && <MllProBadge size="compact" className="ml-0.5" />}
+                showGifterBadge={false}
+              />
             </div>
 
             <div className="flex items-center gap-2 pointer-events-auto flex-shrink-0">
