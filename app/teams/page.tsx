@@ -29,6 +29,7 @@ type MyTeamRow = {
     approved_member_count: number;
     banner_url?: string | null;
     icon_url?: string | null;
+    display_photo_preference?: string | null;
   } | null;
 };
 
@@ -38,6 +39,7 @@ type RecentTeam = {
   name: string;
   banner_url: string | null;
   icon_url: string | null;
+  display_photo_preference: string | null;
   created_at: string;
   approved_member_count: number;
 };
@@ -293,6 +295,7 @@ export default function TeamsIndexPage() {
               team_tag,
               banner_url,
               icon_url,
+              display_photo_preference,
               approved_member_count
             )
           `
@@ -648,10 +651,10 @@ export default function TeamsIndexPage() {
                 </p>
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
-                    {ownerHeroData.primaryRow.team?.icon_url ? (
+                    {getTeamDisplayImage(ownerHeroData.primaryRow.team) ? (
                       <img
-                        src={ownerHeroData.primaryRow.team.icon_url!}
-                        alt={ownerHeroData.primaryRow.team.name}
+                        src={getTeamDisplayImage(ownerHeroData.primaryRow.team)!}
+                        alt={ownerHeroData.primaryRow.team?.name}
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -1015,6 +1018,19 @@ function hasTeamImage(team: { banner_url?: string | null; icon_url?: string | nu
   return Boolean(team?.banner_url || team?.icon_url);
 }
 
+function getTeamDisplayImage(team: { banner_url?: string | null; icon_url?: string | null; display_photo_preference?: string | null } | null | undefined): string | undefined {
+  if (!team) return undefined;
+  
+  // Use display_photo_preference if set, otherwise default to banner
+  const preference = team.display_photo_preference || 'banner';
+  
+  if (preference === 'icon') {
+    return team.icon_url || team.banner_url || undefined;
+  }
+  
+  return team.banner_url || team.icon_url || undefined;
+}
+
 function displayName(team: { name?: string | null; slug?: string | null } | null | undefined): string {
   const name = team?.name?.trim();
   if (name) return name;
@@ -1048,7 +1064,7 @@ function NewTeamTile({
   const team = card.team;
   const teamName = displayName(team);
   const hasImage = hasTeamImage(team);
-  const imageUrl = hasImage ? team.banner_url || team.icon_url || undefined : undefined;
+  const imageUrl = hasImage ? getTeamDisplayImage(team) : undefined;
   const memberCount = team.approved_member_count ?? 0;
   const avatars = buildAvatarItemsFromSamples(memberPreview, team.slug, memberCount);
   let statusLabel: TeamDiscoveryStatus = 'NEW';
@@ -1136,7 +1152,7 @@ function TeamCard({
   const isOwner = row.role === 'Team_Admin';
   const teamName = displayName(team);
   const hasImage = hasTeamImage(team);
-  const imageUrl = hasImage ? team.banner_url || team.icon_url || undefined : undefined;
+  const imageUrl = hasImage ? getTeamDisplayImage(team) : undefined;
   const statusLabel =
     row.status === 'requested'
       ? 'REQUESTED'

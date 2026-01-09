@@ -54,6 +54,7 @@ export default function LandingPage() {
       name: string;
       banner_url: string | null;
       icon_url: string | null;
+      display_photo_preference: string | null;
       created_at: string;
     }[]
   >([]);
@@ -397,13 +398,14 @@ export default function LandingPage() {
                 const fallbackGradients = [
                   'from-pink-500/30 to-purple-500/30',
                   'from-purple-500/30 to-blue-500/30',
-                  'from-rose-500/30 to-orange-500/30',
-                  'from-cyan-500/30 to-violet-500/30',
-                  'from-emerald-500/30 to-cyan-500/30',
+                  'from-blue-500/30 to-teal-500/30',
+                  'from-teal-500/30 to-green-500/30',
                 ];
                 const gradient = fallbackGradients[idx % fallbackGradients.length];
                 const team = card.kind === 'team' ? card.team : null;
-                const imageUrl = team?.banner_url || team?.icon_url || null;
+                // Use display_photo_preference to determine which photo to show
+                const preference = team?.display_photo_preference || 'banner';
+                const imageUrl = team ? (preference === 'icon' ? (team.icon_url || team.banner_url) : (team.banner_url || team.icon_url)) : null;
 
                 const cardInner = (
                   <>
@@ -492,13 +494,14 @@ export default function LandingPage() {
               const fallbackGradients = [
                 'from-pink-500/30 to-purple-500/30',
                 'from-purple-500/30 to-blue-500/30',
-                'from-rose-500/30 to-orange-500/30',
-                'from-cyan-500/30 to-violet-500/30',
-                'from-emerald-500/30 to-cyan-500/30',
+                'from-blue-500/30 to-teal-500/30',
+                'from-teal-500/30 to-green-500/30',
               ];
               const gradient = fallbackGradients[idx % fallbackGradients.length];
               const team = card.kind === 'team' ? card.team : null;
-              const imageUrl = team?.banner_url || team?.icon_url || null;
+              // Use display_photo_preference to determine which photo to show
+              const preference = team?.display_photo_preference || 'banner';
+              const imageUrl = team ? (preference === 'icon' ? (team.icon_url || team.banner_url) : (team.banner_url || team.icon_url)) : null;
 
               const tile = (
                 <>
