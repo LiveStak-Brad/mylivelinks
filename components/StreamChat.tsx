@@ -1343,11 +1343,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                           <UserNameWithBadges
                             profileId={msg.profile_id}
                             name={msg.display_name || msg.username || 'Unknown'}
-                            gifterStatus={msg.gifter_tier_key && Number(msg.lifetime_coins ?? 0) > 0 ? {
-                              tier_key: msg.gifter_tier_key,
-                              level_in_tier: msg.gifter_level ?? 1,
-                              lifetime_coins: msg.lifetime_coins ?? 0
-                            } : undefined}
+                            gifterStatus={undefined}
                             textSize={usernameTextClass}
                             nameClassName="text-white hover:text-blue-300 transition"
                             clickable

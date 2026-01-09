@@ -23,7 +23,7 @@ interface UserNameWithBadgesProps {
   /** Gifter badge size variant */
   gifterBadgeSize?: 'sm' | 'md' | 'lg';
   /** Optional click handler for the name */
-  onClick?: () => void;
+  onClick?: (e?: any) => void;
   /** Whether name is clickable (shows hover styles) */
   clickable?: boolean;
   /** Optional children to render after badges */
