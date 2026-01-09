@@ -588,34 +588,25 @@ export default function BattleGridWrapper({
   const showConnectingOverlay = !participantsReady && !allowEmptyState;
 
   // Handle cooldown actions
-  const handleStayPaired = useCallback(async () => {
-    // Convert battle back to cohost
-    console.log('[BattleGridWrapper] Stay Paired clicked');
+  const handleRematch = useCallback(async () => {
+    // Send battle invite to start a new battle
+    console.log('[BattleGridWrapper] Rematch clicked');
     try {
-      const supabase = createClient();
-      const { error } = await supabase.rpc('rpc_battle_to_cohost', {
-        p_session_id: session.session_id,
+      const response = await fetch('/api/battle/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: session.session_id,
+        }),
       });
-      if (error) {
-        console.error('[BattleGridWrapper] Stay Paired error:', error);
+      if (!response.ok) {
+        throw new Error('Failed to send battle invite');
       }
-      // Session will update via realtime subscription
+      // Battle invite sent, other host will see popup
     } catch (err) {
-      console.error('[BattleGridWrapper] Stay Paired error:', err);
+      console.error('[BattleGridWrapper] Rematch error:', err);
     }
   }, [session.session_id]);
-
-  const handleRematch = useCallback(async () => {
-    // Start a rematch
-    console.log('[BattleGridWrapper] Rematch clicked');
-    // TODO: Implement via useBattleSession.triggerRematch
-  }, []);
-
-  const handleLeave = useCallback(async () => {
-    // End session and disconnect
-    console.log('[BattleGridWrapper] Leave clicked');
-    // TODO: Implement via useBattleSession.endCurrentSession
-  }, []);
 
   const handleStartBattle = useCallback(async () => {
     // Send battle invite from cohost session
@@ -772,9 +763,7 @@ export default function BattleGridWrapper({
       
       {isBattleSession && isInCooldown && canPublish && (
         <BattleCooldownControls
-          onStayPaired={handleStayPaired}
           onRematch={handleRematch}
-          onLeave={handleLeave}
         />
       )}
       
