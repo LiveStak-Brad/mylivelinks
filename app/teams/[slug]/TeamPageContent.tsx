@@ -763,8 +763,15 @@ function RequestToJoinState({
   };
 
   // Use displayPhotoPreference to determine which photo to show
+  console.log('[RequestToJoinState] team.displayPhotoPreference:', team.displayPhotoPreference);
+  console.log('[RequestToJoinState] team.iconUrl:', team.iconUrl);
+  console.log('[RequestToJoinState] team.bannerUrl:', team.bannerUrl);
+  
   const displayPhoto = team.displayPhotoPreference === 'icon' ? team.iconUrl : team.bannerUrl;
   const hasDisplayPhoto = team.displayPhotoPreference === 'icon' ? !!team.iconUrl : !!team.bannerUrl;
+  
+  console.log('[RequestToJoinState] displayPhoto:', displayPhoto);
+  console.log('[RequestToJoinState] hasDisplayPhoto:', hasDisplayPhoto);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
@@ -877,8 +884,15 @@ function PendingRequestState({
   const router = useRouter();
 
   // Use displayPhotoPreference to determine which photo to show
+  console.log('[PendingRequestState] team.displayPhotoPreference:', team.displayPhotoPreference);
+  console.log('[PendingRequestState] team.iconUrl:', team.iconUrl);
+  console.log('[PendingRequestState] team.bannerUrl:', team.bannerUrl);
+  
   const displayPhoto = team.displayPhotoPreference === 'icon' ? team.iconUrl : team.bannerUrl;
   const hasDisplayPhoto = team.displayPhotoPreference === 'icon' ? !!team.iconUrl : !!team.bannerUrl;
+  
+  console.log('[PendingRequestState] displayPhoto:', displayPhoto);
+  console.log('[PendingRequestState] hasDisplayPhoto:', hasDisplayPhoto);
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
