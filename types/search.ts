@@ -5,6 +5,7 @@ export interface PersonResult {
   avatarUrl?: string | null;
   mutualCount: number;
   verified: boolean;
+  isMllPro?: boolean;
   location?: string | null;
   online: boolean;
   status?: string | null;
@@ -50,11 +51,38 @@ export interface LiveResult {
   startsAt?: string | null;
 }
 
+export interface MusicTrackResult {
+  id: string;
+  title: string;
+  artistName?: string | null;
+  audioUrl: string;
+  profileId: string;
+  profileUsername: string;
+  profileDisplayName?: string | null;
+  profileAvatarUrl?: string | null;
+  createdAt: string;
+}
+
+export interface MusicVideoResult {
+  id: string;
+  title: string;
+  videoType: 'upload' | 'youtube';
+  videoUrl?: string | null;
+  youtubeId?: string | null;
+  profileId: string;
+  profileUsername: string;
+  profileDisplayName?: string | null;
+  profileAvatarUrl?: string | null;
+  createdAt: string;
+}
+
 export interface SearchResultsBundle {
   people: PersonResult[];
   posts: PostResult[];
   teams: TeamResult[];
   live: LiveResult[];
+  music: MusicTrackResult[];
+  videos: MusicVideoResult[];
 }
 
 export type SearchResultCategory = keyof SearchResultsBundle;

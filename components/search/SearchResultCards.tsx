@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowUpRight, MapPin, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { MllProBadge } from '@/components/mll/MllProBadge';
 import type { PersonResult, PostResult, TeamResult, LiveResult } from '@/types/search';
 
 export function PersonResultCard({ person, query }: { person: PersonResult; query: string }) {
@@ -36,10 +37,8 @@ export function PersonResultCard({ person, query }: { person: PersonResult; quer
               <div>
                 <div className="flex items-center gap-2 text-base font-semibold">
                   <HighlightedText text={person.name} query={query} />
-                  {person.verified && (
-                    <Badge variant="primary" size="sm">
-                      Verified
-                    </Badge>
+                  {person.isMllPro && (
+                    <MllProBadge size="compact" clickable={false} />
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -112,6 +111,16 @@ export function PostResultCard({ post, query }: { post: PostResult; query: strin
           <p className="text-base leading-relaxed">
             <HighlightedText text={post.text} query={query} />
           </p>
+          {post.mediaUrl && (
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-muted">
+              <img 
+                src={post.mediaUrl} 
+                alt="Post media" 
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            </div>
+          )}
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <Badge variant="secondary" size="sm">
               {post.likeCount} likes
@@ -211,9 +220,9 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
     <>
       {parts.map((part, index) =>
         index % 2 === 1 ? (
-          <mark key={`${part}-${index}`} className="rounded bg-primary/15 px-0.5 text-primary">
+          <span key={`${part}-${index}`} className="font-semibold text-primary">
             {part}
-          </mark>
+          </span>
         ) : (
           <span key={`${part}-${index}`}>{part}</span>
         )

@@ -6,6 +6,8 @@ import type {
   PostResult,
   SearchResultsBundle,
   TeamResult,
+  MusicTrackResult,
+  MusicVideoResult,
 } from '@/types/search';
 
 const PERSON_GRADIENTS = [
@@ -22,6 +24,8 @@ const DEFAULT_LIMITS: SearchResultsLimits = {
   posts: 5,
   teams: 5,
   live: 5,
+  music: 5,
+  videos: 5,
 };
 
 export type SearchResultsLimits = Partial<Record<keyof SearchResultsBundle, number>>;
@@ -51,11 +55,22 @@ export async function fetchSearchResults({
   const peopleLimit = resolvedLimits.people ?? DEFAULT_LIMITS.people ?? 5;
   const teamsLimit = resolvedLimits.teams ?? DEFAULT_LIMITS.teams ?? 5;
   const liveLimit = resolvedLimits.live ?? DEFAULT_LIMITS.live ?? 5;
+  const musicLimit = resolvedLimits.music ?? DEFAULT_LIMITS.music ?? 5;
+  const videosLimit = resolvedLimits.videos ?? DEFAULT_LIMITS.videos ?? 5;
 
-  const [peopleResponse, postsResponse, teamPostsResponse, teamsResponse, liveResponse] = await Promise.all([
+  // First, find matching profile IDs for author-based searches
+  const matchingProfilesResponse = await supabase
+    .from('profiles')
+    .select('id')
+    .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
+    .limit(50);
+  
+  const matchingProfileIds = (matchingProfilesResponse.data ?? []).map((p: any) => p.id);
+
+  const [peopleResponse, postsResponse, teamPostsResponse, teamsResponse, liveResponse, musicResponse, videosResponse, postsByAuthorResponse, musicByProfileResponse, videosByProfileResponse] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url, is_live, follower_count, adult_verified_at, bio')
+      .select('id, username, display_name, avatar_url, is_live, follower_count, adult_verified_at, bio, is_mll_pro')
       .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
       .order('follower_count', { ascending: false })
       .limit(peopleLimit),
@@ -77,13 +92,7 @@ export async function fetchSearchResults({
         )
       `
       )
-      .or(
-        [
-          `text_content.ilike.${likePattern}`,
-          `author.username.ilike.${likePattern}`,
-          `author.display_name.ilike.${likePattern}`,
-        ].join(',')
-      )
+      .ilike('text_content', likePattern)
       .order('created_at', { ascending: false })
       .limit(postsFetchCap),
     supabase
@@ -109,15 +118,7 @@ export async function fetchSearchResults({
         )
       `
       )
-      .or(
-        [
-          `text_content.ilike.${likePattern}`,
-          `team.name.ilike.${likePattern}`,
-          `team.slug.ilike.${likePattern}`,
-          `author.username.ilike.${likePattern}`,
-          `author.display_name.ilike.${likePattern}`,
-        ].join(',')
-      )
+      .ilike('text_content', likePattern)
       .order('created_at', { ascending: false })
       .limit(postsFetchCap),
     supabase
@@ -133,6 +134,106 @@ export async function fetchSearchResults({
       .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
       .order('username')
       .limit(liveLimit),
+    supabase
+      .from('profile_music_tracks')
+      .select(`
+        id,
+        title,
+        artist_name,
+        audio_url,
+        created_at,
+        profile:profiles!profile_music_tracks_profile_id_fkey (
+          id,
+          username,
+          display_name,
+          avatar_url
+        )
+      `)
+      .ilike('title', likePattern)
+      .order('created_at', { ascending: false })
+      .limit(musicLimit),
+    supabase
+      .from('profile_music_videos')
+      .select(`
+        id,
+        title,
+        video_type,
+        video_url,
+        youtube_id,
+        created_at,
+        profile:profiles!profile_music_videos_profile_id_fkey (
+          id,
+          username,
+          display_name,
+          avatar_url
+        )
+      `)
+      .ilike('title', likePattern)
+      .order('created_at', { ascending: false })
+      .limit(videosLimit),
+    // Additional queries to find content BY matching users
+    matchingProfileIds.length > 0
+      ? supabase
+          .from('posts')
+          .select(`
+            id,
+            text_content,
+            created_at,
+            media_url,
+            like_count,
+            comment_count,
+            author:profiles!posts_author_id_fkey (
+              id,
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .in('author_id', matchingProfileIds)
+          .order('created_at', { ascending: false })
+          .limit(postsFetchCap)
+      : Promise.resolve({ data: [], error: null }),
+    matchingProfileIds.length > 0
+      ? supabase
+          .from('profile_music_tracks')
+          .select(`
+            id,
+            title,
+            artist_name,
+            audio_url,
+            created_at,
+            profile:profiles!profile_music_tracks_profile_id_fkey (
+              id,
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .in('profile_id', matchingProfileIds)
+          .order('created_at', { ascending: false })
+          .limit(musicLimit)
+      : Promise.resolve({ data: [], error: null }),
+    matchingProfileIds.length > 0
+      ? supabase
+          .from('profile_music_videos')
+          .select(`
+            id,
+            title,
+            video_type,
+            video_url,
+            youtube_id,
+            created_at,
+            profile:profiles!profile_music_videos_profile_id_fkey (
+              id,
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .in('profile_id', matchingProfileIds)
+          .order('created_at', { ascending: false })
+          .limit(videosLimit)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   validateResponse(peopleResponse.error, 'profiles');
@@ -140,19 +241,59 @@ export async function fetchSearchResults({
   validateResponse(teamPostsResponse.error, 'team_feed_posts');
   validateResponse(teamsResponse.error, 'teams');
   validateResponse(liveResponse.error, 'live');
+  validateResponse(musicResponse.error, 'profile_music_tracks');
+  validateResponse(videosResponse.error, 'profile_music_videos');
+
+  // Combine posts from text search + posts by matching authors (dedupe by id)
+  const allPostRows = [
+    ...(postsResponse.data ?? []),
+    ...(postsByAuthorResponse.data ?? []),
+  ];
+  const seenPostIds = new Set<string>();
+  const dedupedPostRows = allPostRows.filter((row) => {
+    if (seenPostIds.has(row.id)) return false;
+    seenPostIds.add(row.id);
+    return true;
+  });
 
   const combinedPosts = [
-    ...(postsResponse.data ?? []).map((row) => mapGlobalPostRow(row)),
+    ...dedupedPostRows.map((row) => mapGlobalPostRow(row)),
     ...(teamPostsResponse.data ?? []).map((row) => mapTeamPostRow(row)),
   ]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, postsLimit);
+
+  // Combine music from title search + music by matching profiles (dedupe)
+  const allMusicRows = [
+    ...(musicResponse.data ?? []),
+    ...(musicByProfileResponse.data ?? []),
+  ];
+  const seenMusicIds = new Set<string>();
+  const dedupedMusicRows = allMusicRows.filter((row) => {
+    if (seenMusicIds.has(row.id)) return false;
+    seenMusicIds.add(row.id);
+    return true;
+  });
+
+  // Combine videos from title search + videos by matching profiles (dedupe)
+  const allVideoRows = [
+    ...(videosResponse.data ?? []),
+    ...(videosByProfileResponse.data ?? []),
+  ];
+  const seenVideoIds = new Set<string>();
+  const dedupedVideoRows = allVideoRows.filter((row) => {
+    if (seenVideoIds.has(row.id)) return false;
+    seenVideoIds.add(row.id);
+    return true;
+  });
 
   return {
     people: (peopleResponse.data ?? []).map((row, index) => mapProfileRow(row, index)),
     posts: combinedPosts,
     teams: (teamsResponse.data ?? []).map((row) => mapTeamRow(row)),
     live: (liveResponse.data ?? []).map((row) => mapLiveRow(row)),
+    music: dedupedMusicRows.map((row) => mapMusicTrackRow(row)).slice(0, musicLimit),
+    videos: dedupedVideoRows.map((row) => mapMusicVideoRow(row)).slice(0, videosLimit),
   };
 }
 
@@ -168,6 +309,7 @@ function mapProfileRow(row: any, index: number): PersonResult {
     avatarUrl: row.avatar_url,
     mutualCount: Number(row.follower_count ?? 0),
     verified: Boolean(row.is_verified ?? row.verified ?? row.adult_verified_at),
+    isMllPro: Boolean(row.is_mll_pro),
     location: null,
     online: Boolean(row.is_live),
     status: row.bio ?? undefined,
@@ -242,11 +384,42 @@ function validateResponse(error: any, source: string) {
   }
 }
 
+function mapMusicTrackRow(row: any): MusicTrackResult {
+  return {
+    id: row.id,
+    title: row.title ?? 'Untitled Track',
+    artistName: row.artist_name,
+    audioUrl: row.audio_url ?? '',
+    profileId: row.profile?.id ?? '',
+    profileUsername: row.profile?.username ?? 'unknown',
+    profileDisplayName: row.profile?.display_name,
+    profileAvatarUrl: row.profile?.avatar_url,
+    createdAt: row.created_at ?? new Date().toISOString(),
+  };
+}
+
+function mapMusicVideoRow(row: any): MusicVideoResult {
+  return {
+    id: row.id,
+    title: row.title ?? 'Untitled Video',
+    videoType: row.video_type ?? 'upload',
+    videoUrl: row.video_url,
+    youtubeId: row.youtube_id,
+    profileId: row.profile?.id ?? '',
+    profileUsername: row.profile?.username ?? 'unknown',
+    profileDisplayName: row.profile?.display_name,
+    profileAvatarUrl: row.profile?.avatar_url,
+    createdAt: row.created_at ?? new Date().toISOString(),
+  };
+}
+
 function emptyResults(): SearchResultsBundle {
   return {
     people: [],
     posts: [],
     teams: [],
     live: [],
+    music: [],
+    videos: [],
   };
 }

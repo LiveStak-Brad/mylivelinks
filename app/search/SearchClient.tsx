@@ -123,7 +123,7 @@ export default function SearchClient() {
             .from('posts')
             .select(`
               id,
-              content,
+              text_content,
               created_at,
               media_url,
               author:profiles!posts_author_id_fkey (
@@ -133,13 +133,13 @@ export default function SearchClient() {
                 avatar_url
               )
             `)
-            .ilike('content', `%${searchLower}%`)
+            .ilike('text_content', `%${searchLower}%`)
             .order('created_at', { ascending: false })
             .limit(searchCategory === 'all' ? 5 : 20);
 
           const formattedPosts: PostResult[] = (postResults || []).map((post: any) => ({
             id: post.id,
-            content: post.content,
+            content: post.text_content || '',
             created_at: post.created_at,
             media_url: post.media_url,
             author_id: post.author?.id || '',

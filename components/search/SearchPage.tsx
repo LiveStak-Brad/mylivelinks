@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { ReactNode, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -15,6 +15,21 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
+  Home,
+  Tv,
+  Users,
+  Trophy,
+  Heart,
+  Settings,
+  Wallet,
+  Music,
+  Video,
+  Compass,
+  Gift,
+  Crown,
+  Star,
+  MessageSquare,
+  ArrowRight,
 } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -30,8 +45,10 @@ import {
   SearchFilterKey,
   SearchTab,
   TAB_TO_ROUTE,
+  SEARCHABLE_PAGES,
+  type SearchablePage,
 } from './constants';
-import type { PersonResult, PostResult, TeamResult, LiveResult } from '@/types/search';
+import type { PersonResult, PostResult, TeamResult, LiveResult, MusicTrackResult, MusicVideoResult } from '@/types/search';
 import {
   LiveResultCard,
   PersonResultCard,
@@ -103,6 +120,8 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
   const [postResults, setPostResults] = useState<PostResult[]>([]);
   const [teamResults, setTeamResults] = useState<TeamResult[]>([]);
   const [liveResults, setLiveResults] = useState<LiveResult[]>([]);
+  const [musicResults, setMusicResults] = useState<MusicTrackResult[]>([]);
+  const [videoResults, setVideoResults] = useState<MusicVideoResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -129,6 +148,9 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
         return true;
       });
 
+    // Media = posts with media_url (photos/videos that aren't music videos)
+    const mediaResults = postResults.filter((post) => post.mediaUrl);
+
     return {
       people: applyPeopleFilters(basePeople),
       posts: postResults,
@@ -137,17 +159,33 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
         if (filtersSet.has('live') && !live.isLive) return false;
         return true;
       }),
+      media: mediaResults,
+      music: musicResults,
+      videos: videoResults,
     };
-  }, [filtersSet, nearbyEnabled, nearbyResults, peopleResults, postResults, teamResults, liveResults]);
+  }, [filtersSet, nearbyEnabled, nearbyResults, peopleResults, postResults, teamResults, liveResults, musicResults, videoResults]);
 
   const topResults = useMemo(() => {
     return {
-      people: filteredWithToggles.people.slice(0, 2),
-      posts: filteredWithToggles.posts.slice(0, 2),
-      teams: filteredWithToggles.teams.slice(0, 2),
-      live: filteredWithToggles.live.slice(0, 2),
+      people: filteredWithToggles.people?.slice(0, 2) ?? [],
+      posts: filteredWithToggles.posts?.slice(0, 2) ?? [],
+      teams: filteredWithToggles.teams?.slice(0, 2) ?? [],
+      live: filteredWithToggles.live?.slice(0, 2) ?? [],
+      media: filteredWithToggles.media?.slice(0, 2) ?? [],
+      music: filteredWithToggles.music?.slice(0, 2) ?? [],
+      videos: filteredWithToggles.videos?.slice(0, 2) ?? [],
     };
   }, [filteredWithToggles]);
+
+  const matchingPages = useMemo(() => {
+    const query = urlQuery.trim().toLowerCase();
+    if (!query) return [];
+    return SEARCHABLE_PAGES.filter((page) => {
+      if (page.name.toLowerCase().includes(query)) return true;
+      if (page.aliases.some((alias) => alias.toLowerCase().includes(query))) return true;
+      return false;
+    });
+  }, [urlQuery]);
 
   useEffect(() => {
     const trimmedQuery = urlQuery.trim();
@@ -164,9 +202,11 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
     }
 
     const peopleLimit = activeTab === 'people' ? 20 : 5;
-    const postsLimit = activeTab === 'posts' ? 20 : 5;
+    const postsLimit = (activeTab === 'posts' || activeTab === 'media') ? 20 : 5;
     const teamsLimit = activeTab === 'teams' ? 20 : 5;
     const liveLimit = activeTab === 'live' ? 20 : 5;
+    const musicLimit = activeTab === 'music' ? 20 : 5;
+    const videosLimit = activeTab === 'videos' ? 20 : 5;
 
     setStatus('loading');
     setSearchError(null);
@@ -181,18 +221,22 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
             posts: postsLimit,
             teams: teamsLimit,
             live: liveLimit,
+            music: musicLimit,
+            videos: videosLimit,
           },
         });
 
         if (cancelled) return;
 
-        setPeopleResults(results.people);
-        setPostResults(results.posts);
-        setTeamResults(results.teams);
-        setLiveResults(results.live);
+        setPeopleResults(results.people ?? []);
+        setPostResults(results.posts ?? []);
+        setTeamResults(results.teams ?? []);
+        setLiveResults(results.live ?? []);
+        setMusicResults(results.music ?? []);
+        setVideoResults(results.videos ?? []);
 
         const totalMatches =
-          results.people.length + results.posts.length + results.teams.length + results.live.length;
+          (results.people?.length ?? 0) + (results.posts?.length ?? 0) + (results.teams?.length ?? 0) + (results.live?.length ?? 0) + (results.music?.length ?? 0) + (results.videos?.length ?? 0);
         setStatus(totalMatches > 0 ? 'results' : 'empty');
       } catch (error) {
         if (cancelled) return;
@@ -215,10 +259,13 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
     }
 
     const total =
-      filteredWithToggles.people.length +
-      filteredWithToggles.posts.length +
-      filteredWithToggles.teams.length +
-      filteredWithToggles.live.length;
+      (filteredWithToggles?.people?.length ?? 0) +
+      (filteredWithToggles?.posts?.length ?? 0) +
+      (filteredWithToggles?.teams?.length ?? 0) +
+      (filteredWithToggles?.live?.length ?? 0) +
+      (filteredWithToggles?.media?.length ?? 0) +
+      (filteredWithToggles?.music?.length ?? 0) +
+      (filteredWithToggles?.videos?.length ?? 0);
 
     if (total === 0 && status !== 'empty') {
       setStatus('empty');
@@ -317,9 +364,8 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
 
       updater(params);
       const nextTab = targetTab ?? activeTab;
-      if (!params.get('tab')) {
-        params.set('tab', nextTab);
-      }
+      // Always set the tab parameter to the target tab
+      params.set('tab', nextTab);
 
       const basePath = TAB_TO_ROUTE[nextTab] ?? '/search';
       const queryString = params.toString();
@@ -445,7 +491,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
         );
       }
 
-      if (!nearbyLoading && filteredWithToggles.people.length === 0) {
+      if (!nearbyLoading && (filteredWithToggles.people?.length ?? 0) === 0) {
         return (
           <EmptyState
             icon={<MapPin className="h-10 w-10 text-primary" />}
@@ -499,7 +545,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
           <EmptyState
             icon={<Sparkles className="h-10 w-10 text-primary" />}
             title="Search anything"
-            description="People, posts, teams, live, Link — one bar. Try “weekly live drops” or “verified in LA”."
+            description="People, posts, teams, live, Link â€” one bar. Try â€œweekly live dropsâ€ or â€œverified in LAâ€."
             action={{
               label: 'Browse teams',
               onClick: () => router.push('/teams'),
@@ -522,7 +568,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
             <CardContent className="flex flex-col gap-3 p-6 text-sm">
               <div className="flex items-center gap-3 text-destructive">
                 <AlertCircle className="h-5 w-5" />
-                <span>{searchError ?? 'Can’t reach MyLiveLinks right now.'}</span>
+                <span>{searchError ?? 'Canâ€™t reach MyLiveLinks right now.'}</span>
               </div>
               <p className="text-muted-foreground">
                 Something went wrong while searching. Check your connection or try again.
@@ -552,10 +598,54 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
     }
   };
 
+  const getPageIcon = (iconName: SearchablePage['icon']) => {
+    const iconClass = 'h-5 w-5';
+    switch (iconName) {
+      case 'home': return <Home className={iconClass} />;
+      case 'tv': return <Tv className={iconClass} />;
+      case 'users': return <Users className={iconClass} />;
+      case 'trophy': return <Trophy className={iconClass} />;
+      case 'heart': return <Heart className={iconClass} />;
+      case 'settings': return <Settings className={iconClass} />;
+      case 'wallet': return <Wallet className={iconClass} />;
+      case 'music': return <Music className={iconClass} />;
+      case 'video': return <Video className={iconClass} />;
+      case 'compass': return <Compass className={iconClass} />;
+      case 'gift': return <Gift className={iconClass} />;
+      case 'crown': return <Crown className={iconClass} />;
+      case 'star': return <Star className={iconClass} />;
+      case 'message': return <MessageSquare className={iconClass} />;
+      default: return <ArrowRight className={iconClass} />;
+    }
+  };
+
   const renderResults = () => {
     if (activeTab === 'top') {
       return (
         <div className="space-y-8">
+          {matchingPages.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-base font-semibold">Pages</h3>
+              <div className="space-y-2">
+                {matchingPages.map((page) => (
+                  <a
+                    key={page.id}
+                    href={page.route}
+                    className="flex items-center gap-4 p-4 rounded-xl bg-card border border-border hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
+                      {getPageIcon(page.icon)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-foreground">{page.name}</p>
+                      <p className="text-sm text-muted-foreground">{page.description}</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
           {Object.entries(topResults).map(([category, items]) => {
             if (items.length === 0) return null;
 
@@ -581,7 +671,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
     }
 
     const collectionKey = activeTab as keyof typeof filteredWithToggles;
-    const data = filteredWithToggles[collectionKey];
+    const data = filteredWithToggles[collectionKey] ?? [];
     return (
       <div className="space-y-3">
         {renderCards(collectionKey, data)}
@@ -590,6 +680,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
   };
 
   const renderCards = (category: keyof typeof filteredWithToggles, data: unknown[]) => {
+    if (!data || !Array.isArray(data)) return null;
     switch (category) {
       case 'people':
         return (data as typeof filteredWithToggles.people).map((person) => (
@@ -606,6 +697,74 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
       case 'live':
         return (data as typeof filteredWithToggles.live).map((live) => (
           <LiveResultCard key={live.id} live={live} query={urlQuery} />
+        ));
+      case 'media':
+        return (data as typeof filteredWithToggles.media).map((post) => (
+          <PostResultCard key={post.id} post={post} query={urlQuery} />
+        ));
+      case 'music':
+        return (data as typeof filteredWithToggles.music).map((track) => (
+          <div key={track.id} className="p-4 rounded-xl bg-card border border-border">
+            <div className="flex items-center gap-3">
+              {track.profileAvatarUrl ? (
+                <img src={track.profileAvatarUrl} alt={track.profileUsername} className="w-10 h-10 rounded-full object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
+                  {track.profileUsername?.charAt(0).toUpperCase() ?? '?'}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-foreground truncate">{track.title}</p>
+                {track.artistName && <p className="text-sm text-muted-foreground truncate">{track.artistName}</p>}
+                <p className="text-xs text-muted-foreground">by @{track.profileUsername}</p>
+              </div>
+              {track.audioUrl && (
+                <audio controls className="h-8 max-w-[200px]">
+                  <source src={track.audioUrl} type="audio/mpeg" />
+                </audio>
+              )}
+            </div>
+          </div>
+        ));
+      case 'videos':
+        return (data as typeof filteredWithToggles.videos).map((video) => (
+          <div key={video.id} className="p-4 rounded-xl bg-card border border-border">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                {video.profileAvatarUrl ? (
+                  <img src={video.profileAvatarUrl} alt={video.profileUsername} className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold">
+                    {video.profileUsername?.charAt(0).toUpperCase() ?? '?'}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground">{video.title}</p>
+                  <p className="text-xs text-muted-foreground">by @{video.profileUsername}</p>
+                </div>
+              </div>
+              {video.videoType === 'youtube' && video.youtubeId && (
+                <div className="aspect-video rounded-lg overflow-hidden">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    src={`https://www.youtube.com/embed/${video.youtubeId}`}
+                    title={video.title}
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+              {video.videoType === 'upload' && video.videoUrl && (
+                <div className="aspect-video rounded-lg overflow-hidden bg-black">
+                  <video controls className="w-full h-full">
+                    <source src={video.videoUrl} type="video/mp4" />
+                  </video>
+                </div>
+              )}
+            </div>
+          </div>
         ));
       default:
         return null;
@@ -779,7 +938,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
               </Button>
             </div>
             {nearbyLoading && (
-              <p className="text-xs text-muted-foreground">Loading Nearby matches…</p>
+              <p className="text-xs text-muted-foreground">Loading Nearby matchesâ€¦</p>
             )}
             {nearbyError && (
               <p className="text-xs text-destructive">

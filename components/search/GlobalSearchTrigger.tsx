@@ -252,8 +252,8 @@ export function GlobalSearchTrigger({
 
   return (
     <div className={cn('relative w-full', className)}>
-      <div className="hidden md:flex w-full items-center">
-        <div className="relative w-full max-w-xl">
+      <div className="flex w-full items-center">
+        <div className="relative w-full">
           <Input
             ref={desktopInputRef}
             value={query}
@@ -276,11 +276,11 @@ export function GlobalSearchTrigger({
               }
             }}
             placeholder="Search MyLiveLinks"
-            className="h-11 rounded-full pl-11 pr-16 bg-muted/60 border-transparent backdrop-blur"
+            className="h-9 md:h-11 rounded-full pl-9 md:pl-11 pr-4 md:pr-16 bg-muted/60 border-transparent backdrop-blur text-sm md:text-base"
             inputSize="lg"
           />
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+          <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
+          <div className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 items-center gap-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
             <Command className="w-4 h-4" />
             K
           </div>
@@ -696,9 +696,9 @@ function highlightMatches(text: string, query: string) {
     <>
       {parts.map((part, index) =>
         index % 2 === 1 ? (
-          <mark key={`${part}-${index}`} className="rounded bg-primary/15 text-primary">
+          <span key={`${part}-${index}`} className="font-semibold text-primary">
             {part}
-          </mark>
+          </span>
         ) : (
           <span key={`${part}-${index}`}>{part}</span>
         )

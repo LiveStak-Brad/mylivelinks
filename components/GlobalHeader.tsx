@@ -234,7 +234,6 @@ export default function GlobalHeader() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [appMenuOpen, setAppMenuOpen] = useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const supabase = useMemo(() => createClient(), []);
 
@@ -279,7 +278,6 @@ export default function GlobalHeader() {
     const handleResize = () => {
       if (window.innerWidth >= 768) {
         setAppMenuOpen(false);
-        setMobileSearchOpen(false);
       }
     };
     window.addEventListener('resize', handleResize);
@@ -331,8 +329,7 @@ export default function GlobalHeader() {
         className="global-header-bar sticky top-0 z-[60] bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
         role="banner"
       >
-        <div className="mx-auto flex h-14 sm:h-16 lg:h-[60px] w-full items-center gap-3 px-3 md:px-4 lg:px-6">
-          {/* Mobile Layout: Hamburger → Logo → Search Icon → Profile */}
+        <div className="mx-auto flex h-14 sm:h-16 lg:h-[60px] w-full items-center justify-between gap-4 px-3 md:px-6 lg:px-8">
           <div className="flex w-full items-center gap-2 md:hidden">
             <IconButton
               aria-label="Open app menu"
@@ -348,42 +345,24 @@ export default function GlobalHeader() {
               <SmartBrandLogo size={120} className="h-6 w-auto" />
             </Link>
 
-            <div className="flex-1" />
-
-            <IconButton
-              aria-label="Search MyLiveLinks"
-              size="lg"
-              variant="ghost"
-              onClick={() => setMobileSearchOpen(true)}
-              className="flex-shrink-0"
-            >
-              <Search className="h-5 w-5" />
-            </IconButton>
-            
-            <UserMenuSheet className="header-profile-trigger flex-shrink-0" />
-          </div>
-
-          {/* Desktop Layout: Hamburger → Logo → Search (center, grows) → Nav Icons → Profile */}
-          <div className="hidden w-full items-center gap-3 md:flex">
-            <IconButton
-              aria-label="Open app menu"
-              size="lg"
-              variant="ghost"
-              onClick={() => setAppMenuOpen(true)}
-              className="flex-shrink-0"
-            >
-              <Menu className="h-5 w-5" />
-            </IconButton>
-
-            <Link href="/" aria-label="MyLiveLinks Home" className="flex items-center flex-shrink-0">
-              <SmartBrandLogo size={140} className="h-8 w-auto" />
-            </Link>
-
-            <div className="flex-1 max-w-2xl mx-auto">
+            <div className="flex-1 min-w-0">
               <GlobalSearchTrigger className="w-full" mobileVariant="none" />
             </div>
 
-            <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
+            <UserMenuSheet className="header-profile-trigger flex-shrink-0" />
+          </div>
+
+          <div className="hidden w-full items-center gap-4 md:flex">
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              <Link href="/" aria-label="MyLiveLinks Home" className="flex items-center flex-shrink-0">
+                <SmartBrandLogo size={140} className="h-8 w-auto" />
+              </Link>
+              <div className="w-full max-w-xl">
+                <GlobalSearchTrigger className="w-full" mobileVariant="none" />
+              </div>
+            </div>
+
+            <div className="flex flex-none items-center justify-center gap-2 lg:gap-3 px-2">
               <nav
                 className="flex items-center gap-1 xl:gap-2"
                 role="navigation"
@@ -423,6 +402,9 @@ export default function GlobalHeader() {
                   <Video className={`${HEADER_ICON_CLASS} text-red-500 dark:text-red-400`} strokeWidth={2} />
                 </button>
               )}
+            </div>
+
+            <div className="flex min-w-[220px] flex-1 items-center justify-end gap-2">
               {isLoggedIn && <HeaderIcons />}
               {isOwner && (
                 <Link
@@ -440,19 +422,10 @@ export default function GlobalHeader() {
           </div>
         </div>
 
-        <div className="h-0 overflow-hidden md:hidden">
-          <GlobalSearchTrigger
-            className="h-0 overflow-hidden"
-            mobileVariant="none"
-            overlayOpen={mobileSearchOpen}
-            onOverlayOpenChange={setMobileSearchOpen}
-          />
-        </div>
 
         <AppMenuDrawer
           isOpen={appMenuOpen}
           onClose={() => setAppMenuOpen(false)}
-          onOpenSearch={() => setMobileSearchOpen(true)}
           isOwner={isOwner}
         />
       </header>

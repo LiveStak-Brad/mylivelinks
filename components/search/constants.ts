@@ -10,6 +10,8 @@ import {
   Link2,
   HeartHandshake,
   MessagesSquare,
+  Music,
+  Video,
 } from 'lucide-react';
 import type { PersonResult, PostResult, TeamResult, LiveResult } from '@/types/search';
 
@@ -19,6 +21,9 @@ export type SearchTab =
   | 'posts'
   | 'teams'
   | 'live'
+  | 'media'
+  | 'music'
+  | 'videos'
   | 'link'
   | 'dating'
   | 'messages';
@@ -61,6 +66,24 @@ export const PRIMARY_TABS: SearchTabDefinition[] = [
     description: 'Streams + live rooms',
     icon: Radio,
   },
+  {
+    id: 'media',
+    label: 'Media',
+    description: 'Photos and videos',
+    icon: Video,
+  },
+  {
+    id: 'music',
+    label: 'Music',
+    description: 'Tracks and audio',
+    icon: Music,
+  },
+  {
+    id: 'videos',
+    label: 'Music Videos',
+    description: 'Music videos',
+    icon: Video,
+  },
 ];
 
 export const MORE_TABS: SearchTabDefinition[] = [
@@ -90,6 +113,9 @@ export const TAB_TO_ROUTE: Record<SearchTab, string> = {
   posts: '/search/posts',
   teams: '/search/teams',
   live: '/search/live',
+  media: '/search/media',
+  music: '/search/music',
+  videos: '/search/videos',
   link: '/search',
   dating: '/search',
   messages: '/search',
@@ -119,3 +145,29 @@ export const MOCK_SUGGESTED_QUERIES = [
 ];
 
 export const QUICK_JUMP_TARGETS: SearchTab[] = ['people', 'posts', 'teams', 'live'];
+
+export interface SearchablePage {
+  id: string;
+  name: string;
+  aliases: string[];
+  route: string;
+  description: string;
+  icon: 'home' | 'tv' | 'users' | 'trophy' | 'heart' | 'settings' | 'wallet' | 'music' | 'video' | 'compass' | 'gift' | 'crown' | 'star' | 'message';
+}
+
+export const SEARCHABLE_PAGES: SearchablePage[] = [
+  { id: 'home', name: 'Home', aliases: ['main', 'landing'], route: '/', description: 'Home page', icon: 'home' },
+  { id: 'feed', name: 'Feed', aliases: ['timeline', 'posts', 'social'], route: '/feed', description: 'Your social feed', icon: 'compass' },
+  { id: 'livetv', name: 'LiveTV', aliases: ['live tv', 'tv', 'streams', 'streaming', 'broadcast', 'watch'], route: '/liveTV', description: 'Watch live streams', icon: 'tv' },
+  { id: 'teams', name: 'Teams', aliases: ['communities', 'groups', 'clubs'], route: '/teams', description: 'Browse and join teams', icon: 'users' },
+  { id: 'leaderboards', name: 'Leaderboards', aliases: ['leaderboard', 'rankings', 'top creators', 'leaders', 'rank'], route: '/leaderboards', description: 'Top creators and gifters', icon: 'trophy' },
+  { id: 'link', name: 'Link', aliases: ['link or nah', 'dating', 'connections', 'matches'], route: '/link', description: 'Link or Nah - Find connections', icon: 'heart' },
+  { id: 'trending', name: 'Trending', aliases: ['popular', 'hot', 'viral'], route: '/trending', description: 'Trending content', icon: 'star' },
+  { id: 'wallet', name: 'Wallet', aliases: ['coins', 'balance', 'money', 'earnings', 'payments', 'diamonds'], route: '/wallet', description: 'Your wallet and earnings', icon: 'wallet' },
+  { id: 'gifter-levels', name: 'Gifter Levels', aliases: ['gifter', 'gifts', 'gifting', 'levels', 'tiers'], route: '/gifter-levels', description: 'Gifter level rewards', icon: 'gift' },
+  { id: 'settings', name: 'Settings', aliases: ['preferences', 'account', 'options', 'config', 'profile settings'], route: '/settings', description: 'Account settings', icon: 'settings' },
+  { id: 'messages', name: 'Messages', aliases: ['inbox', 'dms', 'chat', 'conversations'], route: '/messages', description: 'Your messages', icon: 'message' },
+  { id: 'noties', name: 'Notifications', aliases: ['alerts', 'noties', 'notifs', 'notifications'], route: '/noties', description: 'Your notifications', icon: 'star' },
+  { id: 'mll-pro', name: 'MLL Pro', aliases: ['premium', 'subscription', 'upgrade', 'mll pro', 'mylivelinks pro', 'pro'], route: '/mll-pro', description: 'Upgrade to MLL Pro', icon: 'crown' },
+  { id: 'referrals', name: 'Referrals', aliases: ['refer', 'invite friends', 'share'], route: '/referrals', description: 'Refer friends and earn', icon: 'gift' },
+];
