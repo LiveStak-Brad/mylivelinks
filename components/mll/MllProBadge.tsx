@@ -2,7 +2,6 @@
 
 import clsx from 'clsx';
 import newProBadge from '@/newprobadge.png';
-import { getOwnerProfileIds } from '@/lib/owner-ids';
 
 export type MllProBadgeSize = 'default' | 'compact';
 
@@ -12,14 +11,11 @@ const SIZE_CLASSES: Record<MllProBadgeSize, string> = {
   compact: 'h-[2em] w-[2em]',
 };
 
-const OWNER_IDS = new Set(getOwnerProfileIds());
-
 export function shouldShowMllProBadge(
   profileId?: string | null,
   profile?: { is_mll_pro?: boolean }
 ): boolean {
   if (!profileId) return false;
-  if (OWNER_IDS.has(profileId)) return true;
   return profile?.is_mll_pro === true;
 }
 
