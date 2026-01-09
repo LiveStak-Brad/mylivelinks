@@ -39,6 +39,7 @@ import BattleCooldownControls from './BattleCooldownControls';
 import BoostRoundIndicator from './BoostRoundIndicator';
 import CohostStartBattleButton from './CohostStartBattleButton';
 import useBattleScores from '@/hooks/useBattleScores';
+import { createClient } from '@/lib/supabase';
 
 const normalizeParticipantId = (identity: string): string => {
   return identity
@@ -139,7 +140,7 @@ export default function BattleGridWrapper({
 
   // Battle states with real scores and team-relative colors
   const battleStates = useMemo(() => {
-    if (!isBattleSession || !scores) {
+    if (!isBattleSession) {
       return new Map<string, BattleParticipantState>();
     }
 
@@ -155,8 +156,9 @@ export default function BattleGridWrapper({
     const currentUserColor = isCurrentUserHostA ? TEAM_COLORS.A : TEAM_COLORS.B;
     const otherUserColor = isCurrentUserHostA ? TEAM_COLORS.B : TEAM_COLORS.A;
     
-    const scoreA = scores.points.A || 0;
-    const scoreB = scores.points.B || 0;
+    // Use scores if available, otherwise default to 0
+    const scoreA = scores?.points.A || 0;
+    const scoreB = scores?.points.B || 0;
     const isALeading = scoreA >= scoreB;
 
     // Current user state (always first in grid)
@@ -581,10 +583,20 @@ export default function BattleGridWrapper({
   // Handle cooldown actions
   const handleStayPaired = useCallback(async () => {
     // Convert battle back to cohost
-    // This would call an API endpoint to update session type
     console.log('[BattleGridWrapper] Stay Paired clicked');
-    // TODO: Implement API call
-  }, []);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.rpc('rpc_battle_to_cohost', {
+        p_session_id: session.session_id,
+      });
+      if (error) {
+        console.error('[BattleGridWrapper] Stay Paired error:', error);
+      }
+      // Session will update via realtime subscription
+    } catch (err) {
+      console.error('[BattleGridWrapper] Stay Paired error:', err);
+    }
+  }, [session.session_id]);
 
   const handleRematch = useCallback(async () => {
     // Start a rematch
