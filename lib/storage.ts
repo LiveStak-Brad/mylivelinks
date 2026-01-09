@@ -42,6 +42,17 @@ export async function uploadAvatar(
     throw new Error('Failed to get avatar URL');
   }
 
+  // Update profiles table with new avatar URL
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ avatar_url: urlData.publicUrl })
+    .eq('id', profileId);
+
+  if (updateError) {
+    console.error('Error updating profile avatar_url:', updateError);
+    throw new Error(`Failed to update profile: ${updateError.message}`);
+  }
+
   return urlData.publicUrl;
 }
 
