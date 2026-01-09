@@ -735,7 +735,7 @@ function RequestToJoinState({
   team, 
   teamSlug 
 }: { 
-  team: { name: string; teamTag: string; iconUrl?: string; bannerUrl?: string; description?: string; approvedMemberCount: number };
+  team: { name: string; teamTag: string; iconUrl?: string; bannerUrl?: string; displayPhotoPreference?: 'banner' | 'icon'; description?: string; approvedMemberCount: number };
   teamSlug: string;
 }) {
   const { toast } = useToast();
@@ -762,14 +762,18 @@ function RequestToJoinState({
     }
   };
 
+  // Use displayPhotoPreference to determine which photo to show
+  const displayPhoto = team.displayPhotoPreference === 'icon' ? team.iconUrl : team.bannerUrl;
+  const hasDisplayPhoto = team.displayPhotoPreference === 'icon' ? !!team.iconUrl : !!team.bannerUrl;
+
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       {/* Banner */}
       <div className="relative h-48 w-full overflow-hidden">
-        {team.bannerUrl ? (
+        {hasDisplayPhoto && displayPhoto ? (
           <>
             <Image
-              src={team.bannerUrl}
+              src={displayPhoto}
               alt={`${team.name} banner`}
               fill
               className="object-cover"
@@ -868,18 +872,22 @@ function RequestToJoinState({
 function PendingRequestState({ 
   team 
 }: { 
-  team: { name: string; teamTag: string; iconUrl?: string; bannerUrl?: string; description?: string; approvedMemberCount: number };
+  team: { name: string; teamTag: string; iconUrl?: string; bannerUrl?: string; displayPhotoPreference?: 'banner' | 'icon'; description?: string; approvedMemberCount: number };
 }) {
   const router = useRouter();
+
+  // Use displayPhotoPreference to determine which photo to show
+  const displayPhoto = team.displayPhotoPreference === 'icon' ? team.iconUrl : team.bannerUrl;
+  const hasDisplayPhoto = team.displayPhotoPreference === 'icon' ? !!team.iconUrl : !!team.bannerUrl;
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white">
       {/* Banner */}
       <div className="relative h-48 w-full overflow-hidden">
-        {team.bannerUrl ? (
+        {hasDisplayPhoto && displayPhoto ? (
           <>
             <Image
-              src={team.bannerUrl}
+              src={displayPhoto}
               alt={`${team.name} banner`}
               fill
               className="object-cover"
@@ -3317,6 +3325,36 @@ function SettingsScreen({
     }
   };
 
+  const handleDisplayPhotoChange = async (preference: 'banner' | 'icon') => {
+    if (!teamId) {
+      toast({ title: 'Unable to update', description: 'Team not loaded yet.', variant: 'error' });
+      return;
+    }
+    if (!isLeader) {
+      toast({ title: 'Forbidden', description: 'Only Team Admins can change display photo.', variant: 'error' });
+      return;
+    }
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('teams')
+        .update({ display_photo_preference: preference })
+        .eq('id', teamId);
+
+      if (error) throw error;
+
+      await refreshTeam();
+      toast({
+        title: 'Display photo updated',
+        description: `Landing page will now show your ${preference === 'banner' ? 'banner' : 'team photo'}.`,
+        variant: 'success',
+      });
+    } catch (err: any) {
+      toast({ title: 'Update failed', description: err?.message || 'Unknown error', variant: 'error' });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -3409,6 +3447,38 @@ function SettingsScreen({
                     </Button>
                   </div>
                 </div>
+              </div>
+            </div>
+            
+            {/* Display Photo Preference */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <p className="text-sm font-semibold text-white">Landing Page Display Photo</p>
+              <p className="text-xs text-white/50 mb-3">Choose which photo to display on home/team landing page.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDisplayPhotoChange('banner')}
+                  disabled={!team.bannerUrl}
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    team.displayPhotoPreference === 'banner'
+                      ? 'border-purple-500 bg-purple-500/20 text-purple-200'
+                      : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10'
+                  } ${!team.bannerUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  Banner
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDisplayPhotoChange('icon')}
+                  disabled={!team.iconUrl}
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    team.displayPhotoPreference === 'icon'
+                      ? 'border-purple-500 bg-purple-500/20 text-purple-200'
+                      : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10'
+                  } ${!team.iconUrl ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  Team Photo
+                </button>
               </div>
             </div>
           </div>

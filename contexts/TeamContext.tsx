@@ -33,6 +33,7 @@ export interface TeamData {
   rules?: string;
   iconUrl?: string;
   bannerUrl?: string;
+  displayPhotoPreference?: 'banner' | 'icon';
   themeColor?: string;
   approvedMemberCount: number;
   pendingRequestCount: number;
@@ -289,6 +290,7 @@ export function TeamProvider({ teamSlug, children }: TeamProviderProps) {
             rules: data.rules,
             iconUrl: data.icon_url,
             bannerUrl: data.banner_url,
+            displayPhotoPreference: data.display_photo_preference || 'banner',
             themeColor: data.theme_color,
             approvedMemberCount: data.approved_member_count,
             pendingRequestCount: data.pending_request_count,
