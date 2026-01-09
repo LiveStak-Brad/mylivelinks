@@ -1,9 +1,10 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import MllProBadge, { shouldShowMllProBadge } from '@/components/mll/MllProBadge';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
+import { createClient } from '@/lib/supabase';
 
 interface UserNameWithBadgesProps {
   /** Profile ID for MLL PRO badge check */
@@ -64,7 +65,29 @@ export default function UserNameWithBadges({
   clickable = false,
   children,
 }: UserNameWithBadgesProps) {
-  const showMllPro = shouldShowMllProBadge(profileId);
+  const [isMllPro, setIsMllPro] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!profileId) {
+      setIsMllPro(false);
+      return;
+    }
+
+    const supabase = createClient();
+    supabase
+      .from('profiles')
+      .select('is_mll_pro')
+      .eq('id', profileId)
+      .single()
+      .then(({ data }) => {
+        setIsMllPro(data?.is_mll_pro === true);
+      })
+      .catch(() => {
+        setIsMllPro(false);
+      });
+  }, [profileId]);
+
+  const showMllPro = shouldShowMllProBadge(profileId, { is_mll_pro: isMllPro });
   const hasGifterBadge = showGifterBadge && gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0;
 
   const nameElement = (
