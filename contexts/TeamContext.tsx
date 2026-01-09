@@ -7,6 +7,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   ReactNode,
 } from 'react';
 import { createClient } from '@/lib/supabase';
