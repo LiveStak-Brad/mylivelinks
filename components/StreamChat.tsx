@@ -17,6 +17,7 @@ interface ChatMessage {
   id: number | string;
   profile_id: string | null;
   username?: string;
+  display_name?: string;
   avatar_url?: string;
   message_type: string;
   content: string;
