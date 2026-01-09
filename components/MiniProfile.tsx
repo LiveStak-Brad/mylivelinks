@@ -408,16 +408,6 @@ export default function MiniProfile({
                 )}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 truncate">@{username}</p>
-                      backgroundColor: `${badgeColor || '#94A3B8'}20`,
-                      color: badgeColor || '#94A3B8',
-                      border: `1px solid ${badgeColor || '#94A3B8'}40`,
-                    }}
-                  >
-                    <span className="font-bold">{gifterLevel}</span>
-                    <span>{badgeName || `Level ${gifterLevel}`}</span>
-                  </span>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
