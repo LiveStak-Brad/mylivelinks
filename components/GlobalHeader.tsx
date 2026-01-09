@@ -331,45 +331,59 @@ export default function GlobalHeader() {
         className="global-header-bar sticky top-0 z-[60] bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
         role="banner"
       >
-        <div className="mx-auto flex h-14 sm:h-16 lg:h-[60px] w-full items-center justify-between gap-4 px-3 md:px-6 lg:px-8">
-          <div className="flex w-full items-center gap-3 md:hidden">
+        <div className="mx-auto flex h-14 sm:h-16 lg:h-[60px] w-full items-center gap-3 px-3 md:px-4 lg:px-6">
+          {/* Mobile Layout: Hamburger → Logo → Search Icon → Profile */}
+          <div className="flex w-full items-center gap-2 md:hidden">
             <IconButton
               aria-label="Open app menu"
               size="lg"
               variant="ghost"
               onClick={() => setAppMenuOpen(true)}
+              className="flex-shrink-0"
             >
               <Menu className="h-5 w-5" />
             </IconButton>
 
-            <Link href="/" className="flex flex-1 justify-center" aria-label="MyLiveLinks Home">
-              <SmartBrandLogo size={128} className="h-7 w-auto" />
+            <Link href="/" className="flex items-center flex-shrink-0" aria-label="MyLiveLinks Home">
+              <SmartBrandLogo size={120} className="h-6 w-auto" />
             </Link>
 
-            <div className="flex items-center gap-2">
-              <IconButton
-                aria-label="Search MyLiveLinks"
-                size="lg"
-                variant="ghost"
-                onClick={() => setMobileSearchOpen(true)}
-              >
-                <Search className="h-5 w-5" />
-              </IconButton>
-              <UserMenuSheet className="header-profile-trigger" />
-            </div>
+            <div className="flex-1" />
+
+            <IconButton
+              aria-label="Search MyLiveLinks"
+              size="lg"
+              variant="ghost"
+              onClick={() => setMobileSearchOpen(true)}
+              className="flex-shrink-0"
+            >
+              <Search className="h-5 w-5" />
+            </IconButton>
+            
+            <UserMenuSheet className="header-profile-trigger flex-shrink-0" />
           </div>
 
-          <div className="hidden w-full items-center gap-4 md:flex">
-            <div className="flex min-w-0 flex-1 items-center gap-4">
-              <Link href="/" aria-label="MyLiveLinks Home" className="flex items-center flex-shrink-0">
-                <SmartBrandLogo size={140} className="h-8 w-auto" />
-              </Link>
-              <div className="w-full max-w-xl">
-                <GlobalSearchTrigger className="w-full" mobileVariant="none" />
-              </div>
+          {/* Desktop Layout: Hamburger → Logo → Search (center, grows) → Nav Icons → Profile */}
+          <div className="hidden w-full items-center gap-3 md:flex">
+            <IconButton
+              aria-label="Open app menu"
+              size="lg"
+              variant="ghost"
+              onClick={() => setAppMenuOpen(true)}
+              className="flex-shrink-0"
+            >
+              <Menu className="h-5 w-5" />
+            </IconButton>
+
+            <Link href="/" aria-label="MyLiveLinks Home" className="flex items-center flex-shrink-0">
+              <SmartBrandLogo size={140} className="h-8 w-auto" />
+            </Link>
+
+            <div className="flex-1 max-w-2xl mx-auto">
+              <GlobalSearchTrigger className="w-full" mobileVariant="none" />
             </div>
 
-            <div className="flex flex-none items-center justify-center gap-2 lg:gap-3 px-2">
+            <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
               <nav
                 className="flex items-center gap-1 xl:gap-2"
                 role="navigation"
@@ -409,9 +423,6 @@ export default function GlobalHeader() {
                   <Video className={`${HEADER_ICON_CLASS} text-red-500 dark:text-red-400`} strokeWidth={2} />
                 </button>
               )}
-            </div>
-
-            <div className="flex min-w-[220px] flex-1 items-center justify-end gap-2">
               {isLoggedIn && <HeaderIcons />}
               {isOwner && (
                 <Link
