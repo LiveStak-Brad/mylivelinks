@@ -2860,7 +2860,7 @@ function ChatMessageRow({ message }: { message: ChatMessage & { _isPending?: boo
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <UserNameWithBadges
-            profileId={message.authorId}
+            profileId={message.author.id}
             name={message.author.name}
             textSize="text-sm"
             nameClassName="font-semibold text-white"

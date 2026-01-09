@@ -208,8 +208,13 @@ BEGIN
 
     -- Sort supporters by points desc, limit to 100 retained entries
     v_supporter_array := (
-      SELECT jsonb_agg(elem ORDER BY (elem ->> 'points')::BIGINT DESC LIMIT 100)
-      FROM jsonb_array_elements(v_supporter_array) elem
+      SELECT jsonb_agg(elem ORDER BY (elem ->> 'points')::BIGINT DESC)
+      FROM (
+        SELECT elem
+        FROM jsonb_array_elements(v_supporter_array) elem
+        ORDER BY (elem ->> 'points')::BIGINT DESC
+        LIMIT 100
+      ) AS limited
     );
 
     v_row.supporter_stats := jsonb_build_object('supporters', v_supporter_array);

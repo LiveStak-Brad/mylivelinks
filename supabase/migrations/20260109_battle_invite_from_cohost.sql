@@ -50,16 +50,12 @@ BEGIN
     v_other_host_id := v_session.host_a;
   END IF;
   
-  -- Check for existing pending battle invite for this session
-  SELECT COUNT(*) INTO v_existing_pending
-  FROM live_session_invites
+  -- Cancel any existing pending battle invites for this session
+  UPDATE live_session_invites
+  SET status = 'declined', responded_at = now()
   WHERE session_id = p_session_id
     AND type = 'battle'
     AND status = 'pending';
-    
-  IF v_existing_pending > 0 THEN
-    RAISE EXCEPTION 'Battle invite already pending for this session';
-  END IF;
   
   -- Create the battle invite (linked to existing session)
   INSERT INTO live_session_invites (
