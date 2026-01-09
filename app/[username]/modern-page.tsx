@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { uploadAvatar } from '@/lib/storage';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -24,6 +25,7 @@ import {
   Calendar,
   ShoppingCart,
   Flag,
+  Camera,
 } from 'lucide-react';
 import SocialCountsWidget from '@/components/profile/SocialCountsWidget';
 import TopSupportersWidget from '@/components/profile/TopSupportersWidget';
@@ -233,6 +235,10 @@ export default function ModernProfilePage() {
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItemRow | null>(null);
   
   const supabase = createClient();
+  const changePhotoInputRef = useRef<HTMLInputElement>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoSuccess, setPhotoSuccess] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   
   useEffect(() => {
     loadProfile();
@@ -1071,14 +1077,39 @@ export default function ModernProfilePage() {
                 ) : (
                   <div>
                     {profile.avatar_url ? (
-                      <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden ring-4 ring-white/50 shadow-lg">
-                        <Image
-                          src={profile.avatar_url}
-                          alt={profile.username}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 640px) 96px, 128px"
-                        />
+                      <div className="relative w-24 h-24 sm:w-32 sm:h-32">
+                        <div className="relative w-full h-full rounded-full overflow-hidden ring-4 ring-white/50 shadow-lg">
+                          <Image
+                            src={profile.avatar_url}
+                            alt={profile.username}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 96px, 128px"
+                          />
+                        </div>
+                        {isOwnProfile && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPhotoError(null);
+                              setPhotoSuccess(false);
+                              changePhotoInputRef.current?.click();
+                            }}
+                            className="absolute inset-0 rounded-full bg-black/40 text-white opacity-0 hover:opacity-100 transition flex flex-col items-center justify-center gap-1"
+                          >
+                            {photoUploading ? (
+                              <svg className="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            ) : (
+                              <>
+                                <Camera className="h-6 w-6" />
+                                <span className="text-xs font-semibold">Change Photo</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <div 
@@ -1087,6 +1118,54 @@ export default function ModernProfilePage() {
                       >
                         {profile.username[0].toUpperCase()}
                       </div>
+                    )}
+                    {isOwnProfile && !profile.avatar_url && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhotoError(null);
+                          setPhotoSuccess(false);
+                          changePhotoInputRef.current?.click();
+                        }}
+                        className="mt-2 inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-1.5 text-white font-semibold text-sm hover:bg-white/30 transition"
+                      >
+                        <Camera className="h-4 w-4" /> Change Photo
+                      </button>
+                    )}
+                    {isOwnProfile && (
+                      <>
+                        <input
+                          ref={changePhotoInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (event) => {
+                            const file = event.target.files?.[0];
+                            if (!file || !profileData?.profile?.id) return;
+                            try {
+                              setPhotoUploading(true);
+                              setPhotoError(null);
+                              setPhotoSuccess(false);
+                              const url = await uploadAvatar(profileData.profile.id, file);
+                              setProfileData((prev) => prev ? ({ ...prev, profile: { ...prev.profile, avatar_url: url } }) : prev);
+                              setPhotoSuccess(true);
+                              setTimeout(() => setPhotoSuccess(false), 4000);
+                            } catch (err: any) {
+                              console.error('Change photo failed:', err);
+                              setPhotoError(err?.message || 'Failed to update photo');
+                            } finally {
+                              setPhotoUploading(false);
+                              if (event.target) event.target.value = '';
+                            }
+                          }}
+                        />
+                        {(photoSuccess || photoError) && (
+                          <div className="mt-2 text-sm text-center">
+                            {photoSuccess && <span className="text-emerald-200">✅ Profile photo updated</span>}
+                            {photoError && <span className="text-red-200">❌ {photoError}</span>}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}

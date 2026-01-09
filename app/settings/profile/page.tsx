@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
@@ -116,6 +116,108 @@ export default function ProfileSettingsPage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const currentSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        avatarUrl,
+        displayName,
+        bio,
+        gender,
+        locationInfo,
+        social: {
+          instagram: socialInstagram,
+          twitter: socialTwitter,
+          youtube: socialYoutube,
+          tiktok: socialTiktok,
+          facebook: socialFacebook,
+          twitch: socialTwitch,
+          discord: socialDiscord,
+          snapchat: socialSnapchat,
+          linkedin: socialLinkedin,
+          github: socialGithub,
+          spotify: socialSpotify,
+          onlyfans: socialOnlyfans,
+        },
+        hideStreamingStats,
+        customization,
+        showTopFriends,
+        topFriendsTitle,
+        topFriendsAvatarStyle,
+        topFriendsMaxCount,
+        profileType,
+        enabledModules,
+        enabledTabs,
+        links,
+        pinnedPostCaption,
+        pinnedPostMediaPreview,
+        pinnedPostMediaType,
+        pinnedPostHasFile: Boolean(pinnedPostMedia),
+        pinnedPostId: pinnedPost?.id ?? null,
+        selectedFilter,
+        invitedByUsername,
+        referralId,
+      }),
+    [
+      avatarUrl,
+      displayName,
+      bio,
+      gender,
+      locationInfo,
+      socialInstagram,
+      socialTwitter,
+      socialYoutube,
+      socialTiktok,
+      socialFacebook,
+      socialTwitch,
+      socialDiscord,
+      socialSnapchat,
+      socialLinkedin,
+      socialGithub,
+      socialSpotify,
+      socialOnlyfans,
+      hideStreamingStats,
+      customization,
+      showTopFriends,
+      topFriendsTitle,
+      topFriendsAvatarStyle,
+      topFriendsMaxCount,
+      profileType,
+      enabledModules,
+      enabledTabs,
+      links,
+      pinnedPostCaption,
+      pinnedPostMediaPreview,
+      pinnedPostMediaType,
+      pinnedPostMedia,
+      pinnedPost,
+      selectedFilter,
+      invitedByUsername,
+      referralId,
+    ]
+  );
+
+  useEffect(() => {
+    if (loading) {
+      setInitialSnapshot(null);
+      setHasUnsavedChanges(false);
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    if (!loading && initialSnapshot === null) {
+      setInitialSnapshot(currentSnapshot);
+      setHasUnsavedChanges(false);
+    }
+  }, [loading, initialSnapshot, currentSnapshot]);
+
+  useEffect(() => {
+    if (initialSnapshot === null) return;
+    setHasUnsavedChanges(currentSnapshot !== initialSnapshot);
+  }, [currentSnapshot, initialSnapshot]);
 
   useEffect(() => {
     checkAuth();
@@ -447,6 +549,7 @@ export default function ProfileSettingsPage() {
         // Update avatar URL if upload succeeded
         if (avatarResult.status === 'fulfilled' && avatarResult.value) {
           updatePayload.avatar_url = avatarResult.value;
+          setAvatarUrl(avatarResult.value);
         }
 
         // Add profile_type to payload if API call failed
@@ -544,12 +647,18 @@ export default function ProfileSettingsPage() {
         // Wait for all parallel operations to complete
         await Promise.all([linksPromise, pinnedPostPromise]);
 
-      setSuccessMessage('✅ Profile saved successfully! Redirecting...');
-      
-      // Give user time to see success message before redirecting
-      setTimeout(() => {
-        router.push(`/${username}`);
-      }, 1500);
+        setPinnedPostMedia(null);
+        if (avatarInputRef.current) {
+          avatarInputRef.current.value = '';
+        }
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+
+        setSuccessMessage('✅ Profile updated');
+        setTimeout(() => setSuccessMessage(''), 4000);
+        setInitialSnapshot(null);
+        setHasUnsavedChanges(false);
       } catch (error: any) {
         console.error('Error saving profile:', error);
         const errMsg = error?.message || error?.toString() || 'Unknown error';
@@ -728,7 +837,7 @@ export default function ProfileSettingsPage() {
         {/* Profile Photo */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">Profile Photo</h2>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
             <div className="relative">
               {avatarUrl ? (
                 <div className="relative w-24 h-24 rounded-full overflow-hidden">
@@ -759,6 +868,34 @@ export default function ProfileSettingsPage() {
               >
                 Change Photo
               </button>
+              <button
+                onClick={handleSave}
+                disabled={!hasUnsavedChanges || saving}
+                className={`mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition ${
+                  !hasUnsavedChanges || saving
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+              >
+                {saving ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    💾 Save Profile
+                  </>
+                )}
+              </button>
+              {hasUnsavedChanges && !saving && (
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  You have unsaved changes.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -952,7 +1089,7 @@ export default function ProfileSettingsPage() {
           <div className="flex gap-4 items-center">
             <button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || !hasUnsavedChanges}
               className="flex-1 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
             >
               {saving ? (
@@ -975,7 +1112,7 @@ export default function ProfileSettingsPage() {
             </button>
           </div>
           <p className="text-white/90 text-sm text-center mt-2">
-            Changes will be saved to your profile
+            {hasUnsavedChanges ? 'Unsaved changes detected' : 'No changes to save'}
           </p>
         </div>
 

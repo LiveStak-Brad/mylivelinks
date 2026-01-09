@@ -100,6 +100,8 @@ interface LeaderboardRank {
   next_rank: number;
 }
 
+const EARLY_ACCESS_BANNER_STORAGE_KEY = 'mll_solo_host_early_access_banner_v2_dismissed';
+
 function computeRankFromLeaderboardRows(profileId: string, rows: any[]): LeaderboardRank {
   const list = Array.isArray(rows) ? rows : [];
   const mapped = list
@@ -191,6 +193,7 @@ export default function SoloHostStream() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
   const [showStreamGifters, setShowStreamGifters] = useState(false);
+  const [showEarlyAccessBanner, setShowEarlyAccessBanner] = useState(false);
   const [showTrending, setShowTrending] = useState(false);
   const [showMiniProfile, setShowMiniProfile] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -201,7 +204,31 @@ export default function SoloHostStream() {
   const [showCooldown, setShowCooldown] = useState(false);
   const [leaderboardRank, setLeaderboardRank] = useState<LeaderboardRank | null>(null);
   const [trendingRank, setTrendingRank] = useState<number | null>(null);
-  
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const dismissed = window.localStorage.getItem(EARLY_ACCESS_BANNER_STORAGE_KEY) === 'true';
+      setShowEarlyAccessBanner(!dismissed);
+    } catch (error) {
+      console.warn('[SoloHostStream] Unable to read early access banner state:', error);
+      setShowEarlyAccessBanner(true);
+    }
+  }, []);
+
+  const handleDismissEarlyAccessBanner = useCallback(() => {
+    setShowEarlyAccessBanner(false);
+
+    if (typeof window === 'undefined') return;
+
+    try {
+      window.localStorage.setItem(EARLY_ACCESS_BANNER_STORAGE_KEY, 'true');
+    } catch (error) {
+      console.warn('[SoloHostStream] Unable to persist early access banner dismissal:', error);
+    }
+  }, []);
+
   // Battle/Cohost session state
   const {
     session: battleSession,
@@ -1431,20 +1458,10 @@ export default function SoloHostStream() {
       }
 
       setIsScreenSharing(false);
-      console.log('[SoloHostStream] Reverted to camera successfully');
+      console.log('[SoloHostStream] Screen share stopped successfully');
       
     } catch (err) {
       console.error('[SoloHostStream] Error stopping screen share:', err);
-      setIsScreenSharing(false);
-    }
-  };
-
-  // Toggle screen share
-  const handleToggleScreenShare = () => {
-    if (isScreenSharing) {
-      handleStopScreenShare();
-    } else {
-      handleStartScreenShare();
     }
   };
 
@@ -1836,7 +1853,7 @@ export default function SoloHostStream() {
               className="absolute z-30 left-4 right-4 flex items-center justify-between pointer-events-none"
               style={{ top: 'calc(max(1rem, env(safe-area-inset-top)) + 3.25rem)' }}
             >
-              <div className="flex items-center gap-2 pointer-events-auto">
+              <div className="flex flex-col gap-2 pointer-events-auto">
                 {leaderboardRank && leaderboardRank.current_rank > 0 && leaderboardRank.current_rank <= 100 && (
                   <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-yellow-500/90 to-orange-500/90 border-2 border-yellow-400/50 shadow-lg shadow-yellow-500/30 backdrop-blur-md w-fit">
                     <span className={`text-[13px] font-bold ${
@@ -1890,6 +1907,27 @@ export default function SoloHostStream() {
                       </span>
                       <span className="text-[10px] text-white/80 font-medium">→ Top 100</span>
                     </div>
+                  </div>
+                )}
+                {showEarlyAccessBanner && (
+                  <div className="relative max-w-[320px] rounded-2xl bg-black/70 text-white border border-white/10 backdrop-blur-md shadow-lg px-4 py-3 pointer-events-auto">
+                    <button
+                      type="button"
+                      onClick={handleDismissEarlyAccessBanner}
+                      aria-label="Dismiss early access notice"
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="text-sm font-semibold flex items-center gap-2 pr-6">
+                      <span>⚠️ Early Access</span>
+                    </div>
+                    <p className="mt-1 text-xs leading-snug text-white/80">
+                      Solo Live is available in early access. Some features (Battles, Co-host) are still in active development and may not work as intended yet.
+                    </p>
+                    <p className="mt-2 text-[10px] text-white/55 leading-tight">
+                      Features will unlock progressively as development continues.
+                    </p>
                   </div>
                 )}
               </div>
