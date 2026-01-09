@@ -3194,7 +3194,7 @@ function SettingsScreen({
   isLiveVisibilityUpdating,
 }: {
   role: RoleState;
-  team: { name: string; slug: string; description?: string; themeColor?: string; iconUrl?: string; bannerUrl?: string };
+  team: { name: string; slug: string; description?: string; themeColor?: string; iconUrl?: string; bannerUrl?: string; displayPhotoPreference?: 'banner' | 'icon' };
   teamLiveConfig: TeamLiveRoomState | null;
   canToggleLiveVisibility: boolean;
   onLiveVisibilityChange: (visibility: TeamLiveVisibility) => Promise<void>;
