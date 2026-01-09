@@ -3326,31 +3326,49 @@ function SettingsScreen({
   };
 
   const handleDisplayPhotoChange = async (preference: 'banner' | 'icon') => {
+    console.log('[handleDisplayPhotoChange] Called with preference:', preference);
+    console.log('[handleDisplayPhotoChange] teamId:', teamId);
+    console.log('[handleDisplayPhotoChange] isLeader:', isLeader);
+    
     if (!teamId) {
+      console.error('[handleDisplayPhotoChange] No teamId');
       toast({ title: 'Unable to update', description: 'Team not loaded yet.', variant: 'error' });
       return;
     }
     if (!isLeader) {
+      console.error('[handleDisplayPhotoChange] Not a leader');
       toast({ title: 'Forbidden', description: 'Only Team Admins can change display photo.', variant: 'error' });
       return;
     }
 
     try {
       const supabase = createClient();
-      const { error } = await supabase
+      console.log('[handleDisplayPhotoChange] Updating database...');
+      
+      const { data, error } = await supabase
         .from('teams')
         .update({ display_photo_preference: preference })
-        .eq('id', teamId);
+        .eq('id', teamId)
+        .select();
 
-      if (error) throw error;
+      console.log('[handleDisplayPhotoChange] Update result:', { data, error });
 
+      if (error) {
+        console.error('[handleDisplayPhotoChange] Database error:', error);
+        throw error;
+      }
+
+      console.log('[handleDisplayPhotoChange] Calling refreshTeam...');
       await refreshTeam();
+      console.log('[handleDisplayPhotoChange] refreshTeam complete');
+      
       toast({
         title: 'Display photo updated',
         description: `Landing page will now show your ${preference === 'banner' ? 'banner' : 'team photo'}.`,
         variant: 'success',
       });
     } catch (err: any) {
+      console.error('[handleDisplayPhotoChange] Error:', err);
       toast({ title: 'Update failed', description: err?.message || 'Unknown error', variant: 'error' });
     }
   };
