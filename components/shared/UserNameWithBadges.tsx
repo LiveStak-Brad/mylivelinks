@@ -5,6 +5,7 @@ import MllProBadge, { shouldShowMllProBadge } from '@/components/mll/MllProBadge
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { createClient } from '@/lib/supabase';
+import { MllProExplainerModal } from '@/components/mll-pro/MllProExplainerModal';
 
 interface UserNameWithBadgesProps {
   /** Profile ID for MLL PRO badge check */
@@ -66,6 +67,7 @@ export default function UserNameWithBadges({
   children,
 }: UserNameWithBadgesProps) {
   const [isMllPro, setIsMllPro] = useState<boolean>(false);
+  const [showProModal, setShowProModal] = useState(false);
 
   useEffect(() => {
     if (!profileId) {
@@ -103,19 +105,32 @@ export default function UserNameWithBadges({
   );
 
   return (
-    <div className={`inline-flex items-center gap-1.5 ${textSize} ${className}`}>
-      {nameElement}
-      {showMllPro && (
-        <MllProBadge size="compact" className="flex-shrink-0" />
-      )}
-      {hasGifterBadge && (
-        <TierBadge
-          tier_key={gifterStatus.tier_key}
-          level={gifterStatus.level_in_tier}
-          size={gifterBadgeSize}
-        />
-      )}
-      {children}
-    </div>
+    <>
+      <div className={`inline-flex items-center gap-1.5 ${textSize} ${className}`}>
+        {nameElement}
+        {showMllPro && (
+          <MllProBadge 
+            size="compact" 
+            className="flex-shrink-0"
+            clickable={true}
+            onClick={() => setShowProModal(true)}
+          />
+        )}
+        {hasGifterBadge && (
+          <TierBadge
+            tier_key={gifterStatus.tier_key}
+            level={gifterStatus.level_in_tier}
+            size={gifterBadgeSize}
+          />
+        )}
+        {children}
+      </div>
+      
+      <MllProExplainerModal
+        isOpen={showProModal}
+        onClose={() => setShowProModal(false)}
+        userIsPro={isMllPro}
+      />
+    </>
   );
 }

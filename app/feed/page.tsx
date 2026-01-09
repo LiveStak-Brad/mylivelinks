@@ -3,6 +3,7 @@
 import { Rss } from 'lucide-react';
 import PublicFeedClient from '@/components/feed/PublicFeedClient';
 import { LinkOrNahPromoCard } from '@/components/link/LinkOrNahPromoCard';
+import { MllProHero } from '@/components/mll-pro/MllProHero';
 
 /* =============================================================================
    PUBLIC FEED PAGE
@@ -45,10 +46,14 @@ export default function FeedPage() {
         </header>
 
         <div className="animate-slide-up" style={{ animationDelay: '25ms' }}>
-          <LinkOrNahPromoCard />
+          <MllProHero />
         </div>
 
         <div className="animate-slide-up" style={{ animationDelay: '50ms' }}>
+          <LinkOrNahPromoCard />
+        </div>
+
+        <div className="animate-slide-up" style={{ animationDelay: '75ms' }}>
           <PublicFeedClient />
         </div>
         

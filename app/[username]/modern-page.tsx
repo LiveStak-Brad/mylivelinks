@@ -71,6 +71,7 @@ import ReportModal from '@/components/ReportModal';
 import { LocationBadge } from '@/components/location/LocationBadge';
 import LinklerSupportButton from '@/components/linkler/LinklerSupportButton';
 import type { ProfileLocation } from '@/lib/location';
+import { MllProHero } from '@/components/mll-pro/MllProHero';
 
 interface ProfileData {
   profile: {
@@ -973,6 +974,13 @@ export default function ModernProfilePage() {
       
       {/* Content - Scrollable */}
       <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20 md:pb-8">
+        {/* MLL PRO Hero - Only on own profile */}
+        {isOwnProfile && (
+          <div className="mb-4 sm:mb-6">
+            <MllProHero />
+          </div>
+        )}
+
         {/* Live Indicator Banner - Click avatar to watch */}
         {profile.is_live && (
           <div className="mb-4 sm:mb-6">

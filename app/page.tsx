@@ -27,6 +27,7 @@ import { ReferralCard } from '@/components/referral';
 import { PolicyFooter } from '@/components/PolicyFooter';
 import PwaInstallButton from '@/components/PwaInstallButton';
 import LinklerSupportButton from '@/components/linkler/LinklerSupportButton';
+import { MllProHero } from '@/components/mll-pro/MllProHero';
 
 // Exact reactions available in the app (from components/feed/ReactionPicker.tsx)
 const LIVE_REACTIONS = [
@@ -318,8 +319,15 @@ export default function LandingPage() {
 
   return (
     <main id="main" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary pb-20 md:pb-8">
+      {/* MLL PRO Hero */}
+      <div className="container mx-auto px-4 pt-6">
+        <div className="max-w-4xl mx-auto">
+          <MllProHero />
+        </div>
+      </div>
+
       {/* Section 1: Teams Banner (Compact + Exciting) */}
-      <div className="container mx-auto px-4 pt-6 pb-3">
+      <div className="container mx-auto px-4 pt-3 pb-3">
         <div className="max-w-4xl mx-auto">
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-white/10 shadow-xl">
             {/* Animated gradient accent */}

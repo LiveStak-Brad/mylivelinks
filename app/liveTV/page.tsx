@@ -13,6 +13,7 @@ import {
   StreamCard,
   type Stream,
 } from '@/components/livetv';
+import { MllProHero } from '@/components/mll-pro/MllProHero';
 
 const SPECIAL_FILTERS = ['Trending', 'Featured', 'Rooms', 'Battles'];
 const CATEGORY_FILTERS = ['IRL', 'Music', 'Gaming', 'Comedy', 'Just Chatting'];
@@ -221,6 +222,11 @@ export default function LiveTVPage() {
       id="main"
       className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 pb-24 md:pb-8 relative flex flex-col"
     >
+      {/* MLL PRO Hero */}
+      <div className="mx-auto max-w-[1600px] w-full px-4 sm:px-6 pt-4">
+        <MllProHero />
+      </div>
+
       {/* Mobile App Waitlist Banner */}
       <div className="flex justify-center py-4">
         <EmailSignupCard placement="banner" />
