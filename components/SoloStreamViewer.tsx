@@ -207,6 +207,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const {
     session: battleSession,
     remainingSeconds: battleRemainingSeconds,
+    loading: battleLoading,
     roomName: battleRoomName,
     refresh: refreshBattleSession,
   } = useBattleSession({ 
@@ -256,6 +257,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const isConnectingRef = useRef(false); // Guard against duplicate connects
   const connectedUsernameRef = useRef<string | null>(null); // Track who we're connected to
+  const connectedRoomNameRef = useRef<string | null>(null); // Track the connected room name
   const [isRoomConnected, setIsRoomConnected] = useState(false);
   const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
   const wasHiddenRef = useRef(false);
@@ -318,33 +320,43 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const disconnectRoom = useCallback(
     async (
       reason: string,
-      options: { markVisibilityDisconnect?: boolean; preserveConnectedUsername?: boolean } = {}
+      options: {
+        markVisibilityDisconnect?: boolean;
+        preserveConnectedUsername?: boolean;
+        preserveActiveRoom?: boolean;
+      } = {}
     ) => {
-      const { markVisibilityDisconnect = false, preserveConnectedUsername = false } = options;
-      if (markVisibilityDisconnect) {
-        disconnectedDueToVisibilityRef.current = true;
-      }
-      const existingRoom = roomRef.current;
-      if (!existingRoom) return;
-
       if (DEBUG_LIVEKIT) {
-        console.log('[SoloStreamViewer] Disconnecting room', { reason });
+        console.log('[LiveKit][Viewer] disconnect', {
+          reason,
+          roomName: connectedRoomNameRef.current,
+          markVisibilityDisconnect: options.markVisibilityDisconnect,
+          preserveConnectedUsername: options.preserveConnectedUsername,
+          preserveActiveRoom: options.preserveActiveRoom,
+        });
       }
 
-      roomRef.current = null;
       try {
-        await existingRoom.disconnect();
+        roomRef.current?.disconnect();
       } catch (err) {
         console.error('[SoloStreamViewer] Error disconnecting room:', err);
       } finally {
         setIsRoomConnected(false);
-        isConnectingRef.current = false;
-        if (!preserveConnectedUsername) {
-          connectedUsernameRef.current = null;
-        }
+        disconnectedDueToVisibilityRef.current = true;
       }
+
+      if (!options.preserveConnectedUsername) {
+        connectedUsernameRef.current = null;
+      }
+
+      if (!options.preserveActiveRoom) {
+        connectedRoomNameRef.current = null;
+      }
+
+      isConnectingRef.current = false;
+      setIsRoomConnected(false);
     },
-    [setIsRoomConnected]
+    [DEBUG_LIVEKIT]
   );
 
   // Track if we need to force reconnect after battle ends
@@ -762,20 +774,50 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
   // Connect to LiveKit room - SINGLE CONNECTION GUARD
   // CRITICAL: Minimal stable deps to prevent reconnection loops
-  useEffect(() => {
-    // Connect only if streamer is live (avoid token calls / LiveKit connect when offline)
-    if (!streamer?.profile_id || !streamer.username || !streamer.live_available) return;
+  const hasActiveSession = !!battleRoomName;
+  const activeRoomName = useMemo(() => {
+    if (!streamer?.live_available) return null;
+    if (battleRoomName) return battleRoomName;
+    return streamer?.profile_id ? `solo_${streamer.profile_id}` : null;
+  }, [battleRoomName, streamer?.live_available, streamer?.profile_id]);
 
-    // Guard: Only one connect per mount, and only if username changed
-    const targetUsername = streamer.username;
-    if (isConnectingRef.current || connectedUsernameRef.current === targetUsername) {
+  useEffect(() => {
+    if (!streamer?.profile_id || !streamer.username || !streamer.live_available) {
       return;
     }
-    
-    // Don't connect to solo room if we're in an active battle session
-    // BattleGridWrapper handles the battle room connection
-    if (isInActiveSession) {
-      console.log('[SoloStreamViewer] Skipping solo room connect - in active battle session');
+
+    if (battleLoading) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[LiveKit][Viewer] waiting for session resolution before connecting');
+      }
+      return;
+    }
+
+    if (hasActiveSession) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[LiveKit][Viewer] active session detected – ensuring solo room is disconnected', {
+          sessionRoom: battleRoomName,
+        });
+      }
+      if (connectedRoomNameRef.current && connectedRoomNameRef.current !== battleRoomName) {
+        void disconnectRoom('switch_to_session', { preserveConnectedUsername: true });
+      }
+      return;
+    }
+
+    if (!activeRoomName) {
+      return;
+    }
+
+    const targetUsername = streamer.username;
+    if (isConnectingRef.current) {
+      if (DEBUG_LIVEKIT) {
+        console.log('[LiveKit][Viewer] connect skipped – already connecting');
+      }
+      return;
+    }
+
+    if (connectedRoomNameRef.current === activeRoomName && connectedUsernameRef.current === targetUsername) {
       return;
     }
 
@@ -785,15 +827,22 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     const connectToRoom = async () => {
       try {
         if (DEBUG_LIVEKIT) {
-          console.log('[SoloStreamViewer] Connecting to room for:', streamer.username);
+          console.log('[LiveKit][Viewer] connecting', {
+            roomName: activeRoomName,
+            identitySource: currentUserId || 'anon',
+            canPublish: false,
+          });
         }
 
         // Disconnect existing room if switching streamers
         if (roomRef.current) {
           if (DEBUG_LIVEKIT) {
-            console.log('[SoloStreamViewer] Disconnecting previous room before connecting to new streamer');
+            console.log('[LiveKit][Viewer] disconnecting previous room before connecting to new streamer');
           }
-          await disconnectRoom('switch_streamer', { preserveConnectedUsername: true });
+          await disconnectRoom('switch_streamer', {
+            preserveConnectedUsername: true,
+            preserveActiveRoom: true,
+          });
         }
 
         const room = new Room({
@@ -811,18 +860,6 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           ? `${currentUserId}_viewer_${Date.now()}` 
           : (currentUserId || `anon_${Date.now()}`);
         
-        // SOLO STREAM FIX: Join the streamer's dedicated solo room
-        // Room name is based on streamer's profile_id, ensuring no collision
-        const soloRoomName = `solo_${streamer.profile_id}`;
-        
-        console.log('[SoloStreamViewer] 🔑 Connecting as viewer:', { 
-          viewerIdentity, 
-          isOwnStream, 
-          currentUserId, 
-          streamerProfileId: streamer.profile_id,
-          soloRoomName,
-        });
-
         const tokenResponse = await fetch(TOKEN_ENDPOINT, {
           method: 'POST',
           headers: {
@@ -830,7 +867,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
           },
           credentials: 'include',
           body: JSON.stringify({
-            roomName: soloRoomName,
+            roomName: activeRoomName,
             participantName: `viewer_${viewerIdentity}`,
             canPublish: false,  // VIEWER MODE - never publish
             canSubscribe: true,
@@ -849,10 +886,10 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         const { token, url, roomName: mintedRoomName, identity: mintedIdentity } = tokenData;
         
         // 🔍 DEBUG: Log token details to verify correct room
-        console.log('[SoloStreamViewer] ✅ TOKEN RECEIVED:', {
+        console.log('[LiveKit][Viewer] token received', {
           mintedRoomName,
           mintedIdentity,
-          expectedRoomName: soloRoomName,
+          expectedRoomName: activeRoomName,
         });
 
         if (!token || !url) {
@@ -861,10 +898,15 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
         await room.connect(url, token);
         setIsRoomConnected(true);
+        connectedRoomNameRef.current = activeRoomName;
 
-        console.log('[SoloStreamViewer] ✅ Connected! Room participants:', room.remoteParticipants.size);
-        console.log('[SoloStreamViewer] 🎥 Local participant:', room.localParticipant.identity);
-        console.log('[SoloStreamViewer] 👥 Remote participants:', Array.from(room.remoteParticipants.values()).map(p => ({
+        console.log('[LiveKit][Viewer] connected', {
+          roomName: activeRoomName,
+          remoteParticipants: room.remoteParticipants.size,
+          identity: room.localParticipant.identity,
+        });
+
+        console.log('[LiveKit][Viewer] remote participants snapshot', Array.from(room.remoteParticipants.values()).map(p => ({
           identity: p.identity,
           isSpeaking: p.isSpeaking,
           trackCount: p.trackPublications.size,
@@ -1005,30 +1047,32 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         });
 
         room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
-          console.log('[SoloStreamViewer] 👋 Participant joined:', {
+          console.log('[LiveKit][Viewer] participant joined', {
             identity: participant.identity,
             trackCount: participant.trackPublications.size,
+            roomName: activeRoomName,
           });
         });
 
         room.on(RoomEvent.Disconnected, () => {
           if (DEBUG_LIVEKIT) {
-            console.log('[SoloStreamViewer] Disconnected from room');
+            console.log('[LiveKit][Viewer] disconnected', { roomName: activeRoomName });
           }
           setIsRoomConnected(false);
           isConnectingRef.current = false;
           connectedUsernameRef.current = null;
+          connectedRoomNameRef.current = null;
         });
 
         room.on(RoomEvent.Reconnecting, () => {
           if (DEBUG_LIVEKIT) {
-            console.log('[SoloStreamViewer] Reconnecting to room...');
+            console.log('[LiveKit][Viewer] reconnecting', { roomName: activeRoomName });
           }
         });
 
         room.on(RoomEvent.Reconnected, () => {
           if (DEBUG_LIVEKIT) {
-            console.log('[SoloStreamViewer] Reconnected to room');
+            console.log('[LiveKit][Viewer] reconnected', { roomName: activeRoomName });
           }
           setIsRoomConnected(true);
           void resumePlayback('room_reconnected');
@@ -1040,6 +1084,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         console.error('[SoloStreamViewer] Error connecting to room:', err);
         isConnectingRef.current = false;
         connectedUsernameRef.current = null;
+        connectedRoomNameRef.current = null;
       }
     };
 
@@ -1052,7 +1097,20 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
       }
       void disconnectRoom('effect_cleanup');
     };
-  }, [disconnectRoom, resumePlayback, streamer?.live_available, streamer?.profile_id, streamer?.username, currentUserId, extractUserId, forceReconnectAfterBattle, isInActiveSession]); // STABLE DEPS: only reconnect if these change
+  }, [
+    activeRoomName,
+    battleLoading,
+    hasActiveSession,
+    battleRoomName,
+    currentUserId,
+    disconnectRoom,
+    extractUserId,
+    resumePlayback,
+    streamer?.live_available,
+    streamer?.profile_id,
+    streamer?.username,
+    DEBUG_LIVEKIT,
+  ]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

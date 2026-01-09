@@ -30,6 +30,13 @@ import MultiHostGrid, { ParticipantVolume } from './MultiHostGrid';
 import { GridTileParticipant } from './GridTile';
 import BattleTimer from './BattleTimer';
 
+const normalizeParticipantId = (identity: string): string => {
+  return identity
+    .replace(/^(u_|guest_)/i, '')
+    .split(':')[0]
+    .trim();
+};
+
 interface BattleGridWrapperProps {
   /** Active session data */
   session: LiveSession;
@@ -62,10 +69,14 @@ export default function BattleGridWrapper({
   const [participants, setParticipants] = useState<GridTileParticipant[]>([]);
   const [volumes, setVolumes] = useState<ParticipantVolume[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [participantsReady, setParticipantsReady] = useState(false);
+  const [allowEmptyState, setAllowEmptyState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<{ video: any; audio: any }>({ video: null, audio: null });
+  const emptyStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hydrationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const roomName = useMemo(() => 
     getSessionRoomName(session.session_id, session.type), 
@@ -133,9 +144,9 @@ export default function BattleGridWrapper({
     
     // Add remote participants
     room.remoteParticipants.forEach((participant) => {
-      // Extract user ID from identity (format: u_<uuid> or guest_<uuid>)
+      // Extract user ID from identity (format: u_<uuid>[:device], guest_<uuid>[:device])
       const identity = participant.identity;
-      const userId = identity.replace(/^(u_|guest_)/, '');
+      const userId = normalizeParticipantId(identity);
       
       // Find video and audio tracks
       let videoTrack: RemoteTrack | undefined;
@@ -156,19 +167,41 @@ export default function BattleGridWrapper({
       const isHostB = userId === hostSnapshot.hostB.id;
       const hostInfo = isHostA ? hostSnapshot.hostA : isHostB ? hostSnapshot.hostB : null;
       
-      if (hostInfo) {
-        gridParticipants.push({
-          id: userId,
-          name: hostInfo.display_name || hostInfo.username,
-          videoTrack: videoTrack || undefined,
-          audioTrack: audioTrack || undefined,
-          isHost: false, // Remote participants are not "host" for local view
-          avatarUrl: hostInfo.avatar_url || undefined,
+      const fallbackName = identity.replace(/^u_/, '').split(':')[0] || 'Participant';
+      gridParticipants.push({
+        id: userId,
+        name: hostInfo ? (hostInfo.display_name || hostInfo.username) : fallbackName,
+        videoTrack: videoTrack || undefined,
+        audioTrack: audioTrack || undefined,
+        isHost: !!hostInfo,
+        avatarUrl: hostInfo?.avatar_url || undefined,
+      });
+      if (!hostInfo) {
+        console.log('[LiveKit][Battle] Fallback participant hydrated', {
+          roomName,
+          identity,
+          normalizedUserId: userId,
+          hostA: hostSnapshot.hostA.id,
+          hostB: hostSnapshot.hostB.id,
         });
       }
     });
     
     setParticipants(gridParticipants);
+    const hasParticipants = gridParticipants.length > 0;
+    setParticipantsReady(hasParticipants);
+
+    if (hasParticipants) {
+      if (emptyStateTimeoutRef.current) {
+        clearTimeout(emptyStateTimeoutRef.current);
+        emptyStateTimeoutRef.current = null;
+      }
+      if (hydrationIntervalRef.current) {
+        clearInterval(hydrationIntervalRef.current);
+        hydrationIntervalRef.current = null;
+      }
+      setAllowEmptyState(true);
+    }
     
     // Initialize volumes for new participants
     setVolumes(prev => {
@@ -218,9 +251,22 @@ export default function BattleGridWrapper({
         });
         
         room.on(RoomEvent.Connected, () => {
-          console.log('[BattleGridWrapper] Room connected:', roomName);
+          console.log('[LiveKit][Battle] connected', {
+            roomName,
+            canPublish,
+            participant: room.localParticipant.identity,
+          });
           if (isActive) {
             setIsConnected(true);
+            setParticipantsReady(false);
+            setAllowEmptyState(false);
+            if (emptyStateTimeoutRef.current) {
+              clearTimeout(emptyStateTimeoutRef.current);
+            }
+            emptyStateTimeoutRef.current = setTimeout(() => {
+              setAllowEmptyState(true);
+              emptyStateTimeoutRef.current = null;
+            }, 4000);
             setError(null);
             updateParticipants();
             onRoomConnected?.();
@@ -228,7 +274,10 @@ export default function BattleGridWrapper({
         });
         
         room.on(RoomEvent.Disconnected, (reason) => {
-          console.log('[BattleGridWrapper] Room disconnected', { reason });
+          console.log('[LiveKit][Battle] disconnected', {
+            roomName,
+            reason,
+          });
           if (isActive) {
             setIsConnected(false);
             onRoomDisconnected?.();
@@ -236,20 +285,47 @@ export default function BattleGridWrapper({
         });
 
         room.on(RoomEvent.Reconnecting, () => {
-          console.log('[BattleGridWrapper] Room reconnecting:', roomName);
+          console.log('[LiveKit][Battle] reconnecting', { roomName });
         });
 
         room.on(RoomEvent.Reconnected, () => {
-          console.log('[BattleGridWrapper] Room reconnected:', roomName);
+          console.log('[LiveKit][Battle] reconnected', { roomName });
           if (isActive) {
             updateParticipants();
           }
         });
         
-        room.on(RoomEvent.ParticipantConnected, () => updateParticipants());
-        room.on(RoomEvent.ParticipantDisconnected, () => updateParticipants());
-        room.on(RoomEvent.TrackSubscribed, () => updateParticipants());
-        room.on(RoomEvent.TrackUnsubscribed, () => updateParticipants());
+        room.on(RoomEvent.ParticipantConnected, (participant) => {
+          console.log('[LiveKit][Battle] participant joined', {
+            roomName,
+            identity: participant.identity,
+            trackCount: participant.trackPublications.size,
+          });
+          updateParticipants();
+        });
+        room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+          console.log('[LiveKit][Battle] participant disconnected', {
+            roomName,
+            identity: participant.identity,
+          });
+          updateParticipants();
+        });
+        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+          console.log('[LiveKit][Battle] track subscribed', {
+            roomName,
+            identity: participant.identity,
+            kind: track.kind,
+          });
+          updateParticipants();
+        });
+        room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+          console.log('[LiveKit][Battle] track unsubscribed', {
+            roomName,
+            identity: participant.identity,
+            kind: track.kind,
+          });
+          updateParticipants();
+        });
         room.on(RoomEvent.TrackPublished, () => updateParticipants());
         room.on(RoomEvent.TrackUnpublished, () => updateParticipants());
         room.on(RoomEvent.LocalTrackPublished, () => updateParticipants());
@@ -295,6 +371,14 @@ export default function BattleGridWrapper({
     
     return () => {
       isActive = false;
+      if (emptyStateTimeoutRef.current) {
+        clearTimeout(emptyStateTimeoutRef.current);
+        emptyStateTimeoutRef.current = null;
+      }
+      if (hydrationIntervalRef.current) {
+        clearInterval(hydrationIntervalRef.current);
+        hydrationIntervalRef.current = null;
+      }
       
       // Stop local tracks
       if (localTracksRef.current.video) {
@@ -312,6 +396,41 @@ export default function BattleGridWrapper({
       }
     };
   }, [roomName, currentUserName, canPublish, updateParticipants, onRoomConnected, onRoomDisconnected]);
+
+  // Poll room participants briefly after connect to capture existing hosts even if no events fire
+  useEffect(() => {
+    if (!isConnected) {
+      if (hydrationIntervalRef.current) {
+        clearInterval(hydrationIntervalRef.current);
+        hydrationIntervalRef.current = null;
+      }
+      return;
+    }
+
+    if (hydrationIntervalRef.current) {
+      clearInterval(hydrationIntervalRef.current);
+      hydrationIntervalRef.current = null;
+    }
+
+    hydrationIntervalRef.current = setInterval(() => {
+      const room = roomRef.current;
+      if (!room) {
+        return;
+      }
+      const participantCount = room.remoteParticipants.size + (room.localParticipant ? 1 : 0);
+      if (participantCount === 0) {
+        return;
+      }
+      updateParticipants();
+    }, 1000);
+
+    return () => {
+      if (hydrationIntervalRef.current) {
+        clearInterval(hydrationIntervalRef.current);
+        hydrationIntervalRef.current = null;
+      }
+    };
+  }, [isConnected, updateParticipants]);
   
   // Handle volume change
   const handleVolumeChange = useCallback((participantId: string, volume: number) => {
@@ -324,7 +443,7 @@ export default function BattleGridWrapper({
     if (!room) return;
     
     room.remoteParticipants.forEach((participant) => {
-      const userId = participant.identity.replace(/^(u_|guest_)/, '');
+      const userId = normalizeParticipantId(participant.identity);
       if (userId === participantId) {
         participant.audioTrackPublications.forEach(pub => {
           if (pub.track) {
@@ -349,7 +468,7 @@ export default function BattleGridWrapper({
     const shouldMute = vol ? !vol.isMuted : true;
     
     room.remoteParticipants.forEach((participant) => {
-      const userId = participant.identity.replace(/^(u_|guest_)/, '');
+      const userId = normalizeParticipantId(participant.identity);
       if (userId === participantId) {
         participant.audioTrackPublications.forEach(pub => {
           if (pub.track) {
@@ -371,6 +490,8 @@ export default function BattleGridWrapper({
     );
   }
   
+  const showConnectingOverlay = !participantsReady && !allowEmptyState;
+
   return (
     <div className={`relative ${className}`}>
       {/* Timer overlay */}
@@ -396,7 +517,7 @@ export default function BattleGridWrapper({
       />
       
       {/* Loading overlay */}
-      {!isConnected && !error && (
+      {((!isConnected) || showConnectingOverlay) && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80">
           <div className="text-center">
             <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-2" />

@@ -98,7 +98,14 @@ export async function POST(request: NextRequest) {
       // In a global room, we need to determine which streamer this viewer is watching
       // For now, we'll use a heuristic: if participant is publishing, they're a streamer
       // Otherwise, we need to check active_viewers to see which stream they're watching
-      if (!liveStreamId && participant.isPublisher) {
+      const roomName = room.name || '';
+      const isBattleRoom = /^battle_[a-f0-9-]+$/i.test(roomName);
+      const isCohostRoom = /^cohost_[a-f0-9-]+$/i.test(roomName);
+      const sessionRoomId = (isBattleRoom || isCohostRoom)
+        ? roomName.replace(/^(battle|cohost)_/i, '')
+        : null;
+
+      if (!liveStreamId && participant.isPublisher && !sessionRoomId) {
         // Participant is a streamer - find their live_stream_id (do not require live_available to handle cleanup)
         const { data: stream } = await admin
           .from('live_streams')
@@ -113,6 +120,44 @@ export async function POST(request: NextRequest) {
 
       // If a publisher left, force-cleanup their stream regardless of viewer heartbeat
       if (event.event === 'participant_left' && participant.isPublisher) {
+        if (sessionRoomId) {
+          try {
+            const { data: session, error: sessionError } = await admin
+              .from('live_sessions')
+              .select('id, host_a, host_b, status')
+              .eq('id', sessionRoomId)
+              .maybeSingle();
+
+            if (sessionError) {
+              console.error('[WEBHOOK] session lookup error:', sessionError, { sessionRoomId });
+            }
+
+            if (
+              session &&
+              (session.host_a === profileId || session.host_b === profileId) &&
+              (session.status === 'active' || session.status === 'cooldown')
+            ) {
+              console.log('[WEBHOOK] Ending session after host left LiveKit room', {
+                sessionId: session.id,
+                profileId,
+                roomName,
+              });
+
+              await admin
+                .from('live_sessions')
+                .update({ status: 'ended', cooldown_ends_at: null })
+                .eq('id', session.id);
+            }
+          } catch (sessionCleanupErr) {
+            console.error('[WEBHOOK] session cleanup error:', sessionCleanupErr, {
+              sessionRoomId,
+              profileId,
+            });
+          }
+
+          return NextResponse.json({ received: true });
+        }
+
         try {
           await admin
             .from('live_streams')
