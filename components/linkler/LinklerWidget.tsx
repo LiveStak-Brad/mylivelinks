@@ -42,6 +42,7 @@ const SIZE_MAP: Record<WidgetSize, number> = {
 
 const SAFE_MARGIN = 12;
 const DRAG_THRESHOLD_PX = 10;
+const BOTTOM_NAV_HEIGHT_FALLBACK = 80;
 
 const isBrowser = () => typeof window !== 'undefined';
 
@@ -103,6 +104,16 @@ type SafeInsets = {
   left: number;
 };
 
+function getBottomNavHeight(): number {
+  if (!isBrowser()) return BOTTOM_NAV_HEIGHT_FALLBACK;
+  const bottomNav = document.querySelector('.bottom-nav');
+  if (bottomNav) {
+    const rect = bottomNav.getBoundingClientRect();
+    return rect.height;
+  }
+  return BOTTOM_NAV_HEIGHT_FALLBACK;
+}
+
 const defaultInsets: SafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 
 const getVisualViewportInsets = (): SafeInsets => {
@@ -113,8 +124,14 @@ const getVisualViewportInsets = (): SafeInsets => {
   const vv = window.visualViewport;
   const top = vv.offsetTop ?? 0;
   const left = vv.offsetLeft ?? 0;
-  const bottom = Math.max(0, window.innerHeight - vv.height - top);
+  let bottom = Math.max(0, window.innerHeight - vv.height - top);
   const right = Math.max(0, window.innerWidth - vv.width - left);
+  
+  // Add bottom nav height + safe area inset to bottom margin
+  const bottomNavHeight = getBottomNavHeight();
+  const safeAreaBottom = isBrowser() ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-bottom') || '0') : 0;
+  bottom = Math.max(bottom, bottomNavHeight + safeAreaBottom);
+  
   return { top, right, bottom, left };
 };
 
@@ -229,6 +246,7 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
   const [menuOpen, setMenuOpen] = useState(false);
   const [viewportRect, setViewportRect] = useState<ViewportRect>({ width: 0, height: 0 });
   const [safeInsets, setSafeInsets] = useState<SafeInsets>(() => getVisualViewportInsets());
+  const [bottomNavHeight, setBottomNavHeight] = useState(BOTTOM_NAV_HEIGHT_FALLBACK);
 
   const sizePx = SIZE_MAP[size];
 
@@ -237,9 +255,13 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
     const updateViewport = () => {
       setViewportRect({ width: window.innerWidth, height: window.innerHeight });
       setSafeInsets(getVisualViewportInsets());
+      setBottomNavHeight(getBottomNavHeight());
     };
 
     updateViewport();
+    // Initial delay to ensure DOM is ready
+    const timer = setTimeout(updateViewport, 100);
+    
     window.addEventListener('resize', updateViewport);
     window.addEventListener('orientationchange', updateViewport);
     if (window.visualViewport) {
@@ -247,6 +269,7 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
       window.visualViewport.addEventListener('scroll', updateViewport);
     }
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('resize', updateViewport);
       window.removeEventListener('orientationchange', updateViewport);
       if (window.visualViewport) {
@@ -328,6 +351,10 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
 
   const handlePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (pointerId.current !== event.pointerId) return;
+    
+    // Prevent page scroll during drag
+    event.preventDefault();
+    
     const rawPosition = {
       left: event.clientX - pointerOffset.current.x,
       top: event.clientY - pointerOffset.current.y,
@@ -340,6 +367,10 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
       dragExceededThreshold.current = true;
       setIsDragging(true);
       setLivePosition(initialPosition.current ?? rawPosition);
+      // Disable page scroll when dragging starts
+      if (isBrowser()) {
+        document.body.classList.add('dragging-linkler');
+      }
     }
 
     if (!dragExceededThreshold.current) {
@@ -359,6 +390,12 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
     dragExceededThreshold.current = false;
     setIsDragging(false);
     suppressClickRef.current = didDrag;
+    
+    // Re-enable page scroll
+    if (isBrowser()) {
+      document.body.classList.remove('dragging-linkler');
+    }
+    
     if (!didDrag) {
       setLivePosition(null);
       initialPosition.current = null;
@@ -380,16 +417,23 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
     setIsDragging(false);
     dragExceededThreshold.current = false;
     suppressClickRef.current = false;
+    
+    // Re-enable page scroll
+    if (isBrowser()) {
+      document.body.classList.remove('dragging-linkler');
+    }
+    
     setLivePosition(null);
     initialPosition.current = null;
   };
 
   if (!isVisible) {
+    const reopenBottom = bottomNavHeight + (isBrowser() ? parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-area-inset-bottom') || '0') : 0) + 16;
     return (
       <div
-        className="fixed bottom-4 left-4 z-50"
+        className="fixed left-4 z-50"
         style={{
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4px)',
+          bottom: `${reopenBottom}px`,
           paddingLeft: 'calc(env(safe-area-inset-left, 0px) + 4px)',
         }}
       >
@@ -440,6 +484,9 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
           top: currentPosition.top,
           left: currentPosition.left,
           transition: isDragging ? 'none' : 'transform 0.2s ease, top 0.2s ease, left 0.2s ease',
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
       >
         {showBubble && (
@@ -495,6 +542,7 @@ export function LinklerWidget({ onOpenPanel, defaultSize = 'large' }: LinklerWid
                 'rounded-full bg-transparent shadow-xl shadow-primary/40 transition hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                 widgetSizeClass
               )}
+              style={{ touchAction: 'none' }}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}

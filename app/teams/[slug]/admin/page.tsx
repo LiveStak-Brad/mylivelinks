@@ -15,8 +15,10 @@ import {
   RefreshCcw,
   Trash2,
 } from 'lucide-react';
-import { Button, Badge } from '@/components/ui';
+import { Button, Badge, Input } from '@/components/ui';
+import { useToast } from '@/components/ui/Toast';
 import { createClient } from '@/lib/supabase';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 /**
  * REAL Team Admin Panel
@@ -480,9 +482,13 @@ export default function TeamAdminPage() {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">
-                      {req.profile.display_name || req.profile.username}
-                    </p>
+                    <UserNameWithBadges
+                      profileId={req.profile_id}
+                      name={req.profile.display_name || req.profile.username}
+                      textSize="text-sm"
+                      nameClassName="font-medium text-white truncate"
+                      showGifterBadge={false}
+                    />
                     <p className="text-xs text-white/50">@{req.profile.username}</p>
                     <p className="text-xs text-white/40 mt-1">
                       Requested {new Date(req.requested_at).toLocaleDateString()}
@@ -555,16 +561,20 @@ export default function TeamAdminPage() {
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-white truncate">
-                        {member.profile.display_name || member.profile.username}
-                      </p>
+                      <UserNameWithBadges
+                        profileId={member.profile_id}
+                        name={member.profile.display_name || member.profile.username}
+                        textSize="text-sm"
+                        nameClassName="font-medium text-white truncate"
+                        showGifterBadge={false}
+                      />
                       <Badge
                         className={
                           member.role === 'Team_Admin'
-                            ? 'bg-amber-500/20 text-amber-300 text-xs'
+                            ? 'bg-yellow-500/20 text-yellow-300 text-[10px]'
                             : member.role === 'Team_Moderator'
-                            ? 'bg-purple-500/20 text-purple-300 text-xs'
-                            : 'bg-white/10 text-white/60 text-xs'
+                            ? 'bg-blue-500/20 text-blue-300 text-[10px]'
+                            : 'bg-white/10 text-white/60 text-[10px]'
                         }
                       >
                         {member.role === 'Team_Admin' ? 'Admin' : member.role === 'Team_Moderator' ? 'Moderator' : 'Member'}
@@ -650,9 +660,13 @@ export default function TeamAdminPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">
-                            {invite.invitee?.display_name || invite.invitee?.username || 'Unknown user'}
-                          </p>
+                          <UserNameWithBadges
+                            profileId={invite.invitee_id}
+                            name={invite.invitee?.display_name || invite.invitee?.username || 'Unknown user'}
+                            textSize="text-sm"
+                            nameClassName="font-semibold text-white truncate"
+                            showGifterBadge={false}
+                          />
                           {invite.invitee?.username && (
                             <p className="text-xs text-white/50">@{invite.invitee.username}</p>
                           )}

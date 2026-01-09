@@ -1,0 +1,11 @@
+/* Linkler drag overscroll prevention */
+body.dragging-linkler {
+  overscroll-behavior: none;
+  overflow: hidden;
+  -webkit-overflow-scrolling: auto;
+}
+
+/* Ensure safe area CSS variable is available */
+:root {
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+}

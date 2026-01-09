@@ -2222,7 +2222,13 @@ function FeedCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-white text-sm">{item.author.name}</span>
+            <UserNameWithBadges
+              profileId={item.authorId}
+              name={item.author.name}
+              textSize="text-sm"
+              nameClassName="font-semibold text-white"
+              showGifterBadge={false}
+            />
             <RoleBadge role={item.author.role} />
             <span className="text-xs text-white/40">{formatTime(item.createdAt)}</span>
             {item.type !== 'post' && item.type !== 'announcement' && (
@@ -2853,7 +2859,13 @@ function ChatMessageRow({ message }: { message: ChatMessage & { _isPending?: boo
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-white text-sm">{message.author.name}</span>
+          <UserNameWithBadges
+            profileId={message.authorId}
+            name={message.author.name}
+            textSize="text-sm"
+            nameClassName="font-semibold text-white"
+            showGifterBadge={false}
+          />
           <RoleBadge role={message.author.role} />
           <span className="text-[10px] text-white/40">{formatTime(message.timestamp)}</span>
         </div>
@@ -3138,7 +3150,13 @@ function MemberRow({ member }: { member: TeamMember }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-medium text-white">{member.name}</span>
+          <UserNameWithBadges
+            profileId={member.id}
+            name={member.name}
+            textSize="text-base"
+            nameClassName="font-medium text-white"
+            showGifterBadge={false}
+          />
           <RoleBadge role={member.role} />
         </div>
         <p className="text-xs text-white/50">{member.handle}</p>
