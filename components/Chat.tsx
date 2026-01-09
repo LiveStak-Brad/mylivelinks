@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import { GifterBadge as TierBadge } from '@/components/gifter';
+import MllProBadge, { shouldShowMllProBadge } from '@/components/mll/MllProBadge';
 import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';

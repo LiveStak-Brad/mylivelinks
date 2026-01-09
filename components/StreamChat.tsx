@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import { GifterBadge as TierBadge } from '@/components/gifter';
+import MllProBadge, { shouldShowMllProBadge } from '@/components/mll/MllProBadge';
 import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import SafeRichText from '@/components/SafeRichText';
@@ -1308,102 +1309,109 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
             No messages yet. Be the first to chat!
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex gap-2 items-start ${
-                msg.message_type === 'system' ? 'justify-center' : ''
-              } w-full`}
-            >
-              <div className="flex gap-2 items-start w-full lg:max-w-3xl lg:mx-auto">
-                {msg.message_type === 'system' ? (
-                  <div className="text-center text-sm text-white/70 lg:text-gray-500 lg:dark:text-gray-400 italic">
-                    {msg.content}
-                  </div>
-                ) : (
-                  <div
-                    className={`flex w-full items-start gap-2 ${msg.chat_bubble_color ? '' : (msg.profile_id ? getUserBubbleColor(msg.profile_id) : 'bg-black/20')} backdrop-blur-sm rounded-lg px-2 py-1.5 border border-white/10`}
-                    style={msg.chat_bubble_color ? { backgroundColor: `${msg.chat_bubble_color}66` } : undefined}
-                  >
-                    <img
-                      src={getAvatarUrl(msg.avatar_url)}
-                      alt={msg.username}
-                      className="w-8 h-8 rounded-full flex-shrink-0"
-                      onError={(e) => {
-                        e.currentTarget.src = '/no-profile-pic.png';
-                      }}
-                    />
+          messages.map((msg) => {
+            const showMllPro = shouldShowMllProBadge(msg.profile_id);
 
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            if (msg.profile_id && msg.username) {
-                              setSelectedProfile({
-                                profileId: msg.profile_id,
-                                username: msg.username,
-                                avatarUrl: msg.avatar_url,
-                                gifterStatus: gifterStatusMap[msg.profile_id] || null,
-                              });
-                            }
-                          }}
-                          className={`font-semibold ${usernameTextClass} text-white hover:text-blue-300 transition cursor-pointer leading-tight`}
-                          style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                        >
-                          {msg.username}
-                        </button>
-                        <span className={`${timeTextClass} text-white/50 leading-tight`}>
-                          {formatTime(msg.created_at)}
-                        </span>
-                        {msg.message_type !== 'system' && msg.profile_id && (
+            return (
+              <div
+                key={msg.id}
+                className={`flex gap-2 items-start ${
+                  msg.message_type === 'system' ? 'justify-center' : ''
+                } w-full`}
+              >
+                <div className="flex gap-2 items-start w-full lg:max-w-3xl lg:mx-auto">
+                  {msg.message_type === 'system' ? (
+                    <div className="text-center text-sm text-white/70 lg:text-gray-500 lg:dark:text-gray-400 italic">
+                      {msg.content}
+                    </div>
+                  ) : (
+                    <div
+                      className={`flex w-full items-start gap-2 ${msg.chat_bubble_color ? '' : (msg.profile_id ? getUserBubbleColor(msg.profile_id) : 'bg-black/20')} backdrop-blur-sm rounded-lg px-2 py-1.5 border border-white/10`}
+                      style={msg.chat_bubble_color ? { backgroundColor: `${msg.chat_bubble_color}66` } : undefined}
+                    >
+                      <img
+                        src={getAvatarUrl(msg.avatar_url)}
+                        alt={msg.username}
+                        className="w-8 h-8 rounded-full flex-shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src = '/no-profile-pic.png';
+                        }}
+                      />
+
+                      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1">
                           <button
-                            type="button"
-                            onClick={() => openReportMessage(msg)}
-                            className="text-[10px] text-white/60 hover:text-white transition"
-                            title="Report message"
-                            aria-label="Report message"
+                            onClick={() => {
+                              if (msg.profile_id && msg.username) {
+                                setSelectedProfile({
+                                  profileId: msg.profile_id,
+                                  username: msg.username,
+                                  avatarUrl: msg.avatar_url,
+                                  gifterStatus: gifterStatusMap[msg.profile_id] || null,
+                                });
+                              }
+                            }}
+                            className={`font-semibold ${usernameTextClass} text-white hover:text-blue-300 transition cursor-pointer leading-tight`}
+                            style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
                           >
-                            Report
+                            {msg.username}
                           </button>
-                        )}
-                      </div>
-
-                      {(() => {
-                        const status = msg.profile_id ? gifterStatusMap[msg.profile_id] : null;
-                        if (!status || Number(status.lifetime_coins ?? 0) <= 0) {
-                          // No badge - just show message
-                          return (
-                            <div
-                              className={`${messageTextClass} text-white/90 break-words leading-snug`}
-                              style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                          {showMllPro && (
+                            <MllProBadge size="compact" className="ml-0.5" />
+                          )}
+                          <span className={`${timeTextClass} text-white/50 leading-tight`}>
+                            {formatTime(msg.created_at)}
+                          </span>
+                          {msg.message_type !== 'system' && msg.profile_id && (
+                            <button
+                              type="button"
+                              onClick={() => openReportMessage(msg)}
+                              className="text-[10px] text-white/60 hover:text-white transition"
+                              title="Report message"
+                              aria-label="Report message"
                             >
-                              <SafeRichText text={msg.content} />
+                              Report
+                            </button>
+                          )}
+                        </div>
+
+                        {(() => {
+                          const status = msg.profile_id ? gifterStatusMap[msg.profile_id] : null;
+                          if (!status || Number(status.lifetime_coins ?? 0) <= 0) {
+                            // No badge - just show message
+                            return (
+                              <div
+                                className={`${messageTextClass} text-white/90 break-words leading-snug`}
+                                style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                              >
+                                <SafeRichText text={msg.content} />
+                              </div>
+                            );
+                          }
+                          // Show tier badge + message
+                          return (
+                            <div className="flex items-start gap-2">
+                              <TierBadge
+                                tier_key={status.tier_key}
+                                level={status.level_in_tier}
+                                size="sm"
+                              />
+                              <div
+                                className={`${messageTextClass} text-white/90 break-words leading-snug flex-1 min-w-0`}
+                                style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                              >
+                                <SafeRichText text={msg.content} />
+                              </div>
                             </div>
                           );
-                        }
-                        // Show tier badge + message
-                        return (
-                          <div className="flex items-start gap-2">
-                            <TierBadge
-                              tier_key={status.tier_key}
-                              level={status.level_in_tier}
-                              size="sm"
-                            />
-                            <div
-                              className={`${messageTextClass} text-white/90 break-words leading-snug flex-1 min-w-0`}
-                              style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
-                            >
-                              <SafeRichText text={msg.content} />
-                            </div>
-                          </div>
-                        );
-                      })()}
+                        })()}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>

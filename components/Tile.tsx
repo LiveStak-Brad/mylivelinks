@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Gift, Heart, Maximize2, Minimize2, Volume2, VolumeX, X } from 'lucide-react';
 import { GifterBadge as TierBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
+import MllProBadge, { shouldShowMllProBadge } from '@/components/mll/MllProBadge';
 import GiftModal from './GiftModal';
 import MiniProfile from './MiniProfile';
 import GiftAnimation from './GiftAnimation';
@@ -93,6 +94,7 @@ export default function Tile({
   const supabase = createClient();
   const shouldUseCompact = false;
   const isSelfTile = !!user && user.id === streamerId;
+  const showMllProBadge = shouldShowMllProBadge(streamerId);
   const gridIconSizeClass = compactMode ? 'w-4 h-4' : 'w-5 h-5';
   const gridNameMaxWidthClass = compactMode ? 'max-w-[55%]' : 'max-w-[70%]';
 
@@ -1376,6 +1378,7 @@ export default function Tile({
               >
                 {streamerUsername}
               </button>
+              {showMllProBadge && <MllProBadge size="compact" className="ml-0.5" />}
               {gifterStatus && Number(gifterStatus.lifetime_coins ?? 0) > 0 && (
                 <TierBadge
                   tier_key={gifterStatus.tier_key}
@@ -1583,6 +1586,7 @@ export default function Tile({
               >
                 {streamerUsername}
               </button>
+              {showMllProBadge && <MllProBadge size="compact" className="ml-0.5" />}
             </div>
 
             <div className="flex items-center gap-2 pointer-events-auto flex-shrink-0">

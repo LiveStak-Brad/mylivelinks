@@ -25,10 +25,16 @@ import {
   createLocalTracks,
 } from 'livekit-client';
 import { TOKEN_ENDPOINT } from '@/lib/livekit-constants';
-import { LiveSession, getSessionRoomName, formatTimer } from '@/lib/battle-session';
+import { LiveSession, getSessionRoomName } from '@/lib/battle-session';
 import MultiHostGrid, { ParticipantVolume } from './MultiHostGrid';
 import { GridTileParticipant } from './GridTile';
 import BattleTimer from './BattleTimer';
+import BattleScoreSlider from './BattleScoreSlider';
+import BattleTileOverlay, {
+  BattleParticipantState,
+  BattleMode,
+  TEAM_COLORS,
+} from './BattleTileOverlay';
 
 const normalizeParticipantId = (identity: string): string => {
   return identity
@@ -73,6 +79,8 @@ export default function BattleGridWrapper({
   const [allowEmptyState, setAllowEmptyState] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const isBattleSession = session.type === 'battle';
+
   const roomRef = useRef<Room | null>(null);
   const localTracksRef = useRef<{ video: any; audio: any }>({ video: null, audio: null });
   const emptyStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -114,6 +122,54 @@ export default function BattleGridWrapper({
     session.type,
     session.session_id,
   ]);
+
+  const battleMode: BattleMode = 'duel';
+
+  const battleStates = useMemo(() => {
+    if (!isBattleSession) {
+      return new Map<string, BattleParticipantState>();
+    }
+
+    const states = new Map<string, BattleParticipantState>();
+
+    states.set(hostSnapshot.hostA.id, {
+      participantId: hostSnapshot.hostA.id,
+      score: 0,
+      color: TEAM_COLORS.A,
+      teamId: 'A',
+      rank: 1,
+      isLeading: true,
+    });
+
+    states.set(hostSnapshot.hostB.id, {
+      participantId: hostSnapshot.hostB.id,
+      score: 0,
+      color: TEAM_COLORS.B,
+      teamId: 'B',
+      rank: 2,
+      isLeading: false,
+    });
+
+    return states;
+  }, [hostSnapshot.hostA.id, hostSnapshot.hostB.id, isBattleSession]);
+
+  const renderBattleOverlay = useCallback(
+    (participant: GridTileParticipant) => {
+      if (!isBattleSession) return null;
+      const state = battleStates.get(participant.id);
+      if (!state) return null;
+
+      return (
+        <BattleTileOverlay
+          participantId={participant.id}
+          battleState={state}
+          battleMode={battleMode}
+          compact={participants.length > 2}
+        />
+      );
+    },
+    [battleStates, battleMode, isBattleSession, participants.length]
+  );
   
   // Map LiveKit participants to grid participants
   const updateParticipants = useCallback(() => {
@@ -494,17 +550,35 @@ export default function BattleGridWrapper({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Timer overlay */}
-      <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
-        <BattleTimer
-          remainingSeconds={remainingSeconds}
-          phase={session.status === 'cooldown' ? 'cooldown' : 'active'}
-          mode={session.mode}
-          compact
-        />
-      </div>
+      {isBattleSession && battleStates.size > 0 && (
+        <div className="pointer-events-none absolute top-3 left-1/2 z-20 flex w-full max-w-sm -translate-x-1/2 flex-col items-center gap-2 px-3 sm:max-w-md">
+          <BattleScoreSlider
+            battleStates={battleStates}
+            battleMode={battleMode}
+            height={20}
+            hostId={hostSnapshot.hostA.id}
+            className="w-full drop-shadow-[0_0_12px_rgba(0,0,0,0.45)]"
+          />
+          <BattleTimer
+            remainingSeconds={remainingSeconds}
+            phase={session.status === 'cooldown' ? 'cooldown' : 'active'}
+            mode={session.mode}
+            compact
+          />
+        </div>
+      )}
+
+      {!isBattleSession && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
+          <BattleTimer
+            remainingSeconds={remainingSeconds}
+            phase={session.status === 'cooldown' ? 'cooldown' : 'active'}
+            mode={session.mode}
+            compact
+          />
+        </div>
+      )}
       
-      {/* Grid */}
       <MultiHostGrid
         participants={participants}
         mode="duo"
@@ -513,10 +587,10 @@ export default function BattleGridWrapper({
         volumes={volumes}
         onVolumeChange={handleVolumeChange}
         onMuteToggle={handleMuteToggle}
-        isBattleMode={session.type === 'battle'}
+        isBattleMode={isBattleSession}
+        renderOverlay={isBattleSession ? renderBattleOverlay : undefined}
       />
       
-      {/* Loading overlay */}
       {((!isConnected) || showConnectingOverlay) && !error && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/80">
           <div className="text-center">
