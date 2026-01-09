@@ -6,6 +6,8 @@ import clsx from 'clsx';
 import TeamBadge from './TeamBadge';
 import TeamChatStyleTrigger from './TeamChatStyleTrigger';
 import TeamChatStyleSheet from './TeamChatStyleSheet';
+import { TeamLiveVisibility } from '@/contexts/TeamContext';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import { useTeamChatStyle } from '@/hooks/useTeamChatStyle';
 import type { TeamChatStyle } from '@/hooks/useTeamChatStyle';
 import type { TeamIdentityContext, TeamThemeTokens } from '@/types/teams';

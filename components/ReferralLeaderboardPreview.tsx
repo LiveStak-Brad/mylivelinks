@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   formatReferralCount,
   type LeaderboardEntry,
 } from '@/lib/referralMockData';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { createClient } from '@/lib/supabase';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface ReferralLeaderboardPreviewProps {
   className?: string;
@@ -214,8 +216,13 @@ export default function ReferralLeaderboardPreview({
 
             {/* Username */}
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-900 dark:text-white truncate">
-                {entry.username}
+              <UserNameWithBadges
+                profileId={entry.profileId}
+                name={entry.username}
+                textSize="text-base"
+                nameClassName="font-medium text-gray-900 dark:text-white truncate"
+                showGifterBadge={false}
+              >
                 {entry.isCurrentUser && (
                   <span className="ml-2 text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">
                     YOU
