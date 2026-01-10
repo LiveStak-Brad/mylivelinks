@@ -66,6 +66,7 @@ export default function GiftModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userCoinBalance, setUserCoinBalance] = useState<number>(0);
+  const [balanceLoaded, setBalanceLoaded] = useState(false);
   const isMobileLayout = useIsMobileLayout();
 
   const inFlightRef = useRef(false);
@@ -126,14 +127,14 @@ export default function GiftModal({
     loadUserBalance();
   }, []);
 
-  // Redirect to wallet if user has 0 coins
+  // Redirect to wallet if user has 0 coins (only after balance is loaded)
   useEffect(() => {
-    if (userCoinBalance === 0) {
+    if (balanceLoaded && userCoinBalance === 0) {
       // Close modal and redirect to wallet
       onClose();
       window.location.href = '/wallet';
     }
-  }, [userCoinBalance, onClose]);
+  }, [balanceLoaded, userCoinBalance, onClose]);
 
   // ESC to close + iOS-safe scroll lock
   useEffect(() => {
@@ -171,6 +172,7 @@ export default function GiftModal({
 
     if (!error && data) {
       setUserCoinBalance((data as any).coin_balance);
+      setBalanceLoaded(true);
     }
   };
 

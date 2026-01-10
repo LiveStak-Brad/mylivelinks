@@ -70,23 +70,25 @@ const getGiftEmoji = (name: string) => {
 export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipientUsername }: GiftPickerMiniProps) {
   const [giftTypes, setGiftTypes] = useState<GiftType[]>([]);
   const [userCoinBalance, setUserCoinBalance] = useState<number>(0);
+  const [balanceLoaded, setBalanceLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGift, setSelectedGift] = useState<GiftType | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     if (isOpen) {
+      setBalanceLoaded(false);
       loadData();
     }
   }, [isOpen]);
 
-  // Redirect to wallet if user has 0 coins
+  // Redirect to wallet if user has 0 coins (only after balance is loaded)
   useEffect(() => {
-    if (isOpen && userCoinBalance === 0) {
+    if (isOpen && balanceLoaded && userCoinBalance === 0) {
       onClose();
       window.location.href = '/wallet';
     }
-  }, [isOpen, userCoinBalance, onClose]);
+  }, [isOpen, balanceLoaded, userCoinBalance, onClose]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -113,6 +115,7 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
 
         if (profile) {
           setUserCoinBalance(profile.coin_balance || 0);
+          setBalanceLoaded(true);
         }
       }
     } catch (error) {
