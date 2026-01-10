@@ -325,7 +325,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
           name: row.display_name || row.username || 'Unknown',
           handle: row.username ? `@${row.username}` : 'unknown',
           avatarUrl: row.avatar_url,
-          mutualCount: 0,
+          followerCount: Number(row.follower_count ?? 0),
           verified: Boolean(row.is_verified ?? row.verified ?? row.adult_verified_at),
           location: buildLocationString(row),
           online: Boolean(row.is_live),

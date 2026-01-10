@@ -6,11 +6,12 @@ import { ArrowUpRight, MapPin, Users, Gift, MessageCircle, ChevronDown, ChevronU
 import { REACTIONS } from '@/components/feed/ReactionPicker';
 import type { ReactionType } from '@/hooks/useFeedLikes';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { MllProBadge } from '@/components/mll/MllProBadge';
 import GiftModal from '@/components/GiftModal';
 import { createClient } from '@/lib/supabase';
+import { PresenceDot } from '@/components/presence/PresenceDot';
 import type { PersonResult, PostResult, TeamResult, LiveResult, CommentResult } from '@/types/search';
 
 export function PersonResultCard({ person, query }: { person: PersonResult; query: string }) {
@@ -43,7 +44,7 @@ export function PersonResultCard({ person, query }: { person: PersonResult; quer
       >
         <Card className="relative border border-border/70 shadow-sm transition group-hover:border-primary/40 group-hover:shadow-lg">
           <CardContent className="flex gap-4 px-5 pb-5 pt-8">
-          <div className="h-14 w-14 mt-1 rounded-full overflow-hidden border border-white/10 bg-muted flex-shrink-0">
+          <div className="relative h-14 w-14 mt-1 rounded-full overflow-hidden border border-white/10 bg-muted flex-shrink-0">
             {person.avatarUrl ? (
               <img src={person.avatarUrl} alt={person.name} className="h-full w-full object-cover" loading="lazy" />
             ) : (
@@ -56,6 +57,7 @@ export function PersonResultCard({ person, query }: { person: PersonResult; quer
                   .slice(0, 2)}
               </div>
             )}
+            <PresenceDot profileId={person.id} size="md" />
           </div>
           <div className="flex-1 space-y-3">
             <div className="flex items-start justify-between gap-4">
@@ -70,20 +72,12 @@ export function PersonResultCard({ person, query }: { person: PersonResult; quer
                   <HighlightedText text={person.handle} query={query} />
                 </p>
               </div>
-              <Badge
-                variant={person.online ? 'success' : 'secondary'}
-                size="sm"
-                dot={person.online}
-                dotColor={person.online ? 'success' : 'default'}
-              >
-                {person.online ? 'Online now' : 'Offline'}
-              </Badge>
             </div>
             <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-              {typeof person.mutualCount === 'number' && person.mutualCount > 0 && (
+              {typeof person.followerCount === 'number' && person.followerCount > 0 && (
                 <span className="flex items-center gap-1">
                   <Users className="h-3.5 w-3.5" />
-                  {person.mutualCount} mutuals
+                  {person.followerCount.toLocaleString()} followers
                 </span>
               )}
               {person.location && (

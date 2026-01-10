@@ -3,11 +3,10 @@ export interface PersonResult {
   name: string;
   handle: string;
   avatarUrl?: string | null;
-  mutualCount: number;
+  followerCount: number;
   verified: boolean;
   isMllPro?: boolean;
   location?: string | null;
-  online: boolean;
   status?: string | null;
   avatarColor: string;
   following?: boolean;
