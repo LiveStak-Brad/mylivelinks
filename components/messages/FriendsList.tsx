@@ -5,13 +5,14 @@ import { Users, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { useMessages } from './MessagesContext';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import { usePresence } from '@/contexts/PresenceContext';
+import { PresenceDot } from '@/components/presence/PresenceDot';
 
 interface Friend {
   id: string;
   username: string;
   display_name: string | null;
   avatar_url: string | null;
-  is_online: boolean;
   is_live: boolean;
 }
 
@@ -25,6 +26,7 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const { currentUserId, openConversationWith } = useMessages();
+  const { refresh: refreshPresence } = usePresence();
   const supabase = createClient();
 
   const loadFriends = useCallback(async () => {
@@ -65,31 +67,18 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
           .select('id, username, display_name, avatar_url, is_live')
           .in('id', followingIds.slice(0, 20));
 
-        // Check online status
-        const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
-        const { data: onlineData } = await supabase
-          .from('room_presence')
-          .select('profile_id')
-          .in('profile_id', followingIds)
-          .gt('last_seen_at', cutoff);
-
-        const onlineSet = new Set((onlineData || []).map((o: { profile_id: string }) => o.profile_id));
-
         const friendsList: Friend[] = (profiles || []).map((p: any) => ({
           id: p.id,
           username: p.username,
           display_name: p.display_name,
           avatar_url: p.avatar_url,
-          is_online: onlineSet.has(p.id),
           is_live: p.is_live === true,
         }));
 
-        // Sort: live first, then online, then alphabetical
+        // Sort: live first, then alphabetical
         friendsList.sort((a, b) => {
           if (a.is_live && !b.is_live) return -1;
           if (!a.is_live && b.is_live) return 1;
-          if (a.is_online && !b.is_online) return -1;
-          if (!a.is_online && b.is_online) return 1;
           return (a.display_name || a.username).localeCompare(b.display_name || b.username);
         });
 
@@ -104,31 +93,18 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
         .select('id, username, display_name, avatar_url, is_live')
         .in('id', mutualFriendIds);
 
-      // Check online status
-      const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
-      const { data: onlineData } = await supabase
-        .from('room_presence')
-        .select('profile_id')
-        .in('profile_id', mutualFriendIds)
-        .gt('last_seen_at', cutoff);
-
-      const onlineSet = new Set((onlineData || []).map((o: { profile_id: string }) => o.profile_id));
-
       const friendsList: Friend[] = (profiles || []).map((p: any) => ({
         id: p.id,
         username: p.username,
         display_name: p.display_name,
         avatar_url: p.avatar_url,
-        is_online: onlineSet.has(p.id),
         is_live: p.is_live === true,
       }));
 
-      // Sort: live first, then online, then alphabetical
+      // Sort: live first, then alphabetical
       friendsList.sort((a, b) => {
         if (a.is_live && !b.is_live) return -1;
         if (!a.is_live && b.is_live) return 1;
-        if (a.is_online && !b.is_online) return -1;
-        if (!a.is_online && b.is_online) return 1;
         return (a.display_name || a.username).localeCompare(b.display_name || b.username);
       });
 
@@ -142,11 +118,8 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
 
   useEffect(() => {
     loadFriends();
-
-    // Refresh every 30 seconds for online status
-    const interval = setInterval(loadFriends, 30000);
-    return () => clearInterval(interval);
-  }, [loadFriends]);
+    refreshPresence();
+  }, [loadFriends, refreshPresence]);
 
   const handleFriendClick = (friend: Friend) => {
     void (async () => {
@@ -331,9 +304,7 @@ function FriendAvatar({ friend, onClick }: { friend: Friend; onClick: () => void
         )}
 
         {/* Online indicator (purple dot) - only show if not live */}
-        {!friend.is_live && friend.is_online && (
-          <div className="absolute bottom-0 right-0 w-4 h-4 bg-purple-500 rounded-full border-2 border-card shadow-lg shadow-purple-500/50" />
-        )}
+        <PresenceDot profileId={friend.id} isLive={friend.is_live} size="lg" />
       </div>
 
       {/* Name */}
@@ -371,9 +342,7 @@ function FriendRow({ friend, onClick }: { friend: Friend; onClick: () => void })
         </div>
 
         {/* Online indicator */}
-        {!friend.is_live && friend.is_online && (
-          <div className="absolute bottom-0 right-0 w-3 h-3 bg-purple-500 rounded-full border-2 border-card" />
-        )}
+        <PresenceDot profileId={friend.id} isLive={friend.is_live} size="md" />
       </div>
 
       {/* Name and status */}
@@ -383,9 +352,6 @@ function FriendRow({ friend, onClick }: { friend: Friend; onClick: () => void })
         </p>
         {friend.is_live && (
           <span className="text-[10px] text-red-500 font-semibold uppercase">● Live</span>
-        )}
-        {!friend.is_live && friend.is_online && (
-          <span className="text-[10px] text-purple-400">Online</span>
         )}
       </div>
     </button>

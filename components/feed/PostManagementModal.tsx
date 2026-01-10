@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { Pin, Trash2, Eye, Users, Lock, X } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { toast } from 'sonner';
+import { createClient } from '@/lib/supabase';
 
 interface PostManagementModalProps {
   postId: string;
@@ -42,12 +41,12 @@ export function PostManagementModal({
 
       if (error) throw error;
 
-      toast.success(isPinned ? 'Post unpinned' : 'Post pinned');
+      console.log(isPinned ? 'Post unpinned' : 'Post pinned');
       onPostUpdated?.();
       onClose();
     } catch (error: any) {
       console.error('Error pinning post:', error);
-      toast.error(error.message || 'Failed to pin post');
+      alert(error.message || 'Failed to pin post');
     } finally {
       setIsLoading(false);
     }
@@ -67,12 +66,11 @@ export function PostManagementModal({
 
       if (error) throw error;
 
-      toast.success('Post deleted');
       onPostDeleted?.();
       onClose();
     } catch (error: any) {
       console.error('Error deleting post:', error);
-      toast.error(error.message || 'Failed to delete post');
+      alert(error.message || 'Failed to delete post');
     } finally {
       setIsLoading(false);
     }
@@ -89,12 +87,11 @@ export function PostManagementModal({
 
       if (error) throw error;
 
-      toast.success('Visibility updated');
       onPostUpdated?.();
       onClose();
     } catch (error: any) {
       console.error('Error updating visibility:', error);
-      toast.error(error.message || 'Failed to update visibility');
+      alert(error.message || 'Failed to update visibility');
     } finally {
       setIsLoading(false);
     }

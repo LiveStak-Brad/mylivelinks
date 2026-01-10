@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, MessageCircle } from 'lucide-react';
 import { useMessages, Conversation } from './MessagesContext';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
+import { usePresence } from '@/contexts/PresenceContext';
+import { PresenceDot } from '@/components/presence/PresenceDot';
 
 interface ConversationListProps {
   onSelectConversation?: (conversation: Conversation) => void;
@@ -11,7 +13,12 @@ interface ConversationListProps {
 
 export default function ConversationList({ onSelectConversation }: ConversationListProps) {
   const { conversations, isLoading, activeConversationId, setActiveConversationId } = useMessages();
+  const { refresh: refreshPresence } = usePresence();
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    refreshPresence();
+  }, [refreshPresence]);
 
   const filteredConversations = conversations.filter(conv => 
     conv.recipientUsername.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -124,9 +131,7 @@ function ConversationRow({
           className="w-12 h-12 rounded-full object-cover"
         />
         {/* Online indicator */}
-        {conversation.isOnline && (
-          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card" />
-        )}
+        <PresenceDot profileId={conversation.recipientId} size="md" />
       </div>
 
       {/* Content */}

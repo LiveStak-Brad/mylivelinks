@@ -9,6 +9,8 @@ import SafeRichText from '@/components/SafeRichText';
 import SafeOutboundLink from '@/components/SafeOutboundLink';
 import LiveAvatar from '@/components/LiveAvatar';
 import ReportModal from '@/components/ReportModal';
+import { usePresence } from '@/contexts/PresenceContext';
+import { PresenceDot } from '@/components/presence/PresenceDot';
 
 interface MessageThreadProps {
   conversation: Conversation;
@@ -73,6 +75,7 @@ const EMOJIS = [
 export default function MessageThread({ conversation, onBack, showBackButton = false }: MessageThreadProps) {
   const { messages, sendMessage, sendGift, sendImage, currentUserId } = useMessages();
   const { openChat } = useIM();
+  const { isOnline } = usePresence();
   const [messageInput, setMessageInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
@@ -86,6 +89,8 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputAreaRef = useRef<HTMLDivElement>(null);
+  
+  const recipientIsOnline = isOnline(conversation.recipientId);
 
   const openReportDmMessage = (message: Message) => {
     setReportTarget({
@@ -238,15 +243,18 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
         )}
         
         {/* Avatar */}
-        <LiveAvatar
-          avatarUrl={conversation.recipientAvatar}
-          username={conversation.recipientUsername}
-          displayName={conversation.recipientDisplayName || conversation.recipientUsername}
-          isLive={conversation.recipientIsLive}
-          size="md"
-          showLiveBadge={false}
-          clickable={true}
-        />
+        <div className="relative">
+          <LiveAvatar
+            avatarUrl={conversation.recipientAvatar}
+            username={conversation.recipientUsername}
+            displayName={conversation.recipientDisplayName || conversation.recipientUsername}
+            isLive={conversation.recipientIsLive}
+            size="md"
+            showLiveBadge={false}
+            clickable={true}
+          />
+          <PresenceDot profileId={conversation.recipientId} isLive={conversation.recipientIsLive} size="md" />
+        </div>
 
         {/* Name & Status */}
         <div className="flex-1 min-w-0">
@@ -254,7 +262,7 @@ export default function MessageThread({ conversation, onBack, showBackButton = f
             {conversation.recipientDisplayName || conversation.recipientUsername}
           </p>
           <p className="text-xs text-muted-foreground">
-            {conversation.isOnline ? 'Active now' : 'Offline'}
+            {recipientIsOnline ? 'Active now' : 'Offline'}
           </p>
         </div>
 
