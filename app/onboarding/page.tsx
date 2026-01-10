@@ -351,7 +351,7 @@ export default function OnboardingPage() {
                     maxLength={10}
                     inputSize="lg"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Example: 08/30/1986</p>
+                  <p className="text-xs text-muted-foreground mt-1">Example: 01/15/1990</p>
                 </div>
                 {formData.dateOfBirth && (
                   <p className="text-sm text-muted-foreground">
