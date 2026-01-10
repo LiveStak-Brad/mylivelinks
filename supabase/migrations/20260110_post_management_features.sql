@@ -325,9 +325,8 @@ AS $$
     GROUP BY c.post_id
   ),
   gift_totals AS (
-    SELECT pg.post_id, COALESCE(SUM(COALESCE(gg.coin_amount, pg.coins)), 0)::bigint AS gift_total_coins
+    SELECT pg.post_id, COALESCE(SUM(pg.coins), 0)::bigint AS gift_total_coins
     FROM public.post_gifts pg
-    LEFT JOIN public.gifts gg ON gg.id = pg.gift_id
     WHERE pg.post_id IN (SELECT id FROM base_posts)
     GROUP BY pg.post_id
   )

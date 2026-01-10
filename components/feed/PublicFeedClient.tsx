@@ -35,6 +35,8 @@ type FeedPost = {
   text_content: string;
   media_url: string | null;
   created_at: string;
+  visibility?: 'public' | 'friends' | 'private';
+  is_pinned?: boolean;
   author: FeedAuthor;
   comment_count: number;
   gift_total_coins: number;
@@ -850,6 +852,10 @@ export default function PublicFeedClient({
                 <FeedPostWithLikes
                   postId={post.id}
                   initialLikesCount={post.likes_count}
+                  postType="personal"
+                  currentUserId={currentUserId || undefined}
+                  visibility={post.visibility}
+                  isPinned={post.is_pinned}
                   authorProfileId={post.author.id}
                   authorName={post.author.username}
                   authorUsername={post.author.username}
@@ -872,6 +878,12 @@ export default function PublicFeedClient({
                   onMore={() => openReportPost(post)}
                   onProfileClick={() => {
                     window.location.href = `/${post.author.username}`;
+                  }}
+                  onPostDeleted={() => {
+                    setPosts((prev) => prev.filter((p) => p.id !== post.id));
+                  }}
+                  onPostUpdated={() => {
+                    void loadFeed('replace');
                   }}
                   className={`backdrop-blur-sm ${borderRadiusClass}`}
                   style={cardStyle}

@@ -1,7 +1,8 @@
 'use client';
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { Heart, MessageCircle, Gift, Flag, Coins } from 'lucide-react';
+import { Heart, MessageCircle, Gift, Flag, Coins, Pin, MoreHorizontal } from 'lucide-react';
+import { PostManagementModal } from './PostManagementModal';
 import { Card } from '@/components/ui/Card';
 import LiveAvatar from '@/components/LiveAvatar';
 import ClipActions from '@/components/ClipActions';
@@ -73,6 +74,16 @@ export interface FeedPostCardProps {
   likesCount?: number;
   /** Unique identifier of the post (for reactions modal) */
   postId?: string;
+  /** Post type (personal or team) */
+  postType?: 'personal' | 'team';
+  /** Current user ID */
+  currentUserId?: string;
+  /** Is current user a moderator (for team posts) */
+  isModerator?: boolean;
+  /** Post visibility */
+  visibility?: 'public' | 'friends' | 'private' | 'members';
+  /** Is post pinned */
+  isPinned?: boolean;
   /** Callback when like button clicked */
   onLike?: (reactionType?: ReactionType) => void;
   /** Callback when comment button clicked */
@@ -85,6 +96,10 @@ export interface FeedPostCardProps {
   onProfileClick?: () => void;
   /** Callback when clip action is triggered */
   onClipAction?: (action: 'post' | 'save' | 'post-save' | 'composer') => void;
+  /** Callback when post is deleted */
+  onPostDeleted?: () => void;
+  /** Callback when post is updated */
+  onPostUpdated?: () => void;
   /** Additional className */
   className?: string;
   /** Inline styles */
@@ -225,18 +240,29 @@ const FeedPostCard = memo(function FeedPostCard({
   likesCount = 0,
   userReaction = null,
   postId,
+  postType = 'personal',
+  currentUserId,
+  isModerator = false,
+  visibility = 'public',
+  isPinned = false,
   onLike,
   onComment,
   onGift,
   onMore,
   onProfileClick,
   onClipAction,
+  onPostDeleted,
+  onPostUpdated,
   className = '',
   style,
 }: FeedPostCardProps) {
   const formattedTimestamp = formatTimestamp(timestamp);
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
+  const [showManagementModal, setShowManagementModal] = useState(false);
   const likeButtonRef = useRef<HTMLButtonElement>(null);
+
+  const isAuthor = currentUserId && authorProfileId && currentUserId === authorProfileId;
+  const canManage = isAuthor || (postType === 'team' && isModerator);
 
   const activeReaction = useMemo(
     () => (userReaction ? REACTIONS.find((reaction) => reaction.type === userReaction) ?? null : null),
@@ -292,7 +318,7 @@ const FeedPostCard = memo(function FeedPostCard({
           </div>
           
           <div className="flex-1 min-w-0 leading-tight">
-            <div className="mb-0.5">
+            <div className="mb-0.5 flex items-center gap-2">
               <UserNameWithBadges
                 profileId={authorProfileId}
                 name={authorName}
@@ -302,20 +328,37 @@ const FeedPostCard = memo(function FeedPostCard({
                 clickable={!!onProfileClick}
                 onClick={onProfileClick}
               />
+              {isPinned && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                  <Pin className="w-3 h-3 text-primary fill-current" />
+                  <span className="text-xs font-semibold text-primary">Pinned</span>
+                </div>
+              )}
             </div>
             <time className="text-[13px] text-muted-foreground">{formattedTimestamp}</time>
           </div>
           
-          {typeof onMore === 'function' ? (
-            <button
-              onClick={onMore}
-              className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 -mr-1 rounded-lg hover:bg-muted/60 transition-colors text-sm font-semibold text-muted-foreground"
-              aria-label="Report post"
-            >
-              <Flag className="w-4 h-4" aria-hidden="true" />
-              <span>Report</span>
-            </button>
-          ) : null}
+          <div className="flex items-center gap-1">
+            {canManage && postId && (
+              <button
+                onClick={() => setShowManagementModal(true)}
+                className="flex-shrink-0 p-2 -mr-2 rounded-lg hover:bg-muted/60 transition-colors"
+                aria-label="Manage post"
+              >
+                <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
+              </button>
+            )}
+            {!canManage && typeof onMore === 'function' && (
+              <button
+                onClick={onMore}
+                className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 -mr-1 rounded-lg hover:bg-muted/60 transition-colors text-sm font-semibold text-muted-foreground"
+                aria-label="Report post"
+              >
+                <Flag className="w-4 h-4" aria-hidden="true" />
+                <span>Report</span>
+              </button>
+            )}
+          </div>
         </div>
         
         {/* Content - Larger Font Like Facebook/Instagram */}
@@ -423,6 +466,20 @@ const FeedPostCard = memo(function FeedPostCard({
           onClose={closeReactionPicker}
         />
       ) : null}
+
+      {showManagementModal && postId && (
+        <PostManagementModal
+          postId={postId}
+          postType={postType}
+          isAuthor={!!isAuthor}
+          isModerator={isModerator}
+          currentVisibility={visibility}
+          isPinned={isPinned}
+          onClose={() => setShowManagementModal(false)}
+          onPostDeleted={onPostDeleted}
+          onPostUpdated={onPostUpdated}
+        />
+      )}
     </>
   );
 });
