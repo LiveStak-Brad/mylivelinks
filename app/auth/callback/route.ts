@@ -18,20 +18,29 @@ export async function GET(request: NextRequest) {
     }
 
     if (data.user) {
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('username, date_of_birth')
         .eq('id', data.user.id)
         .maybeSingle();
 
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+      }
+
       if (!profile) {
-        await supabase.from('profiles').insert({
+        const { error: insertError } = await supabase.from('profiles').insert({
           id: data.user.id,
           username: null,
           coin_balance: 0,
           earnings_balance: 0,
           gifter_level: 0,
         });
+        
+        if (insertError) {
+          console.error('Profile creation error:', insertError);
+          return NextResponse.redirect(`${requestUrl.origin}/login?error=${encodeURIComponent('Failed to create profile. Please try again.')}`);
+        }
       }
 
       if (returnTo) {
