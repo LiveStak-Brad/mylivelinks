@@ -548,7 +548,7 @@ export default function TeamPageContent() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 pb-6">
+      <div className="mx-auto max-w-5xl px-4 pb-24">
         {/* ══════════════════════════════════════════════════════════════════════
             NAVIGATION TABS
             ══════════════════════════════════════════════════════════════════════ */}
