@@ -26,7 +26,7 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const { currentUserId, openConversationWith } = useMessages();
-  const { refresh: refreshPresence } = usePresence();
+  const { refresh: refreshPresence, isOnline } = usePresence();
   const supabase = createClient();
 
   const loadFriends = useCallback(async () => {
@@ -75,10 +75,12 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
           is_live: p.is_live === true,
         }));
 
-        // Sort: live first, then alphabetical
+        // Sort: online first (from PresenceContext), then offline, both alphabetically
         friendsList.sort((a, b) => {
-          if (a.is_live && !b.is_live) return -1;
-          if (!a.is_live && b.is_live) return 1;
+          const aOnline = isOnline(a.id);
+          const bOnline = isOnline(b.id);
+          if (aOnline && !bOnline) return -1;
+          if (!aOnline && bOnline) return 1;
           return (a.display_name || a.username).localeCompare(b.display_name || b.username);
         });
 
@@ -101,10 +103,12 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
         is_live: p.is_live === true,
       }));
 
-      // Sort: live first, then alphabetical
+      // Sort: online first (from PresenceContext), then offline, both alphabetically
       friendsList.sort((a, b) => {
-        if (a.is_live && !b.is_live) return -1;
-        if (!a.is_live && b.is_live) return 1;
+        const aOnline = isOnline(a.id);
+        const bOnline = isOnline(b.id);
+        if (aOnline && !bOnline) return -1;
+        if (!aOnline && bOnline) return 1;
         return (a.display_name || a.username).localeCompare(b.display_name || b.username);
       });
 
@@ -114,7 +118,7 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, supabase]);
+  }, [currentUserId, supabase, isOnline]);
 
   useEffect(() => {
     loadFriends();

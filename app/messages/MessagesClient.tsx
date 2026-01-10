@@ -8,6 +8,10 @@ import { Input, EmptyState } from '@/components/ui';
 import { useMessages } from '@/components/messages';
 import SafeRichText from '@/components/SafeRichText';
 import ReportModal from '@/components/ReportModal';
+import { usePresence } from '@/contexts/PresenceContext';
+import { PresenceDot } from '@/components/presence/PresenceDot';
+import { getAvatarUrl } from '@/lib/defaultAvatar';
+import FriendsList from '@/components/messages/FriendsList';
 
 /**
  * MESSAGES PAGE (Client)
@@ -30,6 +34,7 @@ function MessagesPageContent() {
     markConversationRead,
     isLoading,
   } = useMessages();
+  const { refresh: refreshPresence } = usePresence();
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -89,6 +94,11 @@ function MessagesPageContent() {
     void openConversationWith(target);
   }, [openConversationWith, searchParams]);
 
+  // Refresh presence on mount
+  useEffect(() => {
+    refreshPresence();
+  }, [refreshPresence]);
+
   return (
     <main
       id="main"
@@ -122,6 +132,11 @@ function MessagesPageContent() {
             </div>
           </header>
 
+          {/* Friends List - Horizontal Scroll */}
+          <div className="border-b border-border">
+            <FriendsList onSelectFriend={() => {}} layout="horizontal" />
+          </div>
+
           {/* Conversations */}
           <div className="flex-1 overflow-y-auto">
             {isLoading ? (
@@ -149,9 +164,12 @@ function MessagesPageContent() {
                   >
                     {/* Avatar */}
                     <div className="relative flex-shrink-0">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-semibold">
-                        {conv.recipientUsername?.[0]?.toUpperCase() || '?'}
-                      </div>
+                      <img
+                        src={getAvatarUrl(conv.recipientAvatar)}
+                        alt={conv.recipientUsername}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                      <PresenceDot profileId={conv.recipientId} isLive={conv.recipientIsLive} size="md" />
                       {conv.unreadCount > 0 && (
                         <span className="absolute -top-1 -right-1 bg-destructive text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
                           {conv.unreadCount}
@@ -198,8 +216,13 @@ function MessagesPageContent() {
                 <button onClick={() => setActiveConversationId(null)} className="md:hidden p-2 hover:bg-muted rounded-lg">
                   ←
                 </button>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-semibold">
-                  {activeConversation.recipientUsername?.[0]?.toUpperCase() || '?'}
+                <div className="relative flex-shrink-0">
+                  <img
+                    src={getAvatarUrl(activeConversation.recipientAvatar)}
+                    alt={activeConversation.recipientUsername}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                  <PresenceDot profileId={activeConversation.recipientId} isLive={activeConversation.recipientIsLive} size="sm" />
                 </div>
                 <div className="flex-1">
                   <h2 className="font-semibold text-foreground">
