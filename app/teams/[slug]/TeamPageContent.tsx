@@ -5,6 +5,7 @@ import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { PostManagementModal } from '@/components/feed/PostManagementModal';
 import {
   ArrowUp,
   Bell,
@@ -2071,6 +2072,7 @@ function FeedCard({
 }) {
   const { toast } = useToast();
   const [showMenu, setShowMenu] = useState(false);
+  const [showManagementModal, setShowManagementModal] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showGiftPicker, setShowGiftPicker] = useState(false);
   const [commentText, setCommentText] = useState('');
@@ -2335,9 +2337,18 @@ function FeedCard({
           )}
 
           {/* Media */}
-          {item.media && (isClip || item.type === 'post') && (
+          {item.media && (
             <div className="mt-3 relative rounded-xl overflow-hidden">
-              <Image src={item.media} alt="" width={600} height={300} className="w-full object-cover" />
+              {/(\.(mp4|webm|mov|m4v)(\?|$))/i.test(item.media) ? (
+                <video 
+                  src={item.media} 
+                  controls 
+                  className="w-full rounded-xl"
+                  style={{ maxHeight: '400px' }}
+                />
+              ) : (
+                <Image src={item.media} alt="" width={600} height={300} className="w-full object-cover" />
+              )}
               {isClip && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur">
@@ -2413,6 +2424,18 @@ function FeedCard({
             
             {/* More menu */}
             {hasActions && (
+              <div className="relative ml-auto" ref={menuRef}>
+                <button 
+                  onClick={() => setShowManagementModal(true)}
+                  className="text-white/30 hover:text-white"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            
+            {/* Legacy menu fallback - keeping for backwards compat */}
+            {showMenu && hasActions && (
               <div className="relative ml-auto" ref={menuRef}>
                 <button 
                   onClick={() => setShowMenu(!showMenu)}
@@ -2545,6 +2568,27 @@ function FeedCard({
           )}
         </div>
       </div>
+
+      {/* Post Management Modal */}
+      {showManagementModal && (
+        <PostManagementModal
+          postId={item.id}
+          postType="team"
+          isAuthor={isOwner}
+          isModerator={!!canModerate}
+          currentVisibility="public"
+          isPinned={!!item.isPinned}
+          onClose={() => setShowManagementModal(false)}
+          onPostDeleted={() => {
+            setShowManagementModal(false);
+            onDelete?.(item.id);
+          }}
+          onPostUpdated={() => {
+            setShowManagementModal(false);
+            onRefresh?.();
+          }}
+        />
+      )}
     </div>
   );
 }
