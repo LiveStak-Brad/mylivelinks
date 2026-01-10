@@ -7,15 +7,27 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get('code');
   const returnTo = requestUrl.searchParams.get('returnTo');
 
+  console.log('Auth callback received:', { 
+    hasCode: !!code, 
+    returnTo,
+    url: requestUrl.toString() 
+  });
+
   if (code) {
     const supabase = createClient();
     
+    console.log('Attempting to exchange code for session...');
     const { error, data } = await supabase.auth.exchangeCodeForSession(code);
     
     if (error) {
       console.error('Auth callback error:', error);
       return NextResponse.redirect(`${requestUrl.origin}/login?error=${encodeURIComponent('Authentication failed. Please try again.')}`);
     }
+
+    console.log('Session exchange successful:', { 
+      userId: data.user?.id,
+      email: data.user?.email 
+    });
 
     if (data.user) {
       const { data: profile, error: profileError } = await supabase
