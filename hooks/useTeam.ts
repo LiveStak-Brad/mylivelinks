@@ -39,6 +39,7 @@ export interface FeedItem {
   isPinned?: boolean;
   isAnnouncement?: boolean;
   isReacted?: boolean;
+  reactionType?: string;
   giftCount?: number;
   isPoll?: boolean;
   pollOptions?: { id: string; label: string; votes: number; isSelected?: boolean }[];
@@ -454,6 +455,7 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
             isPinned,
             isAnnouncement: isPinned,
             isReacted: !!r.is_reacted,
+            reactionType: r.reaction_type ? String(r.reaction_type) : undefined,
             giftCount: Number(r.gift_count ?? 0),
             isPoll: !!r.is_poll,
           } satisfies FeedItem;
@@ -541,6 +543,7 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
             isPinned,
             isAnnouncement: isPinned,
             isReacted: !!r.is_reacted,
+            reactionType: r.reaction_type ? String(r.reaction_type) : undefined,
             giftCount: Number(r.gift_count ?? 0),
             isPoll: !!r.is_poll,
           } satisfies FeedItem;
@@ -1171,20 +1174,22 @@ export function usePinPost() {
   return { mutate, pinPost, isLoading, error };
 }
 
+export type TeamReactionType = 'like' | 'love' | 'haha' | 'wow' | 'sad' | 'fire';
+
 export function useReactToPost() {
   const supabase = useMemo(() => createClient(), []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const reactToPost = useCallback(
-    async (postId: string): Promise<{ reaction_count: number; is_reacted: boolean } | null> => {
+    async (postId: string, reactionType: TeamReactionType = 'like'): Promise<{ reaction_count: number; is_reacted: boolean } | null> => {
       setIsLoading(true);
       setError(null);
 
       try {
         const { data, error: rpcError } = await supabase.rpc('rpc_react_team_post', {
           p_post_id: postId,
-          p_reaction_type: 'like',
+          p_reaction_type: reactionType,
         });
         if (rpcError) throw rpcError;
         // RPC returns array with single row

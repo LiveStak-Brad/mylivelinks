@@ -17,9 +17,11 @@ export type PostSource = 'global' | 'team';
 
 export interface PostResult {
   id: string;
+  authorId: string;
   author: string;
   authorHandle: string;
   authorAvatarUrl?: string | null;
+  authorIsMllPro?: boolean;
   text: string;
   createdAt: string;
   likeCount: number;
@@ -76,6 +78,18 @@ export interface MusicVideoResult {
   createdAt: string;
 }
 
+export interface CommentResult {
+  id: string;
+  content: string;
+  createdAt: string;
+  postId: string;
+  postText?: string;
+  authorId: string;
+  authorUsername: string;
+  authorDisplayName?: string | null;
+  authorAvatarUrl?: string | null;
+}
+
 export interface SearchResultsBundle {
   people: PersonResult[];
   posts: PostResult[];
@@ -83,6 +97,7 @@ export interface SearchResultsBundle {
   live: LiveResult[];
   music: MusicTrackResult[];
   videos: MusicVideoResult[];
+  comments: CommentResult[];
 }
 
 export type SearchResultCategory = keyof SearchResultsBundle;

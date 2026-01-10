@@ -45,6 +45,9 @@ const EMPTY_RESULTS: SearchResultsBundle = {
   posts: [],
   teams: [],
   live: [],
+  music: [],
+  videos: [],
+  comments: [],
 };
 
 export function GlobalSearchTrigger({
@@ -481,9 +484,13 @@ const CATEGORY_LABELS: Record<SearchResultCategory, string> = {
   posts: 'Posts',
   teams: 'Teams',
   live: 'Live',
+  music: 'Music',
+  videos: 'Videos',
+  comments: 'Comments',
 };
 
-const CATEGORY_ORDER: SearchResultCategory[] = ['people', 'posts', 'teams', 'live'];
+type TypeaheadCategory = 'people' | 'posts' | 'teams' | 'live';
+const CATEGORY_ORDER: TypeaheadCategory[] = ['people', 'posts', 'teams', 'live'];
 
 function TypeaheadResultsList({
   query,
@@ -575,7 +582,7 @@ function TypeaheadResultRow({
   onNavigate,
   variant,
 }: {
-  category: SearchResultCategory;
+  category: TypeaheadCategory;
   item: PersonResult | PostResult | TeamResult | LiveResult;
   query: string;
   onNavigate: (href: string) => void;

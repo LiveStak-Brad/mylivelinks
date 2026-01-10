@@ -30,6 +30,7 @@ import {
   Star,
   MessageSquare,
   ArrowRight,
+  MoreHorizontal,
 } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -48,12 +49,13 @@ import {
   SEARCHABLE_PAGES,
   type SearchablePage,
 } from './constants';
-import type { PersonResult, PostResult, TeamResult, LiveResult, MusicTrackResult, MusicVideoResult } from '@/types/search';
+import type { PersonResult, PostResult, TeamResult, LiveResult, MusicTrackResult, MusicVideoResult, CommentResult } from '@/types/search';
 import {
   LiveResultCard,
   PersonResultCard,
   PostResultCard,
   TeamResultCard,
+  CommentResultCard,
 } from './SearchResultCards';
 import { createClient } from '@/lib/supabase';
 import { fetchSearchResults } from '@/lib/search';
@@ -122,6 +124,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
   const [liveResults, setLiveResults] = useState<LiveResult[]>([]);
   const [musicResults, setMusicResults] = useState<MusicTrackResult[]>([]);
   const [videoResults, setVideoResults] = useState<MusicVideoResult[]>([]);
+  const [commentResults, setCommentResults] = useState<CommentResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -162,8 +165,9 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
       media: mediaResults,
       music: musicResults,
       videos: videoResults,
+      comments: commentResults,
     };
-  }, [filtersSet, nearbyEnabled, nearbyResults, peopleResults, postResults, teamResults, liveResults, musicResults, videoResults]);
+  }, [filtersSet, nearbyEnabled, nearbyResults, peopleResults, postResults, teamResults, liveResults, musicResults, videoResults, commentResults]);
 
   const topResults = useMemo(() => {
     return {
@@ -174,6 +178,7 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
       media: filteredWithToggles.media?.slice(0, 2) ?? [],
       music: filteredWithToggles.music?.slice(0, 2) ?? [],
       videos: filteredWithToggles.videos?.slice(0, 2) ?? [],
+      comments: filteredWithToggles.comments?.slice(0, 3) ?? [],
     };
   }, [filteredWithToggles]);
 
@@ -234,9 +239,10 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
         setLiveResults(results.live ?? []);
         setMusicResults(results.music ?? []);
         setVideoResults(results.videos ?? []);
+        setCommentResults(results.comments ?? []);
 
         const totalMatches =
-          (results.people?.length ?? 0) + (results.posts?.length ?? 0) + (results.teams?.length ?? 0) + (results.live?.length ?? 0) + (results.music?.length ?? 0) + (results.videos?.length ?? 0);
+          (results.people?.length ?? 0) + (results.posts?.length ?? 0) + (results.teams?.length ?? 0) + (results.live?.length ?? 0) + (results.music?.length ?? 0) + (results.videos?.length ?? 0) + (results.comments?.length ?? 0);
         setStatus(totalMatches > 0 ? 'results' : 'empty');
       } catch (error) {
         if (cancelled) return;
@@ -265,7 +271,8 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
       (filteredWithToggles?.live?.length ?? 0) +
       (filteredWithToggles?.media?.length ?? 0) +
       (filteredWithToggles?.music?.length ?? 0) +
-      (filteredWithToggles?.videos?.length ?? 0);
+      (filteredWithToggles?.videos?.length ?? 0) +
+      (filteredWithToggles?.comments?.length ?? 0);
 
     if (total === 0 && status !== 'empty') {
       setStatus('empty');
@@ -766,13 +773,17 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
             </div>
           </div>
         ));
+      case 'comments':
+        return (data as typeof filteredWithToggles.comments).map((comment) => (
+          <CommentResultCard key={comment.id} comment={comment} query={urlQuery} />
+        ));
       default:
         return null;
     }
   };
 
   return (
-    <div className="bg-secondary/40 min-h-screen">
+    <div className="bg-secondary/40 min-h-screen pb-24">
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col gap-6 lg:flex-row">
           <aside className="hidden w-64 shrink-0 lg:block">
@@ -836,48 +847,96 @@ function SearchPageContent({ initialTab }: SearchPageProps) {
               </p>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as SearchTab)}>
-                <TabsList className="flex max-w-full flex-wrap gap-2 overflow-x-auto rounded-2xl bg-muted/70 p-1">
-                  {PRIMARY_TABS.map((tab) => (
-                    <TabsTrigger key={tab.id} value={tab.id} className="rounded-2xl px-3 py-1.5 text-sm">
-                      {tab.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-              <div className="relative">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setMoreMenuOpen((prev) => !prev)}
-                  rightIcon={<ChevronDown className="h-4 w-4" />}
-                >
-                  More
-                </Button>
-                {moreMenuOpen && (
-                  <Card className="absolute right-0 z-20 mt-2 w-60 border border-border shadow-xl">
-                    <CardContent className="p-2">
-                      {MORE_TABS.map((tab) => (
-                        <button
-                          key={tab.id}
-                          type="button"
-                          onClick={() => handleTabChange(tab.id)}
-                          className="flex w-full flex-col items-start rounded-xl px-3 py-2 text-left hover:bg-muted/60"
-                        >
-                          <span className="text-sm font-semibold">{tab.label}</span>
-                          <span className="text-xs text-muted-foreground">{tab.description}</span>
-                          {tab.id === 'messages' && (
-                            <span className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                              <Lock className="h-3.5 w-3.5" />
-                              Phase 2
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
+            {/* Search Tabs - 2 rows, full width pills with icons */}
+            <div className="space-y-2">
+              {/* Row 1: Top, People, Posts, Teams */}
+              <div className="grid grid-cols-4 gap-2">
+                {PRIMARY_TABS.slice(0, 4).map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground shadow-md'
+                          : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="text-xs">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Row 2: Live, Media, Music, Videos */}
+              <div className="grid grid-cols-4 gap-2">
+                {PRIMARY_TABS.slice(4).map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${
+                        isActive
+                          ? 'bg-primary text-primary-foreground shadow-md'
+                          : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="text-xs">{tab.label}</span>
+                    </button>
+                  );
+                })}
+                {/* More dropdown in the last slot if needed */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMoreMenuOpen((prev) => !prev)}
+                    className={`flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-all ${
+                      MORE_TABS.some((t) => t.id === activeTab)
+                        ? 'bg-primary text-primary-foreground shadow-md'
+                        : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                    <span className="text-xs">More</span>
+                  </button>
+                  {moreMenuOpen && (
+                    <Card className="absolute left-0 z-20 mt-2 w-60 border border-border shadow-xl">
+                      <CardContent className="p-2">
+                        {MORE_TABS.map((tab) => {
+                          const Icon = tab.icon;
+                          return (
+                            <button
+                              key={tab.id}
+                              type="button"
+                              onClick={() => handleTabChange(tab.id)}
+                              className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left hover:bg-muted/60 ${
+                                activeTab === tab.id ? 'bg-muted' : ''
+                              }`}
+                            >
+                              <Icon className="h-4 w-4 text-muted-foreground" />
+                              <div>
+                                <span className="text-sm font-semibold">{tab.label}</span>
+                                <p className="text-xs text-muted-foreground">{tab.description}</p>
+                              </div>
+                              {tab.id === 'messages' && (
+                                <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Lock className="h-3 w-3" />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               </div>
             </div>
 

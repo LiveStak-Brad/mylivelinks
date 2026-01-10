@@ -426,6 +426,10 @@ export default function GlobalHeader() {
         <AppMenuDrawer
           isOpen={appMenuOpen}
           onClose={() => setAppMenuOpen(false)}
+          onOpenSearch={() => {
+            setAppMenuOpen(false);
+            router.push('/search');
+          }}
           isOwner={isOwner}
         />
       </header>

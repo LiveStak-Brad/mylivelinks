@@ -8,6 +8,7 @@ import type {
   TeamResult,
   MusicTrackResult,
   MusicVideoResult,
+  CommentResult,
 } from '@/types/search';
 
 const PERSON_GRADIENTS = [
@@ -50,6 +51,21 @@ export async function fetchSearchResults({
   const likePattern = `%${escapeLikePattern(trimmed.toLowerCase())}%`;
   const resolvedLimits = { ...DEFAULT_LIMITS, ...limits };
 
+  // Get current user for team membership filtering
+  const { data: { user } } = await supabase.auth.getUser();
+  const currentUserId = user?.id;
+
+  // Get teams the user is a member of
+  let userTeamIds: string[] = [];
+  if (currentUserId) {
+    const { data: memberships } = await supabase
+      .from('team_memberships')
+      .select('team_id')
+      .eq('profile_id', currentUserId)
+      .eq('status', 'approved');
+    userTeamIds = (memberships ?? []).map((m: any) => m.team_id);
+  }
+
   const postsLimit = resolvedLimits.posts ?? DEFAULT_LIMITS.posts ?? 5;
   const postsFetchCap = Math.max(postsLimit * 2, postsLimit + 2);
   const peopleLimit = resolvedLimits.people ?? DEFAULT_LIMITS.people ?? 5;
@@ -57,6 +73,7 @@ export async function fetchSearchResults({
   const liveLimit = resolvedLimits.live ?? DEFAULT_LIMITS.live ?? 5;
   const musicLimit = resolvedLimits.music ?? DEFAULT_LIMITS.music ?? 5;
   const videosLimit = resolvedLimits.videos ?? DEFAULT_LIMITS.videos ?? 5;
+  const commentsLimit = resolvedLimits.comments ?? 10;
 
   // First, find matching profile IDs for author-based searches
   const matchingProfilesResponse = await supabase
@@ -67,7 +84,7 @@ export async function fetchSearchResults({
   
   const matchingProfileIds = (matchingProfilesResponse.data ?? []).map((p: any) => p.id);
 
-  const [peopleResponse, postsResponse, teamPostsResponse, teamsResponse, liveResponse, musicResponse, videosResponse, postsByAuthorResponse, musicByProfileResponse, videosByProfileResponse] = await Promise.all([
+  const [peopleResponse, postsResponse, teamPostsResponse, teamsResponse, liveResponse, musicResponse, videosResponse, commentsResponse, postsByAuthorResponse, musicByProfileResponse, videosByProfileResponse] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, username, display_name, avatar_url, is_live, follower_count, adult_verified_at, bio, is_mll_pro')
@@ -82,45 +99,52 @@ export async function fetchSearchResults({
         text_content,
         created_at,
         media_url,
-        like_count,
-        comment_count,
+        likes_count,
+        post_comments(count),
         author:profiles!posts_author_id_fkey (
           id,
           username,
           display_name,
-          avatar_url
+          avatar_url,
+          is_mll_pro
         )
       `
       )
       .ilike('text_content', likePattern)
       .order('created_at', { ascending: false })
       .limit(postsFetchCap),
-    supabase
-      .from('team_feed_posts')
-      .select(
-        `
-        id,
-        text_content,
-        created_at,
-        media_url,
-        comment_count,
-        reaction_count,
-        team:teams!team_feed_posts_team_id_fkey (
-          id,
-          name,
-          slug
-        ),
-        author:profiles!team_feed_posts_author_id_fkey (
-          id,
-          username,
-          display_name,
-          avatar_url
-        )
-      `
-      )
-      .ilike('text_content', likePattern)
-      .order('created_at', { ascending: false })
-      .limit(postsFetchCap),
+    // Only fetch team posts if user is a member of at least one team
+    userTeamIds.length > 0
+      ? supabase
+          .from('team_feed_posts')
+          .select(
+            `
+            id,
+            text_content,
+            created_at,
+            media_url,
+            comment_count,
+            reaction_count,
+            team_id,
+            team:teams!team_feed_posts_team_id_fkey (
+              id,
+              name,
+              slug
+            ),
+            author:profiles!team_feed_posts_author_id_fkey (
+              id,
+              username,
+              display_name,
+              avatar_url,
+              is_mll_pro
+            )
+          `
+          )
+          .in('team_id', userTeamIds)
+          .ilike('text_content', likePattern)
+          .order('created_at', { ascending: false })
+          .limit(postsFetchCap)
+      : Promise.resolve({ data: [], error: null }),
     supabase
       .from('teams')
       .select('id, name, slug, description, icon_url, banner_url, approved_member_count')
@@ -171,6 +195,27 @@ export async function fetchSearchResults({
       .ilike('title', likePattern)
       .order('created_at', { ascending: false })
       .limit(videosLimit),
+    // Search comments by content
+    supabase
+      .from('post_comments')
+      .select(`
+        id,
+        text_content,
+        created_at,
+        post_id,
+        author_id,
+        post:posts!post_comments_post_id_fkey (
+          text_content
+        ),
+        author:profiles!post_comments_author_id_fkey (
+          username,
+          display_name,
+          avatar_url
+        )
+      `)
+      .ilike('text_content', likePattern)
+      .order('created_at', { ascending: false })
+      .limit(commentsLimit),
     // Additional queries to find content BY matching users
     matchingProfileIds.length > 0
       ? supabase
@@ -180,13 +225,14 @@ export async function fetchSearchResults({
             text_content,
             created_at,
             media_url,
-            like_count,
-            comment_count,
+            likes_count,
+            post_comments(count),
             author:profiles!posts_author_id_fkey (
               id,
               username,
               display_name,
-              avatar_url
+              avatar_url,
+              is_mll_pro
             )
           `)
           .in('author_id', matchingProfileIds)
@@ -294,6 +340,7 @@ export async function fetchSearchResults({
     live: (liveResponse.data ?? []).map((row) => mapLiveRow(row)),
     music: dedupedMusicRows.map((row) => mapMusicTrackRow(row)).slice(0, musicLimit),
     videos: dedupedVideoRows.map((row) => mapMusicVideoRow(row)).slice(0, videosLimit),
+    comments: (commentsResponse.data ?? []).map((row) => mapCommentRow(row)),
   };
 }
 
@@ -319,16 +366,23 @@ function mapProfileRow(row: any, index: number): PersonResult {
 }
 
 function mapGlobalPostRow(row: any): PostResult {
+  // Extract comment count from post_comments aggregate
+  const commentCount = Array.isArray(row.post_comments) && row.post_comments[0]?.count != null
+    ? Number(row.post_comments[0].count)
+    : Number(row.comment_count ?? 0);
+
   return {
     id: row.id,
+    authorId: row.author?.id ?? '',
     text: row.text_content ?? '',
     createdAt: row.created_at ?? new Date().toISOString(),
     mediaUrl: row.media_url,
-    likeCount: Number(row.like_count ?? 0),
-    commentCount: Number(row.comment_count ?? 0),
+    likeCount: Number(row.likes_count ?? 0),
+    commentCount,
     author: row.author?.display_name || row.author?.username || 'Unknown',
     authorHandle: row.author?.username ? `@${row.author.username}` : '',
     authorAvatarUrl: row.author?.avatar_url,
+    authorIsMllPro: Boolean(row.author?.is_mll_pro),
     source: 'global',
   };
 }
@@ -339,6 +393,7 @@ function mapTeamPostRow(row: any): PostResult {
 
   return {
     id: row.id,
+    authorId: row.author?.id ?? '',
     text: row.text_content ?? '',
     createdAt: row.created_at ?? new Date().toISOString(),
     mediaUrl: row.media_url,
@@ -347,6 +402,7 @@ function mapTeamPostRow(row: any): PostResult {
     author: row.author?.display_name || row.author?.username || 'Unknown',
     authorHandle: row.author?.username ? `@${row.author.username}` : '',
     authorAvatarUrl: row.author?.avatar_url,
+    authorIsMllPro: Boolean(row.author?.is_mll_pro),
     source: 'team',
     contextLabel: teamSlug ? `Team • ${teamName}` : 'Team post',
     contextHref: teamSlug ? `/teams/${teamSlug}?postId=${row.id}` : undefined,
@@ -413,6 +469,20 @@ function mapMusicVideoRow(row: any): MusicVideoResult {
   };
 }
 
+function mapCommentRow(row: any): CommentResult {
+  return {
+    id: String(row.id),
+    content: row.text_content ?? '',
+    createdAt: row.created_at ?? new Date().toISOString(),
+    postId: row.post_id ?? '',
+    postText: row.post?.text_content?.slice(0, 100),
+    authorId: row.author_id ?? '',
+    authorUsername: row.author?.username ?? 'unknown',
+    authorDisplayName: row.author?.display_name,
+    authorAvatarUrl: row.author?.avatar_url,
+  };
+}
+
 function emptyResults(): SearchResultsBundle {
   return {
     people: [],
@@ -421,5 +491,6 @@ function emptyResults(): SearchResultsBundle {
     live: [],
     music: [],
     videos: [],
+    comments: [],
   };
 }

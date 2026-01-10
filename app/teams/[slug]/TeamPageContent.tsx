@@ -1126,8 +1126,8 @@ function HomeScreen({
     }
   }, [pinPost, toast, onPostCreated]);
   
-  const handleReactToPost = useCallback(async (postId: string) => {
-    return await reactToPost(postId);
+  const handleReactToPost = useCallback(async (postId: string, reactionType?: string) => {
+    return await reactToPost(postId, (reactionType as any) || 'love');
   }, [reactToPost]);
 
   const liveMemberCount = liveMemberEntries.length;
@@ -1414,8 +1414,8 @@ function FeedScreen({
 }) {
   const { toast } = useToast();
   const { reactToPost } = useReactToPost();
-  const handleReactToPost = useCallback(async (postId: string) => {
-    return await reactToPost(postId);
+  const handleReactToPost = useCallback(async (postId: string, reactionType?: string) => {
+    return await reactToPost(postId, (reactionType as any) || 'love');
   }, [reactToPost]);
   const [postText, setPostText] = useState('');
   const [postMediaUrl, setPostMediaUrl] = useState<string | null>(null);
@@ -2065,7 +2065,7 @@ function FeedCard({
   canModerate?: boolean;
   onDelete?: (postId: string) => void;
   onPin?: (postId: string, pin: boolean) => void;
-  onReact?: (postId: string) => Promise<{ reaction_count: number; is_reacted: boolean } | null>;
+  onReact?: (postId: string, reactionType?: string) => Promise<{ reaction_count: number; is_reacted: boolean } | null>;
   onGift?: (postId: string, authorId: string) => void;
   onRefresh?: () => void;
 }) {
@@ -2085,6 +2085,9 @@ function FeedCard({
   // Local optimistic state for reactions
   const [localIsReacted, setLocalIsReacted] = useState(item.isReacted ?? false);
   const [localReactionCount, setLocalReactionCount] = useState(item.upvotes);
+  const [localReactionType, setLocalReactionType] = useState<string | null>(item.reactionType ?? null);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const reactionPickerRef = useRef<HTMLDivElement>(null);
   
   // Comments
   const { comments, isLoading: commentsLoading, refetch: refetchComments } = usePostComments(showComments ? item.id : null);
@@ -2141,16 +2144,30 @@ function FeedCard({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
   
-  const handleReact = async () => {
+  const REACTION_EMOJIS = [
+    { type: 'love', emoji: '❤️' },
+    { type: 'haha', emoji: '😂' },
+    { type: 'wow', emoji: '😮' },
+    { type: 'sad', emoji: '😢' },
+    { type: 'fire', emoji: '🔥' },
+  ];
+
+  const handleReact = async (reactionType: string = 'love') => {
     if (!onReact) return;
+    
+    setShowReactionPicker(false);
     
     // Optimistic update
     const wasReacted = localIsReacted;
-    setLocalIsReacted(!wasReacted);
-    setLocalReactionCount((c) => wasReacted ? c - 1 : c + 1);
+    const oldReactionType = localReactionType;
+    setLocalIsReacted(true);
+    setLocalReactionType(reactionType);
+    if (!wasReacted) {
+      setLocalReactionCount((c) => c + 1);
+    }
     
     try {
-      const result = await onReact(item.id);
+      const result = await onReact(item.id, reactionType);
       if (result) {
         setLocalIsReacted(result.is_reacted);
         setLocalReactionCount(result.reaction_count);
@@ -2158,9 +2175,23 @@ function FeedCard({
     } catch {
       // Revert on error
       setLocalIsReacted(wasReacted);
-      setLocalReactionCount((c) => wasReacted ? c + 1 : c - 1);
+      setLocalReactionType(oldReactionType);
+      if (!wasReacted) {
+        setLocalReactionCount((c) => c - 1);
+      }
     }
   };
+
+  // Close reaction picker on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (reactionPickerRef.current && !reactionPickerRef.current.contains(e.target as Node)) {
+        setShowReactionPicker(false);
+      }
+    };
+    if (showReactionPicker) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showReactionPicker]);
   
   const handleSubmitComment = async () => {
     if (!commentText.trim()) return;
@@ -2319,13 +2350,35 @@ function FeedCard({
 
           {/* Actions */}
           <div className="mt-3 flex items-center gap-4">
-            {/* Heart/Like button */}
-            <button 
-              onClick={handleReact}
-              className={`flex items-center gap-1 text-xs transition ${localIsReacted ? 'text-pink-500' : 'text-white/50 hover:text-pink-400'}`}
-            >
-              <Heart className={`h-4 w-4 ${localIsReacted ? 'fill-current' : ''}`} /> {localReactionCount}
-            </button>
+            {/* Reaction button with picker */}
+            <div className="relative" ref={reactionPickerRef}>
+              <button 
+                onClick={() => setShowReactionPicker(!showReactionPicker)}
+                className={`flex items-center gap-1 text-xs transition ${localIsReacted ? 'text-pink-500' : 'text-white/50 hover:text-pink-400'}`}
+              >
+                <span className="text-sm">
+                  {localReactionType 
+                    ? REACTION_EMOJIS.find(r => r.type === localReactionType)?.emoji || '❤️'
+                    : '😊'}
+                </span>
+                {localReactionCount}
+              </button>
+              {showReactionPicker && (
+                <div className="absolute bottom-full left-0 mb-1 flex gap-1 p-1.5 rounded-full bg-zinc-800 shadow-lg border border-white/10 z-20">
+                  {REACTION_EMOJIS.map((r) => (
+                    <button
+                      key={r.type}
+                      onClick={() => handleReact(r.type)}
+                      className={`w-8 h-8 rounded-full text-lg flex items-center justify-center hover:scale-110 transition-transform ${
+                        localReactionType === r.type ? 'bg-white/20' : 'hover:bg-white/10'
+                      }`}
+                    >
+                      {r.emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             
             {/* Comments button */}
             <button 

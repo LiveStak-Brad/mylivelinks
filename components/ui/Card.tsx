@@ -93,8 +93,7 @@ const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & 
       ref={ref} 
       className={className}
       style={{
-        padding: noPadding ? 0 : 'var(--card-padding)',
-        paddingTop: noPadding ? 0 : 0,
+        padding: noPadding ? 0 : undefined,
         ...style,
       }}
       {...props} 
