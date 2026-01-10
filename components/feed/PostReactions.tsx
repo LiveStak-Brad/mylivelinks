@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { X, Eye } from 'lucide-react';
 
 import { createClient } from '@/lib/supabase';
 
@@ -31,10 +31,11 @@ function createEmptyCounts(): Map<ReactionType, number> {
 interface PostReactionsProps {
   postId: string;
   totalCount: number;
+  viewsCount?: number;
   className?: string;
 }
 
-export function PostReactions({ postId, totalCount, className = '' }: PostReactionsProps) {
+export function PostReactions({ postId, totalCount, viewsCount, className = '' }: PostReactionsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<ReactionFilter>('all');
   const [isLoading, setIsLoading] = useState(false);
@@ -201,6 +202,12 @@ export function PostReactions({ postId, totalCount, className = '' }: PostReacti
           </div>
         )}
         <span className="font-medium">{totalReactions} reactions</span>
+        {viewsCount !== undefined && (
+          <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Eye className="w-4 h-4" />
+            <span>{viewsCount.toLocaleString()} views</span>
+          </div>
+        )}
       </button>
 
       {isModalOpen && portalTarget

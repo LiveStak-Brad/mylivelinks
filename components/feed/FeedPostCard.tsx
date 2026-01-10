@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { Heart, MessageCircle, Gift, Flag, Coins, Pin, MoreHorizontal } from 'lucide-react';
+import { Heart, MessageCircle, Gift, Flag, Coins, Pin, MoreHorizontal, Eye } from 'lucide-react';
 import { PostManagementModal } from './PostManagementModal';
 import { Card } from '@/components/ui/Card';
 import LiveAvatar from '@/components/LiveAvatar';
@@ -10,6 +10,7 @@ import SafeRichText from '@/components/SafeRichText';
 import { PostReactions } from './PostReactions';
 import { ReactionPicker, REACTIONS, type ReactionType } from './ReactionPicker';
 import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
+import { useContentViewTracking } from '@/lib/useContentViewTracking';
 
 /* =============================================================================
    FEED POST CARD COMPONENT
@@ -72,6 +73,8 @@ export interface FeedPostCardProps {
   userReaction?: ReactionType | null;
   /** Number of likes on this post */
   likesCount?: number;
+  /** Number of views on this post */
+  viewsCount?: number;
   /** Unique identifier of the post (for reactions modal) */
   postId?: string;
   /** Post type (personal or team) */
@@ -238,6 +241,7 @@ const FeedPostCard = memo(function FeedPostCard({
   topGifters = [],
   isLiked = false,
   likesCount = 0,
+  viewsCount = 0,
   userReaction = null,
   postId,
   postType = 'personal',
@@ -260,6 +264,13 @@ const FeedPostCard = memo(function FeedPostCard({
   const [pickerAnchor, setPickerAnchor] = useState<DOMRect | null>(null);
   const [showManagementModal, setShowManagementModal] = useState(false);
   const likeButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Track content view automatically
+  const { ref: viewTrackingRef } = useContentViewTracking({
+    contentType: 'feed_post',
+    contentId: postId,
+    enabled: !!postId
+  });
 
   const isAuthor = currentUserId && authorProfileId && currentUserId === authorProfileId;
   const canManage = isAuthor || (postType === 'team' && isModerator);
@@ -305,7 +316,11 @@ const FeedPostCard = memo(function FeedPostCard({
 
   return (
     <>
-      <Card className={`overflow-hidden hover:shadow-md transition-shadow ${className}`} style={style}>
+      <Card 
+        ref={viewTrackingRef}
+        className={`overflow-hidden hover:shadow-md transition-shadow ${className}`} 
+        style={style}
+      >
         {/* Header - Instagram/Facebook Style */}
         <div className="flex items-center gap-3 px-4 py-3">
           <div 
@@ -449,11 +464,22 @@ const FeedPostCard = memo(function FeedPostCard({
                 )}
               </div>
             </div>
-            {postId ? (
-              <div className="border-t border-border">
-                <PostReactions postId={postId} totalCount={likesCount ?? 0} />
-              </div>
-            ) : null}
+            
+            <div className="border-t border-border">
+              {postId ? (
+                <PostReactions postId={postId} totalCount={likesCount ?? 0} viewsCount={viewsCount} />
+              ) : (
+                <div className="flex items-center px-4 py-2">
+                  <span className="font-medium text-sm text-muted-foreground">0 reactions</span>
+                  {viewsCount !== undefined && (
+                    <div className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Eye className="w-4 h-4" />
+                      <span>{viewsCount.toLocaleString()} views</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
       </Card>

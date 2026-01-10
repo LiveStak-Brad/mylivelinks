@@ -24,6 +24,7 @@ type FeedPost = {
   gift_total_diamonds: number;
   top_gifters: TopGifter[];
   likes_count: number;
+  views_count: number;
 };
 
 export async function GET(request: NextRequest) {
@@ -126,6 +127,7 @@ export async function GET(request: NextRequest) {
         gift_total_diamonds: giftCoins, // 1:1 ratio for now
         top_gifters: topGiftersMap[postId] || [],
         likes_count: Number(r.likes_count ?? 0),
+        views_count: Number(r.views_count ?? 0),
       };
     });
 

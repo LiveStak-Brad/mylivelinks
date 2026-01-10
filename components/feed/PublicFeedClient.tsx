@@ -43,6 +43,7 @@ type FeedPost = {
   gift_total_diamonds: number;
   top_gifters: TopGifter[];
   likes_count: number;
+  views_count: number;
 };
 
 type FeedComment = {
@@ -860,6 +861,7 @@ export default function PublicFeedClient({
                 <FeedPostWithLikes
                   postId={post.id}
                   initialLikesCount={post.likes_count}
+                  viewsCount={post.views_count}
                   postType="personal"
                   currentUserId={currentUserId || undefined}
                   visibility={post.visibility}
