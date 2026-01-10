@@ -41,6 +41,11 @@ export default function AccountSettingsPage() {
   const [appleError, setAppleError] = useState<string | null>(null);
   const [appleMessage, setAppleMessage] = useState<string | null>(null);
 
+  const [twitchConnected, setTwitchConnected] = useState(false);
+  const [connectingTwitch, setConnectingTwitch] = useState(false);
+  const [twitchError, setTwitchError] = useState<string | null>(null);
+  const [twitchMessage, setTwitchMessage] = useState<string | null>(null);
+
   useEffect(() => {
     const load = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -60,6 +65,9 @@ export default function AccountSettingsPage() {
       
       const hasApple = user.identities?.some(identity => identity.provider === 'apple');
       setAppleConnected(!!hasApple);
+      
+      const hasTwitch = user.identities?.some(identity => identity.provider === 'twitch');
+      setTwitchConnected(!!hasTwitch);
       
       setLoading(false);
     };
@@ -177,6 +185,25 @@ export default function AccountSettingsPage() {
     } catch (err: any) {
       setAppleError(err?.message || 'Unable to connect Apple right now.');
       setConnectingApple(false);
+    }
+  };
+
+  const handleConnectTwitch = async () => {
+    setConnectingTwitch(true);
+    setTwitchError(null);
+    setTwitchMessage(null);
+
+    try {
+      const { error } = await supabase.auth.linkIdentity({
+        provider: 'twitch',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?returnTo=/settings/account`,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setTwitchError(err?.message || 'Unable to connect Twitch right now.');
+      setConnectingTwitch(false);
     }
   };
 
@@ -352,6 +379,55 @@ export default function AccountSettingsPage() {
               <div className="flex items-start gap-2 text-success text-sm">
                 <CheckCircle2 size={18} />
                 <span>{facebookMessage}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#9146FF] flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="font-medium text-foreground">Twitch</div>
+                  <div className="text-sm text-muted-foreground">
+                    {twitchConnected ? 'Connected' : 'Not connected'}
+                  </div>
+                </div>
+              </div>
+              {!twitchConnected && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={connectingTwitch}
+                  isLoading={connectingTwitch}
+                  onClick={handleConnectTwitch}
+                >
+                  <LinkIcon className="w-4 h-4 mr-2" />
+                  Connect
+                </Button>
+              )}
+              {twitchConnected && (
+                <div className="flex items-center gap-2 text-success">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-sm font-medium">Connected</span>
+                </div>
+              )}
+            </div>
+
+            {twitchError && (
+              <div className="flex items-start gap-2 text-destructive text-sm">
+                <AlertCircle size={18} />
+                <span>{twitchError}</span>
+              </div>
+            )}
+
+            {twitchMessage && (
+              <div className="flex items-start gap-2 text-success text-sm">
+                <CheckCircle2 size={18} />
+                <span>{twitchMessage}</span>
               </div>
             )}
           </div>
