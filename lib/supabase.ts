@@ -22,6 +22,8 @@ export function createClient() {
           getSession: async () => ({ data: { session: null }, error: null }),
           signUp: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
           signInWithPassword: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
+          signInWithOAuth: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
+          linkIdentity: async () => ({ data: null, error: { message: 'Missing Supabase environment variables' } }),
           signOut: async () => ({ error: { message: 'Missing Supabase environment variables' } }),
           onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
         },
