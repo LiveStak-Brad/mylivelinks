@@ -126,6 +126,15 @@ export default function GiftModal({
     loadUserBalance();
   }, []);
 
+  // Redirect to wallet if user has 0 coins
+  useEffect(() => {
+    if (userCoinBalance === 0) {
+      // Close modal and redirect to wallet
+      onClose();
+      window.location.href = '/wallet';
+    }
+  }, [userCoinBalance, onClose]);
+
   // ESC to close + iOS-safe scroll lock
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

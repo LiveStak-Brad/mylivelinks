@@ -2218,7 +2218,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
               {streamer.live_stream_id ? (
                 <StreamChat 
                   liveStreamId={streamer.live_stream_id} 
-                  onGiftClick={() => setShowGiftModal(true)}
+                  onGiftClick={async () => {
+                    const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+                    const hasCoins = await checkCoinBalanceBeforeGift();
+                    if (hasCoins) {
+                      setShowGiftModal(true);
+                    }
+                  }}
                   onShareClick={handleShare}
                   onSettingsClick={() => setShowChatSettings(true)}
                   onRequestGuestClick={() => setShowRequestGuest(true)}

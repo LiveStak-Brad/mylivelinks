@@ -688,16 +688,24 @@ export default function PublicFeedClient({
     }
   }, [replyDrafts]);
 
-  const openGiftModal = useCallback((post: FeedPost) => {
-    setGiftTargetPost(post);
-    setGiftTargetComment(null);
-    setGiftModalOpen(true);
+  const openGiftModal = useCallback(async (post: FeedPost) => {
+    const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+    const hasCoins = await checkCoinBalanceBeforeGift();
+    if (hasCoins) {
+      setGiftTargetPost(post);
+      setGiftTargetComment(null);
+      setGiftModalOpen(true);
+    }
   }, []);
 
-  const openGiftCommentModal = useCallback((comment: FeedComment) => {
-    setGiftTargetComment(comment);
-    setGiftTargetPost(null);
-    setGiftModalOpen(true);
+  const openGiftCommentModal = useCallback(async (comment: FeedComment) => {
+    const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+    const hasCoins = await checkCoinBalanceBeforeGift();
+    if (hasCoins) {
+      setGiftTargetComment(comment);
+      setGiftTargetPost(null);
+      setGiftModalOpen(true);
+    }
   }, []);
 
   const handleGiftSent = useCallback(() => {

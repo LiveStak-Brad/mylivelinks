@@ -28,10 +28,15 @@ export function PersonResultCard({ person, query }: { person: PersonResult; quer
   const canGift = currentUserId && currentUserId !== person.id;
   const personUsername = person.handle?.replace('@', '') || 'user';
 
-  const handleGiftClick = (e: React.MouseEvent) => {
+  const handleGiftClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowGiftModal(true);
+    
+    const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+    const hasCoins = await checkCoinBalanceBeforeGift();
+    if (hasCoins) {
+      setShowGiftModal(true);
+    }
   };
 
   return (
@@ -199,10 +204,15 @@ export function PostResultCard({ post, query }: { post: PostResult; query: strin
   const canGift = currentUserId && post.authorId && currentUserId !== post.authorId;
   const authorUsername = post.authorHandle?.replace('@', '') || 'user';
 
-  const handleGiftClick = (e: React.MouseEvent) => {
+  const handleGiftClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowGiftModal(true);
+    
+    const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+    const hasCoins = await checkCoinBalanceBeforeGift();
+    if (hasCoins) {
+      setShowGiftModal(true);
+    }
   };
 
   const handleCommentsClick = async (e: React.MouseEvent) => {
@@ -297,11 +307,15 @@ export function PostResultCard({ post, query }: { post: PostResult; query: strin
     setShowComments(true);
   };
 
-  const handleGiftCommentAuthor = (e: React.MouseEvent, authorId: string, username: string) => {
+  const handleGiftCommentAuthor = async (e: React.MouseEvent, authorId: string, username: string) => {
     e.preventDefault();
     e.stopPropagation();
     if (currentUserId && currentUserId !== authorId) {
-      setGiftingCommentAuthor({ id: authorId, username });
+      const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+      const hasCoins = await checkCoinBalanceBeforeGift();
+      if (hasCoins) {
+        setGiftingCommentAuthor({ id: authorId, username });
+      }
     }
   };
 
@@ -941,10 +955,15 @@ export function CommentResultCard({ comment, query }: { comment: CommentResult; 
 
   const canGift = currentUserId && comment.authorId && currentUserId !== comment.authorId;
 
-  const handleGiftClick = (e: React.MouseEvent) => {
+  const handleGiftClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowGiftModal(true);
+    
+    const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+    const hasCoins = await checkCoinBalanceBeforeGift();
+    if (hasCoins) {
+      setShowGiftModal(true);
+    }
   };
 
   return (

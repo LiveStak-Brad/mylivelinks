@@ -45,7 +45,11 @@ export default function BattleViewer({ battle, onClose, className = '' }: Battle
     return () => clearInterval(interval);
   }, [battle.status]);
 
-  const handleSendGift = useCallback((side: BattleSide) => {
+  const handleSendGift = useCallback(async (side: BattleSide) => {
+    const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+    const hasCoins = await checkCoinBalanceBeforeGift();
+    if (!hasCoins) return;
+    
     setSelectedSide(side);
     
     // Get team leader as recipient (or first participant)

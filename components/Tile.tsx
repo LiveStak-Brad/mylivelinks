@@ -118,8 +118,12 @@ export default function Tile({
     return () => ro.disconnect();
   }, [compactMode, isFullscreen]);
 
-  const handleGiftOpen = useCallback(() => {
-    setShowGiftModal(true);
+  const handleGiftOpen = useCallback(async () => {
+    const { checkCoinBalanceBeforeGift } = await import('@/lib/gift-balance-check');
+    const hasCoins = await checkCoinBalanceBeforeGift();
+    if (hasCoins) {
+      setShowGiftModal(true);
+    }
   }, []);
 
   const handleFullscreenToggle = useCallback(() => {

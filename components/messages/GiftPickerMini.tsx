@@ -80,6 +80,14 @@ export default function GiftPickerMini({ isOpen, onClose, onSelectGift, recipien
     }
   }, [isOpen]);
 
+  // Redirect to wallet if user has 0 coins
+  useEffect(() => {
+    if (isOpen && userCoinBalance === 0) {
+      onClose();
+      window.location.href = '/wallet';
+    }
+  }, [isOpen, userCoinBalance, onClose]);
+
   const loadData = async () => {
     setIsLoading(true);
     try {
