@@ -60,6 +60,7 @@ export function PostManagementModal({
     setIsLoading(true);
     try {
       const rpcFunction = postType === 'personal' ? 'rpc_delete_post' : 'rpc_delete_team_post';
+      console.log('[PostManagementModal] Deleting post:', { postId, postType, rpcFunction });
       const { error } = await supabase.rpc(rpcFunction, {
         p_post_id: postId,
       });

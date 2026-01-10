@@ -432,20 +432,15 @@ export function useTeamFeed(teamId: string | null, sort: FeedSort = 'hot') {
 
           const isPinned = !!r.is_pinned;
           const rawText = String(r.text_content ?? '');
-          const announcementParts = isPinned ? rawText.split(/\n\n+/) : null;
-          const announcementTitle = isPinned ? String(announcementParts?.[0] ?? '').trim() : undefined;
-          const announcementBody = isPinned
-            ? String((announcementParts ?? []).slice(1).join('\n\n')).trim()
-            : rawText;
           const hotScore = Math.round((upvotes * 2 + comments * 3) / Math.max(1, (Date.now() - createdAtMs) / 36e5));
 
           return {
             id: String(r.post_id ?? r.id),
             authorId: String(r.author_id),
-            type: r.is_poll ? 'poll' : (isPinned ? 'announcement' : 'post'),
+            type: r.is_poll ? 'poll' : 'post',
             author,
-            title: isPinned && announcementTitle ? announcementTitle : undefined,
-            body: announcementBody,
+            title: undefined,
+            body: rawText,
             media: r.media_url ? String(r.media_url) : undefined,
             createdAt: createdAtMs,
             hotScore,

@@ -179,11 +179,12 @@ export default function TeamPageContent() {
     [members]
   );
   
+  // Serialize memberProfileIds for stable dependency
+  const memberProfileIdsKey = memberProfileIds.join(',');
+  
   useEffect(() => {
     let cancelled = false;
-    if (!teamId || memberProfileIds.length === 0) {
-      setLiveMemberEntries([]);
-      setLiveMembersLoading(false);
+    if (!teamId || !memberProfileIdsKey) {
       return;
     }
     
@@ -326,7 +327,7 @@ export default function TeamPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [memberProfileIds, supabaseClient, teamId, presenceData?.liveCount]);
+  }, [memberProfileIdsKey, supabaseClient, teamId, presenceData?.liveCount]);
   
   // Derive counts
   const onlineMembers = members.filter((m) => m.activity === 'online');
@@ -1214,9 +1215,14 @@ function HomeScreen({
         />
       </div>
 
-      {/* ══════════ PINNED ANNOUNCEMENT ══════════ */}
+      {/* ══════════ PINNED POST ══════════ */}
       {pinnedItems[0] && (
-        <AnnouncementCard item={pinnedItems[0]} />
+        <FeedCard 
+          item={pinnedItems[0]}
+          viewerProfileId={viewerProfileId}
+          canModerate={canModerate}
+          compact
+        />
       )}
 
       {/* ══════════ MOMENTUM + PROGRESS ══════════ */}
@@ -1900,7 +1906,16 @@ function FeedScreen({
 
       {/* Pinned */}
       {pinnedItems.map((item) => (
-        <AnnouncementCard key={item.id} item={item} />
+        <FeedCard 
+          key={item.id} 
+          item={item}
+          viewerProfileId={viewerProfileId}
+          canModerate={canModerate}
+          onDelete={handleDeletePost}
+          onPin={handlePinPost}
+          onReact={handleReactToPost}
+          onRefresh={onPostCreated}
+        />
       ))}
 
       {/* Feed Items */}
@@ -2581,7 +2596,7 @@ function FeedCard({
           onClose={() => setShowManagementModal(false)}
           onPostDeleted={() => {
             setShowManagementModal(false);
-            onDelete?.(item.id);
+            onRefresh?.();
           }}
           onPostUpdated={() => {
             setShowManagementModal(false);

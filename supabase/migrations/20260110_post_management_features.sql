@@ -378,7 +378,8 @@ RETURNS TABLE(
   pinned_at timestamptz,
   comment_count int,
   reaction_count int,
-  created_at timestamptz
+  created_at timestamptz,
+  is_poll boolean
 )
 LANGUAGE plpgsql
 STABLE
@@ -422,7 +423,8 @@ BEGIN
     p.pinned_at,
     p.comment_count,
     p.reaction_count,
-    p.created_at
+    p.created_at,
+    COALESCE(p.is_poll, false) AS is_poll
   FROM public.team_feed_posts p
   JOIN public.profiles pr ON pr.id = p.author_id
   WHERE p.team_id = v_team_id
