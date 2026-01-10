@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     
     if (error) {
       console.error('Auth callback error:', error);
-      return NextResponse.redirect(`${requestUrl.origin}/login?error=${encodeURIComponent(error.message)}`);
+      return NextResponse.redirect(`${requestUrl.origin}/login?error=${encodeURIComponent('Authentication failed. Please try again.')}`);
     }
 
     if (data.user) {
