@@ -23,6 +23,13 @@ function LoginPageInner() {
   const referralCode = (searchParams?.get('ref') || '').trim();
   const referralClickId = (searchParams?.get('click_id') || '').trim();
 
+  useEffect(() => {
+    const urlError = searchParams?.get('error');
+    if (urlError) {
+      setError(decodeURIComponent(urlError));
+    }
+  }, [searchParams]);
+
   const withTimeout = async <T = any,>(p: PromiseLike<T>, ms: number, label: string): Promise<T> => {
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
