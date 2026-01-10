@@ -133,12 +133,8 @@ export default function GiftModal({
     };
     document.addEventListener('keydown', handleEscape);
     
-    // iOS-safe scroll lock
-    lockScroll();
-    
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      unlockScroll();
     };
   }, [onClose]);
 
@@ -291,7 +287,7 @@ export default function GiftModal({
   if (isMobileLayout) {
     return (
       <div 
-        className="fixed inset-0 flex flex-col justify-end bg-black/40"
+        className="fixed inset-0 flex flex-col justify-end bg-black/20"
         style={{ zIndex: 99999 }}
         onClick={onClose}
       >
@@ -438,7 +434,7 @@ export default function GiftModal({
 
   // Desktop centered modal layout
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 99999 }} onClick={onClose}>
+    <div className="fixed inset-0 bg-black/20 flex items-center justify-center p-4" style={{ zIndex: 99999 }} onClick={onClose}>
       <div 
         className="bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-950 rounded-2xl w-full max-w-md max-h-[85vh] shadow-xl overflow-hidden flex flex-col border border-white/20 dark:border-white/10 animate-in zoom-in-95 duration-200" 
         onClick={(e) => e.stopPropagation()}

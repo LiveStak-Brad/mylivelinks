@@ -312,8 +312,8 @@ export default function VideoPlaylistPlayer({
 
   return (
     <div
-      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
-      style={cardStyle}
+      className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6 relative`}
+      style={{ ...cardStyle, isolation: 'isolate', zIndex: 1 }}
     >
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-extrabold text-gray-900 dark:text-white flex items-center gap-2">
