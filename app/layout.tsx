@@ -13,6 +13,8 @@ import { IMProvider } from '@/components/im';
 import { NotiesProvider } from '@/components/noties';
 import { MessagesProvider } from '@/components/messages';
 import { ToastProvider } from '@/components/ui';
+import { PresenceProvider } from '@/contexts/PresenceContext';
+import { PresenceHeartbeat } from '@/components/presence/PresenceHeartbeat';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -63,21 +65,24 @@ export default function RootLayout({
         <ErrorBoundary>
           <ClientThemeProvider>
             <ToastProvider>
-              <NotiesProvider>
-                <MessagesProvider>
-                  <Suspense fallback={null}>
-                    <NavigationWrapper />
-                  </Suspense>
-                  <PullToRefresh />
-                  <GlobalLiveFloatingButton />
-                  <AgeVerificationModal />
-                  <IMProvider />
-                  {/* Note: Pages should wrap content in PageShell which provides <main id="main">
-                      for skip-link accessibility. If not using PageShell, ensure you have a 
-                      <main id="main" tabIndex={-1}> landmark element. */}
-                  {children}
-                </MessagesProvider>
-              </NotiesProvider>
+              <PresenceProvider>
+                <PresenceHeartbeat />
+                <NotiesProvider>
+                  <MessagesProvider>
+                    <Suspense fallback={null}>
+                      <NavigationWrapper />
+                    </Suspense>
+                    <PullToRefresh />
+                    <GlobalLiveFloatingButton />
+                    <AgeVerificationModal />
+                    <IMProvider />
+                    {/* Note: Pages should wrap content in PageShell which provides <main id="main">
+                        for skip-link accessibility. If not using PageShell, ensure you have a 
+                        <main id="main" tabIndex={-1}> landmark element. */}
+                    {children}
+                  </MessagesProvider>
+                </NotiesProvider>
+              </PresenceProvider>
             </ToastProvider>
           </ClientThemeProvider>
         </ErrorBoundary>

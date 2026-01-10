@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/Badge';
 import { MllProBadge } from '@/components/mll/MllProBadge';
 import GiftModal from '@/components/GiftModal';
 import { createClient } from '@/lib/supabase';
-import { PresenceDot } from '@/components/presence/PresenceDot';
 import type { PersonResult, PostResult, TeamResult, LiveResult, CommentResult } from '@/types/search';
 
 export function PersonResultCard({ person, query }: { person: PersonResult; query: string }) {
@@ -57,7 +56,6 @@ export function PersonResultCard({ person, query }: { person: PersonResult; quer
                   .slice(0, 2)}
               </div>
             )}
-            <PresenceDot profileId={person.id} size="md" />
           </div>
           <div className="flex-1 space-y-3">
             <div className="flex items-start justify-between gap-4">

@@ -160,7 +160,7 @@ export default function ReferralsPage() {
         <Card>
           <CardHeader
             title="Top Referrers"
-            subtitle="Ranked by activations, then signups"
+            subtitle="Ranked by active accepted members (activations)"
           />
           <CardBody>
             {leaderboard.length === 0 ? (
@@ -188,7 +188,7 @@ export default function ReferralsPage() {
                         Signups
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Activated
+                        Active Accepted
                       </th>
                     </tr>
                   </thead>

@@ -10,6 +10,7 @@ export interface PersonResult {
   status?: string | null;
   avatarColor: string;
   following?: boolean;
+  online?: boolean;
 }
 
 export type PostSource = 'global' | 'team';

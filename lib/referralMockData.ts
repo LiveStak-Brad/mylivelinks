@@ -21,6 +21,7 @@ export interface LeaderboardEntry {
   avatarUrl?: string;
   referralCount: number;
   activeCount?: number;
+  totalAccepted?: number;
   isCurrentUser?: boolean;
 }
 

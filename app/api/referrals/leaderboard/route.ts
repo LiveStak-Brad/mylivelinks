@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       avatar_url: r?.profiles?.avatar_url ?? null,
       joined: Number(r?.referral_count ?? 0),
       active: Number(r?.activation_count ?? 0),
+      active_accepted: Number(r?.activation_count ?? 0), // Primary metric: active members who accepted
       rank: idx + 1,
     }));
 

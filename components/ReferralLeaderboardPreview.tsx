@@ -45,8 +45,9 @@ export default function ReferralLeaderboardPreview({
           profileId: r?.profile_id ? String(r.profile_id) : undefined,
           username: String(r?.username ?? 'Unknown'),
           avatarUrl: r?.avatar_url ? String(r.avatar_url) : undefined,
-          referralCount: Number(r?.joined ?? 0),
+          referralCount: Number(r?.active ?? 0), // Display active accepted members as primary metric
           activeCount: Number(r?.active ?? 0),
+          totalAccepted: Number(r?.joined ?? 0), // Total accepted including inactive
           isCurrentUser: userId ? String(r?.profile_id ?? '') === String(userId) : false,
         }));
 
@@ -166,7 +167,7 @@ export default function ReferralLeaderboardPreview({
             Top Referrers
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            This month's leading members
+            Ranked by active accepted members
           </p>
         </div>
       </div>
@@ -231,7 +232,10 @@ export default function ReferralLeaderboardPreview({
                 )}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                {formatReferralCount(entry.referralCount)} referrals
+                {formatReferralCount(entry.referralCount)} active
+                {entry.totalAccepted && entry.totalAccepted > entry.referralCount && (
+                  <span className="text-orange-500 dark:text-orange-400"> • {entry.totalAccepted - entry.referralCount} inactive</span>
+                )}
               </div>
             </div>
 
@@ -282,7 +286,10 @@ export default function ReferralLeaderboardPreview({
                   <span className="ml-2 text-xs bg-purple-500 text-white px-2 py-0.5 rounded-full">YOU</span>
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {formatReferralCount(currentUserEntry.referralCount)} referrals
+                  {formatReferralCount(currentUserEntry.referralCount)} active
+                  {currentUserEntry.totalAccepted && currentUserEntry.totalAccepted > currentUserEntry.referralCount && (
+                    <span className="text-orange-500 dark:text-orange-400"> • {currentUserEntry.totalAccepted - currentUserEntry.referralCount} inactive</span>
+                  )}
                 </div>
               </div>
 
