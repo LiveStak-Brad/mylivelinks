@@ -89,7 +89,14 @@ export default function OnboardingPage() {
   };
 
   const calculateAge = (dob: string): number => {
-    const birthDate = new Date(dob);
+    // Parse MM/DD/YYYY format
+    const parts = dob.split('/');
+    if (parts.length !== 3) return 0;
+    const month = parseInt(parts[0]) - 1; // JS months are 0-indexed
+    const day = parseInt(parts[1]);
+    const year = parseInt(parts[2]);
+    
+    const birthDate = new Date(year, month, day);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -97,6 +104,11 @@ export default function OnboardingPage() {
       age--;
     }
     return age;
+  };
+
+  const validateDateFormat = (date: string): boolean => {
+    const regex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+    return regex.test(date);
   };
 
   const validateStep = (currentStep: number): boolean => {
@@ -121,6 +133,10 @@ export default function OnboardingPage() {
       case 2: // Age Verification
         if (!formData.dateOfBirth) {
           setError('Date of birth is required');
+          return false;
+        }
+        if (!validateDateFormat(formData.dateOfBirth)) {
+          setError('Please enter a valid date in MM/DD/YYYY format');
           return false;
         }
         const age = calculateAge(formData.dateOfBirth);
@@ -187,6 +203,10 @@ export default function OnboardingPage() {
     try {
       const age = calculateAge(formData.dateOfBirth);
       
+      // Convert MM/DD/YYYY to YYYY-MM-DD for database
+      const parts = formData.dateOfBirth.split('/');
+      const dbDate = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      
       // UPSERT profile (create if doesn't exist, update if it does)
       const { error: profileError } = await supabase
         .from('profiles')
@@ -195,7 +215,7 @@ export default function OnboardingPage() {
           username: formData.username.trim(),
           display_name: formData.displayName.trim() || null,
           bio: formData.bio.trim() || null,
-          date_of_birth: formData.dateOfBirth,
+          date_of_birth: dbDate,
           adult_verified_at: age >= 18 ? new Date().toISOString() : null,
           adult_verified_method: age >= 18 ? 'self_attested' : null,
           coin_balance: 0,
@@ -324,12 +344,14 @@ export default function OnboardingPage() {
                 <div>
                   <label className="block mb-2 font-medium text-foreground">Date of Birth</label>
                   <Input
-                    type="date"
+                    type="text"
                     value={formData.dateOfBirth}
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                    max={new Date().toISOString().split('T')[0]}
+                    placeholder="MM/DD/YYYY"
+                    maxLength={10}
                     inputSize="lg"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">Example: 08/30/1986</p>
                 </div>
                 {formData.dateOfBirth && (
                   <p className="text-sm text-muted-foreground">
