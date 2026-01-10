@@ -446,7 +446,11 @@ export default function VideoPlaylistPlayer({
           {!isOwner && artistProfileId && artistUsername && (
             <button
               type="button"
-              onClick={() => setShowGiftModal(true)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowGiftModal(true);
+              }}
               className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 flex items-center justify-center shadow-lg transition-all"
               title="Send Gift"
             >

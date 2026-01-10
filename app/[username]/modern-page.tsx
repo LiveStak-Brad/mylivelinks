@@ -955,7 +955,7 @@ export default function ModernProfilePage() {
   return (
     <div className={`min-h-screen overflow-y-auto overflow-x-hidden ${fontClass}`}>
       {/* Background */}
-      <div className="fixed inset-0 z-0">
+      <div className="fixed inset-0 z-0 pointer-events-none">
         {profile.profile_bg_url ? (
           <Image
             src={profile.profile_bg_url}
