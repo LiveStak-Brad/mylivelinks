@@ -1,0 +1,10 @@
+[
+  {
+    "fileName": "main-overview.mdc",
+    "description": "Complete overview of the entire system, its architecture, and key components"
+  },
+  {
+    "fileName": "frontend-architecture.mdc",
+    "description": "Documentation of the frontend components, state management, and UI patterns"
+  }
+]

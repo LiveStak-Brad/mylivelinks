@@ -1,3 +1,0 @@
-# Ensure patch-package patches have consistent LF line endings on macOS build servers
-patches/*.patch text eol=lf
-*.patch text eol=lf
