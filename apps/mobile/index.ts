@@ -1,3 +1,7 @@
+// LiveKit: Register WebRTC globals BEFORE any other imports
+import { registerGlobals } from '@livekit/react-native';
+registerGlobals();
+
 import 'react-native-gesture-handler';
 
 import { registerRootComponent } from 'expo';

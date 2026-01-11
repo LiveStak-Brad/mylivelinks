@@ -1,18 +1,59 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { VideoView } from '@livekit/react-native';
+import { createLocalVideoTrack, LocalVideoTrack, VideoPresets, Track, facingModeFromLocalTrack } from 'livekit-client';
+import { useAuth } from '../state/AuthContext';
+import { fetchMobileToken, connectAndPublish, disconnectAndCleanup, generateSoloRoomName } from '../lib/livekit';
+import type { Room, LocalAudioTrack } from 'livekit-client';
+
+// Request permissions
+async function requestPermissions(): Promise<{ camera: boolean; mic: boolean }> {
+  if (Platform.OS === 'android') {
+    const { PermissionsAndroid } = require('react-native');
+    try {
+      const grants = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+      ]);
+      return {
+        camera: grants[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED,
+        mic: grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED,
+      };
+    } catch (err) {
+      console.error('[GoLive] Permission request error:', err);
+      return { camera: false, mic: false };
+    }
+  }
+  // iOS permissions are handled by Info.plist and prompted automatically
+  return { camera: true, mic: true };
+}
 
 export default function GoLiveScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+  const { user } = useAuth();
+
   const [streamTitle, setStreamTitle] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('irl');
   const [audience, setAudience] = useState<'Public' | 'Team'>('Public');
-  const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
+  const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
 
-  // UI-only permission states
-  const [cameraGranted] = useState(false);
-  const [micGranted] = useState(false);
+  // Permission states
+  const [cameraGranted, setCameraGranted] = useState(false);
+  const [micGranted, setMicGranted] = useState(false);
+  const [permissionsRequested, setPermissionsRequested] = useState(false);
+
+  // Preview track state
+  const [previewTrack, setPreviewTrack] = useState<LocalVideoTrack | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  // Go Live state
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const roomRef = useRef<Room | null>(null);
 
   const categories = useMemo(
     () => [
@@ -27,17 +68,169 @@ export default function GoLiveScreen() {
 
   const needsPermissions = !cameraGranted || !micGranted;
 
+  // Request permissions on mount
+  useEffect(() => {
+    if (!permissionsRequested) {
+      setPermissionsRequested(true);
+      requestPermissions().then(({ camera, mic }) => {
+        setCameraGranted(camera);
+        setMicGranted(mic);
+      });
+    }
+  }, [permissionsRequested]);
+
+  // Create preview track when permissions are granted
+  useEffect(() => {
+    if (!cameraGranted) return;
+
+    let mounted = true;
+    let track: LocalVideoTrack | null = null;
+
+    const startPreview = async () => {
+      try {
+        track = await createLocalVideoTrack({
+          facingMode: cameraFacing,
+          resolution: VideoPresets.h720.resolution,
+        });
+
+        if (mounted) {
+          setPreviewTrack(track);
+          setPreviewError(null);
+        } else {
+          track.stop();
+        }
+      } catch (err) {
+        console.error('[GoLive] Preview error:', err);
+        if (mounted) {
+          setPreviewError('Could not start camera preview');
+        }
+      }
+    };
+
+    startPreview();
+
+    return () => {
+      mounted = false;
+      if (track) {
+        track.stop();
+      }
+    };
+  }, [cameraGranted, cameraFacing]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (previewTrack) {
+        previewTrack.stop();
+      }
+    };
+  }, [previewTrack]);
+
+  // Handle camera flip
+  const handleFlipCamera = useCallback(() => {
+    setCameraFacing((prev) => (prev === 'user' ? 'environment' : 'user'));
+  }, []);
+
+  // Handle permissions request
+  const handleRequestPermissions = useCallback(async () => {
+    const { camera, mic } = await requestPermissions();
+    setCameraGranted(camera);
+    setMicGranted(mic);
+  }, []);
+
+  // Handle close
+  const handleClose = useCallback(() => {
+    if (previewTrack) {
+      previewTrack.stop();
+    }
+    navigation.goBack();
+  }, [navigation, previewTrack]);
+
+  // Handle Go Live
+  const handleGoLive = useCallback(async () => {
+    // Validate required fields
+    if (!streamTitle.trim()) {
+      Alert.alert('Title Required', 'Please enter a stream title.');
+      return;
+    }
+    if (!selectedCategoryId) {
+      Alert.alert('Category Required', 'Please select a category.');
+      return;
+    }
+    if (!audience) {
+      Alert.alert('Audience Required', 'Please select an audience.');
+      return;
+    }
+    if (!user?.id) {
+      Alert.alert('Not Logged In', 'Please log in to go live.');
+      return;
+    }
+    if (needsPermissions) {
+      Alert.alert('Permissions Required', 'Camera and microphone access are required to go live.');
+      return;
+    }
+
+    setIsConnecting(true);
+    setConnectError(null);
+
+    try {
+      // Stop preview track before connecting
+      if (previewTrack) {
+        previewTrack.stop();
+        setPreviewTrack(null);
+      }
+
+      // Generate room name
+      const roomName = generateSoloRoomName(user.id);
+      const userName = user.email?.split('@')[0] || 'Host';
+
+      // Fetch token from Edge Function
+      const { token, url } = await fetchMobileToken(roomName, user.id, userName, true);
+
+      // Connect and publish
+      const { room, videoTrack, audioTrack } = await connectAndPublish(url, token, true);
+      roomRef.current = room;
+
+      // Navigate to live screen with params
+      navigation.navigate('LiveScreen', {
+        roomName,
+        title: streamTitle.trim(),
+        category: selectedCategoryId,
+        audience,
+        isHost: true,
+      });
+
+    } catch (err: any) {
+      console.error('[GoLive] Connect error:', err);
+      setConnectError(err.message || 'Failed to go live. Please try again.');
+      Alert.alert('Connection Failed', err.message || 'Failed to go live. Please try again.');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [streamTitle, selectedCategoryId, audience, user, needsPermissions, previewTrack, navigation]);
+
   return (
     <View style={styles.container}>
-      {/* Full-screen Camera Preview (UI placeholder) */}
+      {/* Camera Preview */}
       <View style={styles.cameraPreview}>
-        <View style={styles.previewPlaceholder}>
-          <Ionicons name="videocam" size={48} color="rgba(255,255,255,0.2)" />
-          <Text style={styles.previewText}>Camera Preview</Text>
-          <Text style={styles.previewHint}>
-            {cameraFacing === 'front' ? 'Front camera' : 'Back camera'}
-          </Text>
-        </View>
+        {previewTrack ? (
+          <VideoView
+            style={styles.videoView}
+            videoTrack={previewTrack}
+            mirror={cameraFacing === 'user'}
+            objectFit="cover"
+          />
+        ) : (
+          <View style={styles.previewPlaceholder}>
+            <Ionicons name="videocam" size={48} color="rgba(255,255,255,0.2)" />
+            <Text style={styles.previewText}>
+              {previewError || (cameraGranted ? 'Starting camera...' : 'Camera Preview')}
+            </Text>
+            <Text style={styles.previewHint}>
+              {cameraFacing === 'user' ? 'Front camera' : 'Back camera'}
+            </Text>
+          </View>
+        )}
 
         {/* Permissions Banner - shown in preview area */}
         {needsPermissions && (
@@ -55,7 +248,7 @@ export default function GoLiveScreen() {
                 </Text>
               </View>
               <Pressable
-                onPress={() => {}}
+                onPress={handleRequestPermissions}
                 style={({ pressed }) => [styles.permissionsButton, pressed && { opacity: 0.8 }]}
               >
                 <Text style={styles.permissionsButtonText}>Enable</Text>
@@ -68,7 +261,7 @@ export default function GoLiveScreen() {
       {/* Top Controls */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
         <Pressable
-          onPress={() => {}}
+          onPress={handleClose}
           style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}
           accessibilityRole="button"
           accessibilityLabel="Close"
@@ -79,7 +272,7 @@ export default function GoLiveScreen() {
         <View style={styles.topSpacer} />
 
         <Pressable
-          onPress={() => setCameraFacing((prev) => (prev === 'front' ? 'back' : 'front'))}
+          onPress={handleFlipCamera}
           style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}
           accessibilityRole="button"
           accessibilityLabel="Flip camera"
@@ -185,14 +378,28 @@ export default function GoLiveScreen() {
 
         {/* Go Live Button */}
         <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 12 }]}>
+          {connectError && (
+            <Text style={styles.errorText}>{connectError}</Text>
+          )}
           <Pressable
-            onPress={() => {}}
-            style={({ pressed }) => [styles.goLiveButton, pressed && styles.goLiveButtonPressed]}
+            onPress={handleGoLive}
+            disabled={isConnecting}
+            style={({ pressed }) => [
+              styles.goLiveButton, 
+              pressed && styles.goLiveButtonPressed,
+              isConnecting && styles.goLiveButtonDisabled,
+            ]}
             accessibilityRole="button"
             accessibilityLabel="Go Live"
           >
-            <View style={styles.liveIndicator} />
-            <Text style={styles.goLiveText}>Go Live</Text>
+            {isConnecting ? (
+              <Text style={styles.goLiveText}>Connecting...</Text>
+            ) : (
+              <>
+                <View style={styles.liveIndicator} />
+                <Text style={styles.goLiveText}>Go Live</Text>
+              </>
+            )}
           </Pressable>
         </View>
       </View>
@@ -212,6 +419,7 @@ const COLORS = {
   inputBg: 'rgba(255,255,255,0.06)',
   border: 'rgba(255,255,255,0.10)',
   warning: '#F59E0B',
+  error: '#EF4444',
 };
 
 const styles = StyleSheet.create({
@@ -224,6 +432,9 @@ const styles = StyleSheet.create({
   cameraPreview: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0A0A0A',
+  },
+  videoView: {
+    flex: 1,
   },
   previewPlaceholder: {
     flex: 1,
@@ -453,6 +664,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
   },
+  errorText: {
+    fontSize: 12,
+    color: COLORS.error,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
   goLiveButton: {
     height: 48,
     borderRadius: 12,
@@ -464,6 +681,9 @@ const styles = StyleSheet.create({
   },
   goLiveButtonPressed: {
     backgroundColor: COLORS.primaryPressed,
+  },
+  goLiveButtonDisabled: {
+    opacity: 0.6,
   },
   liveIndicator: {
     width: 8,
