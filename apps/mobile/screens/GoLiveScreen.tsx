@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function GoLiveScreen() {
   const insets = useSafeAreaInsets();
   const [streamTitle, setStreamTitle] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('just-chatting');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('irl');
   const [audience, setAudience] = useState<'Public' | 'Team'>('Public');
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
 
@@ -16,12 +16,11 @@ export default function GoLiveScreen() {
 
   const categories = useMemo(
     () => [
-      { id: 'just-chatting', label: 'Just Chatting', icon: 'chatbubbles-outline' as const },
+      { id: 'irl', label: 'IRL', icon: 'walk-outline' as const },
       { id: 'music', label: 'Music', icon: 'musical-notes-outline' as const },
       { id: 'gaming', label: 'Gaming', icon: 'game-controller-outline' as const },
-      { id: 'fitness', label: 'Fitness', icon: 'barbell-outline' as const },
-      { id: 'irl', label: 'IRL', icon: 'walk-outline' as const },
-      { id: 'sports', label: 'Sports', icon: 'football-outline' as const },
+      { id: 'comedy', label: 'Comedy', icon: 'happy-outline' as const },
+      { id: 'just-chatting', label: 'Just Chatting', icon: 'chatbubbles-outline' as const },
     ],
     []
   );
