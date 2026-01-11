@@ -7,18 +7,21 @@ import { navigationRef } from './navigation/navigationRef';
 import TopBar from './components/TopBar';
 import AppMenus from './components/AppMenus';
 import { MenusProvider } from './state/MenusContext';
+import { AuthProvider } from './state/AuthContext';
 
 enableScreens();
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <MenusProvider>
-        <NavigationContainer ref={navigationRef}>
-          <RootNavigator header={() => <TopBar />} />
-          <AppMenus />
-        </NavigationContainer>
-      </MenusProvider>
+      <AuthProvider>
+        <MenusProvider>
+          <NavigationContainer ref={navigationRef}>
+            <RootNavigator header={() => <TopBar />} />
+            <AppMenus />
+          </NavigationContainer>
+        </MenusProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

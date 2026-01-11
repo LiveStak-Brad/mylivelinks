@@ -1,10 +1,34 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '../state/AuthContext';
 
 export default function LoginScreen() {
+  const navigation = useNavigation<any>();
+  const { signInWithPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onSubmit = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setError('Please enter your email and password.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    const result = await signInWithPassword(trimmedEmail, password);
+    if (result.error) {
+      setError(result.error);
+    }
+
+    setSubmitting(false);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -18,42 +42,63 @@ export default function LoginScreen() {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
 
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.form}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  setError(null);
+                }}
                 placeholder="you@example.com"
                 placeholderTextColor="#999"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                editable={!submitting}
               />
             </View>
 
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
                 <Text style={styles.label}>Password</Text>
-                <TouchableOpacity disabled>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('ResetPasswordScreen')}
+                  disabled={submitting}
+                >
                   <Text style={styles.forgotLink}>Forgot password?</Text>
                 </TouchableOpacity>
               </View>
               <TextInput
                 style={styles.input}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(t) => {
+                  setPassword(t);
+                  setError(null);
+                }}
                 placeholder="••••••••"
                 placeholderTextColor="#999"
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
+                editable={!submitting}
               />
             </View>
 
-            <TouchableOpacity style={styles.loginButton} disabled>
-              <Text style={styles.loginButtonText}>Sign In</Text>
+            <TouchableOpacity style={styles.loginButton} onPress={onSubmit} disabled={submitting}>
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.loginButtonText}>Sign In</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -81,7 +126,11 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.toggleButton} disabled>
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => navigation.navigate('SignupScreen')}
+            disabled={submitting}
+          >
             <Text style={styles.toggleText}>Don't have an account? Sign up</Text>
           </TouchableOpacity>
         </View>
@@ -132,6 +181,18 @@ const styles = StyleSheet.create({
   },
   form: {
     marginBottom: 24,
+  },
+  errorBox: {
+    backgroundColor: '#fee',
+    borderWidth: 1,
+    borderColor: '#fcc',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#c00',
+    fontSize: 14,
   },
   inputGroup: {
     marginBottom: 16,

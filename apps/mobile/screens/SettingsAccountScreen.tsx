@@ -1,7 +1,8 @@
-﻿import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+﻿import React, { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../state/AuthContext';
 
 const stylesVars = {
   pageBg: '#F8FAFC', // web: bg-muted/30
@@ -42,12 +43,14 @@ function ChevronRow({
   subtitle,
   rightText,
   disabled,
+  onPress,
 }: {
   iconName?: React.ComponentProps<typeof Ionicons>['name'];
   title: string;
   subtitle?: string;
   rightText?: string;
   disabled?: boolean;
+  onPress?: () => void;
 }) {
   const isDisabled = !!disabled;
 
@@ -56,7 +59,8 @@ function ChevronRow({
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       onPress={() => {
-        // UI only — navigation is visual only (no wiring changes)
+        if (isDisabled) return;
+        onPress?.();
       }}
       style={({ pressed }) => [
         styles.row,
@@ -138,6 +142,9 @@ function ProviderRow({
 }
 
 export default function SettingsAccountScreen() {
+  const { signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -192,6 +199,26 @@ export default function SettingsAccountScreen() {
 
           <SectionCard title="Password" description="Update your password.">
             <ChevronRow iconName="key" title="Update Password" subtitle="Choose a strong password" />
+          </SectionCard>
+
+          <SectionCard title="Session" description="Manage your current session.">
+            <ChevronRow
+              iconName="log-out-outline"
+              title={signingOut ? 'Signing out…' : 'Sign out'}
+              subtitle="End your current session on this device"
+              disabled={signingOut}
+              onPress={async () => {
+                try {
+                  setSigningOut(true);
+                  const { error } = await signOut();
+                  if (error) {
+                    Alert.alert('Sign out failed', error);
+                  }
+                } finally {
+                  setSigningOut(false);
+                }
+              }}
+            />
           </SectionCard>
         </View>
       </ScrollView>

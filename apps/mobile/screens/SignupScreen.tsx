@@ -1,14 +1,36 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../state/AuthContext';
 
 export default function SignupScreen() {
+  const { signUp } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
-  const handleSignup = () => {
-    console.log('Signup:', { name, email, password });
+  const handleSignup = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setError('Please enter an email and password.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    setMessage(null);
+
+    const result = await signUp(trimmedEmail, password);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setMessage('Account created. You may need to confirm your email before signing in.');
+    }
+
+    setSubmitting(false);
   };
 
   return (
@@ -26,6 +48,18 @@ export default function SignupScreen() {
             <Text style={styles.subtitle}>Join MyLiveLinks</Text>
           </View>
 
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {message ? (
+            <View style={styles.successBox}>
+              <Text style={styles.successText}>{message}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.form}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Name</Text>
@@ -37,6 +71,7 @@ export default function SignupScreen() {
                 placeholderTextColor="#999"
                 autoCapitalize="words"
                 autoCorrect={false}
+                editable={!submitting}
               />
             </View>
 
@@ -45,12 +80,16 @@ export default function SignupScreen() {
               <TextInput
                 style={styles.input}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  setError(null);
+                }}
                 placeholder="Enter your email"
                 placeholderTextColor="#999"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                editable={!submitting}
               />
             </View>
 
@@ -59,20 +98,29 @@ export default function SignupScreen() {
               <TextInput
                 style={styles.input}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(t) => {
+                  setPassword(t);
+                  setError(null);
+                }}
                 placeholder="Enter your password"
                 placeholderTextColor="#999"
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
+                editable={!submitting}
               />
             </View>
 
             <TouchableOpacity 
               style={styles.signupButton}
               onPress={handleSignup}
+              disabled={submitting}
             >
-              <Text style={styles.signupButtonText}>Sign Up</Text>
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.signupButtonText}>Sign Up</Text>
+              )}
             </TouchableOpacity>
 
             <View style={styles.termsRow}>
@@ -112,6 +160,32 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#999',
+  },
+  errorBox: {
+    backgroundColor: '#2a0d0d',
+    borderWidth: 1,
+    borderColor: '#5c1a1a',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#ffb4b4',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  successBox: {
+    backgroundColor: '#0d2412',
+    borderWidth: 1,
+    borderColor: '#1f5c2d',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  successText: {
+    color: '#b8ffd0',
+    fontSize: 14,
+    fontWeight: '600',
   },
   form: {
     flex: 1,

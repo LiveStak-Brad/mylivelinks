@@ -1,8 +1,10 @@
 ﻿import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../state/AuthContext';
 
 export default function ResetPasswordScreen() {
+  const { resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -25,6 +27,12 @@ export default function ResetPasswordScreen() {
     setMessage(null);
 
     try {
+      const { error: resetError } = await resetPassword(email.trim());
+      if (resetError) {
+        setError(resetError);
+        return;
+      }
+
       setMessage('Password reset email sent! Check your inbox (and spam folder) for the reset link.');
       setEmail('');
     } catch (err: any) {

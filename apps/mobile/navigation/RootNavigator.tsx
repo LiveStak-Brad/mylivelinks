@@ -81,6 +81,9 @@ import UserFeedScreen from '../screens/UserFeedScreen';
 import UserPhotosScreen from '../screens/UserPhotosScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
 import WalletScreen from '../screens/WalletScreen';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, View } from 'react-native';
+import { useAuth } from '../state/AuthContext';
 
 const Tabs = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
@@ -145,6 +148,33 @@ function TabsNavigator() {
 }
 
 export default function RootNavigator({ header }: { header: () => React.ReactNode }) {
+  const { loading, session } = useAuth();
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom', 'left', 'right']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text>Loading…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!session) {
+    return (
+      <RootStack.Navigator
+        initialRouteName="LoginScreen"
+        screenOptions={{
+          header,
+        }}
+      >
+        <RootStack.Screen name="LoginScreen" component={LoginScreen} />
+        <RootStack.Screen name="SignupScreen" component={SignupScreen} />
+        <RootStack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />
+      </RootStack.Navigator>
+    );
+  }
+
   return (
     <RootStack.Navigator
       screenOptions={{
@@ -185,7 +215,6 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="LiveHostScreen" component={LiveHostScreen} />
       <RootStack.Screen name="LiveScreen" component={LiveScreen} />
       <RootStack.Screen name="LiveUserScreen" component={LiveUserScreen} />
-      <RootStack.Screen name="LoginScreen" component={LoginScreen} />
       <RootStack.Screen name="MllProApplyScreen" component={MllProApplyScreen} />
       <RootStack.Screen name="MllProScreen" component={MllProScreen} />
       <RootStack.Screen name="MyAnalyticsScreen" component={MyAnalyticsScreen} />
