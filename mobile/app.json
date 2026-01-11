@@ -3,6 +3,9 @@
     "name": "MyLiveLinks",
     "slug": "mylivelinks-mobile",
     "version": "1.0.2",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
     "scheme": "mylivelinks",
     "orientation": "default",
     "icon": "./assets/icon.png",

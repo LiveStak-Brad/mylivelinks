@@ -1,3 +1,5 @@
+console.log('[BOOT] index.js executing at', new Date().toISOString());
+
 // CRITICAL: Set up global error handler FIRST (before any other imports)
 if (typeof ErrorUtils !== 'undefined') {
   // Ensure all downstream error handlers know not to rethrow into RN's fatal abort path during boot.
