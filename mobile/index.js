@@ -1,3 +1,8 @@
+// P0 BOOT LOGGING: This MUST print if JS executes at all
+console.log('[BOOT] ========================================');
+console.log('[BOOT] index.js EXECUTING at', new Date().toISOString());
+console.log('[BOOT] ========================================');
+
 // CRITICAL: Set up global error handler FIRST (before any other imports)
 if (typeof ErrorUtils !== 'undefined') {
   // Ensure all downstream error handlers know not to rethrow into RN's fatal abort path during boot.
@@ -13,6 +18,19 @@ if (typeof ErrorUtils !== 'undefined') {
     global.__BOOT_FATAL_ERROR__ = error;
     // Avoid calling the original handler so React Native doesn't abort the process.
   });
+}
+
+// P0: Catch unhandled promise rejections during boot
+if (typeof global !== 'undefined' && global.Promise) {
+  const originalUnhandled = global.Promise.prototype.catch;
+  if (typeof global.addEventListener === 'function') {
+    global.addEventListener('unhandledrejection', (event) => {
+      console.error('🔴 UNHANDLED PROMISE REJECTION:', {
+        reason: event?.reason?.message || event?.reason,
+        stack: event?.reason?.stack,
+      });
+    });
+  }
 }
 
 import { registerRootComponent } from 'expo';
@@ -52,6 +70,13 @@ if (global.__LIVEKIT_GLOBALS_REGISTERED__ == null) {
   global.__LIVEKIT_GLOBALS_REGISTERED__ = false;
 }
 console.log('[BOOT] LiveKit globals init: lazy (skipped at startup)');
+
+// P0 FIX: Prevent splash screen from auto-hiding (Expo SDK 50 requirement)
+// App.tsx will call hideAsync() when navigation is ready
+const SplashScreen = require('expo-splash-screen');
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Safe if already prevented
+});
 
 // CRITICAL: Catch any errors during App import
 let App;

@@ -92,9 +92,25 @@ function AppNavigation() {
         },
       },
       getInitialURL: async () => {
-        const url = await Linking.getInitialURL();
-        await handleReferralFromUrl(url);
-        return url;
+        // P0 FIX: Wrap Linking.getInitialURL with timeout to prevent iOS splash freeze
+        // ROOT CAUSE: Linking.getInitialURL() can hang indefinitely on iOS if deep linking
+        // is slow/unresponsive, blocking NavigationContainer.onReady and splash hide.
+        // PREVENTION: Always use Promise.race with timeout for any async init in linking config.
+        // DO NOT await any blocking operations here without a timeout guard.
+        try {
+          const urlPromise = Linking.getInitialURL();
+          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 500));
+          const url = await Promise.race([urlPromise, timeoutPromise]);
+          
+          // Fire-and-forget referral handling (non-blocking)
+          if (url) {
+            void handleReferralFromUrl(url);
+          }
+          return url;
+        } catch (error) {
+          console.warn('[LINKING] getInitialURL failed (non-blocking):', error);
+          return null;
+        }
       },
       subscribe: (listener) => {
         const onReceiveURL = (evt: any) => {
@@ -216,6 +232,24 @@ function AppNavigation() {
 export default function App() {
   useEffect(() => {
     logStartupBreadcrumb('APP_START');
+  }, []);
+
+  // P0 Failsafe: Hide splash after 3s even if navigation never becomes ready
+  // Prevents permanent splash freeze on iOS if nav init hangs
+  // Increased from 1.5s to 3s to allow auth bootstrap to complete
+  useEffect(() => {
+    console.log('[SPLASH] Failsafe timer armed (3000ms)');
+    const t = setTimeout(() => {
+      console.log('[SPLASH] ⏰ FAILSAFE TRIGGERED - forcing splash hide');
+      logStartupBreadcrumb('SPLASH_FAILSAFE_TRIGGERED', { at: Date.now() });
+      SplashScreen.hideAsync().catch((err) => {
+        console.warn('[SPLASH] Failsafe hide failed:', err);
+      });
+    }, 3000);
+    return () => {
+      console.log('[SPLASH] Failsafe timer cleared');
+      clearTimeout(t);
+    };
   }, []);
 
   const showBundleMarker = (globalThis as any)?.__FORCE_STARTUP_OVERLAY__ === true;
