@@ -15,6 +15,7 @@
         "buildConfiguration": "Debug"
       },
       "env": {
+        "EXPO_NO_CAPABILITY_SYNC": "1",
         "EXPO_PUBLIC_DEBUG_LIVE": "1",
         "EXPO_PUBLIC_STARTUP_OVERLAY": "1",
         "EXPO_PUBLIC_API_URL": "https://www.mylivelinks.com",
@@ -31,6 +32,7 @@
         "buildConfiguration": "Release"
       },
       "env": {
+        "EXPO_NO_CAPABILITY_SYNC": "1",
         "EXPO_PUBLIC_DEBUG_LIVE": "0",
         "EXPO_PUBLIC_API_URL": "https://www.mylivelinks.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://dfiyrmqobjfsdsgklweg.supabase.co",
@@ -46,6 +48,7 @@
         "buildConfiguration": "Release"
       },
       "env": {
+        "EXPO_NO_CAPABILITY_SYNC": "1",
         "EXPO_PUBLIC_DEBUG_LIVE": "0",
         "EXPO_PUBLIC_API_URL": "https://www.mylivelinks.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://dfiyrmqobjfsdsgklweg.supabase.co",
