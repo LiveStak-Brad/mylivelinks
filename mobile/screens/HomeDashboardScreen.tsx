@@ -34,6 +34,8 @@ import { RoomsCarousel } from '../components/RoomsCarousel';
 import type { MainTabsParamList } from '../types/navigation';
 import { supabase } from '../lib/supabase';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { LinklerFab } from '../components/LinklerFab';
+import { logStartupBreadcrumb } from '../lib/startupTrace';
 
 type Props = { navigation: any };
 
@@ -46,6 +48,14 @@ export function HomeDashboardScreen({ navigation }: Props) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [searchResults, setSearchResults] = React.useState<any[]>([]);
   const [searching, setSearching] = React.useState(false);
+
+  React.useEffect(() => {
+    console.log('[NAV] HomeDashboardScreen mounted');
+  }, []);
+
+  React.useEffect(() => {
+    logStartupBreadcrumb('SCREEN_MOUNT_HomeDashboard');
+  }, []);
 
   React.useEffect(() => {
     checkUser();
@@ -192,6 +202,7 @@ export function HomeDashboardScreen({ navigation }: Props) {
       onNavigateToAnalytics={handleNavigateToAnalytics}
       onNavigateToApply={handleApplyPress}
       onNavigateToRooms={handleNavigateToRooms}
+      floatingContent={<LinklerFab show />}
     >
       {/* Page Header: Home icon + Home */}
       <PageHeader icon="home" iconColor="#8b5cf6" title="Home" />

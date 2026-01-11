@@ -31,6 +31,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase, supabaseConfigured } from '../lib/supabase';
 
+const LINKLER_IMAGE = require('../../linkler.png');
+
 type CompanionEntry = {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -467,11 +469,7 @@ export function LinklerFab({ show = true }: { show?: boolean }) {
         accessibilityRole="button"
         accessibilityLabel="Open Linkler support panel"
       >
-        {/* P0: Avoid hard-requiring an image outside Metro watch roots (monorepo root),
-            which can prevent the app from bundling/booting. */}
-        <View style={styles.fabFallback}>
-          <Text style={styles.fabFallbackText}>L</Text>
-        </View>
+        <Image source={LINKLER_IMAGE} style={styles.fabImage} />
       </Pressable>
 
       <Modal visible={visible} onRequestClose={() => setVisible(false)}>
@@ -743,19 +741,6 @@ function createStyles(theme: any) {
     width: 56,
     height: 56,
     resizeMode: 'contain',
-  },
-  fabFallback: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabFallbackText: {
-    color: '#ffffff',
-    fontSize: 22,
-    fontWeight: '900',
   },
   sheet: {
     gap: 16,

@@ -18,15 +18,16 @@
  * - Noties: Bell icon (Amber #f59e0b)
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+console.log('[NAV] MainTabs module loaded');
+
 import type { MainTabsParamList } from '../types/navigation';
 import { HomeDashboardScreen } from '../screens/HomeDashboardScreen';
 import { FeedScreen } from '../screens/FeedScreen';
-import { SoloHostStreamScreen } from '../screens/SoloHostStreamScreen';
 import { TeamsTabScreen } from '../screens/TeamsTabScreen';
 import { ProfileTabScreen } from '../screens/ProfileTabScreen';
 import { MessagesScreen } from '../screens/MessagesScreen';
@@ -34,15 +35,22 @@ import { NotiesScreen } from '../screens/NotiesScreen';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { canUserGoLive } from '../lib/livekit-constants';
+import { logStartupBreadcrumb } from '../lib/startupTrace';
 import { Modal } from '../components/ui';
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
-export function MainTabs() {
+export default function MainTabs() {
   const { theme } = useThemeMode();
   const { user } = useAuthContext();
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);
   const isOwner = useMemo(() => canUserGoLive(user ? { id: user.id, email: user.email } : null), [user?.email, user?.id]);
+
+  useEffect(() => {
+    logStartupBreadcrumb('SCREEN_MOUNT_MainTabs');
+    console.log('[NAV] MainTabs mounted (AppStack equivalent). Initial tab route is first declared Tab.Screen: Home');
+  }, []);
+
   const tabBarStyle = useMemo(
     () => ({
       backgroundColor: theme.colors.tabBar,
@@ -97,7 +105,8 @@ export function MainTabs() {
       />
       <Tab.Screen
         name="GoLive"
-        component={SoloHostStreamScreen}
+        // Lazy-load live host screen so LiveKit modules never evaluate during normal boot.
+        getComponent={() => require('../screens/SoloHostStreamScreen').SoloHostStreamScreen}
         listeners={{
           tabPress: (e) => {
             if (isOwner) return;

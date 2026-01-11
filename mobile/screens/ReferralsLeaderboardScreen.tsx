@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 import { PageHeader, PageShell } from '../components/ui';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { getRuntimeEnv } from '../lib/env';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ReferralsLeaderboard'>;
 
@@ -23,7 +24,7 @@ export function ReferralsLeaderboardScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const apiBaseUrl = useMemo(() => {
-    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
+    const raw = getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com';
     return raw.replace(/\/+$/, '');
   }, []);
 

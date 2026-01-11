@@ -5,6 +5,8 @@
  * Web source: lib/livekit-constants.ts
  */
 
+ import { getRuntimeEnv } from './env';
+
 /**
  * Shared room name for ALL clients (web + mobile)
  * ⚠️ DO NOT CHANGE without coordinating with web
@@ -24,7 +26,7 @@ export const DEVICE_TYPE = 'mobile' as const;
 /**
  * Debug logging flag
  */
-export const DEBUG_LIVEKIT = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
+export const DEBUG_LIVEKIT = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVE') === '1';
 
 /**
  * Video quality presets

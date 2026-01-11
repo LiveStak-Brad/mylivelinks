@@ -383,6 +383,15 @@ export function OptionsMenu({
                   />
                   <MenuItem
                     styles={styles}
+                    label="Linkler Prompt"
+                    onPress={() => {
+                      closeMenu();
+                      navigateRoot('AdminLinklerPrompt');
+                    }}
+                    disabled={!topBar.enabledItems.optionsMenu_linklerPrompt}
+                  />
+                  <MenuItem
+                    styles={styles}
                     label={endingAllStreams ? 'Ending all streams...' : 'End ALL streams'}
                     onPress={handleEndAllStreams}
                     destructive

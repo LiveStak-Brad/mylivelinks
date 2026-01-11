@@ -16,25 +16,7 @@ export function StartupDebugOverlay() {
 
   React.useEffect(() => {
     logStartupBreadcrumb('STARTUP_OVERLAY_MOUNTED');
-
-    let mounted = true;
-    const onUpdate = (next: StartupBreadcrumb[]) => {
-      const apply = () => {
-        if (mounted) setCrumbs(next);
-      };
-      // Defer to avoid state updates during another component's render (SceneView warning).
-      if (typeof (globalThis as any).queueMicrotask === 'function') {
-        (globalThis as any).queueMicrotask(apply);
-      } else {
-        setTimeout(apply, 0);
-      }
-    };
-
-    const unsubscribe = subscribeToStartupBreadcrumbs(onUpdate);
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
+    return subscribeToStartupBreadcrumbs(setCrumbs);
   }, []);
 
   const lastCrumbs = crumbs.slice(-6).reverse();

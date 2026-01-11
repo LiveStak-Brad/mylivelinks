@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { supabase, supabaseConfigured } from '../../lib/supabase';
 import { useAuthContext } from '../../contexts/AuthContext';
+import { getRuntimeEnv } from '../../lib/env';
 
 export type EnabledItemsMap = Record<string, boolean>;
 
@@ -54,11 +55,11 @@ function parseEnvList(raw: unknown): string[] {
 }
 
 function getAdminEnvIds(): string[] {
-  return parseEnvList(process.env.EXPO_PUBLIC_ADMIN_PROFILE_IDS ?? process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS);
+  return parseEnvList(getRuntimeEnv('EXPO_PUBLIC_ADMIN_PROFILE_IDS') ?? getRuntimeEnv('NEXT_PUBLIC_ADMIN_PROFILE_IDS'));
 }
 
 function getAdminEnvEmails(): string[] {
-  return parseEnvList(process.env.EXPO_PUBLIC_ADMIN_EMAILS ?? process.env.NEXT_PUBLIC_ADMIN_EMAILS).map((s) => s.toLowerCase());
+  return parseEnvList(getRuntimeEnv('EXPO_PUBLIC_ADMIN_EMAILS') ?? getRuntimeEnv('NEXT_PUBLIC_ADMIN_EMAILS')).map((s) => s.toLowerCase());
 }
 
 async function loadReadIds(userId: string): Promise<Set<string>> {
@@ -303,7 +304,7 @@ export function useTopBarState(): TopBarState {
         setUnreadMessagesCount(m);
         setUnreadNotiesCount(n);
       } catch {
-        if (process.env.NODE_ENV !== 'production') {
+        if (__DEV__) {
           console.warn('[TopBar] Failed to reload counts:', reason);
         }
       } finally {
@@ -418,6 +419,7 @@ export function useTopBarState(): TopBarState {
       optionsMenu_approveApplications: isAdmin,
       optionsMenu_manageGifts: isAdmin,
       optionsMenu_endAllStreams: isAdmin,
+      optionsMenu_linklerPrompt: isAdmin,
     };
 
     return base;

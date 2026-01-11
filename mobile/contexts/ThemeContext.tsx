@@ -210,6 +210,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const load = async () => {
+      // Add small delay to ensure iOS sandbox is ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       try {
         // Load theme mode
         const saved = (await SecureStore.getItemAsync(STORAGE_KEY)) as ThemeMode | null;

@@ -16,7 +16,9 @@ import type { TileItem } from '../../types/live';
 import { Track, type Room, type VideoTrack } from 'livekit-client';
 import { useThemeMode } from '../../contexts/ThemeContext';
 
-const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
+import { getRuntimeEnv } from '../../lib/env';
+
+const DEBUG = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVE') === '1';
 
 interface TileProps {
   item: TileItem;

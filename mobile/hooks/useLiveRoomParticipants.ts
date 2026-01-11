@@ -23,10 +23,12 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { createWebRequestHeaders } from '../lib/webSession';
 
 import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT, canUserGoLive } from '../lib/livekit-constants';
+import { ensureLivekitGlobals } from '../lib/livekitGlobals';
+import { getRuntimeEnv } from '../lib/env';
 
 const DEBUG = DEBUG_LIVEKIT;
 const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com').replace(/\/+$/, '');
+const API_BASE_URL = (getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com').replace(/\/+$/, '');
 const TOKEN_ENDPOINT = `${API_BASE_URL}${TOKEN_ENDPOINT_PATH}`;
 
 type CameraFacingMode = 'user' | 'environment';
@@ -300,6 +302,11 @@ export function useLiveRoomParticipants(
     } catch {
       // ignore
     }
+    // P0: Initialize LiveKit/WebRTC globals lazily *only* when entering live features.
+    // If this fails, do not attempt to load livekit-client (it may crash under Hermes/WebRTC mismatch).
+    if (!ensureLivekitGlobals()) {
+      throw new Error('LIVEKIT_GLOBALS_INIT_FAILED');
+    }
     // Lazy-load so app boot doesn't evaluate livekit-client unless LiveRoom is entered.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     livekitModuleRef.current = require('livekit-client');
@@ -370,7 +377,7 @@ export function useLiveRoomParticipants(
       const sessionId = generateSessionId();
 
       console.log('[PARITY-PROOF] token_fetch_inputs', {
-        EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+        EXPO_PUBLIC_API_URL: getRuntimeEnv('EXPO_PUBLIC_API_URL'),
         TOKEN_ENDPOINT,
         ROOM_NAME,
         deviceType: 'mobile',
@@ -1360,9 +1367,8 @@ export function useLiveRoomParticipants(
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token || null;
-        const cleanupUrl = process.env.EXPO_PUBLIC_API_URL
-          ? `${process.env.EXPO_PUBLIC_API_URL}/api/stream-cleanup`
-          : 'https://www.mylivelinks.com/api/stream-cleanup';
+        const apiBase = getRuntimeEnv('EXPO_PUBLIC_API_URL');
+        const cleanupUrl = apiBase ? `${apiBase}/api/stream-cleanup` : 'https://www.mylivelinks.com/api/stream-cleanup';
 
         await fetch(cleanupUrl, {
           method: 'POST',
@@ -1408,9 +1414,8 @@ export function useLiveRoomParticipants(
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token || null;
-        const cleanupUrl = process.env.EXPO_PUBLIC_API_URL
-          ? `${process.env.EXPO_PUBLIC_API_URL}/api/stream-cleanup`
-          : 'https://www.mylivelinks.com/api/stream-cleanup';
+        const apiBase = getRuntimeEnv('EXPO_PUBLIC_API_URL');
+        const cleanupUrl = apiBase ? `${apiBase}/api/stream-cleanup` : 'https://www.mylivelinks.com/api/stream-cleanup';
 
         await fetch(cleanupUrl, {
           method: 'POST',

@@ -20,6 +20,7 @@ export function ProfileRouteScreen({ navigation, route }: Props) {
 
   // Get the parent tab navigator
   const parentNav = navigation.getParent();
+  const navigationForProfile = parentNav || navigation;
 
   useEffect(() => {
     const token = session?.access_token;
@@ -36,7 +37,7 @@ export function ProfileRouteScreen({ navigation, route }: Props) {
       isOwnProfile={isOwnProfile}
       apiBaseUrl="https://www.mylivelinks.com"
       authToken={authToken}
-      navigation={parentNav}
+      navigation={navigationForProfile}
       onBack={() => navigation.goBack()}
       onEditProfile={() => {
         navigation.getParent?.()?.navigate?.('EditProfile');

@@ -2,14 +2,13 @@ import 'react-native-url-polyfill/auto';
 import 'react-native-get-random-values';
 
 import * as SecureStore from 'expo-secure-store';
-import Constants from 'expo-constants';
 import { createClient } from '@supabase/supabase-js';
 
-const expoExtra: Record<string, any> =
-  (Constants.expoConfig?.extra as any) ?? (Constants as any).manifest?.extra ?? (Constants as any).manifest2?.extra ?? {};
+import { getRuntimeEnv } from './env';
+import { logStartupBreadcrumb } from './startupTrace';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? expoExtra.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? expoExtra.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = getRuntimeEnv('EXPO_PUBLIC_SUPABASE_URL');
+const supabaseAnonKey = getRuntimeEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 export const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
@@ -19,12 +18,45 @@ if (!supabaseUrl || !supabaseAnonKey) {
   if (!supabaseUrl) console.error('  - EXPO_PUBLIC_SUPABASE_URL is not set');
   if (!supabaseAnonKey) console.error('  - EXPO_PUBLIC_SUPABASE_ANON_KEY is not set');
   console.error('[SUPABASE] App will run in offline mode. Auth features will not work.');
+  logStartupBreadcrumb('SUPABASE_ENV_MISSING', {
+    hasUrl: Boolean(supabaseUrl),
+    hasAnonKey: Boolean(supabaseAnonKey),
+  });
+} else {
+  logStartupBreadcrumb('SUPABASE_INIT', {
+    host: (() => {
+      try {
+        return new URL(supabaseUrl).host;
+      } catch {
+        return 'invalid-url';
+      }
+    })(),
+  });
 }
 
 const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
+  getItem: async (key: string) => {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch (error) {
+      console.warn('[SecureStore] getItem failed:', error);
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string) => {
+    try {
+      return await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      console.warn('[SecureStore] setItem failed:', error);
+    }
+  },
+  removeItem: async (key: string) => {
+    try {
+      return await SecureStore.deleteItemAsync(key);
+    } catch (error) {
+      console.warn('[SecureStore] removeItem failed:', error);
+    }
+  },
 };
 
 const safeSupabaseUrl = supabaseUrl ?? 'https://example.supabase.co';

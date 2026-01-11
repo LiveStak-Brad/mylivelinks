@@ -1,4 +1,5 @@
 import { supabase, supabaseConfigured } from './supabase';
+import { getRuntimeEnv } from './env';
 
 // Authenticated API helpers (mobile)
 
@@ -10,7 +11,7 @@ export type FetchAuthedResult = {
 };
 
 function getApiBaseUrl() {
-  const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
+  const raw = getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com';
   return raw.replace(/\/+$/, '');
 }
 
@@ -78,4 +79,36 @@ export async function fetchAuthed(
   };
 
   return attempt(accessToken);
+}
+
+export async function linklerSupportIntake(
+  payload: { message: string; context?: Record<string, unknown> },
+  accessToken: string | null
+) {
+  return fetchAuthed(
+    '/api/linkler/support',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    accessToken
+  );
+}
+
+export async function linklerCompanionChat(
+  payload: { message: string; sessionId?: string; context?: Record<string, unknown> },
+  accessToken: string | null
+) {
+  return fetchAuthed(
+    '/api/linkler/companion',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    accessToken
+  );
+}
+
+export async function linklerPing(accessToken: string | null) {
+  return fetchAuthed('/api/ai/ping', { method: 'GET' }, accessToken);
 }

@@ -18,6 +18,7 @@ import {
   Image,
   Switch,
   Linking,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,6 +78,7 @@ export function UserMenu({
       navigation.getParent?.()?.navigate?.(screenName);
     } catch {
       console.warn(`Failed to navigate to ${screenName}`);
+      Alert.alert('Navigation unavailable', `Could not open ${screenName}.`);
     }
   };
 
@@ -426,6 +428,17 @@ export function UserMenu({
                       navigateRoot('AdminGifts');
                     }}
                     styles={styles}
+                  />
+                  <MenuItem
+                    icon="construct-outline"
+                    iconColor="#22d3ee"
+                    label="Linkler Prompt"
+                    onPress={() => {
+                      closeMenu();
+                      navigateRoot('AdminLinklerPrompt');
+                    }}
+                    styles={styles}
+                    disabled={!topBar.enabledItems.optionsMenu_linklerPrompt}
                   />
                 </>
               )}

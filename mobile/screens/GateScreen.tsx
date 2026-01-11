@@ -8,6 +8,7 @@ import type { RootStackParamList } from '../types/navigation';
 import { BrandLogo } from '../components/ui/BrandLogo';
 import { LegalFooter } from '../components/LegalFooter';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { logStartupBreadcrumb } from '../lib/startupTrace';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Gate'>;
 
@@ -16,26 +17,61 @@ type Target = keyof RootStackParamList;
 export function GateScreen({ navigation }: Props) {
   const { session, loading: authLoading } = useAuthContext();
   const userId = session?.user?.id ?? null;
-  const { loading: profileLoading, needsOnboarding, isComplete } = useProfile(userId);
+  const { loading: profileLoading, needsOnboarding, isComplete, error: profileError } = useProfile(userId);
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const lastTargetRef = React.useRef<Target | null>(null);
 
   React.useEffect(() => {
+    logStartupBreadcrumb('SCREEN_MOUNT_Gate');
+  }, []);
+
+  React.useEffect(() => {
+    console.log(`[GATE][${new Date().toISOString()}] effect tick`, {
+      authLoading,
+      hasSession: !!session,
+      userId: session?.user?.id,
+      profileLoading,
+      profileError,
+      needsOnboarding,
+      isComplete,
+    });
+
     if (authLoading) return;
 
+    // Authoritative rule (P0):
+    // - No session -> Auth
+    // - Session exists -> immediately route to MainTabs (Home)
+    // - In parallel, once profile is loaded, redirect to CreateProfile if missing/incomplete
+    // - If profile query fails, stay in MainTabs (do not block / do not black screen)
     let target: Target;
 
     if (!session) {
       target = 'Auth';
-    } else if (profileLoading) {
-      return;
-    } else if (needsOnboarding || !isComplete) {
-      target = 'CreateProfile';
     } else {
       target = 'MainTabs';
     }
+
+    if (session && !profileLoading && !profileError && (needsOnboarding || !isComplete)) {
+      target = 'CreateProfile';
+    }
+
+    logStartupBreadcrumb('GATE_NAV_DECISION', {
+      target,
+      hasSession: !!session,
+      profileLoading,
+      profileError,
+      needsOnboarding,
+      isComplete,
+    });
+
+    console.log(`[GATE][${new Date().toISOString()}] nav decision`, {
+      target,
+      lastTarget: lastTargetRef.current,
+    });
+
+    console.log('[NAV] GateScreen resetting to target route:', target);
 
     if (lastTargetRef.current === target) return;
     lastTargetRef.current = target;
@@ -44,7 +80,7 @@ export function GateScreen({ navigation }: Props) {
       index: 0,
       routes: [{ name: target }],
     });
-  }, [authLoading, isComplete, needsOnboarding, navigation, profileLoading, session]);
+  }, [authLoading, isComplete, navigation, needsOnboarding, profileError, profileLoading, session]);
 
   return (
     <ImageBackground
