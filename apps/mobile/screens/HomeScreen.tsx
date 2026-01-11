@@ -276,6 +276,8 @@ export default function HomeScreen() {
       const followingIds: string[] = (following ?? [])
         .map((f: any) => String(f.followee_id))
         .filter(Boolean);
+      const excludedSet = new Set<string>([userId, ...followingIds]);
+      console.log('[home] recommended: followingIds=', followingIds.length);
 
       if (followingIds.length === 0) {
         const { data, error } = await supabase
@@ -293,7 +295,10 @@ export default function HomeScreen() {
           return;
         }
 
-        setRecommendedProfiles((data as any) ?? []);
+        // Final safety filter: never show self (and if follows somehow got cached, exclude those too)
+        const cleaned = (((data as any) ?? []) as RecommendedProfile[]).filter((p) => !excludedSet.has(String(p.id)));
+        console.log('[home] recommended: final=', cleaned.length);
+        setRecommendedProfiles(cleaned);
         setRecommendedLoading(false);
         return;
       }
@@ -303,7 +308,8 @@ export default function HomeScreen() {
         .select('followee_id')
         .in('follower_id', followingIds)
         .neq('followee_id', userId)
-        .not('followee_id', 'in', `(${followingIds.join(',')})`);
+        // NOTE: we also do a client-side filter below to avoid "not in" edge cases with UUID formatting
+        .limit(500);
 
       if (similarError) {
         setRecommendedProfiles([]);
@@ -316,6 +322,7 @@ export default function HomeScreen() {
       (similarFollows ?? []).forEach((f: any) => {
         const id = String(f.followee_id);
         if (!id) return;
+        if (excludedSet.has(id)) return; // exclude already-followed + self
         followCounts.set(id, (followCounts.get(id) || 0) + 1);
       });
 
@@ -324,8 +331,7 @@ export default function HomeScreen() {
         .slice(0, 10)
         .map(([id]) => id);
 
-      const excludedIds = [userId, ...followingIds, ...recommendedIds].filter(Boolean);
-      const excludedFilter = excludedIds.length ? `(${excludedIds.join(',')})` : null;
+      recommendedIds.forEach((id) => excludedSet.add(id));
 
       const popularQuery = supabase
         .from('profiles')
@@ -333,11 +339,9 @@ export default function HomeScreen() {
         .not('username', 'is', null)
         .neq('id', userId)
         .order('follower_count', { ascending: false })
-        .limit(10);
+        .limit(30);
 
-      const { data: popular, error: popularError } = excludedFilter
-        ? await popularQuery.not('id', 'in', excludedFilter)
-        : await popularQuery;
+      const { data: popularRaw, error: popularError } = await popularQuery;
 
       if (popularError) {
         setRecommendedProfiles([]);
@@ -361,17 +365,29 @@ export default function HomeScreen() {
         return;
       }
 
+      const popular = (((popularRaw as any) ?? []) as RecommendedProfile[]).filter((p) => !excludedSet.has(String(p.id)));
       const combined: RecommendedProfile[] = [
         ...(((recommended as any[]) ?? []) as any[]),
         ...(((popular as any[]) ?? []) as any[]),
       ].filter(Boolean);
-      combined.sort((a, b) => {
+
+      // Final safety filter: never show self or already-followed (prevents "I still see it" when following everyone)
+      const filtered = combined.filter((p) => !excludedSet.has(String(p.id)));
+      if (filtered.length === 0) {
+        setRecommendedProfiles([]);
+        console.log('[home] recommended: final=0 (hiding)');
+        setRecommendedLoading(false);
+        return;
+      }
+
+      filtered.sort((a, b) => {
         if (a.is_live && !b.is_live) return -1;
         if (!a.is_live && b.is_live) return 1;
         return Number(b.follower_count || 0) - Number(a.follower_count || 0);
       });
 
-      setRecommendedProfiles(combined.slice(0, 20));
+      setRecommendedProfiles(filtered.slice(0, 20));
+      console.log('[home] recommended: final=', Math.min(filtered.length, 20));
       setRecommendedLoading(false);
     } catch (e: any) {
       setRecommendedProfiles([]);
@@ -824,78 +840,39 @@ export default function HomeScreen() {
           </Card>
         </View>
 
-        {/* Section 3: What you can do right now */}
-        <View style={styles.container}>
-          <Card>
-            <Text style={styles.kickerCenter}>What you can do right now</Text>
-
-            <View style={styles.quickRow}>
-              <QuickAction icon="logo-usd" iconColor="#FBBF24" label="Buy coins" />
-
-              <View style={styles.quickGroup}>
-                <QuickAction icon="gift" iconColor="#EC4899" label="Posts" overline="Gift" />
-                <QuickAction icon="chatbubble-ellipses" iconColor="#A855F7" label="Comments" overline="Gift" />
-                <QuickAction icon="mail" iconColor="#60A5FA" label="Messages" overline="Gift" />
-                <QuickAction icon="musical-notes" iconColor="#34D399" label="Music" overline="Gift" />
-              </View>
-
-              <QuickAction icon="trending-up" iconColor="#A855F7" label="Gifter level" />
-              <QuickAction icon="trophy" iconColor="#F59E0B" label="Rise board" />
-            </View>
-
-            <View style={styles.quickRow}>
-              <QuickAction icon="gift" iconColor="#F472B6" label="Get gifted" />
-              <QuickAction icon="diamond" iconColor="#22D3EE" label="Diamonds" />
-              <QuickAction icon="trophy" iconColor="#F59E0B" label="Rise board" />
-
-              <View style={styles.quickAction}>
-                <View style={styles.cashOutRing}>
-                  <Ionicons name="cash" size={20} color="#22C55E" />
-                </View>
-                <Text style={styles.quickActionLabel}>Cash out</Text>
-              </View>
-
-              <Text style={styles.orText}>or</Text>
-              <QuickAction icon="logo-usd" iconColor="#FBBF24" label="Convert" />
-            </View>
-          </Card>
-        </View>
-
         {/* Main Content Section */}
-        <View style={styles.container}>
-          <Card>
-            <SectionTitle>Recommended for You</SectionTitle>
-            <View style={styles.placeholderRow}>
+        {recommendedLoading || recommendedError || recommendedProfiles.length > 0 ? (
+          <View style={styles.container}>
+            <Card>
+              <SectionTitle>Recommended for You</SectionTitle>
+              <View style={styles.placeholderRow}>
+                {recommendedLoading ? (
+                  <>
+                    <View style={styles.profilePill} />
+                    <View style={styles.profilePill} />
+                    <View style={styles.profilePill} />
+                    <View style={styles.profilePill} />
+                  </>
+                ) : recommendedError ? null : (
+                  recommendedProfiles.slice(0, 8).map((p) => (
+                    <View key={p.id} style={styles.profilePill}>
+                      {p.avatar_url ? (
+                        <Image source={{ uri: p.avatar_url }} style={styles.profilePillImage} />
+                      ) : (
+                        <Text style={styles.profilePillInitial}>{getInitials(p.display_name || p.username)}</Text>
+                      )}
+                    </View>
+                  ))
+                )}
+              </View>
               {recommendedLoading ? (
-                <>
-                  <View style={styles.profilePill} />
-                  <View style={styles.profilePill} />
-                  <View style={styles.profilePill} />
-                  <View style={styles.profilePill} />
-                </>
-              ) : recommendedError ? null : recommendedProfiles.length === 0 ? null : (
-                recommendedProfiles.slice(0, 8).map((p) => (
-                  <View key={p.id} style={styles.profilePill}>
-                    {p.avatar_url ? (
-                      <Image source={{ uri: p.avatar_url }} style={styles.profilePillImage} />
-                    ) : (
-                      <Text style={styles.profilePillInitial}>
-                        {getInitials(p.display_name || p.username)}
-                      </Text>
-                    )}
-                  </View>
-                ))
-              )}
-            </View>
-            {recommendedLoading ? (
-              <Text style={styles.placeholderHint}>Loading…</Text>
-            ) : recommendedError ? (
-              <Text style={styles.placeholderHint}>Error: {recommendedError}</Text>
-            ) : recommendedProfiles.length === 0 ? (
-              <Text style={styles.placeholderHint}>No items yet</Text>
-            ) : null}
-          </Card>
-        </View>
+                <Text style={styles.placeholderHint}>Loading…</Text>
+              ) : recommendedError ? (
+                <Text style={styles.placeholderHint}>Error: {recommendedError}</Text>
+              ) : null}
+            </Card>
+          </View>
+        ) : null}
 
         <View style={styles.container}>
           <Card>
