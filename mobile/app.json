@@ -75,6 +75,7 @@
     "plugins": [
       "expo-dev-client",
       "expo-secure-store",
+      "expo-apple-authentication",
       "./plugins/withNoApsEnvironment"
     ],
     "extra": {
