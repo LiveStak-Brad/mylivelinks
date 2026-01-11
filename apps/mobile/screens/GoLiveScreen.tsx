@@ -7,7 +7,6 @@ export default function GoLiveScreen() {
   const [streamTitle, setStreamTitle] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('just-chatting');
   const [audience, setAudience] = useState<'Public' | 'Team'>('Public');
-  const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
 
   const categories = useMemo(
     () => [
@@ -23,11 +22,7 @@ export default function GoLiveScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Go Live</Text>
           <Text style={styles.subtitle}>Set up your stream—then go live when you're ready.</Text>
@@ -50,10 +45,14 @@ export default function GoLiveScreen() {
           </View>
         </View>
 
-        {/* Category Section - Horizontal Pills Only */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Category</Text>
-          <View style={styles.chipsWrap}>
+        {/* Category Section - Horizontal Slider */}
+        <View style={styles.sectionNoPadding}>
+          <Text style={[styles.sectionTitle, { paddingHorizontal: 14 }]}>Category</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categorySlider}
+          >
             {categories.map((c) => {
               const isSelected = c.id === selectedCategoryId;
               return (
@@ -74,7 +73,7 @@ export default function GoLiveScreen() {
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
         </View>
 
         {/* Audience Section - Segmented Control */}
@@ -112,48 +111,22 @@ export default function GoLiveScreen() {
           </View>
         </View>
 
-        {/* Thumbnail Section - UI Only */}
+        {/* Thumbnail Section - Compact UI Only */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thumbnail</Text>
           <Pressable
             onPress={() => {}}
-            style={({ pressed }) => [styles.thumbnailCard, pressed && { opacity: 0.9 }]}
+            style={({ pressed }) => [styles.thumbnailRow, pressed && { opacity: 0.9 }]}
             accessibilityRole="button"
             accessibilityLabel="Select thumbnail"
           >
-            <View style={styles.thumbnailPlaceholder}>
-              <Ionicons name="image-outline" size={32} color={COLORS.mutedText} />
-              <Text style={styles.thumbnailText}>Tap to add cover image</Text>
-              <Text style={styles.thumbnailHint}>Optional</Text>
-            </View>
-          </Pressable>
-        </View>
-
-        {/* Camera Section - Flip Only */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Camera</Text>
-          <Pressable
-            onPress={() => setCameraFacing((prev) => (prev === 'front' ? 'back' : 'front'))}
-            style={({ pressed }) => [styles.flipCameraButton, pressed && { opacity: 0.9 }]}
-            accessibilityRole="button"
-            accessibilityLabel="Flip camera"
-          >
-            <View style={styles.flipCameraIcon}>
-              <Ionicons name="camera-reverse-outline" size={22} color={COLORS.text} />
+            <View style={styles.thumbnailIcon}>
+              <Ionicons name="image-outline" size={20} color={COLORS.mutedText} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.flipCameraTitle}>Flip Camera</Text>
-              <Text style={styles.flipCameraMeta}>
-                Currently using {cameraFacing === 'front' ? 'front' : 'back'} camera
-              </Text>
+              <Text style={styles.thumbnailTitle}>Thumbnail</Text>
+              <Text style={styles.thumbnailHint}>Tap to add cover image (optional)</Text>
             </View>
-            <View style={styles.cameraIndicator}>
-              <Ionicons
-                name={cameraFacing === 'front' ? 'person-outline' : 'videocam-outline'}
-                size={16}
-                color={COLORS.primary}
-              />
-            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.mutedText} />
           </Pressable>
         </View>
 
@@ -167,9 +140,9 @@ export default function GoLiveScreen() {
             <Ionicons name="radio-outline" size={20} color={COLORS.white} style={{ marginRight: 10 }} />
             <Text style={styles.goLiveText}>Go Live</Text>
           </Pressable>
-          <Text style={styles.disclaimer}>This is a mock setup screen. Going live is UI-only here (no streaming starts).</Text>
+          <Text style={styles.disclaimer}>This is a mock setup screen. Going live is UI-only here.</Text>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -190,15 +163,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
   },
-  scroll: {
+  container: {
     flex: 1,
-  },
-  content: {
     padding: 16,
-    paddingBottom: 28,
   },
   header: {
-    marginBottom: 14,
+    marginBottom: 12,
   },
   title: {
     fontSize: 26,
@@ -207,7 +177,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   subtitle: {
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 14,
     lineHeight: 20,
     color: COLORS.mutedText,
@@ -216,24 +186,32 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 12,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 10,
+  },
+  sectionNoPadding: {
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingVertical: 12,
+    marginTop: 10,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
   inputIcon: {
@@ -245,10 +223,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingVertical: 0,
   },
-  chipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+  categorySlider: {
+    paddingHorizontal: 14,
+    gap: 8,
   },
   chip: {
     flexDirection: 'row',
@@ -257,7 +234,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
   chipSelected: {
@@ -279,7 +256,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
@@ -288,8 +265,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   segmentButtonActive: {
     backgroundColor: COLORS.primary,
@@ -302,73 +279,40 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: COLORS.white,
   },
-  thumbnailCard: {
+  thumbnailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  thumbnailIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 12,
     borderStyle: 'dashed',
     backgroundColor: 'rgba(255,255,255,0.02)',
-    overflow: 'hidden',
-  },
-  thumbnailPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-    gap: 8,
   },
-  thumbnailText: {
+  thumbnailTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.text,
   },
   thumbnailHint: {
-    fontSize: 12,
-    color: COLORS.mutedText,
-  },
-  flipCameraButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    gap: 12,
-  },
-  flipCameraIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  flipCameraTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: COLORS.text,
-  },
-  flipCameraMeta: {
     marginTop: 2,
     fontSize: 12,
     color: COLORS.mutedText,
   },
-  cameraIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   footer: {
-    marginTop: 14,
-    gap: 10,
+    marginTop: 'auto',
+    paddingTop: 16,
+    gap: 8,
   },
   goLiveButton: {
-    height: 54,
-    borderRadius: 16,
+    height: 52,
+    borderRadius: 14,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -384,8 +328,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   disclaimer: {
-    fontSize: 12,
+    fontSize: 11,
     lineHeight: 16,
     color: COLORS.mutedText,
+    textAlign: 'center',
   },
 });
