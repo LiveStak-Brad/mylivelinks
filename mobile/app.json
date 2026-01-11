@@ -12,14 +12,18 @@
     },
     "ios": {
       "bundleIdentifier": "com.mylivelinks.app",
-      "buildNumber": "43"
+      "buildNumber": "43",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.mylivelinks.app",
       "versionCode": 16
     },
     "plugins": [
-      "expo-dev-client"
+      "expo-dev-client",
+      "./plugins/withLiveKitModularHeaders"
     ],
     "extra": {
       "eas": {
