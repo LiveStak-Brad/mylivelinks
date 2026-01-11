@@ -1,0 +1,82 @@
+# ===== NODE MODULES =====
+node_modules/
+**/node_modules/
+
+# ===== WEB APP (Next.js) - NOT NEEDED FOR MOBILE DEBUG =====
+app/
+pages/
+components/
+lib/
+hooks/
+contexts/
+frontend/
+owner-panel/
+public/
+shared/
+scripts/
+sql/
+docs/
+README/
+
+# ===== BUILD ARTIFACTS =====
+.next/
+.expo/
+.expo-shared/
+dist/
+build/
+.eas/
+.eas-build/
+DerivedData/
+Pods/
+ios/
+android/
+
+# ===== LOGS AND CACHES =====
+*.log
+logs/
+.cache/
+coverage/
+.vercel/
+.turbo/
+
+# ===== STATIC ASSETS =====
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.mov
+*.mp4
+*.mp3
+*.wav
+*.ttf
+*.otf
+*.woff
+*.woff2
+*.eot
+assets/
+
+# ===== DOCUMENTATION =====
+*.md
+*.txt
+
+# ===== SQL FILES =====
+*.sql
+
+# ===== CONFIG FILES (keep only mobile-relevant) =====
+jest.config.js
+postcss.config.js
+next.config.js
+next-env.d.ts
+middleware.ts
+
+# ===== MISC =====
+*.csv
+*.pem
+*.DS_Store
+.gitignore
+.env*
+*.tsbuildinfo
+supabase/
+patches/
