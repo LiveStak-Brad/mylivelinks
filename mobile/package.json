@@ -12,8 +12,8 @@
     "postinstall": "node ./scripts/patch-expo-dev-menu.js"
   },
   "dependencies": {
-    "@livekit/react-native": "^2.0.0",
-    "@livekit/react-native-webrtc": "^137.0.0",
+    "@livekit/react-native": "2.0.2",
+    "@livekit/react-native-webrtc": "114.0.0",
     "@react-native-async-storage/async-storage": "^1.23.1",
     "@react-native-community/datetimepicker": "7.7.0",
     "@react-native-community/slider": "^4.5.5",
