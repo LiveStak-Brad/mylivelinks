@@ -7,6 +7,14 @@
  * 
  * DO NOT remove or conditionally gate the ios.infoPlist block.
  * This ensures EAS builds are CI-safe with no interactive prompts.
+ * 
+ * P0 CAPABILITY SYNC WARNING:
+ * DO NOT add these fields to ios config - they trigger Apple capability auto-sync which FAILS:
+ *   - ios.entitlements
+ *   - ios.associatedDomains
+ *   - ios.usesAppleSignIn
+ * All capabilities MUST be configured manually in Apple Developer Console.
+ * EAS builds use EXPO_NO_CAPABILITY_SYNC=1 and capabilitiesSync: false to prevent sync.
  */
 
 const appJson = require('./app.json');

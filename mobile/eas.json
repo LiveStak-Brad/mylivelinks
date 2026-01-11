@@ -4,7 +4,16 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "ios": {
+        "capabilitiesSync": false
+      },
+      "env": {
+        "EXPO_NO_CAPABILITY_SYNC": "1"
+      }
+    },
     "development": {
+      "extends": "base",
       "autoIncrement": true,
       "developmentClient": true,
       "distribution": "internal",
@@ -12,7 +21,8 @@
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
         "simulator": false,
-        "buildConfiguration": "Debug"
+        "buildConfiguration": "Debug",
+        "capabilitiesSync": false
       },
       "env": {
         "EXPO_NO_CAPABILITY_SYNC": "1",
@@ -24,12 +34,14 @@
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
       "channel": "preview",
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
         "simulator": false,
-        "buildConfiguration": "Release"
+        "buildConfiguration": "Release",
+        "capabilitiesSync": false
       },
       "env": {
         "EXPO_NO_CAPABILITY_SYNC": "1",
@@ -40,12 +52,14 @@
       }
     },
     "production": {
+      "extends": "base",
       "distribution": "store",
       "channel": "production",
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
         "simulator": false,
-        "buildConfiguration": "Release"
+        "buildConfiguration": "Release",
+        "capabilitiesSync": false
       },
       "env": {
         "EXPO_NO_CAPABILITY_SYNC": "1",
