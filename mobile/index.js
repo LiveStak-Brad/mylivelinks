@@ -3,6 +3,10 @@ console.log('[BOOT] ========================================');
 console.log('[BOOT] index.js EXECUTING at', new Date().toISOString());
 console.log('[BOOT] ========================================');
 
+// P0: Track boot status at module level (before React)
+const { setBootStep } = require('./lib/bootStatus');
+setBootStep('INDEX_LOADED');
+
 // CRITICAL: Set up global error handler FIRST (before any other imports)
 if (typeof ErrorUtils !== 'undefined') {
   // Ensure all downstream error handlers know not to rethrow into RN's fatal abort path during boot.

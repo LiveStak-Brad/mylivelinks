@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import type { Theme as NavigationTheme } from '@react-navigation/native';
+import { setBootStep, setBootError } from '../lib/bootStatus';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -204,43 +205,73 @@ export const themeTokens = {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>('light');
+  // P0 FIX: Start with default theme immediately - NEVER await SecureStore for first render
+  // This is the root cause of iOS splash freeze: ThemeProvider blocked entire app tree
+  const [mode, setModeState] = useState<ThemeMode>('dark');
   const [cardOpacity, setCardOpacityState] = useState<number>(0.95);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setBootStep('THEME_PROVIDER_START');
+    
+    let cancelled = false;
+    
+    // Fire-and-forget async hydration - NEVER block render
     const load = async () => {
-      // Add small delay to ensure iOS sandbox is ready
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
       try {
-        // Load theme mode
-        const saved = (await SecureStore.getItemAsync(STORAGE_KEY)) as ThemeMode | null;
+        // Load theme mode (with timeout as additional safety)
+        const modePromise = SecureStore.getItemAsync(STORAGE_KEY);
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 500));
+        const saved = await Promise.race([modePromise, timeoutPromise]) as ThemeMode | null;
+        
+        if (cancelled) return;
+        
         if (saved === 'light' || saved === 'dark') {
           setModeState(saved);
         } else {
-          const legacy = (await SecureStore.getItemAsync(LEGACY_KEY)) as ThemeMode | null;
+          // Try legacy key
+          const legacyPromise = SecureStore.getItemAsync(LEGACY_KEY);
+          const legacyTimeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 500));
+          const legacy = await Promise.race([legacyPromise, legacyTimeout]) as ThemeMode | null;
+          
+          if (cancelled) return;
+          
           if (legacy === 'light' || legacy === 'dark') {
             setModeState(legacy);
-            await SecureStore.setItemAsync(STORAGE_KEY, legacy);
+            // Fire-and-forget migration
+            SecureStore.setItemAsync(STORAGE_KEY, legacy).catch(() => {});
           }
         }
         
-        // Load card opacity
-        const savedOpacity = await SecureStore.getItemAsync(OPACITY_KEY);
+        // Load card opacity (with timeout)
+        const opacityPromise = SecureStore.getItemAsync(OPACITY_KEY);
+        const opacityTimeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 500));
+        const savedOpacity = await Promise.race([opacityPromise, opacityTimeout]);
+        
+        if (cancelled) return;
+        
         if (savedOpacity) {
           const opacity = parseFloat(savedOpacity);
           if (!isNaN(opacity) && opacity >= 0.3 && opacity <= 1) {
             setCardOpacityState(opacity);
           }
         }
-      } catch {
-        // fall back to defaults
+      } catch (err) {
+        // Hydration failure is non-fatal - app uses defaults
+        setBootError(`Theme hydration failed: ${(err as Error)?.message || String(err)}`);
       } finally {
-        setHydrated(true);
+        if (!cancelled) {
+          setHydrated(true);
+          setBootStep('THEME_PROVIDER_HYDRATED');
+        }
       }
     };
+    
     void load();
+    
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const persistMode = async (next: ThemeMode) => {

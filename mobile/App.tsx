@@ -30,16 +30,19 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useThemeMode } from './contexts/ThemeContext';
 import { SafeAppBoundary } from './components/SafeAppBoundary';
 import { StartupDebugOverlay } from './components/StartupDebugOverlay';
+import { BootOverlay } from './components/BootOverlay';
 
 import type { RootStackParamList } from './types/navigation';
 import { setPendingReferralCode } from './lib/referrals';
 import { initGlobalErrorHandlers, logStartupBreadcrumb } from './lib/startupTrace';
+import { setBootStep } from './lib/bootStatus';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 initGlobalErrorHandlers();
 logStartupBreadcrumb('APP_MODULE_LOADED');
+setBootStep('APP_MODULE_LOADED');
 
 function extractReferralCode(url: string): string | null {
   const match = url.match(/[?&]ref=([^&#]+)/i);
@@ -58,6 +61,7 @@ function AppNavigation() {
   const { navigationTheme, mode } = useThemeMode();
   useEffect(() => {
     logStartupBreadcrumb('APP_NAVIGATION_MOUNT', { mode });
+    setBootStep('NAV_CONTAINER_MOUNT');
   }, [mode]);
 
   const dumpRouteNames = useCallback(() => {
@@ -130,6 +134,7 @@ function AppNavigation() {
 
   const handleNavReady = useCallback(() => {
     logStartupBreadcrumb('NAV_READY');
+    setBootStep('NAV_READY');
 
     // P0: If iOS is stuck on the native splash, we need an explicit, logged hide call.
     // This is safe even if SplashScreen was not manually prevented from auto-hiding.
@@ -137,12 +142,14 @@ function AppNavigation() {
       at: Date.now(),
       iso: new Date().toISOString(),
     });
+    setBootStep('SPLASH_HIDE_CALLED');
     void SplashScreen.hideAsync()
       .then(() => {
         logStartupBreadcrumb('SPLASH_HIDE_OK', {
           at: Date.now(),
           iso: new Date().toISOString(),
         });
+        setBootStep('SPLASH_HIDE_OK');
       })
       .catch((err: any) => {
         logStartupBreadcrumb('SPLASH_HIDE_FAIL', {
@@ -242,6 +249,7 @@ export default function App() {
     const t = setTimeout(() => {
       console.log('[SPLASH] ⏰ FAILSAFE TRIGGERED - forcing splash hide');
       logStartupBreadcrumb('SPLASH_FAILSAFE_TRIGGERED', { at: Date.now() });
+      setBootStep('SPLASH_FAILSAFE');
       SplashScreen.hideAsync().catch((err) => {
         console.warn('[SPLASH] Failsafe hide failed:', err);
       });
@@ -254,20 +262,30 @@ export default function App() {
 
   const showBundleMarker = (globalThis as any)?.__FORCE_STARTUP_OVERLAY__ === true;
 
+  // ⚠️ BOOT SAFETY RULE
+  // Do NOT add awaits, SecureStore, Linking, Auth, or async work
+  // that blocks the first render inside these providers.
+  // First render MUST be synchronous to avoid iOS splash deadlocks.
+  //
+  // CRITICAL: BootOverlay renders OUTSIDE all providers so it's visible
+  // even if ThemeProvider, AuthProvider, or NavigationContainer fail to mount.
   return (
-    <SafeAppBoundary>
-      <ThemeProvider>
-        <SafeAreaProvider>
-          <AppNavigation />
-          <StartupDebugOverlay />
-          {showBundleMarker ? (
-            <View pointerEvents="none" style={styles.bundleMarkerWrap}>
-              <Text style={styles.bundleMarkerText}>BUNDLE_MARKER 2026-01-06_1728</Text>
-            </View>
-          ) : null}
-        </SafeAreaProvider>
-      </ThemeProvider>
-    </SafeAppBoundary>
+    <>
+      <BootOverlay />
+      <SafeAppBoundary>
+        <ThemeProvider>
+          <SafeAreaProvider>
+            <AppNavigation />
+            <StartupDebugOverlay />
+            {showBundleMarker ? (
+              <View pointerEvents="none" style={styles.bundleMarkerWrap}>
+                <Text style={styles.bundleMarkerText}>BUNDLE_MARKER 2026-01-06_1728</Text>
+              </View>
+            ) : null}
+          </SafeAreaProvider>
+        </ThemeProvider>
+      </SafeAppBoundary>
+    </>
   );
 }
 
