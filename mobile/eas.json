@@ -12,8 +12,7 @@
       "ios": {
         "image": "macos-sequoia-15.6-xcode-16.4",
         "simulator": false,
-        "buildConfiguration": "Debug",
-        "capabilitiesConfig": {}
+        "buildConfiguration": "Debug"
       },
       "env": {
         "EXPO_NO_CAPABILITY_SYNC": "1",
