@@ -10,6 +10,10 @@ export default function GoLiveScreen() {
   const [audience, setAudience] = useState<'Public' | 'Team'>('Public');
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('front');
 
+  // UI-only permission states
+  const [cameraGranted] = useState(false);
+  const [micGranted] = useState(false);
+
   const categories = useMemo(
     () => [
       { id: 'just-chatting', label: 'Just Chatting', icon: 'chatbubbles-outline' as const },
@@ -22,6 +26,8 @@ export default function GoLiveScreen() {
     []
   );
 
+  const needsPermissions = !cameraGranted || !micGranted;
+
   return (
     <View style={styles.container}>
       {/* Full-screen Camera Preview (UI placeholder) */}
@@ -33,6 +39,31 @@ export default function GoLiveScreen() {
             {cameraFacing === 'front' ? 'Front camera' : 'Back camera'}
           </Text>
         </View>
+
+        {/* Permissions Banner - shown in preview area */}
+        {needsPermissions && (
+          <View style={[styles.permissionsBanner, { top: insets.top + 60 }]}>
+            <View style={styles.permissionsContent}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.warning} />
+              <View style={styles.permissionsText}>
+                <Text style={styles.permissionsTitle}>Permissions needed</Text>
+                <Text style={styles.permissionsHint}>
+                  {!cameraGranted && !micGranted
+                    ? 'Camera & microphone access required'
+                    : !cameraGranted
+                    ? 'Camera access required'
+                    : 'Microphone access required'}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => {}}
+                style={({ pressed }) => [styles.permissionsButton, pressed && { opacity: 0.8 }]}
+              >
+                <Text style={styles.permissionsButtonText}>Enable</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Top Controls */}
@@ -58,40 +89,43 @@ export default function GoLiveScreen() {
         </Pressable>
       </View>
 
-      {/* Setup Modal Overlay */}
-      <View style={[styles.modalOverlay, { paddingBottom: insets.bottom + 12 }]}>
+      {/* Setup Modal Overlay - Positioned higher */}
+      <View style={styles.modalOverlay}>
         <View style={styles.modalHandle} />
 
         <View style={styles.modalHeader}>
           <Text style={styles.modalTitle}>Go Live</Text>
         </View>
 
-        <ScrollView
-          style={styles.modalScroll}
-          contentContainerStyle={styles.modalContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Title */}
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Title</Text>
-            <View style={styles.inputWrap}>
-              <TextInput
-                value={streamTitle}
-                onChangeText={setStreamTitle}
-                placeholder="What are you streaming?"
-                placeholderTextColor={COLORS.mutedText}
-                style={styles.input}
-                autoCapitalize="sentences"
-                returnKeyType="done"
-              />
+        <View style={styles.modalContent}>
+          {/* Title + Thumbnail Row */}
+          <View style={styles.titleRow}>
+            <View style={styles.titleField}>
+              <Text style={styles.fieldLabel}>Title</Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  value={streamTitle}
+                  onChangeText={setStreamTitle}
+                  placeholder="What are you streaming?"
+                  placeholderTextColor={COLORS.mutedText}
+                  style={styles.input}
+                  autoCapitalize="sentences"
+                  returnKeyType="done"
+                />
+              </View>
             </View>
+            <Pressable
+              onPress={() => {}}
+              style={({ pressed }) => [styles.thumbnailButton, pressed && { opacity: 0.8 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Add thumbnail"
+            >
+              <Ionicons name="image-outline" size={18} color={COLORS.mutedText} />
+            </Pressable>
           </View>
 
           {/* Category - Horizontal Slider */}
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Category</Text>
-          </View>
+          <Text style={styles.fieldLabel}>Category</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -110,9 +144,9 @@ export default function GoLiveScreen() {
                 >
                   <Ionicons
                     name={c.icon}
-                    size={15}
+                    size={14}
                     color={isSelected ? COLORS.white : COLORS.mutedText}
-                    style={{ marginRight: 5 }}
+                    style={{ marginRight: 4 }}
                   />
                   <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{c.label}</Text>
                 </Pressable>
@@ -120,40 +154,38 @@ export default function GoLiveScreen() {
             })}
           </ScrollView>
 
-          {/* Audience & Thumbnail Row */}
-          <View style={styles.rowFields}>
-            <View style={styles.halfField}>
-              <Text style={styles.fieldLabel}>Audience</Text>
-              <View style={styles.segmentedControl}>
-                <Pressable
-                  onPress={() => setAudience('Public')}
-                  style={[styles.segmentButton, audience === 'Public' && styles.segmentButtonActive]}
-                >
-                  <Text style={[styles.segmentText, audience === 'Public' && styles.segmentTextActive]}>Public</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setAudience('Team')}
-                  style={[styles.segmentButton, audience === 'Team' && styles.segmentButtonActive]}
-                >
-                  <Text style={[styles.segmentText, audience === 'Team' && styles.segmentTextActive]}>Team</Text>
-                </Pressable>
-              </View>
-            </View>
-
+          {/* Audience */}
+          <Text style={styles.fieldLabel}>Audience</Text>
+          <View style={styles.segmentedControl}>
             <Pressable
-              onPress={() => {}}
-              style={({ pressed }) => [styles.thumbnailButton, pressed && { opacity: 0.8 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Add thumbnail"
+              onPress={() => setAudience('Public')}
+              style={[styles.segmentButton, audience === 'Public' && styles.segmentButtonActive]}
             >
-              <Ionicons name="image-outline" size={20} color={COLORS.mutedText} />
-              <Text style={styles.thumbnailLabel}>Thumbnail</Text>
+              <Ionicons
+                name="globe-outline"
+                size={14}
+                color={audience === 'Public' ? COLORS.white : COLORS.mutedText}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[styles.segmentText, audience === 'Public' && styles.segmentTextActive]}>Public</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setAudience('Team')}
+              style={[styles.segmentButton, audience === 'Team' && styles.segmentButtonActive]}
+            >
+              <Ionicons
+                name="people-outline"
+                size={14}
+                color={audience === 'Team' ? COLORS.white : COLORS.mutedText}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[styles.segmentText, audience === 'Team' && styles.segmentTextActive]}>Team</Text>
             </Pressable>
           </View>
-        </ScrollView>
+        </View>
 
         {/* Go Live Button */}
-        <View style={styles.modalFooter}>
+        <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 12 }]}>
           <Pressable
             onPress={() => {}}
             style={({ pressed }) => [styles.goLiveButton, pressed && styles.goLiveButtonPressed]}
@@ -180,6 +212,7 @@ const COLORS = {
   primaryPressed: '#DC2626',
   inputBg: 'rgba(255,255,255,0.06)',
   border: 'rgba(255,255,255,0.10)',
+  warning: '#F59E0B',
 };
 
 const styles = StyleSheet.create({
@@ -209,6 +242,48 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.15)',
   },
 
+  // Permissions Banner
+  permissionsBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+  },
+  permissionsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    gap: 10,
+  },
+  permissionsText: {
+    flex: 1,
+  },
+  permissionsTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.warning,
+  },
+  permissionsHint: {
+    fontSize: 11,
+    color: 'rgba(245, 158, 11, 0.8)',
+    marginTop: 1,
+  },
+  permissionsButton: {
+    backgroundColor: COLORS.warning,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  permissionsButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000',
+  },
+
   // Top Bar
   topBar: {
     position: 'absolute',
@@ -236,18 +311,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Modal Overlay
+  // Modal Overlay - Centered/Higher position
   modalOverlay: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: '15%',
+    left: 16,
+    right: 16,
     backgroundColor: COLORS.modal,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
+    borderRadius: 20,
+    borderWidth: 1,
     borderColor: COLORS.modalBorder,
-    maxHeight: '55%',
   },
   modalHandle: {
     width: 36,
@@ -258,35 +331,36 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   modalHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: COLORS.text,
-    letterSpacing: 0.2,
-  },
-  modalScroll: {
-    flex: 1,
   },
   modalContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingHorizontal: 16,
   },
 
-  // Fields
-  field: {
-    marginBottom: 6,
+  // Title + Thumbnail Row
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    marginBottom: 12,
+  },
+  titleField: {
+    flex: 1,
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: COLORS.mutedText,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 6,
+    marginBottom: 5,
   },
   inputWrap: {
     flexDirection: 'row',
@@ -299,18 +373,29 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: COLORS.text,
-    fontSize: 15,
+    fontSize: 14,
     paddingVertical: 0,
+  },
+  thumbnailButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Category Slider
   categoryScrollView: {
-    marginHorizontal: -20,
-    marginBottom: 14,
+    marginHorizontal: -16,
+    marginBottom: 12,
   },
   categorySlider: {
-    paddingHorizontal: 20,
-    gap: 8,
+    paddingHorizontal: 16,
+    gap: 6,
   },
   chip: {
     flexDirection: 'row',
@@ -319,7 +404,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingVertical: 6,
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
   chipSelected: {
@@ -330,7 +415,7 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   chipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: COLORS.text,
   },
@@ -338,26 +423,19 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
 
-  // Row Fields
-  rowFields: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-  },
-  halfField: {
-    flex: 1,
-  },
+  // Audience
   segmentedControl: {
     flexDirection: 'row',
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: COLORS.inputBg,
   },
   segmentButton: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
+    paddingVertical: 10,
   },
   segmentButtonActive: {
     backgroundColor: 'rgba(99, 102, 241, 0.9)',
@@ -370,31 +448,14 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: COLORS.white,
   },
-  thumbnailButton: {
-    width: 64,
-    height: 42,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderStyle: 'dashed',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  thumbnailLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: COLORS.mutedText,
-  },
 
   // Footer
   modalFooter: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 14,
   },
   goLiveButton: {
-    height: 50,
+    height: 48,
     borderRadius: 12,
     backgroundColor: COLORS.primary,
     flexDirection: 'row',
@@ -412,7 +473,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   goLiveText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '900',
     color: COLORS.white,
     letterSpacing: 0.3,
