@@ -139,7 +139,11 @@ function TabsNavigator() {
     >
       <Tabs.Screen name="Home" component={HomeScreen} />
       <Tabs.Screen name="Feed" component={FeedScreen} />
-      <Tabs.Screen name="Go Live" component={GoLiveScreen} />
+      <Tabs.Screen
+        name="Go Live"
+        component={GoLiveScreen}
+        options={{ tabBarStyle: { display: 'none' } }}
+      />
       <Tabs.Screen name="LiveTV" component={LiveTVScreen} />
       <Tabs.Screen name="Messages" component={MessagesScreen} />
       <Tabs.Screen name="Noties" component={NotiesScreen} />
