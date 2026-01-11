@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -185,7 +186,16 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
         header,
       }}
     >
-      <RootStack.Screen name="Tabs" component={TabsNavigator} />
+      <RootStack.Screen
+        name="Tabs"
+        component={TabsNavigator}
+        options={({ route }) => {
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'Home';
+          return {
+            headerShown: routeName !== 'Go Live',
+          };
+        }}
+      />
 
       {/* Placeholder menu destinations */}
       <RootStack.Screen name="OwnerPanelScreen" component={OwnerPanelScreen} />
