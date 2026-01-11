@@ -1,9 +1,78 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../state/AuthContext';
+
 const TAB_BAR_SAFE_PADDING = 96;
+
+type HomeProfile = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+type RecommendedProfile = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  follower_count: number;
+  is_live: boolean;
+};
+
+type ComingSoonRoom = {
+  id: string;
+  name: string;
+  subtitle: string | null;
+  status: string;
+  category: string | null;
+  image_url: string | null;
+  banner_url: string | null;
+  fallback_gradient: string | null;
+  current_interest_count: number | null;
+  effective_interest_threshold: number | null;
+};
+
+type TrendingStream = {
+  stream_id: number;
+  profile_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  trending_score: number | null;
+};
+
+type LiveRoom = {
+  id: string;
+  slug: string;
+  name: string;
+  current_viewer_count: number;
+  current_streamer_count: number;
+};
+
+type NewTeam = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  icon_url: string | null;
+  banner_url: string | null;
+  approved_member_count: number | null;
+  created_at: string | null;
+};
+
+function getInitials(label: string) {
+  const trimmed = label.trim();
+  if (!trimmed) return '?';
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? '?';
+  const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? '' : '';
+  return (first + second).toUpperCase();
+}
 
 function SectionTitle({ children }: { children: string }) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
@@ -46,17 +115,65 @@ function IconPill({ iconName, label }: { iconName: React.ComponentProps<typeof I
   );
 }
 
-function SquareTile({ title, subtitle }: { title: string; subtitle?: string }) {
+function SquareTile({
+  title,
+  subtitle,
+  imageUrl,
+  size = 120,
+  width,
+  height,
+  showText = true,
+  imageResizeMode = 'cover',
+  useBackdrop = false,
+}: {
+  title: string;
+  subtitle?: string;
+  imageUrl?: string | null;
+  size?: number;
+  width?: number;
+  height?: number;
+  showText?: boolean;
+  imageResizeMode?: React.ComponentProps<typeof Image>['resizeMode'];
+  useBackdrop?: boolean;
+}) {
+  const initials = useMemo(() => getInitials(title), [title]);
+  const w = width ?? size;
+  const h = height ?? size;
+
   return (
-    <View style={styles.squareTile}>
-      <View style={styles.squareTileBadgeRow}>
-        <Pill label="NEW" />
-      </View>
-      <View style={styles.squareTileBody}>
-        <Text numberOfLines={2} style={styles.squareTileTitle}>
-          {title}
-        </Text>
-        {subtitle ? <Text style={styles.squareTileSubtitle}>{subtitle}</Text> : null}
+    <View style={[styles.squareTile, { width: w, height: h }]}>
+      {imageUrl ? (
+        <>
+          {useBackdrop ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.squareTileBackdropImage}
+              resizeMode="cover"
+              blurRadius={18}
+            />
+          ) : null}
+          <Image source={{ uri: imageUrl }} style={styles.squareTileImage} resizeMode={imageResizeMode} />
+          <View style={styles.squareTileOverlay} />
+        </>
+      ) : (
+        <View style={styles.squareTileFallbackCenter}>
+          <Text style={styles.squareTileFallbackText}>{initials}</Text>
+        </View>
+      )}
+      <View style={styles.squareTileContent}>
+        <View style={styles.squareTileBadgeRow}>
+          <Pill label="NEW" />
+        </View>
+        {showText ? (
+          <View style={styles.squareTileBody}>
+            <Text numberOfLines={2} style={styles.squareTileTitle}>
+              {title}
+            </Text>
+            {subtitle ? <Text style={styles.squareTileSubtitle}>{subtitle}</Text> : null}
+          </View>
+        ) : (
+          <View />
+        )}
       </View>
     </View>
   );
@@ -83,24 +200,438 @@ function QuickAction({
 }
 
 export default function HomeScreen() {
+  const { user } = useAuth();
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [myProfile, setMyProfile] = useState<HomeProfile | null>(null);
+  const [myProfileLoading, setMyProfileLoading] = useState(true);
+  const [myProfileError, setMyProfileError] = useState<string | null>(null);
+
+  const [recommendedProfiles, setRecommendedProfiles] = useState<RecommendedProfile[]>([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(true);
+  const [recommendedError, setRecommendedError] = useState<string | null>(null);
+
+  const [comingSoonRooms, setComingSoonRooms] = useState<ComingSoonRoom[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [roomsError, setRoomsError] = useState<string | null>(null);
+  const [roomsActionError, setRoomsActionError] = useState<string | null>(null);
+  const [interestedRoomIds, setInterestedRoomIds] = useState<Set<string>>(new Set());
+  const [roomInterestBusyIds, setRoomInterestBusyIds] = useState<Set<string>>(new Set());
+
+  const [trendingStreams, setTrendingStreams] = useState<TrendingStream[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(true);
+  const [trendingError, setTrendingError] = useState<string | null>(null);
+
+  const [liveRooms, setLiveRooms] = useState<LiveRoom[]>([]);
+  const [liveRoomsLoading, setLiveRoomsLoading] = useState(true);
+  const [liveRoomsError, setLiveRoomsError] = useState<string | null>(null);
+
+  const [newTeams, setNewTeams] = useState<NewTeam[]>([]);
+  const [newTeamsLoading, setNewTeamsLoading] = useState(true);
+  const [newTeamsError, setNewTeamsError] = useState<string | null>(null);
+
+  const displayName = useMemo(() => {
+    if (!user) return null;
+    return myProfile?.display_name || myProfile?.username || null;
+  }, [myProfile?.display_name, myProfile?.username, user]);
+
+  const loadMyProfile = useCallback(async (userId: string) => {
+    setMyProfileLoading(true);
+    setMyProfileError(null);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, avatar_url')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      setMyProfile(null);
+      setMyProfileError(error.message);
+      setMyProfileLoading(false);
+      return;
+    }
+
+    setMyProfile(data ?? null);
+    setMyProfileLoading(false);
+  }, []);
+
+  const loadRecommendedProfiles = useCallback(async (userId: string) => {
+    setRecommendedLoading(true);
+    setRecommendedError(null);
+
+    try {
+      const { data: following, error: followingError } = await supabase
+        .from('follows')
+        .select('followee_id')
+        .eq('follower_id', userId);
+
+      if (followingError) {
+        setRecommendedProfiles([]);
+        setRecommendedError(followingError.message);
+        setRecommendedLoading(false);
+        return;
+      }
+
+      const followingIds: string[] = (following ?? [])
+        .map((f: any) => String(f.followee_id))
+        .filter(Boolean);
+
+      if (followingIds.length === 0) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url, follower_count, is_live')
+          .not('username', 'is', null)
+          .neq('id', userId)
+          .order('follower_count', { ascending: false })
+          .limit(20);
+
+        if (error) {
+          setRecommendedProfiles([]);
+          setRecommendedError(error.message);
+          setRecommendedLoading(false);
+          return;
+        }
+
+        setRecommendedProfiles((data as any) ?? []);
+        setRecommendedLoading(false);
+        return;
+      }
+
+      const { data: similarFollows, error: similarError } = await supabase
+        .from('follows')
+        .select('followee_id')
+        .in('follower_id', followingIds)
+        .neq('followee_id', userId)
+        .not('followee_id', 'in', `(${followingIds.join(',')})`);
+
+      if (similarError) {
+        setRecommendedProfiles([]);
+        setRecommendedError(similarError.message);
+        setRecommendedLoading(false);
+        return;
+      }
+
+      const followCounts = new Map<string, number>();
+      (similarFollows ?? []).forEach((f: any) => {
+        const id = String(f.followee_id);
+        if (!id) return;
+        followCounts.set(id, (followCounts.get(id) || 0) + 1);
+      });
+
+      const recommendedIds = Array.from(followCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([id]) => id);
+
+      const excludedIds = [userId, ...followingIds, ...recommendedIds].filter(Boolean);
+      const excludedFilter = excludedIds.length ? `(${excludedIds.join(',')})` : null;
+
+      const popularQuery = supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url, follower_count, is_live')
+        .not('username', 'is', null)
+        .neq('id', userId)
+        .order('follower_count', { ascending: false })
+        .limit(10);
+
+      const { data: popular, error: popularError } = excludedFilter
+        ? await popularQuery.not('id', 'in', excludedFilter)
+        : await popularQuery;
+
+      if (popularError) {
+        setRecommendedProfiles([]);
+        setRecommendedError(popularError.message);
+        setRecommendedLoading(false);
+        return;
+      }
+
+      const { data: recommended, error: recommendedError } =
+        recommendedIds.length > 0
+          ? await supabase
+              .from('profiles')
+              .select('id, username, display_name, avatar_url, follower_count, is_live')
+              .in('id', recommendedIds)
+          : { data: [], error: null };
+
+      if (recommendedError) {
+        setRecommendedProfiles([]);
+        setRecommendedError(recommendedError.message);
+        setRecommendedLoading(false);
+        return;
+      }
+
+      const combined: RecommendedProfile[] = [
+        ...(((recommended as any[]) ?? []) as any[]),
+        ...(((popular as any[]) ?? []) as any[]),
+      ].filter(Boolean);
+      combined.sort((a, b) => {
+        if (a.is_live && !b.is_live) return -1;
+        if (!a.is_live && b.is_live) return 1;
+        return Number(b.follower_count || 0) - Number(a.follower_count || 0);
+      });
+
+      setRecommendedProfiles(combined.slice(0, 20));
+      setRecommendedLoading(false);
+    } catch (e: any) {
+      setRecommendedProfiles([]);
+      setRecommendedError(e?.message || 'Failed to load recommended profiles');
+      setRecommendedLoading(false);
+    }
+  }, []);
+
+  const loadComingSoonRooms = useCallback(async (userId: string) => {
+    setRoomsLoading(true);
+    setRoomsError(null);
+    setRoomsActionError(null);
+
+    const { data, error } = await supabase
+      .from('v_rooms_effective')
+      .select(
+        'id, name, subtitle, status, category, image_url, banner_url, fallback_gradient, current_interest_count, effective_interest_threshold'
+      )
+      .in('status', ['interest', 'opening_soon'])
+      .order('display_order', { ascending: true })
+      .limit(25);
+
+    if (error) {
+      setComingSoonRooms([]);
+      setRoomsError(error.message);
+      setRoomsLoading(false);
+      return;
+    }
+
+    const rooms = ((data as any) ?? []) as ComingSoonRoom[];
+    setComingSoonRooms(rooms);
+
+    // Load current user's interested rooms for this list
+    const roomIds = rooms.map((r) => r.id);
+    if (roomIds.length > 0) {
+      const { data: interests, error: interestError } = await supabase
+        .from('room_interest')
+        .select('room_id')
+        .eq('profile_id', userId)
+        .in('room_id', roomIds);
+
+      if (interestError) {
+        // Don't fail the whole section; just surface an inline note
+        setRoomsActionError(interestError.message);
+        setInterestedRoomIds(new Set());
+      } else {
+        const ids = new Set<string>((interests ?? []).map((i: any) => String(i.room_id)).filter(Boolean));
+        setInterestedRoomIds(ids);
+      }
+    } else {
+      setInterestedRoomIds(new Set());
+    }
+
+    setRoomsLoading(false);
+  }, []);
+
+  const toggleRoomInterest = useCallback(
+    async (roomId: string, nextInterested: boolean) => {
+      if (!user) return;
+      setRoomsActionError(null);
+
+      setRoomInterestBusyIds((prev) => {
+        const next = new Set(prev);
+        next.add(roomId);
+        return next;
+      });
+
+      // Optimistic UI
+      setInterestedRoomIds((prev) => {
+        const next = new Set(prev);
+        if (nextInterested) next.add(roomId);
+        else next.delete(roomId);
+        return next;
+      });
+      setComingSoonRooms((prev) =>
+        prev.map((r) => {
+          if (r.id !== roomId) return r;
+          const prevCount = Number(r.current_interest_count ?? 0);
+          const nextCount = Math.max(prevCount + (nextInterested ? 1 : -1), 0);
+          return { ...r, current_interest_count: nextCount };
+        })
+      );
+
+      try {
+        if (nextInterested) {
+          const { error } = await supabase.from('room_interest').insert({ room_id: roomId, profile_id: user.id });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('room_interest')
+            .delete()
+            .eq('room_id', roomId)
+            .eq('profile_id', user.id);
+          if (error) throw error;
+        }
+      } catch (e: any) {
+        // Revert optimistic UI
+        setRoomsActionError(e?.message || 'Failed to update interest');
+        setInterestedRoomIds((prev) => {
+          const next = new Set(prev);
+          if (nextInterested) next.delete(roomId);
+          else next.add(roomId);
+          return next;
+        });
+        setComingSoonRooms((prev) =>
+          prev.map((r) => {
+            if (r.id !== roomId) return r;
+            const prevCount = Number(r.current_interest_count ?? 0);
+            const nextCount = Math.max(prevCount + (nextInterested ? -1 : 1), 0);
+            return { ...r, current_interest_count: nextCount };
+          })
+        );
+      } finally {
+        setRoomInterestBusyIds((prev) => {
+          const next = new Set(prev);
+          next.delete(roomId);
+          return next;
+        });
+      }
+    },
+    [user]
+  );
+
+  const loadTrendingStreams = useCallback(async () => {
+    setTrendingLoading(true);
+    setTrendingError(null);
+
+    const { data, error } = await supabase.rpc('rpc_get_trending_live_streams', { p_limit: 5, p_offset: 0 });
+
+    if (error) {
+      setTrendingStreams([]);
+      setTrendingError(error.message);
+      setTrendingLoading(false);
+      return;
+    }
+
+    setTrendingStreams((data as any) ?? []);
+    setTrendingLoading(false);
+  }, []);
+
+  const loadLiveRooms = useCallback(async () => {
+    setLiveRoomsLoading(true);
+    setLiveRoomsError(null);
+
+    const { data, error } = await supabase.rpc('rpc_get_live_rooms');
+
+    if (error) {
+      setLiveRooms([]);
+      setLiveRoomsError(error.message);
+      setLiveRoomsLoading(false);
+      return;
+    }
+
+    setLiveRooms((data as any) ?? []);
+    setLiveRoomsLoading(false);
+  }, []);
+
+  const loadNewTeams = useCallback(async () => {
+    setNewTeamsLoading(true);
+    setNewTeamsError(null);
+
+    // Prefer the discovery ordering RPC (same ordering rule used on web)
+    const { data: rpcData, error: rpcError } = await supabase.rpc('rpc_get_teams_discovery_ordered', {
+      p_limit: 10,
+      p_offset: 0,
+    });
+
+    if (!rpcError) {
+      setNewTeams((rpcData as any) ?? []);
+      setNewTeamsLoading(false);
+      return;
+    }
+
+    // Fallback: simple "newest teams" query if RPC isn't available
+    const { data, error } = await supabase
+      .from('teams')
+      .select('id, slug, name, description, icon_url, banner_url, approved_member_count, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (error) {
+      setNewTeams([]);
+      setNewTeamsError(rpcError.message || error.message);
+      setNewTeamsLoading(false);
+      return;
+    }
+
+    setNewTeams((data as any) ?? []);
+    setNewTeamsLoading(false);
+  }, []);
+
+  const loadAll = useCallback(async () => {
+    if (!user) return;
+    await Promise.allSettled([
+      loadMyProfile(user.id),
+      loadRecommendedProfiles(user.id),
+      loadComingSoonRooms(user.id),
+      loadTrendingStreams(),
+      loadLiveRooms(),
+      loadNewTeams(),
+    ]);
+  }, [loadComingSoonRooms, loadLiveRooms, loadMyProfile, loadNewTeams, loadRecommendedProfiles, loadTrendingStreams, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadAll();
+  }, [loadAll, user]);
+
+  const onRefresh = useCallback(async () => {
+    if (!user) return;
+    setRefreshing(true);
+    await loadAll();
+    setRefreshing(false);
+  }, [loadAll, user]);
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <View style={[styles.container, { paddingTop: 12 }]}>
+          <Card>
+            <Text style={styles.sectionTitle}>Signed out</Text>
+            <Text style={styles.placeholderHint}>Please sign in to see your home feed.</Text>
+          </Card>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: TAB_BAR_SAFE_PADDING }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />}
       >
         {/* MLL PRO Hero */}
         <View style={styles.container}>
           <Card>
             <View style={styles.heroHeaderRow}>
-              <Text style={styles.heroTitle}>MLL PRO is where top streamers build real communities.</Text>
+              <Text style={styles.heroTitle}>
+                {displayName ? `Welcome back, ${displayName}.` : 'Welcome back.'}
+              </Text>
               <View style={styles.heroBadgePlaceholder}>
-                <Text style={styles.heroBadgePlaceholderText}>PRO</Text>
+                {myProfile?.avatar_url ? (
+                  <Image source={{ uri: myProfile.avatar_url }} style={styles.heroAvatar} />
+                ) : (
+                  <Text style={styles.heroBadgePlaceholderText}>
+                    {getInitials(myProfile?.display_name || myProfile?.username || user.email || 'You')}
+                  </Text>
+                )}
               </View>
             </View>
             <Text style={styles.heroBody}>
-              Get recognized across the app, featured placement when live, and help grow the platform by bringing your
-              community with you. No contracts. No quotas. Just quality + intent.
+              {myProfileLoading
+                ? 'Loading your profile…'
+                : myProfileError
+                  ? `Profile error: ${myProfileError}`
+                  : myProfile?.username
+                    ? `@${myProfile.username}`
+                    : 'Complete your profile to show your username here.'}
             </Text>
             <View style={styles.heroButtonsRow}>
               <PrimaryButton label="Apply for MLL PRO" />
@@ -133,31 +664,63 @@ export default function HomeScreen() {
         {/* New Teams */}
         <View style={styles.container}>
           <Text style={styles.kicker}>New Teams</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalRow}>
-            <View style={styles.tileWrap}>
-              <SquareTile title="Your Team Here" subtitle="Start something new" />
-              <Text style={styles.tileCaption} numberOfLines={1}>
-                Your Team Here
-              </Text>
-            </View>
-            <View style={styles.tileWrap}>
-              <SquareTile title="New Team" />
-              <Text style={styles.tileCaption} numberOfLines={1}>
-                New Team
-              </Text>
-            </View>
-            <View style={styles.tileWrap}>
-              <SquareTile title="New Team" />
-              <Text style={styles.tileCaption} numberOfLines={1}>
-                New Team
-              </Text>
-            </View>
-            <View style={styles.tileWrap}>
-              <SquareTile title="New Team" />
-              <Text style={styles.tileCaption} numberOfLines={1}>
-                New Team
-              </Text>
-            </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teamsHorizontalRow}>
+            {newTeamsLoading ? (
+              <>
+                <View style={styles.teamsTileWrap}>
+                  <SquareTile title="Loading…" size={156} showText={false} />
+                  <Text style={styles.tileCaption} numberOfLines={1}>
+                    Loading…
+                  </Text>
+                  <Text style={styles.teamMembersCaption} numberOfLines={1}>
+                    —
+                  </Text>
+                </View>
+                <View style={styles.teamsTileWrap}>
+                  <SquareTile title="Loading…" size={156} showText={false} />
+                  <Text style={styles.tileCaption} numberOfLines={1}>
+                    Loading…
+                  </Text>
+                  <Text style={styles.teamMembersCaption} numberOfLines={1}>
+                    —
+                  </Text>
+                </View>
+                <View style={styles.teamsTileWrap}>
+                  <SquareTile title="Loading…" size={156} showText={false} />
+                  <Text style={styles.tileCaption} numberOfLines={1}>
+                    Loading…
+                  </Text>
+                  <Text style={styles.teamMembersCaption} numberOfLines={1}>
+                    —
+                  </Text>
+                </View>
+              </>
+            ) : newTeamsError ? (
+              <View style={{ paddingHorizontal: 4, paddingVertical: 10 }}>
+                <Text style={styles.placeholderHint}>Error: {newTeamsError}</Text>
+              </View>
+            ) : newTeams.length === 0 ? (
+              <View style={{ paddingHorizontal: 4, paddingVertical: 10 }}>
+                <Text style={styles.placeholderHint}>No items yet</Text>
+              </View>
+            ) : (
+              newTeams.map((t) => {
+                const imageUrl = t.icon_url || t.banner_url || null;
+                const membersLabel =
+                  t.approved_member_count != null ? `${Number(t.approved_member_count)} members` : '—';
+                return (
+                  <View key={t.id} style={styles.teamsTileWrap}>
+                    <SquareTile title={t.name} imageUrl={imageUrl} size={156} showText={false} imageResizeMode="stretch" />
+                    <Text style={styles.tileCaption} numberOfLines={1}>
+                      {t.name}
+                    </Text>
+                    <Text style={styles.teamMembersCaption} numberOfLines={1}>
+                      {membersLabel}
+                    </Text>
+                  </View>
+                );
+              })
+            )}
           </ScrollView>
         </View>
 
@@ -229,7 +792,17 @@ export default function HomeScreen() {
                 <Text style={styles.liveMiniCardHeaderRight}>Group room</Text>
               </View>
               <View style={styles.liveVideoPlaceholder}>
-                <Text style={styles.liveVideoPlaceholderText}>livecentral.png</Text>
+                <Text style={styles.liveVideoPlaceholderText}>
+                  {trendingLoading || liveRoomsLoading
+                    ? 'Loading live…'
+                    : trendingError || liveRoomsError
+                      ? 'Live preview unavailable'
+                      : trendingStreams[0]?.username
+                        ? `Top live: @${trendingStreams[0].username}`
+                        : liveRooms.length > 0
+                          ? `${liveRooms.length} live rooms now`
+                          : 'No live items yet'}
+                </Text>
               </View>
               <View style={styles.liveMiniCardFooter}>
                 <View style={styles.liveAvatars}>
@@ -237,7 +810,15 @@ export default function HomeScreen() {
                   <View style={styles.liveAvatar} />
                   <View style={styles.liveAvatar} />
                 </View>
-                <Text style={styles.liveMiniCardFooterText}>Rooms are filling up</Text>
+                <Text style={styles.liveMiniCardFooterText}>
+                  {liveRoomsLoading
+                    ? 'Updating…'
+                    : liveRoomsError
+                      ? 'Live rooms unavailable'
+                      : liveRooms.length > 0
+                        ? `${liveRooms.length} live rooms`
+                        : 'No live rooms yet'}
+                </Text>
               </View>
             </View>
           </Card>
@@ -285,12 +866,34 @@ export default function HomeScreen() {
           <Card>
             <SectionTitle>Recommended for You</SectionTitle>
             <View style={styles.placeholderRow}>
-              <View style={styles.profilePill} />
-              <View style={styles.profilePill} />
-              <View style={styles.profilePill} />
-              <View style={styles.profilePill} />
+              {recommendedLoading ? (
+                <>
+                  <View style={styles.profilePill} />
+                  <View style={styles.profilePill} />
+                  <View style={styles.profilePill} />
+                  <View style={styles.profilePill} />
+                </>
+              ) : recommendedError ? null : recommendedProfiles.length === 0 ? null : (
+                recommendedProfiles.slice(0, 8).map((p) => (
+                  <View key={p.id} style={styles.profilePill}>
+                    {p.avatar_url ? (
+                      <Image source={{ uri: p.avatar_url }} style={styles.profilePillImage} />
+                    ) : (
+                      <Text style={styles.profilePillInitial}>
+                        {getInitials(p.display_name || p.username)}
+                      </Text>
+                    )}
+                  </View>
+                ))
+              )}
             </View>
-            <Text style={styles.placeholderHint}>ProfileCarousel placeholder</Text>
+            {recommendedLoading ? (
+              <Text style={styles.placeholderHint}>Loading…</Text>
+            ) : recommendedError ? (
+              <Text style={styles.placeholderHint}>Error: {recommendedError}</Text>
+            ) : recommendedProfiles.length === 0 ? (
+              <Text style={styles.placeholderHint}>No items yet</Text>
+            ) : null}
           </Card>
         </View>
 
@@ -298,8 +901,61 @@ export default function HomeScreen() {
           <Card>
             <SectionTitle>Coming Soon Rooms</SectionTitle>
             <View style={styles.placeholderRoom}>
-              <Text style={styles.placeholderRoomText}>RoomsCarousel placeholder</Text>
+              {roomsLoading ? (
+                <Text style={styles.placeholderRoomText}>Loading…</Text>
+              ) : roomsError ? (
+                <Text style={styles.placeholderRoomText}>Error: {roomsError}</Text>
+              ) : comingSoonRooms.length === 0 ? (
+                <Text style={styles.placeholderRoomText}>No items yet</Text>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ width: '100%' }}
+                  contentContainerStyle={styles.roomsHorizontalRow}
+                >
+                  {comingSoonRooms.slice(0, 10).map((room) => {
+                    const interested = Number(room.current_interest_count ?? 0);
+                    const imageUrl = room.image_url || room.banner_url || null;
+                    const isInterested = interestedRoomIds.has(room.id);
+                    const busy = roomInterestBusyIds.has(room.id);
+
+                    return (
+                      <View key={room.id} style={styles.roomsTileWrap}>
+                        <SquareTile
+                          title={room.name}
+                          subtitle={room.subtitle || undefined}
+                          imageUrl={imageUrl}
+                          width={260}
+                          height={156}
+                          imageResizeMode="contain"
+                          useBackdrop
+                        />
+                        <Text style={styles.tileCaption} numberOfLines={1}>
+                          {room.name}
+                        </Text>
+                        <Text style={styles.teamMembersCaption} numberOfLines={1}>
+                          {interested} interested
+                        </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={busy}
+                          onPress={() => toggleRoomInterest(room.id, !isInterested)}
+                          style={({ pressed }) => [
+                            styles.roomInterestButton,
+                            isInterested ? styles.roomInterestButtonActive : styles.roomInterestButtonInactive,
+                            (pressed || busy) && styles.pressed,
+                          ]}
+                        >
+                          <Text style={styles.roomInterestButtonText}>{isInterested ? 'Interested' : "I'm interested"}</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </View>
+            {roomsActionError ? <Text style={styles.placeholderHint}>Note: {roomsActionError}</Text> : null}
           </Card>
         </View>
 
@@ -321,9 +977,9 @@ export default function HomeScreen() {
               <View style={styles.emailIconCircle}>
                 <MaterialCommunityIcons name="cellphone" size={20} color="#8B5CF6" />
               </View>
-              <Text style={styles.emailTitle}>Mobile app coming soon</Text>
+              <Text style={styles.emailTitle}>Email updates</Text>
             </View>
-            <Text style={styles.emailSubtext}>Drop your email and we’ll notify you when it's live.</Text>
+            <Text style={styles.emailSubtext}>No items yet.</Text>
 
             <View style={styles.emailFormRow}>
               <TextInput
@@ -513,6 +1169,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1.2,
   },
+  heroAvatar: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
   heroBody: {
     color: 'rgba(255,255,255,0.82)',
     fontSize: 13,
@@ -556,8 +1217,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     gap: 12,
   },
+  roomsHorizontalRow: {
+    paddingHorizontal: 4,
+    gap: 8,
+  },
+  teamsHorizontalRow: {
+    paddingHorizontal: 4,
+    gap: 8,
+  },
   tileWrap: {
     width: 120,
+  },
+  teamsTileWrap: {
+    width: 156,
+  },
+  roomsTileWrap: {
+    width: 260,
   },
   squareTile: {
     width: 120,
@@ -567,8 +1242,41 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.14)',
+    position: 'relative',
+  },
+  squareTileContent: {
+    flex: 1,
     padding: 10,
     justifyContent: 'space-between',
+  },
+  squareTileImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    borderRadius: 14,
+  },
+  squareTileBackdropImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    opacity: 0.55,
+    borderRadius: 14,
+  },
+  squareTileOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 14,
+  },
+  squareTileFallbackCenter: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  squareTileFallbackText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   squareTileBadgeRow: {
     flexDirection: 'row',
@@ -593,6 +1301,35 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     fontSize: 11,
     fontWeight: '700',
+  },
+  teamMembersCaption: {
+    marginTop: 2,
+    color: 'rgba(255,255,255,0.65)',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  roomInterestButton: {
+    marginTop: 8,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  roomInterestButtonInactive: {
+    backgroundColor: '#EC4899',
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  roomInterestButtonActive: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.24)',
+  },
+  roomInterestButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
   },
 
   referralBadge: {
@@ -829,6 +1566,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.14)',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profilePillImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+  },
+  profilePillInitial: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 20,
+    fontWeight: '900',
   },
   placeholderHint: {
     marginTop: 10,
@@ -837,7 +1587,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   placeholderRoom: {
-    height: 120,
+    minHeight: 292,
     borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.18)',
     borderWidth: StyleSheet.hairlineWidth,
@@ -847,6 +1597,16 @@ const styles = StyleSheet.create({
   },
   placeholderRoomText: {
     color: 'rgba(255,255,255,0.55)',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  roomsList: {
+    width: '100%',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  roomLine: {
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
     fontWeight: '800',
   },
