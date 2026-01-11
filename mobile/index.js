@@ -1,4 +1,5 @@
 console.log('[BOOT] index.js executing at', new Date().toISOString());
+console.log('[BUILD_STAMP]', '021f079', new Date().toISOString());
 
 // CRITICAL: Set up global error handler FIRST (before any other imports)
 if (typeof ErrorUtils !== 'undefined') {
