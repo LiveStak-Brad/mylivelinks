@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Dim
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import type { Room, RemoteParticipant } from 'livekit-client';
 
 import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode } from '../contexts/ThemeContext';
@@ -12,12 +13,12 @@ import { useRoomPresence } from '../hooks/useRoomPresence';
 import { GiftOverlay } from '../overlays/GiftOverlay';
 import { supabase } from '../lib/supabase';
 import type { Participant } from '../types/live';
+import { Tile } from '../components/live/Tile';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { LiveChatActionBar } from '../components/live/LiveChatActionBar';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useViewerHeartbeat } from '../hooks/useViewerHeartbeat';
 import { fetchWithWebSession } from '../lib/webSession';
-import { ensureLiveKitReady } from '../lib/livekit/ensureLiveKitReady';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -38,100 +39,6 @@ type TopGifter = {
 };
 
 export function SoloStreamViewerScreen({ navigation, route }: Props) {
-  // P0: Safe shell first render. Do not touch LiveKit/Tile until after ensureLiveKitReady() succeeds.
-  useKeepAwake();
-  const insets = useSafeAreaInsets();
-  const { theme } = useThemeMode();
-
-  const [ready, setReady] = useState(false);
-  const [initError, setInitError] = useState<string | null>(null);
-  const [retryNonce, setRetryNonce] = useState(0);
-  const [TileComponent, setTileComponent] = useState<React.ComponentType<any> | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setInitError(null);
-        await ensureLiveKitReady();
-        const tileMod: any = await import('../components/live/Tile');
-        if (!tileMod?.Tile) {
-          throw new Error('LIVEKIT_TILE_MISSING');
-        }
-        if (!mounted) return;
-        setTileComponent(() => tileMod.Tile);
-        setReady(true);
-      } catch (e: any) {
-        const msg = e?.message ? String(e.message) : String(e);
-        if (mounted) {
-          setReady(false);
-          setTileComponent(null);
-          setInitError(msg);
-        }
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [retryNonce]);
-
-  const handleBack = useCallback(() => {
-    try {
-      navigation.goBack();
-    } catch {
-      navigation.navigate('Home' as any);
-    }
-  }, [navigation]);
-
-  if (!ready || !TileComponent) {
-    const shellPaddingTop = Math.max(12, (insets.top || 0) + 12);
-    return (
-      <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <View style={{ paddingTop: shellPaddingTop, paddingHorizontal: 14, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <TouchableOpacity onPress={handleBack} activeOpacity={0.85} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Ionicons name="chevron-back" size={22} color={theme.colors.textPrimary} />
-            <Text style={{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '800' }}>Back</Text>
-          </TouchableOpacity>
-          <Text style={{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '900' }}>Live</Text>
-          <View style={{ width: 54 }} />
-        </View>
-
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 }}>
-          <View style={{ width: '100%', maxWidth: 340, aspectRatio: 9 / 16, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.15)' }} />
-          <Text style={{ marginTop: 14, color: theme.colors.textSecondary, fontSize: 13, fontWeight: '700', textAlign: 'center' }}>
-            {initError ? 'Live video unavailable (LiveKit init failed).' : 'Preparing live video…'}
-          </Text>
-          {initError ? (
-            <Text style={{ marginTop: 8, color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600', textAlign: 'center' }} numberOfLines={4}>
-              {initError}
-            </Text>
-          ) : (
-            <ActivityIndicator style={{ marginTop: 12 }} />
-          )}
-
-          {initError ? (
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              <TouchableOpacity onPress={handleBack} activeOpacity={0.85} style={{ backgroundColor: theme.colors.cardSurface, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 }}>
-                <Text style={{ color: theme.colors.textPrimary, fontSize: 13, fontWeight: '900' }}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setRetryNonce((n) => n + 1)}
-                activeOpacity={0.85}
-                style={{ backgroundColor: theme.colors.accent, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 }}
-              >
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '900' }}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-        </View>
-      </View>
-    );
-  }
-
-  return <SoloStreamViewerScreenLive navigation={navigation} route={route} TileComponent={TileComponent} />;
-}
-
-function SoloStreamViewerScreenLive({ navigation, route, TileComponent }: Props & { TileComponent: React.ComponentType<any> }) {
   useKeepAwake();
 
   const insets = useSafeAreaInsets();
@@ -169,14 +76,12 @@ function SoloStreamViewerScreenLive({ navigation, route, TileComponent }: Props 
 
   const { giftingEnabled } = useFeatureFlags();
 
-  // SOLO STREAM FIX: Join the streamer's dedicated solo room
-  // Wait until streamer profile is loaded to get their profile_id for room name
-  const soloRoomName = streamer?.id ? `solo_${streamer.id}` : undefined;
-  
-  const { participants, isConnected, room, connectionError } = useLiveRoomParticipants({ 
-    enabled: !!streamer?.id, // Only enable once we know the streamer's room
-    roomName: soloRoomName,
-  });
+  const {
+    participants,
+    isConnected,
+    room,
+    connectionError,
+  } = useLiveRoomParticipants({ enabled: true });
 
   useEffect(() => {
     let cancelled = false;
@@ -342,8 +247,8 @@ function SoloStreamViewerScreenLive({ navigation, route, TileComponent }: Props 
   }, [streamer?.id]);
 
   const remoteStreamers = useMemo(() => {
-    const r = room as any;
-    if (!r) return [] as any[];
+    const r = room as unknown as Room | null;
+    if (!r) return [] as Array<RemoteParticipant>;
     return Array.from(r.remoteParticipants.values()).filter((p) => {
       const raw: any = p as any;
       const pubs = raw?.videoTrackPublications ? Array.from(raw.videoTrackPublications.values()) : [];
@@ -383,7 +288,7 @@ function SoloStreamViewerScreenLive({ navigation, route, TileComponent }: Props 
   const tileParticipant: Participant | null = useMemo(() => {
     if (!room || !selectedRemoteIdentity) return null;
 
-    const r = room as any;
+    const r = room as unknown as Room;
     const p = r.remoteParticipants.get(selectedRemoteIdentity);
     if (!p) return null;
 
@@ -443,7 +348,7 @@ function SoloStreamViewerScreenLive({ navigation, route, TileComponent }: Props 
   const shouldShowWaiting = isConnected && !hasSelectedStreamer;
 
   const viewerCountLiveKitFallback = useMemo(() => {
-    const r = room as any;
+    const r = room as unknown as Room | null;
     if (!r) return 0;
     const remoteCount = r.remoteParticipants?.size ?? 0;
     const streamerPresent = selectedRemoteIdentity ? 1 : 0;
@@ -880,7 +785,7 @@ function SoloStreamViewerScreenLive({ navigation, route, TileComponent }: Props 
         ) : tileParticipant ? (
           <View style={styles.viewerLayout}>
             <View style={styles.videoContainer}>
-              <TileComponent
+              <Tile
                 item={{ id: tileParticipant.identity, participant: tileParticipant, isAutofill: false }}
                 isEditMode={false}
                 isFocused={false}

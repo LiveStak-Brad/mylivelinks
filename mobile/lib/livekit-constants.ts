@@ -5,8 +5,6 @@
  * Web source: lib/livekit-constants.ts
  */
 
- import { getRuntimeEnv } from './env';
-
 /**
  * Shared room name for ALL clients (web + mobile)
  * ⚠️ DO NOT CHANGE without coordinating with web
@@ -26,7 +24,7 @@ export const DEVICE_TYPE = 'mobile' as const;
 /**
  * Debug logging flag
  */
-export const DEBUG_LIVEKIT = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVE') === '1';
+export const DEBUG_LIVEKIT = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
 /**
  * Video quality presets
@@ -51,14 +49,6 @@ export const VIDEO_PRESETS = {
  */
 export const DEFAULT_VIDEO_CAPTURE = VIDEO_PRESETS.HD;
 
-/**
- * SOLO LIVE KILL-SWITCH
- * Emergency OFF switch for Solo Live feature.
- * Default: ON (enabled for all authenticated users)
- * Set EXPO_PUBLIC_SOLO_LIVE_ENABLED=false to disable
- */
-export const SOLO_LIVE_ENABLED = getRuntimeEnv('EXPO_PUBLIC_SOLO_LIVE_ENABLED') !== 'false';
-
 export const LIVE_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'] as const;
 export const LIVE_OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'] as const;
 
@@ -81,16 +71,11 @@ export function canUserGoLiveGroup(user: { id?: string; email?: string | null } 
 
 /**
  * Check if user can go live in SOLO mode (1:1 streams)
- * SOLO LIVE IS NOW OPEN TO ALL AUTHENTICATED USERS!
- * Kill-switch: EXPO_PUBLIC_SOLO_LIVE_ENABLED=false to disable
+ * SOLO LIVE IS STILL PAUSED/OWNER-ONLY
  */
 export function canUserGoLiveSolo(user: { id?: string; email?: string | null } | null | undefined) {
-  // If kill-switch is OFF, only allow owners
-  if (!SOLO_LIVE_ENABLED) {
-    return isLiveOwnerUser(user);
-  }
-  // Solo live is open to all authenticated users
-  return !!user?.id;
+  // Solo live is still owner-only
+  return isLiveOwnerUser(user);
 }
 
 /**

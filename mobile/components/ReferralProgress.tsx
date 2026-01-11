@@ -18,7 +18,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { fetchAuthed } from '../lib/api';
 import { useAuthContext } from '../contexts/AuthContext';
 import { ThemeDefinition } from '../contexts/ThemeContext';
-import { getRuntimeEnv } from '../lib/env';
 
 type ReferralStats = {
   invitesSent: number;
@@ -60,7 +59,7 @@ export function ReferralProgress({
   const [loading, setLoading] = useState(true);
 
   const apiBaseUrl = useMemo(() => {
-    const raw = getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com';
+    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
     return raw.replace(/\/+$/, '');
   }, []);
 

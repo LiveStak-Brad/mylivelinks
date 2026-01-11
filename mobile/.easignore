@@ -4,10 +4,6 @@
 .vscode/
 .idea/
 
-# Ignore native projects so app.json stays the source of truth during EAS builds
-ios/
-android/
-
 
 
 

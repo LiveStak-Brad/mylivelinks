@@ -20,6 +20,7 @@ import {
 } from '../components/livetv';
 import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
+import { LiveRoomScreen } from './LiveRoomScreen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Rooms'>;
 
@@ -48,12 +49,10 @@ function formatLabelCategoryRail(titlePrefix: string, category: string) {
   return `${titlePrefix} in ${category}`;
 }
 
-export default function LiveTVScreen({ navigation }: Props) {
+export function LiveTVScreen({ navigation }: Props) {
   const { theme } = useThemeMode();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [liveRoomEnabled, setLiveRoomEnabled] = useState(false);
-  const [LiveRoomComponent, setLiveRoomComponent] = useState<null | React.ComponentType<any>>(null);
-  const [liveRoomLoadError, setLiveRoomLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQuickFilter, setActiveQuickFilter] = useState<string>('Trending');
   const [genderFilter, setGenderFilter] = useState<LiveTVGenderFilter>('All');
@@ -367,76 +366,10 @@ export default function LiveTVScreen({ navigation }: Props) {
     return () => clearTimeout(timeoutId);
   }, [activeQuickFilter, genderFilter]);
 
-  // Lazy-load LiveRoomScreen ONLY when user enters the live room flow.
-  // This prevents any LiveKit import chain from evaluating during normal boot.
-  useEffect(() => {
-    if (!liveRoomEnabled) return;
-    if (LiveRoomComponent) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        setLiveRoomLoadError(null);
-        const mod = await import('./LiveRoomScreen');
-        const Comp = (mod as any)?.LiveRoomScreen;
-        if (!Comp) throw new Error('LiveRoomScreen export missing');
-        if (!cancelled) setLiveRoomComponent(() => Comp);
-      } catch (e: any) {
-        const msg = e?.message ? String(e.message) : String(e);
-        if (!cancelled) setLiveRoomLoadError(msg);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [LiveRoomComponent, liveRoomEnabled]);
-
   // If LiveRoom is active, show it fullscreen WITHOUT PageShell
   if (liveRoomEnabled) {
-    if (liveRoomLoadError) {
-      return (
-        <View style={[styles.container, { padding: 16, justifyContent: 'center' }]}>
-          <Text style={[{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '900', marginBottom: 8 }]}>
-            Live room unavailable
-          </Text>
-          <Text style={[{ color: theme.colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: 14 }]}>
-            {liveRoomLoadError}
-          </Text>
-          <Pressable
-            onPress={() => {
-              setLiveRoomEnabled(false);
-              setLiveRoomLoadError(null);
-            }}
-            style={[{ alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: theme.colors.accent }]}
-          >
-            <Text style={[{ color: '#fff', fontSize: 13, fontWeight: '900' }]}>Back</Text>
-          </Pressable>
-        </View>
-      );
-    }
-
-    if (!LiveRoomComponent) {
-      return (
-        <View style={[styles.container, { padding: 16, justifyContent: 'center' }]}>
-          <Text style={[{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '900', marginBottom: 8 }]}>
-            Loading live room…
-          </Text>
-          <Text style={[{ color: theme.colors.textSecondary, fontSize: 13, fontWeight: '600', marginBottom: 14 }]}>
-            If this takes too long, go back and try again.
-          </Text>
-          <Pressable
-            onPress={() => setLiveRoomEnabled(false)}
-            style={[{ alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: theme.colors.card }]}
-          >
-            <Text style={[{ color: theme.colors.textPrimary, fontSize: 13, fontWeight: '900' }]}>Back</Text>
-          </Pressable>
-        </View>
-      );
-    }
-
     return (
-      <LiveRoomComponent
+      <LiveRoomScreen
         enabled={true}
         onExitLive={() => setLiveRoomEnabled(false)}
         onNavigateToRooms={() => {

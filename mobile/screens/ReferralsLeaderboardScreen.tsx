@@ -5,7 +5,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/navigation';
 import { PageHeader, PageShell } from '../components/ui';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
-import { getRuntimeEnv } from '../lib/env';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ReferralsLeaderboard'>;
 
@@ -24,7 +23,7 @@ export function ReferralsLeaderboardScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const apiBaseUrl = useMemo(() => {
-    const raw = getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com';
+    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
     return raw.replace(/\/+$/, '');
   }, []);
 
@@ -55,8 +54,8 @@ export function ReferralsLeaderboardScreen({ navigation }: Props) {
         profile_id: String(r?.profile_id ?? ''),
         username: String(r?.username ?? ''),
         avatar_url: r?.avatar_url ? String(r.avatar_url) : null,
-        joined: Number(r?.joined ?? 0), // Total accepted including inactive
-        active: Number(r?.active ?? 0), // Primary ranking metric: active accepted members
+        joined: Number(r?.joined ?? 0),
+        active: Number(r?.active ?? 0),
         rank: Number(r?.rank ?? 0),
       }));
 
@@ -168,7 +167,7 @@ export function ReferralsLeaderboardScreen({ navigation }: Props) {
               <View style={styles.noteCard}>
                 <Text style={styles.noteTitle}>Leaderboard</Text>
                 <Text style={styles.noteText}>
-                  Ranked by active accepted members (members who joined and are active). Tap a row to open the profile.
+                  Sorted by active referrals, then total joined. Tap a row to open the profile.
                 </Text>
                 <Text style={styles.noteTextMuted}>
                   Ranges: 7d uses joined/activated counts in the last 7 days; 30d uses last 30 days; All is all-time.
@@ -191,9 +190,7 @@ export function ReferralsLeaderboardScreen({ navigation }: Props) {
                   {item.username || 'Unknown'}
                 </Text>
                 <Text style={styles.subText} numberOfLines={1}>
-                  {item.active} active{item.joined > item.active && (
-                    <Text style={styles.inactiveText}> • {item.joined - item.active} inactive</Text>
-                  )}
+                  Joined: {item.joined} • Active: {item.active}
                 </Text>
               </View>
             </Pressable>
@@ -352,9 +349,6 @@ function createStyles(theme: ThemeDefinition) {
     subText: {
       color: theme.colors.textMuted,
       fontSize: 12,
-    },
-    inactiveText: {
-      color: '#FB923C',
     },
     footer: {
       paddingTop: 12,

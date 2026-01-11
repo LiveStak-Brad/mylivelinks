@@ -19,7 +19,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { ThemeDefinition } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
 import { getAvatarSource } from '../lib/defaultAvatar';
-import { getRuntimeEnv } from '../lib/env';
 
 type LeaderboardEntry = {
   rank: number;
@@ -28,7 +27,6 @@ type LeaderboardEntry = {
   avatarUrl?: string;
   referralCount: number;
   activeCount?: number;
-  totalAccepted?: number;
   isCurrentUser?: boolean;
 };
 
@@ -54,7 +52,7 @@ export function ReferralLeaderboardPreview({
   const [loading, setLoading] = useState(true);
 
   const apiBaseUrl = useMemo(() => {
-    const raw = getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com';
+    const raw = process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com';
     return raw.replace(/\/+$/, '');
   }, []);
 
@@ -74,9 +72,8 @@ export function ReferralLeaderboardPreview({
           profileId: r?.profile_id ? String(r.profile_id) : undefined,
           username: String(r?.username ?? 'Unknown'),
           avatarUrl: r?.avatar_url ? String(r.avatar_url) : undefined,
-          referralCount: Number(r?.active ?? 0), // Display active accepted members as primary metric
+          referralCount: Number(r?.joined ?? 0),
           activeCount: Number(r?.active ?? 0),
-          totalAccepted: Number(r?.joined ?? 0), // Total accepted including inactive
           isCurrentUser: userId ? String(r?.profile_id ?? '') === String(userId) : false,
         }));
 
@@ -89,9 +86,8 @@ export function ReferralLeaderboardPreview({
               profileId: found?.profile_id ? String(found.profile_id) : undefined,
               username: String(found?.username ?? 'You'),
               avatarUrl: found?.avatar_url ? String(found.avatar_url) : undefined,
-              referralCount: Number(found?.active ?? 0), // Display active accepted members as primary metric
+              referralCount: Number(found?.joined ?? 0),
               activeCount: Number(found?.active ?? 0),
-              totalAccepted: Number(found?.joined ?? 0), // Total accepted including inactive
               isCurrentUser: true,
             };
           }
@@ -163,7 +159,7 @@ export function ReferralLeaderboardPreview({
         </View>
         <View style={styles.headerTextContainer}>
           <Text style={styles.title}>Top Referrers</Text>
-          <Text style={styles.subtitle}>Ranked by active accepted members</Text>
+          <Text style={styles.subtitle}>This month's leading members</Text>
         </View>
       </View>
 
@@ -234,10 +230,7 @@ export function ReferralLeaderboardPreview({
                   )}
                 </View>
                 <Text style={styles.referralsSubtext}>
-                  {formatReferralCount(entry.referralCount)} active
-                  {entry.totalAccepted && entry.totalAccepted > entry.referralCount && (
-                    <Text style={styles.inactiveText}> • {entry.totalAccepted - entry.referralCount} inactive</Text>
-                  )}
+                  {formatReferralCount(entry.referralCount)} referrals
                 </Text>
               </View>
 
@@ -289,10 +282,7 @@ export function ReferralLeaderboardPreview({
                   </View>
                 </View>
                 <Text style={styles.referralsSubtext}>
-                  {formatReferralCount(currentUserEntry.referralCount)} active
-                  {currentUserEntry.totalAccepted && currentUserEntry.totalAccepted > currentUserEntry.referralCount && (
-                    <Text style={styles.inactiveText}> • {currentUserEntry.totalAccepted - currentUserEntry.referralCount} inactive</Text>
-                  )}
+                  {formatReferralCount(currentUserEntry.referralCount)} referrals
                 </Text>
               </View>
               <View style={styles.countBadge}>
@@ -452,9 +442,6 @@ function createStyles(theme: ThemeDefinition) {
     referralsSubtext: {
       fontSize: 12,
       color: theme.colors.textSecondary,
-    },
-    inactiveText: {
-      color: '#FB923C',
     },
     countBadge: {
       alignItems: 'flex-end',

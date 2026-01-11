@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { useFetchAuthed } from '../hooks/useFetchAuthed';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
-import { getRuntimeEnv } from '../lib/env';
 
 type RoomCategory = 'gaming' | 'music' | 'entertainment' | 'Gaming' | 'Music' | 'Entertainment';
 type RoomStatus = 'draft' | 'interest' | 'opening_soon' | 'live' | 'paused' | 'coming_soon';
@@ -50,7 +49,7 @@ export function RoomsCarousel({ onApplyPress }: RoomsCarouselProps) {
 
   const loadRooms = async () => {
     try {
-      const baseUrl = (getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com').replace(/\/+$/, '');
+      const baseUrl = (process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com').replace(/\/+$/, '');
       const res = await fetch(`${baseUrl}/api/rooms`);
       const json = await res.json();
       if (res.ok) {

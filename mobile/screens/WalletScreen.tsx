@@ -8,7 +8,6 @@ import { Button, Modal, PageShell } from '../components/ui';
 import { LegalFooter } from '../components/LegalFooter';
 import type { RootStackParamList } from '../types/navigation';
 import { useThemeMode, type ThemeDefinition } from '../contexts/ThemeContext';
-import { getRuntimeEnv } from '../lib/env';
 
 type WalletResponse = {
   coin_balance: number;
@@ -84,7 +83,7 @@ export function WalletScreen({ navigation }: Props) {
     setPacksLoading(true);
     try {
       // Public endpoint (no auth)
-      const baseUrl = (getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com').replace(/\/+$/, '');
+      const baseUrl = (process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com').replace(/\/+$/, '');
       const resp = await fetch(`${baseUrl}/api/coins/packs`, {
         method: 'GET',
         headers: {

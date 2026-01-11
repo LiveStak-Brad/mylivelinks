@@ -6,9 +6,7 @@
 import { useState, useCallback } from 'react';
 import type { OverlayType, LiveRoomUIState } from '../types/live';
 
-import { getRuntimeEnv } from '../lib/env';
-
-const DEBUG = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVE') === '1';
+const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
 const initialState: LiveRoomUIState = {
   activeOverlay: null,

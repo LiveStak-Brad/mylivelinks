@@ -5,7 +5,6 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { getRuntimeEnv } from '../lib/env';
 
 interface UseViewerHeartbeatOptions {
   liveStreamId: number;
@@ -57,7 +56,7 @@ export function useViewerHeartbeat({
   const sendHeartbeat = useCallback(async () => {
     if (!enabledRef.current || !liveStreamIdRef.current) return;
 
-    const DEBUG = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVEKIT') === '1';
+    const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVEKIT === '1';
 
     try {
       const { data: { user } } = await supabase.auth.getUser();

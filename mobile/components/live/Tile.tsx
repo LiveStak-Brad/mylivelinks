@@ -11,21 +11,19 @@ import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, withSpring, useSharedValue } from 'react-native-reanimated';
+import { VideoView } from '@livekit/react-native';
 import type { TileItem } from '../../types/live';
+import { Track, type Room, type VideoTrack } from 'livekit-client';
 import { useThemeMode } from '../../contexts/ThemeContext';
 
-import { getRuntimeEnv } from '../../lib/env';
-
-const DEBUG = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVE') === '1';
+const DEBUG = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
 
 interface TileProps {
   item: TileItem;
   isEditMode: boolean;
   isFocused: boolean;
   isMinimized: boolean;
-  // IMPORTANT: Do not import LiveKit types/modules at module scope.
-  // This component is only loaded dynamically after LiveKit readiness.
-  room: any;
+  room: Room | null;
   onLongPress?: () => void;
   onDoubleTap?: () => void;
 }
@@ -41,13 +39,6 @@ export const Tile: React.FC<TileProps> = ({
 }) => {
   const { participant, isAutofill } = item;
   const { theme } = useThemeMode();
-  let VideoView: any = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    VideoView = require('@livekit/react-native')?.VideoView ?? null;
-  } catch {
-    VideoView = null;
-  }
   
   // Animation values for edit mode
   const scale = useSharedValue(1);
@@ -56,15 +47,6 @@ export const Tile: React.FC<TileProps> = ({
   // Get video track from room
   const videoTrack = useMemo(() => {
     if (!room || !participant) return null;
-
-    let Track: any = null;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const livekit = require('livekit-client');
-      Track = livekit?.Track ?? null;
-    } catch {
-      Track = null;
-    }
 
     const isLocal = !!room.localParticipant && room.localParticipant.identity === participant.identity;
 
@@ -77,12 +59,12 @@ export const Tile: React.FC<TileProps> = ({
     const videoPublications = Array.from(targetParticipant.videoTrackPublications.values());
 
     const screenPub = videoPublications.find((pub: any) => {
-      if (Track && pub?.source !== Track.Source.ScreenShare) return false;
+      if (pub?.source !== Track.Source.ScreenShare) return false;
       if (!pub?.track) return false;
       return isLocal ? !pub?.isMuted : !!pub?.isSubscribed;
     });
     const cameraPub = videoPublications.find((pub: any) => {
-      if (Track && pub?.source !== Track.Source.Camera) return false;
+      if (pub?.source !== Track.Source.Camera) return false;
       if (!pub?.track) return false;
       return isLocal ? !pub?.isMuted : !!pub?.isSubscribed;
     });
@@ -102,7 +84,7 @@ export const Tile: React.FC<TileProps> = ({
       });
     }
 
-    return videoPublication.track as any;
+    return videoPublication.track as unknown as VideoTrack;
   }, [room, participant]);
 
   useEffect(() => {
@@ -174,7 +156,7 @@ export const Tile: React.FC<TileProps> = ({
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[containerStyle, animatedStyle]}>
         {/* Video surface - LiveKit VideoRenderer */}
-        {videoTrack && VideoView ? (
+        {videoTrack ? (
           <VideoView
             videoTrack={videoTrack}
             style={{ ...styles.videoRenderer }}

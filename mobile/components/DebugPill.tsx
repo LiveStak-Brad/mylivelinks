@@ -7,8 +7,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import type { OverlayType } from '../types/live';
 
-import { getRuntimeEnv } from '../lib/env';
-
 interface DebugPillProps {
   overlayState: OverlayType;
   tileCount: number;
@@ -27,7 +25,7 @@ export const DebugPill: React.FC<DebugPillProps> = ({
   filledSlots,
 }) => {
   // Only show if debug mode is enabled
-  const debugMode = getRuntimeEnv('EXPO_PUBLIC_DEBUG_LIVE') === '1';
+  const debugMode = process.env.EXPO_PUBLIC_DEBUG_LIVE === '1';
   
   if (!debugMode) return null;
 

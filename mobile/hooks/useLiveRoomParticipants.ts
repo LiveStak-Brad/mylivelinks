@@ -11,6 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { AppState } from 'react-native';
+import type { LocalParticipant, Room, RemoteParticipant } from 'livekit-client';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import type { Participant } from '../types/live';
@@ -22,12 +23,10 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { createWebRequestHeaders } from '../lib/webSession';
 
 import { LIVEKIT_ROOM_NAME, TOKEN_ENDPOINT_PATH, DEBUG_LIVEKIT, canUserGoLive } from '../lib/livekit-constants';
-import { getRuntimeEnv } from '../lib/env';
-import { ensureLiveKitReady } from '../lib/livekit/ensureLiveKitReady';
 
 const DEBUG = DEBUG_LIVEKIT;
 const ROOM_NAME = LIVEKIT_ROOM_NAME; // Imported from shared constants
-const API_BASE_URL = (getRuntimeEnv('EXPO_PUBLIC_API_URL') || 'https://www.mylivelinks.com').replace(/\/+$/, '');
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://www.mylivelinks.com').replace(/\/+$/, '');
 const TOKEN_ENDPOINT = `${API_BASE_URL}${TOKEN_ENDPOINT_PATH}`;
 
 type CameraFacingMode = 'user' | 'environment';
@@ -92,7 +91,7 @@ interface UseLiveRoomParticipantsReturn {
   isLive: boolean;
   isPublishing: boolean;
   tileCount: number;
-  room: any;
+  room: Room | null;
   liveStreamId: number | null;
   localMicEnabled: boolean;
   localCameraEnabled: boolean;
@@ -111,7 +110,6 @@ interface UseLiveRoomParticipantsReturn {
 
 interface UseLiveRoomParticipantsOptions {
   enabled?: boolean; // gate connect until login/device/env ready
-  roomName?: string; // optional custom room name (e.g., solo_${profile_id} for solo streams)
 }
 
 /**
@@ -122,15 +120,11 @@ interface UseLiveRoomParticipantsOptions {
 export function useLiveRoomParticipants(
   options: UseLiveRoomParticipantsOptions = {}
 ): UseLiveRoomParticipantsReturn {
-  const { enabled = false, roomName: customRoomName } = options;
-  // Use custom room name if provided, otherwise default to ROOM_NAME (live_central)
-  const effectiveRoomName = customRoomName || ROOM_NAME;
-  if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked', { effectiveRoomName, customRoomName });
+  const { enabled = false } = options;
+  if (DEBUG) console.log('[ROOM] useLiveRoomParticipants invoked');
 
   const { user } = useAuthContext();
-  // IMPORTANT: Do not import the LiveKit client at module scope. Any runtime usage
-  // is loaded lazily via `require(...)` after `ensureLiveKitReady()`.
-  type LiveKitParticipant = any;
+  type LiveKitParticipant = RemoteParticipant | LocalParticipant;
   const [allParticipants, setAllParticipants] = useState<LiveKitParticipant[]>([]);
   const [myIdentity, setMyIdentity] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -186,7 +180,7 @@ export function useLiveRoomParticipants(
     return null;
   }, []);
 
-  const applyNoSelfAudio = useCallback((room: any) => {
+  const applyNoSelfAudio = useCallback((room: Room) => {
     const myProfileId = myProfileIdRef.current;
     if (!myProfileId) return;
 
@@ -253,12 +247,12 @@ export function useLiveRoomParticipants(
   }, [updateLiveStreamId, user?.id]);
 
   // Refs to prevent reconnect on rerender
-  const roomRef = useRef<any>(null);
+  const roomRef = useRef<Room | null>(null);
   const isConnectingRef = useRef(false);
   const hasConnectedRef = useRef(false);
   const reachedConnectedRef = useRef(false);
   const lastTokenStatusRef = useRef<number | null>(null);
-  const ensureRoomConnected = useCallback((): any => {
+  const ensureRoomConnected = useCallback((): Room => {
     const room = roomRef.current;
     if (!room || room.state !== 'connected') {
       throw new Error('LiveKit room not connected');
@@ -295,9 +289,9 @@ export function useLiveRoomParticipants(
 
   const livekitModuleRef = useRef<any>(null);
 
-  const getLivekit = useCallback(async () => {
+  const getLivekit = useCallback(() => {
     if (livekitModuleRef.current) return livekitModuleRef.current;
-    // Ensure encoder/decoder globals exist before loading the LiveKit client under Hermes
+    // Ensure encoder/decoder globals exist before loading livekit-client under Hermes
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { TextDecoder, TextEncoder } = require('text-encoding');
@@ -306,10 +300,7 @@ export function useLiveRoomParticipants(
     } catch {
       // ignore
     }
-    // P0: Authoritative gate — LiveKit globals must be registered before any client usage.
-    await ensureLiveKitReady();
-
-    // Lazy-load so app boot doesn't evaluate the LiveKit client unless LiveRoom is entered.
+    // Lazy-load so app boot doesn't evaluate livekit-client unless LiveRoom is entered.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     livekitModuleRef.current = require('livekit-client');
     return livekitModuleRef.current;
@@ -379,7 +370,7 @@ export function useLiveRoomParticipants(
       const sessionId = generateSessionId();
 
       console.log('[PARITY-PROOF] token_fetch_inputs', {
-        EXPO_PUBLIC_API_URL: getRuntimeEnv('EXPO_PUBLIC_API_URL'),
+        EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
         TOKEN_ENDPOINT,
         ROOM_NAME,
         deviceType: 'mobile',
@@ -418,7 +409,7 @@ export function useLiveRoomParticipants(
       }
 
       const requestBody = {
-        roomName: effectiveRoomName, // Use custom room name for solo streams
+        roomName: ROOM_NAME,
         participantName: params.participantName,
         canPublish: params.canPublish,
         canSubscribe: params.canSubscribe,
@@ -736,7 +727,7 @@ export function useLiveRoomParticipants(
   /**
    * Update all participants list from room
    */
-  const updateParticipants = useCallback((room: any) => {
+  const updateParticipants = useCallback((room: Room) => {
     const remoteParticipants = Array.from(room.remoteParticipants.values());
     const localParticipant = room.localParticipant;
 
@@ -847,7 +838,7 @@ export function useLiveRoomParticipants(
       try {
         reachedConnectedRef.current = false;
         setConnectDebug({ wsUrl: null, errorMessage: null, reachedConnected: false });
-        const livekit = await getLivekit();
+        const livekit = getLivekit();
         const RoomEvent = livekit.RoomEvent;
         const Track = livekit.Track;
 
@@ -942,7 +933,7 @@ export function useLiveRoomParticipants(
           hasConnectedRef.current = false;
         });
 
-        room.on(RoomEvent.ParticipantConnected, (participant: any) => {
+        room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
           if (DEBUG) {
             console.log('[SUB] Participant joined:', {
               id: participant.identity,
@@ -955,7 +946,7 @@ export function useLiveRoomParticipants(
           updateParticipants(room);
         });
 
-        room.on(RoomEvent.ParticipantDisconnected, (participant: any) => {
+        room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
           if (DEBUG) {
             console.log('[SUB] Participant left:', participant.identity);
           }
@@ -1037,15 +1028,6 @@ export function useLiveRoomParticipants(
       } catch (error: any) {
         const { name, message, cause } = getErrorDetails(error);
         console.error('[ROOM] Room connect error', { name, message, cause });
-        const msg = message || '';
-        if (
-          msg.includes('WebRTC isn’t detected') ||
-          msg.includes("WebRTC isn't detected") ||
-          msg.includes('registerGlobals') ||
-          msg.includes('LIVEKIT_REGISTERGLOBALS_MISSING')
-        ) {
-          setConnectionError('Live video unavailable (LiveKit init failed).');
-        }
         isConnectingRef.current = false;
         hasConnectedRef.current = false;
         if (!lastConnectError) {
@@ -1378,8 +1360,9 @@ export function useLiveRoomParticipants(
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token || null;
-        const apiBase = getRuntimeEnv('EXPO_PUBLIC_API_URL');
-        const cleanupUrl = apiBase ? `${apiBase}/api/stream-cleanup` : 'https://www.mylivelinks.com/api/stream-cleanup';
+        const cleanupUrl = process.env.EXPO_PUBLIC_API_URL
+          ? `${process.env.EXPO_PUBLIC_API_URL}/api/stream-cleanup`
+          : 'https://www.mylivelinks.com/api/stream-cleanup';
 
         await fetch(cleanupUrl, {
           method: 'POST',
@@ -1425,8 +1408,9 @@ export function useLiveRoomParticipants(
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token || null;
-        const apiBase = getRuntimeEnv('EXPO_PUBLIC_API_URL');
-        const cleanupUrl = apiBase ? `${apiBase}/api/stream-cleanup` : 'https://www.mylivelinks.com/api/stream-cleanup';
+        const cleanupUrl = process.env.EXPO_PUBLIC_API_URL
+          ? `${process.env.EXPO_PUBLIC_API_URL}/api/stream-cleanup`
+          : 'https://www.mylivelinks.com/api/stream-cleanup';
 
         await fetch(cleanupUrl, {
           method: 'POST',

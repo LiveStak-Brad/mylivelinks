@@ -72,19 +72,7 @@ export function useAuth(): UseAuthReturn {
     const bootstrap = async () => {
       try {
         console.log('[AUTH] Bootstrap: fetching initial session...');
-        
-        // P0 FIX: Wrap getSession with timeout to prevent blocking splash screen
-        // If auth init hangs, app must still become interactive
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<{ data: { session: null }; error: null }>((resolve) =>
-          setTimeout(() => {
-            console.warn('[AUTH] Bootstrap: getSession timed out after 2s');
-            resolve({ data: { session: null }, error: null });
-          }, 2000)
-        );
-        
-        const { data, error } = await Promise.race([sessionPromise, timeoutPromise]);
-        
+        const { data, error } = await supabase.auth.getSession();
         if (error) {
           // If the stored auth state is corrupted (e.g. missing refresh token), treat as signed out.
           // This keeps first-launch / dev-client reload from hard-failing.
@@ -103,8 +91,7 @@ export function useAuth(): UseAuthReturn {
           setSession(data.session ?? null);
         }
 
-        // Fire-and-forget referral claim (non-blocking)
-        void maybeClaimReferral(data.session ?? null);
+        await maybeClaimReferral(data.session ?? null);
       } catch (e) {
         console.warn('[AUTH] getSession failed', e);
         if (mounted) {

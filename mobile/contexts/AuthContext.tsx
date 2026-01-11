@@ -3,7 +3,6 @@ import React from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 
 import { useAuth } from '../hooks/useAuth';
-import { setBootStep } from '../lib/bootStatus';
 
 type AuthContextValue = {
   user: User | null;
@@ -21,18 +20,7 @@ type AuthContextValue = {
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  React.useEffect(() => {
-    setBootStep('AUTH_PROVIDER_START');
-  }, []);
-  
   const auth = useAuth();
-  
-  React.useEffect(() => {
-    if (!auth.loading) {
-      setBootStep('AUTH_PROVIDER_READY');
-    }
-  }, [auth.loading]);
-  
   return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
 }
 

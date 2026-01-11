@@ -27,15 +27,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLiveRoomParticipants } from '../hooks/useLiveRoomParticipants';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { supabase } from '../lib/supabase';
 import { useThemeMode } from '../contexts/ThemeContext';
 import { useAuthContext } from '../contexts/AuthContext';
+import { Tile } from '../components/live/Tile';
+import type { Participant } from '../types/live';
 import { canUserGoLive } from '../lib/livekit-constants';
 import { Modal, Input } from '../components/ui';
 import { useActiveViewerCount } from '../hooks/useActiveViewerCount';
 import { useGiftFeed } from '../hooks/useGiftFeed';
-import { ensureLiveKitReady } from '../lib/livekit/ensureLiveKitReady';
 
 type SoloHostStreamScreenProps = {
   onExit?: () => void;
@@ -50,147 +52,9 @@ type LeaderboardRank = {
   next_rank: number;
 };
 
-// Local minimal participant type to avoid importing any LiveKit-linked types in this screen.
-type TileParticipant = {
-  identity: string;
-  username: string;
-  isSpeaking: boolean;
-  isCameraEnabled: boolean;
-  isMicEnabled: boolean;
-  isLocal: boolean;
-  viewerCount?: number;
-};
-
-type LiveKitDeps = {
-  useLiveRoomParticipants: null | ((opts: { enabled: boolean }) => any);
-  Tile: null | React.ComponentType<any>;
-};
-
-const LK: LiveKitDeps = {
-  useLiveRoomParticipants: null,
-  Tile: null,
-};
-
-export default function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
+export function SoloHostStreamScreen({ onExit }: SoloHostStreamScreenProps) {
   useKeepAwake();
-
-  const insets = useSafeAreaInsets();
-  const { theme } = useThemeMode();
-  const { user } = useAuthContext();
-
-  const isOwner = useMemo(() => canUserGoLive(user ? { id: user.id, email: user.email } : null), [user?.email, user?.id]);
-  const [ready, setReady] = useState(false);
-  const [initError, setInitError] = useState<string | null>(null);
-
-  // Safe-shell rule: DO NOT evaluate LiveKit until after mount and after registerGlobals().
-  useEffect(() => {
-    if (!isOwner) return;
-    if (ready) return;
-
-    let mounted = true;
-    (async () => {
-      try {
-        setInitError(null);
-        await ensureLiveKitReady();
-
-        // Import LiveKit-dependent modules ONLY after registerGlobals is complete.
-        const hookMod: any = await import('../hooks/useLiveRoomParticipants');
-        const tileMod: any = await import('../components/live/Tile');
-
-        const useLiveRoomParticipants = hookMod?.useLiveRoomParticipants;
-        const Tile = tileMod?.Tile;
-        if (typeof useLiveRoomParticipants !== 'function') {
-          throw new Error('useLiveRoomParticipants missing');
-        }
-        if (!Tile) {
-          throw new Error('Tile export missing');
-        }
-
-        LK.useLiveRoomParticipants = useLiveRoomParticipants;
-        LK.Tile = Tile;
-
-        if (mounted) setReady(true);
-      } catch (e: any) {
-        const msg = e?.message ? String(e.message) : String(e);
-        if (mounted) setInitError(msg);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [isOwner, ready]);
-
-  if (!isOwner) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: (insets.top || 0) + 24 }]}>
-        <View style={styles.centered}>
-          <Text style={[styles.subtleText, { color: theme.colors.textSecondary, textAlign: 'center' }]}>
-            Go Live is currently limited to the owner account.
-          </Text>
-          <TouchableOpacity
-            style={[styles.goLiveButton, { backgroundColor: theme.colors.accent }]}
-            onPress={() => {
-              onExit?.();
-            }}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.goLiveButtonText}>Back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  if (initError) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: (insets.top || 0) + 24 }]}>
-        <View style={styles.centered}>
-          <Text style={[{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '900', marginBottom: 10, textAlign: 'center' }]}>
-            LiveKit failed to load
-          </Text>
-          <Text style={[styles.subtleText, { color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 16 }]}>
-            {initError}
-          </Text>
-          <TouchableOpacity
-            style={[styles.goLiveButton, { backgroundColor: theme.colors.accent }]}
-            onPress={() => onExit?.()}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.goLiveButtonText}>Back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background, paddingTop: (insets.top || 0) + 24 }]}>
-        <View style={styles.centered}>
-          <Text style={[{ color: theme.colors.textPrimary, fontSize: 16, fontWeight: '900', marginBottom: 10 }]}>
-            Preparing LiveKit…
-          </Text>
-          <Text style={[styles.subtleText, { color: theme.colors.textSecondary, textAlign: 'center', marginBottom: 18 }]}>
-            Loading video system. This should only take a moment.
-          </Text>
-          <View style={{ width: '100%', maxWidth: 320, aspectRatio: 9 / 16, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.15)', marginBottom: 18 }} />
-          <TouchableOpacity
-            style={[styles.goLiveButton, { backgroundColor: theme.colors.cardSurface }]}
-            onPress={() => onExit?.()}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.goLiveButtonText, { color: theme.colors.textPrimary }]}>Back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  return <SoloHostStreamScreenLive onExit={onExit} />;
-}
-
-function SoloHostStreamScreenLive({ onExit }: SoloHostStreamScreenProps) {
+  
   const insets = useSafeAreaInsets();
   const { theme } = useThemeMode();
   const { user } = useAuthContext();
@@ -210,11 +74,7 @@ function SoloHostStreamScreenLive({ onExit }: SoloHostStreamScreenProps) {
   const [requestingPermissions, setRequestingPermissions] = useState(false);
   const [permissionsRequested, setPermissionsRequested] = useState(false);
   
-  // LiveKit streaming - SOLO STREAM FIX: Use unique room per user profile
-  const useLiveRoomParticipants = LK.useLiveRoomParticipants as any;
-  // Each solo host gets their own dedicated room: solo_${profile_id}
-  const soloRoomName = user?.id ? `solo_${user.id}` : undefined;
-  
+  // LiveKit streaming
   const {
     goLive,
     stopLive,
@@ -235,7 +95,7 @@ function SoloHostStreamScreenLive({ onExit }: SoloHostStreamScreenProps) {
     lastConnectError,
     lastTokenError,
     isPublishing,
-  } = useLiveRoomParticipants({ enabled: true, roomName: soloRoomName });
+  } = useLiveRoomParticipants({ enabled: true });
 
   const { messages, loading: loadingMessages, retryMessage } = useChatMessages({
     liveStreamId: liveStreamId ?? undefined,
@@ -470,7 +330,7 @@ function SoloHostStreamScreenLive({ onExit }: SoloHostStreamScreenProps) {
 
   const localParticipant = participants.find((p) => p.isLocal) || null;
 
-  const tileParticipant: TileParticipant = {
+  const tileParticipant: Participant = {
     identity: localParticipant?.identity || currentUser?.id || 'local',
     username: currentUser?.display_name || currentUser?.username || 'You',
     isSpeaking: false,
@@ -628,21 +488,13 @@ function SoloHostStreamScreenLive({ onExit }: SoloHostStreamScreenProps) {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.videoStage}>
         <View style={styles.videoStageInner}>
-          {LK.Tile ? (
-            <LK.Tile
-              item={{ id: tileParticipant.identity, participant: tileParticipant, isAutofill: false }}
-              isEditMode={false}
-              isFocused={false}
-              isMinimized={false}
-              room={room as any}
-            />
-          ) : (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, fontWeight: '700', marginBottom: 8 }}>
-                Loading video…
-              </Text>
-            </View>
-          )}
+          <Tile
+            item={{ id: tileParticipant.identity, participant: tileParticipant, isAutofill: false }}
+            isEditMode={false}
+            isFocused={false}
+            isMinimized={false}
+            room={room as any}
+          />
         </View>
 
         <View pointerEvents="none" style={styles.videoTopShade} />
