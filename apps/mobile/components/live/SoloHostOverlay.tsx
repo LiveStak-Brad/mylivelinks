@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   hostNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 1,
+    gap: 0,
   },
   hostName: {
     fontSize: 12,
@@ -299,6 +299,7 @@ const styles = StyleSheet.create({
   proBadgeImage: {
     width: 56,
     height: 28,
+    marginLeft: -2,
   },
   rankRow: {
     flexDirection: 'row',
