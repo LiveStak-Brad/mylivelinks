@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -24,8 +24,43 @@ type PickerItem = {
   right?: React.ReactNode;
 };
 
+// Theme context for helper components
+type ThemedColors = {
+  bg: string;
+  card: string;
+  card2: string;
+  border: string;
+  text: string;
+  muted: string;
+  muted2: string;
+  inputBg: string;
+  inputBorder: string;
+};
+
+const ThemedColorsContext = createContext<ThemedColors | null>(null);
+
+function useThemedColors(): ThemedColors {
+  const ctx = useContext(ThemedColorsContext);
+  // Fallback to dark colors if context not available
+  if (!ctx) {
+    return {
+      bg: COLORS.bg,
+      card: COLORS.card,
+      card2: COLORS.card2,
+      border: COLORS.border,
+      text: COLORS.text,
+      muted: COLORS.muted,
+      muted2: COLORS.muted2,
+      inputBg: 'rgba(255,255,255,0.04)',
+      inputBorder: 'rgba(255,255,255,0.08)',
+    };
+  }
+  return ctx;
+}
+
 function Divider() {
-  return <View style={styles.divider} />;
+  const themed = useThemedColors();
+  return <View style={[styles.divider, { backgroundColor: themed.border }]} />;
 }
 
 function Card({
@@ -39,14 +74,15 @@ function Card({
   icon?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const themed = useThemedColors();
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, { backgroundColor: themed.card, borderColor: themed.border }]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
           {icon ? <View style={styles.cardIconWrap}>{icon}</View> : null}
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>{title}</Text>
-            {subtitle ? <Text style={styles.cardSubtitle}>{subtitle}</Text> : null}
+            <Text style={[styles.cardTitle, { color: themed.text }]}>{title}</Text>
+            {subtitle ? <Text style={[styles.cardSubtitle, { color: themed.muted }]}>{subtitle}</Text> : null}
           </View>
         </View>
       </View>
@@ -72,18 +108,19 @@ function Row({
   disabled?: boolean;
   onPress?: () => void;
 }) {
+  const themed = useThemedColors();
   const content = (
-    <View style={[styles.row, disabled && styles.rowDisabled]}>
+    <View style={[styles.row, { backgroundColor: themed.card2, borderColor: themed.border }, disabled && styles.rowDisabled]}>
       <View style={styles.rowLeft}>
-        {leftIcon ? <View style={styles.rowIcon}>{leftIcon}</View> : null}
+        {leftIcon ? <View style={[styles.rowIcon, { backgroundColor: themed.card, borderColor: themed.border }]}>{leftIcon}</View> : null}
         <View style={{ flex: 1 }}>
-          <Text style={styles.rowLabel}>{label}</Text>
-          {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-          {hint ? <Text style={styles.rowHint}>{hint}</Text> : null}
+          <Text style={[styles.rowLabel, { color: themed.text }]}>{label}</Text>
+          {value ? <Text style={[styles.rowValue, { color: themed.muted }]}>{value}</Text> : null}
+          {hint ? <Text style={[styles.rowHint, { color: themed.muted2 }]}>{hint}</Text> : null}
         </View>
       </View>
       <View style={styles.rowRight}>
-        {right ?? <Ionicons name="chevron-forward" size={18} color={COLORS.muted} />}
+        {right ?? <Ionicons name="chevron-forward" size={18} color={themed.muted} />}
       </View>
     </View>
   );
@@ -109,18 +146,13 @@ function Button({
   disabled?: boolean;
   onPress?: () => void;
 }) {
+  const themed = useThemedColors();
   const toneStyle =
     tone === 'primary'
       ? styles.btnPrimary
       : tone === 'danger'
         ? styles.btnDanger
         : styles.btnSecondary;
-  const textStyle =
-    tone === 'primary'
-      ? styles.btnPrimaryText
-      : tone === 'danger'
-        ? styles.btnDangerText
-        : styles.btnSecondaryText;
 
   return (
     <Pressable
@@ -129,6 +161,7 @@ function Button({
       style={({ pressed }) => [
         styles.btn,
         toneStyle,
+        tone === 'secondary' && { backgroundColor: themed.card, borderColor: themed.border },
         (disabled || !onPress) && styles.btnDisabled,
         pressed && !(disabled || !onPress) && styles.btnPressed,
       ]}
@@ -137,11 +170,11 @@ function Button({
         <Ionicons
           name={iconName}
           size={18}
-          color={tone === 'primary' ? COLORS.white : tone === 'danger' ? COLORS.red600 : COLORS.text}
+          color={tone === 'primary' ? COLORS.white : tone === 'danger' ? COLORS.red600 : themed.text}
           style={{ marginRight: 8 }}
         />
       ) : null}
-      <Text style={[styles.btnText, textStyle]}>{label}</Text>
+      <Text style={[styles.btnText, tone === 'primary' ? styles.btnPrimaryText : tone === 'danger' ? styles.btnDangerText : { color: themed.text }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -169,29 +202,31 @@ function Field({
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'url';
   maxLength?: number;
 }) {
+  const themed = useThemedColors();
   return (
     <View style={{ marginBottom: 12 }}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={[styles.inputWrap, disabled && styles.inputWrapDisabled]}>
+      <Text style={[styles.fieldLabel, { color: themed.text }]}>{label}</Text>
+      <View style={[styles.inputWrap, { backgroundColor: themed.inputBg, borderColor: themed.inputBorder }, disabled && styles.inputWrapDisabled]}>
         <TextInput
           placeholder={placeholder}
-          placeholderTextColor={COLORS.muted}
+          placeholderTextColor={themed.muted}
           editable={!disabled}
           multiline={multiline}
           value={value}
           onChangeText={onChangeText}
           keyboardType={keyboardType}
           maxLength={maxLength}
-          style={[styles.input, multiline && styles.inputMultiline]}
+          style={[styles.input, { color: themed.text }, multiline && styles.inputMultiline]}
         />
         {right ? <View style={styles.inputRight}>{right}</View> : null}
       </View>
-      {helper ? <Text style={styles.fieldHelper}>{helper}</Text> : null}
+      {helper ? <Text style={[styles.fieldHelper, { color: themed.muted2 }]}>{helper}</Text> : null}
     </View>
   );
 }
 
 function Chip({ label, selected, disabled }: { label: string; selected?: boolean; disabled?: boolean }) {
+  const themed = useThemedColors();
   return (
     <View
       style={[
@@ -274,8 +309,24 @@ const COLORS = {
 };
 
 export default function SettingsProfileScreen() {
-  const { colors } = useTheme();
+  const { mode, colors } = useTheme();
   const currentUser = useCurrentUser();
+
+  // Theme-driven colors that override the static COLORS object
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      card: mode === 'dark' ? '#0F1A2E' : colors.surface,
+      card2: mode === 'dark' ? '#0E1930' : colors.surface,
+      border: mode === 'dark' ? 'rgba(255,255,255,0.08)' : colors.border,
+      text: colors.text,
+      muted: colors.mutedText,
+      muted2: (colors as any).subtleText ?? colors.mutedText,
+      inputBg: mode === 'dark' ? 'rgba(255,255,255,0.04)' : colors.surface,
+      inputBorder: mode === 'dark' ? 'rgba(255,255,255,0.08)' : colors.border,
+    }),
+    [mode, colors]
+  );
 
   const userId = currentUser.userId;
   const profile = currentUser.profile;
@@ -404,7 +455,8 @@ export default function SettingsProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
+    <ThemedColorsContext.Provider value={themed}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: themed.bg }]}>
       <PickerModal
         visible={modulesModalOpen}
         title="Customize Profile Modules"
@@ -424,7 +476,7 @@ export default function SettingsProfileScreen() {
         {/* Header */}
         <View style={{ marginBottom: 16 }}>
           <View style={styles.headerRow}>
-            <Text style={styles.screenTitle}>Edit Profile</Text>
+            <Text style={[styles.screenTitle, { color: themed.text }]}>Edit Profile</Text>
           </View>
           <View style={styles.headerActions}>
             <View style={styles.linkPill}>
@@ -922,6 +974,7 @@ export default function SettingsProfileScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+    </ThemedColorsContext.Provider>
   );
 }
 

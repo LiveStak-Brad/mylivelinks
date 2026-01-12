@@ -1,8 +1,46 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { createContext, useContext, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
+
+// Theme context for helper components
+type LeaderboardTheme = {
+  bg: string;
+  surface: string;
+  text: string;
+  mutedText: string;
+  border: string;
+  cardBg: string;
+  cardBorder: string;
+  segmentBg: string;
+  avatarBg: string;
+  avatarText: string;
+  podiumBg: string;
+};
+
+const LeaderboardThemeContext = createContext<LeaderboardTheme | null>(null);
+
+function useLeaderboardTheme(): LeaderboardTheme {
+  const ctx = useContext(LeaderboardThemeContext);
+  if (!ctx) {
+    // Fallback to dark theme
+    return {
+      bg: '#0B0B0F',
+      surface: '#12121A',
+      text: '#fff',
+      mutedText: '#9ca3af',
+      border: '#2a2a2a',
+      cardBg: '#1a1a1a',
+      cardBorder: '#2a2a2a',
+      segmentBg: '#0a0a0a',
+      avatarBg: '#111827',
+      avatarText: '#fff',
+      podiumBg: '#0a0a0a',
+    };
+  }
+  return ctx;
+}
 
 export default function LeaderboardsScreen() {
   const { mode, colors } = useTheme();
@@ -21,6 +59,7 @@ export default function LeaderboardsScreen() {
       segmentBg: mode === 'dark' ? '#0a0a0a' : colors.surface,
       avatarBg: mode === 'dark' ? '#111827' : 'rgba(124, 58, 237, 0.12)',
       avatarText: mode === 'dark' ? '#fff' : colors.text,
+      podiumBg: mode === 'dark' ? '#0a0a0a' : colors.surface,
     }),
     [mode, colors]
   );
@@ -100,7 +139,8 @@ export default function LeaderboardsScreen() {
   }, [category]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
+    <LeaderboardThemeContext.Provider value={themed}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <View style={styles.header}>
           <View style={styles.headerIcon}>
@@ -227,6 +267,7 @@ export default function LeaderboardsScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+    </LeaderboardThemeContext.Provider>
   );
 }
 
@@ -277,12 +318,13 @@ function PodiumSpot(props: {
   accent: string;
   size: 'small' | 'large';
 }) {
+  const themed = useLeaderboardTheme();
   const isWinner = props.place === 1;
   const avatarSize = props.size === 'large' ? 56 : 44;
   const cardPad = props.size === 'large' ? 14 : 12;
 
   return (
-    <View style={[styles.podiumSpot, isWinner && styles.podiumSpotWinner]}>
+    <View style={[styles.podiumSpot, { backgroundColor: themed.podiumBg, borderColor: themed.cardBorder }, isWinner && styles.podiumSpotWinner]}>
       <View style={[styles.podiumBadge, { backgroundColor: props.accent }]}>
         <Text style={styles.podiumBadgeText}>{props.place}</Text>
       </View>
@@ -290,29 +332,29 @@ function PodiumSpot(props: {
       <View
         style={[
           styles.avatar,
-          { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
+          { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2, backgroundColor: themed.avatarBg, borderColor: themed.cardBorder },
         ]}
       >
-        <Text style={styles.avatarText}>{getInitials(props.name)}</Text>
+        <Text style={[styles.avatarText, { color: themed.avatarText }]}>{getInitials(props.name)}</Text>
       </View>
 
       <View style={[styles.podiumInfo, { paddingHorizontal: cardPad }]}>
         <View style={styles.podiumNameRow}>
           {isWinner ? <Ionicons name="ribbon" size={14} color="#fbbf24" /> : null}
-          <Text style={styles.podiumName} numberOfLines={1}>
+          <Text style={[styles.podiumName, { color: themed.text }]} numberOfLines={1}>
             {props.name}
           </Text>
         </View>
-        <Text style={styles.podiumHandle} numberOfLines={1}>
+        <Text style={[styles.podiumHandle, { color: themed.mutedText }]} numberOfLines={1}>
           {props.handle}
         </Text>
         <View style={styles.podiumScoreRow}>
           <Ionicons
             name={props.scoreLabel === 'Coins' ? 'cash-outline' : 'diamond-outline'}
             size={14}
-            color="#e5e7eb"
+            color={themed.text}
           />
-          <Text style={styles.podiumScore}>
+          <Text style={[styles.podiumScore, { color: themed.text }]}>
             {props.score} {props.scoreLabel}
           </Text>
         </View>
@@ -329,24 +371,25 @@ function LeaderboardRow(props: {
   trend: 'up' | 'down' | 'flat';
   isLast: boolean;
 }) {
+  const themed = useLeaderboardTheme();
   const trendIcon =
     props.trend === 'up' ? 'caret-up' : props.trend === 'down' ? 'caret-down' : 'remove';
   const trendColor =
-    props.trend === 'up' ? '#22c55e' : props.trend === 'down' ? '#ef4444' : '#9ca3af';
+    props.trend === 'up' ? '#22c55e' : props.trend === 'down' ? '#ef4444' : themed.mutedText;
 
   return (
-    <View style={[styles.row, props.isLast && styles.rowLast]}>
-      <Text style={[styles.rank, styles.colRank]}>{props.rank}</Text>
+    <View style={[styles.row, { borderBottomColor: themed.cardBorder }, props.isLast && styles.rowLast]}>
+      <Text style={[styles.rank, styles.colRank, { color: themed.text }]}>{props.rank}</Text>
 
       <View style={[styles.userCell, styles.colUser]}>
-        <View style={styles.avatarSmall}>
-          <Text style={styles.avatarSmallText}>{getInitials(props.name)}</Text>
+        <View style={[styles.avatarSmall, { backgroundColor: themed.avatarBg, borderColor: themed.cardBorder }]}>
+          <Text style={[styles.avatarSmallText, { color: themed.avatarText }]}>{getInitials(props.name)}</Text>
         </View>
         <View style={styles.userText}>
-          <Text style={styles.userName} numberOfLines={1}>
+          <Text style={[styles.userName, { color: themed.text }]} numberOfLines={1}>
             {props.name}
           </Text>
-          <Text style={styles.userHandle} numberOfLines={1}>
+          <Text style={[styles.userHandle, { color: themed.mutedText }]} numberOfLines={1}>
             {props.handle}
           </Text>
         </View>
@@ -354,7 +397,7 @@ function LeaderboardRow(props: {
 
       <View style={[styles.scoreCell, styles.colScore]}>
         <Ionicons name={trendIcon as any} size={14} color={trendColor} />
-        <Text style={styles.scoreText}>{props.score}</Text>
+        <Text style={[styles.scoreText, { color: themed.text }]}>{props.score}</Text>
       </View>
     </View>
   );
