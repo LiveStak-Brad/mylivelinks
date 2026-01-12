@@ -69,64 +69,62 @@ export default function GoLiveScreen() {
 
   const needsPermissions = !cameraGranted || !micGranted;
 
-  // Track if we've attempted to start preview
-  const [previewAttempted, setPreviewAttempted] = useState(false);
+  // Track if preview is loading
+  const [previewLoading, setPreviewLoading] = useState(false);
 
-  // Request Android permissions on mount (iOS will prompt on camera access)
+  // Function to start camera preview
+  const startCameraPreview = useCallback(async () => {
+    if (previewLoading || previewTrack) return;
+    
+    setPreviewLoading(true);
+    setPreviewError(null);
+
+    try {
+      // Small delay to ensure native modules are ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const track = await createLocalVideoTrack({
+        facingMode: cameraFacing,
+        resolution: VideoPresets.h720.resolution,
+      });
+
+      setPreviewTrack(track);
+      setCameraGranted(true);
+      setMicGranted(true);
+      setPreviewError(null);
+    } catch (err: any) {
+      console.error('[GoLive] Preview error:', err);
+      setPreviewError(err?.message || 'Camera access denied. Please enable in Settings.');
+      setCameraGranted(false);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, [cameraFacing, previewLoading, previewTrack]);
+
+  // Request Android permissions on mount
   useEffect(() => {
     if (Platform.OS === 'android' && !permissionsRequested) {
       setPermissionsRequested(true);
       requestAndroidPermissions().then(({ camera, mic }) => {
         setCameraGranted(camera);
         setMicGranted(mic);
+        // Auto-start preview if Android permissions granted
+        if (camera) {
+          startCameraPreview();
+        }
       });
     }
-  }, [permissionsRequested]);
+  }, [permissionsRequested, startCameraPreview]);
 
-  // Create preview track - only when explicitly requested or after Android permissions granted
+  // Handle camera facing change - recreate track
   useEffect(() => {
-    // On Android, wait for permissions
-    if (Platform.OS === 'android' && !cameraGranted) return;
-    // On iOS, wait for user to tap Enable
-    if (Platform.OS === 'ios' && !previewAttempted) return;
-
-    let mounted = true;
-    let track: LocalVideoTrack | null = null;
-
-    const startPreview = async () => {
-      try {
-        track = await createLocalVideoTrack({
-          facingMode: cameraFacing,
-          resolution: VideoPresets.h720.resolution,
-        });
-
-        if (mounted) {
-          setPreviewTrack(track);
-          setPreviewError(null);
-          // If we got here, permissions were granted (iOS will have prompted)
-          setCameraGranted(true);
-          setMicGranted(true); // Assume mic is also granted for now
-        } else {
-          track.stop();
-        }
-      } catch (err) {
-        console.error('[GoLive] Preview error:', err);
-        if (mounted) {
-          setPreviewError('Camera access denied. Please enable in Settings.');
-          setCameraGranted(false);
-        }
-      }
-    };
-
-    startPreview();
-
-    return () => {
-      mounted = false;
-      if (track) {
-        track.stop();
-      }
-    };
-  }, [cameraGranted, cameraFacing, previewAttempted]);
+    if (!previewTrack) return;
+    
+    // Stop current track and create new one with new facing
+    previewTrack.stop();
+    setPreviewTrack(null);
+    startCameraPreview();
+  }, [cameraFacing]); // Intentionally not including other deps to avoid loops
 
   // Cleanup on unmount
   useEffect(() => {
@@ -148,11 +146,14 @@ export default function GoLiveScreen() {
       const { camera, mic } = await requestAndroidPermissions();
       setCameraGranted(camera);
       setMicGranted(mic);
+      if (camera) {
+        startCameraPreview();
+      }
     } else {
-      // iOS: trigger camera access which will show permission dialog
-      setPreviewAttempted(true);
+      // iOS: trying to access camera will trigger permission dialog
+      startCameraPreview();
     }
-  }, []);
+  }, [startCameraPreview]);
 
   // Handle close
   const handleClose = useCallback(() => {
@@ -240,7 +241,7 @@ export default function GoLiveScreen() {
           <View style={styles.previewPlaceholder}>
             <Ionicons name="videocam" size={48} color="rgba(255,255,255,0.2)" />
             <Text style={styles.previewText}>
-              {previewError || (cameraGranted ? 'Starting camera...' : 'Camera Preview')}
+              {previewError || (previewLoading ? 'Starting camera...' : 'Camera Preview')}
             </Text>
             <Text style={styles.previewHint}>
               {cameraFacing === 'user' ? 'Front camera' : 'Back camera'}
