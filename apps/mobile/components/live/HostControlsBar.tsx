@@ -1,6 +1,11 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+// Brand colors from logo
+const BRAND_PINK = '#E91E8C';
+const BRAND_CYAN = '#00D4FF';
+const BRAND_PURPLE = '#A855F7';
 
 interface HostControlsBarProps {
   onBattle: () => void;
@@ -40,11 +45,20 @@ export default function HostControlsBar({
   return (
     <View style={styles.container}>
       <View style={styles.bar}>
-        <ControlButton icon="flash-outline" onPress={onBattle} color="#F97316" />
-        <ControlButton icon="person-add-outline" onPress={onCoHost} color="#A855F7" />
-        <ControlButton icon="people-outline" onPress={onGuests} color="#22C55E" />
-        <ControlButton icon="settings-outline" onPress={onSettings} color="#3B82F6" />
-        <ControlButton icon="color-filter-outline" onPress={onFilters} color="#06B6D4" />
+        {/* Battle - Crossed swords icon */}
+        <Pressable
+          onPress={onBattle}
+          style={({ pressed }) => [
+            styles.button,
+            pressed && styles.buttonPressed,
+          ]}
+        >
+          <MaterialCommunityIcons name="sword-cross" size={24} color={BRAND_PINK} />
+        </Pressable>
+        <ControlButton icon="person-add-outline" onPress={onCoHost} color={BRAND_PURPLE} />
+        <ControlButton icon="people-outline" onPress={onGuests} color={BRAND_CYAN} />
+        <ControlButton icon="settings-outline" onPress={onSettings} color={BRAND_PINK} />
+        <ControlButton icon="color-filter-outline" onPress={onFilters} color={BRAND_CYAN} />
       </View>
     </View>
   );
