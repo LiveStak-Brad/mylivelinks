@@ -113,9 +113,7 @@ export default function SoloHostOverlay({
                   {hostName}
                 </Text>
                 {isPro && (
-                  <View style={styles.proBadgeContainer}>
-                    <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="cover" />
-                  </View>
+                  <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
                 )}
               </View>
               {/* Trending + Leaderboard row (like web) */}
@@ -298,17 +296,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     flexShrink: 1,
   },
-  proBadgeContainer: {
-    width: 36,
-    height: 14,
-    overflow: 'hidden',
-    marginLeft: 2,
-  },
   proBadgeImage: {
     width: 56,
     height: 28,
-    marginTop: -7,
-    marginLeft: -10,
+    marginLeft: -8,
+    marginTop: -4,
+    marginBottom: -4,
   },
   rankRow: {
     flexDirection: 'row',
