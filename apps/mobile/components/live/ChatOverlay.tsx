@@ -19,7 +19,36 @@ export interface ChatMessage {
   isPro?: boolean;
 }
 
-// Gifter tier configuration (matches web lib/gifter-tiers.ts exactly)
+// Gifter tier configuration (matches web lib/gifter-status.ts exactly)
+interface TierDef {
+  key: string;
+  name: string;
+  color: string;
+  icon: string;
+  start: number;
+  end: number | null;
+  growth: number;
+  levelCount: number | null;
+}
+
+const DIAMOND_UNLOCK_COINS = 60_000_000;
+const DIAMOND_BASE_COST = 3_000_000;
+const DIAMOND_GROWTH = 1.45;
+
+const TIERS: TierDef[] = [
+  { key: 'starter', name: 'Starter', color: '#9CA3AF', icon: '🌱', start: 0, end: 60_000, growth: 1.1, levelCount: 50 },
+  { key: 'supporter', name: 'Supporter', color: '#CD7F32', icon: '🤝', start: 60_000, end: 300_000, growth: 1.12, levelCount: 50 },
+  { key: 'contributor', name: 'Contributor', color: '#C0C0C0', icon: '⭐', start: 300_000, end: 900_000, growth: 1.15, levelCount: 50 },
+  { key: 'elite', name: 'Elite', color: '#D4AF37', icon: '👑', start: 900_000, end: 2_400_000, growth: 1.18, levelCount: 50 },
+  { key: 'patron', name: 'Patron', color: '#22C55E', icon: '🏆', start: 2_400_000, end: 6_000_000, growth: 1.22, levelCount: 50 },
+  { key: 'power', name: 'Power', color: '#3B82F6', icon: '⚡', start: 6_000_000, end: 15_000_000, growth: 1.26, levelCount: 50 },
+  { key: 'vip', name: 'VIP', color: '#EF4444', icon: '🔥', start: 15_000_000, end: 30_000_000, growth: 1.3, levelCount: 50 },
+  { key: 'legend', name: 'Legend', color: '#A855F7', icon: '🌟', start: 30_000_000, end: 45_000_000, growth: 1.35, levelCount: 50 },
+  { key: 'mythic', name: 'Mythic', color: '#111827', icon: '🔮', start: 45_000_000, end: 60_000_000, growth: 1.4, levelCount: 50 },
+  { key: 'diamond', name: 'Diamond', color: '#22D3EE', icon: '💎', start: 60_000_000, end: null, growth: DIAMOND_GROWTH, levelCount: null },
+];
+
+// Legacy interface for getTierByKey
 export interface GifterTier {
   key: string;
   name: string;
@@ -29,46 +58,127 @@ export interface GifterTier {
   maxCoins: number | null;
 }
 
-export const GIFTER_TIERS: GifterTier[] = [
-  { key: 'starter', name: 'Starter', color: '#9CA3AF', icon: '🌱', minCoins: 0, maxCoins: 59_999 },
-  { key: 'supporter', name: 'Supporter', color: '#CD7F32', icon: '🤝', minCoins: 60_000, maxCoins: 299_999 },
-  { key: 'contributor', name: 'Contributor', color: '#C0C0C0', icon: '⭐', minCoins: 300_000, maxCoins: 899_999 },
-  { key: 'elite', name: 'Elite', color: '#D4AF37', icon: '👑', minCoins: 900_000, maxCoins: 2_399_999 },
-  { key: 'patron', name: 'Patron', color: '#22C55E', icon: '🏆', minCoins: 2_400_000, maxCoins: 5_999_999 },
-  { key: 'power', name: 'Power', color: '#3B82F6', icon: '⚡', minCoins: 6_000_000, maxCoins: 14_999_999 },
-  { key: 'vip', name: 'VIP', color: '#EF4444', icon: '🔥', minCoins: 15_000_000, maxCoins: 29_999_999 },
-  { key: 'legend', name: 'Legend', color: '#A855F7', icon: '🌟', minCoins: 30_000_000, maxCoins: 44_999_999 },
-  { key: 'mythic', name: 'Mythic', color: '#111827', icon: '🔮', minCoins: 45_000_000, maxCoins: 59_999_999 },
-  { key: 'diamond', name: 'Diamond', color: '#22D3EE', icon: '💎', minCoins: 60_000_000, maxCoins: null },
-];
+export const GIFTER_TIERS: GifterTier[] = TIERS.map((t) => ({
+  key: t.key,
+  name: t.name,
+  color: t.color,
+  icon: t.icon,
+  minCoins: t.start,
+  maxCoins: t.end,
+}));
 
 export function getTierByKey(key: string): GifterTier | undefined {
   return GIFTER_TIERS.find((t) => t.key === key);
 }
 
-// Get tier and level from lifetime coins (matches web lib/gifter-status.ts logic)
-export function getGifterTierFromCoins(lifetimeCoins: number): { tierKey: string; levelInTier: number } {
-  const coins = Math.max(0, Math.floor(lifetimeCoins || 0));
-  
-  // Find the tier based on lifetime coins
-  let tier = GIFTER_TIERS[0];
-  for (const t of GIFTER_TIERS) {
-    if (t.maxCoins === null) {
-      // Diamond tier (no max)
-      if (coins >= t.minCoins) tier = t;
-      break;
-    }
-    if (coins >= t.minCoins && coins <= t.maxCoins) {
-      tier = t;
-      break;
+// Compute tier boundaries with exponential growth (matches web exactly)
+function computeTierBoundaries(start: number, end: number, growth: number, levelCount: number): number[] {
+  const totalSpan = end - start;
+  if (totalSpan <= 0) return [start, end];
+
+  const weights: number[] = [];
+  let sumW = 0;
+  for (let i = 0; i < levelCount; i++) {
+    const w = Math.pow(growth, i);
+    weights.push(w);
+    sumW += w;
+  }
+
+  const increments: number[] = [];
+  let used = 0;
+  for (let i = 0; i < levelCount; i++) {
+    if (i === levelCount - 1) {
+      increments.push(totalSpan - used);
+    } else {
+      const inc = Math.floor((totalSpan * weights[i]) / sumW);
+      increments.push(inc);
+      used += inc;
     }
   }
-  
-  // Calculate level within tier (simplified - 50 levels per tier, linear distribution)
-  const tierRange = tier.maxCoins === null ? 10_000_000 : (tier.maxCoins - tier.minCoins + 1);
-  const coinsInTier = coins - tier.minCoins;
-  const levelInTier = Math.min(50, Math.max(1, Math.floor((coinsInTier / tierRange) * 50) + 1));
-  
+
+  const boundaries: number[] = [start];
+  let cur = start;
+  for (let i = 0; i < levelCount; i++) {
+    cur += increments[i];
+    boundaries.push(cur);
+  }
+
+  boundaries[boundaries.length - 1] = end;
+  for (let i = 1; i < boundaries.length; i++) {
+    if (boundaries[i] < boundaries[i - 1]) boundaries[i] = boundaries[i - 1];
+  }
+
+  return boundaries;
+}
+
+// Find level within tier boundaries using binary search (matches web exactly)
+function findLevelInBoundaries(coins: number, boundaries: number[]): number {
+  let lo = 0;
+  let hi = boundaries.length - 2;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const a = boundaries[mid];
+    const b = boundaries[mid + 1];
+    if (coins < a) {
+      hi = mid - 1;
+    } else if (coins >= b) {
+      lo = mid + 1;
+    } else {
+      return mid + 1;
+    }
+  }
+  return Math.max(1, Math.min(boundaries.length - 1, lo + 1));
+}
+
+// Diamond level calculation (matches web exactly)
+function diamondCost(step: number): number {
+  return Math.floor(DIAMOND_BASE_COST * Math.pow(DIAMOND_GROWTH, step - 1));
+}
+
+function computeDiamond(coins: number) {
+  let level = 1;
+  let levelStart = DIAMOND_UNLOCK_COINS;
+  let next = DIAMOND_UNLOCK_COINS + diamondCost(1);
+
+  while (coins >= next) {
+    level += 1;
+    levelStart = next;
+    next = next + diamondCost(level);
+  }
+
+  return { level, levelStart, nextLevel: next };
+}
+
+// Get tier and level from lifetime coins (matches web lib/gifter-status.ts exactly)
+export function getGifterTierFromCoins(lifetimeCoins: number): { tierKey: string; levelInTier: number } {
+  const lifetime = Math.max(0, Math.floor(lifetimeCoins || 0));
+  const isDiamond = lifetime >= DIAMOND_UNLOCK_COINS;
+
+  // Find tier
+  const tier = (() => {
+    if (isDiamond) {
+      return TIERS.find((t) => t.key === 'diamond')!;
+    }
+
+    for (const t of TIERS) {
+      if (t.end === null) continue;
+      if (lifetime >= t.start && lifetime < t.end) return t;
+    }
+
+    return TIERS[0];
+  })();
+
+  // Calculate level within tier
+  let levelInTier = 1;
+
+  if (isDiamond) {
+    const d = computeDiamond(lifetime);
+    levelInTier = d.level;
+  } else {
+    const boundaries = computeTierBoundaries(tier.start, tier.end!, tier.growth, 50);
+    levelInTier = findLevelInBoundaries(lifetime, boundaries);
+  }
+
   return { tierKey: tier.key, levelInTier };
 }
 
