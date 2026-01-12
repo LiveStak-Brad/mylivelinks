@@ -214,7 +214,7 @@ export default function GoLiveScreen() {
     }
   }, [streamTitle, user, needsPermissions, videoTrack, audioTrack]);
 
-  // Handle End Live
+  // Handle End Live - full cleanup and reset to preview state
   const handleEndLive = useCallback(() => {
     Alert.alert('End Stream', 'Are you sure you want to end your stream?', [
       { text: 'Cancel', style: 'cancel' },
@@ -222,24 +222,41 @@ export default function GoLiveScreen() {
         text: 'End Stream',
         style: 'destructive',
         onPress: async () => {
+          console.log('[GoLive] Ending stream and cleaning up...');
+          
           // Disconnect from LiveKit room
           if (roomRef.current) {
             roomRef.current.disconnect();
             roomRef.current = null;
           }
           
+          // Stop and clear tracks (they become stale after room disconnect)
+          if (videoTrack) {
+            videoTrack.stop();
+          }
+          if (audioTrack) {
+            audioTrack.stop();
+          }
+          setVideoTrack(null);
+          setAudioTrack(null);
+          
           // End the live_streams record in database
           if (user?.id) {
             await endLiveStreamRecord(user.id);
           }
           
+          // Reset all state to initial
           setIsLive(false);
           setViewerCount(0);
-          console.log('[GoLive] Stream ended, removed from LiveTV.');
+          setCameraGranted(false);
+          setMicGranted(false);
+          setPreviewError(null);
+          
+          console.log('[GoLive] Stream ended. Tap Enable to start a new preview.');
         },
       },
     ]);
-  }, [user]);
+  }, [user, videoTrack, audioTrack]);
 
   return (
     <View style={styles.container}>
