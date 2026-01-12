@@ -202,6 +202,7 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
           .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
           .not('username', 'is', null)
           .neq('id', userId)
+          .not('id', 'in', `(${followingIds.join(',')})`)
           .order('follower_count', { ascending: false })
           .limit(15);
         
@@ -234,11 +235,26 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
       return combined.slice(0, 15);
     } catch (error) {
       console.error('[ProfileCarousel] Recommendation error:', error);
-      const { data } = await supabase
+      
+      const { data: following } = await supabase
+        .from('follows')
+        .select('followee_id')
+        .eq('follower_id', userId)
+        .limit(100);
+      
+      const followingIds = following?.map((f: { followee_id: string }) => f.followee_id) || [];
+      
+      const query = supabase
         .from('profiles')
         .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
         .not('username', 'is', null)
-        .neq('id', userId)
+        .neq('id', userId);
+      
+      if (followingIds.length > 0) {
+        query.not('id', 'in', `(${followingIds.join(',')})`);
+      }
+      
+      const { data } = await query
         .order('follower_count', { ascending: false })
         .limit(15);
       
