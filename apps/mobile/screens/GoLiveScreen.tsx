@@ -95,7 +95,7 @@ export default function GoLiveScreen() {
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('username, display_name, avatar_url, is_pro')
+          .select('username, display_name, avatar_url, is_mll_pro')
           .eq('id', user.id)
           .single();
 
@@ -108,7 +108,7 @@ export default function GoLiveScreen() {
           setHostProfile({
             displayName: profile.display_name || profile.username || 'Host',
             avatarUrl: profile.avatar_url || undefined,
-            isPro: profile.is_pro ?? false,
+            isPro: profile.is_mll_pro ?? false,
           });
         }
       } catch (err) {
