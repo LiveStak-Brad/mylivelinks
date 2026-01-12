@@ -1356,7 +1356,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                             style={msg.chat_bubble_color ? { color: msg.chat_bubble_color } : { color: '#FFFFFF' }}
                             showGifterBadge={false}
                           />
-                          {gifterStatusMap[msg.profile_id] && Number(gifterStatusMap[msg.profile_id]?.lifetime_coins ?? 0) > 0 && (
+                          {msg.profile_id && gifterStatusMap[msg.profile_id] && Number(gifterStatusMap[msg.profile_id]?.lifetime_coins ?? 0) > 0 && (
                             <div className="flex-shrink-0" style={{ transform: 'scale(0.7)', transformOrigin: 'left center' }}>
                               <TierBadge
                                 tier_key={gifterStatusMap[msg.profile_id].tier_key}
