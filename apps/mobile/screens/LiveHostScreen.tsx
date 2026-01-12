@@ -1,12 +1,14 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
 import SoloHostOverlay from '../components/live/SoloHostOverlay';
-import type { ChatMessage, ChatFontColor } from '../components/live/ChatOverlay';
+import type { ChatMessage } from '../components/live/ChatOverlay';
 import type { TopGifter } from '../components/live/TopGifterBubbles';
+import { useAuth } from '../state/AuthContext';
+import { DEFAULT_HOST_LIVE_OPTIONS, loadHostLiveOptions, saveHostLiveOptions, type HostLiveOptions } from '../lib/hostLiveOptions';
 
 // ============================================================================
 // MOCK DATA - Host info, gifters, and chat messages
@@ -22,9 +24,6 @@ const MOCK_TOP_GIFTERS: TopGifter[] = [
   { id: '2', username: 'GenGifter', avatarUrl: 'https://i.pravatar.cc/100?u=gengifter', totalCoins: 2500 },
   { id: '3', username: 'CoinKing', avatarUrl: 'https://i.pravatar.cc/100?u=coinking', totalCoins: 1200 },
 ];
-
-// Mock chat font color (from approved palette)
-const MOCK_CHAT_FONT_COLOR: ChatFontColor = '#FFFFFF';
 
 const MOCK_MESSAGES: ChatMessage[] = [
   { id: '1', type: 'system', username: 'System', text: 'Stream started' },
@@ -60,6 +59,7 @@ const MOCK_MESSAGES: ChatMessage[] = [
 
 export default function LiveHostScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
 
   // Setup state
   const [streamTitle, setStreamTitle] = useState('');
@@ -79,6 +79,10 @@ export default function LiveHostScreen() {
   // LIVE STATE - toggles between setup and live overlay
   const [isLive, setIsLive] = useState(false);
   const [viewerCount, setViewerCount] = useState(127);
+
+  // Host overlay filters (persisted per profile ID; UI-only)
+  const profileId = user?.id ?? 'anonymous';
+  const [hostFilters, setHostFilters] = useState<HostLiveOptions>(DEFAULT_HOST_LIVE_OPTIONS);
 
   // Host controls state (UI-only)
   const [isMuted, setIsMuted] = useState(false);
@@ -114,6 +118,18 @@ export default function LiveHostScreen() {
     }, 3000);
     return () => clearInterval(interval);
   };
+
+  // Load persisted options on mount (and when user changes), so they apply instantly when going live.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const loaded = await loadHostLiveOptions(profileId);
+      if (!cancelled) setHostFilters(loaded);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
 
   // Handler: End Stream (mock - returns to setup)
   const handleEndStream = () => {
@@ -159,7 +175,11 @@ export default function LiveHostScreen() {
           messages={MOCK_MESSAGES}
           isMuted={isMuted}
           isCameraFlipped={isCameraFlipped}
-          chatFontColor={MOCK_CHAT_FONT_COLOR}
+          hostFilters={hostFilters}
+          onHostFiltersChange={(next) => {
+            setHostFilters(next);
+            void saveHostLiveOptions(profileId, next);
+          }}
           onEndStream={handleEndStream}
           onFlipCamera={() => setIsCameraFlipped((prev) => !prev)}
           onToggleMute={() => setIsMuted((prev) => !prev)}

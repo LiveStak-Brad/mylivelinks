@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
+import { CHAT_FONT_COLORS } from '../../live/ChatOverlay';
+import { DEFAULT_HOST_LIVE_OPTIONS, type HostLiveOptions } from '../../../lib/hostLiveOptions';
 
 interface BaseSheetProps {
   visible: boolean;
@@ -108,30 +110,105 @@ export function CoHostSheet({ visible, onClose }: BaseSheetProps) {
 }
 
 // Filters Sheet
-export function FiltersSheet({ visible, onClose }: BaseSheetProps) {
+export function FiltersSheet({
+  visible,
+  onClose,
+  filters = DEFAULT_HOST_LIVE_OPTIONS,
+  onChange,
+}: BaseSheetProps & {
+  filters?: HostLiveOptions;
+  onChange?: (next: HostLiveOptions) => void;
+}) {
+  const fontSizeLabel = useMemo(() => {
+    switch (filters.chatFontSize) {
+      case 'small':
+        return 'Small';
+      case 'large':
+        return 'Large';
+      default:
+        return 'Medium';
+    }
+  }, [filters.chatFontSize]);
+
+  const cycleChatFontSize = () => {
+    const next =
+      filters.chatFontSize === 'small'
+        ? 'medium'
+        : filters.chatFontSize === 'medium'
+          ? 'large'
+          : 'small';
+    onChange?.({ ...filters, chatFontSize: next });
+  };
+
+  const cycleChatFontColor = () => {
+    const idx = CHAT_FONT_COLORS.indexOf(filters.chatFontColor as any);
+    const safeIdx = idx >= 0 ? idx : 0;
+    const next = CHAT_FONT_COLORS[(safeIdx + 1) % CHAT_FONT_COLORS.length];
+    onChange?.({ ...filters, chatFontColor: next });
+  };
+
   return (
-    <SheetContainer visible={visible} onClose={onClose} title="Video Filters">
+    <SheetContainer visible={visible} onClose={onClose} title="Filters">
+      {/* Chat visibility */}
       <View style={styles.row}>
-        <Ionicons name="sunny-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Brightness</Text>
-        <View style={styles.slider} />
+        <Ionicons name="chatbubbles-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Chat overlay</Text>
+        <Switch
+          value={filters.chatVisible}
+          onValueChange={(v) => onChange?.({ ...filters, chatVisible: v })}
+        />
       </View>
-      <View style={styles.row}>
-        <Ionicons name="contrast-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Contrast</Text>
-        <View style={styles.slider} />
-      </View>
-      <View style={styles.row}>
+
+      {/* Chat font size (tap row to cycle) */}
+      <Pressable style={styles.row} onPress={cycleChatFontSize}>
+        <Ionicons name="text-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Chat font size</Text>
+        <View style={styles.valuePill}>
+          <Text style={styles.valuePillText}>{fontSizeLabel}</Text>
+          <Ionicons name="sync" size={14} color="rgba(255,255,255,0.7)" />
+        </View>
+      </Pressable>
+
+      {/* Chat font color (tap row to cycle) */}
+      <Pressable style={styles.row} onPress={cycleChatFontColor}>
         <Ionicons name="color-palette-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Saturation</Text>
-        <View style={styles.slider} />
-      </View>
+        <Text style={styles.rowText}>Chat font color</Text>
+        <View style={styles.valuePill}>
+          <View style={[styles.colorDot, { backgroundColor: filters.chatFontColor }]} />
+          <Text style={styles.valuePillText}>{filters.chatFontColor}</Text>
+          <Ionicons name="sync" size={14} color="rgba(255,255,255,0.7)" />
+        </View>
+      </Pressable>
+
+      {/* Show/hide top gifters */}
       <View style={styles.row}>
-        <Ionicons name="water-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Blur</Text>
-        <View style={styles.slider} />
+        <Ionicons name="gift-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Top gifters</Text>
+        <Switch
+          value={filters.showTopGifters}
+          onValueChange={(v) => onChange?.({ ...filters, showTopGifters: v })}
+        />
       </View>
-      <Text style={styles.placeholder}>Filters are UI-only placeholders</Text>
+
+      {/* Show/hide viewer count badge */}
+      <View style={styles.row}>
+        <Ionicons name="eye-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Viewer badge</Text>
+        <Switch
+          value={filters.showViewerCountBadge}
+          onValueChange={(v) => onChange?.({ ...filters, showViewerCountBadge: v })}
+        />
+      </View>
+
+      {/* Compact mode */}
+      <View style={styles.row}>
+        <Ionicons name="contract-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Compact mode</Text>
+        <Switch
+          value={filters.compactMode}
+          onValueChange={(v) => onChange?.({ ...filters, compactMode: v })}
+        />
+      </View>
     </SheetContainer>
   );
 }
@@ -579,6 +656,29 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 2,
+  },
+  valuePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  valuePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.9)',
+  },
+  colorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
   },
   emptyState: {
     alignItems: 'center',

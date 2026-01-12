@@ -9,6 +9,7 @@ const PRO_BADGE_IMAGE = require('../../assets/pro.png');
 import ChatOverlay, { ChatMessage, ChatFontColor } from './ChatOverlay';
 import TopGifterBubbles, { TopGifter } from './TopGifterBubbles';
 import HostControlsBar from './HostControlsBar';
+import { DEFAULT_HOST_LIVE_OPTIONS, type HostLiveOptions } from '../../lib/hostLiveOptions';
 import {
   SettingsSheet,
   GuestsSheet,
@@ -51,6 +52,10 @@ export interface SoloHostOverlayProps {
   
   // Chat font color (new spec)
   chatFontColor?: ChatFontColor;
+
+  // Host live overlay filters (persisted by screen; UI-only for now)
+  hostFilters?: HostLiveOptions;
+  onHostFiltersChange?: (next: HostLiveOptions) => void;
   
   // Handlers (placeholder)
   onEndStream: () => void;
@@ -74,12 +79,15 @@ export default function SoloHostOverlay({
   isMuted,
   isCameraFlipped,
   chatFontColor = '#FFFFFF',
+  hostFilters,
+  onHostFiltersChange,
   onEndStream,
   onShare,
   onFlipCamera,
   onToggleMute,
 }: SoloHostOverlayProps) {
   const insets = useSafeAreaInsets();
+  const filters = hostFilters ?? DEFAULT_HOST_LIVE_OPTIONS;
   
   // Sheet visibility states
   const [showSettings, setShowSettings] = useState(false);
@@ -161,16 +169,18 @@ export default function SoloHostOverlay({
         {/* Right cluster: Viewer count + Exit (matches web mobile layout) */}
         <View style={styles.topRightCluster}>
           {/* Viewer count badge - positioned near X on mobile (web parity) */}
-          <Pressable
-            onPress={() => setShowViewers(true)}
-            style={({ pressed }) => [
-              styles.viewerBadge,
-              pressed && styles.viewerBadgePressed,
-            ]}
-          >
-            <Ionicons name="eye" size={14} color="#FFFFFF" />
-            <Text style={styles.viewerCount}>{viewerCount.toLocaleString()}</Text>
-          </Pressable>
+          {filters.showViewerCountBadge && (
+            <Pressable
+              onPress={() => setShowViewers(true)}
+              style={({ pressed }) => [
+                styles.viewerBadge,
+                pressed && styles.viewerBadgePressed,
+              ]}
+            >
+              <Ionicons name="eye" size={14} color="#FFFFFF" />
+              <Text style={styles.viewerCount}>{viewerCount.toLocaleString()}</Text>
+            </Pressable>
+          )}
 
           {/* Exit button */}
           <Pressable
@@ -189,10 +199,12 @@ export default function SoloHostOverlay({
       <View style={[styles.secondRow, { top: insets.top + 56 }]}>
         {/* Top gifters + Share */}
         <View style={styles.secondRowRight}>
-          <TopGifterBubbles
-            gifters={topGifters}
-            onPress={() => setShowGifters(true)}
-          />
+          {filters.showTopGifters && (
+            <TopGifterBubbles
+              gifters={topGifters}
+              onPress={() => setShowGifters(true)}
+            />
+          )}
           <Pressable
             onPress={() => setShowShare(true)}
             style={({ pressed }) => [
@@ -206,9 +218,16 @@ export default function SoloHostOverlay({
       </View>
 
       {/* E. Chat Overlay (above bottom bar, closer to buttons) */}
-      <View style={[styles.chatContainer, { bottom: insets.bottom + 56 }]}>
-        <ChatOverlay messages={messages} fontColor={chatFontColor} />
-      </View>
+      {filters.chatVisible && (
+        <View style={[styles.chatContainer, { bottom: insets.bottom + 56 }]}>
+          <ChatOverlay
+            messages={messages}
+            fontColor={filters.chatFontColor ?? chatFontColor}
+            fontSize={filters.chatFontSize}
+            compactMode={filters.compactMode}
+          />
+        </View>
+      )}
 
       {/* F. Bottom Host Controls - Order: Battle, CoHost, Guests, Settings, Filters (web parity) */}
       <View style={[styles.bottomControls, { paddingBottom: insets.bottom }]}>
@@ -226,7 +245,12 @@ export default function SoloHostOverlay({
       <GuestsSheet visible={showGuests} onClose={() => setShowGuests(false)} />
       <BattleSheet visible={showBattle} onClose={() => setShowBattle(false)} />
       <CoHostSheet visible={showCoHost} onClose={() => setShowCoHost(false)} />
-      <FiltersSheet visible={showFilters} onClose={() => setShowFilters(false)} />
+      <FiltersSheet
+        visible={showFilters}
+        onClose={() => setShowFilters(false)}
+        filters={filters}
+        onChange={onHostFiltersChange}
+      />
       <ShareSheet visible={showShare} onClose={() => setShowShare(false)} />
       <ViewersSheet visible={showViewers} onClose={() => setShowViewers(false)} viewerCount={viewerCount} />
       <GiftersSheet visible={showGifters} onClose={() => setShowGifters(false)} />
