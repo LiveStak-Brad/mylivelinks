@@ -2,10 +2,12 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-// Brand colors from logo
-const BRAND_PINK = '#E91E8C';
-const BRAND_CYAN = '#00D4FF';
-const BRAND_PURPLE = '#A855F7';
+// Brand colors from logo palette - 5 distinct colors
+const COLOR_PINK = '#E91E8C';      // Hot pink
+const COLOR_CYAN = '#00D4FF';       // Bright cyan
+const COLOR_PURPLE = '#A855F7';     // Purple
+const COLOR_CORAL = '#FF6B9D';      // Coral pink
+const COLOR_VIOLET = '#8B5CF6';     // Blue-violet
 
 interface HostControlsBarProps {
   onBattle: () => void;
@@ -53,12 +55,12 @@ export default function HostControlsBar({
             pressed && styles.buttonPressed,
           ]}
         >
-          <MaterialCommunityIcons name="sword-cross" size={24} color={BRAND_PINK} />
+          <MaterialCommunityIcons name="sword-cross" size={24} color={COLOR_PINK} />
         </Pressable>
-        <ControlButton icon="person-add-outline" onPress={onCoHost} color={BRAND_PURPLE} />
-        <ControlButton icon="people-outline" onPress={onGuests} color={BRAND_CYAN} />
-        <ControlButton icon="settings-outline" onPress={onSettings} color={BRAND_PINK} />
-        <ControlButton icon="color-filter-outline" onPress={onFilters} color={BRAND_CYAN} />
+        <ControlButton icon="person-add-outline" onPress={onCoHost} color={COLOR_PURPLE} />
+        <ControlButton icon="people-outline" onPress={onGuests} color={COLOR_CYAN} />
+        <ControlButton icon="settings-outline" onPress={onSettings} color={COLOR_CORAL} />
+        <ControlButton icon="color-filter-outline" onPress={onFilters} color={COLOR_VIOLET} />
       </View>
     </View>
   );
