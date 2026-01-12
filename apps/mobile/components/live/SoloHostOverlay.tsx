@@ -79,19 +79,11 @@ export default function SoloHostOverlay({
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {/* A. Top Gradient Overlay (black → transparent) - matches web h-28 */}
-      <View style={[styles.topGradient, { paddingTop: insets.top }]} pointerEvents="none">
-        <View style={styles.gradientLayer1} />
-        <View style={styles.gradientLayer2} />
-        <View style={styles.gradientLayer3} />
-      </View>
+      {/* Top Gradient: darkest at top edge, fading towards center */}
+      <View style={styles.topGradient} pointerEvents="none" />
 
-      {/* B. Bottom Gradient Overlay (black → transparent) - matches web h-56 */}
-      <View style={[styles.bottomGradient, { paddingBottom: insets.bottom }]} pointerEvents="none">
-        <View style={styles.bottomGradientLayer1} />
-        <View style={styles.bottomGradientLayer2} />
-        <View style={styles.bottomGradientLayer3} />
-      </View>
+      {/* Bottom Gradient: darkest at bottom edge, fading towards center */}
+      <View style={styles.bottomGradient} pointerEvents="none" />
 
       {/* C. Top Bar - Web parity: Left (avatar+name), Right (viewer near X, then X) */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
@@ -214,70 +206,24 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
-  // Top gradient layers (simulating web h-28 gradient)
+  // Top gradient: single overlay, darkest at top edge
   topGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 112, // ~h-28 (28*4=112)
-  },
-  gradientLayer1: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 44,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-  },
-  gradientLayer2: {
-    position: 'absolute',
-    top: 44,
-    left: 0,
-    right: 0,
-    height: 36,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  gradientLayer3: {
-    position: 'absolute',
-    top: 80,
-    left: 0,
-    right: 0,
-    height: 32,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    height: 100,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 
-  // Bottom gradient layers (simulating web h-56 gradient)
+  // Bottom gradient: single overlay, darkest at bottom edge
   bottomGradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 224, // ~h-56 (56*4=224)
-  },
-  bottomGradientLayer1: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 90,
-    backgroundColor: 'rgba(0,0,0,0.95)',
-  },
-  bottomGradientLayer2: {
-    position: 'absolute',
-    bottom: 90,
-    left: 0,
-    right: 0,
-    height: 70,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-  },
-  bottomGradientLayer3: {
-    position: 'absolute',
-    bottom: 160,
-    left: 0,
-    right: 0,
-    height: 64,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    height: 160,
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
 
   // Top bar (web parity: left avatar+name, right viewer+X)
