@@ -3,6 +3,9 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+// Pro badge image
+const PRO_BADGE_IMAGE = require('../../assets/pro.png');
+
 import ChatOverlay, { ChatMessage, ChatFontColor } from './ChatOverlay';
 import TopGifterBubbles, { TopGifter } from './TopGifterBubbles';
 import HostControlsBar from './HostControlsBar';
@@ -28,6 +31,7 @@ export interface SoloHostOverlayProps {
   // Host info
   hostName: string;
   hostAvatarUrl?: string;
+  isPro?: boolean;
   
   // Counters
   viewerCount: number;
@@ -60,6 +64,7 @@ const PLACEHOLDER_AVATAR = 'https://via.placeholder.com/40/6366F1/FFFFFF?text=H'
 export default function SoloHostOverlay({
   hostName,
   hostAvatarUrl,
+  isPro = false,
   viewerCount,
   likesCount = 0,
   trendingRank,
@@ -103,9 +108,14 @@ export default function SoloHostOverlay({
               style={styles.hostAvatar}
             />
             <View style={styles.hostText}>
-              <Text style={styles.hostName} numberOfLines={1}>
-                {hostName}
-              </Text>
+              <View style={styles.hostNameRow}>
+                <Text style={styles.hostName} numberOfLines={1}>
+                  {hostName}
+                </Text>
+                {isPro && (
+                  <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
+                )}
+              </View>
               {/* Trending + Leaderboard row (like web) */}
               <View style={styles.rankRow}>
                 <Pressable
@@ -275,10 +285,20 @@ const styles = StyleSheet.create({
   hostText: {
     flex: 1,
   },
+  hostNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   hostName: {
     fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
+    flexShrink: 1,
+  },
+  proBadgeImage: {
+    width: 28,
+    height: 14,
   },
   rankRow: {
     flexDirection: 'row',
