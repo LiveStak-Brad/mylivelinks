@@ -129,22 +129,8 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
       }
 
       if (mountedRef.current) {
-        if (currentUserId && result.length > 0) {
-          const { data: following } = await supabase
-            .from('follows')
-            .select('followee_id')
-            .eq('follower_id', currentUserId)
-            .limit(100);
-          
-          const followingIds = following?.map((f: { followee_id: string }) => f.followee_id) || [];
-          const filtered = result.filter(p => !followingIds.includes(p.id));
-          
-          setProfiles(filtered);
-          saveToCache(currentUserId, filtered);
-        } else {
-          setProfiles(result);
-          saveToCache(currentUserId, result);
-        }
+        setProfiles(result);
+        saveToCache(currentUserId, result);
         setLoading(false);
         setError(null);
       }
@@ -211,31 +197,46 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
         .map(([id]) => id);
 
       if (recommendedIds.length === 0) {
-        const { data } = await supabase
+        const query = supabase
           .from('profiles')
           .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
           .not('username', 'is', null)
-          .neq('id', userId)
-          .not('id', 'in', `(${followingIds.join(',')})`)
-          .order('follower_count', { ascending: false })
-          .limit(15);
+          .neq('id', userId);
         
+        if (followingIds.length > 0) {
+          query.not('id', 'in', `(${followingIds.join(',')})`).order('follower_count', { ascending: false }).limit(15);
+        } else {
+          query.order('follower_count', { ascending: false }).limit(15);
+        }
+        
+        const { data } = await query;
         return data || [];
       }
 
-      const { data: recommended } = await supabase
+      let recommendedQuery = supabase
         .from('profiles')
         .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
-        .in('id', recommendedIds)
-        .not('id', 'in', `(${followingIds.join(',')})`);
+        .in('id', recommendedIds);
+      
+      if (followingIds.length > 0) {
+        recommendedQuery = recommendedQuery.not('id', 'in', `(${followingIds.join(',')})`);
+      }
+      
+      const { data: recommended } = await recommendedQuery;
 
       const excludeIds = [...followingIds, ...recommendedIds];
-      const { data: popular } = await supabase
+      
+      let popularQuery = supabase
         .from('profiles')
         .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
         .not('username', 'is', null)
-        .neq('id', userId)
-        .not('id', 'in', `(${excludeIds.join(',')})`)
+        .neq('id', userId);
+      
+      if (excludeIds.length > 0) {
+        popularQuery = popularQuery.not('id', 'in', `(${excludeIds.join(',')})`);
+      }
+      
+      const { data: popular } = await popularQuery
         .order('follower_count', { ascending: false })
         .limit(7);
 
@@ -298,33 +299,14 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
   useEffect(() => {
     if (!authResolved) return;
 
-    const loadWithFilter = async () => {
-      const cached = loadFromCache(currentUserId);
-      
-      if (cached && cached.length > 0 && currentUserId) {
-        const { data: following } = await supabase
-          .from('follows')
-          .select('followee_id')
-          .eq('follower_id', currentUserId)
-          .limit(100);
-        
-        const followingIds = following?.map((f: { followee_id: string }) => f.followee_id) || [];
-        const filtered = cached.filter(p => !followingIds.includes(p.id));
-        
-        if (filtered.length > 0) {
-          setProfiles(filtered);
-          setLoading(false);
-        }
-      } else if (cached && cached.length > 0) {
-        setProfiles(cached);
-        setLoading(false);
-      }
+    const cached = loadFromCache(currentUserId);
+    if (cached && cached.length > 0) {
+      setProfiles(cached);
+      setLoading(false);
+    }
 
-      loadProfiles();
-    };
-
-    loadWithFilter();
-  }, [authResolved, currentUserId, loadProfiles, loadFromCache, supabase]);
+    loadProfiles();
+  }, [authResolved, currentUserId, loadProfiles, loadFromCache]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
