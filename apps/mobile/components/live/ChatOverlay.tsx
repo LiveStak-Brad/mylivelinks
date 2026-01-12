@@ -2,6 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+// Pro badge image
+const PRO_BADGE_IMAGE = require('../../assets/pro.png');
+
 export interface ChatMessage {
   id: string;
   type: 'chat' | 'gift' | 'follow' | 'system';
@@ -249,9 +252,7 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
                 )}
                 {/* Pro badge */}
                 {item.isPro && (
-                  <View style={styles.proBadge}>
-                    <Text style={styles.proBadgeText}>PRO</Text>
-                  </View>
+                  <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
                 )}
                 <View style={styles.giftBadge}>
                   <Ionicons name="gift" size={10} color="#FFD700" />
@@ -330,9 +331,7 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
                 )}
                 {/* Pro badge */}
                 {item.isPro && (
-                  <View style={styles.proBadge}>
-                    <Text style={styles.proBadgeText}>PRO</Text>
-                  </View>
+                  <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
                 )}
               </View>
               <Text style={[styles.messageText, { color: textColor }]} numberOfLines={2}>
@@ -428,18 +427,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   
-  // Pro badge
-  proBadge: {
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
+  // Pro badge image
+  proBadgeImage: {
+    width: 28,
+    height: 14,
     marginLeft: 4,
-  },
-  proBadgeText: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
   
   // Gift badge (small inline indicator)
