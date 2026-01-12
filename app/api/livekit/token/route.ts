@@ -128,31 +128,52 @@ export async function POST(request: NextRequest) {
 
   const main = (async (): Promise<NextResponse> => {
     try {
-      const origin = (request.headers.get('origin') || '').toLowerCase();
-      if (!origin || !ALLOWED_ORIGINS.has(origin)) {
-        return sendJson(403, { error: 'Web-only launch: invalid origin', stage: 'cors' }, 'cors');
-      }
-
       const authHeader = await runStage('auth_header_parse', 1_000, async () => {
         return request.headers.get('authorization') || request.headers.get('Authorization') || '';
       });
 
       const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
+      const isMobileRequest = !!bearerToken; // Mobile uses Bearer token, web uses cookies
 
-      // LAUNCH GATE (WEB ONLY): do not accept Bearer auth (mobile-style). Web uses cookie auth.
-      if (bearerToken) {
-        return sendJson(403, { error: 'Web-only launch: Bearer auth not allowed', stage: 'auth_verify' }, 'auth_verify');
+      // CORS check only for web (non-Bearer) requests
+      if (!isMobileRequest) {
+        const origin = (request.headers.get('origin') || '').toLowerCase();
+        if (!origin || !ALLOWED_ORIGINS.has(origin)) {
+          return sendJson(403, { error: 'Invalid origin', stage: 'cors' }, 'cors');
+        }
       }
 
       const auth = await runStage('auth_verify', 3_000, async () => {
-        const cookieClient = createRouteHandlerClient(request);
-
-        const result = await cookieClient.auth.getUser();
-        return {
-          user: result.data?.user || null,
-          authError: result.error || null,
-          supabase: cookieClient as any,
-        };
+        if (isMobileRequest && bearerToken) {
+          // Mobile: validate Bearer token via Supabase
+          const { createClient } = await import('@supabase/supabase-js');
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+          
+          if (!supabaseUrl || !supabaseAnonKey) {
+            return { user: null, authError: new Error('Supabase config missing'), supabase: null };
+          }
+          
+          const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: `Bearer ${bearerToken}` } },
+          });
+          
+          const result = await supabase.auth.getUser(bearerToken);
+          return {
+            user: result.data?.user || null,
+            authError: result.error || null,
+            supabase: supabase as any,
+          };
+        } else {
+          // Web: use cookie-based auth
+          const cookieClient = createRouteHandlerClient(request);
+          const result = await cookieClient.auth.getUser();
+          return {
+            user: result.data?.user || null,
+            authError: result.error || null,
+            supabase: cookieClient as any,
+          };
+        }
       });
 
       const user = auth.user;

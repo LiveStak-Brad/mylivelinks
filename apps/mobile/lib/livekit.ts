@@ -21,8 +21,11 @@ export interface TokenRequest {
   isHost?: boolean;
 }
 
+// API endpoint for token - uses the web API with Bearer auth
+const TOKEN_API_URL = 'https://www.mylivelinks.com/api/livekit/token';
+
 /**
- * Fetch a LiveKit token from the mobile Edge Function
+ * Fetch a LiveKit token from the API
  */
 export async function fetchMobileToken(
   roomName: string,
@@ -30,25 +33,49 @@ export async function fetchMobileToken(
   name?: string,
   isHost?: boolean
 ): Promise<TokenResponse> {
-  const { data, error } = await supabase.functions.invoke<TokenResponse>('livekit-token-mobile', {
-    body: {
+  // Get current session for Bearer token
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  
+  if (sessionError || !sessionData?.session?.access_token) {
+    console.error('[livekit] No session for token fetch:', sessionError);
+    throw new Error('Not authenticated. Please log in.');
+  }
+
+  const accessToken = sessionData.session.access_token;
+
+  const response = await fetch(TOKEN_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
       roomName,
-      identity,
-      name,
-      isHost,
-    } satisfies TokenRequest,
+      participantName: name || 'User',
+      canPublish: isHost === true,
+      canSubscribe: true,
+      role: isHost ? 'host' : 'viewer',
+    }),
   });
 
-  if (error) {
-    console.error('[livekit] Token fetch error:', error);
-    throw new Error(error.message || 'Failed to fetch LiveKit token');
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('[livekit] Token API error:', response.status, errorData);
+    throw new Error(errorData?.error || `Token request failed: ${response.status}`);
   }
+
+  const data = await response.json();
 
   if (!data?.token || !data?.url) {
     throw new Error('Invalid token response from server');
   }
 
-  return data;
+  return {
+    token: data.token,
+    url: data.url,
+    identity: data.identity || identity,
+    roomName: data.roomName || roomName,
+  };
 }
 
 /**
