@@ -355,9 +355,10 @@ export default function BattleGridWrapper({
           publishDefaults: {
             simulcast: true,
             videoSimulcastLayers: [
-              { width: 320, height: 180, bitrate: 150_000 },
-              { width: 640, height: 360, bitrate: 500_000 },
-              { width: 1280, height: 720, bitrate: 1_500_000 },
+              // LiveKit expects `VideoPreset[]` here (encoding + resolution).
+              VideoPresets.h180,
+              VideoPresets.h360,
+              VideoPresets.h720,
             ],
           },
         });
