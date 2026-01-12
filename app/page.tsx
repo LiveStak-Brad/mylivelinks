@@ -8,16 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   Users, 
-  DollarSign,
-  Gift, 
-  MessageCircle, 
-  Mail, 
-  Music, 
-  PenLine, 
-  Sparkles,
-  Trophy,
-  TrendingUp,
-  Gem
+  Sparkles
 } from 'lucide-react';
 import ProfileCarousel from '@/components/ProfileCarousel';
 import { RoomsCarousel } from '@/components/rooms';
@@ -114,7 +105,12 @@ export default function LandingPage() {
       setCurrentUser(profile || { id: user.id, email: user.email });
       setLoading(false);
     } else {
-      router.push('/login');
+      // Public landing page should be accessible when logged out.
+      // Redirecting to /login causes confusing loops (especially when OAuth cookies
+      // are not yet established on localhost).
+      setCurrentUser(null);
+      setCanOpenLive(false);
+      setLoading(false);
     }
   };
 
@@ -648,104 +644,6 @@ export default function LandingPage() {
                     <span className="text-xs font-semibold text-white/70">Rooms are filling up</span>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Section 3: What you can do right now (2 rows) */}
-      <div className="container mx-auto px-4 py-3">
-        <div className="max-w-4xl mx-auto">
-          <Card className="border-border/50 shadow-lg">
-            <CardContent className="p-4">
-              <h2 className="text-xs font-semibold text-muted-foreground mb-2 text-center uppercase tracking-wide">
-                What you can do right now
-              </h2>
-              
-              {/* Row 1: Buy coins + Gift actions + Gifter level + Rise board */}
-              <div className="flex justify-center items-end gap-3 py-2">
-                {/* Buy coins */}
-                <Link href="/wallet" className="group flex flex-col items-center gap-0.5">
-                  <Image src="/coin-icon.png" alt="Coin" width={24} height={24} className="group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-semibold">Buy coins</span>
-                </Link>
-
-                {/* Gift section */}
-                <div className="flex gap-2">
-                  <Link href="/feed" className="group flex flex-col items-center gap-0.5">
-                    <span className="text-[8px] font-semibold text-muted-foreground uppercase">Gift</span>
-                    <Gift className="w-6 h-6 text-pink-500 group-hover:scale-110 transition-transform" />
-                    <span className="text-[9px] font-semibold">Posts</span>
-                  </Link>
-                  
-                  <Link href="/feed" className="group flex flex-col items-center gap-0.5">
-                    <span className="text-[8px] font-semibold text-muted-foreground uppercase">Gift</span>
-                    <MessageCircle className="w-6 h-6 text-purple-500 group-hover:scale-110 transition-transform" />
-                    <span className="text-[9px] font-semibold">Comments</span>
-                  </Link>
-                  
-                  <Link href="/messages" className="group flex flex-col items-center gap-0.5">
-                    <span className="text-[8px] font-semibold text-muted-foreground uppercase">Gift</span>
-                    <Mail className="w-6 h-6 text-blue-500 group-hover:scale-110 transition-transform" />
-                    <span className="text-[9px] font-semibold">Messages</span>
-                  </Link>
-                  
-                  <Link href="/feed" className="group flex flex-col items-center gap-0.5">
-                    <span className="text-[8px] font-semibold text-muted-foreground uppercase">Gift</span>
-                    <Music className="w-6 h-6 text-green-500 group-hover:scale-110 transition-transform" />
-                    <span className="text-[9px] font-semibold">Music</span>
-                  </Link>
-                </div>
-
-                {/* Gifter level */}
-                <Link href="/gifter-levels" className="group flex flex-col items-center gap-0.5">
-                  <TrendingUp className="w-6 h-6 text-purple-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-semibold text-center">Gifter level</span>
-                </Link>
-                
-                {/* Rise board */}
-                <Link href="/leaderboards" className="group flex flex-col items-center gap-0.5">
-                  <Trophy className="w-6 h-6 text-yellow-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-semibold text-center">Rise board</span>
-                </Link>
-              </div>
-
-              {/* Row 2: Get gifted + Earn diamonds + Rise board + Cash out or Convert */}
-              <div className="flex justify-center items-center gap-3 py-2">
-                {/* Get gifted */}
-                <div className="group flex flex-col items-center gap-0.5">
-                  <Gift className="w-6 h-6 text-pink-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-semibold">Get gifted</span>
-                </div>
-                
-                {/* Earn diamonds */}
-                <Link href="/wallet" className="group flex flex-col items-center gap-0.5">
-                  <Gem className="w-6 h-6 text-cyan-400 group-hover:scale-110 transition-transform" strokeWidth={2} />
-                  <span className="text-[9px] font-semibold">Diamonds</span>
-                </Link>
-                
-                {/* Rise board */}
-                <Link href="/leaderboards" className="group flex flex-col items-center gap-0.5">
-                  <Trophy className="w-6 h-6 text-amber-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-semibold text-center">Rise board</span>
-                </Link>
-
-                {/* Cash out */}
-                <Link href="/wallet" className="group flex flex-col items-center gap-0.5">
-                  <div className="w-8 h-8 rounded-full border-2 border-green-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <DollarSign className="w-5 h-5 text-green-500" strokeWidth={2.5} />
-                  </div>
-                  <span className="text-[9px] font-semibold">Cash out</span>
-                </Link>
-                
-                <span className="text-[8px] text-muted-foreground">or</span>
-                
-                {/* Convert */}
-                <Link href="/wallet" className="group flex flex-col items-center gap-0.5">
-                  <Image src="/coin-icon.png" alt="Coin" width={24} height={24} className="group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-semibold">Convert</span>
-                </Link>
               </div>
             </CardContent>
           </Card>
