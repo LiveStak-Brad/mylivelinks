@@ -226,7 +226,8 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
       const { data: recommended } = await supabase
         .from('profiles')
         .select('id, username, display_name, avatar_url, bio, follower_count, is_live, location_zip, location_city, location_region, location_country, location_label, location_hidden, location_show_zip')
-        .in('id', recommendedIds);
+        .in('id', recommendedIds)
+        .not('id', 'in', `(${followingIds.join(',')})`);
 
       const excludeIds = [...followingIds, ...recommendedIds];
       const { data: popular } = await supabase
