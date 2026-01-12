@@ -5,6 +5,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
+import { brand } from '../theme/colors';
 
 const TAB_BAR_SAFE_PADDING = 96;
 
@@ -74,133 +76,150 @@ function getInitials(label: string) {
   return (first + second).toUpperCase();
 }
 
-function SectionTitle({ children }: { children: string }) {
-  return <Text style={styles.sectionTitle}>{children}</Text>;
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return <View style={styles.card}>{children}</View>;
-}
-
-function PrimaryButton({ label }: { label: string }) {
-  return (
-    <Pressable accessibilityRole="button" style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-      <Text style={styles.primaryButtonText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function OutlineButton({ label }: { label: string }) {
-  return (
-    <Pressable accessibilityRole="button" style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
-      <Text style={styles.outlineButtonText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function Pill({ label }: { label: string }) {
-  return (
-    <View style={styles.pill}>
-      <Text style={styles.pillText}>{label}</Text>
-    </View>
-  );
-}
-
-function IconPill({ iconName, label }: { iconName: React.ComponentProps<typeof Ionicons>['name']; label: string }) {
-  return (
-    <View style={styles.iconPill}>
-      <Ionicons name={iconName} size={14} color="#FFFFFF" />
-      <Text style={styles.iconPillText}>{label}</Text>
-    </View>
-  );
-}
-
-function SquareTile({
-  title,
-  subtitle,
-  imageUrl,
-  size = 120,
-  width,
-  height,
-  showText = true,
-  imageResizeMode = 'cover',
-  useBackdrop = false,
-}: {
-  title: string;
-  subtitle?: string;
-  imageUrl?: string | null;
-  size?: number;
-  width?: number;
-  height?: number;
-  showText?: boolean;
-  imageResizeMode?: React.ComponentProps<typeof Image>['resizeMode'];
-  useBackdrop?: boolean;
-}) {
-  const initials = useMemo(() => getInitials(title), [title]);
-  const w = width ?? size;
-  const h = height ?? size;
-
-  return (
-    <View style={[styles.squareTile, { width: w, height: h }]}>
-      {imageUrl ? (
-        <>
-          {useBackdrop ? (
-            <Image
-              source={{ uri: imageUrl }}
-              style={styles.squareTileBackdropImage}
-              resizeMode="cover"
-              blurRadius={18}
-            />
-          ) : null}
-          <Image source={{ uri: imageUrl }} style={styles.squareTileImage} resizeMode={imageResizeMode} />
-          <View style={styles.squareTileOverlay} />
-        </>
-      ) : (
-        <View style={styles.squareTileFallbackCenter}>
-          <Text style={styles.squareTileFallbackText}>{initials}</Text>
-        </View>
-      )}
-      <View style={styles.squareTileContent}>
-        <View style={styles.squareTileBadgeRow}>
-          <Pill label="NEW" />
-        </View>
-        {showText ? (
-          <View style={styles.squareTileBody}>
-            <Text numberOfLines={2} style={styles.squareTileTitle}>
-              {title}
-            </Text>
-            {subtitle ? <Text style={styles.squareTileSubtitle}>{subtitle}</Text> : null}
-          </View>
-        ) : (
-          <View />
-        )}
-      </View>
-    </View>
-  );
-}
-
-function QuickAction({
-  icon,
-  iconColor,
-  label,
-  overline,
-}: {
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  iconColor: string;
-  label: string;
-  overline?: string;
-}) {
-  return (
-    <View style={styles.quickAction}>
-      {overline ? <Text style={styles.quickActionOverline}>{overline}</Text> : null}
-      <Ionicons name={icon} size={22} color={iconColor} />
-      <Text style={styles.quickActionLabel}>{label}</Text>
-    </View>
-  );
-}
-
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { mode, colors } = useTheme();
+
+  const stylesVars = useMemo(
+    () => ({
+      bg: colors.bg,
+      card: colors.surface,
+      border: colors.border,
+      text: colors.text,
+      mutedText: (colors as any).subtleText ?? colors.mutedText,
+      onBrand: (colors as any).tabIconActive ?? colors.text,
+      primary: (brand as any).primary ?? brand.pink,
+      isDark: mode === 'dark',
+    }),
+    [colors, mode]
+  );
+
+  const styles = useMemo(() => createStyles(stylesVars), [stylesVars]);
+
+  function SectionTitle({ children }: { children: string }) {
+    return <Text style={styles.sectionTitle}>{children}</Text>;
+  }
+
+  function Card({ children }: { children: React.ReactNode }) {
+    return <View style={styles.card}>{children}</View>;
+  }
+
+  function PrimaryButton({ label }: { label: string }) {
+    return (
+      <Pressable accessibilityRole="button" style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+        <Text style={styles.primaryButtonText}>{label}</Text>
+      </Pressable>
+    );
+  }
+
+  function OutlineButton({ label }: { label: string }) {
+    return (
+      <Pressable accessibilityRole="button" style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
+        <Text style={styles.outlineButtonText}>{label}</Text>
+      </Pressable>
+    );
+  }
+
+  function Pill({ label }: { label: string }) {
+    return (
+      <View style={styles.pill}>
+        <Text style={styles.pillText}>{label}</Text>
+      </View>
+    );
+  }
+
+  function IconPill({ iconName, label }: { iconName: React.ComponentProps<typeof Ionicons>['name']; label: string }) {
+    return (
+      <View style={styles.iconPill}>
+        <Ionicons name={iconName} size={14} color="#FFFFFF" />
+        <Text style={styles.iconPillText}>{label}</Text>
+      </View>
+    );
+  }
+
+  function SquareTile({
+    title,
+    subtitle,
+    imageUrl,
+    size = 120,
+    width,
+    height,
+    showText = true,
+    imageResizeMode = 'cover',
+    useBackdrop = false,
+  }: {
+    title: string;
+    subtitle?: string;
+    imageUrl?: string | null;
+    size?: number;
+    width?: number;
+    height?: number;
+    showText?: boolean;
+    imageResizeMode?: React.ComponentProps<typeof Image>['resizeMode'];
+    useBackdrop?: boolean;
+  }) {
+    const initials = useMemo(() => getInitials(title), [title]);
+    const w = width ?? size;
+    const h = height ?? size;
+
+    return (
+      <View style={[styles.squareTile, { width: w, height: h }]}>
+        {imageUrl ? (
+          <>
+            {useBackdrop ? (
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.squareTileBackdropImage}
+                resizeMode="cover"
+                blurRadius={18}
+              />
+            ) : null}
+            <Image source={{ uri: imageUrl }} style={styles.squareTileImage} resizeMode={imageResizeMode} />
+            <View style={styles.squareTileOverlay} />
+          </>
+        ) : (
+          <View style={styles.squareTileFallbackCenter}>
+            <Text style={styles.squareTileFallbackText}>{initials}</Text>
+          </View>
+        )}
+        <View style={styles.squareTileContent}>
+          <View style={styles.squareTileBadgeRow}>
+            <Pill label="NEW" />
+          </View>
+          {showText ? (
+            <View style={styles.squareTileBody}>
+              <Text numberOfLines={2} style={styles.squareTileTitle}>
+                {title}
+              </Text>
+              {subtitle ? <Text style={styles.squareTileSubtitle}>{subtitle}</Text> : null}
+            </View>
+          ) : (
+            <View />
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  function QuickAction({
+    icon,
+    iconColor,
+    label,
+    overline,
+  }: {
+    icon: React.ComponentProps<typeof Ionicons>['name'];
+    iconColor: string;
+    label: string;
+    overline?: string;
+  }) {
+    return (
+      <View style={styles.quickAction}>
+        {overline ? <Text style={styles.quickActionOverline}>{overline}</Text> : null}
+        <Ionicons name={icon} size={22} color={iconColor} />
+        <Text style={styles.quickActionLabel}>{label}</Text>
+      </View>
+    );
+  }
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -751,7 +770,7 @@ export default function HomeScreen() {
               Invite friends and grow together. Every referral is tracked, and quality connections matter.
             </Text>
             <View style={styles.referralHintRow}>
-              <Ionicons name="sparkles" size={14} color="rgba(255,255,255,0.85)" />
+              <Ionicons name="sparkles" size={14} color={mode === 'dark' ? 'rgba(255,255,255,0.85)' : colors.text} />
               <Text style={styles.referralHintText}>Top referrers unlock perks 👀</Text>
             </View>
 
@@ -959,10 +978,10 @@ export default function HomeScreen() {
             <Text style={styles.emailSubtext}>No items yet.</Text>
 
             <View style={styles.emailFormRow}>
-              <TextInput
+            <TextInput
                 editable={false}
                 placeholder="you@email.com"
-                placeholderTextColor="rgba(255,255,255,0.5)"
+                placeholderTextColor={mode === 'dark' ? 'rgba(255,255,255,0.5)' : colors.mutedText}
                 style={styles.emailInput}
               />
               <Pressable accessibilityRole="button" style={({ pressed }) => [styles.notifyButton, pressed && styles.pressed]}>
@@ -997,10 +1016,28 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+type StylesVars = {
+  bg: string;
+  card: string;
+  border: string;
+  text: string;
+  mutedText: string;
+  onBrand: string;
+  primary: string;
+  isDark: boolean;
+};
+
+function createStyles(stylesVars: StylesVars) {
+  const isDark = stylesVars.isDark;
+  const softCardBg = isDark ? 'rgba(255,255,255,0.08)' : stylesVars.card;
+  const softCardBorder = isDark ? 'rgba(255,255,255,0.14)' : stylesVars.border;
+  const softText = isDark ? '#FFFFFF' : stylesVars.text;
+  const softMuted = isDark ? 'rgba(255,255,255,0.7)' : stylesVars.mutedText;
+
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#2A0B4A',
+    backgroundColor: stylesVars.bg,
   },
   scrollContent: {
     paddingTop: 12,
@@ -1011,21 +1048,21 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: softCardBg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: softCardBorder,
     padding: 16,
   },
 
   sectionTitle: {
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 10,
   },
 
   kicker: {
-    color: 'rgba(255,255,255,0.7)',
+    color: softMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -1034,7 +1071,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   kickerTight: {
-    color: 'rgba(255,255,255,0.55)',
+    color: softMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 2.5,
@@ -1042,7 +1079,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   kickerCenter: {
-    color: 'rgba(255,255,255,0.7)',
+    color: softMuted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -1057,7 +1094,7 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: '#EC4899',
+    backgroundColor: stylesVars.primary,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -1072,7 +1109,7 @@ const styles = StyleSheet.create({
   },
   outlineButton: {
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.9)',
+    borderColor: isDark ? 'rgba(255,255,255,0.9)' : stylesVars.border,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -1082,7 +1119,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   outlineButtonText: {
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -1126,7 +1163,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     flex: 1,
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 26,
@@ -1142,7 +1179,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   heroBadgePlaceholderText: {
-    color: '#FFFFFF',
+    color: softText,
     fontWeight: '900',
     letterSpacing: 1.2,
   },
@@ -1152,7 +1189,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   heroBody: {
-    color: 'rgba(255,255,255,0.82)',
+    color: isDark ? 'rgba(255,255,255,0.82)' : stylesVars.mutedText,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 14,
@@ -1171,18 +1208,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   teamsTitle: {
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 20,
     fontWeight: '900',
     letterSpacing: 0.6,
   },
   teamsTagline: {
-    color: 'rgba(255,255,255,0.7)',
+    color: softMuted,
     fontSize: 13,
     fontWeight: '700',
   },
   teamsSubtext: {
-    color: 'rgba(255,255,255,0.6)',
+    color: softMuted,
     fontSize: 12,
     lineHeight: 16,
   },
@@ -1275,13 +1312,13 @@ const styles = StyleSheet.create({
   },
   tileCaption: {
     marginTop: 6,
-    color: 'rgba(255,255,255,0.9)',
+    color: isDark ? 'rgba(255,255,255,0.9)' : stylesVars.text,
     fontSize: 11,
     fontWeight: '700',
   },
   teamMembersCaption: {
     marginTop: 2,
-    color: 'rgba(255,255,255,0.65)',
+    color: softMuted,
     fontSize: 10,
     fontWeight: '700',
   },
@@ -1296,15 +1333,15 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   roomInterestButtonInactive: {
-    backgroundColor: '#EC4899',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: stylesVars.primary,
+    borderColor: isDark ? 'rgba(255,255,255,0.12)' : stylesVars.border,
   },
   roomInterestButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderColor: 'rgba(255,255,255,0.24)',
+    backgroundColor: isDark ? 'rgba(255,255,255,0.14)' : stylesVars.card,
+    borderColor: isDark ? 'rgba(255,255,255,0.24)' : stylesVars.border,
   },
   roomInterestButtonText: {
-    color: '#FFFFFF',
+    color: isDark ? '#FFFFFF' : stylesVars.text,
     fontSize: 12,
     fontWeight: '900',
   },
@@ -1319,13 +1356,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   referralTitle: {
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 22,
     fontWeight: '900',
     marginBottom: 8,
   },
   referralBody: {
-    color: 'rgba(255,255,255,0.9)',
+    color: isDark ? 'rgba(255,255,255,0.9)' : stylesVars.text,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 8,
@@ -1337,7 +1374,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   referralHintText: {
-    color: 'rgba(255,255,255,0.8)',
+    color: softMuted,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1366,30 +1403,30 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   referralGridTitle: {
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 12,
     fontWeight: '800',
   },
   referralGridSubtitle: {
-    color: 'rgba(255,255,255,0.7)',
+    color: softMuted,
     fontSize: 11,
     fontWeight: '700',
   },
 
   liveTitle: {
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 22,
     fontWeight: '900',
     marginBottom: 6,
   },
   liveBody: {
-    color: 'rgba(255,255,255,0.82)',
+    color: isDark ? 'rgba(255,255,255,0.82)' : stylesVars.mutedText,
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 6,
   },
   liveSubbody: {
-    color: 'rgba(255,255,255,0.65)',
+    color: softMuted,
     fontSize: 12,
     lineHeight: 16,
     marginBottom: 12,
@@ -1402,7 +1439,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   textLinkText: {
-    color: 'rgba(255,255,255,0.85)',
+    color: isDark ? 'rgba(255,255,255,0.85)' : stylesVars.primary,
     fontSize: 13,
     fontWeight: '800',
     textDecorationLine: 'underline',
@@ -1589,7 +1626,7 @@ const styles = StyleSheet.create({
   },
 
   ctaTitle: {
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 18,
     fontWeight: '900',
     textAlign: 'center',
@@ -1616,13 +1653,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
   },
   emailTitle: {
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 0.2,
   },
   emailSubtext: {
-    color: 'rgba(255,255,255,0.72)',
+    color: softMuted,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
@@ -1637,11 +1674,11 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: isDark ? 'rgba(255,255,255,0.18)' : stylesVars.border,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : stylesVars.card,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: '#FFFFFF',
+    color: softText,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -1663,8 +1700,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
-    color: 'rgba(255,255,255,0.45)',
+    borderTopColor: isDark ? 'rgba(255,255,255,0.12)' : stylesVars.border,
+    color: softMuted,
     fontSize: 11,
     fontWeight: '700',
     textAlign: 'center',
@@ -1676,7 +1713,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 18,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.12)',
+    borderTopColor: isDark ? 'rgba(255,255,255,0.12)' : stylesVars.border,
     gap: 10,
   },
   footerLinksRow: {
@@ -1692,21 +1729,22 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   footerLinkStrong: {
-    color: '#C084FC',
+    color: isDark ? '#C084FC' : stylesVars.primary,
     fontSize: 12,
     fontWeight: '900',
   },
   footerLink: {
-    color: 'rgba(255,255,255,0.65)',
+    color: softMuted,
     fontSize: 12,
     fontWeight: '700',
   },
   footerCopy: {
-    color: 'rgba(255,255,255,0.65)',
+    color: softMuted,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 4,
   },
-});
+  });
+}
 

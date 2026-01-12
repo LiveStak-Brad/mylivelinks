@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../theme/useTheme';
 
 const INTEREST_TAGS = [
   'Music', 'Gaming', 'Fitness', 'Business', 'Art', 'Tech',
@@ -24,6 +25,7 @@ const RELIGION_OPTIONS = ['Christian', 'Muslim', 'Jewish', 'Hindu', 'Buddhist', 
 const BUILD_OPTIONS = ['Slim', 'Average', 'Athletic', 'Curvy', 'Heavyset'];
 
 export default function LinkDatingProfileScreen() {
+  const { colors } = useTheme();
   const [enabled, setEnabled] = useState(false);
   const [bio, setBio] = useState('');
   const [locationText, setLocationText] = useState('');
@@ -82,7 +84,7 @@ export default function LinkDatingProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton}>
@@ -464,7 +466,6 @@ export default function LinkDatingProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
   },
   header: {
     flexDirection: 'row',

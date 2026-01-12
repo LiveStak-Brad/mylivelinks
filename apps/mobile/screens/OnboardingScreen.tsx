@@ -1,6 +1,7 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../theme/useTheme';
 
 const { width } = Dimensions.get('window');
 
@@ -28,7 +29,19 @@ const ONBOARDING_STEPS = [
 ];
 
 export default function OnboardingScreen() {
+  const { colors } = useTheme();
   const [currentStep, setCurrentStep] = useState(0);
+
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      border: colors.border,
+      dotInactive: colors.border,
+    }),
+    [colors]
+  );
 
   const handleContinue = () => {
     if (currentStep < ONBOARDING_STEPS.length - 1) {
@@ -44,12 +57,12 @@ export default function OnboardingScreen() {
   const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]}>
       <View style={styles.content}>
         <View style={styles.slideContainer}>
           <Text style={styles.emoji}>{step.emoji}</Text>
-          <Text style={styles.title}>{step.title}</Text>
-          <Text style={styles.description}>{step.description}</Text>
+          <Text style={[styles.title, { color: themed.text }]}>{step.title}</Text>
+          <Text style={[styles.description, { color: themed.mutedText }]}>{step.description}</Text>
         </View>
 
         <View style={styles.progressContainer}>
@@ -58,6 +71,7 @@ export default function OnboardingScreen() {
               key={index}
               style={[
                 styles.progressDot,
+                { backgroundColor: themed.dotInactive },
                 index === currentStep && styles.progressDotActive,
               ]}
             />
@@ -67,7 +81,7 @@ export default function OnboardingScreen() {
         <View style={styles.buttonContainer}>
           {!isLastStep && (
             <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-              <Text style={styles.skipText}>Skip</Text>
+              <Text style={[styles.skipText, { color: themed.mutedText }]}>Skip</Text>
             </TouchableOpacity>
           )}
           
@@ -88,7 +102,6 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   content: {
     flex: 1,
@@ -109,13 +122,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fff',
     textAlign: 'center',
     marginBottom: 16,
   },
   description: {
     fontSize: 16,
-    color: '#aaa',
     textAlign: 'center',
     lineHeight: 24,
     maxWidth: width - 80,
@@ -131,7 +142,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#333',
   },
   progressDotActive: {
     backgroundColor: '#3b82f6',
@@ -146,7 +156,6 @@ const styles = StyleSheet.create({
   },
   skipText: {
     fontSize: 16,
-    color: '#888',
     fontWeight: '600',
   },
   continueButton: {

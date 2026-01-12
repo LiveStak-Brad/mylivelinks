@@ -20,6 +20,7 @@ import {
   saveHostCameraFilters,
   type HostCameraFilters,
 } from '../lib/hostCameraFilters';
+import { DEFAULT_HOST_LIVE_OPTIONS, loadHostLiveOptions, saveHostLiveOptions, type HostLiveOptions } from '../lib/hostLiveOptions';
 
 // Default font color for chat
 const DEFAULT_CHAT_FONT_COLOR: ChatFontColor = '#FFFFFF';
@@ -77,6 +78,11 @@ export default function GoLiveScreen() {
   const roomRef = useRef<Room | null>(null);
   const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
 
+  // Host options + real track controls
+  const [hostLiveOptions, setHostLiveOptions] = useState<HostLiveOptions>(DEFAULT_HOST_LIVE_OPTIONS);
+  const [micMuted, setMicMuted] = useState(false);
+  const [cameraDisabled, setCameraDisabled] = useState(false);
+
   // Host profile (fetched from Supabase like web)
   const [hostProfile, setHostProfile] = useState<{
     displayName: string;
@@ -123,6 +129,60 @@ export default function GoLiveScreen() {
       // Note: Database cleanup handled by handleClose/handleEndLive
     };
   }, [videoTrack, audioTrack]);
+
+  // Load persisted host live options (for mirror + settings)
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const loaded = await loadHostLiveOptions(user.id);
+      if (!cancelled) setHostLiveOptions(loaded);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const applyMicMuted = useCallback(
+    async (nextMuted: boolean) => {
+      setMicMuted(nextMuted);
+      try {
+        const t: any = audioTrack as any;
+        if (t && typeof t.mute === 'function' && typeof t.unmute === 'function') {
+          if (nextMuted) await t.mute();
+          else await t.unmute();
+        } else if (audioTrack?.mediaStreamTrack) {
+          audioTrack.mediaStreamTrack.enabled = !nextMuted;
+        }
+      } catch (err) {
+        console.error('[GoLive] applyMicMuted error:', err);
+      }
+    },
+    [audioTrack]
+  );
+
+  const applyCameraDisabled = useCallback(
+    async (nextDisabled: boolean) => {
+      setCameraDisabled(nextDisabled);
+      try {
+        const t: any = videoTrack as any;
+        if (t && typeof t.mute === 'function' && typeof t.unmute === 'function') {
+          if (nextDisabled) await t.mute();
+          else await t.unmute();
+        } else if (videoTrack?.mediaStreamTrack) {
+          videoTrack.mediaStreamTrack.enabled = !nextDisabled;
+        }
+      } catch (err) {
+        console.error('[GoLive] applyCameraDisabled error:', err);
+      }
+    },
+    [videoTrack]
+  );
+
+  const persistHostLiveOptions = (next: HostLiveOptions) => {
+    setHostLiveOptions(next);
+    if (user?.id) void saveHostLiveOptions(user.id, next);
+  };
 
   // Load host profile from Supabase (like web SoloHostStream)
   useEffect(() => {
@@ -586,6 +646,15 @@ export default function GoLiveScreen() {
     const newFacing = cameraFacing === 'user' ? 'environment' : 'user';
     setCameraFacing(newFacing);
     
+    // If live, unpublish the old track first so viewers don't get stuck on a frozen/ended publication.
+    if (isLive && roomRef.current) {
+      try {
+        await roomRef.current.localParticipant.unpublishTrack(videoTrack);
+      } catch (err) {
+        console.warn('[GoLive] Failed to unpublish old video track before flip:', err);
+      }
+    }
+
     // Stop old track and create new one with new facing
     videoTrack.stop();
     
@@ -759,6 +828,14 @@ export default function GoLiveScreen() {
       const room = new Room({
         adaptiveStream: true,
         dynacast: true,
+        // Host publishing: disable simulcast on mobile to reduce encoder load and latency
+        publishDefaults: {
+          simulcast: false,
+          videoEncoding: {
+            maxBitrate: 1_200_000, // 1.2 Mbps cap for stability/latency
+            maxFramerate: 30,
+          },
+        },
       });
 
       room.on(RoomEvent.ParticipantConnected, () => {
@@ -878,7 +955,7 @@ export default function GoLiveScreen() {
           <VideoView
             style={styles.videoView}
             videoTrack={videoTrack}
-            mirror={cameraFacing === 'user'}
+            mirror={cameraFacing === 'user' && !!hostLiveOptions.mirrorCamera}
             objectFit="cover"
           />
         ) : (
@@ -1057,7 +1134,7 @@ export default function GoLiveScreen() {
             leaderboardRank={leaderboardRank ?? undefined}
             topGifters={topGifters}
             messages={chatMessages}
-            isMuted={false}
+            isMuted={micMuted}
             isCameraFlipped={cameraFacing === 'environment'}
             chatFontColor={DEFAULT_CHAT_FONT_COLOR}
             cameraFilters={cameraFilters}
@@ -1070,8 +1147,14 @@ export default function GoLiveScreen() {
                 return next;
               });
             }}
+            micMuted={micMuted}
+            onSetMicMuted={(next) => void applyMicMuted(next)}
+            cameraDisabled={cameraDisabled}
+            onSetCameraDisabled={(next) => void applyCameraDisabled(next)}
+            onHostLiveOptionsChange={persistHostLiveOptions}
             onEndStream={handleEndLive}
             onFlipCamera={handleFlipCamera}
+            onToggleMute={() => void applyMicMuted(!micMuted)}
           />
         </View>
       )}

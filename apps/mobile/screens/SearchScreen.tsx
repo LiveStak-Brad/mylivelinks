@@ -2,6 +2,7 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/useTheme';
 
 type SearchTab = 'top' | 'people' | 'posts' | 'teams' | 'live' | 'media' | 'music' | 'videos' | 'more';
 
@@ -223,6 +224,7 @@ function Avatar({
 }
 
 export default function SearchScreen() {
+  const { colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SearchTab>('top');
   const [filters, setFilters] = useState<Record<FilterKey, boolean>>({
@@ -246,7 +248,7 @@ export default function SearchScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.searchContainer}>
           <View style={styles.searchInputWrapper}>
@@ -569,7 +571,6 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
   },
   scrollView: {
     flex: 1,

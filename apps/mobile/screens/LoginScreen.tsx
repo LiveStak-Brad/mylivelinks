@@ -1,16 +1,33 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
   const { signInWithPassword } = useAuth();
+  const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      card: colors.surface,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      border: colors.border,
+      subtleText: (colors as any).subtleText ?? colors.mutedText,
+      dangerBg: colors.mode === 'dark' ? 'rgba(239,68,68,0.15)' : '#fee',
+      dangerBorder: colors.mode === 'dark' ? 'rgba(239,68,68,0.35)' : '#fcc',
+      dangerText: colors.danger,
+    }),
+    [colors]
+  );
 
   const onSubmit = async () => {
     const trimmedEmail = email.trim();
@@ -31,35 +48,35 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]} edges={['top', 'bottom']}>
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: themed.card, shadowColor: themed.text }]}>
           <Text style={styles.logo}>MyLiveLinks</Text>
           
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to your account</Text>
+          <Text style={[styles.title, { color: themed.text }]}>Welcome Back</Text>
+          <Text style={[styles.subtitle, { color: themed.mutedText }]}>Sign in to your account</Text>
 
           {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
+            <View style={[styles.errorBox, { backgroundColor: themed.dangerBg, borderColor: themed.dangerBorder }]}>
+              <Text style={[styles.errorText, { color: themed.dangerText }]}>{error}</Text>
             </View>
           ) : null}
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={[styles.label, { color: themed.text }]}>Email</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: themed.card, borderColor: themed.border, color: themed.text }]}
                 value={email}
                 onChangeText={(t) => {
                   setEmail(t);
                   setError(null);
                 }}
                 placeholder="you@example.com"
-                placeholderTextColor="#999"
+                placeholderTextColor={themed.subtleText}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -69,7 +86,7 @@ export default function LoginScreen() {
 
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Password</Text>
+                <Text style={[styles.label, { color: themed.text }]}>Password</Text>
                 <TouchableOpacity
                   onPress={() => navigation.navigate('ResetPasswordScreen')}
                   disabled={submitting}
@@ -78,14 +95,14 @@ export default function LoginScreen() {
                 </TouchableOpacity>
               </View>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: themed.card, borderColor: themed.border, color: themed.text }]}
                 value={password}
                 onChangeText={(t) => {
                   setPassword(t);
                   setError(null);
                 }}
                 placeholder="••••••••"
-                placeholderTextColor="#999"
+                placeholderTextColor={themed.subtleText}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -103,26 +120,26 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
-            <View style={styles.dividerLine} />
+            <View style={[styles.dividerLine, { backgroundColor: themed.border }]} />
+            <Text style={[styles.dividerText, { color: themed.subtleText }]}>OR CONTINUE WITH</Text>
+            <View style={[styles.dividerLine, { backgroundColor: themed.border }]} />
           </View>
 
           <View style={styles.socialButtons}>
             <TouchableOpacity style={styles.socialButton} disabled>
-              <Text style={styles.socialButtonText}>🔵 Continue with Google</Text>
+              <Text style={[styles.socialButtonText, { color: themed.text }]}>🔵 Continue with Google</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.socialButton} disabled>
-              <Text style={styles.socialButtonText}>🍎 Continue with Apple</Text>
+              <Text style={[styles.socialButtonText, { color: themed.text }]}>🍎 Continue with Apple</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.socialButton} disabled>
-              <Text style={styles.socialButtonText}>📘 Continue with Facebook</Text>
+              <Text style={[styles.socialButtonText, { color: themed.text }]}>📘 Continue with Facebook</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.socialButton} disabled>
-              <Text style={styles.socialButtonText}>🎮 Continue with Twitch</Text>
+              <Text style={[styles.socialButtonText, { color: themed.text }]}>🎮 Continue with Twitch</Text>
             </TouchableOpacity>
           </View>
 

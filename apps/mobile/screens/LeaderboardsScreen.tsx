@@ -2,8 +2,10 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/useTheme';
 
 export default function LeaderboardsScreen() {
+  const { colors } = useTheme();
   const [category, setCategory] = useState<'streamers' | 'gifters'>('streamers');
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly' | 'all'>('weekly');
 
@@ -82,7 +84,7 @@ export default function LeaderboardsScreen() {
   }, [category]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <View style={styles.header}>
           <View style={styles.headerIcon}>
@@ -354,7 +356,6 @@ function getInitials(name: string) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   scrollView: {
     flex: 1,

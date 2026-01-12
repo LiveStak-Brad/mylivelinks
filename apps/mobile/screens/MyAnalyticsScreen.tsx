@@ -2,15 +2,17 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/useTheme';
 
 type AnalyticsTab = 'overview' | 'wallet' | 'gifting' | 'earnings' | 'streams' | 'badges' | 'settings';
 
 export default function MyAnalyticsScreen() {
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.titleRow}>
@@ -391,7 +393,6 @@ function UserRow({ username, displayName, value, subtitle, badge }: { username: 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     paddingHorizontal: 16,

@@ -2,6 +2,7 @@
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/useTheme';
 
 const { width } = Dimensions.get('window');
 const GRID_GAP = 2;
@@ -10,6 +11,7 @@ const ITEM_SIZE = (width - GRID_GAP * 4) / 3;
 type TabType = 'all' | 'photos' | 'videos' | 'tagged';
 
 export default function UserPhotosScreen() {
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('all');
 
   const tabs: Array<{ key: TabType; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
@@ -51,7 +53,7 @@ export default function UserPhotosScreen() {
   const emptyState = getEmptyStateConfig();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       {/* Filter Tabs */}
       <View style={styles.tabsContainer}>
         <ScrollView 
@@ -115,7 +117,6 @@ export default function UserPhotosScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   tabsContainer: {
     borderBottomWidth: 1,

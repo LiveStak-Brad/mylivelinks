@@ -59,6 +59,13 @@ export default function LiveScreen() {
         const room = new Room({
           adaptiveStream: true,
           dynacast: true,
+          publishDefaults: {
+            simulcast: false,
+            videoEncoding: {
+              maxBitrate: 1_200_000,
+              maxFramerate: 30,
+            },
+          },
         });
 
         room.on(RoomEvent.Connected, () => {

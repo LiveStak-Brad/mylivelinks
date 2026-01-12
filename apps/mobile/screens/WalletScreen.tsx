@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../theme/useTheme';
 
 interface CoinPack {
   sku: string;
@@ -20,6 +21,7 @@ const COIN_PACKS: CoinPack[] = [
 ];
 
 export default function WalletScreen() {
+  const { colors } = useTheme();
   const [coinBalance] = useState(0);
   const [diamondBalance] = useState(0);
 
@@ -41,7 +43,7 @@ export default function WalletScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.headerIcon}>💼</Text>
@@ -95,7 +97,6 @@ export default function WalletScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   scrollView: {
     flex: 1,

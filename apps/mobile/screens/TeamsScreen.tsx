@@ -2,6 +2,7 @@
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/useTheme';
 
 const PLACEHOLDER_TEAMS = [
   { id: '1', name: 'Team Alpha', slug: 'team-alpha', members: 24, role: 'owner' },
@@ -21,11 +22,12 @@ const PLACEHOLDER_INVITES = [
 ];
 
 export default function TeamsScreen() {
+  const { colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateCta] = useState(false);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <View style={styles.headerContent}>
@@ -244,7 +246,6 @@ export default function TeamsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0c0c16',
   },
   scrollView: {
     flex: 1,

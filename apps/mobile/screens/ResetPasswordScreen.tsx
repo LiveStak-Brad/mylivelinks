@@ -1,14 +1,34 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
 
 export default function ResetPasswordScreen() {
   const { resetPassword } = useAuth();
+  const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      surface: colors.surface,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      border: colors.border,
+      subtleText: (colors as any).subtleText ?? colors.mutedText,
+      dangerBg: colors.mode === 'dark' ? 'rgba(239,68,68,0.15)' : '#fee',
+      dangerBorder: colors.mode === 'dark' ? 'rgba(239,68,68,0.35)' : '#fcc',
+      dangerText: colors.danger,
+      successBg: colors.mode === 'dark' ? 'rgba(34,197,94,0.15)' : '#efe',
+      successBorder: colors.mode === 'dark' ? 'rgba(34,197,94,0.35)' : '#cfc',
+      successText: colors.success,
+    }),
+    [colors]
+  );
 
   const handleResetPassword = async () => {
     if (!email.trim()) {
@@ -43,7 +63,7 @@ export default function ResetPasswordScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -53,34 +73,34 @@ export default function ResetPasswordScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            <Text style={styles.title}>Reset Password</Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.title, { color: themed.text }]}>Reset Password</Text>
+            <Text style={[styles.subtitle, { color: themed.mutedText }]}>
               Enter your email and we'll send you a reset link
             </Text>
 
             {error && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
+              <View style={[styles.errorContainer, { backgroundColor: themed.dangerBg, borderColor: themed.dangerBorder }]}>
+                <Text style={[styles.errorText, { color: themed.dangerText }]}>{error}</Text>
               </View>
             )}
 
             {message && (
-              <View style={styles.successContainer}>
-                <Text style={styles.successText}>{message}</Text>
+              <View style={[styles.successContainer, { backgroundColor: themed.successBg, borderColor: themed.successBorder }]}>
+                <Text style={[styles.successText, { color: themed.successText }]}>{message}</Text>
               </View>
             )}
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={[styles.label, { color: themed.text }]}>Email</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: themed.surface, borderColor: themed.border, color: themed.text }]}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
                   setError(null);
                 }}
                 placeholder="you@example.com"
-                placeholderTextColor="#999"
+                placeholderTextColor={themed.subtleText}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}

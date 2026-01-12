@@ -2,6 +2,7 @@
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/useTheme';
 
 const MAX_PHOTOS = 6;
 const INTEREST_TAGS = [
@@ -11,6 +12,7 @@ const INTEREST_TAGS = [
 ];
 
 export default function LinkProfileScreen() {
+  const { colors } = useTheme();
   const [enabled, setEnabled] = useState(false);
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
@@ -36,7 +38,7 @@ export default function LinkProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Link Profile</Text>
 
@@ -153,7 +155,6 @@ export default function LinkProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   scrollView: {
     flex: 1,

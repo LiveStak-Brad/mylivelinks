@@ -1,150 +1,195 @@
 ﻿import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, Text } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
-const stylesVars = {
-  bg: '#F3F4F6',
-  card: '#FFFFFF',
-  border: '#E5E7EB',
-  text: '#111827',
-  mutedText: '#6B7280',
-  primary: 'hsl(258 90% 58%)',
-} as const;
-
-function Card({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  style?: object;
-}) {
-  return <View style={[styles.card, style]}>{children}</View>;
-}
-
-function Divider({ style }: { style?: object }) {
-  return <View style={[styles.divider, style]} />;
-}
-
-function PrimaryButton({
-  label,
-  iconName,
-  onPress,
-}: {
-  label: string;
-  iconName?: React.ComponentProps<typeof Feather>['name'];
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.buttonBase, styles.buttonPrimary, pressed && styles.buttonPressed]}
-    >
-      {iconName ? <Feather name={iconName} size={16} color="#FFFFFF" /> : null}
-      <Text style={styles.buttonPrimaryText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function SecondaryButton({
-  label,
-  iconName,
-  onPress,
-}: {
-  label: string;
-  iconName?: React.ComponentProps<typeof Feather>['name'];
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.buttonBase, styles.buttonSecondary, pressed && styles.buttonPressed]}
-    >
-      {iconName ? <Feather name={iconName} size={16} color={stylesVars.text} /> : null}
-      <Text style={styles.buttonSecondaryText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function CountChip({
-  label,
-  value,
-  onPress,
-}: {
-  label: string;
-  value: string;
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.countChip, pressed && styles.pressedSoft]}>
-      <Text style={styles.countValue}>{value}</Text>
-      <Text style={styles.countLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function SectionHeader({
-  title,
-  rightLabel,
-  rightIconName,
-  onRightPress,
-}: {
-  title: string;
-  rightLabel?: string;
-  rightIconName?: React.ComponentProps<typeof Feather>['name'];
-  onRightPress?: () => void;
-}) {
-  return (
-    <View style={styles.sectionHeaderRow}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {rightLabel ? (
-        <Pressable accessibilityRole="button" onPress={onRightPress} style={({ pressed }) => [styles.sectionHeaderAction, pressed && styles.pressedSoft]}>
-          {rightIconName ? <Feather name={rightIconName} size={14} color={stylesVars.primary} /> : null}
-          <Text style={styles.sectionHeaderActionText}>{rightLabel}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-function LinkRow({
-  title,
-  subtitle,
-  iconName = 'external-link',
-  onPress,
-}: {
-  title: string;
-  subtitle?: string;
-  iconName?: React.ComponentProps<typeof Feather>['name'];
-  onPress?: () => void;
-}) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.linkRow, pressed && styles.pressedSoft]}>
-      <View style={styles.linkRowLeft}>
-        <View style={styles.linkIcon}>
-          <Feather name={iconName} size={16} color={stylesVars.primary} />
-        </View>
-        <View style={styles.linkTextCol}>
-          <Text style={styles.linkTitle} numberOfLines={1}>
-            {title}
-          </Text>
-          {subtitle ? (
-            <Text style={styles.linkSubtitle} numberOfLines={1}>
-              {subtitle}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-      <Feather name="chevron-right" size={18} color={stylesVars.mutedText} />
-    </Pressable>
-  );
-}
+import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useTheme } from '../theme/useTheme';
 
 export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
   const bottomGuard = insets.bottom + 88;
+  const navigation = useNavigation<any>();
+  const currentUser = useCurrentUser();
+  const { colors } = useTheme();
+
+  const stylesVars = useMemo(
+    () => ({
+      bg: colors.bg,
+      card: colors.surface,
+      border: colors.border,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      primary: (colors as any).tabIconActive ?? colors.text,
+    }),
+    [colors]
+  );
+
+  const styles = useMemo(() => createStyles(stylesVars), [stylesVars]);
+
+  function Card({
+    children,
+    style,
+  }: {
+    children: React.ReactNode;
+    style?: object;
+  }) {
+    return <View style={[styles.card, style]}>{children}</View>;
+  }
+
+  function Divider({ style }: { style?: object }) {
+    return <View style={[styles.divider, style]} />;
+  }
+
+  function PrimaryButton({
+    label,
+    iconName,
+    onPress,
+  }: {
+    label: string;
+    iconName?: React.ComponentProps<typeof Feather>['name'];
+    onPress?: () => void;
+  }) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.buttonBase, styles.buttonPrimary, pressed && styles.buttonPressed]}
+      >
+        {iconName ? <Feather name={iconName} size={16} color="#FFFFFF" /> : null}
+        <Text style={styles.buttonPrimaryText}>{label}</Text>
+      </Pressable>
+    );
+  }
+
+  function SecondaryButton({
+    label,
+    iconName,
+    onPress,
+  }: {
+    label: string;
+    iconName?: React.ComponentProps<typeof Feather>['name'];
+    onPress?: () => void;
+  }) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.buttonBase, styles.buttonSecondary, pressed && styles.buttonPressed]}
+      >
+        {iconName ? <Feather name={iconName} size={16} color={stylesVars.text} /> : null}
+        <Text style={styles.buttonSecondaryText}>{label}</Text>
+      </Pressable>
+    );
+  }
+
+  function CountChip({
+    label,
+    value,
+    onPress,
+  }: {
+    label: string;
+    value: string;
+    onPress?: () => void;
+  }) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.countChip, pressed && styles.pressedSoft]}
+      >
+        <Text style={styles.countValue}>{value}</Text>
+        <Text style={styles.countLabel}>{label}</Text>
+      </Pressable>
+    );
+  }
+
+  function SectionHeader({
+    title,
+    rightLabel,
+    rightIconName,
+    onRightPress,
+  }: {
+    title: string;
+    rightLabel?: string;
+    rightIconName?: React.ComponentProps<typeof Feather>['name'];
+    onRightPress?: () => void;
+  }) {
+    return (
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {rightLabel ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onRightPress}
+            style={({ pressed }) => [styles.sectionHeaderAction, pressed && styles.pressedSoft]}
+          >
+            {rightIconName ? <Feather name={rightIconName} size={14} color={stylesVars.primary} /> : null}
+            <Text style={styles.sectionHeaderActionText}>{rightLabel}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
+  function LinkRow({
+    title,
+    subtitle,
+    iconName = 'external-link',
+    onPress,
+  }: {
+    title: string;
+    subtitle?: string;
+    iconName?: React.ComponentProps<typeof Feather>['name'];
+    onPress?: () => void;
+  }) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.linkRow, pressed && styles.pressedSoft]}
+      >
+        <View style={styles.linkRowLeft}>
+          <View style={styles.linkIcon}>
+            <Feather name={iconName} size={16} color={stylesVars.primary} />
+          </View>
+          <View style={styles.linkTextCol}>
+            <Text style={styles.linkTitle} numberOfLines={1}>
+              {title}
+            </Text>
+            {subtitle ? (
+              <Text style={styles.linkSubtitle} numberOfLines={1}>
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <Feather name="chevron-right" size={18} color={stylesVars.mutedText} />
+      </Pressable>
+    );
+  }
+
+  const displayName = useMemo(() => {
+    return (
+      (currentUser.profile?.display_name ? String(currentUser.profile.display_name) : '') ||
+      (currentUser.profile?.username ? String(currentUser.profile.username) : '') ||
+      'My Profile'
+    );
+  }, [currentUser.profile?.display_name, currentUser.profile?.username]);
+
+  const username = useMemo(() => {
+    return currentUser.profile?.username ? String(currentUser.profile.username) : '';
+  }, [currentUser.profile?.username]);
+
+  const avatarUrl = useMemo(() => {
+    return currentUser.profile?.avatar_url ? String(currentUser.profile.avatar_url) : '';
+  }, [currentUser.profile?.avatar_url]);
+
+  const avatarFallback = useMemo(() => {
+    const basis = displayName || username || 'U';
+    return basis.trim().slice(0, 1).toUpperCase() || 'U';
+  }, [displayName, username]);
 
   type TabId = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products';
   const tabs = useMemo(
@@ -175,20 +220,28 @@ export default function UserProfileScreen() {
           <Card>
             <View style={styles.heroTopRow}>
               <View style={styles.heroAvatar}>
-                <Text style={styles.heroAvatarText}>B</Text>
+                {currentUser.loading ? (
+                  <Text style={styles.heroAvatarText}>U</Text>
+                ) : avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.heroAvatarImage} />
+                ) : (
+                  <Text style={styles.heroAvatarText}>{avatarFallback}</Text>
+                )}
               </View>
 
               <View style={styles.heroInfoCol}>
                 <View style={styles.heroNameRow}>
                   <Text style={styles.heroName} numberOfLines={1}>
-                    Brad Morris
+                    {displayName}
                   </Text>
                 </View>
 
                 <View style={styles.heroMetaRow}>
-                  <Text style={styles.heroUsername} numberOfLines={1}>
-                    @brad
-                  </Text>
+                  {username ? (
+                    <Text style={styles.heroUsername} numberOfLines={1}>
+                      @{username}
+                    </Text>
+                  ) : null}
                   <View style={styles.pill}>
                     <Feather name="star" size={12} color={stylesVars.primary} />
                     <Text style={styles.pillText}>Creator</Text>
@@ -198,19 +251,23 @@ export default function UserProfileScreen() {
                 <View style={styles.heroLocationRow}>
                   <Feather name="map-pin" size={14} color={stylesVars.mutedText} />
                   <Text style={styles.heroLocationText} numberOfLines={1}>
-                    Las Vegas, NV
+                    —
                   </Text>
                 </View>
               </View>
             </View>
 
             <Text style={styles.heroBio}>
-              This is your profile. Add links, socials, top friends, and content tabs. UI-only on mobile (no-op).
+              {currentUser.loading
+                ? 'Loading your profile…'
+                : currentUser.profile
+                  ? 'This is your profile.'
+                  : 'No profile data yet.'}
             </Text>
 
             {/* Action Buttons (web: Edit Profile / Share / Stats) */}
             <View style={styles.heroButtonsRow}>
-              <SecondaryButton label="Edit Profile" iconName="edit-3" onPress={() => {}} />
+              <SecondaryButton label="Edit Profile" iconName="edit-3" onPress={() => navigation.navigate('SettingsProfileScreen')} />
               <SecondaryButton label="Share" iconName="share-2" onPress={() => {}} />
               <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.statsButton, pressed && styles.buttonPressed]}>
                 <Feather name="bar-chart-2" size={16} color={stylesVars.primary} />
@@ -339,9 +396,14 @@ export default function UserProfileScreen() {
               {/* Links (web: ModernLinksSection) */}
               <Card>
                 <SectionHeader title="My Links" rightLabel="Edit" rightIconName="edit-3" onRightPress={() => {}} />
-                <LinkRow title="MyLiveLinks" subtitle="mylivelinks.com/brad" iconName="link" onPress={() => {}} />
-                <LinkRow title="YouTube" subtitle="youtube.com/@brad" iconName="youtube" onPress={() => {}} />
-                <LinkRow title="Instagram" subtitle="instagram.com/brad" iconName="instagram" onPress={() => {}} />
+                <LinkRow
+                  title="MyLiveLinks"
+                  subtitle={username ? `mylivelinks.com/${username}` : 'mylivelinks.com/…'}
+                  iconName="link"
+                  onPress={() => {}}
+                />
+                <LinkRow title="YouTube" subtitle="Not set" iconName="youtube" onPress={() => {}} />
+                <LinkRow title="Instagram" subtitle="Not set" iconName="instagram" onPress={() => {}} />
               </Card>
 
               {/* Adult Links (web: AdultLinksSection; web-only) */}
@@ -391,7 +453,15 @@ export default function UserProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(stylesVars: {
+  bg: string;
+  card: string;
+  border: string;
+  text: string;
+  mutedText: string;
+  primary: string;
+}) {
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: stylesVars.bg,
@@ -432,6 +502,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(124, 58, 237, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  heroAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   heroAvatarText: {
     fontSize: 26,
@@ -789,4 +864,5 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: stylesVars.mutedText,
   },
-});
+  });
+}

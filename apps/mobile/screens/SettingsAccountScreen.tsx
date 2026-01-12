@@ -1,149 +1,154 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../state/AuthContext';
-
-const stylesVars = {
-  pageBg: '#F8FAFC', // web: bg-muted/30
-  cardBg: '#FFFFFF',
-  border: '#E5E7EB',
-  text: '#0F172A',
-  mutedText: '#64748B',
-  mutedBg: '#F1F5F9',
-};
-
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>{title}</Text>
-        {description ? <Text style={styles.cardDescription}>{description}</Text> : null}
-      </View>
-      {children}
-    </View>
-  );
-}
-
-function Divider() {
-  return <View style={styles.divider} />;
-}
-
-function ChevronRow({
-  iconName,
-  title,
-  subtitle,
-  rightText,
-  disabled,
-  onPress,
-}: {
-  iconName?: React.ComponentProps<typeof Ionicons>['name'];
-  title: string;
-  subtitle?: string;
-  rightText?: string;
-  disabled?: boolean;
-  onPress?: () => void;
-}) {
-  const isDisabled = !!disabled;
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled }}
-      onPress={() => {
-        if (isDisabled) return;
-        onPress?.();
-      }}
-      style={({ pressed }) => [
-        styles.row,
-        pressed && !isDisabled ? styles.rowPressed : null,
-        isDisabled ? styles.rowDisabled : null,
-      ]}
-    >
-      <View style={styles.rowLeft}>
-        {iconName ? (
-          <View style={styles.rowIcon}>
-            <Ionicons name={iconName} size={18} color={stylesVars.text} />
-          </View>
-        ) : null}
-
-        <View style={styles.rowTextCol}>
-          <Text style={styles.rowTitle}>{title}</Text>
-          {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
-        </View>
-      </View>
-
-      <View style={styles.rowRight}>
-        {rightText ? <Text style={styles.rowRightText}>{rightText}</Text> : null}
-        <Ionicons name="chevron-forward" size={18} color={stylesVars.mutedText} />
-      </View>
-    </Pressable>
-  );
-}
-
-function ProviderRow({
-  provider,
-  status = 'Not connected',
-  leftIcon,
-  badgeBg,
-  badgeBorderColor,
-  badgeIconColor,
-}: {
-  provider: 'Apple' | 'Google' | 'Facebook' | 'Twitch';
-  status?: string;
-  leftIcon: React.ComponentProps<typeof Ionicons>['name'];
-  badgeBg: string;
-  badgeBorderColor?: string;
-  badgeIconColor: string;
-}) {
-  return (
-    <View style={styles.providerRow}>
-      <View style={styles.providerLeft}>
-        <View
-          style={[
-            styles.providerBadge,
-            {
-              backgroundColor: badgeBg,
-              borderColor: badgeBorderColor ?? 'transparent',
-              borderWidth: badgeBorderColor ? StyleSheet.hairlineWidth : 0,
-            },
-          ]}
-        >
-          <Ionicons name={leftIcon} size={18} color={badgeIconColor} />
-        </View>
-
-        <View style={styles.providerTextCol}>
-          <Text style={styles.providerName}>{provider}</Text>
-          <Text style={styles.providerStatus}>{status}</Text>
-        </View>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Connect ${provider}`}
-        onPress={() => {
-          // UI only — no auth / no linking
-        }}
-        style={({ pressed }) => [styles.connectButton, pressed ? styles.connectButtonPressed : null]}
-      >
-        <Ionicons name="link" size={14} color={stylesVars.text} />
-        <Text style={styles.connectButtonText}>Connect</Text>
-      </Pressable>
-    </View>
-  );
-}
+import { useTheme } from '../theme/useTheme';
 
 export default function SettingsAccountScreen() {
   const { signOut } = useAuth();
+  const { colors } = useTheme();
+  const stylesVars = useMemo(
+    () => ({
+      pageBg: colors.bg,
+      cardBg: colors.surface,
+      border: colors.border,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      mutedBg: colors.surface2,
+    }),
+    [colors.bg, colors.border, colors.mutedText, colors.surface, colors.surface2, colors.text]
+  );
+  const styles = useMemo(() => createStyles(stylesVars), [stylesVars]);
   const [signingOut, setSigningOut] = useState(false);
+
+  function SectionCard({
+    title,
+    description,
+    children,
+  }: {
+    title: string;
+    description?: string;
+    children: React.ReactNode;
+  }) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>{title}</Text>
+          {description ? <Text style={styles.cardDescription}>{description}</Text> : null}
+        </View>
+        {children}
+      </View>
+    );
+  }
+
+  function Divider() {
+    return <View style={styles.divider} />;
+  }
+
+  function ChevronRow({
+    iconName,
+    title,
+    subtitle,
+    rightText,
+    disabled,
+    onPress,
+  }: {
+    iconName?: React.ComponentProps<typeof Ionicons>['name'];
+    title: string;
+    subtitle?: string;
+    rightText?: string;
+    disabled?: boolean;
+    onPress?: () => void;
+  }) {
+    const isDisabled = !!disabled;
+
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isDisabled }}
+        onPress={() => {
+          if (isDisabled) return;
+          onPress?.();
+        }}
+        style={({ pressed }) => [
+          styles.row,
+          pressed && !isDisabled ? styles.rowPressed : null,
+          isDisabled ? styles.rowDisabled : null,
+        ]}
+      >
+        <View style={styles.rowLeft}>
+          {iconName ? (
+            <View style={styles.rowIcon}>
+              <Ionicons name={iconName} size={18} color={stylesVars.text} />
+            </View>
+          ) : null}
+
+          <View style={styles.rowTextCol}>
+            <Text style={styles.rowTitle}>{title}</Text>
+            {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
+          </View>
+        </View>
+
+        <View style={styles.rowRight}>
+          {rightText ? <Text style={styles.rowRightText}>{rightText}</Text> : null}
+          <Ionicons name="chevron-forward" size={18} color={stylesVars.mutedText} />
+        </View>
+      </Pressable>
+    );
+  }
+
+  function ProviderRow({
+    provider,
+    status = 'Not connected',
+    leftIcon,
+    badgeBg,
+    badgeBorderColor,
+    badgeIconColor,
+  }: {
+    provider: 'Apple' | 'Google' | 'Facebook' | 'Twitch';
+    status?: string;
+    leftIcon: React.ComponentProps<typeof Ionicons>['name'];
+    badgeBg: string;
+    badgeBorderColor?: string;
+    badgeIconColor: string;
+  }) {
+    return (
+      <View style={styles.providerRow}>
+        <View style={styles.providerLeft}>
+          <View
+            style={[
+              styles.providerBadge,
+              {
+                backgroundColor: badgeBg,
+                borderColor: badgeBorderColor ?? 'transparent',
+                borderWidth: badgeBorderColor ? StyleSheet.hairlineWidth : 0,
+              },
+            ]}
+          >
+            <Ionicons name={leftIcon} size={18} color={badgeIconColor} />
+          </View>
+
+          <View style={styles.providerTextCol}>
+            <Text style={styles.providerName}>{provider}</Text>
+            <Text style={styles.providerStatus}>{status}</Text>
+          </View>
+        </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Connect ${provider}`}
+          onPress={() => {
+            // UI only — no auth / no linking
+          }}
+          style={({ pressed }) => [styles.connectButton, pressed ? styles.connectButtonPressed : null]}
+        >
+          <Ionicons name="link" size={14} color={stylesVars.text} />
+          <Text style={styles.connectButtonText}>Connect</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -226,7 +231,15 @@ export default function SettingsAccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(stylesVars: {
+  pageBg: string;
+  cardBg: string;
+  border: string;
+  text: string;
+  mutedText: string;
+  mutedBg: string;
+}) {
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: stylesVars.pageBg,
@@ -347,7 +360,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: stylesVars.cardBg,
     borderWidth: 1,
     borderColor: stylesVars.border,
     alignItems: 'center',
@@ -385,7 +398,7 @@ const styles = StyleSheet.create({
     borderColor: stylesVars.border,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: stylesVars.cardBg,
   },
   providerRow: {
     minHeight: 64,
@@ -445,4 +458,5 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: stylesVars.text,
   },
-});
+  });
+}

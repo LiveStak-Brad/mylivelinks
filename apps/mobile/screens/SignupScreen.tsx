@@ -1,16 +1,36 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
 
 export default function SignupScreen() {
   const { signUp } = useAuth();
+  const { colors } = useTheme();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      surface: colors.surface,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      border: colors.border,
+      subtleText: (colors as any).subtleText ?? colors.mutedText,
+      dangerBg: colors.mode === 'dark' ? 'rgba(239,68,68,0.15)' : '#fee',
+      dangerBorder: colors.mode === 'dark' ? 'rgba(239,68,68,0.35)' : '#fcc',
+      dangerText: colors.danger,
+      successBg: colors.mode === 'dark' ? 'rgba(34,197,94,0.15)' : '#efe',
+      successBorder: colors.mode === 'dark' ? 'rgba(34,197,94,0.35)' : '#cfc',
+      successText: colors.success,
+    }),
+    [colors]
+  );
 
   const handleSignup = async () => {
     const trimmedEmail = email.trim();
@@ -34,7 +54,7 @@ export default function SignupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -44,31 +64,31 @@ export default function SignupScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join MyLiveLinks</Text>
+            <Text style={[styles.title, { color: themed.text }]}>Create Account</Text>
+            <Text style={[styles.subtitle, { color: themed.mutedText }]}>Join MyLiveLinks</Text>
           </View>
 
           {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
+            <View style={[styles.errorBox, { backgroundColor: themed.dangerBg, borderColor: themed.dangerBorder }]}>
+              <Text style={[styles.errorText, { color: themed.dangerText }]}>{error}</Text>
             </View>
           ) : null}
 
           {message ? (
-            <View style={styles.successBox}>
-              <Text style={styles.successText}>{message}</Text>
+            <View style={[styles.successBox, { backgroundColor: themed.successBg, borderColor: themed.successBorder }]}>
+              <Text style={[styles.successText, { color: themed.successText }]}>{message}</Text>
             </View>
           ) : null}
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Name</Text>
+              <Text style={[styles.label, { color: themed.text }]}>Name</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: themed.surface, borderColor: themed.border, color: themed.text }]}
                 value={name}
                 onChangeText={setName}
                 placeholder="Enter your name"
-                placeholderTextColor="#999"
+                placeholderTextColor={themed.subtleText}
                 autoCapitalize="words"
                 autoCorrect={false}
                 editable={!submitting}
@@ -76,16 +96,16 @@ export default function SignupScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={[styles.label, { color: themed.text }]}>Email</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: themed.surface, borderColor: themed.border, color: themed.text }]}
                 value={email}
                 onChangeText={(t) => {
                   setEmail(t);
                   setError(null);
                 }}
                 placeholder="Enter your email"
-                placeholderTextColor="#999"
+                placeholderTextColor={themed.subtleText}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -94,16 +114,16 @@ export default function SignupScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={[styles.label, { color: themed.text }]}>Password</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: themed.surface, borderColor: themed.border, color: themed.text }]}
                 value={password}
                 onChangeText={(t) => {
                   setPassword(t);
                   setError(null);
                 }}
                 placeholder="Enter your password"
-                placeholderTextColor="#999"
+                placeholderTextColor={themed.subtleText}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}

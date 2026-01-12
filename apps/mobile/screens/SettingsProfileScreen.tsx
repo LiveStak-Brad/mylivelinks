@@ -1,5 +1,6 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +12,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+
+import { supabase } from '../lib/supabase';
+import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useTheme } from '../theme/useTheme';
 
 type PickerItem = {
   id: string;
@@ -143,6 +148,8 @@ function Button({
 
 function Field({
   label,
+  value,
+  onChangeText,
   placeholder,
   helper,
   disabled,
@@ -152,6 +159,8 @@ function Field({
   maxLength,
 }: {
   label: string;
+  value?: string;
+  onChangeText?: (text: string) => void;
   placeholder?: string;
   helper?: string;
   disabled?: boolean;
@@ -169,6 +178,8 @@ function Field({
           placeholderTextColor={COLORS.muted}
           editable={!disabled}
           multiline={multiline}
+          value={value}
+          onChangeText={onChangeText}
           keyboardType={keyboardType}
           maxLength={maxLength}
           style={[styles.input, multiline && styles.inputMultiline]}
@@ -263,6 +274,70 @@ const COLORS = {
 };
 
 export default function SettingsProfileScreen() {
+  const { colors } = useTheme();
+  const currentUser = useCurrentUser();
+
+  const userId = currentUser.userId;
+  const profile = currentUser.profile;
+
+  const profileUsername = profile?.username != null ? String(profile.username) : '';
+  const profileDisplayName = profile?.display_name != null ? String(profile.display_name) : '';
+  const profileBio = profile && Object.prototype.hasOwnProperty.call(profile, 'bio') ? String((profile as any).bio ?? '') : '';
+
+  const [displayName, setDisplayName] = useState('');
+  const [bio, setBio] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    // Initialize (and re-sync when profile refreshes) as long as the user isn't actively editing/saving.
+    if (saving) return;
+    setDisplayName(profileDisplayName);
+    setBio(profileBio);
+  }, [profileBio, profileDisplayName, saving]);
+
+  const dirty = useMemo(() => {
+    const nextDisplay = displayName.trim();
+    const nextBio = bio.trim();
+    return nextDisplay !== profileDisplayName.trim() || nextBio !== profileBio.trim();
+  }, [bio, displayName, profileBio, profileDisplayName]);
+
+  const canSave = Boolean(userId) && !currentUser.loading && !saving && dirty;
+
+  const handleCancel = useCallback(() => {
+    setDisplayName(profileDisplayName);
+    setBio(profileBio);
+  }, [profileBio, profileDisplayName]);
+
+  const handleSave = useCallback(async () => {
+    if (!userId) return;
+
+    setSaving(true);
+    try {
+      const updates: Record<string, any> = {
+        display_name: displayName.trim() || null,
+      };
+
+      // Only attempt columns that exist on the loaded row (avoids schema mismatch surprises).
+      if (profile && Object.prototype.hasOwnProperty.call(profile, 'bio')) {
+        updates.bio = bio.trim() || null;
+      }
+
+      const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+      if (error) {
+        console.error('[SettingsProfileScreen] profiles update error:', error.message);
+        Alert.alert('Save failed', error.message);
+        return;
+      }
+
+      await currentUser.refresh();
+    } catch (e: any) {
+      console.error('[SettingsProfileScreen] save exception:', e);
+      Alert.alert('Save failed', e?.message || 'Unexpected error');
+    } finally {
+      setSaving(false);
+    }
+  }, [bio, currentUser, displayName, profile, userId]);
+
   const [modulesModalOpen, setModulesModalOpen] = useState(false);
   const [tabsModalOpen, setTabsModalOpen] = useState(false);
 
@@ -329,7 +404,7 @@ export default function SettingsProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
       <PickerModal
         visible={modulesModalOpen}
         title="Customize Profile Modules"
@@ -394,14 +469,22 @@ export default function SettingsProfileScreen() {
         >
           <View style={styles.photoRow}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>U</Text>
+              <Text style={styles.avatarText}>
+                {(profileDisplayName || profileUsername || 'U').trim().slice(0, 1).toUpperCase() || 'U'}
+              </Text>
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                 <Button label="Change Photo" iconName="image-outline" />
-                <Button label="Save Profile" iconName="save-outline" tone="primary" disabled />
+                <Button
+                  label={saving ? 'Saving…' : 'Save Profile'}
+                  iconName="save-outline"
+                  tone="primary"
+                  disabled={!canSave}
+                  onPress={handleSave}
+                />
               </View>
-              <Text style={styles.mutedNote}>You have unsaved changes.</Text>
+              {dirty ? <Text style={styles.mutedNote}>You have unsaved changes.</Text> : null}
             </View>
           </View>
         </Card>
@@ -416,6 +499,7 @@ export default function SettingsProfileScreen() {
                   placeholder="username"
                   placeholderTextColor={COLORS.muted}
                   editable={false}
+                  value={currentUser.loading ? '' : profileUsername}
                   style={styles.input}
                 />
               </View>
@@ -424,8 +508,23 @@ export default function SettingsProfileScreen() {
             <Text style={styles.fieldHelper}>Your unique identifier: mylivelinks.com/username</Text>
           </View>
 
-          <Field label="Display Name" placeholder="Your display name" />
-          <Field label="Bio" placeholder="Tell us about yourself" multiline maxLength={500} helper="0/500" />
+          <Field
+            label="Display Name"
+            placeholder="Your display name"
+            value={displayName}
+            onChangeText={setDisplayName}
+            disabled={currentUser.loading || saving}
+          />
+          <Field
+            label="Bio"
+            placeholder="Tell us about yourself"
+            multiline
+            maxLength={500}
+            helper={`${bio.length}/500`}
+            value={bio}
+            onChangeText={setBio}
+            disabled={currentUser.loading || saving}
+          />
         </Card>
 
         {/* Location (web LocationEditor) */}
@@ -811,9 +910,15 @@ export default function SettingsProfileScreen() {
 
         {/* Bottom Save Bar (web sticky) */}
         <View style={styles.saveBar}>
-          <Button label="Save All Changes" tone="primary" iconName="save-outline" disabled />
+          <Button
+            label={saving ? 'Saving…' : 'Save All Changes'}
+            tone="primary"
+            iconName="save-outline"
+            disabled={!canSave}
+            onPress={handleSave}
+          />
           <View style={{ width: 10 }} />
-          <Button label="Cancel" tone="secondary" disabled />
+          <Button label="Cancel" tone="secondary" disabled={saving || currentUser.loading || !dirty} onPress={handleCancel} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -821,7 +926,7 @@ export default function SettingsProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: COLORS.bg },
+  safeArea: { flex: 1 },
   container: { padding: 16, paddingBottom: 28 },
 
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

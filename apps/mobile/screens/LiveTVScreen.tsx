@@ -1,61 +1,123 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { loadLiveBrowseFilters, saveLiveBrowseFilters, type BrowseGenderFilter } from '../lib/liveBrowsePreferences';
 import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
+import { brand, darkPalette, lightPalette } from '../theme/colors';
 
-type MockStream = {
+type LiveTVStreamApi = {
   id: string;
-  name: string;
-  title: string;
-  viewers: string;
-  badge: 'Trending' | 'Featured' | 'Sponsored';
-  category: (typeof CATEGORY_FILTERS)[number];
-  gender: Exclude<BrowseGenderFilter, 'All'>;
+  slug?: string;
+  streamer_display_name: string;
+  streamer_profile_id?: string;
+  thumbnail_url: string | null;
+  total_views: number;
+  viewer_count?: number;
+  category: string | null;
+  stream_type?: string | null;
+  badges?: Array<'Trending' | 'Featured' | 'Sponsored'>;
+  gender?: 'Men' | 'Women';
+  trendingRank?: number;
 };
 
-type MockRoom = {
+type LiveTVRoomApi = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  room_type: string;
+  icon_url: string | null;
+  banner_url: string | null;
+  viewer_count: number;
+  streamer_count: number;
+  category: string;
+  gender?: 'Men' | 'Women';
+};
+
+type LiveTVStreamCard = {
+  id: string;
+  slug?: string;
+  name: string;
+  title: string;
+  thumbnailUrl: string | null;
+  viewersText: string;
+  badge?: 'Trending' | 'Featured' | 'Sponsored';
+  category: string | null;
+  gender?: 'Men' | 'Women';
+};
+
+type LiveTVRoomCard = {
   id: string;
   name: string;
-  viewers: string;
+  imageUrl: string | null;
+  viewersText: string;
 };
 
 const SPECIAL_FILTERS = ['Trending', 'Featured', 'Rooms', 'Battles'] as const;
 const CATEGORY_FILTERS = ['IRL', 'Music', 'Gaming', 'Comedy', 'Just Chatting'] as const;
 const GENDER_FILTERS = ['All', 'Men', 'Women'] as const;
 
-const MOCK_ROOMS: MockRoom[] = [
-  { id: 'room-1', name: 'Just Chatting', viewers: '1.2K' },
-  { id: 'room-2', name: 'Music', viewers: '842' },
-  { id: 'room-3', name: 'Gaming', viewers: '2.1K' },
-  { id: 'room-4', name: 'Comedy', viewers: '503' },
-  { id: 'room-5', name: 'IRL', viewers: '999' },
-];
+const API_BASE_URL = 'https://www.mylivelinks.com';
+const LIVETV_STREAMS_URL = `${API_BASE_URL}/api/livetv/streams`;
+const LIVETV_ROOMS_URL = `${API_BASE_URL}/api/livetv/rooms`;
 
-const MOCK_STREAMS: MockStream[] = [
-  { id: 's-1', name: 'Ava', title: 'Chill vibes', viewers: '123', badge: 'Trending', category: 'Just Chatting', gender: 'Women' },
-  { id: 's-2', name: 'Miles', title: 'Late night chat', viewers: '987', badge: 'Featured', category: 'Just Chatting', gender: 'Men' },
-  { id: 's-3', name: 'Nova', title: 'Ranked grind', viewers: '452', badge: 'Trending', category: 'Gaming', gender: 'Women' },
-  { id: 's-4', name: 'Kai', title: 'Acoustic set', viewers: '1.1K', badge: 'Sponsored', category: 'Music', gender: 'Men' },
-  { id: 's-5', name: 'Sage', title: 'IRL walk', viewers: '76', badge: 'Trending', category: 'IRL', gender: 'Women' },
-  { id: 's-6', name: 'Luna', title: 'Comedy bits', viewers: '321', badge: 'Featured', category: 'Comedy', gender: 'Women' },
-  { id: 's-7', name: 'Jules', title: 'Just chatting', viewers: '2.4K', badge: 'Trending', category: 'Just Chatting', gender: 'Men' },
-  { id: 's-8', name: 'Remy', title: 'Cozy gaming', viewers: '640', badge: 'Sponsored', category: 'Gaming', gender: 'Men' },
-  { id: 's-9', name: 'Zoe', title: 'Music requests', viewers: '189', badge: 'Featured', category: 'Music', gender: 'Women' },
-  { id: 's-10', name: 'Finn', title: 'Highlights', viewers: '555', badge: 'Trending', category: 'Gaming', gender: 'Men' },
-];
+function toAbsoluteUrl(url: string | null | undefined) {
+  if (!url) return null;
+  const trimmed = String(url).trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  if (trimmed.startsWith('/')) return `${API_BASE_URL}${trimmed}`;
+  return `${API_BASE_URL}/${trimmed}`;
+}
+
+function formatCompactCount(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return '0';
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(Math.floor(value));
+}
 
 export default function LiveTVScreen() {
+  const navigation = useNavigation<any>();
   const { user, loading } = useAuth();
+  const { mode, colors } = useTheme();
   const profileId = user?.id ?? 'anon';
+
+  const stylesVars = useMemo(
+    () => ({
+      bg: colors.bg,
+      card: colors.surface,
+      card2: (colors as any).surface2 ?? colors.surface,
+      border: colors.border,
+      text: colors.text,
+      textSecondary: (colors as any).subtleText ?? colors.mutedText,
+      primary: (brand as any).primary ?? brand.pink,
+      red: colors.danger,
+      amber: colors.warning,
+      overlay: colors.overlay,
+      chipBg: mode === 'dark' ? 'rgba(255,255,255,0.04)' : lightPalette.slate100,
+    }),
+    [colors, mode]
+  );
+
+  const styles = useMemo(() => createStyles(stylesVars), [stylesVars]);
 
   const [selectedSpecial, setSelectedSpecial] = useState<(typeof SPECIAL_FILTERS)[number]>('Trending');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedGender, setSelectedGender] = useState<BrowseGenderFilter>('All');
   const [search, setSearch] = useState('');
   const [hydrated, setHydrated] = useState(false);
+
+  const [streams, setStreams] = useState<LiveTVStreamApi[]>([]);
+  const [rooms, setRooms] = useState<LiveTVRoomApi[]>([]);
+  const [streamsLoading, setStreamsLoading] = useState(true);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [failedThumbsById, setFailedThumbsById] = useState<Record<string, true>>({});
+  const [failedRoomImagesById, setFailedRoomImagesById] = useState<Record<string, true>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -86,26 +148,119 @@ export default function LiveTVScreen() {
     });
   }, [hydrated, loading, profileId, selectedCategory, selectedGender, selectedSpecial]);
 
+  const loadStreams = useCallback(async () => {
+    try {
+      setStreamsLoading(true);
+      const res = await fetch(LIVETV_STREAMS_URL, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Failed to load streams: ${res.status}`);
+      const json = await res.json();
+      const next = Array.isArray(json?.streams) ? (json.streams as LiveTVStreamApi[]) : [];
+      setStreams(next);
+    } catch (err) {
+      console.error('[LiveTVScreen] loadStreams error:', err);
+      setStreams([]);
+    } finally {
+      setStreamsLoading(false);
+    }
+  }, []);
+
+  const loadRooms = useCallback(async () => {
+    try {
+      setRoomsLoading(true);
+      const res = await fetch(LIVETV_ROOMS_URL, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Failed to load rooms: ${res.status}`);
+      const json = await res.json();
+      const next = Array.isArray(json?.rooms) ? (json.rooms as LiveTVRoomApi[]) : [];
+      setRooms(next);
+    } catch (err) {
+      console.error('[LiveTVScreen] loadRooms error:', err);
+      setRooms([]);
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadStreams();
+      void loadRooms();
+    }, [loadRooms, loadStreams])
+  );
+
+  const streamCards = useMemo((): LiveTVStreamCard[] => {
+    // Web parity: prefer active viewer_count if > 0, else fall back to total_views.
+    return (streams || []).map((s) => {
+      const active = Number(s.viewer_count ?? 0);
+      const fallback = Number(s.total_views ?? 0);
+      const displayCount = active > 0 ? active : fallback;
+
+      const badges = Array.isArray(s.badges) ? s.badges : [];
+      const primaryBadge = badges.find((b) => b === 'Trending' || b === 'Featured' || b === 'Sponsored');
+
+      return {
+        id: String(s.id),
+        slug: s.slug,
+        name: s.streamer_display_name || s.slug || String(s.id),
+        title: s.slug ? `@${s.slug}` : 'Live now',
+        thumbnailUrl: toAbsoluteUrl(s.thumbnail_url),
+        viewersText: formatCompactCount(displayCount),
+        badge: primaryBadge,
+        category: s.category ?? null,
+        gender: s.gender,
+      };
+    });
+  }, [streams]);
+
+  const roomCards = useMemo((): LiveTVRoomCard[] => {
+    return (rooms || []).map((r) => ({
+      id: String(r.id),
+      name: r.name || r.slug || String(r.id),
+      imageUrl: toAbsoluteUrl(r.banner_url || r.icon_url || null),
+      viewersText: formatCompactCount(Number(r.viewer_count ?? 0)),
+    }));
+  }, [rooms]);
+
   const filteredStreams = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return MOCK_STREAMS.filter((s) => {
+
+    // Web parity: "Trending" shows all streams (already trending-sorted by API),
+    // "Featured" filters to streams with Featured badge, "Battles" filters to category === 'Battles',
+    // "Rooms" is a rooms-only mode.
+    const bySpecial =
+      selectedSpecial === 'Rooms'
+        ? []
+        : selectedSpecial === 'Featured'
+          ? streamCards.filter((s) => (s.badge ? s.badge === 'Featured' : false))
+          : selectedSpecial === 'Battles'
+            ? streamCards.filter((s) => s.category === 'Battles')
+            : streamCards;
+
+    return bySpecial.filter((s) => {
       const matchesGender = selectedGender === 'All' ? true : s.gender === selectedGender;
       const matchesCategory = selectedCategory === 'All' ? true : s.category === selectedCategory;
-
-      // Keep special filter behavior minimal but real for the labels that map to existing mock data.
-      const matchesSpecial =
-        selectedSpecial === 'Trending' ? s.badge === 'Trending' : selectedSpecial === 'Featured' ? s.badge === 'Featured' : true;
-
       const matchesSearch = !q ? true : `${s.name} ${s.title}`.toLowerCase().includes(q);
-      return matchesGender && matchesCategory && matchesSpecial && matchesSearch;
+      return matchesGender && matchesCategory && matchesSearch;
     });
-  }, [search, selectedCategory, selectedGender, selectedSpecial]);
+  }, [search, selectedCategory, selectedGender, selectedSpecial, streamCards]);
 
-  const renderStreamCard = ({ item }: { item: MockStream }) => {
+  const renderStreamCard = ({ item }: { item: LiveTVStreamCard }) => {
+    const imageFailed = !!failedThumbsById[item.id];
     return (
       <View style={styles.streamCardOuter}>
-        <View style={styles.streamCard}>
+        <Pressable
+          onPress={() => navigation.navigate('LiveUserScreen', { username: item.slug || item.id, streamId: item.id })}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.streamCard, pressed && { opacity: 0.9 }]}
+        >
           <View style={styles.streamThumb}>
+            {item.thumbnailUrl && !imageFailed ? (
+              <Image
+                source={{ uri: item.thumbnailUrl }}
+                style={styles.streamThumbImage}
+                resizeMode="cover"
+                onError={() => setFailedThumbsById((prev) => ({ ...prev, [item.id]: true }))}
+              />
+            ) : null}
             <View style={styles.streamThumbInner}>
               <View style={styles.streamThumbTopRow}>
                 <View style={styles.liveBadge}>
@@ -114,15 +269,28 @@ export default function LiveTVScreen() {
                 </View>
 
                 <View style={styles.viewerBadge}>
-                  <Feather name="eye" size={12} color={COLORS.textSecondary} />
-                  <Text style={styles.viewerBadgeText}>{item.viewers}</Text>
+                  <Feather name="eye" size={12} color={stylesVars.textSecondary} />
+                  <Text style={styles.viewerBadgeText}>{item.viewersText}</Text>
                 </View>
               </View>
 
               <View style={styles.streamThumbBottomRow}>
-                <View style={[styles.primaryBadge, badgeStyle(item.badge)]}>
-                  <Text style={styles.primaryBadgeText}>{item.badge}</Text>
-                </View>
+                {item.badge ? (
+                  <View
+                    style={[
+                      styles.primaryBadge,
+                      item.badge === 'Trending'
+                        ? styles.badgeTrending
+                        : item.badge === 'Featured'
+                          ? styles.badgeFeatured
+                          : styles.badgeSponsored,
+                    ]}
+                  >
+                    <Text style={styles.primaryBadgeText}>{item.badge}</Text>
+                  </View>
+                ) : (
+                  <View />
+                )}
                 <View style={styles.thumbMark}>
                   <Text style={styles.thumbMarkText}>📺</Text>
                 </View>
@@ -138,10 +306,34 @@ export default function LiveTVScreen() {
               {item.title}
             </Text>
           </View>
-        </View>
+        </Pressable>
       </View>
     );
   };
+
+  const listEmpty = useMemo(() => {
+    if (streamsLoading) {
+      return (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIcon}>
+            <Feather name="loader" size={22} color={stylesVars.textSecondary} />
+          </View>
+          <Text style={styles.emptyTitle}>Loading LiveTV…</Text>
+          <Text style={styles.emptySubtitle}>Fetching live streams from the backend.</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIcon}>
+          <Feather name="tv" size={22} color={stylesVars.textSecondary} />
+        </View>
+        <Text style={styles.emptyTitle}>No streams available</Text>
+        <Text style={styles.emptySubtitle}>Check back soon for live content.</Text>
+      </View>
+    );
+  }, [streamsLoading, stylesVars.textSecondary]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -152,6 +344,7 @@ export default function LiveTVScreen() {
         renderItem={renderStreamCard}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={listEmpty}
         ListHeaderComponent={
           <View>
             {/* Web parity: top hero + waitlist banner */}
@@ -182,7 +375,7 @@ export default function LiveTVScreen() {
                 <View style={styles.waitlistFormRow}>
                   <TextInput
                     placeholder="Email address"
-                    placeholderTextColor={COLORS.textSecondary}
+                    placeholderTextColor={stylesVars.textSecondary}
                     style={styles.waitlistInput}
                   />
                   <View style={styles.waitlistButton}>
@@ -202,10 +395,10 @@ export default function LiveTVScreen() {
               </View>
 
               <View style={styles.searchRow}>
-                <Feather name="search" size={16} color={COLORS.textSecondary} />
+                <Feather name="search" size={16} color={stylesVars.textSecondary} />
                 <TextInput
                   placeholder="Search..."
-                  placeholderTextColor={COLORS.textSecondary}
+                  placeholderTextColor={stylesVars.textSecondary}
                   style={styles.searchInput}
                   value={search}
                   onChangeText={setSearch}
@@ -285,41 +478,47 @@ export default function LiveTVScreen() {
 
             <View style={styles.section}>
               <View style={styles.sectionTitleRow}>
-                <View style={[styles.sectionDot, { backgroundColor: COLORS.purple }]} />
+                <View style={[styles.sectionDot, { backgroundColor: stylesVars.primary }]} />
                 <Text style={styles.sectionTitle}>Live Rooms</Text>
               </View>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.roomsRail}
-              >
-                {MOCK_ROOMS.map((room) => (
-                  <View key={room.id} style={styles.roomCard}>
-                    <View style={styles.roomThumb}>
-                      <View style={styles.roomThumbInner}>
-                        <View style={styles.roomTopRow}>
-                          <View style={styles.viewerBadge}>
-                            <Feather name="eye" size={12} color={COLORS.textSecondary} />
-                            <Text style={styles.viewerBadgeText}>{room.viewers}</Text>
+              {!roomsLoading && roomCards.length > 0 && (selectedSpecial === 'Trending' || selectedSpecial === 'Rooms') ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roomsRail}>
+                  {roomCards.map((room) => (
+                    <View key={room.id} style={styles.roomCard}>
+                      <View style={styles.roomThumb}>
+                        {room.imageUrl && !failedRoomImagesById[room.id] ? (
+                          <Image
+                            source={{ uri: room.imageUrl }}
+                            style={styles.roomThumbImage}
+                            resizeMode="cover"
+                            onError={() => setFailedRoomImagesById((prev) => ({ ...prev, [room.id]: true }))}
+                          />
+                        ) : null}
+                        <View style={styles.roomThumbInner}>
+                          <View style={styles.roomTopRow}>
+                            <View style={styles.viewerBadge}>
+                              <Feather name="eye" size={12} color={stylesVars.textSecondary} />
+                              <Text style={styles.viewerBadgeText}>{room.viewersText}</Text>
+                            </View>
+                          </View>
+                          <View style={styles.roomBottomRow}>
+                            <Text style={styles.roomEmoji}>🎙️</Text>
                           </View>
                         </View>
-                        <View style={styles.roomBottomRow}>
-                          <Text style={styles.roomEmoji}>🎙️</Text>
-                        </View>
                       </View>
+                      <Text numberOfLines={1} style={styles.roomName}>
+                        {room.name}
+                      </Text>
                     </View>
-                    <Text numberOfLines={1} style={styles.roomName}>
-                      {room.name}
-                    </Text>
-                  </View>
-                ))}
-              </ScrollView>
+                  ))}
+                </ScrollView>
+              ) : null}
             </View>
 
             <View style={[styles.section, styles.sectionTightBottom]}>
               <View style={styles.sectionTitleRow}>
-                <View style={[styles.sectionDot, { backgroundColor: COLORS.red }]} />
+                <View style={[styles.sectionDot, { backgroundColor: stylesVars.red }]} />
                 <Text style={styles.sectionTitle}>Trending Now</Text>
               </View>
             </View>
@@ -330,30 +529,26 @@ export default function LiveTVScreen() {
   );
 }
 
-const COLORS = {
-  bg: '#0B0B0F',
-  card: '#12121A',
-  card2: '#14141F',
-  border: 'rgba(255,255,255,0.08)',
-  text: '#F5F6FA',
-  textSecondary: 'rgba(245,246,250,0.65)',
-  primary: '#7C3AED',
-  red: '#EF4444',
-  amber: '#F59E0B',
-  purple: '#A855F7',
-};
-
-function badgeStyle(badge: MockStream['badge']) {
-  if (badge === 'Trending') return styles.badgeTrending;
-  if (badge === 'Featured') return styles.badgeFeatured;
-  return styles.badgeSponsored;
-}
-
 const GRID_GUTTER = 12;
 const GRID_SIDE_PADDING = 16;
 const CARD_SIDE_PADDING = GRID_GUTTER / 2;
 
-const styles = StyleSheet.create({
+type StylesVars = {
+  bg: string;
+  card: string;
+  card2: string;
+  border: string;
+  text: string;
+  textSecondary: string;
+  primary: string;
+  red: string;
+  amber: string;
+  overlay: string;
+  chipBg: string;
+};
+
+function createStyles(COLORS: StylesVars) {
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.bg,
@@ -698,6 +893,11 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     backgroundColor: 'rgba(255,255,255,0.04)',
   },
+  roomThumbImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+  },
   roomThumbInner: {
     flex: 1,
     padding: 10,
@@ -741,6 +941,11 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 3 / 4,
     backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  streamThumbImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
   streamThumbInner: {
     flex: 1,
@@ -855,5 +1060,39 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 12,
   },
-});
+
+  emptyState: {
+    paddingHorizontal: GRID_SIDE_PADDING - CARD_SIDE_PADDING,
+    paddingTop: 22,
+    paddingBottom: 14,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    color: COLORS.text,
+    fontWeight: '900',
+    fontSize: 18,
+    letterSpacing: -0.2,
+    marginTop: 4,
+  },
+  emptySubtitle: {
+    color: COLORS.textSecondary,
+    fontWeight: '800',
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 16,
+    maxWidth: 320,
+  },
+  });
+}
 

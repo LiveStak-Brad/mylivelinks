@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { loadLiveBrowseFilters, saveLiveBrowseFilters, type BrowseGenderFilter } from '../lib/liveBrowsePreferences';
 import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
 
 const SPECIAL_FILTERS = ['Trending', 'Featured', 'Rooms', 'Battles'] as const;
 const CATEGORY_FILTERS = ['IRL', 'Music', 'Gaming', 'Comedy', 'Just Chatting'] as const;
@@ -32,6 +33,7 @@ const MOCK_TRENDING_STREAMS: MockStream[] = [
 export default function TrendingScreen() {
   const navigation = useNavigation<any>();
   const { user, loading } = useAuth();
+  const { colors } = useTheme();
   const profileId = user?.id ?? 'anon';
 
   const [selectedSpecial, setSelectedSpecial] = useState<(typeof SPECIAL_FILTERS)[number]>('Trending');
@@ -86,7 +88,7 @@ export default function TrendingScreen() {
   }, [search, selectedCategory, selectedGender, selectedSpecial]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
@@ -268,7 +270,6 @@ const GRID_SIDE_PADDING = 16;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.bg,
   },
 
   container: {

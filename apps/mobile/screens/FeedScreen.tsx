@@ -16,6 +16,8 @@ import { useNavigation } from '@react-navigation/native';
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
+import { brand, darkPalette, lightPalette } from '../theme/colors';
 
 type FeedRow = {
   post_id: string;
@@ -46,12 +48,15 @@ type FeedPost = {
 
 type ReactionType = 'love' | 'haha' | 'wow' | 'sad' | 'fire';
 const REACTIONS: ReactionType[] = ['love', 'haha', 'wow', 'sad', 'fire'];
-const REACTION_EMOJI: Record<ReactionType, string> = {
-  love: '❤️',
-  haha: '😂',
-  wow: '😮',
-  sad: '😢',
-  fire: '🔥',
+const REACTION_ICON: Record<
+  ReactionType,
+  React.ComponentProps<typeof MaterialCommunityIcons>['name']
+> = {
+  love: 'heart',
+  haha: 'emoticon-happy-outline',
+  wow: 'emoticon-surprised-outline',
+  sad: 'emoticon-cry-outline',
+  fire: 'fire',
 };
 
 function ReactionPickerModal({
@@ -67,6 +72,7 @@ function ReactionPickerModal({
   onSelect: (reaction: ReactionType) => void;
   onClear: () => void;
 }) {
+  const { styles, stylesVars } = useFeedStyles();
   return (
     <Modal
       visible={visible}
@@ -87,7 +93,11 @@ function ReactionPickerModal({
                   onPress={() => onSelect(r)}
                   style={[styles.reactionChip, selected ? styles.reactionChipSelected : null]}
                 >
-                  <Text style={styles.reactionChipEmoji}>{REACTION_EMOJI[r]}</Text>
+                  <MaterialCommunityIcons
+                    name={REACTION_ICON[r]}
+                    size={22}
+                    color={selected ? stylesVars.primary : stylesVars.mutedText}
+                  />
                 </Pressable>
               );
             })}
@@ -114,6 +124,7 @@ function Card({
   children: React.ReactNode;
   style?: object;
 }) {
+  const { styles } = useFeedStyles();
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
@@ -126,6 +137,7 @@ function Button({
   variant?: 'primary' | 'outline';
   iconName?: React.ComponentProps<typeof Feather>['name'];
 }) {
+  const { styles, stylesVars } = useFeedStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -139,7 +151,7 @@ function Button({
         <Feather
           name={iconName}
           size={16}
-          color="#FFFFFF"
+          color={variant === 'primary' ? stylesVars.onPrimary : stylesVars.primary}
         />
       ) : null}
       <Text style={variant === 'primary' ? styles.buttonPrimaryText : styles.buttonOutlineText}>
@@ -150,6 +162,7 @@ function Button({
 }
 
 function Divider() {
+  const { styles } = useFeedStyles();
   return <View style={styles.divider} />;
 }
 
@@ -196,6 +209,7 @@ function FeedPostCard({
   userReaction,
   mediaAspectRatio,
   onPressProfile,
+  onPressMedia,
   onOpenReactionPicker,
   onPressComment,
   onPressReactions,
@@ -206,11 +220,14 @@ function FeedPostCard({
   userReaction: ReactionType | null;
   mediaAspectRatio: number | null;
   onPressProfile: () => void;
+  onPressMedia: (args: { kind: 'image' | 'video'; url: string }) => void;
   onOpenReactionPicker: () => void;
   onPressComment: () => void;
   onPressReactions: () => void;
   onVideoReadyAspectRatio: (aspectRatio: number) => void;
 }) {
+  const { styles, stylesVars } = useFeedStyles();
+  const { colors } = useTheme();
   const [avatarError, setAvatarError] = useState(false);
 
   const initial = (post.author_display_name || post.author_username || '?')
@@ -274,23 +291,34 @@ function FeedPostCard({
       ) : null}
 
       {mediaUrl ? (
-        <View style={mediaContainerStyle}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={kind === 'video' ? 'Open video' : 'Open photo'}
+          onPress={() => onPressMedia({ kind: kind || 'image', url: mediaUrl })}
+          style={mediaContainerStyle}
+        >
           {kind === 'video' ? (
-            <Video
-              source={{ uri: mediaUrl }}
-              style={styles.media}
-              resizeMode={ResizeMode.CONTAIN}
-              useNativeControls
-              shouldPlay={false}
-              isMuted={false}
-              onReadyForDisplay={(evt) => {
-                const w = evt?.naturalSize?.width;
-                const h = evt?.naturalSize?.height;
-                if (typeof w === 'number' && typeof h === 'number' && w > 0 && h > 0) {
-                  onVideoReadyAspectRatio(w / h);
-                }
-              }}
-            />
+            <>
+              <Video
+                source={{ uri: mediaUrl }}
+                style={styles.media}
+                resizeMode={ResizeMode.CONTAIN}
+                useNativeControls={false}
+                shouldPlay={false}
+                isMuted
+                pointerEvents="none"
+                onReadyForDisplay={(evt) => {
+                  const w = evt?.naturalSize?.width;
+                  const h = evt?.naturalSize?.height;
+                  if (typeof w === 'number' && typeof h === 'number' && w > 0 && h > 0) {
+                    onVideoReadyAspectRatio(w / h);
+                  }
+                }}
+              />
+              <View pointerEvents="none" style={styles.mediaPlayOverlay}>
+                <Feather name="play" size={42} color="#FFFFFF" />
+              </View>
+            </>
           ) : (
             <Image
               source={{ uri: mediaUrl }}
@@ -306,7 +334,7 @@ function FeedPostCard({
               }}
             />
           )}
-        </View>
+        </Pressable>
       ) : null}
 
       <View style={styles.postActionsRow}>
@@ -317,12 +345,15 @@ function FeedPostCard({
         >
           {userReaction ? (
             <View style={styles.reactionEmojiWrap}>
-              <Text style={styles.reactionEmoji} accessibilityLabel="Reaction">
-                {REACTION_EMOJI[userReaction]}
-              </Text>
+              <MaterialCommunityIcons
+                name={REACTION_ICON[userReaction]}
+                size={18}
+                color={stylesVars.primary}
+                accessibilityLabel="Reaction"
+              />
             </View>
           ) : (
-            <Feather name="heart" size={18} color={isLiked ? '#EF4444' : stylesVars.mutedText} />
+            <Feather name="heart" size={18} color={isLiked ? colors.danger : stylesVars.mutedText} />
           )}
           <Text style={styles.actionButtonText}>Like</Text>
         </Pressable>
@@ -353,6 +384,7 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const navigation = useNavigation<any>();
+  const { styles, stylesVars } = useFeedStyles();
 
   const PAGE_SIZE = 20;
 
@@ -808,7 +840,8 @@ export default function FeedScreen() {
                 style={styles.reactionsModalList}
                 renderItem={({ item }) => {
                   const avatarUrl = resolvePublicStorageUrl('avatars', item.avatar_url);
-                  const emoji = REACTION_EMOJI[item.reaction_type as ReactionType] ?? '❤️';
+                  const reactionType = (item.reaction_type as ReactionType) || 'love';
+                  const iconName = REACTION_ICON[reactionType] ?? 'heart';
                   return (
                     <View style={styles.reactionsModalRow}>
                       <View style={styles.reactionsModalAvatar}>
@@ -828,7 +861,12 @@ export default function FeedScreen() {
                         <Text style={styles.reactionsModalDisplayName}>{item.display_name}</Text>
                         <Text style={styles.reactionsModalUsername}>@{item.username}</Text>
                       </View>
-                      <Text style={styles.reactionsModalEmoji}>{emoji}</Text>
+                      <MaterialCommunityIcons
+                        name={iconName}
+                        size={20}
+                        color={stylesVars.primary}
+                        accessibilityLabel="Reaction"
+                      />
                     </View>
                   );
                 }}
@@ -1036,6 +1074,7 @@ export default function FeedScreen() {
                   username: item.author_username,
                 })
               }
+              onPressMedia={({ kind, url }) => navigation.navigate('MediaViewer', { kind, url })}
               onPressComment={() => {
                 // No dedicated post comments screen in mobile yet; keep UI intact.
               }}
@@ -1053,17 +1092,45 @@ export default function FeedScreen() {
   );
 }
 
-const stylesVars = {
-  bg: '#FFFFFF',
-  card: '#FFFFFF',
-  border: '#E5E7EB',
-  text: '#0F172A',
-  mutedText: '#64748B',
-  mutedBg: '#F1F5F9',
-  primary: '#4F46E5',
+type StylesVars = {
+  bg: string;
+  card: string;
+  border: string;
+  text: string;
+  mutedText: string;
+  mutedBg: string;
+  primary: string;
+  onPrimary: string;
+  overlay: string;
+  selectedBg: string;
 };
 
-const styles = StyleSheet.create({
+function useFeedStyles() {
+  const { mode, colors } = useTheme();
+
+  const stylesVars = useMemo<StylesVars>(
+    () => ({
+      bg: colors.bg,
+      card: colors.surface,
+      border: colors.border,
+      text: colors.text,
+      mutedText: (colors as any).subtleText ?? colors.mutedText,
+      mutedBg: mode === 'dark' ? darkPalette.slate800 : lightPalette.slate100,
+      primary: (brand as any).primary ?? brand.pink,
+      onPrimary: mode === 'dark' ? darkPalette.slate100 : lightPalette.white,
+      overlay: colors.overlay,
+      selectedBg: mode === 'dark' ? 'rgba(236,72,153,0.16)' : '#EEF2FF',
+    }),
+    [colors, mode]
+  );
+
+  const styles = useMemo(() => createStyles(stylesVars), [stylesVars]);
+
+  return { styles, stylesVars };
+}
+
+function createStyles(stylesVars: StylesVars) {
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: stylesVars.bg,
@@ -1371,6 +1438,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  mediaPlayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.10)',
+  },
   mediaMetaOverlay: {
     position: 'absolute',
     bottom: 10,
@@ -1532,7 +1605,7 @@ const styles = StyleSheet.create({
   },
   reactionModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    backgroundColor: stylesVars.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
@@ -1570,7 +1643,7 @@ const styles = StyleSheet.create({
   },
   reactionChipSelected: {
     borderColor: stylesVars.primary,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: stylesVars.selectedBg,
   },
   reactionChipEmoji: {
     fontSize: 22,
@@ -1619,7 +1692,7 @@ const styles = StyleSheet.create({
   // Reactions modal styles
   reactionsModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: stylesVars.overlay,
     justifyContent: 'flex-end',
   },
   reactionsModalCard: {
@@ -1713,5 +1786,6 @@ const styles = StyleSheet.create({
     color: stylesVars.mutedText,
     fontWeight: '600',
   },
-});
+  });
+}
 

@@ -1,28 +1,52 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
+import { brand, darkPalette, lightPalette } from '../theme/colors';
 
 const TAB_BAR_SAFE_PADDING = 96;
+const NO_PROFILE_PIC = require('../assets/no-profile-pic.png');
 
 type MockFriend = {
   id: string;
   displayName: string;
   isOnline?: boolean;
   isLive?: boolean;
+  avatarUrl?: string | null;
 };
 
-type MockConversation = {
+type ImConversationRow = {
+  other_user_id: string;
+  other_username: string | null;
+  other_avatar_url: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  unread_count: number | string | null;
+  is_sender: boolean | null;
+};
+
+type ProfileLite = {
   id: string;
-  displayName: string;
-  username: string;
-  lastMessage: string;
-  timeLabel: string;
-  unreadCount?: number;
-  isOnline?: boolean;
-  isLive?: boolean;
-  lastMessageSentByMe?: boolean;
-  lastMessageRead?: boolean;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_live: boolean | null;
+};
+
+type FriendsListRpc = {
+  friends: Array<{
+    id: string;
+    username: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_live: boolean | null;
+  }>;
+  total: number;
 };
 
 function AvatarPlaceholder({
@@ -30,20 +54,26 @@ function AvatarPlaceholder({
   size,
   isLive,
   isOnline,
+  avatarUrl,
+  styles,
 }: {
   label: string;
   size: number;
   isLive?: boolean;
   isOnline?: boolean;
+  avatarUrl?: string | null;
+  styles: any;
 }) {
   const initial = label.trim().slice(0, 1).toUpperCase() || '•';
 
   return (
     <View style={styles.avatarOuter}>
       <View style={[styles.avatarRing, isLive ? styles.avatarRingLive : undefined]}>
-        <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-          <Text style={styles.avatarText}>{initial}</Text>
-        </View>
+        <Image
+          source={avatarUrl ? { uri: avatarUrl } : NO_PROFILE_PIC}
+          style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+          resizeMode="cover"
+        />
       </View>
 
       {!isLive && isOnline ? <View style={styles.onlineDot} /> : null}
@@ -51,7 +81,7 @@ function AvatarPlaceholder({
   );
 }
 
-function FriendsStrip({ friends }: { friends: MockFriend[] }) {
+function FriendsStrip({ friends, styles, stylesVars }: { friends: MockFriend[]; styles: any; stylesVars: any }) {
   return (
     <View style={styles.friendsSection}>
       <View style={styles.friendsHeaderRow}>
@@ -70,7 +100,14 @@ function FriendsStrip({ friends }: { friends: MockFriend[] }) {
           return (
             <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.friendItem, pressed && styles.pressed]}>
               <View>
-                <AvatarPlaceholder label={item.displayName} size={56} isLive={item.isLive} isOnline={item.isOnline} />
+                <AvatarPlaceholder
+                  label={item.displayName}
+                  size={56}
+                  isLive={item.isLive}
+                  isOnline={item.isOnline}
+                  avatarUrl={item.avatarUrl}
+                  styles={styles}
+                />
                 {item.isLive ? (
                   <View style={styles.liveBadge}>
                     <Text style={styles.liveBadgeText}>LIVE</Text>
@@ -88,7 +125,62 @@ function FriendsStrip({ friends }: { friends: MockFriend[] }) {
   );
 }
 
-function ConversationRow({ conversation }: { conversation: MockConversation }) {
+function formatRelativeTimeLabel(iso: string | null | undefined) {
+  if (!iso) return '';
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return '';
+  const now = Date.now();
+  const diffSec = Math.max(0, Math.floor((now - ms) / 1000));
+  if (diffSec < 60) return `${diffSec}s`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h`;
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 7) return `${diffDay}d`;
+  const d = new Date(ms);
+  const month = d.toLocaleString(undefined, { month: 'short' });
+  const day = d.getDate();
+  return `${month} ${day}`;
+}
+
+function formatImPreview(content: string | null | undefined) {
+  const text = String(content ?? '').trim();
+  if (!text) return '';
+  if (text.startsWith('__gift__:')) {
+    try {
+      const parsed = JSON.parse(text.slice('__gift__:'.length));
+      const giftName = typeof parsed?.giftName === 'string' ? parsed.giftName : null;
+      return giftName ? `🎁 ${giftName}` : '🎁 Gift';
+    } catch {
+      return '🎁 Gift';
+    }
+  }
+  if (text.startsWith('__img__:')) return '📷 Photo';
+  return text;
+}
+
+function ConversationRow({
+  conversation,
+  onPress,
+  styles,
+}: {
+  conversation: {
+    otherProfileId: string;
+    displayName: string;
+    username: string | null;
+    avatarUrl: string | null;
+    lastMessage: string;
+    timeLabel: string;
+    unreadCount: number;
+    isLive?: boolean;
+    isOnline?: boolean;
+    lastMessageSentByMe?: boolean;
+    lastMessageRead?: boolean;
+  };
+  onPress: () => void;
+  styles: any;
+}) {
   const unreadCount = conversation.unreadCount ?? 0;
   const showUnread = unreadCount > 0;
 
@@ -98,7 +190,7 @@ function ConversationRow({ conversation }: { conversation: MockConversation }) {
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={() => {}}
+      onPress={onPress}
       style={({ pressed }) => [
         styles.conversationRow,
         pressed && styles.conversationRowPressed,
@@ -110,6 +202,8 @@ function ConversationRow({ conversation }: { conversation: MockConversation }) {
         size={48}
         isLive={conversation.isLive}
         isOnline={conversation.isOnline}
+        avatarUrl={conversation.avatarUrl}
+        styles={styles}
       />
 
       <View style={styles.conversationBody}>
@@ -141,123 +235,208 @@ function ConversationRow({ conversation }: { conversation: MockConversation }) {
 
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+  const { user } = useAuth();
+  const { mode, colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const friends = useMemo<MockFriend[]>(
-    () => [
-      { id: 'f1', displayName: 'Mia', isLive: true },
-      { id: 'f2', displayName: 'Jay', isOnline: true },
-      { id: 'f3', displayName: 'Sofia', isOnline: true },
-      { id: 'f4', displayName: 'Noah' },
-      { id: 'f5', displayName: 'Ava', isOnline: true },
-      { id: 'f6', displayName: 'Liam' },
-      { id: 'f7', displayName: 'Zoe', isLive: true },
-    ],
-    []
+  const stylesVars = useMemo(
+    () => ({
+      bg: colors.bg,
+      card: colors.surface,
+      border: colors.border,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      mutedBg: mode === 'dark' ? darkPalette.slate800 : lightPalette.slate100,
+      primary: brand.purple,
+      liveRed: brand.red,
+      pink: brand.pink,
+      purple: brand.purple,
+      unreadBg: brand.purple,
+      pillText: mode === 'dark' ? darkPalette.slate100 : lightPalette.white,
+      readBlue: mode === 'dark' ? darkPalette.blue400 : lightPalette.blue600,
+      subtleRow: mode === 'dark' ? 'rgba(96,165,250,0.08)' : 'rgba(79,70,229,0.06)',
+    }),
+    [colors, mode]
   );
 
-  const conversations = useMemo<MockConversation[]>(
-    () => [
-      {
-        id: 'c1',
-        displayName: 'Mia Rodriguez',
-        username: 'miarod',
-        lastMessage: 'You going live tonight?',
-        timeLabel: '2m',
-        unreadCount: 2,
-        isLive: true,
-        isOnline: true,
-      },
-      {
-        id: 'c2',
-        displayName: 'Jay Carter',
-        username: 'jaycarter',
-        lastMessage: 'Sent you the clip — it’s insane 🔥',
-        timeLabel: '14m',
-        unreadCount: 0,
-        isOnline: true,
-        lastMessageSentByMe: true,
-        lastMessageRead: true,
-      },
-      {
-        id: 'c3',
-        displayName: 'Sofia',
-        username: 'sofia',
-        lastMessage: 'Let’s run a battle in an hour.',
-        timeLabel: '1h',
-        unreadCount: 1,
-        isOnline: true,
-      },
-      {
-        id: 'c4',
-        displayName: 'Noah',
-        username: 'noah',
-        lastMessage: 'Ok cool — see you then.',
-        timeLabel: '3h',
-        unreadCount: 0,
-        lastMessageSentByMe: true,
+  const styles = useMemo(() => createStyles(stylesVars), [stylesVars]);
+
+  const [friends, setFriends] = useState<MockFriend[]>([]);
+  const [conversations, setConversations] = useState<
+    Array<{
+      otherProfileId: string;
+      displayName: string;
+      username: string | null;
+      avatarUrl: string | null;
+      lastMessage: string;
+      timeLabel: string;
+      unreadCount: number;
+      isLive?: boolean;
+      lastMessageSentByMe?: boolean;
+      lastMessageRead?: boolean;
+    }>
+  >([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadFriends = useCallback(async () => {
+    if (!user?.id) return;
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_friends_list', {
+      p_profile_id: user.id,
+      p_limit: 200,
+      p_offset: 0,
+    });
+
+    if (rpcError) {
+      console.warn('[messages] get_friends_list error:', rpcError.message);
+      setFriends([]);
+      return;
+    }
+
+    const parsed = (rpcData as any) as FriendsListRpc;
+    const rawFriends = Array.isArray(parsed?.friends) ? parsed.friends : [];
+    const ids = rawFriends.map((f) => String(f.id)).filter(Boolean);
+
+    const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+    const { data: onlineData, error: onlineError } = ids.length
+      ? await supabase.from('room_presence').select('profile_id').in('profile_id', ids).gt('last_seen_at', cutoff)
+      : { data: [], error: null };
+
+    if (onlineError) {
+      console.warn('[messages] room_presence error:', onlineError.message);
+    }
+
+    const onlineSet = new Set((onlineData ?? []).map((o: any) => String(o.profile_id)));
+
+    const list: MockFriend[] = rawFriends.map((f) => ({
+      id: String(f.id),
+      displayName: String(f.display_name || f.username || 'User'),
+      isLive: Boolean(f.is_live),
+      isOnline: onlineSet.has(String(f.id)),
+      avatarUrl: f.avatar_url ?? null,
+    }));
+
+    // Keep the existing feel: live first, then online, then alphabetical.
+    list.sort((a, b) => {
+      if (Boolean(a.isLive) && !Boolean(b.isLive)) return -1;
+      if (!Boolean(a.isLive) && Boolean(b.isLive)) return 1;
+      if (Boolean(a.isOnline) && !Boolean(b.isOnline)) return -1;
+      if (!Boolean(a.isOnline) && Boolean(b.isOnline)) return 1;
+      return a.displayName.localeCompare(b.displayName);
+    });
+
+    setFriends(list);
+  }, [user?.id]);
+
+  const loadInbox = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setError(null);
+
+    const { data: rows, error: rpcError } = await supabase.rpc('get_im_conversations', { p_user_id: user.id });
+    if (rpcError) {
+      console.error('[messages] get_im_conversations error:', rpcError.message);
+      setConversations([]);
+      setFriends([]);
+      setError(rpcError.message);
+      setLoading(false);
+      return;
+    }
+
+    const raw = ((rows as any) ?? []) as ImConversationRow[];
+    const otherIds = raw.map((r) => String(r.other_user_id)).filter(Boolean);
+
+    const profileById = new Map<string, ProfileLite>();
+    if (otherIds.length > 0) {
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url, is_live')
+        .in('id', otherIds);
+
+      if (profileError) {
+        console.warn('[messages] profiles lookup error:', profileError.message);
+      } else {
+        (((profiles as any) ?? []) as ProfileLite[]).forEach((p) => profileById.set(String(p.id), p));
+      }
+    }
+
+    const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+    const { data: onlineData, error: onlineError } = otherIds.length
+      ? await supabase.from('room_presence').select('profile_id').in('profile_id', otherIds).gt('last_seen_at', cutoff)
+      : { data: [], error: null };
+    if (onlineError) console.warn('[messages] room_presence error:', onlineError.message);
+    const onlineSet = new Set((onlineData ?? []).map((o: any) => String(o.profile_id)));
+
+    const mapped = raw.map((r) => {
+      const otherId = String(r.other_user_id);
+      const p = profileById.get(otherId);
+      const username = p?.username ?? r.other_username ?? null;
+      const displayName = p?.display_name ?? username ?? 'User';
+      const avatarUrl = p?.avatar_url ?? r.other_avatar_url ?? null;
+      const isLive = Boolean(p?.is_live);
+      const isOnline = onlineSet.has(otherId);
+      const unreadCount = Number(r.unread_count ?? 0) || 0;
+      const timeLabel = formatRelativeTimeLabel(r.last_message_at);
+      const lastMessage = formatImPreview(r.last_message);
+      const lastMessageSentByMe = Boolean(r.is_sender);
+
+      return {
+        otherProfileId: otherId,
+        displayName,
+        username,
+        avatarUrl,
+        lastMessage,
+        timeLabel,
+        unreadCount,
+        isLive,
+        isOnline,
+        lastMessageSentByMe,
+        // IM table doesn't track per-message read for sender in a way we can reliably show here; keep UI consistent.
         lastMessageRead: false,
-      },
-      {
-        id: 'c5',
-        displayName: 'Ava Kim',
-        username: 'avak',
-        lastMessage: '😂😂',
-        timeLabel: '6h',
-        unreadCount: 0,
-      },
-      {
-        id: 'c6',
-        displayName: 'Liam',
-        username: 'liam',
-        lastMessage: 'Can you pin the schedule?',
-        timeLabel: '1d',
-        unreadCount: 5,
-      },
-      {
-        id: 'c7',
-        displayName: 'Zoe',
-        username: 'zoe',
-        lastMessage: 'Gift battle rematch? 🎁',
-        timeLabel: '2d',
-        unreadCount: 0,
-        isLive: true,
-      },
-      {
-        id: 'c8',
-        displayName: 'Chris',
-        username: 'chris',
-        lastMessage: 'Thanks again 🙏',
-        timeLabel: 'Jan 2',
-        unreadCount: 0,
-      },
-      {
-        id: 'c9',
-        displayName: 'Nina',
-        username: 'nina',
-        lastMessage: 'I’m outside.',
-        timeLabel: 'Dec 28',
-        unreadCount: 3,
-        isOnline: true,
-      },
-      {
-        id: 'c10',
-        displayName: 'Drew',
-        username: 'drew',
-        lastMessage: 'lol',
-        timeLabel: 'Dec 20',
-        unreadCount: 0,
-      },
-    ],
-    []
-  );
+      };
+    });
+
+    setConversations(mapped);
+    setLoading(false);
+  }, [user?.id]);
+
+  useEffect(() => {
+    void loadInbox();
+  }, [loadInbox]);
+
+  useEffect(() => {
+    void loadFriends();
+  }, [loadFriends]);
+
+  const filteredConversations = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter((c) => {
+      const hay = `${c.displayName ?? ''} ${c.username ?? ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [conversations, searchQuery]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <FlatList
-        data={conversations}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ConversationRow conversation={item} />}
+        data={filteredConversations}
+        keyExtractor={(item) => item.otherProfileId}
+        renderItem={({ item }) => (
+          <ConversationRow
+            conversation={item}
+            onPress={() =>
+              navigation.navigate('IMThreadScreen', {
+                otherProfileId: item.otherProfileId,
+                otherDisplayName: item.displayName,
+                otherAvatarUrl: item.avatarUrl,
+              })
+            }
+            styles={styles}
+          />
+        )}
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.rowDivider} />}
         contentContainerStyle={[styles.listContent, { paddingBottom: TAB_BAR_SAFE_PADDING + insets.bottom }]}
@@ -284,10 +463,15 @@ export default function MessagesScreen() {
                   returnKeyType="search"
                 />
               </View>
+              {error ? (
+                <Text style={{ marginTop: 8, color: colors.danger, fontSize: 12, fontWeight: '700' }} numberOfLines={2}>
+                  {error}
+                </Text>
+              ) : null}
             </View>
 
             {/* Friends strip */}
-            <FriendsStrip friends={friends} />
+            <FriendsStrip friends={friends} styles={styles} stylesVars={stylesVars} />
 
             <View style={styles.sectionDivider} />
           </View>
@@ -297,21 +481,25 @@ export default function MessagesScreen() {
   );
 }
 
-const stylesVars = {
-  bg: '#FFFFFF',
-  card: '#FFFFFF',
-  border: '#E5E7EB',
-  text: '#0F172A',
-  mutedText: '#64748B',
-  mutedBg: '#F1F5F9',
-  primary: '#4F46E5',
-  liveRed: '#EF4444',
-  pink: '#EC4899',
-  purple: '#A855F7',
-  unreadBg: '#4F46E5',
+type StylesVars = {
+  bg: string;
+  card: string;
+  border: string;
+  text: string;
+  mutedText: string;
+  mutedBg: string;
+  primary: string;
+  liveRed: string;
+  pink: string;
+  purple: string;
+  unreadBg: string;
+  pillText: string;
+  readBlue: string;
+  subtleRow: string;
 };
 
-const styles = StyleSheet.create({
+function createStyles(stylesVars: StylesVars) {
+  return StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: stylesVars.bg,
@@ -329,7 +517,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: stylesVars.border,
-    backgroundColor: 'rgba(255,255,255,0.96)',
+    backgroundColor: stylesVars.card,
   },
   headerTitleRow: {
     flexDirection: 'row',
@@ -368,7 +556,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: stylesVars.border,
-    backgroundColor: 'rgba(241,245,249,0.35)',
+    backgroundColor: stylesVars.mutedBg,
   },
   friendsHeaderRow: {
     flexDirection: 'row',
@@ -383,7 +571,7 @@ const styles = StyleSheet.create({
   },
   friendsHeaderCount: {
     fontSize: 12,
-    color: 'rgba(100,116,139,0.8)',
+    color: stylesVars.mutedText,
     fontWeight: '600',
   },
   friendsListContent: {
@@ -418,7 +606,7 @@ const styles = StyleSheet.create({
   liveBadgeText: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: stylesVars.pillText,
     letterSpacing: 0.6,
   },
 
@@ -436,7 +624,7 @@ const styles = StyleSheet.create({
     backgroundColor: stylesVars.bg,
   },
   conversationRowUnread: {
-    backgroundColor: 'rgba(79,70,229,0.06)',
+    backgroundColor: stylesVars.subtleRow,
   },
   conversationRowPressed: {
     opacity: 0.92,
@@ -530,11 +718,11 @@ const styles = StyleSheet.create({
   },
   snippetCheck: {
     fontSize: 10,
-    color: 'rgba(100,116,139,0.6)',
+    color: stylesVars.mutedText,
     fontWeight: '800',
   },
   snippetCheckRead: {
-    color: '#60A5FA',
+    color: stylesVars.readBlue,
   },
   conversationSnippet: {
     flex: 1,
@@ -559,12 +747,13 @@ const styles = StyleSheet.create({
   },
   unreadPillText: {
     fontSize: 10,
-    color: '#FFFFFF',
+    color: stylesVars.pillText,
     fontWeight: '900',
   },
 
   pressed: {
     opacity: 0.9,
   },
-});
+  });
+}
 
