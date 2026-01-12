@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { VideoView } from '@livekit/react-native';
 import { createLocalVideoTrack, createLocalAudioTrack, LocalVideoTrack, LocalAudioTrack, VideoPresets, Room, RoomEvent } from 'livekit-client';
 import { useAuth } from '../state/AuthContext';
-import { fetchMobileToken, generateSoloRoomName } from '../lib/livekit';
+import { fetchMobileToken, generateSoloRoomName, startLiveStreamRecord, endLiveStreamRecord } from '../lib/livekit';
 
 export default function GoLiveScreen() {
   const insets = useSafeAreaInsets();
@@ -52,7 +52,11 @@ export default function GoLiveScreen() {
     return () => {
       if (videoTrack) videoTrack.stop();
       if (audioTrack) audioTrack.stop();
-      if (roomRef.current) roomRef.current.disconnect();
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+        roomRef.current = null;
+      }
+      // Note: Database cleanup handled by handleClose/handleEndLive
     };
   }, [videoTrack, audioTrack]);
 
@@ -122,12 +126,24 @@ export default function GoLiveScreen() {
   }, [cameraFacing]);
 
   // Handle close
-  const handleClose = useCallback(() => {
+  const handleClose = useCallback(async () => {
+    // Stop tracks
     if (videoTrack) videoTrack.stop();
     if (audioTrack) audioTrack.stop();
-    if (roomRef.current) roomRef.current.disconnect();
+    
+    // Disconnect from room
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+      roomRef.current = null;
+    }
+    
+    // If we were live, end the stream record
+    if (isLive && user?.id) {
+      await endLiveStreamRecord(user.id);
+    }
+    
     navigation.goBack();
-  }, [navigation, videoTrack, audioTrack]);
+  }, [navigation, videoTrack, audioTrack, isLive, user]);
 
   // Handle Go Live - connect and publish on SAME screen
   const handleGoLive = useCallback(async () => {
@@ -149,6 +165,13 @@ export default function GoLiveScreen() {
     try {
       const roomName = generateSoloRoomName(user.id);
       const userName = user.email?.split('@')[0] || 'Host';
+
+      // Create live_streams record in database (makes stream visible on LiveTV)
+      const { error: dbError } = await startLiveStreamRecord(user.id, roomName);
+      if (dbError) {
+        console.warn('[GoLive] DB record warning:', dbError);
+        // Continue anyway - stream will work, just may not show on LiveTV immediately
+      }
 
       // Fetch token
       const { token, url } = await fetchMobileToken(roomName, user.id, userName, true);
@@ -175,9 +198,13 @@ export default function GoLiveScreen() {
       await room.localParticipant.publishTrack(audioTrack);
 
       setIsLive(true);
-      console.log('[GoLive] Now live!');
+      console.log('[GoLive] Now live! Stream should appear on LiveTV.');
     } catch (err: any) {
       console.error('[GoLive] Connect error:', err);
+      // If we created a DB record but connection failed, clean it up
+      if (user?.id) {
+        await endLiveStreamRecord(user.id);
+      }
       Alert.alert('Connection Failed', err.message || 'Failed to go live.');
     } finally {
       setIsConnecting(false);
@@ -191,17 +218,25 @@ export default function GoLiveScreen() {
       {
         text: 'End Stream',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
+          // Disconnect from LiveKit room
           if (roomRef.current) {
             roomRef.current.disconnect();
             roomRef.current = null;
           }
+          
+          // End the live_streams record in database
+          if (user?.id) {
+            await endLiveStreamRecord(user.id);
+          }
+          
           setIsLive(false);
           setViewerCount(0);
+          console.log('[GoLive] Stream ended, removed from LiveTV.');
         },
       },
     ]);
-  }, []);
+  }, [user]);
 
   return (
     <View style={styles.container}>

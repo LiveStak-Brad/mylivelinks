@@ -183,3 +183,90 @@ export async function disconnectAndCleanup(
 export function generateSoloRoomName(userId: string): string {
   return `solo_${userId}`;
 }
+
+/**
+ * Create a live_streams record when going live.
+ * This makes the stream visible on LiveTV for web viewers.
+ */
+export async function startLiveStreamRecord(
+  userId: string,
+  roomName: string
+): Promise<{ liveStreamId: number | null; error: string | null }> {
+  try {
+    // First, end any existing live streams for this user
+    await supabase
+      .from('live_streams')
+      .update({
+        live_available: false,
+        ended_at: new Date().toISOString(),
+      })
+      .eq('profile_id', userId)
+      .eq('live_available', true);
+
+    // Create new live stream record
+    const { data, error } = await supabase
+      .from('live_streams')
+      .insert({
+        profile_id: userId,
+        live_available: true,
+        streaming_mode: 'solo',
+        room_name: roomName,
+        started_at: new Date().toISOString(),
+        ended_at: null,
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[livekit] Failed to create live_streams record:', error);
+      return { liveStreamId: null, error: error.message };
+    }
+
+    // Update profile is_live status
+    await supabase
+      .from('profiles')
+      .update({ is_live: true })
+      .eq('id', userId);
+
+    console.log('[livekit] Live stream record created:', data?.id);
+    return { liveStreamId: data?.id || null, error: null };
+  } catch (err: any) {
+    console.error('[livekit] startLiveStreamRecord error:', err);
+    return { liveStreamId: null, error: err?.message || 'Failed to start stream' };
+  }
+}
+
+/**
+ * End a live_streams record when stopping the stream.
+ */
+export async function endLiveStreamRecord(userId: string): Promise<void> {
+  try {
+    // End any active live streams for this user
+    const { error: streamError } = await supabase
+      .from('live_streams')
+      .update({
+        live_available: false,
+        ended_at: new Date().toISOString(),
+      })
+      .eq('profile_id', userId)
+      .eq('live_available', true);
+
+    if (streamError) {
+      console.error('[livekit] Failed to end live_streams record:', streamError);
+    }
+
+    // Update profile is_live status
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ is_live: false })
+      .eq('id', userId);
+
+    if (profileError) {
+      console.error('[livekit] Failed to update profile is_live:', profileError);
+    }
+
+    console.log('[livekit] Live stream record ended for user:', userId);
+  } catch (err) {
+    console.error('[livekit] endLiveStreamRecord error:', err);
+  }
+}
