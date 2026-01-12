@@ -4,31 +4,32 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { VideoView } from '@livekit/react-native';
-import { createLocalVideoTrack, LocalVideoTrack, VideoPresets, Track, facingModeFromLocalTrack } from 'livekit-client';
+import { createLocalVideoTrack, LocalVideoTrack, VideoPresets } from 'livekit-client';
 import { useAuth } from '../state/AuthContext';
 import { fetchMobileToken, connectAndPublish, disconnectAndCleanup, generateSoloRoomName } from '../lib/livekit';
 import type { Room, LocalAudioTrack } from 'livekit-client';
 
-// Request permissions
-async function requestPermissions(): Promise<{ camera: boolean; mic: boolean }> {
-  if (Platform.OS === 'android') {
-    const { PermissionsAndroid } = require('react-native');
-    try {
-      const grants = await PermissionsAndroid.requestMultiple([
-        PermissionsAndroid.PERMISSIONS.CAMERA,
-        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-      ]);
-      return {
-        camera: grants[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED,
-        mic: grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED,
-      };
-    } catch (err) {
-      console.error('[GoLive] Permission request error:', err);
-      return { camera: false, mic: false };
-    }
+// Request Android permissions (iOS permissions are triggered by camera access)
+async function requestAndroidPermissions(): Promise<{ camera: boolean; mic: boolean }> {
+  if (Platform.OS !== 'android') {
+    // iOS: permissions will be requested when we try to access camera
+    return { camera: false, mic: false };
   }
-  // iOS permissions are handled by Info.plist and prompted automatically
-  return { camera: true, mic: true };
+  
+  const { PermissionsAndroid } = require('react-native');
+  try {
+    const grants = await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+    ]);
+    return {
+      camera: grants[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED,
+      mic: grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED,
+    };
+  } catch (err) {
+    console.error('[GoLive] Permission request error:', err);
+    return { camera: false, mic: false };
+  }
 }
 
 export default function GoLiveScreen() {
@@ -68,20 +69,26 @@ export default function GoLiveScreen() {
 
   const needsPermissions = !cameraGranted || !micGranted;
 
-  // Request permissions on mount
+  // Track if we've attempted to start preview
+  const [previewAttempted, setPreviewAttempted] = useState(false);
+
+  // Request Android permissions on mount (iOS will prompt on camera access)
   useEffect(() => {
-    if (!permissionsRequested) {
+    if (Platform.OS === 'android' && !permissionsRequested) {
       setPermissionsRequested(true);
-      requestPermissions().then(({ camera, mic }) => {
+      requestAndroidPermissions().then(({ camera, mic }) => {
         setCameraGranted(camera);
         setMicGranted(mic);
       });
     }
   }, [permissionsRequested]);
 
-  // Create preview track when permissions are granted
+  // Create preview track - only when explicitly requested or after Android permissions granted
   useEffect(() => {
-    if (!cameraGranted) return;
+    // On Android, wait for permissions
+    if (Platform.OS === 'android' && !cameraGranted) return;
+    // On iOS, wait for user to tap Enable
+    if (Platform.OS === 'ios' && !previewAttempted) return;
 
     let mounted = true;
     let track: LocalVideoTrack | null = null;
@@ -96,13 +103,17 @@ export default function GoLiveScreen() {
         if (mounted) {
           setPreviewTrack(track);
           setPreviewError(null);
+          // If we got here, permissions were granted (iOS will have prompted)
+          setCameraGranted(true);
+          setMicGranted(true); // Assume mic is also granted for now
         } else {
           track.stop();
         }
       } catch (err) {
         console.error('[GoLive] Preview error:', err);
         if (mounted) {
-          setPreviewError('Could not start camera preview');
+          setPreviewError('Camera access denied. Please enable in Settings.');
+          setCameraGranted(false);
         }
       }
     };
@@ -115,7 +126,7 @@ export default function GoLiveScreen() {
         track.stop();
       }
     };
-  }, [cameraGranted, cameraFacing]);
+  }, [cameraGranted, cameraFacing, previewAttempted]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -131,11 +142,16 @@ export default function GoLiveScreen() {
     setCameraFacing((prev) => (prev === 'user' ? 'environment' : 'user'));
   }, []);
 
-  // Handle permissions request
+  // Handle permissions request (Enable button tap)
   const handleRequestPermissions = useCallback(async () => {
-    const { camera, mic } = await requestPermissions();
-    setCameraGranted(camera);
-    setMicGranted(mic);
+    if (Platform.OS === 'android') {
+      const { camera, mic } = await requestAndroidPermissions();
+      setCameraGranted(camera);
+      setMicGranted(mic);
+    } else {
+      // iOS: trigger camera access which will show permission dialog
+      setPreviewAttempted(true);
+    }
   }, []);
 
   // Handle close
