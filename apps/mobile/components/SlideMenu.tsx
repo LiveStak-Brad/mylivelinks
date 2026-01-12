@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/useTheme';
+import { darkPalette, lightPalette } from '../theme/colors';
 
 export type SlideMenuItem = {
   key: string;
@@ -9,6 +12,8 @@ export type SlideMenuItem = {
   disabled?: boolean;
   pillText?: string;
   tone?: 'default' | 'danger';
+  type?: 'item' | 'section';
+  rightIconName?: React.ComponentProps<typeof Ionicons>['name'];
 };
 
 export default function SlideMenu({
@@ -24,10 +29,12 @@ export default function SlideMenu({
   items: SlideMenuItem[];
   onRequestClose: () => void;
 }) {
+  const { mode, colors } = useTheme();
   const translate = useRef(new Animated.Value(0)).current;
   const panelWidth = 300;
 
   const closedX = useMemo(() => (side === 'left' ? -panelWidth : panelWidth), [side]);
+  const pressedBg = mode === 'dark' ? darkPalette.slate800 : lightPalette.slate100;
 
   useEffect(() => {
     if (visible) translate.setValue(closedX);
@@ -50,23 +57,34 @@ export default function SlideMenu({
           accessibilityRole="button"
           accessibilityLabel="Close menu"
           onPress={onRequestClose}
-          style={styles.backdrop}
+          style={[styles.backdrop, { backgroundColor: colors.overlay }]}
         />
 
         <Animated.View
           style={[
             styles.panel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
             side === 'left' ? styles.panelLeft : styles.panelRight,
             { width: panelWidth, transform: [{ translateX: translate }] },
           ]}
         >
           <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
-            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {title ? <Text style={[styles.title, { color: colors.text }]}>{title}</Text> : null}
 
             <View style={styles.list}>
               {items.map((item) => {
                 const isDisabled = !!item.disabled;
                 const isDanger = item.tone === 'danger';
+                const isSection = item.type === 'section';
+
+                if (isSection) {
+                  return (
+                    <View key={item.key} style={styles.sectionRow}>
+                      <Text style={[styles.sectionLabel, { color: colors.mutedText }]}>{item.label}</Text>
+                    </View>
+                  );
+                }
+
                 return (
                   <Pressable
                     key={item.key}
@@ -78,18 +96,26 @@ export default function SlideMenu({
                     }}
                     style={({ pressed }) => [
                       styles.row,
-                      pressed && !isDisabled ? styles.rowPressed : null,
+                      pressed && !isDisabled ? { backgroundColor: pressedBg } : null,
                       isDisabled ? styles.rowDisabled : null,
+                      { borderBottomColor: colors.border },
                     ]}
                   >
-                    <Text style={[styles.label, isDanger ? styles.labelDanger : null]}>
+                    <Text
+                      style={[
+                        styles.label,
+                        { color: isDanger ? colors.danger : colors.text },
+                      ]}
+                    >
                       {item.label}
                     </Text>
 
                     {item.pillText ? (
-                      <View style={styles.pill}>
-                        <Text style={styles.pillText}>{item.pillText}</Text>
+                      <View style={[styles.pill, { backgroundColor: colors.text }]}>
+                        <Text style={[styles.pillText, { color: colors.bg }]}>{item.pillText}</Text>
                       </View>
+                    ) : item.rightIconName ? (
+                      <Ionicons name={item.rightIconName} size={18} color={colors.icon} />
                     ) : null}
                   </Pressable>
                 );
@@ -108,14 +134,12 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    backgroundColor: 'transparent',
   },
   panel: {
     position: 'absolute',
     top: 0,
     bottom: 0,
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
     borderTopWidth: 0,
     borderBottomWidth: 0,
   },
@@ -135,9 +159,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 6,
-    color: '#0F172A',
     fontSize: 16,
     fontWeight: '900',
+  },
+  sectionRow: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   list: {
     paddingTop: 8,
@@ -149,30 +183,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
-  },
-  rowPressed: {
-    backgroundColor: '#F1F5F9',
   },
   rowDisabled: {
     opacity: 0.55,
   },
   label: {
-    color: '#0F172A',
     fontSize: 14,
     fontWeight: '800',
-  },
-  labelDanger: {
-    color: '#DC2626',
   },
   pill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: '#111827',
   },
   pillText: {
-    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.6,

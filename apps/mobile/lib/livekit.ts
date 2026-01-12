@@ -96,6 +96,13 @@ export async function connectAndPublish(
   const room = new Room({
     adaptiveStream: true,
     dynacast: true,
+    publishDefaults: {
+      simulcast: false,
+      videoEncoding: {
+        maxBitrate: 1_200_000,
+        maxFramerate: 30,
+      },
+    },
   });
 
   // Set up event listeners for debugging

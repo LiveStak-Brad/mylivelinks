@@ -49,6 +49,15 @@ void MLLSetSoftSkinLevel(int level) {
     return frame;
   }
 
+  // Identity bypass: if user is effectively "off", return original frame untouched.
+  // This avoids extra CI render passes and prevents subtle color/softness artifacts.
+  if (gSoftSkinLevel == 0 &&
+      fabsf(gBrightness - 1.0f) < 0.0001f &&
+      fabsf(gContrast - 1.0f) < 0.0001f &&
+      fabsf(gSaturation - 1.0f) < 0.0001f) {
+    return frame;
+  }
+
   RTCCVPixelBuffer *cvBuf = (RTCCVPixelBuffer *)buffer;
   CVPixelBufferRef pixelBuffer = cvBuf.pixelBuffer;
   if (pixelBuffer == nil) {
@@ -77,13 +86,33 @@ void MLLSetSoftSkinLevel(int level) {
   // Optional global soft skin: small gaussian blur, cropped back to original extent.
   if (gSoftSkinLevel > 0) {
     // Keep radius small for stable performance.
+    // Use blending with original to avoid obvious background "glow/bleed".
     const CGFloat radius = (gSoftSkinLevel == 1) ? 1.0 : 2.0;
     CIFilter *blur = [CIFilter filterWithName:@"CIGaussianBlur"];
     [blur setValue:outputImage forKey:kCIInputImageKey];
     [blur setValue:@(radius) forKey:kCIInputRadiusKey];
     CIImage *blurred = blur.outputImage;
     if (blurred) {
-      outputImage = [blurred imageByCroppingToRect:inputImage.extent];
+      CIImage *cropped = [blurred imageByCroppingToRect:inputImage.extent];
+
+      // Set alpha on blurred image (global blend amount)
+      const CGFloat amount = (gSoftSkinLevel == 1) ? 0.25 : 0.40;
+      CIFilter *alpha = [CIFilter filterWithName:@"CIColorMatrix"];
+      [alpha setValue:cropped forKey:kCIInputImageKey];
+      // Multiply alpha by amount
+      [alpha setValue:[CIVector vectorWithX:0 Y:0 Z:0 W:amount] forKey:@"inputAVector"];
+      [alpha setValue:[CIVector vectorWithX:0 Y:0 Z:0 W:0] forKey:@"inputBiasVector"];
+      CIImage *blurWithAlpha = alpha.outputImage ?: cropped;
+
+      CIFilter *comp = [CIFilter filterWithName:@"CISourceOverCompositing"];
+      [comp setValue:blurWithAlpha forKey:kCIInputImageKey];
+      [comp setValue:outputImage forKey:kCIInputBackgroundImageKey];
+      CIImage *mixed = comp.outputImage;
+      if (mixed) {
+        outputImage = [mixed imageByCroppingToRect:inputImage.extent];
+      } else {
+        outputImage = cropped;
+      }
     }
   }
 

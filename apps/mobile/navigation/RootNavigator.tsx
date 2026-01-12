@@ -9,6 +9,7 @@ import FeedScreen from '../screens/FeedScreen';
 import GoLiveScreen from '../screens/GoLiveScreen';
 import LiveTVScreen from '../screens/LiveTVScreen';
 import MessagesScreen from '../screens/MessagesScreen';
+import IMThreadScreen from '../screens/IMThreadScreen';
 import NotiesScreen from '../screens/NotiesScreen';
 
 import ActivityScreen from '../screens/ActivityScreen';
@@ -82,47 +83,56 @@ import UserFeedScreen from '../screens/UserFeedScreen';
 import UserPhotosScreen from '../screens/UserPhotosScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
 import WalletScreen from '../screens/WalletScreen';
+import MediaViewerScreen from '../screens/MediaViewerScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, View } from 'react-native';
 import { useAuth } from '../state/AuthContext';
+import { useTheme } from '../theme/useTheme';
+import { brand } from '../theme/colors';
 
 const Tabs = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
 
 function TabsNavigator() {
+  const { colors } = useTheme();
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: false,
+        tabBarStyle: {
+          backgroundColor: (colors as any).tabBarBg ?? colors.surface,
+          borderTopColor: (colors as any).tabBarBorder ?? colors.border,
+        },
         tabBarIcon: ({ size, focused }) => {
           let name: React.ComponentProps<typeof Ionicons>['name'];
-          let iconColor = '#6B7280';
+          let iconColor = (colors as any).tabIconInactive ?? colors.mutedText;
+          const active = (colors as any).tabIconActive ?? colors.text;
 
           switch (route.name) {
             case 'Home':
               name = focused ? 'home' : 'home-outline';
-              iconColor = 'hsl(258 90% 58%)';
+              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
             case 'Feed':
               name = 'logo-rss';
-              iconColor = 'hsl(328 85% 60%)';
+              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
             case 'Go Live':
               name = focused ? 'videocam' : 'videocam-outline';
-              iconColor = 'hsl(0 84% 60%)';
+              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
             case 'LiveTV':
               name = focused ? 'tv' : 'tv-outline';
-              iconColor = 'hsl(330 100% 63%)';
+              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
             case 'Messages':
               name = focused ? 'chatbubble' : 'chatbubble-outline';
-              iconColor = 'hsl(200 98% 50%)';
+              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
             case 'Noties':
               name = focused ? 'notifications' : 'notifications-outline';
-              iconColor = 'hsl(43 96% 56%)';
+              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
             default:
               name = focused ? 'ellipse' : 'ellipse-outline';
@@ -154,12 +164,13 @@ function TabsNavigator() {
 
 export default function RootNavigator({ header }: { header: () => React.ReactNode }) {
   const { loading, session } = useAuth();
+  const { colors } = useTheme();
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom', 'left', 'right']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom', 'left', 'right']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text>Loading…</Text>
+          <Text style={{ color: colors.text }}>Loading…</Text>
         </View>
       </SafeAreaView>
     );
@@ -226,6 +237,7 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="LinkRegularSwipeScreen" component={LinkRegularSwipeScreen} />
       <RootStack.Screen name="LinkScreen" component={LinkScreen} />
       <RootStack.Screen name="LinkSettingsScreen" component={LinkSettingsScreen} />
+      <RootStack.Screen name="IMThreadScreen" component={IMThreadScreen} />
       <RootStack.Screen name="LiveHostScreen" component={LiveHostScreen} />
       <RootStack.Screen name="LiveScreen" component={LiveScreen} />
       <RootStack.Screen name="LiveUserScreen" component={LiveUserScreen} />
@@ -270,6 +282,18 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="UserPhotosScreen" component={UserPhotosScreen} />
       <RootStack.Screen name="UserProfileScreen" component={UserProfileScreen} />
       <RootStack.Screen name="WalletScreen" component={WalletScreen} />
+
+      {/* Full-screen media viewer (Facebook-style expand) */}
+      <RootStack.Screen
+        name="MediaViewer"
+        component={MediaViewerScreen}
+        options={{
+          headerShown: false,
+          presentation: 'fullScreenModal',
+          contentStyle: { backgroundColor: '#000000' },
+          gestureEnabled: true,
+        }}
+      />
     </RootStack.Navigator>
   );
 }

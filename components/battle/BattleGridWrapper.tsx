@@ -343,6 +343,23 @@ export default function BattleGridWrapper({
         const room = new Room({
           adaptiveStream: true,
           dynacast: true,
+          // Optimize for viewer experience
+          videoCaptureDefaults: {
+            resolution: {
+              width: 1280,
+              height: 720,
+              frameRate: 30,
+            },
+          },
+          // Prefer lower quality layers for faster initial load
+          publishDefaults: {
+            simulcast: true,
+            videoSimulcastLayers: [
+              { width: 320, height: 180, bitrate: 150_000 },
+              { width: 640, height: 360, bitrate: 500_000 },
+              { width: 1280, height: 720, bitrate: 1_500_000 },
+            ],
+          },
         });
         
         room.on(RoomEvent.Connected, () => {

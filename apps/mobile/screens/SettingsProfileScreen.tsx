@@ -35,6 +35,18 @@ type ThemedColors = {
   muted2: string;
   inputBg: string;
   inputBorder: string;
+  blue600: string;
+  purple600: string;
+  pink600: string;
+  green600: string;
+  amber600: string;
+  red600: string;
+  white: string;
+  infoCardBg: string;
+  infoCardBorder: string;
+  infoCardNeutralBg: string;
+  avatarBg: string;
+  avatarText: string;
 };
 
 const ThemedColorsContext = createContext<ThemedColors | null>(null);
@@ -53,6 +65,18 @@ function useThemedColors(): ThemedColors {
       muted2: COLORS.muted2,
       inputBg: 'rgba(255,255,255,0.04)',
       inputBorder: 'rgba(255,255,255,0.08)',
+      blue600: COLORS.blue600,
+      purple600: COLORS.purple600,
+      pink600: COLORS.pink600,
+      green600: COLORS.green600,
+      amber600: COLORS.amber600,
+      red600: COLORS.red600,
+      white: COLORS.white,
+      infoCardBg: 'rgba(37,99,235,0.16)',
+      infoCardBorder: 'rgba(37,99,235,0.28)',
+      infoCardNeutralBg: COLORS.card,
+      avatarBg: '#7C3AED',
+      avatarText: '#FFFFFF',
     };
   }
   return ctx;
@@ -79,7 +103,11 @@ function Card({
     <View style={[styles.card, { backgroundColor: themed.card, borderColor: themed.border }]}>
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
-          {icon ? <View style={styles.cardIconWrap}>{icon}</View> : null}
+          {icon ? (
+            <View style={[styles.cardIconWrap, { backgroundColor: themed.card2, borderColor: themed.border }]}>
+              {icon}
+            </View>
+          ) : null}
           <View style={{ flex: 1 }}>
             <Text style={[styles.cardTitle, { color: themed.text }]}>{title}</Text>
             {subtitle ? <Text style={[styles.cardSubtitle, { color: themed.muted }]}>{subtitle}</Text> : null}
@@ -170,7 +198,7 @@ function Button({
         <Ionicons
           name={iconName}
           size={18}
-          color={tone === 'primary' ? COLORS.white : tone === 'danger' ? COLORS.red600 : themed.text}
+          color={tone === 'primary' ? themed.white : tone === 'danger' ? themed.red600 : themed.text}
           style={{ marginRight: 8 }}
         />
       ) : null}
@@ -231,11 +259,11 @@ function Chip({ label, selected, disabled }: { label: string; selected?: boolean
     <View
       style={[
         styles.chip,
-        selected ? styles.chipSelected : styles.chipUnselected,
+        selected ? styles.chipSelected : { backgroundColor: themed.card2, borderColor: themed.border },
         disabled && styles.chipDisabled,
       ]}
     >
-      <Text style={[styles.chipText, selected ? styles.chipTextSelected : styles.chipTextUnselected]}>
+      <Text style={[styles.chipText, { color: disabled ? themed.muted : themed.text }]}>
         {label}
       </Text>
     </View>
@@ -255,17 +283,18 @@ function PickerModal({
   items: PickerItem[];
   onClose: () => void;
 }) {
+  const themed = useThemedColors();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
+        <View style={[styles.modalCard, { backgroundColor: themed.card, borderColor: themed.border }]}>
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>{title}</Text>
-              {subtitle ? <Text style={styles.modalSubtitle}>{subtitle}</Text> : null}
+              <Text style={[styles.modalTitle, { color: themed.text }]}>{title}</Text>
+              {subtitle ? <Text style={[styles.modalSubtitle, { color: themed.muted }]}>{subtitle}</Text> : null}
             </View>
             <Pressable onPress={onClose} style={styles.modalCloseBtn}>
-              <Ionicons name="close" size={20} color={COLORS.text} />
+              <Ionicons name="close" size={20} color={themed.text} />
             </Pressable>
           </View>
           <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ padding: 12 }}>
@@ -273,8 +302,8 @@ function PickerModal({
               <View key={it.id}>
                 <View style={styles.modalRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.modalRowTitle}>{it.label}</Text>
-                    {it.description ? <Text style={styles.modalRowDesc}>{it.description}</Text> : null}
+                    <Text style={[styles.modalRowTitle, { color: themed.text }]}>{it.label}</Text>
+                    {it.description ? <Text style={[styles.modalRowDesc, { color: themed.muted }]}>{it.description}</Text> : null}
                   </View>
                   {it.right}
                 </View>
@@ -324,6 +353,21 @@ export default function SettingsProfileScreen() {
       muted2: (colors as any).subtleText ?? colors.mutedText,
       inputBg: mode === 'dark' ? 'rgba(255,255,255,0.04)' : colors.surface,
       inputBorder: mode === 'dark' ? 'rgba(255,255,255,0.08)' : colors.border,
+      // Accent colors (same in both modes)
+      blue600: '#2563EB',
+      purple600: '#7C3AED',
+      pink600: '#DB2777',
+      green600: '#16A34A',
+      amber600: '#D97706',
+      red600: '#DC2626',
+      white: '#FFFFFF',
+      // Info card styling
+      infoCardBg: mode === 'dark' ? 'rgba(37,99,235,0.16)' : 'rgba(37,99,235,0.08)',
+      infoCardBorder: mode === 'dark' ? 'rgba(37,99,235,0.28)' : 'rgba(37,99,235,0.2)',
+      infoCardNeutralBg: mode === 'dark' ? '#0F1A2E' : colors.surface,
+      // Avatar
+      avatarBg: mode === 'dark' ? '#7C3AED' : 'rgba(124, 58, 237, 0.15)',
+      avatarText: mode === 'dark' ? '#FFFFFF' : '#7C3AED',
     }),
     [mode, colors]
   );
@@ -398,46 +442,46 @@ export default function SettingsProfileScreen() {
         id: 'social_counts',
         label: 'Social Counts',
         description: 'Follower/following/friends counts',
-        right: <Switch value={true} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />,
+        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
       },
       {
         id: 'social_media',
         label: 'Social Media Links',
         description: 'Instagram, Twitter, TikTok icons',
-        right: <Switch value={true} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />,
+        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
       },
       {
         id: 'links',
         label: 'Custom Links',
         description: 'Your Linktree-style link section',
-        right: <Switch value={true} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />,
+        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
       },
       {
         id: 'connections',
         label: 'Connections',
         description: 'Friends and followers display',
-        right: <Switch value={false} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />,
+        right: <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
       },
       {
         id: 'streaming_stats',
         label: 'Streaming Stats',
         description: 'Live hours, viewer counts',
-        right: <Switch value={true} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />,
+        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
       },
       {
         id: 'top_supporters',
         label: 'Top Supporters',
         description: 'Users who gifted you',
-        right: <Switch value={true} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />,
+        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
       },
       {
         id: 'portfolio',
         label: 'Portfolio / Products',
         description: 'Your work showcase',
-        right: <Switch value={false} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />,
+        right: <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
       },
     ],
-    []
+    [themed]
   );
 
   const tabs = useMemo<PickerItem[]>(
@@ -480,36 +524,36 @@ export default function SettingsProfileScreen() {
           </View>
           <View style={styles.headerActions}>
             <View style={styles.linkPill}>
-              <Ionicons name="person-circle-outline" size={16} color={COLORS.blue600} style={{ marginRight: 6 }} />
-              <Text style={styles.linkPillText}>View Profile</Text>
+              <Ionicons name="person-circle-outline" size={16} color={themed.blue600} style={{ marginRight: 6 }} />
+              <Text style={[styles.linkPillText, { color: themed.blue600 }]}>View Profile</Text>
             </View>
             <View style={styles.linkPill}>
-              <Ionicons name="key-outline" size={16} color={COLORS.blue600} style={{ marginRight: 6 }} />
-              <Text style={styles.linkPillText}>Change password</Text>
+              <Ionicons name="key-outline" size={16} color={themed.blue600} style={{ marginRight: 6 }} />
+              <Text style={[styles.linkPillText, { color: themed.blue600 }]}>Change password</Text>
             </View>
           </View>
         </View>
 
         {/* Account & Security quick link */}
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, { backgroundColor: themed.infoCardBg, borderColor: themed.infoCardBorder }]}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.infoCardTitle}>Need to change your email or password?</Text>
-            <Text style={styles.infoCardSubtitle}>Go to Account & Security to update login details.</Text>
+            <Text style={[styles.infoCardTitle, { color: themed.text }]}>Need to change your email or password?</Text>
+            <Text style={[styles.infoCardSubtitle, { color: themed.muted }]}>Go to Account & Security to update login details.</Text>
           </View>
           <View style={styles.infoCardBtn}>
             <Text style={styles.infoCardBtnText}>Account & Security</Text>
-            <Ionicons name="chevron-forward" size={18} color={COLORS.white} />
+            <Ionicons name="chevron-forward" size={18} color={themed.white} />
           </View>
         </View>
 
         {/* Download app */}
-        <View style={styles.infoCardNeutral}>
+        <View style={[styles.infoCardNeutral, { backgroundColor: themed.infoCardNeutralBg, borderColor: themed.border }]}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.infoCardTitle}>Download the app</Text>
-            <Text style={styles.infoCardSubtitle}>Install Live Links on your home screen for faster access.</Text>
+            <Text style={[styles.infoCardTitle, { color: themed.text }]}>Download the app</Text>
+            <Text style={[styles.infoCardSubtitle, { color: themed.muted }]}>Install Live Links on your home screen for faster access.</Text>
           </View>
-          <View style={[styles.infoCardBtn, { backgroundColor: COLORS.purple600, opacity: 0.6 }]}>
-            <Ionicons name="download-outline" size={18} color={COLORS.white} style={{ marginRight: 6 }} />
+          <View style={[styles.infoCardBtn, { backgroundColor: themed.purple600, opacity: 0.6 }]}>
+            <Ionicons name="download-outline" size={18} color={themed.white} style={{ marginRight: 6 }} />
             <Text style={styles.infoCardBtnText}>Install</Text>
           </View>
         </View>
@@ -517,11 +561,11 @@ export default function SettingsProfileScreen() {
         {/* Profile Photo */}
         <Card
           title="Profile Photo"
-          icon={<Ionicons name="camera-outline" size={18} color={COLORS.blue600} />}
+          icon={<Ionicons name="camera-outline" size={18} color={themed.blue600} />}
         >
           <View style={styles.photoRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
+            <View style={[styles.avatar, { backgroundColor: themed.avatarBg, borderColor: themed.infoCardBorder }]}>
+              <Text style={[styles.avatarText, { color: themed.avatarText }]}>
                 {(profileDisplayName || profileUsername || 'U').trim().slice(0, 1).toUpperCase() || 'U'}
               </Text>
             </View>
@@ -536,28 +580,34 @@ export default function SettingsProfileScreen() {
                   onPress={handleSave}
                 />
               </View>
-              {dirty ? <Text style={styles.mutedNote}>You have unsaved changes.</Text> : null}
+              {dirty ? <Text style={[styles.mutedNote, { color: themed.muted2 }]}>You have unsaved changes.</Text> : null}
             </View>
           </View>
         </Card>
 
         {/* Basic Info */}
-        <Card title="Basic Info" icon={<Ionicons name="id-card-outline" size={18} color={COLORS.blue600} />}>
+        <Card title="Basic Info" icon={<Ionicons name="id-card-outline" size={18} color={themed.blue600} />}>
           <View style={{ marginBottom: 8 }}>
-            <Text style={styles.fieldLabel}>Username</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Username</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={[styles.inputWrap, { flex: 1 }, styles.inputWrapDisabled]}>
+              <View
+                style={[
+                  styles.inputWrap,
+                  { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder },
+                  styles.inputWrapDisabled,
+                ]}
+              >
                 <TextInput
                   placeholder="username"
-                  placeholderTextColor={COLORS.muted}
+                  placeholderTextColor={themed.muted}
                   editable={false}
                   value={currentUser.loading ? '' : profileUsername}
-                  style={styles.input}
+                  style={[styles.input, { color: themed.text }]}
                 />
               </View>
               <Button label="Change Username" iconName="create-outline" disabled />
             </View>
-            <Text style={styles.fieldHelper}>Your unique identifier: mylivelinks.com/username</Text>
+            <Text style={[styles.fieldHelper, { color: themed.muted }]}>Your unique identifier: mylivelinks.com/username</Text>
           </View>
 
           <Field
@@ -583,24 +633,24 @@ export default function SettingsProfileScreen() {
         <Card
           title="Location (Optional)"
           subtitle="Set a ZIP code to show city/region. Self-reported only."
-          icon={<Ionicons name="location-outline" size={18} color={COLORS.blue600} />}
+          icon={<Ionicons name="location-outline" size={18} color={themed.blue600} />}
         >
           <View style={{ marginBottom: 12 }}>
-            <Text style={styles.smallMuted}>
+            <Text style={[styles.smallMuted, { color: themed.muted }]}>
               This helps with local discovery. You can hide it anytime.
             </Text>
           </View>
 
           <View style={{ marginBottom: 10 }}>
-            <Text style={styles.fieldLabel}>ZIP Code</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>ZIP Code</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={[styles.inputWrap, { flex: 1 }]}>
+              <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
                 <TextInput
                   placeholder="e.g. 90012"
-                  placeholderTextColor={COLORS.muted}
+                  placeholderTextColor={themed.muted}
                   keyboardType="numeric"
                   maxLength={5}
-                  style={styles.input}
+                  style={[styles.input, { color: themed.text }]}
                 />
               </View>
               <Button label="Set" tone="primary" disabled />
@@ -609,35 +659,35 @@ export default function SettingsProfileScreen() {
 
           <Field label="Area label (optional)" placeholder='e.g. "St. Louis Metro"' maxLength={48} />
 
-          <View style={styles.noticeBox}>
+          <View style={[styles.noticeBox, { borderColor: themed.infoCardBorder, backgroundColor: themed.infoCardBg }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={COLORS.blue600} style={{ marginRight: 8 }} />
-              <Text style={styles.noticeTitle}>Self-reported only</Text>
+              <Ionicons name="shield-checkmark-outline" size={18} color={themed.blue600} style={{ marginRight: 8 }} />
+              <Text style={[styles.noticeTitle, { color: themed.text }]}>Self-reported only</Text>
             </View>
-            <Text style={styles.noticeText}>No location saved yet.</Text>
+            <Text style={[styles.noticeText, { color: themed.muted }]}>No location saved yet.</Text>
           </View>
 
           <View style={{ marginTop: 10 }}>
             <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>Hide location from others</Text>
-              <Switch value={false} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />
+              <Text style={[styles.toggleLabel, { color: themed.text }]}>Hide location from others</Text>
+              <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />
             </View>
             <Divider />
             <View style={[styles.toggleRow, { opacity: 0.6 }]}>
-              <Text style={styles.toggleLabel}>Show ZIP publicly</Text>
-              <Switch value={false} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />
+              <Text style={[styles.toggleLabel, { color: themed.text }]}>Show ZIP publicly</Text>
+              <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />
             </View>
           </View>
         </Card>
 
         {/* About */}
-        <Card title="About" icon={<Ionicons name="information-circle-outline" size={18} color={COLORS.blue600} />}>
+        <Card title="About" icon={<Ionicons name="information-circle-outline" size={18} color={themed.blue600} />}>
           <View style={{ marginBottom: 10 }}>
             <View style={styles.aboutHeaderRow}>
-              <Text style={styles.fieldLabel}>Gender (Optional)</Text>
-              <Text style={styles.smallMuted}>Not set</Text>
+              <Text style={[styles.fieldLabel, { color: themed.text }]}>Gender (Optional)</Text>
+              <Text style={[styles.smallMuted, { color: themed.muted }]}>Not set</Text>
             </View>
-            <Text style={styles.smallMuted}>Used for Dating filters. You can leave this blank.</Text>
+            <Text style={[styles.smallMuted, { color: themed.muted }]}>Used for Dating filters. You can leave this blank.</Text>
           </View>
           <View style={styles.chipsWrap}>
             <Chip label="Man" />
@@ -649,28 +699,34 @@ export default function SettingsProfileScreen() {
         </Card>
 
         {/* Referral */}
-        <Card title="Referral" icon={<Ionicons name="gift-outline" size={18} color={COLORS.blue600} />}>
+        <Card title="Referral" icon={<Ionicons name="gift-outline" size={18} color={themed.blue600} />}>
           <View style={{ marginBottom: 8 }}>
-            <Text style={styles.fieldLabel}>Who invited you? (username)</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Who invited you? (username)</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={[styles.inputWrap, { flex: 1 }]}>
-                <TextInput placeholder="username (no @)" placeholderTextColor={COLORS.muted} style={styles.input} />
+              <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
+                <TextInput
+                  placeholder="username (no @)"
+                  placeholderTextColor={themed.muted}
+                  style={[styles.input, { color: themed.text }]}
+                />
               </View>
               <Button label="Save" tone="primary" disabled />
             </View>
-            <Text style={styles.fieldHelper}>You can only set this once. If already claimed, it will be locked.</Text>
+            <Text style={[styles.fieldHelper, { color: themed.muted }]}>
+              You can only set this once. If already claimed, it will be locked.
+            </Text>
           </View>
         </Card>
 
         {/* Profile Type */}
-        <Card title="Profile Type" icon={<Ionicons name="pricetag-outline" size={18} color={COLORS.blue600} />}>
+        <Card title="Profile Type" icon={<Ionicons name="pricetag-outline" size={18} color={themed.blue600} />}>
           <Row
             label="Current Type"
             value="creator"
             hint="Tap to change (UI only)"
             onPress={() => {}}
           />
-          <Text style={[styles.smallMuted, { marginTop: 10, color: COLORS.amber600 }]}>
+          <Text style={[styles.smallMuted, { marginTop: 10, color: themed.amber600 }]}>
             ⚠️ Changing profile type may hide or show different sections on your profile. Nothing is deleted.
           </Text>
         </Card>
@@ -679,11 +735,11 @@ export default function SettingsProfileScreen() {
         <Card
           title="Profile Modules"
           subtitle="Customize which sections appear on your profile."
-          icon={<Ionicons name="grid-outline" size={18} color={COLORS.blue600} />}
+          icon={<Ionicons name="grid-outline" size={18} color={themed.blue600} />}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.smallMuted}>
+              <Text style={[styles.smallMuted, { color: themed.muted }]}>
                 Profile type is a starting point — add or remove any module (UI only).
               </Text>
             </View>
@@ -698,8 +754,8 @@ export default function SettingsProfileScreen() {
         </Card>
 
         {/* Profile Tabs */}
-        <Card title="Profile Tabs" icon={<Ionicons name="albums-outline" size={18} color={COLORS.blue600} />}>
-          <Text style={styles.smallMuted}>
+        <Card title="Profile Tabs" icon={<Ionicons name="albums-outline" size={18} color={themed.blue600} />}>
+          <Text style={[styles.smallMuted, { color: themed.muted }]}>
             Choose which tabs appear on your profile. Visitors can navigate between enabled tabs.
           </Text>
           <View style={[styles.chipsWrap, { marginTop: 12 }]}>
@@ -716,14 +772,14 @@ export default function SettingsProfileScreen() {
         <Card
           title="Top Friends Section"
           subtitle="Customize your Top Friends display (MySpace style!)"
-          icon={<Ionicons name="people-outline" size={18} color={COLORS.purple600} />}
+          icon={<Ionicons name="people-outline" size={18} color={themed.purple600} />}
         >
           <View style={styles.topFriendsToggle}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Show Top Friends Section</Text>
-              <Text style={styles.rowHint}>Display your favorite people on your profile</Text>
+              <Text style={[styles.rowLabel, { color: themed.text }]}>Show Top Friends Section</Text>
+              <Text style={[styles.rowHint, { color: themed.muted }]}>Display your favorite people on your profile</Text>
             </View>
-            <Switch value={true} disabled trackColor={{ false: COLORS.muted2, true: COLORS.purple600 }} />
+            <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.purple600 }} />
           </View>
 
           <View style={{ marginTop: 12, opacity: 0.9 }}>
@@ -733,17 +789,24 @@ export default function SettingsProfileScreen() {
               helper={'Examples: "Top G\'s", "My Crew", "Best Buds", "VIPs", etc.'}
             />
 
-            <Text style={styles.fieldLabel}>Avatar Style</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>Avatar Style</Text>
             <View style={styles.twoCol}>
-              <View style={[styles.choiceCard, styles.choiceCardSelected, { opacity: 0.7 }]}>
-                <Ionicons name="square-outline" size={24} color={COLORS.text} />
-                <Text style={styles.choiceTitle}>Square</Text>
-                <Text style={styles.choiceDesc}>Classic look</Text>
+              <View
+                style={[
+                  styles.choiceCard,
+                  { backgroundColor: themed.card2, borderColor: themed.border },
+                  styles.choiceCardSelected,
+                  { opacity: 0.7 },
+                ]}
+              >
+                <Ionicons name="square-outline" size={24} color={themed.text} />
+                <Text style={[styles.choiceTitle, { color: themed.text }]}>Square</Text>
+                <Text style={[styles.choiceDesc, { color: themed.muted }]}>Classic look</Text>
               </View>
-              <View style={[styles.choiceCard, { opacity: 0.7 }]}>
-                <Ionicons name="ellipse-outline" size={24} color={COLORS.text} />
-                <Text style={styles.choiceTitle}>Circle</Text>
-                <Text style={styles.choiceDesc}>Modern style</Text>
+              <View style={[styles.choiceCard, { backgroundColor: themed.card2, borderColor: themed.border, opacity: 0.7 }]}>
+                <Ionicons name="ellipse-outline" size={24} color={themed.text} />
+                <Text style={[styles.choiceTitle, { color: themed.text }]}>Circle</Text>
+                <Text style={[styles.choiceDesc, { color: themed.muted }]}>Modern style</Text>
               </View>
             </View>
 
@@ -752,14 +815,16 @@ export default function SettingsProfileScreen() {
                 label="Maximum Friends to Display"
                 value="4"
                 hint="Slider on web (UI only)"
-                leftIcon={<Ionicons name="options-outline" size={18} color={COLORS.muted} />}
-                right={<Text style={styles.rowHint}>4</Text>}
+                leftIcon={<Ionicons name="options-outline" size={18} color={themed.muted} />}
+                right={<Text style={[styles.rowHint, { color: themed.muted }]}>4</Text>}
               />
-              <Text style={styles.fieldHelper}>Grid will auto-center based on the number of friends you add</Text>
+              <Text style={[styles.fieldHelper, { color: themed.muted }]}>
+                Grid will auto-center based on the number of friends you add
+              </Text>
             </View>
 
-            <View style={styles.previewBox}>
-              <Text style={styles.previewTitle}>Preview Grid Layout</Text>
+            <View style={[styles.previewBox, { backgroundColor: themed.card2, borderColor: themed.border }]}>
+              <Text style={[styles.previewTitle, { color: themed.text }]}>Preview Grid Layout</Text>
               <View style={styles.previewGrid}>
                 {Array.from({ length: 4 }).map((_, i) => (
                   <View key={`pf-${i}`} style={styles.previewTile} />
@@ -771,20 +836,22 @@ export default function SettingsProfileScreen() {
 
         {/* Profile Customization */}
         <View style={{ marginTop: 6 }}>
-          <Text style={styles.customizationTitle}>Profile Customization</Text>
-          <Text style={styles.customizationSubtitle}>Customize how your profile looks to visitors</Text>
+          <Text style={[styles.customizationTitle, { color: themed.text }]}>Profile Customization</Text>
+          <Text style={[styles.customizationSubtitle, { color: themed.muted }]}>
+            Customize how your profile looks to visitors
+          </Text>
         </View>
 
         <Card
           title="Background"
-          icon={<Ionicons name="color-palette-outline" size={18} color={COLORS.blue600} />}
+          icon={<Ionicons name="color-palette-outline" size={18} color={themed.blue600} />}
         >
-          <Text style={styles.fieldLabel}>Background Image</Text>
-          <View style={styles.bgPreview}>
-            <Text style={styles.bgPreviewText}>Background preview</Text>
+          <Text style={[styles.fieldLabel, { color: themed.text }]}>Background Image</Text>
+          <View style={[styles.bgPreview, { backgroundColor: themed.card2, borderColor: themed.border }]}>
+            <Text style={[styles.bgPreviewText, { color: themed.muted }]}>Background preview</Text>
           </View>
           <Button label="Upload Background" iconName="cloud-upload-outline" tone="primary" disabled />
-          <Text style={styles.fieldHelper}>
+          <Text style={[styles.fieldHelper, { color: themed.muted }]}>
             Recommended: 1920x1080px or larger. Max 5MB. JPG, PNG, or WebP. Leave empty for default gradient background.
           </Text>
 
@@ -796,12 +863,16 @@ export default function SettingsProfileScreen() {
           />
         </Card>
 
-        <Card title="Card Style" icon={<Ionicons name="layers-outline" size={18} color={COLORS.blue600} />}>
-          <Text style={styles.fieldLabel}>Card Color</Text>
+        <Card title="Card Style" icon={<Ionicons name="layers-outline" size={18} color={themed.blue600} />}>
+          <Text style={[styles.fieldLabel, { color: themed.text }]}>Card Color</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <View style={[styles.colorSwatch, { backgroundColor: '#FFFFFF' }]} />
-            <View style={[styles.inputWrap, { flex: 1 }]}>
-              <TextInput placeholder="#FFFFFF" placeholderTextColor={COLORS.muted} style={styles.input} />
+            <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
+              <TextInput
+                placeholder="#FFFFFF"
+                placeholderTextColor={themed.muted}
+                style={[styles.input, { color: themed.text }]}
+              />
             </View>
           </View>
 
@@ -815,66 +886,92 @@ export default function SettingsProfileScreen() {
           <Row label="Border Radius" value="Medium (Balanced)" onPress={() => {}} />
         </Card>
 
-        <Card title="Colors & Typography" icon={<Ionicons name="text-outline" size={18} color={COLORS.blue600} />}>
+        <Card title="Colors & Typography" icon={<Ionicons name="text-outline" size={18} color={themed.blue600} />}>
           <Row label="Font Style" value="Modern (Sans-serif)" onPress={() => {}} />
 
           <View style={{ marginTop: 12 }}>
-            <Text style={styles.fieldLabel}>🎯 Button Color</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>🎯 Button Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <View style={[styles.colorSwatch, { backgroundColor: COLORS.blue600 }]} />
-              <View style={[styles.inputWrap, { flex: 1 }]}>
-                <TextInput placeholder="#3B82F6" placeholderTextColor={COLORS.muted} style={styles.input} />
+              <View style={[styles.colorSwatch, { backgroundColor: themed.blue600 }]} />
+              <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
+                <TextInput
+                  placeholder="#3B82F6"
+                  placeholderTextColor={themed.muted}
+                  style={[styles.input, { color: themed.text }]}
+                />
               </View>
             </View>
-            <Text style={styles.fieldHelper}>Color for buttons, CTAs, and primary actions</Text>
+            <Text style={[styles.fieldHelper, { color: themed.muted }]}>Color for buttons, CTAs, and primary actions</Text>
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={styles.fieldLabel}>✍️ Content Text Color</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>✍️ Content Text Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
               <View style={[styles.colorSwatch, { backgroundColor: '#1F2937' }]} />
-              <View style={[styles.inputWrap, { flex: 1 }]}>
-                <TextInput placeholder="#1F2937" placeholderTextColor={COLORS.muted} style={styles.input} />
+              <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
+                <TextInput
+                  placeholder="#1F2937"
+                  placeholderTextColor={themed.muted}
+                  style={[styles.input, { color: themed.text }]}
+                />
               </View>
             </View>
-            <Text style={styles.fieldHelper}>Color for your bio, post captions, and user-written content</Text>
+            <Text style={[styles.fieldHelper, { color: themed.muted }]}>
+              Color for your bio, post captions, and user-written content
+            </Text>
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={styles.fieldLabel}>🏷️ UI Text Color</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>🏷️ UI Text Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
               <View style={[styles.colorSwatch, { backgroundColor: '#374151' }]} />
-              <View style={[styles.inputWrap, { flex: 1 }]}>
-                <TextInput placeholder="#374151" placeholderTextColor={COLORS.muted} style={styles.input} />
+              <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
+                <TextInput
+                  placeholder="#374151"
+                  placeholderTextColor={themed.muted}
+                  style={[styles.input, { color: themed.text }]}
+                />
               </View>
             </View>
-            <Text style={styles.fieldHelper}>Color for labels, headings, stats, and UI elements</Text>
+            <Text style={[styles.fieldHelper, { color: themed.muted }]}>
+              Color for labels, headings, stats, and UI elements
+            </Text>
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={styles.fieldLabel}>🔗 Link Color</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>🔗 Link Color</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <View style={[styles.colorSwatch, { backgroundColor: COLORS.blue600 }]} />
-              <View style={[styles.inputWrap, { flex: 1 }]}>
-                <TextInput placeholder="#3B82F6" placeholderTextColor={COLORS.muted} style={styles.input} />
+              <View style={[styles.colorSwatch, { backgroundColor: themed.blue600 }]} />
+              <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
+                <TextInput
+                  placeholder="#3B82F6"
+                  placeholderTextColor={themed.muted}
+                  style={[styles.input, { color: themed.text }]}
+                />
               </View>
             </View>
-            <Text style={styles.fieldHelper}>Color for clickable links in your profile</Text>
+            <Text style={[styles.fieldHelper, { color: themed.muted }]}>Color for clickable links in your profile</Text>
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <Text style={styles.fieldLabel}>✨ Accent Color (Highlights)</Text>
+            <Text style={[styles.fieldLabel, { color: themed.text }]}>✨ Accent Color (Highlights)</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <View style={[styles.colorSwatch, { backgroundColor: COLORS.blue600 }]} />
-              <View style={[styles.inputWrap, { flex: 1 }]}>
-                <TextInput placeholder="#3B82F6" placeholderTextColor={COLORS.muted} style={styles.input} />
+              <View style={[styles.colorSwatch, { backgroundColor: themed.blue600 }]} />
+              <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
+                <TextInput
+                  placeholder="#3B82F6"
+                  placeholderTextColor={themed.muted}
+                  style={[styles.input, { color: themed.text }]}
+                />
               </View>
             </View>
-            <Text style={styles.fieldHelper}>Used for highlights, badges, and special elements</Text>
+            <Text style={[styles.fieldHelper, { color: themed.muted }]}>
+              Used for highlights, badges, and special elements
+            </Text>
           </View>
 
           <View style={[styles.noticeBox, { marginTop: 14 }]}>
-            <Text style={styles.noticeTitle}>🎨 Quick Color Presets</Text>
+            <Text style={[styles.noticeTitle, { color: themed.text }]}>🎨 Quick Color Presets</Text>
             <View style={styles.presetGrid}>
               <Button label="💙 Classic Blue" disabled />
               <Button label="💜 Purple Dream" disabled />
@@ -886,27 +983,27 @@ export default function SettingsProfileScreen() {
           </View>
         </Card>
 
-        <Card title="Links Section" icon={<Ionicons name="link-outline" size={18} color={COLORS.blue600} />}>
+        <Card title="Links Section" icon={<Ionicons name="link-outline" size={18} color={themed.blue600} />}>
           <Field label="Section Title" placeholder="My Links" helper='Examples: "My Links", "Follow Me", "My Platforms", "Sponsors"' />
         </Card>
 
         <Card
           title="Display Preferences"
-          icon={<Ionicons name="eye-outline" size={18} color={COLORS.blue600} />}
+          icon={<Ionicons name="eye-outline" size={18} color={themed.blue600} />}
         >
           <View style={styles.toggleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>Links-Only Profile (Hide Streaming Stats)</Text>
-              <Text style={styles.fieldHelper}>
+              <Text style={[styles.fieldLabel, { color: themed.text }]}>Links-Only Profile (Hide Streaming Stats)</Text>
+              <Text style={[styles.fieldHelper, { color: themed.muted }]}>
                 Hide streaming stats, top supporters, and top streamers widgets. Your profile will only show your links, social media, and bio.
               </Text>
             </View>
-            <Switch value={false} disabled trackColor={{ false: COLORS.muted2, true: COLORS.blue600 }} />
+            <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />
           </View>
         </Card>
 
-        <View style={styles.previewNote}>
-          <Text style={styles.previewNoteText}>
+        <View style={[styles.previewNote, { backgroundColor: themed.infoCardBg, borderColor: themed.infoCardBorder }]}>
+          <Text style={[styles.previewNoteText, { color: themed.text }]}>
             💡 <Text style={{ fontWeight: '800' }}>Preview your changes:</Text> Visit your profile page after saving to see how it looks!
           </Text>
         </View>
@@ -919,7 +1016,7 @@ export default function SettingsProfileScreen() {
         <Card
           title="Social Media"
           subtitle="Add your social media usernames (without @). These will appear as icons on your profile."
-          icon={<Ionicons name="share-social-outline" size={18} color={COLORS.blue600} />}
+          icon={<Ionicons name="share-social-outline" size={18} color={themed.blue600} />}
         >
           <View style={styles.twoColInputs}>
             <Field label="Instagram" placeholder="username" />
@@ -938,9 +1035,9 @@ export default function SettingsProfileScreen() {
         </Card>
 
         {/* Pinned Post */}
-        <Card title="Pinned Post" icon={<Ionicons name="pin-outline" size={18} color={COLORS.blue600} />}>
-          <View style={styles.pinnedPreview}>
-            <Text style={styles.smallMuted}>Pinned post preview (image/video)</Text>
+        <Card title="Pinned Post" icon={<Ionicons name="pin-outline" size={18} color={themed.blue600} />}>
+          <View style={[styles.pinnedPreview, { backgroundColor: themed.card2, borderColor: themed.border }]}>
+            <Text style={[styles.smallMuted, { color: themed.muted }]}>Pinned post preview (image/video)</Text>
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             <Button label="Upload Photo/Video" iconName="cloud-upload-outline" tone="primary" disabled />
@@ -961,7 +1058,7 @@ export default function SettingsProfileScreen() {
         </Card>
 
         {/* Bottom Save Bar (web sticky) */}
-        <View style={styles.saveBar}>
+        <View style={[styles.saveBar, { backgroundColor: themed.infoCardBg, borderColor: themed.infoCardBorder }]}>
           <Button
             label={saving ? 'Saving…' : 'Save All Changes'}
             tone="primary"

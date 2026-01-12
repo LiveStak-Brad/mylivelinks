@@ -95,115 +95,121 @@ export function SettingsSheet({
 
   return (
     <SheetContainer visible={visible} onClose={onClose} title="Stream Settings">
-      {/* Mute mic */}
-      <View style={styles.row}>
-        <Ionicons name="mic-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Mute mic</Text>
-        <Switch value={micMuted} onValueChange={(v) => onSetMicMuted?.(v)} />
-      </View>
-
-      {/* Disable cam */}
-      <View style={styles.row}>
-        <Ionicons name="videocam-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Disable cam</Text>
-        <Switch value={cameraDisabled} onValueChange={(v) => onSetCameraDisabled?.(v)} />
-      </View>
-
-      {/* Switch camera */}
-      <Pressable style={styles.row} onPress={onFlipCamera}>
-        <Ionicons name="camera-reverse-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Switch camera</Text>
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
-      </Pressable>
-
-      {/* Mirror camera */}
-      <View style={styles.row}>
-        <Ionicons name="swap-horizontal-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Mirror camera</Text>
-        <Switch value={!!options.mirrorCamera} onValueChange={(v) => updateOptions({ mirrorCamera: v })} />
-      </View>
-
-      {/* Allow guest requests */}
-      <View style={styles.row}>
-        <Ionicons name="people-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Allow guest requests</Text>
-        <Switch value={!!options.allowGuestRequests} onValueChange={(v) => updateOptions({ allowGuestRequests: v })} />
-      </View>
-
-      {/* Muted words */}
-      <Text style={styles.sectionLabel}>Muted words</Text>
-      <View style={styles.inputRow}>
-        <TextInput
-          value={newMutedWord}
-          onChangeText={setNewMutedWord}
-          placeholder="Add word"
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="done"
-          onSubmitEditing={addMutedWord}
-        />
-        <Pressable style={styles.addButton} onPress={addMutedWord}>
-          <Ionicons name="add" size={18} color="#FFFFFF" />
-        </Pressable>
-      </View>
-      <View style={styles.chipWrap}>
-        {(options.mutedWords || []).map((w) => (
-          <Pressable key={w} onPress={() => removeMutedWord(w)} style={styles.chip}>
-            <Text style={styles.chipText}>{w}</Text>
-            <Ionicons name="close" size={14} color="rgba(255,255,255,0.8)" />
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Moderators */}
-      <Text style={styles.sectionLabel}>Moderators</Text>
-      <View style={styles.inputRow}>
-        <TextInput
-          value={newModerator}
-          onChangeText={setNewModerator}
-          placeholder="Add @username"
-          placeholderTextColor="rgba(255,255,255,0.35)"
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="done"
-          onSubmitEditing={addModerator}
-        />
-        <Pressable style={styles.addButton} onPress={addModerator}>
-          <Ionicons name="add" size={18} color="#FFFFFF" />
-        </Pressable>
-      </View>
-      <View style={styles.chipWrap}>
-        {(options.moderators || []).map((u) => (
-          <Pressable key={u} onPress={() => removeModerator(u)} style={styles.chip}>
-            <Text style={styles.chipText}>@{u}</Text>
-            <Ionicons name="close" size={14} color="rgba(255,255,255,0.8)" />
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Merge chat */}
-      <View style={[styles.row, { opacity: 0.6 }]}>
-        <Ionicons name="git-merge-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Merge chat</Text>
-        <View style={styles.valuePill}>
-          <Text style={styles.valuePillText}>Coming soon</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 28 }}
+      >
+        {/* Mute mic */}
+        <View style={styles.row}>
+          <Ionicons name="mic-outline" size={22} color="#FFFFFF" />
+          <Text style={styles.rowText}>Mute mic</Text>
+          <Switch value={micMuted} onValueChange={(v) => onSetMicMuted?.(v)} />
         </View>
-      </View>
 
-      {/* Chat size */}
-      <Pressable style={styles.row} onPress={cycleChatSize}>
-        <Ionicons name="text-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Chat size</Text>
-        <View style={styles.valuePill}>
-          <Text style={styles.valuePillText}>
-            {options.chatSize === 'small' ? 'Small' : options.chatSize === 'large' ? 'Large' : 'Medium'}
-          </Text>
-          <Ionicons name="sync" size={14} color="rgba(255,255,255,0.7)" />
+        {/* Disable cam */}
+        <View style={styles.row}>
+          <Ionicons name="videocam-outline" size={22} color="#FFFFFF" />
+          <Text style={styles.rowText}>Disable cam</Text>
+          <Switch value={cameraDisabled} onValueChange={(v) => onSetCameraDisabled?.(v)} />
         </View>
-      </Pressable>
+
+        {/* Switch camera */}
+        <Pressable style={styles.row} onPress={onFlipCamera}>
+          <Ionicons name="camera-reverse-outline" size={22} color="#FFFFFF" />
+          <Text style={styles.rowText}>Switch camera</Text>
+          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
+        </Pressable>
+
+        {/* Mirror camera */}
+        <View style={styles.row}>
+          <Ionicons name="swap-horizontal-outline" size={22} color="#FFFFFF" />
+          <Text style={styles.rowText}>Mirror camera</Text>
+          <Switch value={!!options.mirrorCamera} onValueChange={(v) => updateOptions({ mirrorCamera: v })} />
+        </View>
+
+        {/* Allow guest requests */}
+        <View style={styles.row}>
+          <Ionicons name="people-outline" size={22} color="#FFFFFF" />
+          <Text style={styles.rowText}>Allow guest requests</Text>
+          <Switch value={!!options.allowGuestRequests} onValueChange={(v) => updateOptions({ allowGuestRequests: v })} />
+        </View>
+
+        {/* Muted words */}
+        <Text style={styles.sectionLabel}>Muted words</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            value={newMutedWord}
+            onChangeText={setNewMutedWord}
+            placeholder="Add word"
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            style={styles.input}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={addMutedWord}
+          />
+          <Pressable style={styles.addButton} onPress={addMutedWord}>
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+        <View style={styles.chipWrap}>
+          {(options.mutedWords || []).map((w) => (
+            <Pressable key={w} onPress={() => removeMutedWord(w)} style={styles.chip}>
+              <Text style={styles.chipText}>{w}</Text>
+              <Ionicons name="close" size={14} color="rgba(255,255,255,0.8)" />
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Moderators */}
+        <Text style={styles.sectionLabel}>Moderators</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            value={newModerator}
+            onChangeText={setNewModerator}
+            placeholder="Add @username"
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            style={styles.input}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={addModerator}
+          />
+          <Pressable style={styles.addButton} onPress={addModerator}>
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+          </Pressable>
+        </View>
+        <View style={styles.chipWrap}>
+          {(options.moderators || []).map((u) => (
+            <Pressable key={u} onPress={() => removeModerator(u)} style={styles.chip}>
+              <Text style={styles.chipText}>@{u}</Text>
+              <Ionicons name="close" size={14} color="rgba(255,255,255,0.8)" />
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Merge chat */}
+        <View style={[styles.row, { opacity: 0.6 }]}>
+          <Ionicons name="git-merge-outline" size={22} color="#FFFFFF" />
+          <Text style={styles.rowText}>Merge chat</Text>
+          <View style={styles.valuePill}>
+            <Text style={styles.valuePillText}>Coming soon</Text>
+          </View>
+        </View>
+
+        {/* Chat size */}
+        <Pressable style={styles.row} onPress={cycleChatSize}>
+          <Ionicons name="text-outline" size={22} color="#FFFFFF" />
+          <Text style={styles.rowText}>Chat size</Text>
+          <View style={styles.valuePill}>
+            <Text style={styles.valuePillText}>
+              {options.chatSize === 'small' ? 'Small' : options.chatSize === 'large' ? 'Large' : 'Medium'}
+            </Text>
+            <Ionicons name="sync" size={14} color="rgba(255,255,255,0.7)" />
+          </View>
+        </Pressable>
+      </ScrollView>
     </SheetContainer>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -66,6 +66,9 @@ export interface SoloHostOverlayProps {
   onSetMicMuted?: (next: boolean) => void;
   cameraDisabled?: boolean;
   onSetCameraDisabled?: (next: boolean) => void;
+
+  // Optional: let host screen mirror/persist options and apply mirror to VideoView immediately
+  onHostLiveOptionsChange?: (next: HostLiveOptions) => void;
   
   // Handlers (placeholder)
   onEndStream: () => void;
@@ -94,6 +97,7 @@ export default function SoloHostOverlay({
   onSetMicMuted,
   cameraDisabled,
   onSetCameraDisabled,
+  onHostLiveOptionsChange,
   onEndStream,
   onShare,
   onFlipCamera,
@@ -140,6 +144,7 @@ export default function SoloHostOverlay({
   const updateHostOptions = (next: HostLiveOptions) => {
     setHostOptions(next);
     void saveHostLiveOptions(storageProfileId, next);
+    onHostLiveOptionsChange?.(next);
   };
   
   // Sheet visibility states
@@ -283,7 +288,13 @@ export default function SoloHostOverlay({
         <HostControlsBar
           onBattle={() => setShowBattle(true)}
           onCoHost={() => setShowCoHost(true)}
-          onGuests={() => setShowGuests(true)}
+          onGuests={() => {
+            if (!hostOptions.allowGuestRequests) {
+              Alert.alert('Guest requests disabled', 'Enable “Allow guest requests” in Settings to accept guests.');
+              return;
+            }
+            setShowGuests(true);
+          }}
           onSettings={() => setShowSettings(true)}
           onFilters={() => setShowFilters(true)}
         />

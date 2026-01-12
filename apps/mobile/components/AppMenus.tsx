@@ -2,9 +2,11 @@ import React, { useMemo } from 'react';
 import SlideMenu, { SlideMenuItem } from './SlideMenu';
 import { useMenus } from '../state/MenusContext';
 import { navTo, navToTab } from '../navigation/navigationRef';
+import { useTheme } from '../theme/useTheme';
 
 export default function AppMenus() {
   const menus = useMenus();
+  const { mode, setMode } = useTheme();
 
   const leftItems = useMemo<SlideMenuItem[]>(
     () => [
@@ -21,8 +23,15 @@ export default function AppMenus() {
       { key: 'help', label: 'Help & Safety', onPress: () => navTo('HelpSafetyScreen') },
       { key: 'terms', label: 'Terms', onPress: () => navTo('TermsScreen') },
       { key: 'privacy', label: 'Privacy', onPress: () => navTo('PrivacyScreen') },
+      { key: 'appearance-section', label: 'Appearance', type: 'section' },
+      {
+        key: 'appearance-toggle',
+        label: 'Theme',
+        rightIconName: mode === 'dark' ? 'moon-outline' : 'sunny-outline',
+        onPress: () => setMode(mode === 'dark' ? 'light' : 'dark'),
+      },
     ],
-    []
+    [mode, setMode]
   );
 
   const rightItems = useMemo<SlideMenuItem[]>(

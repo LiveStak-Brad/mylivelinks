@@ -13,15 +13,28 @@ type NativeVideoFiltersModule = {
 };
 
 const Native = NativeModules.MLLVideoFilters as NativeVideoFiltersModule | undefined;
+let warnedMissing = false;
 
 export function installVideoFilters() {
   // Safe no-op if module isn't linked yet (dev builds will link it once native is added)
-  if (!Native?.install) return;
+  if (!Native?.install) {
+    if (!warnedMissing) {
+      warnedMissing = true;
+      console.warn('[mll-video-filters] Native module MLLVideoFilters is missing. install() is a no-op.');
+    }
+    return;
+  }
   Native.install();
 }
 
 export function setFilterParams(params: FilterParams) {
-  if (!Native?.setFilterParams) return;
+  if (!Native?.setFilterParams) {
+    if (!warnedMissing) {
+      warnedMissing = true;
+      console.warn('[mll-video-filters] Native module MLLVideoFilters is missing. setFilterParams() is a no-op.');
+    }
+    return;
+  }
   Native.setFilterParams({
     brightness: params.brightness,
     contrast: params.contrast,

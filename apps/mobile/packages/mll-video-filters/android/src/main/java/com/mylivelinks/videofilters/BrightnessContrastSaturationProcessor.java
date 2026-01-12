@@ -23,12 +23,21 @@ public class BrightnessContrastSaturationProcessor implements VideoFrameProcesso
 
   private byte[] yTemp;
   private int yTempSize = 0;
+  private byte[] yOrig;
+  private int yOrigSize = 0;
   private long lastLogMs = 0;
 
   private void ensureYTemp(int size) {
     if (yTemp == null || yTempSize != size) {
       yTemp = new byte[size];
       yTempSize = size;
+    }
+  }
+
+  private void ensureYOrig(int size) {
+    if (yOrig == null || yOrigSize != size) {
+      yOrig = new byte[size];
+      yOrigSize = size;
     }
   }
 
@@ -70,17 +79,45 @@ public class BrightnessContrastSaturationProcessor implements VideoFrameProcesso
     yPlane.position(0);
   }
 
+  private void blendY(java.nio.ByteBuffer yPlane, int width, int height, int stride, float amount) {
+    // Blend blurred result (currently in yPlane) with the original Y stored in yOrig.
+    // amount: 0..1 (higher = smoother/softer)
+    final int size = stride * height;
+    if (yOrig == null || yOrigSize != size) return;
+    final int a = Math.max(0, Math.min(255, Math.round(amount * 255f)));
+    final int invA = 255 - a;
+    for (int row = 0; row < height; row++) {
+      final int rowOff = row * stride;
+      for (int col = 0; col < width; col++) {
+        final int idx = rowOff + col;
+        final int orig = yOrig[idx] & 0xFF;
+        final int blur = yPlane.get(idx) & 0xFF;
+        final int v = (orig * invA + blur * a + 127) / 255;
+        yPlane.put(idx, (byte) v);
+      }
+    }
+  }
+
   @Override
   public VideoFrame process(VideoFrame frame, SurfaceTextureHelper textureHelper) {
-    final VideoFrame.Buffer buffer = frame.getBuffer();
-    final I420Buffer i420 = buffer.toI420();
-    final int width = i420.getWidth();
-    final int height = i420.getHeight();
-
     final float brightness = FilterParams.brightness;
     final float contrast = FilterParams.contrast;
     final float saturation = FilterParams.saturation;
     final int softSkinLevel = FilterParams.softSkinLevel;
+
+    // Identity bypass: if user is effectively "off", return original frame untouched.
+    // This avoids unnecessary CPU work and prevents subtle color conversion artifacts.
+    if (softSkinLevel == 0 &&
+      Math.abs(brightness - 1.0f) < 0.0001f &&
+      Math.abs(contrast - 1.0f) < 0.0001f &&
+      Math.abs(saturation - 1.0f) < 0.0001f) {
+      return frame;
+    }
+
+    final VideoFrame.Buffer buffer = frame.getBuffer();
+    final I420Buffer i420 = buffer.toI420();
+    final int width = i420.getWidth();
+    final int height = i420.getHeight();
 
     // Throttled runtime proof that processor is active (every ~2s)
     final long nowMs = android.os.SystemClock.elapsedRealtime();
@@ -111,14 +148,21 @@ public class BrightnessContrastSaturationProcessor implements VideoFrameProcesso
       }
     }
 
-    // Optional global smoothing on luma after B/C is applied
-    if (softSkinLevel == 1) {
+    // Optional global smoothing on luma after B/C is applied.
+    // To avoid "foreground color bleed" artifacts, we blur lightly and then blend with the original.
+    if (softSkinLevel > 0) {
+      final int size = yStrideOut * height;
+      ensureYOrig(size);
+      // Snapshot original (post B/C) luma.
+      yOut.position(0);
+      yOut.get(yOrig, 0, size);
+      yOut.position(0);
+
+      // Blur pass (keep it small and stable)
       softSkinPass(yOut, width, height, yStrideOut);
-    } else if (softSkinLevel >= 2) {
-      // Medium = three passes of the very mild filter (still small radius; more visible)
-      softSkinPass(yOut, width, height, yStrideOut);
-      softSkinPass(yOut, width, height, yStrideOut);
-      softSkinPass(yOut, width, height, yStrideOut);
+
+      final float amount = (softSkinLevel == 1) ? 0.35f : 0.55f;
+      blendY(yOut, width, height, yStrideOut, amount);
     }
 
     // U/V planes (4:2:0)

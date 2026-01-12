@@ -345,31 +345,27 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
         if (p?.id) isLiveById.set(String(p.id), Boolean(p.is_live ?? false));
       }
 
-      // Need to fetch last message read status for each conversation
-      // For now, we'll query to check if the last message was sent by us and if it was read
+      // Avoid N+1 queries: derive last-message "sentByMe/read" from one batch query of recent messages.
       const lastMessageStatusMap = new Map<string, { sentByMe: boolean; read: boolean }>();
-      
-      // Batch query to get the last message info for all conversations
-      for (const r of rows) {
-        const otherId = String(r.other_user_id);
-        try {
-          const { data: lastMsg } = await supabase
-            .from('instant_messages')
-            .select('sender_id, read_at')
-            .or(`and(sender_id.eq.${currentUserId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${currentUserId})`)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          
-          if (lastMsg) {
-            const sentByMe = String(lastMsg.sender_id) === currentUserId;
-            lastMessageStatusMap.set(otherId, {
-              sentByMe,
-              read: sentByMe && lastMsg.read_at != null,
-            });
-          }
-        } catch {
-          // Ignore errors for individual lookups
+      if (otherUserIds.length > 0) {
+        const { data: lastMsgs } = await supabase
+          .from('instant_messages')
+          .select('sender_id, recipient_id, read_at, created_at')
+          .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        const rows2 = Array.isArray(lastMsgs) ? (lastMsgs as any[]) : [];
+        for (const m of rows2) {
+          const s = String(m?.sender_id ?? '');
+          const r = String(m?.recipient_id ?? '');
+          if (!s || !r) continue;
+          const otherId = s === currentUserId ? r : r === currentUserId ? s : null;
+          if (!otherId) continue;
+          if (lastMessageStatusMap.has(otherId)) continue; // first (newest) wins due to DESC order
+          const sentByMe = s === currentUserId;
+          lastMessageStatusMap.set(otherId, { sentByMe, read: sentByMe && m?.read_at != null });
+          if (lastMessageStatusMap.size >= otherUserIds.length) break;
         }
       }
 

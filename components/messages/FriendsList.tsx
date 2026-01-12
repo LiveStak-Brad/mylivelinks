@@ -5,14 +5,13 @@ import { Users, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { useMessages } from './MessagesContext';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
-import { usePresence } from '@/contexts/PresenceContext';
-import { PresenceDot } from '@/components/presence/PresenceDot';
 
 interface Friend {
   id: string;
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  is_online: boolean;
   is_live: boolean;
 }
 
@@ -26,7 +25,6 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const { currentUserId, openConversationWith } = useMessages();
-  const { refresh: refreshPresence, isOnline } = usePresence();
   const supabase = createClient();
 
   const loadFriends = useCallback(async () => {
@@ -37,78 +35,45 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
     }
 
     try {
-      // Get mutual follows (friends = people you follow who also follow you back)
-      const { data: followingData } = await supabase
-        .from('follows')
-        .select('followee_id')
-        .eq('follower_id', currentUserId);
+      // Fast path: use RPC (mutual follows) and then compute online status in one query.
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_friends_list', {
+        p_profile_id: currentUserId,
+        p_limit: 200,
+        p_offset: 0,
+      });
 
-      const followingIds = (followingData || []).map((f: { followee_id: string }) => f.followee_id);
-
-      if (followingIds.length === 0) {
+      if (rpcError) {
+        console.error('[FriendsList] get_friends_list RPC error:', rpcError);
         setFriends([]);
-        setLoading(false);
         return;
       }
 
-      // Get people who follow you back from the ones you follow
-      const { data: followersData } = await supabase
-        .from('follows')
-        .select('follower_id')
-        .eq('followee_id', currentUserId)
-        .in('follower_id', followingIds);
+      const friendsRaw = (rpcData as any)?.friends ?? [];
+      const friendIds: string[] = Array.isArray(friendsRaw)
+        ? friendsRaw.map((f: any) => String(f?.id || '')).filter(Boolean)
+        : [];
 
-      const mutualFriendIds = (followersData || []).map((f: { follower_id: string }) => f.follower_id);
+      // Check online status (last_seen_at within 60s)
+      const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+      const { data: onlineData } = friendIds.length
+        ? await supabase.from('room_presence').select('profile_id').in('profile_id', friendIds).gt('last_seen_at', cutoff)
+        : { data: [] as any[] };
 
-      if (mutualFriendIds.length === 0) {
-        // If no mutual friends, show people you follow instead
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, username, display_name, avatar_url, is_live')
-          .in('id', followingIds.slice(0, 20));
+      const onlineSet = new Set((onlineData || []).map((o: { profile_id: string }) => String(o.profile_id)));
 
-        const friendsList: Friend[] = (profiles || []).map((p: any) => ({
-          id: p.id,
-          username: p.username,
-          display_name: p.display_name,
-          avatar_url: p.avatar_url,
-          is_live: p.is_live === true,
-        }));
-
-        // Sort: online first (from PresenceContext), then offline, both alphabetically
-        friendsList.sort((a, b) => {
-          const aOnline = isOnline(a.id);
-          const bOnline = isOnline(b.id);
-          if (aOnline && !bOnline) return -1;
-          if (!aOnline && bOnline) return 1;
-          return (a.display_name || a.username).localeCompare(b.display_name || b.username);
-        });
-
-        setFriends(friendsList);
-        setLoading(false);
-        return;
-      }
-
-      // Get friend profiles
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, username, display_name, avatar_url, is_live')
-        .in('id', mutualFriendIds);
-
-      const friendsList: Friend[] = (profiles || []).map((p: any) => ({
-        id: p.id,
-        username: p.username,
-        display_name: p.display_name,
-        avatar_url: p.avatar_url,
+      const friendsList: Friend[] = (Array.isArray(friendsRaw) ? friendsRaw : []).map((p: any) => ({
+        id: String(p.id),
+        username: String(p.username ?? ''),
+        display_name: p.display_name ?? null,
+        avatar_url: p.avatar_url ?? null,
+        is_online: onlineSet.has(String(p.id)),
         is_live: p.is_live === true,
       }));
 
-      // Sort: online first (from PresenceContext), then offline, both alphabetically
+      // Sort: online first, then alphabetical (display_name || username).
       friendsList.sort((a, b) => {
-        const aOnline = isOnline(a.id);
-        const bOnline = isOnline(b.id);
-        if (aOnline && !bOnline) return -1;
-        if (!aOnline && bOnline) return 1;
+        if (a.is_online && !b.is_online) return -1;
+        if (!a.is_online && b.is_online) return 1;
         return (a.display_name || a.username).localeCompare(b.display_name || b.username);
       });
 
@@ -118,12 +83,15 @@ export default function FriendsList({ onSelectFriend, layout = 'horizontal' }: F
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, supabase, isOnline]);
+  }, [currentUserId, supabase]);
 
   useEffect(() => {
     loadFriends();
-    refreshPresence();
-  }, [loadFriends, refreshPresence]);
+
+    // Refresh every 30 seconds for online status
+    const interval = setInterval(loadFriends, 30000);
+    return () => clearInterval(interval);
+  }, [loadFriends]);
 
   const handleFriendClick = (friend: Friend) => {
     void (async () => {
@@ -308,7 +276,9 @@ function FriendAvatar({ friend, onClick }: { friend: Friend; onClick: () => void
         )}
 
         {/* Online indicator (purple dot) - only show if not live */}
-        <PresenceDot profileId={friend.id} isLive={friend.is_live} size="lg" />
+        {!friend.is_live && friend.is_online && (
+          <div className="absolute bottom-0 right-0 w-4 h-4 bg-purple-500 rounded-full border-2 border-card shadow-lg shadow-purple-500/50" />
+        )}
       </div>
 
       {/* Name */}
@@ -346,7 +316,9 @@ function FriendRow({ friend, onClick }: { friend: Friend; onClick: () => void })
         </div>
 
         {/* Online indicator */}
-        <PresenceDot profileId={friend.id} isLive={friend.is_live} size="md" />
+        {!friend.is_live && friend.is_online && (
+          <div className="absolute bottom-0 right-0 w-3 h-3 bg-purple-500 rounded-full border-2 border-card" />
+        )}
       </div>
 
       {/* Name and status */}
@@ -356,6 +328,9 @@ function FriendRow({ friend, onClick }: { friend: Friend; onClick: () => void })
         </p>
         {friend.is_live && (
           <span className="text-[10px] text-red-500 font-semibold uppercase">● Live</span>
+        )}
+        {!friend.is_live && friend.is_online && (
+          <span className="text-[10px] text-purple-400">Online</span>
         )}
       </div>
     </button>
