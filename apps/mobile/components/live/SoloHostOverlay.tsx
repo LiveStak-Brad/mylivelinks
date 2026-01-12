@@ -203,14 +203,14 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
-  // Bottom gradient: single overlay, darkest at bottom edge
+  // Bottom gradient: only covers button area, darkest at bottom edge
   bottomGradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 160,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    height: 80,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 
   // Top bar (web parity: left avatar+name, right viewer+X)

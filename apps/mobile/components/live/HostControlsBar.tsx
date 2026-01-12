@@ -52,27 +52,25 @@ export default function HostControlsBar({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 0,
+    paddingBottom: 0,
   },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    backdropFilter: 'blur(10)',
-    borderRadius: 28,
-    paddingHorizontal: 16,
+    // No background - buttons float on gradient
+    paddingHorizontal: 20,
     paddingVertical: 8,
   },
   button: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonPressed: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
 });
