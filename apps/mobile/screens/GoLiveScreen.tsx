@@ -8,6 +8,45 @@ import { createLocalVideoTrack, createLocalAudioTrack, LocalVideoTrack, LocalAud
 import { useAuth } from '../state/AuthContext';
 import { fetchMobileToken, generateSoloRoomName, startLiveStreamRecord, endLiveStreamRecord } from '../lib/livekit';
 
+import SoloHostOverlay from '../components/live/SoloHostOverlay';
+import type { ChatMessage, ChatFontColor } from '../components/live/ChatOverlay';
+import type { TopGifter } from '../components/live/TopGifterBubbles';
+
+// ============================================================================
+// MOCK DATA - Top gifters and chat messages for overlay (UI-only)
+// ============================================================================
+
+const MOCK_TOP_GIFTERS: TopGifter[] = [
+  { id: '1', username: 'BigSpender', avatarUrl: 'https://i.pravatar.cc/100?u=bigspender', totalCoins: 5000 },
+  { id: '2', username: 'GenGifter', avatarUrl: 'https://i.pravatar.cc/100?u=gengifter', totalCoins: 2500 },
+  { id: '3', username: 'CoinKing', avatarUrl: 'https://i.pravatar.cc/100?u=coinking', totalCoins: 1200 },
+];
+
+const MOCK_CHAT_FONT_COLOR: ChatFontColor = '#FFFFFF';
+
+const MOCK_MESSAGES: ChatMessage[] = [
+  { id: '1', type: 'system', username: 'System', text: 'Stream started' },
+  { id: '2', type: 'follow', username: 'NewFollower123', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=newfollower123' },
+  { id: '3', type: 'chat', username: 'CoolViewer', text: 'Hey! Great stream!', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
+  { id: '4', type: 'chat', username: 'MusicFan', text: 'Love this vibe 🔥', avatarUrl: 'https://i.pravatar.cc/100?u=musicfan' },
+  { id: '5', type: 'gift', username: 'BigSpender', text: 'sent a Rose', giftAmount: 100, avatarUrl: 'https://i.pravatar.cc/100?u=bigspender' },
+  { id: '6', type: 'chat', username: 'RandomUser', text: 'First time here, this is awesome!', avatarUrl: 'https://i.pravatar.cc/100?u=randomuser' },
+  { id: '7', type: 'chat', username: 'NightOwl', text: 'What city are you in?', avatarUrl: 'https://i.pravatar.cc/100?u=nightowl' },
+  { id: '8', type: 'follow', username: 'StreamWatcher', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=streamwatcher' },
+  { id: '9', type: 'chat', username: 'CoolViewer', text: 'The quality is so good!', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
+  { id: '10', type: 'gift', username: 'GenGifter', text: 'sent a Diamond', giftAmount: 500, avatarUrl: 'https://i.pravatar.cc/100?u=gengifter' },
+  { id: '11', type: 'chat', username: 'MusicFan', text: 'Can you play some jazz?', avatarUrl: 'https://i.pravatar.cc/100?u=musicfan' },
+  { id: '12', type: 'chat', username: 'ChillMode', text: '👋👋👋', avatarUrl: 'https://i.pravatar.cc/100?u=chillmode' },
+  { id: '13', type: 'chat', username: 'ViewerX', text: 'How long have you been streaming?', avatarUrl: 'https://i.pravatar.cc/100?u=viewerx' },
+  { id: '14', type: 'gift', username: 'CoinKing', text: 'sent a Crown', giftAmount: 1000, avatarUrl: 'https://i.pravatar.cc/100?u=coinking' },
+  { id: '15', type: 'chat', username: 'NightOwl', text: 'This chat is so chill', avatarUrl: 'https://i.pravatar.cc/100?u=nightowl' },
+  { id: '16', type: 'follow', username: 'LateNightFan', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=latenightfan' },
+  { id: '17', type: 'chat', username: 'RandomUser', text: 'Followed! Keep it up!', avatarUrl: 'https://i.pravatar.cc/100?u=randomuser' },
+  { id: '18', type: 'chat', username: 'CoolViewer', text: 'The lighting is perfect', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
+  { id: '19', type: 'system', username: 'System', text: '100 viewers reached!' },
+  { id: '20', type: 'chat', username: 'ChillMode', text: 'Love this community', avatarUrl: 'https://i.pravatar.cc/100?u=chillmode' },
+];
+
 export default function GoLiveScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
@@ -303,38 +342,31 @@ export default function GoLiveScreen() {
           </View>
         )}
 
-        {/* Live indicator */}
-        {isLive && (
-          <View style={[styles.liveStatusBanner, { top: insets.top + 12 }]}>
-            <View style={styles.liveStatusContent}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveStatusText}>LIVE</Text>
-              <Text style={styles.viewerCountText}>{viewerCount} watching</Text>
-            </View>
-          </View>
-        )}
+        {/* Live indicator - OLD (now handled by SoloHostOverlay) */}
       </View>
 
-      {/* Top Controls */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable
-          onPress={handleClose}
-          style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}
-        >
-          <Ionicons name="close" size={24} color={COLORS.white} />
-        </Pressable>
-
-        <View style={styles.topSpacer} />
-
-        {videoTrack && (
+      {/* Top Controls - Only show when NOT live (overlay has its own) */}
+      {!isLive && (
+        <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
           <Pressable
-            onPress={handleFlipCamera}
+            onPress={handleClose}
             style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}
           >
-            <Ionicons name="camera-reverse-outline" size={22} color={COLORS.white} />
+            <Ionicons name="close" size={24} color={COLORS.white} />
           </Pressable>
-        )}
-      </View>
+
+          <View style={styles.topSpacer} />
+
+          {videoTrack && (
+            <Pressable
+              onPress={handleFlipCamera}
+              style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}
+            >
+              <Ionicons name="camera-reverse-outline" size={22} color={COLORS.white} />
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {/* Setup Modal - Hidden when live */}
       {!isLive && (
@@ -439,17 +471,22 @@ export default function GoLiveScreen() {
         </View>
       )}
 
-      {/* End Live Button - Shown when live */}
+      {/* Solo Host Overlay - Full UI when live (web parity) */}
       {isLive && (
-        <View style={[styles.endLiveContainer, { paddingBottom: insets.bottom + 16 }]}>
-          <Pressable
-            onPress={handleEndLive}
-            style={({ pressed }) => [styles.endLiveButton, pressed && { opacity: 0.8 }]}
-          >
-            <Ionicons name="stop-circle" size={20} color={COLORS.white} />
-            <Text style={styles.endLiveText}>End Live</Text>
-          </Pressable>
-        </View>
+        <SoloHostOverlay
+          hostName={user?.email?.split('@')[0] || 'Host'}
+          hostAvatarUrl={undefined}
+          title={streamTitle}
+          category={categories.find((c) => c.id === selectedCategoryId)?.label}
+          viewerCount={viewerCount}
+          topGifters={MOCK_TOP_GIFTERS}
+          messages={MOCK_MESSAGES}
+          isMuted={false}
+          isCameraFlipped={cameraFacing === 'environment'}
+          chatFontColor={MOCK_CHAT_FONT_COLOR}
+          onEndStream={handleEndLive}
+          onFlipCamera={handleFlipCamera}
+        />
       )}
     </View>
   );
