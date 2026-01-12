@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start', // Align to top so right side doesn't get pushed down
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     zIndex: 20,
