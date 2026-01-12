@@ -1,7 +1,10 @@
-import React from 'react';
-import { FlatList, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+
+import { loadLiveBrowseFilters, saveLiveBrowseFilters, type BrowseGenderFilter } from '../lib/liveBrowsePreferences';
+import { useAuth } from '../state/AuthContext';
 
 type MockStream = {
   id: string;
@@ -9,6 +12,8 @@ type MockStream = {
   title: string;
   viewers: string;
   badge: 'Trending' | 'Featured' | 'Sponsored';
+  category: (typeof CATEGORY_FILTERS)[number];
+  gender: Exclude<BrowseGenderFilter, 'All'>;
 };
 
 type MockRoom = {
@@ -21,9 +26,6 @@ const SPECIAL_FILTERS = ['Trending', 'Featured', 'Rooms', 'Battles'] as const;
 const CATEGORY_FILTERS = ['IRL', 'Music', 'Gaming', 'Comedy', 'Just Chatting'] as const;
 const GENDER_FILTERS = ['All', 'Men', 'Women'] as const;
 
-const SELECTED_SPECIAL_FILTER: (typeof SPECIAL_FILTERS)[number] = 'Trending';
-const SELECTED_GENDER_FILTER: (typeof GENDER_FILTERS)[number] = 'All';
-
 const MOCK_ROOMS: MockRoom[] = [
   { id: 'room-1', name: 'Just Chatting', viewers: '1.2K' },
   { id: 'room-2', name: 'Music', viewers: '842' },
@@ -33,19 +35,63 @@ const MOCK_ROOMS: MockRoom[] = [
 ];
 
 const MOCK_STREAMS: MockStream[] = [
-  { id: 's-1', name: 'Ava', title: 'Chill vibes', viewers: '123', badge: 'Trending' },
-  { id: 's-2', name: 'Miles', title: 'Late night chat', viewers: '987', badge: 'Featured' },
-  { id: 's-3', name: 'Nova', title: 'Ranked grind', viewers: '452', badge: 'Trending' },
-  { id: 's-4', name: 'Kai', title: 'Acoustic set', viewers: '1.1K', badge: 'Sponsored' },
-  { id: 's-5', name: 'Sage', title: 'IRL walk', viewers: '76', badge: 'Trending' },
-  { id: 's-6', name: 'Luna', title: 'Comedy bits', viewers: '321', badge: 'Featured' },
-  { id: 's-7', name: 'Jules', title: 'Just chatting', viewers: '2.4K', badge: 'Trending' },
-  { id: 's-8', name: 'Remy', title: 'Cozy gaming', viewers: '640', badge: 'Sponsored' },
-  { id: 's-9', name: 'Zoe', title: 'Music requests', viewers: '189', badge: 'Featured' },
-  { id: 's-10', name: 'Finn', title: 'Highlights', viewers: '555', badge: 'Trending' },
+  { id: 's-1', name: 'Ava', title: 'Chill vibes', viewers: '123', badge: 'Trending', category: 'Just Chatting', gender: 'Women' },
+  { id: 's-2', name: 'Miles', title: 'Late night chat', viewers: '987', badge: 'Featured', category: 'Just Chatting', gender: 'Men' },
+  { id: 's-3', name: 'Nova', title: 'Ranked grind', viewers: '452', badge: 'Trending', category: 'Gaming', gender: 'Women' },
+  { id: 's-4', name: 'Kai', title: 'Acoustic set', viewers: '1.1K', badge: 'Sponsored', category: 'Music', gender: 'Men' },
+  { id: 's-5', name: 'Sage', title: 'IRL walk', viewers: '76', badge: 'Trending', category: 'IRL', gender: 'Women' },
+  { id: 's-6', name: 'Luna', title: 'Comedy bits', viewers: '321', badge: 'Featured', category: 'Comedy', gender: 'Women' },
+  { id: 's-7', name: 'Jules', title: 'Just chatting', viewers: '2.4K', badge: 'Trending', category: 'Just Chatting', gender: 'Men' },
+  { id: 's-8', name: 'Remy', title: 'Cozy gaming', viewers: '640', badge: 'Sponsored', category: 'Gaming', gender: 'Men' },
+  { id: 's-9', name: 'Zoe', title: 'Music requests', viewers: '189', badge: 'Featured', category: 'Music', gender: 'Women' },
+  { id: 's-10', name: 'Finn', title: 'Highlights', viewers: '555', badge: 'Trending', category: 'Gaming', gender: 'Men' },
 ];
 
 export default function LiveTVScreen() {
+  const { user } = useAuth();
+  const profileId = user?.id ?? 'anon';
+
+  const [selectedSpecial, setSelectedSpecial] = useState<(typeof SPECIAL_FILTERS)[number]>('Trending');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedGender, setSelectedGender] = useState<BrowseGenderFilter>('All');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    loadLiveBrowseFilters('livetv', profileId).then((prefs) => {
+      if (!mounted) return;
+      if (SPECIAL_FILTERS.includes(prefs.special as any)) setSelectedSpecial(prefs.special as any);
+      setSelectedCategory(prefs.category || 'All');
+      setSelectedGender(prefs.gender);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [profileId]);
+
+  useEffect(() => {
+    saveLiveBrowseFilters('livetv', profileId, {
+      gender: selectedGender,
+      category: selectedCategory,
+      special: selectedSpecial,
+    });
+  }, [profileId, selectedCategory, selectedGender, selectedSpecial]);
+
+  const filteredStreams = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return MOCK_STREAMS.filter((s) => {
+      const matchesGender = selectedGender === 'All' ? true : s.gender === selectedGender;
+      const matchesCategory = selectedCategory === 'All' ? true : s.category === selectedCategory;
+
+      // Keep special filter behavior minimal but real for the labels that map to existing mock data.
+      const matchesSpecial =
+        selectedSpecial === 'Trending' ? s.badge === 'Trending' : selectedSpecial === 'Featured' ? s.badge === 'Featured' : true;
+
+      const matchesSearch = !q ? true : `${s.name} ${s.title}`.toLowerCase().includes(q);
+      return matchesGender && matchesCategory && matchesSpecial && matchesSearch;
+    });
+  }, [search, selectedCategory, selectedGender, selectedSpecial]);
+
   const renderStreamCard = ({ item }: { item: MockStream }) => {
     return (
       <View style={styles.streamCardOuter}>
@@ -91,7 +137,7 @@ export default function LiveTVScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <FlatList
-        data={MOCK_STREAMS}
+        data={filteredStreams}
         keyExtractor={(item) => item.id}
         numColumns={2}
         renderItem={renderStreamCard}
@@ -152,6 +198,8 @@ export default function LiveTVScreen() {
                   placeholder="Search..."
                   placeholderTextColor={COLORS.textSecondary}
                   style={styles.searchInput}
+                  value={search}
+                  onChangeText={setSearch}
                 />
               </View>
             </View>
@@ -163,13 +211,18 @@ export default function LiveTVScreen() {
                 contentContainerStyle={styles.specialFiltersRow}
               >
                 {SPECIAL_FILTERS.map((label) => {
-                  const selected = label === SELECTED_SPECIAL_FILTER;
+                  const selected = label === selectedSpecial;
                   return (
-                    <View key={label} style={[styles.filterPill, selected ? styles.filterPillSelected : styles.filterPillUnselected]}>
+                    <Pressable
+                      key={label}
+                      onPress={() => setSelectedSpecial(label)}
+                      style={[styles.filterPill, selected ? styles.filterPillSelected : styles.filterPillUnselected]}
+                      accessibilityRole="button"
+                    >
                       <Text style={[styles.filterPillText, selected ? styles.filterPillTextSelected : styles.filterPillTextUnselected]}>
                         {label}
                       </Text>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </ScrollView>
@@ -180,18 +233,20 @@ export default function LiveTVScreen() {
                 contentContainerStyle={styles.categoryFiltersRow}
               >
                 {CATEGORY_FILTERS.map((label) => {
-                  const selected = false;
+                  const selected = label === selectedCategory;
                   return (
-                    <View
+                    <Pressable
                       key={label}
+                      onPress={() => setSelectedCategory(selected ? 'All' : label)}
                       style={[styles.categoryChip, selected ? styles.categoryChipSelected : styles.categoryChipUnselected]}
+                      accessibilityRole="button"
                     >
                       <Text
                         style={[styles.categoryChipText, selected ? styles.categoryChipTextSelected : styles.categoryChipTextUnselected]}
                       >
                         {label}
                       </Text>
-                    </View>
+                    </Pressable>
                   );
                 })}
               </ScrollView>
@@ -199,18 +254,20 @@ export default function LiveTVScreen() {
               <View style={styles.genderRowOuter}>
                 <View style={styles.genderRow}>
                   {GENDER_FILTERS.map((label) => {
-                    const selected = label === SELECTED_GENDER_FILTER;
+                    const selected = label === selectedGender;
                     return (
-                      <View
+                      <Pressable
                         key={label}
+                        onPress={() => setSelectedGender(label)}
                         style={[styles.genderButton, selected ? styles.genderButtonSelected : styles.genderButtonUnselected]}
+                        accessibilityRole="button"
                       >
                         <Text
                           style={[styles.genderButtonText, selected ? styles.genderButtonTextSelected : styles.genderButtonTextUnselected]}
                         >
                           {label}
                         </Text>
-                      </View>
+                      </Pressable>
                     );
                   })}
                 </View>

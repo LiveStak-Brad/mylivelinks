@@ -1,38 +1,80 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
+import { loadLiveBrowseFilters, saveLiveBrowseFilters, type BrowseGenderFilter } from '../lib/liveBrowsePreferences';
+import { useAuth } from '../state/AuthContext';
+
 const SPECIAL_FILTERS = ['Trending', 'Featured', 'Rooms', 'Battles'] as const;
 const CATEGORY_FILTERS = ['IRL', 'Music', 'Gaming', 'Comedy', 'Just Chatting'] as const;
 const GENDER_FILTERS = ['All', 'Men', 'Women'] as const;
-
-const SELECTED_SPECIAL_FILTER: (typeof SPECIAL_FILTERS)[number] = 'Trending';
-const SELECTED_GENDER_FILTER: (typeof GENDER_FILTERS)[number] = 'All';
 
 type MockStream = {
   id: string;
   name: string;
   title: string;
   viewers: string;
+  category: (typeof CATEGORY_FILTERS)[number];
+  gender: Exclude<BrowseGenderFilter, 'All'>;
 };
 
 const MOCK_TRENDING_STREAMS: MockStream[] = [
-  { id: 't-1', name: 'Ava', title: 'Chill vibes', viewers: '2.4K' },
-  { id: 't-2', name: 'Jules', title: 'Just chatting', viewers: '1.8K' },
-  { id: 't-3', name: 'Nova', title: 'Ranked grind', viewers: '1.5K' },
-  { id: 't-4', name: 'Kai', title: 'Acoustic set', viewers: '1.1K' },
-  { id: 't-5', name: 'Miles', title: 'Late night chat', viewers: '987' },
-  { id: 't-6', name: 'Finn', title: 'Highlights', viewers: '842' },
+  { id: 't-1', name: 'Ava', title: 'Chill vibes', viewers: '2.4K', category: 'Just Chatting', gender: 'Women' },
+  { id: 't-2', name: 'Jules', title: 'Just chatting', viewers: '1.8K', category: 'Just Chatting', gender: 'Men' },
+  { id: 't-3', name: 'Nova', title: 'Ranked grind', viewers: '1.5K', category: 'Gaming', gender: 'Women' },
+  { id: 't-4', name: 'Kai', title: 'Acoustic set', viewers: '1.1K', category: 'Music', gender: 'Men' },
+  { id: 't-5', name: 'Miles', title: 'Late night chat', viewers: '987', category: 'IRL', gender: 'Men' },
+  { id: 't-6', name: 'Finn', title: 'Highlights', viewers: '842', category: 'Gaming', gender: 'Men' },
 ];
 
 export default function TrendingScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuth();
+  const profileId = user?.id ?? 'anon';
+
+  const [selectedSpecial, setSelectedSpecial] = useState<(typeof SPECIAL_FILTERS)[number]>('Trending');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedGender, setSelectedGender] = useState<BrowseGenderFilter>('All');
+  const [search, setSearch] = useState('');
 
   const navigateToLiveTV = () => {
     navigation.navigate('Tabs', { screen: 'LiveTV' });
   };
+
+  useEffect(() => {
+    let mounted = true;
+    loadLiveBrowseFilters('trending', profileId).then((prefs) => {
+      if (!mounted) return;
+      if (SPECIAL_FILTERS.includes(prefs.special as any)) setSelectedSpecial(prefs.special as any);
+      setSelectedCategory(prefs.category || 'All');
+      setSelectedGender(prefs.gender);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [profileId]);
+
+  useEffect(() => {
+    saveLiveBrowseFilters('trending', profileId, {
+      gender: selectedGender,
+      category: selectedCategory,
+      special: selectedSpecial,
+    });
+  }, [profileId, selectedCategory, selectedGender, selectedSpecial]);
+
+  const filteredStreams = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return MOCK_TRENDING_STREAMS.filter((s) => {
+      const matchesGender = selectedGender === 'All' ? true : s.gender === selectedGender;
+      const matchesCategory = selectedCategory === 'All' ? true : s.category === selectedCategory;
+      const matchesSearch = !q ? true : `${s.name} ${s.title}`.toLowerCase().includes(q);
+      // Special filter currently only affects selection UI; keep behavior stable while data stays mock.
+      const matchesSpecial = true;
+      return matchesGender && matchesCategory && matchesSearch && matchesSpecial;
+    });
+  }, [search, selectedCategory, selectedGender, selectedSpecial]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -52,6 +94,8 @@ export default function TrendingScreen() {
               placeholder="Search trending streams..."
               placeholderTextColor={COLORS.textSecondary}
               style={styles.searchInput}
+              value={search}
+              onChangeText={setSearch}
             />
           </View>
         </View>
@@ -63,13 +107,18 @@ export default function TrendingScreen() {
             contentContainerStyle={styles.specialFiltersRow}
           >
             {SPECIAL_FILTERS.map((label) => {
-              const selected = label === SELECTED_SPECIAL_FILTER;
+              const selected = label === selectedSpecial;
               return (
-                <View key={label} style={[styles.filterPill, selected ? styles.filterPillSelected : styles.filterPillUnselected]}>
+                <Pressable
+                  key={label}
+                  onPress={() => setSelectedSpecial(label)}
+                  style={[styles.filterPill, selected ? styles.filterPillSelected : styles.filterPillUnselected]}
+                  accessibilityRole="button"
+                >
                   <Text style={[styles.filterPillText, selected ? styles.filterPillTextSelected : styles.filterPillTextUnselected]}>
                     {label}
                   </Text>
-                </View>
+                </Pressable>
               );
             })}
           </ScrollView>
@@ -80,18 +129,20 @@ export default function TrendingScreen() {
             contentContainerStyle={styles.categoryFiltersRow}
           >
             {CATEGORY_FILTERS.map((label) => {
-              const selected = false;
+              const selected = label === selectedCategory;
               return (
-                <View
+                <Pressable
                   key={label}
+                  onPress={() => setSelectedCategory(selected ? 'All' : label)}
                   style={[styles.categoryChip, selected ? styles.categoryChipSelected : styles.categoryChipUnselected]}
+                  accessibilityRole="button"
                 >
                   <Text
                     style={[styles.categoryChipText, selected ? styles.categoryChipTextSelected : styles.categoryChipTextUnselected]}
                   >
                     {label}
                   </Text>
-                </View>
+                </Pressable>
               );
             })}
           </ScrollView>
@@ -99,18 +150,20 @@ export default function TrendingScreen() {
           <View style={styles.genderRowOuter}>
             <View style={styles.genderRow}>
               {GENDER_FILTERS.map((label) => {
-                const selected = label === SELECTED_GENDER_FILTER;
+                const selected = label === selectedGender;
                 return (
-                  <View
+                  <Pressable
                     key={label}
+                    onPress={() => setSelectedGender(label)}
                     style={[styles.genderButton, selected ? styles.genderButtonSelected : styles.genderButtonUnselected]}
+                    accessibilityRole="button"
                   >
                     <Text
                       style={[styles.genderButtonText, selected ? styles.genderButtonTextSelected : styles.genderButtonTextUnselected]}
                     >
                       {label}
                     </Text>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
@@ -124,7 +177,7 @@ export default function TrendingScreen() {
           </View>
 
           <View style={styles.streamsList}>
-            {MOCK_TRENDING_STREAMS.map((stream) => (
+            {filteredStreams.map((stream) => (
               <View key={stream.id} style={styles.streamCard}>
                 <View style={styles.streamThumb}>
                   <View style={styles.streamThumbInner}>
