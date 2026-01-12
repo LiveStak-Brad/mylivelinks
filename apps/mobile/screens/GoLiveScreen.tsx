@@ -1,12 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { VideoView } from '@livekit/react-native';
-import { createLocalVideoTrack, LocalVideoTrack, VideoPresets } from 'livekit-client';
+import { createLocalVideoTrack, createLocalAudioTrack, LocalVideoTrack, LocalAudioTrack, VideoPresets, Room, RoomEvent } from 'livekit-client';
 import { useAuth } from '../state/AuthContext';
-import { generateSoloRoomName } from '../lib/livekit';
+import { fetchMobileToken, generateSoloRoomName } from '../lib/livekit';
 
 export default function GoLiveScreen() {
   const insets = useSafeAreaInsets();
@@ -22,9 +22,17 @@ export default function GoLiveScreen() {
   const [cameraGranted, setCameraGranted] = useState(false);
   const [micGranted, setMicGranted] = useState(false);
 
-  // Preview track state
-  const [previewTrack, setPreviewTrack] = useState<LocalVideoTrack | null>(null);
+  // Preview/Live track state
+  const [videoTrack, setVideoTrack] = useState<LocalVideoTrack | null>(null);
+  const [audioTrack, setAudioTrack] = useState<LocalAudioTrack | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Live state
+  const [isLive, setIsLive] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [viewerCount, setViewerCount] = useState(0);
+  const roomRef = useRef<Room | null>(null);
 
   const categories = useMemo(
     () => [
@@ -39,64 +47,75 @@ export default function GoLiveScreen() {
 
   const needsPermissions = !cameraGranted || !micGranted;
 
-  // Track if preview is loading
-  const [previewLoading, setPreviewLoading] = useState(false);
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (previewTrack) {
-        previewTrack.stop();
-      }
+      if (videoTrack) videoTrack.stop();
+      if (audioTrack) audioTrack.stop();
+      if (roomRef.current) roomRef.current.disconnect();
     };
-  }, [previewTrack]);
+  }, [videoTrack, audioTrack]);
 
   // Handle camera flip
-  const handleFlipCamera = useCallback(() => {
-    setCameraFacing((prev) => (prev === 'user' ? 'environment' : 'user'));
-  }, []);
+  const handleFlipCamera = useCallback(async () => {
+    if (!videoTrack) return;
+    
+    const newFacing = cameraFacing === 'user' ? 'environment' : 'user';
+    setCameraFacing(newFacing);
+    
+    // Stop old track and create new one with new facing
+    videoTrack.stop();
+    
+    try {
+      const newTrack = await createLocalVideoTrack({
+        facingMode: newFacing,
+        resolution: VideoPresets.h720.resolution,
+      });
+      setVideoTrack(newTrack);
+      
+      // If live, republish the new track
+      if (isLive && roomRef.current) {
+        await roomRef.current.localParticipant.publishTrack(newTrack);
+      }
+    } catch (err) {
+      console.error('[GoLive] Flip camera error:', err);
+    }
+  }, [cameraFacing, videoTrack, isLive]);
 
-  // Handle permissions request (Enable button tap)
+  // Handle Enable button - request permissions and start preview
   const handleRequestPermissions = useCallback(async () => {
     console.log('[GoLive] Enable button pressed');
     setPreviewLoading(true);
     setPreviewError(null);
 
     try {
-      // Check if we're in Expo Go (LiveKit requires dev client)
-      // @ts-ignore - Constants may not have all fields typed
+      // Check if we're in Expo Go
+      // @ts-ignore
       const Constants = require('expo-constants').default;
       const isExpoGo = Constants?.appOwnership === 'expo';
       
       if (isExpoGo) {
-        throw new Error('Camera preview requires a development build. Please use "npx expo run:ios" or "npx expo run:android".');
+        throw new Error('Camera preview requires a development build.');
       }
 
-      // Small delay to ensure native modules are ready
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      console.log('[GoLive] Creating local video track...');
-      const track = await createLocalVideoTrack({
+      console.log('[GoLive] Creating local tracks...');
+      const video = await createLocalVideoTrack({
         facingMode: cameraFacing,
         resolution: VideoPresets.h720.resolution,
       });
-      console.log('[GoLive] Track created:', !!track);
+      
+      const audio = await createLocalAudioTrack();
 
-      setPreviewTrack(track);
+      setVideoTrack(video);
+      setAudioTrack(audio);
       setCameraGranted(true);
       setMicGranted(true);
+      console.log('[GoLive] Tracks created');
     } catch (err: any) {
       console.error('[GoLive] Camera error:', err?.message || err);
-      // Provide user-friendly error messages
-      let errorMsg = 'Failed to access camera';
-      if (err?.message?.includes('development build')) {
-        errorMsg = err.message;
-      } else if (err?.message?.includes('permission') || err?.message?.includes('denied')) {
-        errorMsg = 'Camera permission denied. Please enable in Settings.';
-      } else if (err?.message) {
-        errorMsg = err.message;
-      }
-      setPreviewError(errorMsg);
+      setPreviewError(err?.message || 'Failed to access camera');
     } finally {
       setPreviewLoading(false);
     }
@@ -104,62 +123,94 @@ export default function GoLiveScreen() {
 
   // Handle close
   const handleClose = useCallback(() => {
-    if (previewTrack) {
-      previewTrack.stop();
-    }
+    if (videoTrack) videoTrack.stop();
+    if (audioTrack) audioTrack.stop();
+    if (roomRef.current) roomRef.current.disconnect();
     navigation.goBack();
-  }, [navigation, previewTrack]);
+  }, [navigation, videoTrack, audioTrack]);
 
-  // Handle Go Live - validate and navigate (LiveScreen handles connection)
-  const handleGoLive = useCallback(() => {
-    // Validate required fields
+  // Handle Go Live - connect and publish on SAME screen
+  const handleGoLive = useCallback(async () => {
     if (!streamTitle.trim()) {
       Alert.alert('Title Required', 'Please enter a stream title.');
-      return;
-    }
-    if (!selectedCategoryId) {
-      Alert.alert('Category Required', 'Please select a category.');
-      return;
-    }
-    if (!audience) {
-      Alert.alert('Audience Required', 'Please select an audience.');
       return;
     }
     if (!user?.id) {
       Alert.alert('Not Logged In', 'Please log in to go live.');
       return;
     }
-    if (needsPermissions) {
-      Alert.alert('Permissions Required', 'Camera and microphone access are required to go live.');
+    if (needsPermissions || !videoTrack || !audioTrack) {
+      Alert.alert('Permissions Required', 'Please enable camera and microphone first.');
       return;
     }
 
-    // Stop preview track before navigating (LiveScreen will create new tracks)
-    if (previewTrack) {
-      previewTrack.stop();
-      setPreviewTrack(null);
+    setIsConnecting(true);
+
+    try {
+      const roomName = generateSoloRoomName(user.id);
+      const userName = user.email?.split('@')[0] || 'Host';
+
+      // Fetch token
+      const { token, url } = await fetchMobileToken(roomName, user.id, userName, true);
+
+      // Create room
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+      });
+
+      room.on(RoomEvent.ParticipantConnected, () => {
+        setViewerCount(room.remoteParticipants.size);
+      });
+      room.on(RoomEvent.ParticipantDisconnected, () => {
+        setViewerCount(room.remoteParticipants.size);
+      });
+
+      // Connect
+      await room.connect(url, token);
+      roomRef.current = room;
+
+      // Publish existing tracks
+      await room.localParticipant.publishTrack(videoTrack);
+      await room.localParticipant.publishTrack(audioTrack);
+
+      setIsLive(true);
+      console.log('[GoLive] Now live!');
+    } catch (err: any) {
+      console.error('[GoLive] Connect error:', err);
+      Alert.alert('Connection Failed', err.message || 'Failed to go live.');
+    } finally {
+      setIsConnecting(false);
     }
+  }, [streamTitle, user, needsPermissions, videoTrack, audioTrack]);
 
-    // Generate room name and navigate - LiveScreen handles connection
-    const roomName = generateSoloRoomName(user.id);
-
-    navigation.navigate('LiveScreen', {
-      roomName,
-      title: streamTitle.trim(),
-      category: selectedCategoryId,
-      audience,
-      isHost: true,
-    });
-  }, [streamTitle, selectedCategoryId, audience, user, needsPermissions, previewTrack, navigation]);
+  // Handle End Live
+  const handleEndLive = useCallback(() => {
+    Alert.alert('End Stream', 'Are you sure you want to end your stream?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'End Stream',
+        style: 'destructive',
+        onPress: () => {
+          if (roomRef.current) {
+            roomRef.current.disconnect();
+            roomRef.current = null;
+          }
+          setIsLive(false);
+          setViewerCount(0);
+        },
+      },
+    ]);
+  }, []);
 
   return (
     <View style={styles.container}>
-      {/* Camera Preview */}
+      {/* Camera Preview / Live Video */}
       <View style={styles.cameraPreview}>
-        {previewTrack ? (
+        {videoTrack ? (
           <VideoView
             style={styles.videoView}
-            videoTrack={previewTrack}
+            videoTrack={videoTrack}
             mirror={cameraFacing === 'user'}
             objectFit="cover"
           />
@@ -175,27 +226,35 @@ export default function GoLiveScreen() {
           </View>
         )}
 
-        {/* Permissions Banner - shown in preview area */}
-        {needsPermissions && (
+        {/* Permissions Banner */}
+        {needsPermissions && !isLive && (
           <View style={[styles.permissionsBanner, { top: insets.top + 60 }]}>
             <View style={styles.permissionsContent}>
               <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.warning} />
               <View style={styles.permissionsText}>
                 <Text style={styles.permissionsTitle}>Permissions needed</Text>
-                <Text style={styles.permissionsHint}>
-                  {!cameraGranted && !micGranted
-                    ? 'Camera & microphone access required'
-                    : !cameraGranted
-                    ? 'Camera access required'
-                    : 'Microphone access required'}
-                </Text>
+                <Text style={styles.permissionsHint}>Camera & microphone access required</Text>
               </View>
               <Pressable
                 onPress={handleRequestPermissions}
+                disabled={previewLoading}
                 style={({ pressed }) => [styles.permissionsButton, pressed && { opacity: 0.8 }]}
               >
-                <Text style={styles.permissionsButtonText}>Enable</Text>
+                <Text style={styles.permissionsButtonText}>
+                  {previewLoading ? '...' : 'Enable'}
+                </Text>
               </Pressable>
+            </View>
+          </View>
+        )}
+
+        {/* Live indicator */}
+        {isLive && (
+          <View style={[styles.liveStatusBanner, { top: insets.top + 12 }]}>
+            <View style={styles.liveStatusContent}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveStatusText}>LIVE</Text>
+              <Text style={styles.viewerCountText}>{viewerCount} watching</Text>
             </View>
           </View>
         )}
@@ -206,135 +265,137 @@ export default function GoLiveScreen() {
         <Pressable
           onPress={handleClose}
           style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
         >
           <Ionicons name="close" size={24} color={COLORS.white} />
         </Pressable>
 
         <View style={styles.topSpacer} />
 
-        <Pressable
-          onPress={handleFlipCamera}
-          style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Flip camera"
-        >
-          <Ionicons name="camera-reverse-outline" size={22} color={COLORS.white} />
-        </Pressable>
+        {videoTrack && (
+          <Pressable
+            onPress={handleFlipCamera}
+            style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}
+          >
+            <Ionicons name="camera-reverse-outline" size={22} color={COLORS.white} />
+          </Pressable>
+        )}
       </View>
 
-      {/* Setup Modal Overlay - Positioned higher */}
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalHandle} />
+      {/* Setup Modal - Hidden when live */}
+      {!isLive && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalHandle} />
 
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Go Live</Text>
-        </View>
-
-        <View style={styles.modalContent}>
-          {/* Title + Thumbnail Row */}
-          <View style={styles.titleRow}>
-            <View style={styles.titleField}>
-              <Text style={styles.fieldLabel}>Title</Text>
-              <View style={styles.inputWrap}>
-                <TextInput
-                  value={streamTitle}
-                  onChangeText={setStreamTitle}
-                  placeholder="What are you streaming?"
-                  placeholderTextColor={COLORS.mutedText}
-                  style={styles.input}
-                  autoCapitalize="sentences"
-                  returnKeyType="done"
-                />
-              </View>
-            </View>
-            <Pressable
-              onPress={() => {}}
-              style={({ pressed }) => [styles.thumbnailButton, pressed && { opacity: 0.8 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Add thumbnail"
-            >
-              <Ionicons name="image-outline" size={18} color={COLORS.mutedText} />
-            </Pressable>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Go Live</Text>
           </View>
 
-          {/* Category - Horizontal Slider */}
-          <Text style={styles.fieldLabel}>Category</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categorySlider}
-            style={styles.categoryScrollView}
-          >
-            {categories.map((c) => {
-              const isSelected = c.id === selectedCategoryId;
-              return (
-                <Pressable
-                  key={c.id}
-                  onPress={() => setSelectedCategoryId(c.id)}
-                  style={({ pressed }) => [styles.chip, isSelected && styles.chipSelected, pressed && styles.chipPressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select category ${c.label}`}
-                >
-                  <Ionicons
-                    name={c.icon}
-                    size={14}
-                    color={isSelected ? COLORS.white : COLORS.mutedText}
-                    style={{ marginRight: 4 }}
+          <View style={styles.modalContent}>
+            {/* Title */}
+            <View style={styles.titleRow}>
+              <View style={styles.titleField}>
+                <Text style={styles.fieldLabel}>Title</Text>
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    value={streamTitle}
+                    onChangeText={setStreamTitle}
+                    placeholder="What are you streaming?"
+                    placeholderTextColor={COLORS.mutedText}
+                    style={styles.input}
+                    autoCapitalize="sentences"
+                    returnKeyType="done"
                   />
-                  <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{c.label}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+                </View>
+              </View>
+              <Pressable style={styles.thumbnailButton}>
+                <Ionicons name="image-outline" size={18} color={COLORS.mutedText} />
+              </Pressable>
+            </View>
 
-          {/* Audience */}
-          <Text style={styles.fieldLabel}>Audience</Text>
-          <View style={styles.segmentedControl}>
-            <Pressable
-              onPress={() => setAudience('Public')}
-              style={[styles.segmentButton, audience === 'Public' && styles.segmentButtonActive]}
+            {/* Category */}
+            <Text style={styles.fieldLabel}>Category</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categorySlider}
+              style={styles.categoryScrollView}
             >
-              <Ionicons
-                name="globe-outline"
-                size={14}
-                color={audience === 'Public' ? COLORS.white : COLORS.mutedText}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.segmentText, audience === 'Public' && styles.segmentTextActive]}>Public</Text>
-            </Pressable>
+              {categories.map((c) => {
+                const isSelected = c.id === selectedCategoryId;
+                return (
+                  <Pressable
+                    key={c.id}
+                    onPress={() => setSelectedCategoryId(c.id)}
+                    style={({ pressed }) => [styles.chip, isSelected && styles.chipSelected, pressed && styles.chipPressed]}
+                  >
+                    <Ionicons
+                      name={c.icon}
+                      size={14}
+                      color={isSelected ? COLORS.white : COLORS.mutedText}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{c.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* Audience */}
+            <Text style={styles.fieldLabel}>Audience</Text>
+            <View style={styles.segmentedControl}>
+              <Pressable
+                onPress={() => setAudience('Public')}
+                style={[styles.segmentButton, audience === 'Public' && styles.segmentButtonActive]}
+              >
+                <Ionicons name="globe-outline" size={14} color={audience === 'Public' ? COLORS.white : COLORS.mutedText} style={{ marginRight: 4 }} />
+                <Text style={[styles.segmentText, audience === 'Public' && styles.segmentTextActive]}>Public</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setAudience('Team')}
+                style={[styles.segmentButton, audience === 'Team' && styles.segmentButtonActive]}
+              >
+                <Ionicons name="people-outline" size={14} color={audience === 'Team' ? COLORS.white : COLORS.mutedText} style={{ marginRight: 4 }} />
+                <Text style={[styles.segmentText, audience === 'Team' && styles.segmentTextActive]}>Team</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Go Live Button */}
+          <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 12 }]}>
             <Pressable
-              onPress={() => setAudience('Team')}
-              style={[styles.segmentButton, audience === 'Team' && styles.segmentButtonActive]}
+              onPress={handleGoLive}
+              disabled={isConnecting || needsPermissions}
+              style={({ pressed }) => [
+                styles.goLiveButton,
+                pressed && styles.goLiveButtonPressed,
+                (isConnecting || needsPermissions) && styles.goLiveButtonDisabled,
+              ]}
             >
-              <Ionicons
-                name="people-outline"
-                size={14}
-                color={audience === 'Team' ? COLORS.white : COLORS.mutedText}
-                style={{ marginRight: 4 }}
-              />
-              <Text style={[styles.segmentText, audience === 'Team' && styles.segmentTextActive]}>Team</Text>
+              {isConnecting ? (
+                <Text style={styles.goLiveText}>Connecting...</Text>
+              ) : (
+                <>
+                  <View style={styles.liveIndicator} />
+                  <Text style={styles.goLiveText}>Go Live</Text>
+                </>
+              )}
             </Pressable>
           </View>
         </View>
+      )}
 
-        {/* Go Live Button */}
-        <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 12 }]}>
+      {/* End Live Button - Shown when live */}
+      {isLive && (
+        <View style={[styles.endLiveContainer, { paddingBottom: insets.bottom + 16 }]}>
           <Pressable
-            onPress={handleGoLive}
-            style={({ pressed }) => [
-              styles.goLiveButton, 
-              pressed && styles.goLiveButtonPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Go Live"
+            onPress={handleEndLive}
+            style={({ pressed }) => [styles.endLiveButton, pressed && { opacity: 0.8 }]}
           >
-            <View style={styles.liveIndicator} />
-            <Text style={styles.goLiveText}>Go Live</Text>
+            <Ionicons name="stop-circle" size={20} color={COLORS.white} />
+            <Text style={styles.endLiveText}>End Live</Text>
           </Pressable>
         </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -351,7 +412,6 @@ const COLORS = {
   inputBg: 'rgba(255,255,255,0.06)',
   border: 'rgba(255,255,255,0.10)',
   warning: '#F59E0B',
-  error: '#EF4444',
 };
 
 const styles = StyleSheet.create({
@@ -359,8 +419,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
   },
-
-  // Camera Preview
   cameraPreview: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0A0A0A',
@@ -383,8 +441,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255,255,255,0.15)',
   },
-
-  // Permissions Banner
   permissionsBanner: {
     position: 'absolute',
     left: 16,
@@ -425,8 +481,39 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#000',
   },
-
-  // Top Bar
+  liveStatusBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+  },
+  liveStatusContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 8,
+    alignSelf: 'flex-start',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.white,
+  },
+  liveStatusText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: COLORS.white,
+    letterSpacing: 1,
+  },
+  viewerCountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.8)',
+    marginLeft: 8,
+  },
   topBar: {
     position: 'absolute',
     top: 0,
@@ -452,8 +539,6 @@ const styles = StyleSheet.create({
   topSpacer: {
     flex: 1,
   },
-
-  // Modal Overlay - Centered/Higher position
   modalOverlay: {
     position: 'absolute',
     bottom: '15%',
@@ -485,8 +570,6 @@ const styles = StyleSheet.create({
   modalContent: {
     paddingHorizontal: 16,
   },
-
-  // Title + Thumbnail Row
   titleRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -529,8 +612,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Category Slider
   categoryScrollView: {
     marginHorizontal: -16,
     marginBottom: 12,
@@ -564,8 +645,6 @@ const styles = StyleSheet.create({
   chipTextSelected: {
     color: COLORS.white,
   },
-
-  // Audience
   segmentedControl: {
     flexDirection: 'row',
     borderRadius: 10,
@@ -590,17 +669,9 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: COLORS.white,
   },
-
-  // Footer
   modalFooter: {
     paddingHorizontal: 16,
     paddingTop: 14,
-  },
-  errorText: {
-    fontSize: 12,
-    color: COLORS.error,
-    textAlign: 'center',
-    marginBottom: 8,
   },
   goLiveButton: {
     height: 48,
@@ -615,7 +686,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryPressed,
   },
   goLiveButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   liveIndicator: {
     width: 8,
@@ -628,5 +699,26 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: COLORS.white,
     letterSpacing: 0.3,
+  },
+  endLiveContainer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 0,
+    alignItems: 'center',
+  },
+  endLiveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 999,
+  },
+  endLiveText: {
+    color: COLORS.white,
+    fontWeight: '900',
+    fontSize: 15,
   },
 });
