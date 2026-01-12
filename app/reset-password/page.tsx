@@ -21,14 +21,79 @@ function ResetPasswordInner() {
   const supabase = createClient();
 
   // Check if this is a password reset callback (from email link)
+  const code = searchParams?.get('code');
   const accessToken = searchParams?.get('access_token');
+  const refreshToken = searchParams?.get('refresh_token');
   const type = searchParams?.get('type');
 
   useEffect(() => {
-    if (accessToken && type === 'recovery') {
-      setStep('reset');
-    }
-  }, [accessToken, type]);
+    const handleRecoverySession = async () => {
+      try {
+        // PKCE code flow (query params)
+        if (code) {
+          console.log('Recovery: exchanging code for session');
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          
+          if (error) {
+            console.error('Recovery session exchange failed:', error);
+            setError(`Failed to verify reset link: ${error.message}`);
+            setStep('request');
+            return;
+          }
+          
+          console.log('Recovery session established via code');
+          setStep('reset');
+          return;
+        }
+        
+        // Implicit flow (hash fragments) - parse from window.location.hash
+        let hashAccessToken = accessToken;
+        let hashRefreshToken = refreshToken;
+        
+        if (!hashAccessToken && typeof window !== 'undefined' && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          hashAccessToken = hashParams.get('access_token');
+          hashRefreshToken = hashParams.get('refresh_token');
+        }
+        
+        if (hashAccessToken && hashRefreshToken) {
+          console.log('Recovery: setting session from tokens');
+          const { data, error } = await supabase.auth.setSession({
+            access_token: hashAccessToken,
+            refresh_token: hashRefreshToken,
+          });
+          
+          if (error) {
+            console.error('Recovery session setup failed:', error);
+            setError(`Failed to verify reset link: ${error.message}`);
+            setStep('request');
+            return;
+          }
+          
+          console.log('Recovery session established via tokens');
+          setStep('reset');
+          
+          // Clean up hash from URL
+          if (typeof window !== 'undefined') {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+          return;
+        }
+        
+        // Legacy: type=recovery check (fallback)
+        if (type === 'recovery' && (accessToken || hashAccessToken)) {
+          console.log('Recovery: legacy type=recovery flow');
+          setStep('reset');
+        }
+      } catch (err: any) {
+        console.error('Recovery session error:', err);
+        setError(`Failed to process reset link: ${err.message}`);
+        setStep('request');
+      }
+    };
+
+    handleRecoverySession();
+  }, [code, accessToken, refreshToken, type, supabase.auth]);
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
