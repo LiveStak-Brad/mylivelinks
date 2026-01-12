@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 
 import SoloHostOverlay from '../components/live/SoloHostOverlay';
 import type { ChatMessage, ChatFontColor } from '../components/live/ChatOverlay';
+import { getGifterTierFromCoins } from '../components/live/ChatOverlay';
 import type { TopGifter } from '../components/live/TopGifterBubbles';
 
 // Default font color for chat
@@ -237,7 +238,7 @@ export default function GoLiveScreen() {
               username,
               display_name,
               avatar_url,
-              gifter_level
+              lifetime_coins_gifted
             )
           `)
           .eq('live_stream_id', liveStreamId)
@@ -263,16 +264,22 @@ export default function GoLiveScreen() {
         );
 
         // Reverse to show oldest first, but FlatList is inverted so newest appears at bottom
-        const messages: ChatMessage[] = (data ?? []).reverse().map((msg: any) => ({
-          id: String(msg.id),
-          type: mapMessageType(msg.message_type),
-          username: msg.profile?.display_name || msg.profile?.username || 'User',
-          text: msg.content || '',
-          avatarUrl: msg.profile?.avatar_url || undefined,
-          giftAmount: msg.message_type === 'gift' ? extractGiftAmount(msg.content) : undefined,
-          chatColor: chatSettingsMap.get(msg.profile_id) || undefined,
-          gifterLevel: msg.profile?.gifter_level || 0,
-        }));
+        const messages: ChatMessage[] = (data ?? []).reverse().map((msg: any) => {
+          const lifetimeCoins = msg.profile?.lifetime_coins_gifted || 0;
+          const gifterInfo = getGifterTierFromCoins(lifetimeCoins);
+          
+          return {
+            id: String(msg.id),
+            type: mapMessageType(msg.message_type),
+            username: msg.profile?.display_name || msg.profile?.username || 'User',
+            text: msg.content || '',
+            avatarUrl: msg.profile?.avatar_url || undefined,
+            giftAmount: msg.message_type === 'gift' ? extractGiftAmount(msg.content) : undefined,
+            chatColor: chatSettingsMap.get(msg.profile_id) || undefined,
+            gifterTierKey: gifterInfo.tierKey,
+            gifterLevelInTier: gifterInfo.levelInTier,
+          };
+        });
 
         setChatMessages(messages);
       } catch (err) {
@@ -302,7 +309,7 @@ export default function GoLiveScreen() {
           const [profileResult, chatSettingsResult] = await Promise.all([
             supabase
               .from('profiles')
-              .select('username, display_name, avatar_url, gifter_level')
+              .select('username, display_name, avatar_url, lifetime_coins_gifted')
               .eq('id', msg.profile_id)
               .single(),
             supabase
@@ -316,6 +323,8 @@ export default function GoLiveScreen() {
           
           const profile = profileResult.data;
           const chatSettings = chatSettingsResult.data;
+          const lifetimeCoins = (profile as any)?.lifetime_coins_gifted || 0;
+          const gifterInfo = getGifterTierFromCoins(lifetimeCoins);
           
           const newMessage: ChatMessage = {
             id: String(msg.id),
@@ -325,7 +334,8 @@ export default function GoLiveScreen() {
             avatarUrl: profile?.avatar_url || undefined,
             giftAmount: msg.message_type === 'gift' ? extractGiftAmount(msg.content) : undefined,
             chatColor: chatSettings?.chat_bubble_color || undefined,
-            gifterLevel: profile?.gifter_level || 0,
+            gifterTierKey: gifterInfo.tierKey,
+            gifterLevelInTier: gifterInfo.levelInTier,
           };
 
           setChatMessages((prev) => [...prev.slice(-49), newMessage]);

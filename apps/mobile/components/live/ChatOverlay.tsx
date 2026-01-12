@@ -11,10 +11,64 @@ export interface ChatMessage {
   giftAmount?: number;
   // User's chosen chat color from chat_settings (web parity)
   chatColor?: string;
-  // Gifter level for showing badge (0 = no badge)
-  gifterLevel?: number;
+  // Gifter status for showing badge (matches web gifter-tiers.ts)
+  gifterTierKey?: string;
+  gifterLevelInTier?: number;
   // Pro badge
   isPro?: boolean;
+}
+
+// Gifter tier configuration (matches web lib/gifter-tiers.ts exactly)
+export interface GifterTier {
+  key: string;
+  name: string;
+  color: string;
+  icon: string;
+  minCoins: number;
+  maxCoins: number | null;
+}
+
+export const GIFTER_TIERS: GifterTier[] = [
+  { key: 'starter', name: 'Starter', color: '#9CA3AF', icon: '🌱', minCoins: 0, maxCoins: 59_999 },
+  { key: 'supporter', name: 'Supporter', color: '#CD7F32', icon: '🤝', minCoins: 60_000, maxCoins: 299_999 },
+  { key: 'contributor', name: 'Contributor', color: '#C0C0C0', icon: '⭐', minCoins: 300_000, maxCoins: 899_999 },
+  { key: 'elite', name: 'Elite', color: '#D4AF37', icon: '👑', minCoins: 900_000, maxCoins: 2_399_999 },
+  { key: 'patron', name: 'Patron', color: '#22C55E', icon: '🏆', minCoins: 2_400_000, maxCoins: 5_999_999 },
+  { key: 'power', name: 'Power', color: '#3B82F6', icon: '⚡', minCoins: 6_000_000, maxCoins: 14_999_999 },
+  { key: 'vip', name: 'VIP', color: '#EF4444', icon: '🔥', minCoins: 15_000_000, maxCoins: 29_999_999 },
+  { key: 'legend', name: 'Legend', color: '#A855F7', icon: '🌟', minCoins: 30_000_000, maxCoins: 44_999_999 },
+  { key: 'mythic', name: 'Mythic', color: '#111827', icon: '🔮', minCoins: 45_000_000, maxCoins: 59_999_999 },
+  { key: 'diamond', name: 'Diamond', color: '#22D3EE', icon: '💎', minCoins: 60_000_000, maxCoins: null },
+];
+
+export function getTierByKey(key: string): GifterTier | undefined {
+  return GIFTER_TIERS.find((t) => t.key === key);
+}
+
+// Get tier and level from lifetime coins (matches web lib/gifter-status.ts logic)
+export function getGifterTierFromCoins(lifetimeCoins: number): { tierKey: string; levelInTier: number } {
+  const coins = Math.max(0, Math.floor(lifetimeCoins || 0));
+  
+  // Find the tier based on lifetime coins
+  let tier = GIFTER_TIERS[0];
+  for (const t of GIFTER_TIERS) {
+    if (t.maxCoins === null) {
+      // Diamond tier (no max)
+      if (coins >= t.minCoins) tier = t;
+      break;
+    }
+    if (coins >= t.minCoins && coins <= t.maxCoins) {
+      tier = t;
+      break;
+    }
+  }
+  
+  // Calculate level within tier (simplified - 50 levels per tier, linear distribution)
+  const tierRange = tier.maxCoins === null ? 10_000_000 : (tier.maxCoins - tier.minCoins + 1);
+  const coinsInTier = coins - tier.minCoins;
+  const levelInTier = Math.min(50, Math.max(1, Math.floor((coinsInTier / tierRange) * 50) + 1));
+  
+  return { tierKey: tier.key, levelInTier };
 }
 
 // Approved bright font colors palette
@@ -38,17 +92,6 @@ interface ChatOverlayProps {
 
 const PLACEHOLDER_AVATAR = 'https://via.placeholder.com/28/6366F1/FFFFFF?text=?';
 
-// Helper to get gifter badge color based on level
-const getGifterBadgeColor = (level: number): string | null => {
-  if (level >= 50) return '#FFD700'; // Gold
-  if (level >= 30) return '#E5E4E2'; // Platinum
-  if (level >= 20) return '#C0C0C0'; // Silver
-  if (level >= 10) return '#CD7F32'; // Bronze
-  if (level >= 5) return '#9966CC'; // Purple
-  if (level >= 1) return '#3B82F6'; // Blue
-  return null;
-};
-
 export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOverlayProps) {
   const flatListRef = useRef<FlatList>(null);
 
@@ -57,7 +100,10 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     // Use user's chosen chat color, fall back to default fontColor
     const textColor = item.chatColor || fontColor;
-    const gifterBadgeColor = getGifterBadgeColor(item.gifterLevel || 0);
+    
+    // Get gifter tier for badge (matches web)
+    const tier = item.gifterTierKey ? getTierByKey(item.gifterTierKey) : undefined;
+    const showGifterBadge = tier && tier.key !== 'starter'; // Don't show starter badge
     
     switch (item.type) {
       case 'gift':
@@ -73,10 +119,21 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
                 <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
-                {/* Gifter badge */}
-                {gifterBadgeColor && (
-                  <View style={[styles.badgeIcon, { backgroundColor: gifterBadgeColor }]}>
-                    <Ionicons name="diamond" size={8} color="#FFFFFF" />
+                {/* Gifter badge (web parity - pill with icon + level) */}
+                {showGifterBadge && tier && (
+                  <View style={[
+                    styles.gifterBadgePill,
+                    { 
+                      backgroundColor: `${tier.color}30`,
+                      borderColor: `${tier.color}60`,
+                    }
+                  ]}>
+                    <Text style={styles.gifterBadgeIcon}>{tier.icon}</Text>
+                    {item.gifterLevelInTier && (
+                      <Text style={[styles.gifterBadgeLevel, { color: tier.color }]}>
+                        {item.gifterLevelInTier}
+                      </Text>
+                    )}
                   </View>
                 )}
                 {/* Pro badge */}
@@ -143,10 +200,21 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
                 <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
-                {/* Gifter badge */}
-                {gifterBadgeColor && (
-                  <View style={[styles.badgeIcon, { backgroundColor: gifterBadgeColor }]}>
-                    <Ionicons name="diamond" size={8} color="#FFFFFF" />
+                {/* Gifter badge (web parity - pill with icon + level) */}
+                {showGifterBadge && tier && (
+                  <View style={[
+                    styles.gifterBadgePill,
+                    { 
+                      backgroundColor: `${tier.color}30`,
+                      borderColor: `${tier.color}60`,
+                    }
+                  ]}>
+                    <Text style={styles.gifterBadgeIcon}>{tier.icon}</Text>
+                    {item.gifterLevelInTier && (
+                      <Text style={[styles.gifterBadgeLevel, { color: tier.color }]}>
+                        {item.gifterLevelInTier}
+                      </Text>
+                    )}
                   </View>
                 )}
                 {/* Pro badge */}
@@ -230,14 +298,23 @@ const styles = StyleSheet.create({
     // color applied dynamically via fontColor prop
   },
   
-  // Gifter badge icon
-  badgeIcon: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+  // Gifter badge pill (matches web GifterBadge component)
+  gifterBadgePill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 10,
+    borderWidth: 1,
     marginLeft: 4,
+    gap: 2,
+  },
+  gifterBadgeIcon: {
+    fontSize: 9,
+  },
+  gifterBadgeLevel: {
+    fontSize: 9,
+    fontWeight: '700',
   },
   
   // Pro badge
