@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { VideoView } from '@livekit/react-native';
@@ -8,29 +8,6 @@ import { createLocalVideoTrack, LocalVideoTrack, VideoPresets } from 'livekit-cl
 import { useAuth } from '../state/AuthContext';
 import { fetchMobileToken, connectAndPublish, disconnectAndCleanup, generateSoloRoomName } from '../lib/livekit';
 import type { Room, LocalAudioTrack } from 'livekit-client';
-
-// Request Android permissions (iOS permissions are triggered by camera access)
-async function requestAndroidPermissions(): Promise<{ camera: boolean; mic: boolean }> {
-  if (Platform.OS !== 'android') {
-    // iOS: permissions will be requested when we try to access camera
-    return { camera: false, mic: false };
-  }
-  
-  const { PermissionsAndroid } = require('react-native');
-  try {
-    const grants = await PermissionsAndroid.requestMultiple([
-      PermissionsAndroid.PERMISSIONS.CAMERA,
-      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-    ]);
-    return {
-      camera: grants[PermissionsAndroid.PERMISSIONS.CAMERA] === PermissionsAndroid.RESULTS.GRANTED,
-      mic: grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] === PermissionsAndroid.RESULTS.GRANTED,
-    };
-  } catch (err) {
-    console.error('[GoLive] Permission request error:', err);
-    return { camera: false, mic: false };
-  }
-}
 
 export default function GoLiveScreen() {
   const insets = useSafeAreaInsets();
@@ -45,7 +22,6 @@ export default function GoLiveScreen() {
   // Permission states
   const [cameraGranted, setCameraGranted] = useState(false);
   const [micGranted, setMicGranted] = useState(false);
-  const [permissionsRequested, setPermissionsRequested] = useState(false);
 
   // Preview track state
   const [previewTrack, setPreviewTrack] = useState<LocalVideoTrack | null>(null);
@@ -72,60 +48,6 @@ export default function GoLiveScreen() {
   // Track if preview is loading
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  // Function to start camera preview
-  const startCameraPreview = useCallback(async () => {
-    if (previewLoading || previewTrack) return;
-    
-    setPreviewLoading(true);
-    setPreviewError(null);
-
-    try {
-      // Small delay to ensure native modules are ready
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const track = await createLocalVideoTrack({
-        facingMode: cameraFacing,
-        resolution: VideoPresets.h720.resolution,
-      });
-
-      setPreviewTrack(track);
-      setCameraGranted(true);
-      setMicGranted(true);
-      setPreviewError(null);
-    } catch (err: any) {
-      console.error('[GoLive] Preview error:', err);
-      setPreviewError(err?.message || 'Camera access denied. Please enable in Settings.');
-      setCameraGranted(false);
-    } finally {
-      setPreviewLoading(false);
-    }
-  }, [cameraFacing, previewLoading, previewTrack]);
-
-  // Request Android permissions on mount
-  useEffect(() => {
-    if (Platform.OS === 'android' && !permissionsRequested) {
-      setPermissionsRequested(true);
-      requestAndroidPermissions().then(({ camera, mic }) => {
-        setCameraGranted(camera);
-        setMicGranted(mic);
-        // Auto-start preview if Android permissions granted
-        if (camera) {
-          startCameraPreview();
-        }
-      });
-    }
-  }, [permissionsRequested, startCameraPreview]);
-
-  // Handle camera facing change - recreate track
-  useEffect(() => {
-    if (!previewTrack) return;
-    
-    // Stop current track and create new one with new facing
-    previewTrack.stop();
-    setPreviewTrack(null);
-    startCameraPreview();
-  }, [cameraFacing]); // Intentionally not including other deps to avoid loops
-
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -142,18 +64,49 @@ export default function GoLiveScreen() {
 
   // Handle permissions request (Enable button tap)
   const handleRequestPermissions = useCallback(async () => {
-    if (Platform.OS === 'android') {
-      const { camera, mic } = await requestAndroidPermissions();
-      setCameraGranted(camera);
-      setMicGranted(mic);
-      if (camera) {
-        startCameraPreview();
+    console.log('[GoLive] Enable button pressed');
+    setPreviewLoading(true);
+    setPreviewError(null);
+
+    try {
+      // Check if we're in Expo Go (LiveKit requires dev client)
+      // @ts-ignore - Constants may not have all fields typed
+      const Constants = require('expo-constants').default;
+      const isExpoGo = Constants?.appOwnership === 'expo';
+      
+      if (isExpoGo) {
+        throw new Error('Camera preview requires a development build. Please use "npx expo run:ios" or "npx expo run:android".');
       }
-    } else {
-      // iOS: trying to access camera will trigger permission dialog
-      startCameraPreview();
+
+      // Small delay to ensure native modules are ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      console.log('[GoLive] Creating local video track...');
+      const track = await createLocalVideoTrack({
+        facingMode: cameraFacing,
+        resolution: VideoPresets.h720.resolution,
+      });
+      console.log('[GoLive] Track created:', !!track);
+
+      setPreviewTrack(track);
+      setCameraGranted(true);
+      setMicGranted(true);
+    } catch (err: any) {
+      console.error('[GoLive] Camera error:', err?.message || err);
+      // Provide user-friendly error messages
+      let errorMsg = 'Failed to access camera';
+      if (err?.message?.includes('development build')) {
+        errorMsg = err.message;
+      } else if (err?.message?.includes('permission') || err?.message?.includes('denied')) {
+        errorMsg = 'Camera permission denied. Please enable in Settings.';
+      } else if (err?.message) {
+        errorMsg = err.message;
+      }
+      setPreviewError(errorMsg);
+    } finally {
+      setPreviewLoading(false);
     }
-  }, [startCameraPreview]);
+  }, [cameraFacing]);
 
   // Handle close
   const handleClose = useCallback(() => {

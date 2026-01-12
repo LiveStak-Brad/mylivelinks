@@ -24,6 +24,6 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "lib/live/**/*", "apps/mobile/**", "mobile/**"]
+  "exclude": ["node_modules", "lib/live/**/*", "apps/mobile/**", "mobile/**", "supabase/functions/**"]
 }
 
