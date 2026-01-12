@@ -198,6 +198,106 @@ export function GiftersSheet({ visible, onClose }: BaseSheetProps) {
   );
 }
 
+// Trending Sheet (flame icon - trending streamers)
+export function TrendingSheet({ visible, onClose }: BaseSheetProps) {
+  const [period, setPeriod] = React.useState<'streamers' | 'gifters'>('streamers');
+  const [timeframe, setTimeframe] = React.useState<'daily' | 'weekly' | 'monthly' | 'alltime'>('daily');
+  
+  return (
+    <SheetContainer visible={visible} onClose={onClose} title="Trending">
+      {/* Type Tabs */}
+      <View style={styles.tabRow}>
+        <Pressable
+          onPress={() => setPeriod('streamers')}
+          style={[styles.tab, period === 'streamers' && styles.tabActive]}
+        >
+          <Ionicons name="videocam" size={16} color={period === 'streamers' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
+          <Text style={[styles.tabText, period === 'streamers' && styles.tabTextActive]}>Streamers</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setPeriod('gifters')}
+          style={[styles.tab, period === 'gifters' && styles.tabActive]}
+        >
+          <Ionicons name="gift" size={16} color={period === 'gifters' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
+          <Text style={[styles.tabText, period === 'gifters' && styles.tabTextActive]}>Gifters</Text>
+        </Pressable>
+      </View>
+      
+      {/* Timeframe Tabs */}
+      <View style={styles.timeframeTabs}>
+        {(['daily', 'weekly', 'monthly', 'alltime'] as const).map((tf) => (
+          <Pressable
+            key={tf}
+            onPress={() => setTimeframe(tf)}
+            style={[styles.timeframeTab, timeframe === tf && styles.timeframeTabActive]}
+          >
+            <Text style={[styles.timeframeText, timeframe === tf && styles.timeframeTextActive]}>
+              {tf === 'alltime' ? 'All Time' : tf.charAt(0).toUpperCase() + tf.slice(1)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      
+      <View style={styles.emptyState}>
+        <Ionicons name="flame" size={48} color="#F97316" />
+        <Text style={styles.emptyTitle}>Trending {period === 'streamers' ? 'Streamers' : 'Gifters'}</Text>
+        <Text style={styles.emptySubtitle}>{timeframe === 'alltime' ? 'All Time' : timeframe.charAt(0).toUpperCase() + timeframe.slice(1)} rankings</Text>
+      </View>
+      <Text style={styles.placeholder}>Trending data is UI-only (mocked)</Text>
+    </SheetContainer>
+  );
+}
+
+// Leaderboard Sheet (trophy icon - streamer/gifter leaderboard)
+export function LeaderboardSheet({ visible, onClose }: BaseSheetProps) {
+  const [period, setPeriod] = React.useState<'streamers' | 'gifters'>('streamers');
+  const [timeframe, setTimeframe] = React.useState<'daily' | 'weekly' | 'monthly' | 'alltime'>('daily');
+  
+  return (
+    <SheetContainer visible={visible} onClose={onClose} title="Leaderboard">
+      {/* Type Tabs */}
+      <View style={styles.tabRow}>
+        <Pressable
+          onPress={() => setPeriod('streamers')}
+          style={[styles.tab, period === 'streamers' && styles.tabActive]}
+        >
+          <Ionicons name="videocam" size={16} color={period === 'streamers' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
+          <Text style={[styles.tabText, period === 'streamers' && styles.tabTextActive]}>Streamers</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setPeriod('gifters')}
+          style={[styles.tab, period === 'gifters' && styles.tabActive]}
+        >
+          <Ionicons name="gift" size={16} color={period === 'gifters' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
+          <Text style={[styles.tabText, period === 'gifters' && styles.tabTextActive]}>Gifters</Text>
+        </Pressable>
+      </View>
+      
+      {/* Timeframe Tabs */}
+      <View style={styles.timeframeTabs}>
+        {(['daily', 'weekly', 'monthly', 'alltime'] as const).map((tf) => (
+          <Pressable
+            key={tf}
+            onPress={() => setTimeframe(tf)}
+            style={[styles.timeframeTab, timeframe === tf && styles.timeframeTabActive]}
+          >
+            <Text style={[styles.timeframeText, timeframe === tf && styles.timeframeTextActive]}>
+              {tf === 'alltime' ? 'All Time' : tf.charAt(0).toUpperCase() + tf.slice(1)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      
+      <View style={styles.emptyState}>
+        <Ionicons name="trophy" size={48} color="#EAB308" />
+        <Text style={styles.emptyTitle}>{period === 'streamers' ? 'Top Streamers' : 'Top Gifters'}</Text>
+        <Text style={styles.emptySubtitle}>{timeframe === 'alltime' ? 'All Time' : timeframe.charAt(0).toUpperCase() + timeframe.slice(1)} leaderboard</Text>
+      </View>
+      <Text style={styles.placeholder}>Leaderboard data is UI-only (mocked)</Text>
+    </SheetContainer>
+  );
+}
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -314,5 +414,56 @@ const styles = StyleSheet.create({
   shareLabel: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
+  },
+  tabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  tabActive: {
+    backgroundColor: '#6366F1',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  tabTextActive: {
+    color: '#FFFFFF',
+  },
+  timeframeTabs: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 16,
+  },
+  timeframeTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  timeframeTabActive: {
+    backgroundColor: 'rgba(99,102,241,0.3)',
+    borderWidth: 1,
+    borderColor: '#6366F1',
+  },
+  timeframeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+  },
+  timeframeTextActive: {
+    color: '#FFFFFF',
   },
 });

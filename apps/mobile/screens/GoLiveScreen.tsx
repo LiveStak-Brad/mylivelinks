@@ -55,6 +55,10 @@ export default function GoLiveScreen() {
   // Chat messages (fetched from chat_messages table like web)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
+  // Ranking data (mocked for now - will fetch from Supabase like web)
+  const [trendingRank, setTrendingRank] = useState<number>(0);
+  const [leaderboardRank, setLeaderboardRank] = useState<{ currentRank: number; pointsToNextRank: number } | null>(null);
+
   const categories = useMemo(
     () => [
       { id: 'irl', label: 'IRL', icon: 'walk-outline' as const },
@@ -548,6 +552,14 @@ export default function GoLiveScreen() {
       await room.localParticipant.publishTrack(audioTrack);
 
       setIsLive(true);
+      
+      // Set mock ranking data (will be replaced with real Supabase fetch like web)
+      setTrendingRank(Math.floor(Math.random() * 20) + 1);
+      setLeaderboardRank({
+        currentRank: Math.floor(Math.random() * 50) + 1,
+        pointsToNextRank: Math.floor(Math.random() * 500) + 100,
+      });
+      
       console.log('[GoLive] Now live! Stream should appear on LiveTV.');
     } catch (err: any) {
       console.error('[GoLive] Connect error:', err);
@@ -598,6 +610,8 @@ export default function GoLiveScreen() {
           setLiveStreamId(null);
           setTopGifters([]);
           setChatMessages([]);
+          setTrendingRank(0);
+          setLeaderboardRank(null);
           setCameraGranted(false);
           setMicGranted(false);
           setPreviewError(null);
@@ -788,6 +802,8 @@ export default function GoLiveScreen() {
           hostName={hostProfile?.displayName || user?.email?.split('@')[0] || 'Host'}
           hostAvatarUrl={hostProfile?.avatarUrl}
           viewerCount={viewerCount}
+          trendingRank={trendingRank}
+          leaderboardRank={leaderboardRank ?? undefined}
           topGifters={topGifters}
           messages={chatMessages}
           isMuted={false}

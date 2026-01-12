@@ -15,7 +15,14 @@ import {
   ShareSheet,
   ViewersSheet,
   GiftersSheet,
+  TrendingSheet,
+  LeaderboardSheet,
 } from './sheets/HostSheets';
+
+export interface LeaderboardRank {
+  currentRank: number;
+  pointsToNextRank: number;
+}
 
 export interface SoloHostOverlayProps {
   // Host info
@@ -25,6 +32,10 @@ export interface SoloHostOverlayProps {
   // Counters
   viewerCount: number;
   likesCount?: number;
+  
+  // Ranking data (like web)
+  trendingRank?: number;
+  leaderboardRank?: LeaderboardRank;
   
   // Data
   topGifters: TopGifter[];
@@ -51,6 +62,8 @@ export default function SoloHostOverlay({
   hostAvatarUrl,
   viewerCount,
   likesCount = 0,
+  trendingRank,
+  leaderboardRank,
   topGifters,
   messages,
   isMuted,
@@ -72,6 +85,8 @@ export default function SoloHostOverlay({
   const [showShare, setShowShare] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
   const [showGifters, setShowGifters] = useState(false);
+  const [showTrending, setShowTrending] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   return (
     <View style={styles.container} pointerEvents="box-none">
@@ -91,8 +106,46 @@ export default function SoloHostOverlay({
               <Text style={styles.hostName} numberOfLines={1}>
                 {hostName}
               </Text>
+              {/* Trending + Leaderboard row (like web) */}
+              <View style={styles.rankRow}>
+                <Pressable
+                  onPress={() => setShowTrending(true)}
+                  style={styles.rankButton}
+                >
+                  <Ionicons name="flame" size={14} color="#F97316" />
+                  <Text style={styles.rankText}>{trendingRank ?? 0}</Text>
+                </Pressable>
+                <Text style={styles.rankDot}>•</Text>
+                <Pressable
+                  onPress={() => setShowLeaderboard(true)}
+                  style={styles.rankButton}
+                >
+                  <Ionicons name="trophy" size={14} color="#EAB308" />
+                  <Text style={styles.rankText}>{leaderboardRank?.currentRank ?? 0}</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
+          {/* Leaderboard badge below bubble (like web) */}
+          {leaderboardRank && leaderboardRank.currentRank > 0 && leaderboardRank.currentRank <= 100 && (
+            <Pressable 
+              onPress={() => setShowLeaderboard(true)}
+              style={styles.leaderboardBadge}
+            >
+              <Text style={styles.leaderboardBadgeRank}>
+                {leaderboardRank.currentRank}
+                <Text style={styles.leaderboardBadgeSuffix}>
+                  {leaderboardRank.currentRank === 1 ? 'st' : leaderboardRank.currentRank === 2 ? 'nd' : leaderboardRank.currentRank === 3 ? 'rd' : 'th'}
+                </Text>
+              </Text>
+              <Text style={styles.leaderboardBadgeDot}>•</Text>
+              <Ionicons name="trophy" size={10} color="#FDE047" />
+              <Text style={styles.leaderboardBadgeDot}>•</Text>
+              <Text style={styles.leaderboardBadgePoints}>
+                {leaderboardRank.currentRank === 1 ? '+' : ''}{leaderboardRank.pointsToNextRank.toLocaleString()}
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Right cluster: Viewer count + Exit (matches web mobile layout) */}
@@ -167,6 +220,8 @@ export default function SoloHostOverlay({
       <ShareSheet visible={showShare} onClose={() => setShowShare(false)} />
       <ViewersSheet visible={showViewers} onClose={() => setShowViewers(false)} viewerCount={viewerCount} />
       <GiftersSheet visible={showGifters} onClose={() => setShowGifters(false)} />
+      <TrendingSheet visible={showTrending} onClose={() => setShowTrending(false)} />
+      <LeaderboardSheet visible={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
     </View>
   );
 }
@@ -224,6 +279,56 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  rankRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+    gap: 4,
+  },
+  rankButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  rankText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
+  },
+  rankDot: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  leaderboardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    marginLeft: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(234,179,8,0.9)',
+    gap: 3,
+  },
+  leaderboardBadgeRank: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  leaderboardBadgeSuffix: {
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  leaderboardBadgeDot: {
+    fontSize: 8,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  leaderboardBadgePoints: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
   },
 
   // Right cluster (viewer + exit) - matches web mobile layout

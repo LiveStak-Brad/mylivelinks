@@ -153,6 +153,8 @@ export default function LiveHostScreen() {
           hostName={MOCK_HOST.name}
           hostAvatarUrl={MOCK_HOST.avatarUrl}
           viewerCount={viewerCount}
+          trendingRank={5}
+          leaderboardRank={{ currentRank: 12, pointsToNextRank: 250 }}
           topGifters={MOCK_TOP_GIFTERS}
           messages={MOCK_MESSAGES}
           isMuted={isMuted}
