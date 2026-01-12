@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   hostNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 1,
   },
   hostName: {
     fontSize: 12,
