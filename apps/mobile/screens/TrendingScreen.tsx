@@ -31,13 +31,14 @@ const MOCK_TRENDING_STREAMS: MockStream[] = [
 
 export default function TrendingScreen() {
   const navigation = useNavigation<any>();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const profileId = user?.id ?? 'anon';
 
   const [selectedSpecial, setSelectedSpecial] = useState<(typeof SPECIAL_FILTERS)[number]>('Trending');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedGender, setSelectedGender] = useState<BrowseGenderFilter>('All');
   const [search, setSearch] = useState('');
+  const [hydrated, setHydrated] = useState(false);
 
   const navigateToLiveTV = () => {
     navigation.navigate('Tabs', { screen: 'LiveTV' });
@@ -45,24 +46,32 @@ export default function TrendingScreen() {
 
   useEffect(() => {
     let mounted = true;
-    loadLiveBrowseFilters('trending', profileId).then((prefs) => {
-      if (!mounted) return;
-      if (SPECIAL_FILTERS.includes(prefs.special as any)) setSelectedSpecial(prefs.special as any);
-      setSelectedCategory(prefs.category || 'All');
-      setSelectedGender(prefs.gender);
-    });
+    if (loading) return;
+    loadLiveBrowseFilters('trending', profileId)
+      .then((prefs) => {
+        if (!mounted) return;
+        if (SPECIAL_FILTERS.includes(prefs.special as any)) setSelectedSpecial(prefs.special as any);
+        setSelectedCategory(prefs.category || 'All');
+        setSelectedGender(prefs.gender);
+        setHydrated(true);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setHydrated(true);
+      });
     return () => {
       mounted = false;
     };
-  }, [profileId]);
+  }, [loading, profileId]);
 
   useEffect(() => {
+    if (loading || !hydrated) return;
     saveLiveBrowseFilters('trending', profileId, {
       gender: selectedGender,
       category: selectedCategory,
       special: selectedSpecial,
     });
-  }, [profileId, selectedCategory, selectedGender, selectedSpecial]);
+  }, [hydrated, loading, profileId, selectedCategory, selectedGender, selectedSpecial]);
 
   const filteredStreams = useMemo(() => {
     const q = search.trim().toLowerCase();

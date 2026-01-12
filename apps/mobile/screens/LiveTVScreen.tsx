@@ -48,34 +48,43 @@ const MOCK_STREAMS: MockStream[] = [
 ];
 
 export default function LiveTVScreen() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const profileId = user?.id ?? 'anon';
 
   const [selectedSpecial, setSelectedSpecial] = useState<(typeof SPECIAL_FILTERS)[number]>('Trending');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedGender, setSelectedGender] = useState<BrowseGenderFilter>('All');
   const [search, setSearch] = useState('');
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    loadLiveBrowseFilters('livetv', profileId).then((prefs) => {
-      if (!mounted) return;
-      if (SPECIAL_FILTERS.includes(prefs.special as any)) setSelectedSpecial(prefs.special as any);
-      setSelectedCategory(prefs.category || 'All');
-      setSelectedGender(prefs.gender);
-    });
+    if (loading) return;
+    loadLiveBrowseFilters('livetv', profileId)
+      .then((prefs) => {
+        if (!mounted) return;
+        if (SPECIAL_FILTERS.includes(prefs.special as any)) setSelectedSpecial(prefs.special as any);
+        setSelectedCategory(prefs.category || 'All');
+        setSelectedGender(prefs.gender);
+        setHydrated(true);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setHydrated(true);
+      });
     return () => {
       mounted = false;
     };
-  }, [profileId]);
+  }, [loading, profileId]);
 
   useEffect(() => {
+    if (loading || !hydrated) return;
     saveLiveBrowseFilters('livetv', profileId, {
       gender: selectedGender,
       category: selectedCategory,
       special: selectedSpecial,
     });
-  }, [profileId, selectedCategory, selectedGender, selectedSpecial]);
+  }, [hydrated, loading, profileId, selectedCategory, selectedGender, selectedSpecial]);
 
   const filteredStreams = useMemo(() => {
     const q = search.trim().toLowerCase();
