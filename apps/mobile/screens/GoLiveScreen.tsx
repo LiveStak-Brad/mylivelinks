@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,8 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { VideoView } from '@livekit/react-native';
 import { createLocalVideoTrack, LocalVideoTrack, VideoPresets } from 'livekit-client';
 import { useAuth } from '../state/AuthContext';
-import { fetchMobileToken, connectAndPublish, disconnectAndCleanup, generateSoloRoomName } from '../lib/livekit';
-import type { Room, LocalAudioTrack } from 'livekit-client';
+import { generateSoloRoomName } from '../lib/livekit';
 
 export default function GoLiveScreen() {
   const insets = useSafeAreaInsets();
@@ -26,11 +25,6 @@ export default function GoLiveScreen() {
   // Preview track state
   const [previewTrack, setPreviewTrack] = useState<LocalVideoTrack | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-
-  // Go Live state
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectError, setConnectError] = useState<string | null>(null);
-  const roomRef = useRef<Room | null>(null);
 
   const categories = useMemo(
     () => [
@@ -116,8 +110,8 @@ export default function GoLiveScreen() {
     navigation.goBack();
   }, [navigation, previewTrack]);
 
-  // Handle Go Live
-  const handleGoLive = useCallback(async () => {
+  // Handle Go Live - validate and navigate (LiveScreen handles connection)
+  const handleGoLive = useCallback(() => {
     // Validate required fields
     if (!streamTitle.trim()) {
       Alert.alert('Title Required', 'Please enter a stream title.');
@@ -140,43 +134,22 @@ export default function GoLiveScreen() {
       return;
     }
 
-    setIsConnecting(true);
-    setConnectError(null);
-
-    try {
-      // Stop preview track before connecting
-      if (previewTrack) {
-        previewTrack.stop();
-        setPreviewTrack(null);
-      }
-
-      // Generate room name
-      const roomName = generateSoloRoomName(user.id);
-      const userName = user.email?.split('@')[0] || 'Host';
-
-      // Fetch token from Edge Function
-      const { token, url } = await fetchMobileToken(roomName, user.id, userName, true);
-
-      // Connect and publish
-      const { room, videoTrack, audioTrack } = await connectAndPublish(url, token, true);
-      roomRef.current = room;
-
-      // Navigate to live screen with params
-      navigation.navigate('LiveScreen', {
-        roomName,
-        title: streamTitle.trim(),
-        category: selectedCategoryId,
-        audience,
-        isHost: true,
-      });
-
-    } catch (err: any) {
-      console.error('[GoLive] Connect error:', err);
-      setConnectError(err.message || 'Failed to go live. Please try again.');
-      Alert.alert('Connection Failed', err.message || 'Failed to go live. Please try again.');
-    } finally {
-      setIsConnecting(false);
+    // Stop preview track before navigating (LiveScreen will create new tracks)
+    if (previewTrack) {
+      previewTrack.stop();
+      setPreviewTrack(null);
     }
+
+    // Generate room name and navigate - LiveScreen handles connection
+    const roomName = generateSoloRoomName(user.id);
+
+    navigation.navigate('LiveScreen', {
+      roomName,
+      title: streamTitle.trim(),
+      category: selectedCategoryId,
+      audience,
+      isHost: true,
+    });
   }, [streamTitle, selectedCategoryId, audience, user, needsPermissions, previewTrack, navigation]);
 
   return (
