@@ -1,9 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
-import { CHAT_FONT_COLORS } from '../../live/ChatOverlay';
-import { DEFAULT_HOST_LIVE_OPTIONS, type HostLiveOptions } from '../../../lib/hostLiveOptions';
+import { DEFAULT_HOST_CAMERA_FILTERS, type HostCameraFilters } from '../../../lib/hostCameraFilters';
 
 interface BaseSheetProps {
   visible: boolean;
@@ -113,103 +112,87 @@ export function CoHostSheet({ visible, onClose }: BaseSheetProps) {
 export function FiltersSheet({
   visible,
   onClose,
-  filters = DEFAULT_HOST_LIVE_OPTIONS,
+  filters = DEFAULT_HOST_CAMERA_FILTERS,
   onChange,
 }: BaseSheetProps & {
-  filters?: HostLiveOptions;
-  onChange?: (next: HostLiveOptions) => void;
+  filters?: HostCameraFilters;
+  onChange?: (next: HostCameraFilters) => void;
 }) {
-  const fontSizeLabel = useMemo(() => {
-    switch (filters.chatFontSize) {
-      case 'small':
-        return 'Small';
-      case 'large':
-        return 'Large';
-      default:
-        return 'Medium';
-    }
-  }, [filters.chatFontSize]);
-
-  const cycleChatFontSize = () => {
-    const next =
-      filters.chatFontSize === 'small'
-        ? 'medium'
-        : filters.chatFontSize === 'medium'
-          ? 'large'
-          : 'small';
-    onChange?.({ ...filters, chatFontSize: next });
-  };
-
-  const cycleChatFontColor = () => {
-    const idx = CHAT_FONT_COLORS.indexOf(filters.chatFontColor as any);
-    const safeIdx = idx >= 0 ? idx : 0;
-    const next = CHAT_FONT_COLORS[(safeIdx + 1) % CHAT_FONT_COLORS.length];
-    onChange?.({ ...filters, chatFontColor: next });
-  };
+  const update = (patch: Partial<HostCameraFilters>) => onChange?.({ ...filters, ...patch });
 
   return (
-    <SheetContainer visible={visible} onClose={onClose} title="Filters">
-      {/* Chat visibility */}
+    <SheetContainer visible={visible} onClose={onClose} title="Video Filters">
       <View style={styles.row}>
-        <Ionicons name="chatbubbles-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Chat overlay</Text>
-        <Switch
-          value={filters.chatVisible}
-          onValueChange={(v) => onChange?.({ ...filters, chatVisible: v })}
-        />
+        <Ionicons name="sunny-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Brightness</Text>
+        <MiniSlider value={filters.brightness} onValueChange={(v) => update({ brightness: v })} />
       </View>
-
-      {/* Chat font size (tap row to cycle) */}
-      <Pressable style={styles.row} onPress={cycleChatFontSize}>
-        <Ionicons name="text-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Chat font size</Text>
-        <View style={styles.valuePill}>
-          <Text style={styles.valuePillText}>{fontSizeLabel}</Text>
-          <Ionicons name="sync" size={14} color="rgba(255,255,255,0.7)" />
-        </View>
-      </Pressable>
-
-      {/* Chat font color (tap row to cycle) */}
-      <Pressable style={styles.row} onPress={cycleChatFontColor}>
+      <View style={styles.row}>
+        <Ionicons name="contrast-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Contrast</Text>
+        <MiniSlider value={filters.contrast} onValueChange={(v) => update({ contrast: v })} />
+      </View>
+      <View style={styles.row}>
         <Ionicons name="color-palette-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Chat font color</Text>
-        <View style={styles.valuePill}>
-          <View style={[styles.colorDot, { backgroundColor: filters.chatFontColor }]} />
-          <Text style={styles.valuePillText}>{filters.chatFontColor}</Text>
-          <Ionicons name="sync" size={14} color="rgba(255,255,255,0.7)" />
-        </View>
-      </Pressable>
-
-      {/* Show/hide top gifters */}
-      <View style={styles.row}>
-        <Ionicons name="gift-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Top gifters</Text>
-        <Switch
-          value={filters.showTopGifters}
-          onValueChange={(v) => onChange?.({ ...filters, showTopGifters: v })}
-        />
+        <Text style={styles.rowText}>Saturation</Text>
+        <MiniSlider value={filters.saturation} onValueChange={(v) => update({ saturation: v })} />
       </View>
-
-      {/* Show/hide viewer count badge */}
       <View style={styles.row}>
-        <Ionicons name="eye-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Viewer badge</Text>
-        <Switch
-          value={filters.showViewerCountBadge}
-          onValueChange={(v) => onChange?.({ ...filters, showViewerCountBadge: v })}
-        />
-      </View>
-
-      {/* Compact mode */}
-      <View style={styles.row}>
-        <Ionicons name="contract-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Compact mode</Text>
-        <Switch
-          value={filters.compactMode}
-          onValueChange={(v) => onChange?.({ ...filters, compactMode: v })}
-        />
+        <Ionicons name="water-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Blur</Text>
+        <MiniSlider value={filters.blur} onValueChange={(v) => update({ blur: v })} />
       </View>
     </SheetContainer>
+  );
+}
+
+function clamp01(n: number) {
+  return Math.max(0, Math.min(1, n));
+}
+
+function MiniSlider({
+  value,
+  onValueChange,
+}: {
+  value: number;
+  onValueChange: (next: number) => void;
+}) {
+  const trackRef = useRef<View>(null);
+  const trackW = useRef(100);
+
+  const setFromX = (x: number) => {
+    const w = trackW.current || 100;
+    onValueChange(clamp01(x / w));
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        setFromX(evt.nativeEvent.locationX);
+      },
+      onPanResponderMove: (evt) => {
+        setFromX(evt.nativeEvent.locationX);
+      },
+    })
+  ).current;
+
+  const pct = clamp01(value);
+
+  return (
+    <View
+      ref={trackRef}
+      style={styles.slider}
+      onLayout={(e) => {
+        trackW.current = e.nativeEvent.layout.width || 100;
+      }}
+      accessibilityRole="adjustable"
+      accessibilityValue={{ min: 0, max: 1, now: pct }}
+      {...panResponder.panHandlers}
+    >
+      <View style={[styles.sliderFill, { width: `${pct * 100}%` }]} />
+    </View>
   );
 }
 
@@ -656,6 +639,11 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 2,
+    overflow: 'hidden',
+  },
+  sliderFill: {
+    height: '100%',
+    backgroundColor: 'rgba(255,255,255,0.85)',
   },
   valuePill: {
     flexDirection: 'row',

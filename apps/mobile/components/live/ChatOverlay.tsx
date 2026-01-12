@@ -198,13 +198,10 @@ export const CHAT_FONT_COLORS = [
 ] as const;
 
 export type ChatFontColor = typeof CHAT_FONT_COLORS[number];
-export type ChatFontSize = 'small' | 'medium' | 'large';
 
 interface ChatOverlayProps {
   messages: ChatMessage[];
   fontColor?: ChatFontColor;
-  fontSize?: ChatFontSize;
-  compactMode?: boolean;
 }
 
 const PLACEHOLDER_AVATAR = 'https://via.placeholder.com/28/6366F1/FFFFFF?text=?';
@@ -212,8 +209,6 @@ const PLACEHOLDER_AVATAR = 'https://via.placeholder.com/28/6366F1/FFFFFF?text=?'
 export default function ChatOverlay({
   messages,
   fontColor = '#FFFFFF',
-  fontSize = 'medium',
-  compactMode = false,
 }: ChatOverlayProps) {
   const flatListRef = useRef<FlatList>(null);
 
@@ -230,15 +225,15 @@ export default function ChatOverlay({
     switch (item.type) {
       case 'gift':
         return (
-          <View style={[styles.messageRow, compactMode && styles.messageRowCompact]}>
+          <View style={styles.messageRow}>
             <Image
               source={{ uri: item.avatarUrl || PLACEHOLDER_AVATAR }}
-              style={[styles.avatar, compactMode && styles.avatarCompact]}
+              style={styles.avatar}
               resizeMode="cover"
             />
             <View style={styles.messageContent}>
               <View style={styles.usernameRow}>
-                <Text style={[styles.username, fontSizeStyles.username[fontSize], { color: textColor }]} numberOfLines={1}>
+                <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
                 {/* Gifter badge (web parity - pill with icon + level) */}
@@ -267,7 +262,7 @@ export default function ChatOverlay({
                   <Text style={styles.giftAmount}>{item.giftAmount}</Text>
                 </View>
               </View>
-              <Text style={[styles.messageText, fontSizeStyles.message[fontSize], { color: textColor }]} numberOfLines={2}>
+              <Text style={[styles.messageText, { color: textColor }]} numberOfLines={2}>
                 {item.text}
               </Text>
             </View>
@@ -276,27 +271,20 @@ export default function ChatOverlay({
         
       case 'follow':
         return (
-          <View style={[styles.messageRow, compactMode && styles.messageRowCompact]}>
+          <View style={styles.messageRow}>
             <Image
               source={{ uri: item.avatarUrl || PLACEHOLDER_AVATAR }}
-              style={[styles.avatar, compactMode && styles.avatarCompact]}
+              style={styles.avatar}
               resizeMode="cover"
             />
             <View style={styles.messageContent}>
               <View style={styles.usernameRow}>
-                <Text style={[styles.username, fontSizeStyles.username[fontSize], { color: textColor }]} numberOfLines={1}>
+                <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
                 <Ionicons name="person-add" size={10} color={textColor} style={{ marginLeft: 4, opacity: 0.7 }} />
               </View>
-              <Text
-                style={[
-                  styles.messageText,
-                  fontSizeStyles.message[fontSize],
-                  { color: textColor, opacity: 0.8 },
-                ]}
-                numberOfLines={1}
-              >
+              <Text style={[styles.messageText, { color: textColor, opacity: 0.8 }]} numberOfLines={1}>
                 followed you
               </Text>
             </View>
@@ -305,9 +293,9 @@ export default function ChatOverlay({
         
       case 'system':
         return (
-          <View style={[styles.systemRow, compactMode && styles.systemRowCompact]}>
+          <View style={styles.systemRow}>
             <Ionicons name="information-circle-outline" size={12} color={textColor} style={{ opacity: 0.5 }} />
-            <Text style={[styles.systemText, fontSizeStyles.system[fontSize], { color: textColor }]} numberOfLines={1}>
+            <Text style={[styles.systemText, { color: textColor }]} numberOfLines={1}>
               {item.text}
             </Text>
           </View>
@@ -316,15 +304,15 @@ export default function ChatOverlay({
       default:
         // Regular chat message
         return (
-          <View style={[styles.messageRow, compactMode && styles.messageRowCompact]}>
+          <View style={styles.messageRow}>
             <Image
               source={{ uri: item.avatarUrl || PLACEHOLDER_AVATAR }}
-              style={[styles.avatar, compactMode && styles.avatarCompact]}
+              style={styles.avatar}
               resizeMode="cover"
             />
             <View style={styles.messageContent}>
               <View style={styles.usernameRow}>
-                <Text style={[styles.username, fontSizeStyles.username[fontSize], { color: textColor }]} numberOfLines={1}>
+                <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
                 {/* Gifter badge (web parity - pill with icon + level) */}
@@ -349,7 +337,7 @@ export default function ChatOverlay({
                   <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
                 )}
               </View>
-              <Text style={[styles.messageText, fontSizeStyles.message[fontSize], { color: textColor }]} numberOfLines={2}>
+              <Text style={[styles.messageText, { color: textColor }]} numberOfLines={2}>
                 {item.text}
               </Text>
             </View>
@@ -359,53 +347,28 @@ export default function ChatOverlay({
   };
 
   return (
-    <View style={[styles.container, compactMode && styles.containerCompact]}>
+    <View style={styles.container}>
       <FlatList
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={renderMessage}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.listContent, compactMode && styles.listContentCompact]}
+        contentContainerStyle={styles.listContent}
         inverted
       />
     </View>
   );
 }
 
-const fontSizeStyles = {
-  username: {
-    small: { fontSize: 11 },
-    medium: { fontSize: 12 },
-    large: { fontSize: 13 },
-  } as const,
-  message: {
-    small: { fontSize: 12, lineHeight: 16 },
-    medium: { fontSize: 13, lineHeight: 17 },
-    large: { fontSize: 15, lineHeight: 19 },
-  } as const,
-  system: {
-    small: { fontSize: 10 },
-    medium: { fontSize: 11 },
-    large: { fontSize: 12 },
-  } as const,
-};
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 12,
   },
-  containerCompact: {
-    paddingHorizontal: 8,
-  },
   listContent: {
     paddingVertical: 4,
     gap: 4, // Compact spacing
-  },
-  listContentCompact: {
-    paddingVertical: 2,
-    gap: 2,
   },
   
   // NEW SPEC: Compact message row with avatar
@@ -415,9 +378,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     // NO background - transparent
   },
-  messageRowCompact: {
-    paddingVertical: 1,
-  },
   
   // 1:1 square avatar (24-28px target)
   avatar: {
@@ -426,12 +386,6 @@ const styles = StyleSheet.create({
     borderRadius: 13,
     marginRight: 8,
     backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  avatarCompact: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    marginRight: 6,
   },
   
   messageContent: {
@@ -445,11 +399,14 @@ const styles = StyleSheet.create({
   },
   
   username: {
+    fontSize: 12,
     fontWeight: '700',
     // color applied dynamically via fontColor prop
   },
   
   messageText: {
+    fontSize: 13,
+    lineHeight: 17,
     marginTop: 1,
     // color applied dynamically via fontColor prop
   },
@@ -501,11 +458,8 @@ const styles = StyleSheet.create({
     paddingLeft: 34, // Align with message text (avatar width + margin)
     gap: 4,
   },
-  systemRowCompact: {
-    paddingLeft: 28,
-    paddingVertical: 1,
-  },
   systemText: {
+    fontSize: 11,
     fontStyle: 'italic',
     opacity: 0.6,
   },

@@ -9,7 +9,7 @@ const PRO_BADGE_IMAGE = require('../../assets/pro.png');
 import ChatOverlay, { ChatMessage, ChatFontColor } from './ChatOverlay';
 import TopGifterBubbles, { TopGifter } from './TopGifterBubbles';
 import HostControlsBar from './HostControlsBar';
-import { DEFAULT_HOST_LIVE_OPTIONS, type HostLiveOptions } from '../../lib/hostLiveOptions';
+import { DEFAULT_HOST_CAMERA_FILTERS, loadHostCameraFilters, saveHostCameraFilters, type HostCameraFilters } from '../../lib/hostCameraFilters';
 import {
   SettingsSheet,
   GuestsSheet,
@@ -53,9 +53,8 @@ export interface SoloHostOverlayProps {
   // Chat font color (new spec)
   chatFontColor?: ChatFontColor;
 
-  // Host live overlay filters (persisted by screen; UI-only for now)
-  hostFilters?: HostLiveOptions;
-  onHostFiltersChange?: (next: HostLiveOptions) => void;
+  // Host profile id (for persisting camera filter slider values)
+  profileId?: string;
   
   // Handlers (placeholder)
   onEndStream: () => void;
@@ -79,15 +78,27 @@ export default function SoloHostOverlay({
   isMuted,
   isCameraFlipped,
   chatFontColor = '#FFFFFF',
-  hostFilters,
-  onHostFiltersChange,
+  profileId,
   onEndStream,
   onShare,
   onFlipCamera,
   onToggleMute,
 }: SoloHostOverlayProps) {
   const insets = useSafeAreaInsets();
-  const filters = hostFilters ?? DEFAULT_HOST_LIVE_OPTIONS;
+  const storageProfileId = profileId ?? 'anonymous';
+  const [cameraFilters, setCameraFilters] = useState<HostCameraFilters>(DEFAULT_HOST_CAMERA_FILTERS);
+
+  // Load persisted camera filter sliders
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const loaded = await loadHostCameraFilters(storageProfileId);
+      if (!cancelled) setCameraFilters(loaded);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storageProfileId]);
   
   // Sheet visibility states
   const [showSettings, setShowSettings] = useState(false);
@@ -169,18 +180,16 @@ export default function SoloHostOverlay({
         {/* Right cluster: Viewer count + Exit (matches web mobile layout) */}
         <View style={styles.topRightCluster}>
           {/* Viewer count badge - positioned near X on mobile (web parity) */}
-          {filters.showViewerCountBadge && (
-            <Pressable
-              onPress={() => setShowViewers(true)}
-              style={({ pressed }) => [
-                styles.viewerBadge,
-                pressed && styles.viewerBadgePressed,
-              ]}
-            >
-              <Ionicons name="eye" size={14} color="#FFFFFF" />
-              <Text style={styles.viewerCount}>{viewerCount.toLocaleString()}</Text>
-            </Pressable>
-          )}
+          <Pressable
+            onPress={() => setShowViewers(true)}
+            style={({ pressed }) => [
+              styles.viewerBadge,
+              pressed && styles.viewerBadgePressed,
+            ]}
+          >
+            <Ionicons name="eye" size={14} color="#FFFFFF" />
+            <Text style={styles.viewerCount}>{viewerCount.toLocaleString()}</Text>
+          </Pressable>
 
           {/* Exit button */}
           <Pressable
@@ -199,12 +208,10 @@ export default function SoloHostOverlay({
       <View style={[styles.secondRow, { top: insets.top + 56 }]}>
         {/* Top gifters + Share */}
         <View style={styles.secondRowRight}>
-          {filters.showTopGifters && (
-            <TopGifterBubbles
-              gifters={topGifters}
-              onPress={() => setShowGifters(true)}
-            />
-          )}
+          <TopGifterBubbles
+            gifters={topGifters}
+            onPress={() => setShowGifters(true)}
+          />
           <Pressable
             onPress={() => setShowShare(true)}
             style={({ pressed }) => [
@@ -218,16 +225,9 @@ export default function SoloHostOverlay({
       </View>
 
       {/* E. Chat Overlay (above bottom bar, closer to buttons) */}
-      {filters.chatVisible && (
-        <View style={[styles.chatContainer, { bottom: insets.bottom + 56 }]}>
-          <ChatOverlay
-            messages={messages}
-            fontColor={filters.chatFontColor ?? chatFontColor}
-            fontSize={filters.chatFontSize}
-            compactMode={filters.compactMode}
-          />
-        </View>
-      )}
+      <View style={[styles.chatContainer, { bottom: insets.bottom + 56 }]}>
+        <ChatOverlay messages={messages} fontColor={chatFontColor} />
+      </View>
 
       {/* F. Bottom Host Controls - Order: Battle, CoHost, Guests, Settings, Filters (web parity) */}
       <View style={[styles.bottomControls, { paddingBottom: insets.bottom }]}>
@@ -248,8 +248,11 @@ export default function SoloHostOverlay({
       <FiltersSheet
         visible={showFilters}
         onClose={() => setShowFilters(false)}
-        filters={filters}
-        onChange={onHostFiltersChange}
+        filters={cameraFilters}
+        onChange={(next) => {
+          setCameraFilters(next);
+          void saveHostCameraFilters(storageProfileId, next);
+        }}
       />
       <ShareSheet visible={showShare} onClose={() => setShowShare(false)} />
       <ViewersSheet visible={showViewers} onClose={() => setShowViewers(false)} viewerCount={viewerCount} />

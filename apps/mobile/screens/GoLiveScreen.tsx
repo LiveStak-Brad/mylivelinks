@@ -924,6 +924,7 @@ export default function GoLiveScreen() {
       {/* Solo Host Overlay - Full UI when live (web parity - real data from Supabase) */}
       {isLive && (
         <SoloHostOverlay
+          profileId={user?.id}
           hostName={hostProfile?.displayName || user?.email?.split('@')[0] || 'Host'}
           hostAvatarUrl={hostProfile?.avatarUrl}
           isPro={hostProfile?.isPro ?? false}
