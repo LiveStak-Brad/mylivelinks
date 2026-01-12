@@ -321,28 +321,17 @@ export default function GoLiveScreen() {
 
         {/* Go Live Button */}
         <View style={[styles.modalFooter, { paddingBottom: insets.bottom + 12 }]}>
-          {connectError && (
-            <Text style={styles.errorText}>{connectError}</Text>
-          )}
           <Pressable
             onPress={handleGoLive}
-            disabled={isConnecting}
             style={({ pressed }) => [
               styles.goLiveButton, 
               pressed && styles.goLiveButtonPressed,
-              isConnecting && styles.goLiveButtonDisabled,
             ]}
             accessibilityRole="button"
             accessibilityLabel="Go Live"
           >
-            {isConnecting ? (
-              <Text style={styles.goLiveText}>Connecting...</Text>
-            ) : (
-              <>
-                <View style={styles.liveIndicator} />
-                <Text style={styles.goLiveText}>Go Live</Text>
-              </>
-            )}
+            <View style={styles.liveIndicator} />
+            <Text style={styles.goLiveText}>Go Live</Text>
           </Pressable>
         </View>
       </View>
