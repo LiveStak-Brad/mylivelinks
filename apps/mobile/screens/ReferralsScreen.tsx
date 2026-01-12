@@ -1,13 +1,29 @@
-﻿import React from 'react';
+﻿import React, { useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
 
 export default function ReferralsScreen() {
-  const { colors } = useTheme();
+  const { mode, colors } = useTheme();
+
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      surface: colors.surface,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      border: colors.border,
+      cardBg: mode === 'dark' ? '#1a1a1a' : colors.surface,
+      cardBorder: mode === 'dark' ? '#2a2a2a' : colors.border,
+      linkBoxBg: mode === 'dark' ? '#0a0a0a' : colors.surface,
+      statCardBg: mode === 'dark' ? '#1a1a1a' : colors.surface,
+    }),
+    [mode, colors]
+  );
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         
         <View style={styles.header}>
@@ -15,19 +31,19 @@ export default function ReferralsScreen() {
             <Ionicons name="people" size={24} color="#fff" />
           </View>
           <View style={styles.headerText}>
-            <Text style={styles.title}>Referral Program</Text>
-            <Text style={styles.subtitle}>Invite friends and earn rewards</Text>
+            <Text style={[styles.title, { color: themed.text }]}>Referral Program</Text>
+            <Text style={[styles.subtitle, { color: themed.mutedText }]}>Invite friends and earn rewards</Text>
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder }]}>
           <View style={styles.cardHeader}>
             <Ionicons name="share-social" size={20} color="#8b5cf6" />
-            <Text style={styles.cardTitle}>Your Referral Link</Text>
+            <Text style={[styles.cardTitle, { color: themed.text }]}>Your Referral Link</Text>
           </View>
           
-          <View style={styles.linkBox}>
-            <Text style={styles.linkText}>https://www.mylivelinks.com/invite/username</Text>
+          <View style={[styles.linkBox, { backgroundColor: themed.linkBoxBg, borderColor: themed.cardBorder }]}>
+            <Text style={[styles.linkText, { color: themed.mutedText }]}>https://www.mylivelinks.com/invite/username</Text>
           </View>
           
           <View style={styles.buttonRow}>
@@ -43,28 +59,28 @@ export default function ReferralsScreen() {
         </View>
 
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Link Clicks</Text>
+          <View style={[styles.statCard, { backgroundColor: themed.statCardBg, borderColor: themed.cardBorder }]}>
+            <Text style={[styles.statValue, { color: themed.text }]}>0</Text>
+            <Text style={[styles.statLabel, { color: themed.mutedText }]}>Link Clicks</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: themed.statCardBg, borderColor: themed.cardBorder }]}>
             <Text style={[styles.statValue, styles.statValueSuccess]}>0</Text>
-            <Text style={styles.statLabel}>Signups</Text>
+            <Text style={[styles.statLabel, { color: themed.mutedText }]}>Signups</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: themed.statCardBg, borderColor: themed.cardBorder }]}>
             <Text style={[styles.statValue, styles.statValueWarning]}>0</Text>
-            <Text style={styles.statLabel}>Coins Earned</Text>
+            <Text style={[styles.statLabel, { color: themed.mutedText }]}>Coins Earned</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, { backgroundColor: themed.statCardBg, borderColor: themed.cardBorder }]}>
             <Text style={[styles.statValue, styles.statValuePrimary]}>—</Text>
-            <Text style={styles.statLabel}>Your Rank</Text>
+            <Text style={[styles.statLabel, { color: themed.mutedText }]}>Your Rank</Text>
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder }]}>
           <View style={styles.cardHeader}>
             <Ionicons name="sparkles" size={20} color="#8b5cf6" />
-            <Text style={styles.cardTitle}>How It Works</Text>
+            <Text style={[styles.cardTitle, { color: themed.text }]}>How It Works</Text>
           </View>
           
           <View style={styles.stepsList}>
@@ -73,8 +89,8 @@ export default function ReferralsScreen() {
                 <Text style={styles.stepNumberText}>1</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Share Your Link</Text>
-                <Text style={styles.stepDescription}>
+                <Text style={[styles.stepTitle, { color: themed.text }]}>Share Your Link</Text>
+                <Text style={[styles.stepDescription, { color: themed.mutedText }]}>
                   Share your unique referral link with friends on social media, messages, or anywhere you like.
                 </Text>
               </View>
@@ -85,8 +101,8 @@ export default function ReferralsScreen() {
                 <Text style={styles.stepNumberText}>2</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Friends Sign Up</Text>
-                <Text style={styles.stepDescription}>
+                <Text style={[styles.stepTitle, { color: themed.text }]}>Friends Sign Up</Text>
+                <Text style={[styles.stepDescription, { color: themed.mutedText }]}>
                   When someone signs up using your link, they become your referral and you both get rewarded.
                 </Text>
               </View>
@@ -97,8 +113,8 @@ export default function ReferralsScreen() {
                 <Text style={styles.stepNumberText}>3</Text>
               </View>
               <View style={styles.stepContent}>
-                <Text style={styles.stepTitle}>Earn Rewards</Text>
-                <Text style={styles.stepDescription}>
+                <Text style={[styles.stepTitle, { color: themed.text }]}>Earn Rewards</Text>
+                <Text style={[styles.stepDescription, { color: themed.mutedText }]}>
                   Get coins for each successful referral and climb the leaderboard for bonus rewards!
                 </Text>
               </View>

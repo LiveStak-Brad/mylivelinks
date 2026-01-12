@@ -1,41 +1,55 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/useTheme';
 
 export default function ComposerProjectIdScreen() {
-  const { colors } = useTheme();
+  const { mode, colors } = useTheme();
   const projectTitle = 'My Project';
   const projectStatus = 'draft';
 
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      surface: colors.surface,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      border: colors.border,
+      cardBg: mode === 'dark' ? '#1a1a1a' : colors.surface,
+      cardBorder: mode === 'dark' ? '#333' : colors.border,
+      badgeBg: mode === 'dark' ? '#333' : colors.border,
+    }),
+    [mode, colors]
+  );
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]} edges={['bottom']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.title}>{projectTitle}</Text>
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>{projectStatus}</Text>
+          <Text style={[styles.title, { color: themed.text }]}>{projectTitle}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: themed.badgeBg }]}>
+            <Text style={[styles.statusText, { color: themed.text }]}>{projectStatus}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tracks</Text>
-          <View style={styles.placeholderBox}>
-            <Text style={styles.placeholderText}>No tracks added yet</Text>
+          <Text style={[styles.sectionTitle, { color: themed.text }]}>Tracks</Text>
+          <View style={[styles.placeholderBox, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder, borderWidth: 1 }]}>
+            <Text style={[styles.placeholderText, { color: themed.mutedText }]}>No tracks added yet</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sounds</Text>
-          <View style={styles.placeholderBox}>
-            <Text style={styles.placeholderText}>No sounds added yet</Text>
+          <Text style={[styles.sectionTitle, { color: themed.text }]}>Sounds</Text>
+          <View style={[styles.placeholderBox, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder, borderWidth: 1 }]}>
+            <Text style={[styles.placeholderText, { color: themed.mutedText }]}>No sounds added yet</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Clips</Text>
-          <View style={styles.placeholderBox}>
-            <Text style={styles.placeholderText}>No clips added yet</Text>
+          <Text style={[styles.sectionTitle, { color: themed.text }]}>Clips</Text>
+          <View style={[styles.placeholderBox, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder, borderWidth: 1 }]}>
+            <Text style={[styles.placeholderText, { color: themed.mutedText }]}>No clips added yet</Text>
           </View>
         </View>
 
@@ -44,11 +58,11 @@ export default function ComposerProjectIdScreen() {
             <Text style={styles.buttonPrimaryText}>Edit</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.buttonSecondary}>
-            <Text style={styles.buttonSecondaryText}>Publish</Text>
+          <TouchableOpacity style={[styles.buttonSecondary, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder }]}>
+            <Text style={[styles.buttonSecondaryText, { color: themed.text }]}>Publish</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.buttonDanger}>
+          <TouchableOpacity style={[styles.buttonDanger, { backgroundColor: themed.cardBg }]}>
             <Text style={styles.buttonDangerText}>Delete</Text>
           </TouchableOpacity>
         </View>
@@ -73,12 +87,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fff',
     marginBottom: 8,
   },
   statusBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#333',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -86,7 +98,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#fff',
     textTransform: 'uppercase',
   },
   section: {
@@ -95,11 +106,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: 12,
   },
   placeholderBox: {
-    backgroundColor: '#1a1a1a',
     borderRadius: 8,
     padding: 24,
     alignItems: 'center',
@@ -108,7 +117,6 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     fontSize: 14,
-    color: '#666',
   },
   actions: {
     gap: 12,
@@ -126,20 +134,16 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   buttonSecondary: {
-    backgroundColor: '#1a1a1a',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333',
   },
   buttonSecondaryText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
   },
   buttonDanger: {
-    backgroundColor: '#1a1a1a',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -152,4 +156,3 @@ const styles = StyleSheet.create({
     color: '#ff3b30',
   },
 });
-

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/useTheme';
@@ -21,73 +21,93 @@ const COIN_PACKS: CoinPack[] = [
 ];
 
 export default function WalletScreen() {
-  const { colors } = useTheme();
+  const { mode, colors } = useTheme();
   const [coinBalance] = useState(0);
   const [diamondBalance] = useState(0);
+
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      surface: colors.surface,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      subtleText: (colors as any).subtleText ?? colors.mutedText,
+      border: colors.border,
+      cardBg: mode === 'dark' ? '#1a1a1a' : colors.surface,
+      cardBorder: mode === 'dark' ? 'rgba(255,255,255,0.08)' : colors.border,
+      coinGlow: mode === 'dark' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(251, 191, 36, 0.15)',
+      diamondGlow: mode === 'dark' ? 'rgba(168, 85, 247, 0.1)' : 'rgba(168, 85, 247, 0.15)',
+      coinBorder: mode === 'dark' ? 'rgba(251, 191, 36, 0.3)' : 'rgba(251, 191, 36, 0.5)',
+      diamondBorder: mode === 'dark' ? 'rgba(168, 85, 247, 0.3)' : 'rgba(168, 85, 247, 0.5)',
+      packCardBg: mode === 'dark' ? '#1a1a1a' : colors.surface,
+      packCardBorder: mode === 'dark' ? '#333' : colors.border,
+    }),
+    [mode, colors]
+  );
 
   const renderPackCard = (pack: CoinPack) => {
     return (
       <TouchableOpacity 
         key={pack.sku}
-        style={styles.packCard}
+        style={[styles.packCard, { backgroundColor: themed.packCardBg, borderColor: themed.packCardBorder }]}
         disabled={true}
       >
-        <Text style={styles.packName}>{pack.pack_name}</Text>
+        <Text style={[styles.packName, { color: themed.mutedText }]}>{pack.pack_name}</Text>
         <Text style={styles.packPrice}>${pack.usd_amount.toLocaleString()}</Text>
-        <Text style={styles.packCoins}>{pack.coins_awarded.toLocaleString()} 🪙</Text>
+        <Text style={[styles.packCoins, { color: themed.text }]}>{pack.coins_awarded.toLocaleString()} 🪙</Text>
         {pack.description && (
-          <Text style={styles.packDescription}>{pack.description}</Text>
+          <Text style={[styles.packDescription, { color: themed.subtleText }]}>{pack.description}</Text>
         )}
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.headerIcon}>💼</Text>
           <View>
-            <Text style={styles.headerTitle}>Wallet</Text>
-            <Text style={styles.headerSubtitle}>Manage your coins and earnings</Text>
+            <Text style={[styles.headerTitle, { color: themed.text }]}>Wallet</Text>
+            <Text style={[styles.headerSubtitle, { color: themed.mutedText }]}>Manage your coins and earnings</Text>
           </View>
         </View>
 
         <View style={styles.balanceSection}>
-          <View style={styles.balanceCard}>
-            <View style={styles.balanceGlow} />
+          <View style={[styles.balanceCard, { backgroundColor: themed.cardBg, borderColor: themed.coinBorder }]}>
+            <View style={[styles.balanceGlow, { backgroundColor: themed.coinGlow }]} />
             <View style={styles.balanceContent}>
               <View style={styles.balanceHeader}>
                 <Text style={styles.balanceEmoji}>🪙</Text>
-                <Text style={styles.balanceLabel}>Coins</Text>
+                <Text style={[styles.balanceLabel, { color: themed.mutedText }]}>Coins</Text>
               </View>
               <Text style={styles.balanceAmount}>{coinBalance.toLocaleString()}</Text>
-              <Text style={styles.balanceDescription}>For sending gifts</Text>
+              <Text style={[styles.balanceDescription, { color: themed.subtleText }]}>For sending gifts</Text>
             </View>
           </View>
           
-          <View style={[styles.balanceCard, styles.diamondCard]}>
-            <View style={[styles.balanceGlow, styles.diamondGlow]} />
+          <View style={[styles.balanceCard, { backgroundColor: themed.cardBg, borderColor: themed.diamondBorder }]}>
+            <View style={[styles.balanceGlow, { backgroundColor: themed.diamondGlow }]} />
             <View style={styles.balanceContent}>
               <View style={styles.balanceHeader}>
                 <Text style={styles.balanceEmoji}>💎</Text>
-                <Text style={styles.balanceLabel}>Diamonds</Text>
+                <Text style={[styles.balanceLabel, { color: themed.mutedText }]}>Diamonds</Text>
               </View>
               <Text style={[styles.balanceAmount, styles.diamondAmount]}>{diamondBalance.toLocaleString()}</Text>
-              <Text style={styles.balanceDescription}>≈ ${(diamondBalance / 100).toFixed(2)} USD</Text>
+              <Text style={[styles.balanceDescription, { color: themed.subtleText }]}>≈ ${(diamondBalance / 100).toFixed(2)} USD</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.packsSection}>
-          <Text style={styles.sectionTitle}>💰 Purchase Coins</Text>
-          <Text style={styles.sectionSubtitle}>Get coins to support your favorite creators with gifts</Text>
+          <Text style={[styles.sectionTitle, { color: themed.text }]}>💰 Purchase Coins</Text>
+          <Text style={[styles.sectionSubtitle, { color: themed.mutedText }]}>Get coins to support your favorite creators with gifts</Text>
           
           <View style={styles.packsGrid}>
             {COIN_PACKS.map(renderPackCard)}
           </View>
           
-          <Text style={styles.securePayment}>Secure payments via Stripe</Text>
+          <Text style={[styles.securePayment, { color: themed.subtleText }]}>Secure payments via Stripe</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -117,11 +137,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#fff',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#999',
     marginTop: 2,
   },
   balanceSection: {
@@ -129,16 +147,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   balanceCard: {
-    backgroundColor: '#1a1a1a',
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.3)',
     position: 'relative',
     overflow: 'hidden',
-  },
-  diamondCard: {
-    borderColor: 'rgba(168, 85, 247, 0.3)',
   },
   balanceGlow: {
     position: 'absolute',
@@ -146,11 +159,7 @@ const styles = StyleSheet.create({
     right: -50,
     width: 150,
     height: 150,
-    backgroundColor: 'rgba(251, 191, 36, 0.1)',
     borderRadius: 75,
-  },
-  diamondGlow: {
-    backgroundColor: 'rgba(168, 85, 247, 0.1)',
   },
   balanceContent: {
     position: 'relative',
@@ -168,7 +177,6 @@ const styles = StyleSheet.create({
   balanceLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#999',
   },
   balanceAmount: {
     fontSize: 36,
@@ -181,7 +189,6 @@ const styles = StyleSheet.create({
   },
   balanceDescription: {
     fontSize: 12,
-    color: '#666',
   },
   packsSection: {
     marginBottom: 24,
@@ -189,12 +196,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
     marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: '#999',
     marginBottom: 16,
   },
   packsGrid: {
@@ -205,15 +210,12 @@ const styles = StyleSheet.create({
   },
   packCard: {
     width: '48%',
-    backgroundColor: '#1a1a1a',
     borderRadius: 12,
     padding: 12,
     borderWidth: 2,
-    borderColor: '#333',
   },
   packName: {
     fontSize: 11,
-    color: '#999',
     fontWeight: '600',
     marginBottom: 4,
   },
@@ -226,17 +228,13 @@ const styles = StyleSheet.create({
   packCoins: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: 4,
   },
   packDescription: {
     fontSize: 10,
-    color: '#666',
   },
   securePayment: {
     fontSize: 10,
-    color: '#666',
     textAlign: 'center',
   },
 });
-

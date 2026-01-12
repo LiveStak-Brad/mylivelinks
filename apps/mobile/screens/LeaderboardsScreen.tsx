@@ -5,9 +5,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
 
 export default function LeaderboardsScreen() {
-  const { colors } = useTheme();
+  const { mode, colors } = useTheme();
   const [category, setCategory] = useState<'streamers' | 'gifters'>('streamers');
   const [timeframe, setTimeframe] = useState<'daily' | 'weekly' | 'all'>('weekly');
+
+  const themed = useMemo(
+    () => ({
+      bg: colors.bg,
+      surface: colors.surface,
+      text: colors.text,
+      mutedText: colors.mutedText,
+      border: colors.border,
+      cardBg: mode === 'dark' ? '#1a1a1a' : colors.surface,
+      cardBorder: mode === 'dark' ? '#2a2a2a' : colors.border,
+      segmentBg: mode === 'dark' ? '#0a0a0a' : colors.surface,
+      avatarBg: mode === 'dark' ? '#111827' : 'rgba(124, 58, 237, 0.12)',
+      avatarText: mode === 'dark' ? '#fff' : colors.text,
+    }),
+    [mode, colors]
+  );
 
   const title = category === 'streamers' ? 'Top Streamers' : 'Top Gifters';
   const scoreLabel = category === 'streamers' ? 'Diamonds' : 'Coins';
@@ -91,17 +107,17 @@ export default function LeaderboardsScreen() {
             <Ionicons name="trophy" size={24} color="#fff" />
           </View>
           <View style={styles.headerText}>
-            <Text style={styles.title}>Leaderboards</Text>
-            <Text style={styles.subtitle}>Daily, weekly, and all-time rankings</Text>
+            <Text style={[styles.title, { color: themed.text }]}>Leaderboards</Text>
+            <Text style={[styles.subtitle, { color: themed.mutedText }]}>Daily, weekly, and all-time rankings</Text>
           </View>
-          <TouchableOpacity style={styles.headerAction} activeOpacity={0.8}>
-            <Ionicons name="information-circle-outline" size={22} color="#9ca3af" />
+          <TouchableOpacity style={[styles.headerAction, { backgroundColor: themed.segmentBg, borderColor: themed.cardBorder }]} activeOpacity={0.8}>
+            <Ionicons name="information-circle-outline" size={22} color={themed.mutedText} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Category</Text>
-          <View style={styles.segment}>
+        <View style={[styles.card, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder }]}>
+          <Text style={[styles.sectionTitle, { color: themed.text }]}>Category</Text>
+          <View style={[styles.segment, { backgroundColor: themed.segmentBg, borderColor: themed.cardBorder }]}>
             <SegmentButton
               label="Streamers"
               icon="videocam"
@@ -118,15 +134,15 @@ export default function LeaderboardsScreen() {
 
           <View style={styles.filtersRow}>
             <View style={styles.filtersTitle}>
-              <Text style={styles.filtersTitleText}>Timeframe</Text>
-              <View style={styles.pill}>
+              <Text style={[styles.filtersTitleText, { color: themed.text }]}>Timeframe</Text>
+              <View style={[styles.pill, { backgroundColor: themed.segmentBg, borderColor: themed.cardBorder }]}>
                 <Ionicons name="time-outline" size={14} color="#9ca3af" />
-                <Text style={styles.pillText}>
+                <Text style={[styles.pillText, { color: themed.mutedText }]}>
                   {timeframe === 'daily' ? 'Daily' : timeframe === 'weekly' ? 'Weekly' : 'All-time'}
                 </Text>
               </View>
             </View>
-            <View style={styles.segmentSmall}>
+            <View style={[styles.segmentSmall, { backgroundColor: themed.segmentBg, borderColor: themed.cardBorder }]}>
               <SegmentButtonSmall
                 label="Daily"
                 isActive={timeframe === 'daily'}
@@ -146,10 +162,10 @@ export default function LeaderboardsScreen() {
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder }]}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{title}</Text>
-            <Text style={styles.sectionMeta}>
+            <Text style={[styles.sectionTitle, { color: themed.text }]}>{title}</Text>
+            <Text style={[styles.sectionMeta, { color: themed.mutedText }]}>
               {timeframe === 'daily' ? 'Today' : timeframe === 'weekly' ? 'This week' : 'All-time'}
             </Text>
           </View>
@@ -185,16 +201,16 @@ export default function LeaderboardsScreen() {
           </View>
         </View>
 
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: themed.cardBg, borderColor: themed.cardBorder }]}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Rankings</Text>
-            <Text style={styles.sectionMeta}>Placeholder data</Text>
+            <Text style={[styles.sectionTitle, { color: themed.text }]}>Rankings</Text>
+            <Text style={[styles.sectionMeta, { color: themed.mutedText }]}>Placeholder data</Text>
           </View>
 
-          <View style={styles.listHeaderRow}>
-            <Text style={[styles.listHeaderText, styles.colRank]}>#</Text>
-            <Text style={[styles.listHeaderText, styles.colUser]}>User</Text>
-            <Text style={[styles.listHeaderText, styles.colScore]}>{scoreLabel}</Text>
+          <View style={[styles.listHeaderRow, { borderBottomColor: themed.cardBorder }]}>
+            <Text style={[styles.listHeaderText, styles.colRank, { color: themed.mutedText }]}>#</Text>
+            <Text style={[styles.listHeaderText, styles.colUser, { color: themed.mutedText }]}>User</Text>
+            <Text style={[styles.listHeaderText, styles.colScore, { color: themed.mutedText }]}>{scoreLabel}</Text>
           </View>
 
           {rows.map((r, idx) => (
