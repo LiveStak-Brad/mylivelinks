@@ -148,7 +148,7 @@ export default function SoloHostOverlay({
       </View>
 
       {/* F. Bottom Host Controls - Order: Battle, CoHost, Guests, Settings, Filters (web parity) */}
-      <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 8 }]}>
+      <View style={[styles.bottomControls, { paddingBottom: insets.bottom }]}>
         <HostControlsBar
           onBattle={() => setShowBattle(true)}
           onCoHost={() => setShowCoHost(true)}
