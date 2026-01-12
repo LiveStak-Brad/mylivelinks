@@ -36,6 +36,15 @@ function ResetPasswordInner() {
           
           if (error) {
             console.error('Recovery session exchange failed:', error);
+            
+            // Check if session was actually created despite the error
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData?.session) {
+              console.log('Recovery session exists despite error - proceeding');
+              setStep('reset');
+              return;
+            }
+            
             setError(`Failed to verify reset link: ${error.message}`);
             setStep('request');
             return;
