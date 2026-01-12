@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,13 +87,16 @@ export default function SoloHostOverlay({
   const insets = useSafeAreaInsets();
   const storageProfileId = profileId ?? 'anonymous';
   const [cameraFilters, setCameraFilters] = useState<HostCameraFilters>(DEFAULT_HOST_CAMERA_FILTERS);
+  const didUserEditCameraFiltersRef = useRef(false);
 
   // Load persisted camera filter sliders
-  React.useEffect(() => {
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       const loaded = await loadHostCameraFilters(storageProfileId);
-      if (!cancelled) setCameraFilters(loaded);
+      if (!cancelled && !didUserEditCameraFiltersRef.current) {
+        setCameraFilters(loaded);
+      }
     })();
     return () => {
       cancelled = true;
@@ -250,6 +253,7 @@ export default function SoloHostOverlay({
         onClose={() => setShowFilters(false)}
         filters={cameraFilters}
         onChange={(next) => {
+          didUserEditCameraFiltersRef.current = true;
           setCameraFilters(next);
           void saveHostCameraFilters(storageProfileId, next);
         }}

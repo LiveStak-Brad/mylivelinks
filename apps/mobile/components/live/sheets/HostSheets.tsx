@@ -123,52 +123,72 @@ export function FiltersSheet({
   return (
     <SheetContainer visible={visible} onClose={onClose} title="Video Filters">
       <View style={styles.row}>
+        <Ionicons name="sparkles-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Smoothing</Text>
+        <MiniSlider value={filters.smoothing} min={0} max={3} step={1} onValueChange={(v) => update({ smoothing: v })} />
+      </View>
+      <View style={styles.row}>
         <Ionicons name="sunny-outline" size={22} color="#FFFFFF" />
         <Text style={styles.rowText}>Brightness</Text>
-        <MiniSlider value={filters.brightness} onValueChange={(v) => update({ brightness: v })} />
+        <MiniSlider value={filters.brightness} min={0.5} max={1.5} step={0.05} onValueChange={(v) => update({ brightness: v })} />
       </View>
       <View style={styles.row}>
         <Ionicons name="contrast-outline" size={22} color="#FFFFFF" />
         <Text style={styles.rowText}>Contrast</Text>
-        <MiniSlider value={filters.contrast} onValueChange={(v) => update({ contrast: v })} />
+        <MiniSlider value={filters.contrast} min={0.5} max={1.5} step={0.05} onValueChange={(v) => update({ contrast: v })} />
       </View>
       <View style={styles.row}>
         <Ionicons name="color-palette-outline" size={22} color="#FFFFFF" />
         <Text style={styles.rowText}>Saturation</Text>
-        <MiniSlider value={filters.saturation} onValueChange={(v) => update({ saturation: v })} />
+        <MiniSlider value={filters.saturation} min={0} max={2} step={0.1} onValueChange={(v) => update({ saturation: v })} />
       </View>
       <View style={styles.row}>
         <Ionicons name="water-outline" size={22} color="#FFFFFF" />
         <Text style={styles.rowText}>Blur</Text>
-        <MiniSlider value={filters.blur} onValueChange={(v) => update({ blur: v })} />
+        <MiniSlider value={filters.blur} min={0} max={4} step={0.5} onValueChange={(v) => update({ blur: v })} />
       </View>
     </SheetContainer>
   );
 }
 
-function clamp01(n: number) {
-  return Math.max(0, Math.min(1, n));
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function quantize(n: number, step: number) {
+  if (!step || step <= 0) return n;
+  return Math.round(n / step) * step;
 }
 
 function MiniSlider({
   value,
+  min,
+  max,
+  step,
   onValueChange,
 }: {
   value: number;
+  min: number;
+  max: number;
+  step: number;
   onValueChange: (next: number) => void;
 }) {
-  const trackRef = useRef<View>(null);
   const trackW = useRef(100);
 
   const setFromX = (x: number) => {
     const w = trackW.current || 100;
-    onValueChange(clamp01(x / w));
+    const pct = clamp(x / w, 0, 1);
+    const raw = min + pct * (max - min);
+    onValueChange(clamp(quantize(raw, step), min, max));
   };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (evt) => {
         setFromX(evt.nativeEvent.locationX);
       },
@@ -178,20 +198,21 @@ function MiniSlider({
     })
   ).current;
 
-  const pct = clamp01(value);
+  const pct = clamp((value - min) / (max - min), 0, 1);
 
   return (
     <View
-      ref={trackRef}
-      style={styles.slider}
+      style={styles.sliderHit}
       onLayout={(e) => {
         trackW.current = e.nativeEvent.layout.width || 100;
       }}
       accessibilityRole="adjustable"
-      accessibilityValue={{ min: 0, max: 1, now: pct }}
+      accessibilityValue={{ min, max, now: value }}
       {...panResponder.panHandlers}
     >
-      <View style={[styles.sliderFill, { width: `${pct * 100}%` }]} />
+      <View style={styles.slider}>
+        <View style={[styles.sliderFill, { width: `${pct * 100}%` }]} />
+      </View>
     </View>
   );
 }
@@ -640,6 +661,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 2,
     overflow: 'hidden',
+  },
+  sliderHit: {
+    width: 100,
+    height: 24,
+    justifyContent: 'center',
   },
   sliderFill: {
     height: '100%',

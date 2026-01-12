@@ -1,21 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface HostCameraFilters {
-  brightness: number; // 0..1
-  contrast: number; // 0..1
-  saturation: number; // 0..1
-  blur: number; // 0..1
+  // Match web StreamFiltersModal + useVideoFilterPipeline
+  smoothing: number; // 0..3 (int)
+  blur: number; // 0..4 (px)
+  brightness: number; // 0.5..1.5 (1 = normal)
+  contrast: number; // 0.5..1.5 (1 = normal)
+  saturation: number; // 0..2 (1 = normal)
 }
 
 export const DEFAULT_HOST_CAMERA_FILTERS: HostCameraFilters = {
-  brightness: 0.5,
-  contrast: 0.5,
-  saturation: 0.5,
+  smoothing: 0,
   blur: 0,
+  brightness: 1,
+  contrast: 1,
+  saturation: 1,
 };
 
-function clamp01(n: number) {
-  return Math.max(0, Math.min(1, n));
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
 }
 
 function storageKey(profileId: string) {
@@ -28,15 +31,42 @@ function normalize(input: unknown): Partial<HostCameraFilters> {
   const obj = input as Record<string, unknown>;
   const out: Partial<HostCameraFilters> = {};
 
+  const sm = obj.smoothing;
   const b = obj.brightness;
   const c = obj.contrast;
   const s = obj.saturation;
   const bl = obj.blur;
 
-  if (typeof b === 'number' && Number.isFinite(b)) out.brightness = clamp01(b);
-  if (typeof c === 'number' && Number.isFinite(c)) out.contrast = clamp01(c);
-  if (typeof s === 'number' && Number.isFinite(s)) out.saturation = clamp01(s);
-  if (typeof bl === 'number' && Number.isFinite(bl)) out.blur = clamp01(bl);
+  // Migration: older builds stored 0..1 values for brightness/contrast/saturation/blur and had no smoothing.
+  const isOld01 =
+    typeof sm !== 'number' &&
+    typeof b === 'number' &&
+    typeof c === 'number' &&
+    typeof s === 'number' &&
+    typeof bl === 'number' &&
+    b >= 0 &&
+    b <= 1.0001 &&
+    c >= 0 &&
+    c <= 1.0001 &&
+    s >= 0 &&
+    s <= 1.0001 &&
+    bl >= 0 &&
+    bl <= 1.0001;
+
+  if (isOld01) {
+    out.smoothing = 0;
+    out.blur = clamp(bl * 4, 0, 4);
+    out.brightness = clamp(0.5 + b, 0.5, 1.5);
+    out.contrast = clamp(0.5 + c, 0.5, 1.5);
+    out.saturation = clamp(s * 2, 0, 2);
+    return out;
+  }
+
+  if (typeof sm === 'number' && Number.isFinite(sm)) out.smoothing = clamp(Math.round(sm), 0, 3);
+  if (typeof bl === 'number' && Number.isFinite(bl)) out.blur = clamp(bl, 0, 4);
+  if (typeof b === 'number' && Number.isFinite(b)) out.brightness = clamp(b, 0.5, 1.5);
+  if (typeof c === 'number' && Number.isFinite(c)) out.contrast = clamp(c, 0.5, 1.5);
+  if (typeof s === 'number' && Number.isFinite(s)) out.saturation = clamp(s, 0, 2);
 
   return out;
 }
