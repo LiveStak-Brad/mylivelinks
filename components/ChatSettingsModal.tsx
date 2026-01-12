@@ -11,9 +11,28 @@ interface ChatSettingsModalProps {
 }
 
 export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: ChatSettingsModalProps) {
-  const [selectedColor, setSelectedColor] = useState('#a855f7'); // Default purple
+  const [selectedColor, setSelectedColor] = useState('#a855f7'); // Default purple (now used for font color)
   const [selectedFont, setSelectedFont] = useState('Inter');
   const [saving, setSaving] = useState(false);
+
+  // Bright-only color palette (enforced)
+  const brightColors = [
+    '#a855f7', // Purple
+    '#ec4899', // Pink
+    '#3b82f6', // Blue
+    '#6366f1', // Indigo
+    '#8b5cf6', // Violet
+    '#d946ef', // Fuchsia
+    '#f43f5e', // Rose
+    '#06b6d4', // Cyan
+    '#10b981', // Emerald
+    '#f59e0b', // Amber
+    '#ef4444', // Red
+    '#14b8a6', // Teal
+    '#84cc16', // Lime
+    '#f97316', // Orange
+    '#FFFFFF', // White
+  ];
 
   const fonts = [
     { name: 'Inter', label: 'Inter (Default)', className: 'font-sans' },
@@ -40,7 +59,13 @@ export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: Ch
       if (error) return;
 
       if (data) {
-        if (data.chat_bubble_color) setSelectedColor(data.chat_bubble_color);
+        // Enforce bright palette - if saved color is not in palette, default to purple
+        const savedColor = data.chat_bubble_color;
+        if (savedColor && brightColors.includes(savedColor)) {
+          setSelectedColor(savedColor);
+        } else {
+          setSelectedColor('#a855f7');
+        }
         if (data.chat_font) setSelectedFont(data.chat_font);
       } else {
         await supabase
@@ -127,37 +152,29 @@ export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: Ch
 
         {/* Content */}
         <div className="modal-body p-6 space-y-6">
-          {/* Color Picker */}
+          {/* Font Color Picker */}
           <div>
             <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-3">
-              Chat Bubble Color
+              Chat Font Color
             </label>
             <div className="space-y-3">
-              {/* HTML5 Color Picker */}
-              <div className="relative">
-                <input
-                  type="color"
-                  value={selectedColor}
-                  onChange={(e) => setSelectedColor(e.target.value)}
-                  className="w-full h-32 rounded-lg cursor-pointer border-2 border-gray-300 dark:border-gray-600"
-                />
-              </div>
-              
               {/* Preview */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-100 dark:bg-gray-700">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-gray-100 dark:bg-gray-700">
                 <div
-                  className="w-12 h-12 rounded-full border-2 border-gray-300 dark:border-gray-600"
-                  style={{ backgroundColor: selectedColor }}
-                />
+                  className="w-12 h-12 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-2xl font-bold"
+                  style={{ color: selectedColor }}
+                >
+                  A
+                </div>
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">Preview</p>
                   <p className="font-mono text-sm text-gray-900 dark:text-white">{selectedColor}</p>
                 </div>
               </div>
 
-              {/* Quick Color Presets */}
+              {/* Bright Color Palette (enforced) */}
               <div className="grid grid-cols-5 gap-2">
-                {['#a855f7', '#ec4899', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#06b6d4', '#7c3aed', '#db2777'].map((color) => (
+                {brightColors.map((color) => (
                   <button
                     key={color}
                     onClick={() => setSelectedColor(color)}
@@ -167,6 +184,7 @@ export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: Ch
                         : 'border-gray-300 dark:border-gray-600 hover:scale-105'
                     }`}
                     style={{ backgroundColor: color }}
+                    title={color}
                   >
                     {selectedColor === color && (
                       <Check className="w-4 h-4 text-white mx-auto drop-shadow-lg" />
@@ -174,6 +192,9 @@ export default function ChatSettingsModal({ isOpen, onClose, currentUserId }: Ch
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                Only bright colors available for maximum visibility
+              </p>
             </div>
           </div>
 

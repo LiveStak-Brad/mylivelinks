@@ -32,6 +32,8 @@ interface UserNameWithBadgesProps {
   clickable?: boolean;
   /** Optional children to render after badges */
   children?: ReactNode;
+  /** Optional inline styles for the name element */
+  style?: React.CSSProperties;
 }
 
 /**
@@ -68,6 +70,7 @@ export default function UserNameWithBadges({
   onClick,
   clickable = false,
   children,
+  style,
 }: UserNameWithBadgesProps) {
   const [isMllProFetched, setIsMllProFetched] = useState<boolean>(false);
   const [showProModal, setShowProModal] = useState(false);
@@ -108,6 +111,7 @@ export default function UserNameWithBadges({
     <span
       className={`font-semibold ${textSize} ${clickable ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} ${nameClassName}`}
       onClick={onClick}
+      style={style}
     >
       {name}
     </span>

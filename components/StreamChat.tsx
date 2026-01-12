@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
-import { GifterBadge as TierBadge } from '@/components/gifter';
+import { GifterBadge as TierBadge, GifterBadgeCompact } from '@/components/gifter';
 import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import UserActionCardV2 from './UserActionCardV2';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
@@ -96,7 +96,7 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
 
   // Typography parity: Host uses readOnly StreamChat; viewer uses interactive StreamChat.
   // Use same font sizes for both host and viewer
-  const usernameTextClass = 'text-xs';
+  const usernameTextClass = 'text-xs font-semibold';
   const timeTextClass = 'text-[10px]';
   const messageTextClass = 'text-sm';
 
@@ -1325,27 +1325,23 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                       {msg.content}
                     </div>
                   ) : (
-                    <div
-                      className={`flex w-full items-start gap-2 ${msg.chat_bubble_color ? '' : (msg.profile_id ? getUserBubbleColor(msg.profile_id) : 'bg-black/20')} backdrop-blur-sm rounded-lg px-2 py-1.5 border border-white/10`}
-                      style={msg.chat_bubble_color ? { backgroundColor: `${msg.chat_bubble_color}66` } : undefined}
-                    >
+                    <div className="flex w-full items-start gap-1.5">
                       <img
                         src={getAvatarUrl(msg.avatar_url)}
                         alt={msg.username}
-                        className="w-8 h-8 rounded-full flex-shrink-0"
+                        className="w-7 h-7 rounded flex-shrink-0 object-cover"
                         onError={(e) => {
                           e.currentTarget.src = '/no-profile-pic.png';
                         }}
                       />
 
-                      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1 flex-wrap">
+                      <div className="flex-1 min-w-0 flex flex-col gap-0">
+                        <div className="flex items-center gap-1">
                           <UserNameWithBadges
                             profileId={msg.profile_id}
                             name={msg.display_name || msg.username || 'Unknown'}
-                            gifterStatus={undefined}
                             textSize={usernameTextClass}
-                            nameClassName="text-white hover:text-blue-300 transition"
+                            nameClassName="hover:text-blue-300 transition"
                             clickable
                             onClick={() => {
                               if (msg.profile_id && msg.username) {
@@ -1357,26 +1353,27 @@ export default function StreamChat({ liveStreamId, onGiftClick, onShareClick, on
                                 });
                               }
                             }}
+                            style={msg.chat_bubble_color ? { color: msg.chat_bubble_color } : { color: '#FFFFFF' }}
+                            showGifterBadge={false}
                           />
-                          <span className={`${timeTextClass} text-white/50 leading-tight`}>
-                            {formatTime(msg.created_at)}
-                          </span>
-                          {msg.message_type !== 'system' && msg.profile_id && (
-                            <button
-                              type="button"
-                              onClick={() => openReportMessage(msg)}
-                              className="text-[10px] text-white/60 hover:text-white transition"
-                              title="Report message"
-                              aria-label="Report message"
-                            >
-                              Report
-                            </button>
+                          {gifterStatusMap[msg.profile_id] && Number(gifterStatusMap[msg.profile_id]?.lifetime_coins ?? 0) > 0 && (
+                            <div className="flex-shrink-0" style={{ transform: 'scale(0.7)', transformOrigin: 'left center' }}>
+                              <TierBadge
+                                tier_key={gifterStatusMap[msg.profile_id].tier_key}
+                                level={gifterStatusMap[msg.profile_id].level_in_tier}
+                                size="sm"
+                                showLevel={true}
+                              />
+                            </div>
                           )}
                         </div>
 
                         <div
-                          className={`${messageTextClass} text-white/90 break-words leading-snug flex-1 min-w-0`}
-                          style={msg.chat_font ? { fontFamily: msg.chat_font } : undefined}
+                          className={`${messageTextClass} break-words leading-tight flex-1 min-w-0`}
+                          style={{
+                            fontFamily: msg.chat_font || undefined,
+                            color: msg.chat_bubble_color || '#E5E5E5'
+                          }}
                         >
                           <SafeRichText text={msg.content} />
                         </div>

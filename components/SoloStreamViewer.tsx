@@ -2197,13 +2197,13 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
 
         </div>
 
-        {/* Right: Chat Panel - All screen sizes: overlay at bottom, no header/border */}
-        {/* CRITICAL: position: fixed ensures chat overlays video and doesn't push it when keyboard opens */}
+        {/* Chat Panel - Fixed at bottom, slightly to the right on desktop */}
         <div className={`
           transition-all duration-300
           fixed
           ${isChatOpen ? 'flex flex-col' : 'hidden'}
           bottom-0 left-0 right-0
+          lg:left-[28px]
           w-full
           h-[40vh]
           bg-transparent
