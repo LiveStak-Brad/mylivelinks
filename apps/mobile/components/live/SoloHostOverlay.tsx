@@ -79,9 +79,6 @@ export default function SoloHostOverlay({
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {/* Top Gradient: darkest at top edge, fading towards center */}
-      <View style={styles.topGradient} pointerEvents="none" />
-
       {/* Bottom Gradient: darkest at bottom edge, fading towards center */}
       <View style={styles.bottomGradient} pointerEvents="none" />
 
@@ -204,16 +201,6 @@ const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 10,
-  },
-
-  // Top gradient: single overlay, darkest at top edge
-  topGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 
   // Bottom gradient: single overlay, darkest at bottom edge
