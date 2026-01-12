@@ -787,8 +787,6 @@ export default function GoLiveScreen() {
         <SoloHostOverlay
           hostName={hostProfile?.displayName || user?.email?.split('@')[0] || 'Host'}
           hostAvatarUrl={hostProfile?.avatarUrl}
-          title={streamTitle}
-          category={categories.find((c) => c.id === selectedCategoryId)?.label}
           viewerCount={viewerCount}
           topGifters={topGifters}
           messages={chatMessages}

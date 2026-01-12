@@ -21,8 +21,6 @@ export interface SoloHostOverlayProps {
   // Host info
   hostName: string;
   hostAvatarUrl?: string;
-  title: string;
-  category?: string;
   
   // Counters
   viewerCount: number;
@@ -51,8 +49,6 @@ const PLACEHOLDER_AVATAR = 'https://via.placeholder.com/40/6366F1/FFFFFF?text=H'
 export default function SoloHostOverlay({
   hostName,
   hostAvatarUrl,
-  title,
-  category,
   viewerCount,
   likesCount = 0,
   topGifters,
@@ -95,19 +91,6 @@ export default function SoloHostOverlay({
               <Text style={styles.hostName} numberOfLines={1}>
                 {hostName}
               </Text>
-              <View style={styles.hostMeta}>
-                {/* LIVE indicator */}
-                <View style={styles.liveBadge}>
-                  <View style={styles.liveDot} />
-                  <Text style={styles.liveText}>LIVE</Text>
-                </View>
-                {/* Category pill */}
-                {category && (
-                  <View style={styles.categoryPill}>
-                    <Text style={styles.categoryText}>{category}</Text>
-                  </View>
-                )}
-              </View>
             </View>
           </View>
         </View>
@@ -139,18 +122,9 @@ export default function SoloHostOverlay({
         </View>
       </View>
 
-      {/* D. Second Row: Stream title left, Top Gifters + Share right (web parity) */}
+      {/* D. Second Row: Top Gifters + Share */}
       <View style={[styles.secondRow, { top: insets.top + 56 }]}>
-        {/* Stream title on left */}
-        <View style={styles.titleContainer}>
-          {title ? (
-            <Text style={styles.streamTitle} numberOfLines={1}>
-              {title}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Top gifters + Share on right */}
+        {/* Top gifters + Share */}
         <View style={styles.secondRowRight}>
           <TopGifterBubbles
             gifters={topGifters}
@@ -251,44 +225,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  hostMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 1,
-  },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EF4444',
-    borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    gap: 2,
-  },
-  liveDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#FFFFFF',
-  },
-  liveText: {
-    fontSize: 8,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  categoryPill: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  categoryText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
-  },
 
   // Right cluster (viewer + exit) - matches web mobile layout
   topRightCluster: {
@@ -329,29 +265,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.8)',
   },
 
-  // Second row (title left, gifters+share right)
+  // Second row (gifters+share)
   secondRow: {
     position: 'absolute',
     left: 12,
     right: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     zIndex: 20,
-  },
-  titleContainer: {
-    flex: 1,
-    marginRight: 10,
-  },
-  streamTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.9)',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    overflow: 'hidden',
   },
   secondRowRight: {
     flexDirection: 'row',

@@ -152,8 +152,6 @@ export default function LiveHostScreen() {
         <SoloHostOverlay
           hostName={MOCK_HOST.name}
           hostAvatarUrl={MOCK_HOST.avatarUrl}
-          title={streamTitle}
-          category={selectedCategory.label}
           viewerCount={viewerCount}
           topGifters={MOCK_TOP_GIFTERS}
           messages={MOCK_MESSAGES}
