@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   proBadgeImage: {
     width: 56,
     height: 28,
-    marginLeft: -2,
+    marginLeft: -12,
   },
   rankRow: {
     flexDirection: 'row',
