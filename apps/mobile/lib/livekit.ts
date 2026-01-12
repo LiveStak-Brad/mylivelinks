@@ -187,13 +187,13 @@ export function generateSoloRoomName(userId: string): string {
 /**
  * Create a live_streams record when going live.
  * This makes the stream visible on LiveTV for web viewers.
+ * Matches the web GoLiveButton.tsx implementation exactly.
  */
 export async function startLiveStreamRecord(
-  userId: string,
-  roomName: string
+  userId: string
 ): Promise<{ liveStreamId: number | null; error: string | null }> {
   try {
-    // First, end any existing live streams for this user
+    // First, end any existing live streams for this user (same as web)
     await supabase
       .from('live_streams')
       .update({
@@ -203,18 +203,17 @@ export async function startLiveStreamRecord(
       .eq('profile_id', userId)
       .eq('live_available', true);
 
-    // Create new live stream record
+    // INSERT a new live_stream record (matches web GoLiveButton.tsx exactly)
     const { data, error } = await supabase
       .from('live_streams')
       .insert({
         profile_id: userId,
         live_available: true,
-        streaming_mode: 'solo',
-        room_name: roomName,
+        streaming_mode: 'solo', // 'solo' for mobile solo streams
         started_at: new Date().toISOString(),
         ended_at: null,
       })
-      .select('id')
+      .select()
       .single();
 
     if (error) {
@@ -222,13 +221,7 @@ export async function startLiveStreamRecord(
       return { liveStreamId: null, error: error.message };
     }
 
-    // Update profile is_live status
-    await supabase
-      .from('profiles')
-      .update({ is_live: true })
-      .eq('id', userId);
-
-    console.log('[livekit] Live stream record created:', data?.id);
+    console.log('[livekit] ✅ Created live_stream with ID:', data?.id);
     return { liveStreamId: data?.id || null, error: null };
   } catch (err: any) {
     console.error('[livekit] startLiveStreamRecord error:', err);

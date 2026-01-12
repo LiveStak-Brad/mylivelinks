@@ -167,10 +167,13 @@ export default function GoLiveScreen() {
       const userName = user.email?.split('@')[0] || 'Host';
 
       // Create live_streams record in database (makes stream visible on LiveTV)
-      const { error: dbError } = await startLiveStreamRecord(user.id, roomName);
+      // Matches web GoLiveButton.tsx implementation
+      const { liveStreamId, error: dbError } = await startLiveStreamRecord(user.id);
       if (dbError) {
         console.warn('[GoLive] DB record warning:', dbError);
         // Continue anyway - stream will work, just may not show on LiveTV immediately
+      } else {
+        console.log('[GoLive] Created live_stream ID:', liveStreamId);
       }
 
       // Fetch token
