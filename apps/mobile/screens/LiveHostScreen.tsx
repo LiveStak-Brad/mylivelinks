@@ -1,9 +1,64 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+
+import SoloHostOverlay from '../components/live/SoloHostOverlay';
+import type { ChatMessage } from '../components/live/ChatOverlay';
+import type { TopGifter } from '../components/live/TopGifterBubbles';
+
+// ============================================================================
+// MOCK DATA - Host info, gifters, and chat messages
+// ============================================================================
+
+const MOCK_HOST = {
+  name: 'DemoHost',
+  avatarUrl: 'https://i.pravatar.cc/100?u=demohost',
+};
+
+const MOCK_TOP_GIFTERS: TopGifter[] = [
+  { id: '1', username: 'BigSpender', avatarUrl: 'https://i.pravatar.cc/100?u=bigspender', totalCoins: 5000 },
+  { id: '2', username: 'GenGifter', avatarUrl: 'https://i.pravatar.cc/100?u=gengifter', totalCoins: 2500 },
+  { id: '3', username: 'CoinKing', avatarUrl: 'https://i.pravatar.cc/100?u=coinking', totalCoins: 1200 },
+];
+
+const MOCK_MESSAGES: ChatMessage[] = [
+  { id: '1', type: 'system', username: 'System', text: 'Stream started' },
+  { id: '2', type: 'follow', username: 'NewFollower123', text: '' },
+  { id: '3', type: 'chat', username: 'CoolViewer', text: 'Hey! Great stream!' },
+  { id: '4', type: 'chat', username: 'MusicFan', text: 'Love this vibe 🔥' },
+  { id: '5', type: 'gift', username: 'BigSpender', text: 'sent a Rose', giftAmount: 100 },
+  { id: '6', type: 'chat', username: 'RandomUser', text: 'First time here, this is awesome!' },
+  { id: '7', type: 'chat', username: 'NightOwl', text: 'What city are you in?' },
+  { id: '8', type: 'follow', username: 'StreamWatcher', text: '' },
+  { id: '9', type: 'chat', username: 'CoolViewer', text: 'The quality is so good!' },
+  { id: '10', type: 'gift', username: 'GenGifter', text: 'sent a Diamond', giftAmount: 500 },
+  { id: '11', type: 'chat', username: 'MusicFan', text: 'Can you play some jazz?' },
+  { id: '12', type: 'chat', username: 'ChillMode', text: '👋👋👋' },
+  { id: '13', type: 'chat', username: 'ViewerX', text: 'How long have you been streaming?' },
+  { id: '14', type: 'gift', username: 'CoinKing', text: 'sent a Crown', giftAmount: 1000 },
+  { id: '15', type: 'chat', username: 'NightOwl', text: 'This chat is so chill' },
+  { id: '16', type: 'follow', username: 'LateNightFan', text: '' },
+  { id: '17', type: 'chat', username: 'RandomUser', text: 'Followed! Keep it up!' },
+  { id: '18', type: 'chat', username: 'CoolViewer', text: 'The lighting is perfect' },
+  { id: '19', type: 'system', username: 'System', text: '100 viewers reached!' },
+  { id: '20', type: 'chat', username: 'ChillMode', text: 'Love this community' },
+  { id: '21', type: 'gift', username: 'BigSpender', text: 'sent a Universe', giftAmount: 2500 },
+  { id: '22', type: 'chat', username: 'MusicFan', text: 'That gift animation was crazy!' },
+  { id: '23', type: 'chat', username: 'ViewerX', text: 'Stream goals 🎯' },
+  { id: '24', type: 'follow', username: 'NewbieFan', text: '' },
+  { id: '25', type: 'chat', username: 'NightOwl', text: 'Best stream of the night!' },
+];
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function LiveHostScreen() {
+  const navigation = useNavigation<any>();
+
+  // Setup state
   const [streamTitle, setStreamTitle] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('just-chatting');
 
@@ -17,6 +72,14 @@ export default function LiveHostScreen() {
   const [audience, setAudience] = useState<'Public' | 'Private'>('Public');
   const [schedule, setSchedule] = useState<'Now' | 'Schedule'>('Now');
   const [thumbnail, setThumbnail] = useState<'None' | 'Selected'>('None');
+
+  // LIVE STATE - toggles between setup and live overlay
+  const [isLive, setIsLive] = useState(false);
+  const [viewerCount, setViewerCount] = useState(127);
+
+  // Host controls state (UI-only)
+  const [isMuted, setIsMuted] = useState(false);
+  const [isCameraFlipped, setIsCameraFlipped] = useState(false);
 
   const categories = useMemo(
     () => [
@@ -35,6 +98,76 @@ export default function LiveHostScreen() {
     [categories, selectedCategoryId]
   );
 
+  // Handler: Go Live (mock - transitions to live overlay)
+  const handleGoLive = () => {
+    if (!streamTitle.trim()) {
+      Alert.alert('Title Required', 'Please enter a stream title.');
+      return;
+    }
+    setIsLive(true);
+    // Simulate viewer count updates
+    const interval = setInterval(() => {
+      setViewerCount((prev) => prev + Math.floor(Math.random() * 5) - 1);
+    }, 3000);
+    return () => clearInterval(interval);
+  };
+
+  // Handler: End Stream (mock - returns to setup)
+  const handleEndStream = () => {
+    Alert.alert('End Stream', 'Are you sure you want to end your stream?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'End Stream',
+        style: 'destructive',
+        onPress: () => {
+          setIsLive(false);
+          setViewerCount(0);
+        },
+      },
+    ]);
+  };
+
+  // ============================================================================
+  // LIVE VIEW - Show overlay on top of video placeholder
+  // ============================================================================
+
+  if (isLive) {
+    return (
+      <View style={styles.liveContainer}>
+        {/* Video placeholder (black background simulating video) */}
+        <View style={styles.videoPlaceholder}>
+          <View style={styles.videoCenter}>
+            <Ionicons name="videocam" size={64} color="rgba(255,255,255,0.15)" />
+            <Text style={styles.videoPlaceholderText}>Camera Preview</Text>
+            <Text style={styles.videoPlaceholderHint}>
+              (Video rendering not connected - UI only)
+            </Text>
+          </View>
+        </View>
+
+        {/* Solo Host Overlay */}
+        <SoloHostOverlay
+          hostName={MOCK_HOST.name}
+          hostAvatarUrl={MOCK_HOST.avatarUrl}
+          title={streamTitle}
+          category={selectedCategory.label}
+          viewerCount={viewerCount}
+          topGifters={MOCK_TOP_GIFTERS}
+          messages={MOCK_MESSAGES}
+          isMuted={isMuted}
+          isCameraFlipped={isCameraFlipped}
+          onEndStream={handleEndStream}
+          onFlipCamera={() => setIsCameraFlipped((prev) => !prev)}
+          onToggleMute={() => setIsMuted((prev) => !prev)}
+        />
+      </View>
+    );
+  }
+
+  // ============================================================================
+  // SETUP VIEW - Stream configuration before going live
+  // ============================================================================
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -44,7 +177,7 @@ export default function LiveHostScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Go Live</Text>
-          <Text style={styles.subtitle}>Set up your stream—then go live when you’re ready.</Text>
+          <Text style={styles.subtitle}>Set up your stream—then go live when you're ready.</Text>
         </View>
 
         <View style={styles.section}>
@@ -200,7 +333,7 @@ export default function LiveHostScreen() {
 
         <View style={styles.footer}>
           <Pressable
-            onPress={() => {}}
+            onPress={handleGoLive}
             style={({ pressed }) => [styles.goLiveButton, pressed && styles.goLiveButtonPressed]}
             accessibilityRole="button"
             accessibilityLabel="Go Live"
@@ -209,13 +342,17 @@ export default function LiveHostScreen() {
             <Text style={styles.goLiveText}>Go Live</Text>
           </Pressable>
           <Text style={styles.disclaimer}>
-            This is a mock setup screen. Going live is UI-only here (no streaming starts).
+            This is a mock setup screen. Tapping "Go Live" shows the overlay UI (no streaming starts).
           </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+// ============================================================================
+// HELPER COMPONENTS
+// ============================================================================
 
 function ToggleRow({
   icon,
@@ -283,6 +420,10 @@ function InfoRow({
   );
 }
 
+// ============================================================================
+// STYLES
+// ============================================================================
+
 const COLORS = {
   bg: '#0B0C10',
   card: '#12131A',
@@ -295,6 +436,33 @@ const COLORS = {
 };
 
 const styles = StyleSheet.create({
+  // Live view styles
+  liveContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  videoPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0A0A0A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoCenter: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  videoPlaceholderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.3)',
+  },
+  videoPlaceholderHint: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.2)',
+    marginTop: 4,
+  },
+
+  // Setup view styles
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.bg,
