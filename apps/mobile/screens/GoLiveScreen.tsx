@@ -389,6 +389,98 @@ export default function GoLiveScreen() {
     };
   }, [liveStreamId, isLive]);
 
+  // Load trending rank and leaderboard rank (like web SoloStreamViewer)
+  useEffect(() => {
+    if (!liveStreamId || !isLive || !user?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadTrendingRank = async () => {
+      try {
+        const { data, error } = await supabase.rpc('rpc_get_trending_live_streams', {
+          p_limit: 100,
+          p_offset: 0,
+        });
+
+        if (error) {
+          console.error('[GoLive] Error fetching trending rank:', error);
+          return;
+        }
+
+        if (data && Array.isArray(data) && !cancelled) {
+          const rank = data.findIndex((s: any) => s.stream_id === liveStreamId);
+          setTrendingRank(rank !== -1 ? rank + 1 : 0);
+        }
+      } catch (err) {
+        console.error('[GoLive] Error loading trending rank:', err);
+      }
+    };
+
+    const loadLeaderboardRank = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_leaderboard', {
+          p_type: 'top_streamers',
+          p_period: 'daily',
+          p_limit: 100,
+          p_room_id: null,
+        });
+
+        if (error) {
+          console.error('[GoLive] Error fetching leaderboard rank:', error);
+          return;
+        }
+
+        if (data && Array.isArray(data) && !cancelled) {
+          const myEntry = data.find((r: any) => r.profile_id === user.id);
+          if (myEntry) {
+            const myRank = Number(myEntry.rank ?? 0);
+            const myValue = Number(myEntry.metric_value ?? 0);
+            
+            // Calculate points to next rank
+            let pointsToNext = 0;
+            if (myRank === 1) {
+              // If first place, show how far ahead we are
+              const secondPlace = data.find((r: any) => Number(r.rank) === 2);
+              pointsToNext = secondPlace ? myValue - Number(secondPlace.metric_value ?? 0) : myValue;
+            } else if (myRank > 1) {
+              // Find the person above us
+              const aboveMe = data.find((r: any) => Number(r.rank) === myRank - 1);
+              pointsToNext = aboveMe ? Number(aboveMe.metric_value ?? 0) - myValue : 0;
+            }
+            
+            setLeaderboardRank({
+              currentRank: myRank,
+              pointsToNextRank: Math.max(0, pointsToNext),
+            });
+          } else {
+            setLeaderboardRank(null);
+          }
+        }
+      } catch (err) {
+        console.error('[GoLive] Error loading leaderboard rank:', err);
+      }
+    };
+
+    // Initial load
+    loadTrendingRank();
+    loadLeaderboardRank();
+
+    // Refresh every 60s
+    const interval = setInterval(() => {
+      if (!cancelled) {
+        loadTrendingRank();
+        loadLeaderboardRank();
+      }
+    }, 60000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [liveStreamId, isLive, user?.id]);
+
   // Helper: Map message_type to ChatMessage type
   const mapMessageType = (type: string): 'chat' | 'gift' | 'follow' | 'system' => {
     switch (type) {
@@ -552,14 +644,6 @@ export default function GoLiveScreen() {
       await room.localParticipant.publishTrack(audioTrack);
 
       setIsLive(true);
-      
-      // Set mock ranking data (will be replaced with real Supabase fetch like web)
-      setTrendingRank(Math.floor(Math.random() * 20) + 1);
-      setLeaderboardRank({
-        currentRank: Math.floor(Math.random() * 50) + 1,
-        pointsToNextRank: Math.floor(Math.random() * 500) + 100,
-      });
-      
       console.log('[GoLive] Now live! Stream should appear on LiveTV.');
     } catch (err: any) {
       console.error('[GoLive] Connect error:', err);

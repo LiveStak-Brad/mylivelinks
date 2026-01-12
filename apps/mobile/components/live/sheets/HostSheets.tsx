@@ -1,6 +1,7 @@
-import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../../lib/supabase';
 
 interface BaseSheetProps {
   visible: boolean;
@@ -200,103 +201,216 @@ export function GiftersSheet({ visible, onClose }: BaseSheetProps) {
 
 // Trending Sheet (flame icon - currently live streams ranked by trending score)
 // NOTE: This is different from LeaderboardSheet - shows LIVE streams only, no tabs
+interface TrendingEntry {
+  stream_id: number;
+  profile_id: string;
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+  trending_score: number;
+  views_count: number;
+  likes_count: number;
+}
+
 export function TrendingSheet({ visible, onClose }: BaseSheetProps) {
-  // Mock trending entries (will be fetched from rpc_get_trending_live_streams)
-  const mockTrendingEntries = [
-    { rank: 1, username: 'TopStreamer', views: 1250, likes: 340, score: 2850 },
-    { rank: 2, username: 'PopularHost', views: 890, likes: 210, score: 1920 },
-    { rank: 3, username: 'RisingStart', views: 650, likes: 180, score: 1450 },
-    { rank: 4, username: 'LiveNow', views: 420, likes: 95, score: 890 },
-    { rank: 5, username: 'StreamKing', views: 310, likes: 72, score: 650 },
-  ];
-  
+  const [entries, setEntries] = useState<TrendingEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const loadTrending = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.rpc('rpc_get_trending_live_streams', {
+          p_limit: 50,
+          p_offset: 0,
+        });
+
+        if (error) {
+          console.error('[TrendingSheet] Error fetching trending:', error);
+          return;
+        }
+
+        if (data) {
+          setEntries(data);
+        }
+      } catch (err) {
+        console.error('[TrendingSheet] Error loading trending:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTrending();
+  }, [visible]);
+
   return (
     <SheetContainer visible={visible} onClose={onClose} title="Trending Now">
-      <Text style={styles.trendingSubtitle}>{mockTrendingEntries.length} live streams</Text>
+      <Text style={styles.trendingSubtitle}>{entries.length} live streams</Text>
       
-      {/* Trending List */}
-      <View style={styles.trendingList}>
-        {mockTrendingEntries.map((entry) => (
-          <View 
-            key={entry.rank} 
-            style={[
-              styles.trendingRow,
-              entry.rank <= 3 && styles.trendingRowTop3,
-            ]}
-          >
-            {/* Rank */}
-            <Text style={[
-              styles.trendingRank,
-              entry.rank === 1 && styles.trendingRank1,
-              entry.rank === 2 && styles.trendingRank2,
-              entry.rank === 3 && styles.trendingRank3,
-            ]}>
-              {entry.rank}
-            </Text>
-            
-            {/* Avatar placeholder */}
-            <View style={[
-              styles.trendingAvatar,
-              entry.rank === 1 && styles.trendingAvatar1,
-              entry.rank === 2 && styles.trendingAvatar2,
-              entry.rank === 3 && styles.trendingAvatar3,
-            ]}>
-              <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
-            </View>
-            
-            {/* Username & stats */}
-            <View style={styles.trendingInfo}>
-              <View style={styles.trendingNameRow}>
-                <Text style={styles.trendingUsername}>{entry.username}</Text>
-                {entry.rank <= 3 && (
-                  <Ionicons name="flash" size={12} color="#EAB308" />
-                )}
-              </View>
-              <View style={styles.trendingStats}>
-                <Ionicons name="eye" size={10} color="rgba(255,255,255,0.6)" />
-                <Text style={styles.trendingStat}>{entry.views}</Text>
-                <Text style={styles.trendingDot}>•</Text>
-                <Ionicons name="heart" size={10} color="rgba(255,255,255,0.6)" />
-                <Text style={styles.trendingStat}>{entry.likes}</Text>
-              </View>
-            </View>
-            
-            {/* Score */}
-            <View style={styles.trendingScore}>
-              <Ionicons name="flame" size={12} color="#F97316" />
-              <Text style={styles.trendingScoreText}>{entry.score}</Text>
-            </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#F97316" />
+        </View>
+      ) : entries.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="flame" size={48} color="#F97316" />
+          <Text style={styles.emptyTitle}>No Trending Streams</Text>
+          <Text style={styles.emptySubtitle}>No live streams trending right now</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.trendingScrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.trendingList}>
+            {entries.map((entry, index) => {
+              const rank = index + 1;
+              return (
+                <View 
+                  key={entry.stream_id} 
+                  style={[
+                    styles.trendingRow,
+                    rank <= 3 && styles.trendingRowTop3,
+                  ]}
+                >
+                  {/* Rank */}
+                  <Text style={[
+                    styles.trendingRank,
+                    rank === 1 && styles.trendingRank1,
+                    rank === 2 && styles.trendingRank2,
+                    rank === 3 && styles.trendingRank3,
+                  ]}>
+                    {rank}
+                  </Text>
+                  
+                  {/* Avatar */}
+                  {entry.avatar_url ? (
+                    <Image
+                      source={{ uri: entry.avatar_url }}
+                      style={[
+                        styles.trendingAvatarImage,
+                        rank === 1 && styles.trendingAvatar1,
+                        rank === 2 && styles.trendingAvatar2,
+                        rank === 3 && styles.trendingAvatar3,
+                      ]}
+                    />
+                  ) : (
+                    <View style={[
+                      styles.trendingAvatar,
+                      rank === 1 && styles.trendingAvatar1,
+                      rank === 2 && styles.trendingAvatar2,
+                      rank === 3 && styles.trendingAvatar3,
+                    ]}>
+                      <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
+                    </View>
+                  )}
+                  
+                  {/* Username & stats */}
+                  <View style={styles.trendingInfo}>
+                    <View style={styles.trendingNameRow}>
+                      <Text style={styles.trendingUsername} numberOfLines={1}>
+                        {entry.display_name || entry.username}
+                      </Text>
+                      {rank <= 3 && (
+                        <Ionicons name="flash" size={12} color="#EAB308" />
+                      )}
+                    </View>
+                    <View style={styles.trendingStats}>
+                      <Ionicons name="eye" size={10} color="rgba(255,255,255,0.6)" />
+                      <Text style={styles.trendingStat}>{entry.views_count}</Text>
+                      <Text style={styles.trendingDot}>•</Text>
+                      <Ionicons name="heart" size={10} color="rgba(255,255,255,0.6)" />
+                      <Text style={styles.trendingStat}>{entry.likes_count}</Text>
+                    </View>
+                  </View>
+                  
+                  {/* Score */}
+                  <View style={styles.trendingScore}>
+                    <Ionicons name="flame" size={12} color="#F97316" />
+                    <Text style={styles.trendingScoreText}>{Math.round(entry.trending_score)}</Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
-        ))}
-      </View>
-      
-      <Text style={styles.placeholder}>Trending data is mocked (will fetch from Supabase)</Text>
+        </ScrollView>
+      )}
     </SheetContainer>
   );
 }
 
 // Leaderboard Sheet (trophy icon - streamer/gifter leaderboard)
+interface LeaderboardEntry {
+  profile_id: string;
+  username: string;
+  avatar_url?: string;
+  metric_value: number;
+  rank: number;
+}
+
+type LeaderboardType = 'top_streamers' | 'top_gifters';
+type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'alltime';
+
 export function LeaderboardSheet({ visible, onClose }: BaseSheetProps) {
-  const [period, setPeriod] = React.useState<'streamers' | 'gifters'>('streamers');
-  const [timeframe, setTimeframe] = React.useState<'daily' | 'weekly' | 'monthly' | 'alltime'>('daily');
-  
+  const [type, setType] = useState<LeaderboardType>('top_streamers');
+  const [period, setPeriod] = useState<LeaderboardPeriod>('daily');
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const loadLeaderboard = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.rpc('get_leaderboard', {
+          p_type: type,
+          p_period: period,
+          p_limit: 50,
+          p_room_id: null,
+        });
+
+        if (error) {
+          console.error('[LeaderboardSheet] Error fetching leaderboard:', error);
+          return;
+        }
+
+        if (data && Array.isArray(data)) {
+          const mappedEntries = data.map((row: any) => ({
+            profile_id: row.profile_id,
+            username: row.username,
+            avatar_url: row.avatar_url,
+            metric_value: Number(row.metric_value ?? 0),
+            rank: Number(row.rank ?? 0),
+          }));
+          setEntries(mappedEntries);
+        }
+      } catch (err) {
+        console.error('[LeaderboardSheet] Error loading leaderboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadLeaderboard();
+  }, [visible, type, period]);
+
   return (
     <SheetContainer visible={visible} onClose={onClose} title="Leaderboard">
       {/* Type Tabs */}
       <View style={styles.tabRow}>
         <Pressable
-          onPress={() => setPeriod('streamers')}
-          style={[styles.tab, period === 'streamers' && styles.tabActive]}
+          onPress={() => setType('top_streamers')}
+          style={[styles.tab, type === 'top_streamers' && styles.tabActive]}
         >
-          <Ionicons name="videocam" size={16} color={period === 'streamers' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
-          <Text style={[styles.tabText, period === 'streamers' && styles.tabTextActive]}>Streamers</Text>
+          <Ionicons name="videocam" size={16} color={type === 'top_streamers' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
+          <Text style={[styles.tabText, type === 'top_streamers' && styles.tabTextActive]}>Streamers</Text>
         </Pressable>
         <Pressable
-          onPress={() => setPeriod('gifters')}
-          style={[styles.tab, period === 'gifters' && styles.tabActive]}
+          onPress={() => setType('top_gifters')}
+          style={[styles.tab, type === 'top_gifters' && styles.tabActive]}
         >
-          <Ionicons name="gift" size={16} color={period === 'gifters' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
-          <Text style={[styles.tabText, period === 'gifters' && styles.tabTextActive]}>Gifters</Text>
+          <Ionicons name="gift" size={16} color={type === 'top_gifters' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
+          <Text style={[styles.tabText, type === 'top_gifters' && styles.tabTextActive]}>Gifters</Text>
         </Pressable>
       </View>
       
@@ -305,22 +419,99 @@ export function LeaderboardSheet({ visible, onClose }: BaseSheetProps) {
         {(['daily', 'weekly', 'monthly', 'alltime'] as const).map((tf) => (
           <Pressable
             key={tf}
-            onPress={() => setTimeframe(tf)}
-            style={[styles.timeframeTab, timeframe === tf && styles.timeframeTabActive]}
+            onPress={() => setPeriod(tf)}
+            style={[styles.timeframeTab, period === tf && styles.timeframeTabActive]}
           >
-            <Text style={[styles.timeframeText, timeframe === tf && styles.timeframeTextActive]}>
+            <Text style={[styles.timeframeText, period === tf && styles.timeframeTextActive]}>
               {tf === 'alltime' ? 'All Time' : tf.charAt(0).toUpperCase() + tf.slice(1)}
             </Text>
           </Pressable>
         ))}
       </View>
       
-      <View style={styles.emptyState}>
-        <Ionicons name="trophy" size={48} color="#EAB308" />
-        <Text style={styles.emptyTitle}>{period === 'streamers' ? 'Top Streamers' : 'Top Gifters'}</Text>
-        <Text style={styles.emptySubtitle}>{timeframe === 'alltime' ? 'All Time' : timeframe.charAt(0).toUpperCase() + timeframe.slice(1)} leaderboard</Text>
-      </View>
-      <Text style={styles.placeholder}>Leaderboard data is UI-only (mocked)</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#EAB308" />
+        </View>
+      ) : entries.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="trophy" size={48} color="#EAB308" />
+          <Text style={styles.emptyTitle}>No Rankings Yet</Text>
+          <Text style={styles.emptySubtitle}>Be the first to earn a spot!</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.trendingScrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.trendingList}>
+            {entries.map((entry) => (
+              <View 
+                key={entry.profile_id} 
+                style={[
+                  styles.trendingRow,
+                  entry.rank <= 3 && styles.trendingRowTop3,
+                ]}
+              >
+                {/* Rank */}
+                <Text style={[
+                  styles.trendingRank,
+                  entry.rank === 1 && styles.trendingRank1,
+                  entry.rank === 2 && styles.trendingRank2,
+                  entry.rank === 3 && styles.trendingRank3,
+                ]}>
+                  {entry.rank}
+                </Text>
+                
+                {/* Avatar */}
+                {entry.avatar_url ? (
+                  <Image
+                    source={{ uri: entry.avatar_url }}
+                    style={[
+                      styles.trendingAvatarImage,
+                      entry.rank === 1 && styles.trendingAvatar1,
+                      entry.rank === 2 && styles.trendingAvatar2,
+                      entry.rank === 3 && styles.trendingAvatar3,
+                    ]}
+                  />
+                ) : (
+                  <View style={[
+                    styles.trendingAvatar,
+                    entry.rank === 1 && styles.trendingAvatar1,
+                    entry.rank === 2 && styles.trendingAvatar2,
+                    entry.rank === 3 && styles.trendingAvatar3,
+                  ]}>
+                    <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
+                  </View>
+                )}
+                
+                {/* Username & metric */}
+                <View style={styles.trendingInfo}>
+                  <Text style={styles.trendingUsername} numberOfLines={1}>
+                    {entry.username}
+                  </Text>
+                  <View style={styles.trendingStats}>
+                    <Ionicons 
+                      name={type === 'top_streamers' ? 'diamond' : 'gift'} 
+                      size={10} 
+                      color="rgba(255,255,255,0.6)" 
+                    />
+                    <Text style={styles.trendingStat}>
+                      {entry.metric_value.toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+                
+                {/* Trophy for top 3 */}
+                {entry.rank <= 3 && (
+                  <Ionicons 
+                    name="trophy" 
+                    size={16} 
+                    color={entry.rank === 1 ? '#EAB308' : entry.rank === 2 ? '#9CA3AF' : '#F97316'} 
+                  />
+                )}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
     </SheetContainer>
   );
 }
@@ -495,10 +686,18 @@ const styles = StyleSheet.create({
   },
   
   // Trending sheet styles
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   trendingSubtitle: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.6)',
     marginBottom: 16,
+  },
+  trendingScrollView: {
+    maxHeight: 350,
   },
   trendingList: {
     gap: 8,
@@ -540,6 +739,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  trendingAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.3)',
   },
