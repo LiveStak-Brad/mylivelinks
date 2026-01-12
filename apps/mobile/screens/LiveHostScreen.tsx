@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
 import SoloHostOverlay from '../components/live/SoloHostOverlay';
-import type { ChatMessage } from '../components/live/ChatOverlay';
+import type { ChatMessage, ChatFontColor } from '../components/live/ChatOverlay';
 import type { TopGifter } from '../components/live/TopGifterBubbles';
 
 // ============================================================================
@@ -23,32 +23,35 @@ const MOCK_TOP_GIFTERS: TopGifter[] = [
   { id: '3', username: 'CoinKing', avatarUrl: 'https://i.pravatar.cc/100?u=coinking', totalCoins: 1200 },
 ];
 
+// Mock chat font color (from approved palette)
+const MOCK_CHAT_FONT_COLOR: ChatFontColor = '#FFFFFF';
+
 const MOCK_MESSAGES: ChatMessage[] = [
   { id: '1', type: 'system', username: 'System', text: 'Stream started' },
-  { id: '2', type: 'follow', username: 'NewFollower123', text: '' },
-  { id: '3', type: 'chat', username: 'CoolViewer', text: 'Hey! Great stream!' },
-  { id: '4', type: 'chat', username: 'MusicFan', text: 'Love this vibe 🔥' },
-  { id: '5', type: 'gift', username: 'BigSpender', text: 'sent a Rose', giftAmount: 100 },
-  { id: '6', type: 'chat', username: 'RandomUser', text: 'First time here, this is awesome!' },
-  { id: '7', type: 'chat', username: 'NightOwl', text: 'What city are you in?' },
-  { id: '8', type: 'follow', username: 'StreamWatcher', text: '' },
-  { id: '9', type: 'chat', username: 'CoolViewer', text: 'The quality is so good!' },
-  { id: '10', type: 'gift', username: 'GenGifter', text: 'sent a Diamond', giftAmount: 500 },
-  { id: '11', type: 'chat', username: 'MusicFan', text: 'Can you play some jazz?' },
-  { id: '12', type: 'chat', username: 'ChillMode', text: '👋👋👋' },
-  { id: '13', type: 'chat', username: 'ViewerX', text: 'How long have you been streaming?' },
-  { id: '14', type: 'gift', username: 'CoinKing', text: 'sent a Crown', giftAmount: 1000 },
-  { id: '15', type: 'chat', username: 'NightOwl', text: 'This chat is so chill' },
-  { id: '16', type: 'follow', username: 'LateNightFan', text: '' },
-  { id: '17', type: 'chat', username: 'RandomUser', text: 'Followed! Keep it up!' },
-  { id: '18', type: 'chat', username: 'CoolViewer', text: 'The lighting is perfect' },
+  { id: '2', type: 'follow', username: 'NewFollower123', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=newfollower123' },
+  { id: '3', type: 'chat', username: 'CoolViewer', text: 'Hey! Great stream!', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
+  { id: '4', type: 'chat', username: 'MusicFan', text: 'Love this vibe 🔥', avatarUrl: 'https://i.pravatar.cc/100?u=musicfan' },
+  { id: '5', type: 'gift', username: 'BigSpender', text: 'sent a Rose', giftAmount: 100, avatarUrl: 'https://i.pravatar.cc/100?u=bigspender' },
+  { id: '6', type: 'chat', username: 'RandomUser', text: 'First time here, this is awesome!', avatarUrl: 'https://i.pravatar.cc/100?u=randomuser' },
+  { id: '7', type: 'chat', username: 'NightOwl', text: 'What city are you in?', avatarUrl: 'https://i.pravatar.cc/100?u=nightowl' },
+  { id: '8', type: 'follow', username: 'StreamWatcher', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=streamwatcher' },
+  { id: '9', type: 'chat', username: 'CoolViewer', text: 'The quality is so good!', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
+  { id: '10', type: 'gift', username: 'GenGifter', text: 'sent a Diamond', giftAmount: 500, avatarUrl: 'https://i.pravatar.cc/100?u=gengifter' },
+  { id: '11', type: 'chat', username: 'MusicFan', text: 'Can you play some jazz?', avatarUrl: 'https://i.pravatar.cc/100?u=musicfan' },
+  { id: '12', type: 'chat', username: 'ChillMode', text: '👋👋👋', avatarUrl: 'https://i.pravatar.cc/100?u=chillmode' },
+  { id: '13', type: 'chat', username: 'ViewerX', text: 'How long have you been streaming?', avatarUrl: 'https://i.pravatar.cc/100?u=viewerx' },
+  { id: '14', type: 'gift', username: 'CoinKing', text: 'sent a Crown', giftAmount: 1000, avatarUrl: 'https://i.pravatar.cc/100?u=coinking' },
+  { id: '15', type: 'chat', username: 'NightOwl', text: 'This chat is so chill', avatarUrl: 'https://i.pravatar.cc/100?u=nightowl' },
+  { id: '16', type: 'follow', username: 'LateNightFan', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=latenightfan' },
+  { id: '17', type: 'chat', username: 'RandomUser', text: 'Followed! Keep it up!', avatarUrl: 'https://i.pravatar.cc/100?u=randomuser' },
+  { id: '18', type: 'chat', username: 'CoolViewer', text: 'The lighting is perfect', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
   { id: '19', type: 'system', username: 'System', text: '100 viewers reached!' },
-  { id: '20', type: 'chat', username: 'ChillMode', text: 'Love this community' },
-  { id: '21', type: 'gift', username: 'BigSpender', text: 'sent a Universe', giftAmount: 2500 },
-  { id: '22', type: 'chat', username: 'MusicFan', text: 'That gift animation was crazy!' },
-  { id: '23', type: 'chat', username: 'ViewerX', text: 'Stream goals 🎯' },
-  { id: '24', type: 'follow', username: 'NewbieFan', text: '' },
-  { id: '25', type: 'chat', username: 'NightOwl', text: 'Best stream of the night!' },
+  { id: '20', type: 'chat', username: 'ChillMode', text: 'Love this community', avatarUrl: 'https://i.pravatar.cc/100?u=chillmode' },
+  { id: '21', type: 'gift', username: 'BigSpender', text: 'sent a Universe', giftAmount: 2500, avatarUrl: 'https://i.pravatar.cc/100?u=bigspender' },
+  { id: '22', type: 'chat', username: 'MusicFan', text: 'That gift animation was crazy!', avatarUrl: 'https://i.pravatar.cc/100?u=musicfan' },
+  { id: '23', type: 'chat', username: 'ViewerX', text: 'Stream goals 🎯', avatarUrl: 'https://i.pravatar.cc/100?u=viewerx' },
+  { id: '24', type: 'follow', username: 'NewbieFan', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=newbiefan' },
+  { id: '25', type: 'chat', username: 'NightOwl', text: 'Best stream of the night!', avatarUrl: 'https://i.pravatar.cc/100?u=nightowl' },
 ];
 
 // ============================================================================
@@ -156,6 +159,7 @@ export default function LiveHostScreen() {
           messages={MOCK_MESSAGES}
           isMuted={isMuted}
           isCameraFlipped={isCameraFlipped}
+          chatFontColor={MOCK_CHAT_FONT_COLOR}
           onEndStream={handleEndStream}
           onFlipCamera={() => setIsCameraFlipped((prev) => !prev)}
           onToggleMute={() => setIsMuted((prev) => !prev)}

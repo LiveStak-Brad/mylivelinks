@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import ChatOverlay, { ChatMessage } from './ChatOverlay';
+import ChatOverlay, { ChatMessage, ChatFontColor } from './ChatOverlay';
 import TopGifterBubbles, { TopGifter } from './TopGifterBubbles';
 import HostControlsBar from './HostControlsBar';
 import {
@@ -36,6 +36,9 @@ export interface SoloHostOverlayProps {
   isMuted: boolean;
   isCameraFlipped: boolean;
   
+  // Chat font color (new spec)
+  chatFontColor?: ChatFontColor;
+  
   // Handlers (placeholder)
   onEndStream: () => void;
   onShare?: () => void;
@@ -56,6 +59,7 @@ export default function SoloHostOverlay({
   messages,
   isMuted,
   isCameraFlipped,
+  chatFontColor = '#FFFFFF',
   onEndStream,
   onShare,
   onFlipCamera,
@@ -75,23 +79,23 @@ export default function SoloHostOverlay({
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {/* A. Top Gradient Overlay (black → transparent) */}
+      {/* A. Top Gradient Overlay (black → transparent) - matches web h-28 */}
       <View style={[styles.topGradient, { paddingTop: insets.top }]} pointerEvents="none">
         <View style={styles.gradientLayer1} />
         <View style={styles.gradientLayer2} />
         <View style={styles.gradientLayer3} />
       </View>
 
-      {/* B. Bottom Gradient Overlay (black → transparent) */}
+      {/* B. Bottom Gradient Overlay (black → transparent) - matches web h-56 */}
       <View style={[styles.bottomGradient, { paddingBottom: insets.bottom }]} pointerEvents="none">
         <View style={styles.bottomGradientLayer1} />
         <View style={styles.bottomGradientLayer2} />
         <View style={styles.bottomGradientLayer3} />
       </View>
 
-      {/* C. Top Bar */}
+      {/* C. Top Bar - Web parity: Left (avatar+name), Right (viewer near X, then X) */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        {/* Left: Host info */}
+        {/* Left: Host info bubble */}
         <View style={styles.hostInfo}>
           <View style={styles.hostBubble}>
             <Image
@@ -119,20 +123,21 @@ export default function SoloHostOverlay({
           </View>
         </View>
 
-        {/* Center: Viewer count */}
-        <Pressable
-          onPress={() => setShowViewers(true)}
-          style={({ pressed }) => [
-            styles.viewerBadge,
-            pressed && styles.viewerBadgePressed,
-          ]}
-        >
-          <Ionicons name="eye" size={16} color="#FFFFFF" />
-          <Text style={styles.viewerCount}>{viewerCount.toLocaleString()}</Text>
-        </Pressable>
+        {/* Right cluster: Viewer count + Exit (matches web mobile layout) */}
+        <View style={styles.topRightCluster}>
+          {/* Viewer count badge - positioned near X on mobile (web parity) */}
+          <Pressable
+            onPress={() => setShowViewers(true)}
+            style={({ pressed }) => [
+              styles.viewerBadge,
+              pressed && styles.viewerBadgePressed,
+            ]}
+          >
+            <Ionicons name="eye" size={14} color="#FFFFFF" />
+            <Text style={styles.viewerCount}>{viewerCount.toLocaleString()}</Text>
+          </Pressable>
 
-        {/* Right: Actions */}
-        <View style={styles.topActions}>
+          {/* Exit button */}
           <Pressable
             onPress={onEndStream}
             style={({ pressed }) => [
@@ -140,13 +145,13 @@ export default function SoloHostOverlay({
               pressed && styles.exitButtonPressed,
             ]}
           >
-            <Ionicons name="close" size={22} color="#FFFFFF" />
+            <Ionicons name="close" size={20} color="#FFFFFF" />
           </Pressable>
         </View>
       </View>
 
-      {/* D. Second Row: Top Gifters + Share */}
-      <View style={[styles.secondRow, { top: insets.top + 60 }]}>
+      {/* D. Second Row: Stream title left, Top Gifters + Share right (web parity) */}
+      <View style={[styles.secondRow, { top: insets.top + 56 }]}>
         {/* Stream title on left */}
         <View style={styles.titleContainer}>
           {title ? (
@@ -156,7 +161,7 @@ export default function SoloHostOverlay({
           ) : null}
         </View>
 
-        {/* Top gifters on right */}
+        {/* Top gifters + Share on right */}
         <View style={styles.secondRowRight}>
           <TopGifterBubbles
             gifters={topGifters}
@@ -169,17 +174,17 @@ export default function SoloHostOverlay({
               pressed && styles.shareButtonPressed,
             ]}
           >
-            <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
           </Pressable>
         </View>
       </View>
 
-      {/* E. Chat Overlay (above bottom bar) */}
-      <View style={[styles.chatContainer, { bottom: insets.bottom + 80 }]}>
-        <ChatOverlay messages={messages} />
+      {/* E. Chat Overlay (above bottom bar, not overlapping controls) */}
+      <View style={[styles.chatContainer, { bottom: insets.bottom + 72 }]}>
+        <ChatOverlay messages={messages} fontColor={chatFontColor} />
       </View>
 
-      {/* F. Bottom Host Controls */}
+      {/* F. Bottom Host Controls - Order: Battle, CoHost, Guests, Settings, Filters (web parity) */}
       <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 8 }]}>
         <HostControlsBar
           onBattle={() => setShowBattle(true)}
@@ -209,73 +214,73 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
-  // Top gradient layers (simulating gradient without expo-linear-gradient)
+  // Top gradient layers (simulating web h-28 gradient)
   topGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 120,
+    height: 112, // ~h-28 (28*4=112)
   },
   gradientLayer1: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 40,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    height: 44,
+    backgroundColor: 'rgba(0,0,0,0.85)',
   },
   gradientLayer2: {
     position: 'absolute',
-    top: 40,
+    top: 44,
     left: 0,
     right: 0,
-    height: 40,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    height: 36,
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   gradientLayer3: {
     position: 'absolute',
     top: 80,
     left: 0,
     right: 0,
-    height: 40,
+    height: 32,
     backgroundColor: 'rgba(0,0,0,0.2)',
   },
 
-  // Bottom gradient layers
+  // Bottom gradient layers (simulating web h-56 gradient)
   bottomGradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 200,
+    height: 224, // ~h-56 (56*4=224)
   },
   bottomGradientLayer1: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
-    backgroundColor: 'rgba(0,0,0,0.9)',
+    height: 90,
+    backgroundColor: 'rgba(0,0,0,0.95)',
   },
   bottomGradientLayer2: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 90,
     left: 0,
     right: 0,
-    height: 60,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    height: 70,
+    backgroundColor: 'rgba(0,0,0,0.65)',
   },
   bottomGradientLayer3: {
     position: 'absolute',
-    bottom: 140,
+    bottom: 160,
     left: 0,
     right: 0,
-    height: 60,
+    height: 64,
     backgroundColor: 'rgba(0,0,0,0.25)',
   },
 
-  // Top bar
+  // Top bar (web parity: left avatar+name, right viewer+X)
   topBar: {
     position: 'absolute',
     top: 0,
@@ -289,98 +294,100 @@ const styles = StyleSheet.create({
   },
   hostInfo: {
     flex: 1,
-    maxWidth: '45%',
+    maxWidth: '55%',
   },
   hostBubble: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 24,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    gap: 8,
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    gap: 6,
   },
   hostAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   hostText: {
     flex: 1,
   },
   hostName: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   hostMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
+    gap: 5,
+    marginTop: 1,
   },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EF4444',
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    gap: 3,
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    gap: 2,
   },
   liveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: '#FFFFFF',
   },
   liveText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   categoryPill: {
     backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
   categoryText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)',
   },
 
-  // Viewer badge
+  // Right cluster (viewer + exit) - matches web mobile layout
+  topRightCluster: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  // Viewer badge (compact for mobile)
   viewerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 6,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    gap: 4,
   },
   viewerBadgePressed: {
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   viewerCount: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
   },
 
-  // Top actions
-  topActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  // Exit button
   exitButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -389,7 +396,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.8)',
   },
 
-  // Second row
+  // Second row (title left, gifters+share right)
   secondRow: {
     position: 'absolute',
     left: 12,
@@ -401,27 +408,27 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
   streamTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)',
     backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
     overflow: 'hidden',
   },
   secondRowRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   shareButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -430,12 +437,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(99,102,241,0.8)',
   },
 
-  // Chat container
+  // Chat container (positioned above bottom controls, not overlapping)
   chatContainer: {
     position: 'absolute',
     left: 0,
     right: 0,
-    height: 180,
+    height: 200,
     zIndex: 15,
   },
 
