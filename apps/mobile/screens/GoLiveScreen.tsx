@@ -263,8 +263,8 @@ export default function GoLiveScreen() {
           (chatSettingsData ?? []).map((s: any) => [s.profile_id, s.chat_bubble_color])
         );
 
-        // Reverse to show oldest first, but FlatList is inverted so newest appears at bottom
-        const messages: ChatMessage[] = (data ?? []).reverse().map((msg: any) => {
+        // Data is newest-first from DB, pass directly to inverted FlatList so newest shows at bottom
+        const messages: ChatMessage[] = (data ?? []).map((msg: any) => {
           const lifetimeCoins = msg.profile?.lifetime_coins_gifted || 0;
           const gifterInfo = getGifterTierFromCoins(lifetimeCoins);
           
@@ -338,7 +338,8 @@ export default function GoLiveScreen() {
             gifterLevelInTier: gifterInfo.levelInTier,
           };
 
-          setChatMessages((prev) => [...prev.slice(-49), newMessage]);
+          // Prepend new message (array is newest-first for inverted FlatList)
+          setChatMessages((prev) => [newMessage, ...prev.slice(0, 49)]);
         }
       )
       .subscribe();
