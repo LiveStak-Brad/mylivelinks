@@ -10,6 +10,7 @@ import ChatOverlay, { ChatMessage, ChatFontColor } from './ChatOverlay';
 import TopGifterBubbles, { TopGifter } from './TopGifterBubbles';
 import HostControlsBar from './HostControlsBar';
 import { DEFAULT_HOST_CAMERA_FILTERS, loadHostCameraFilters, saveHostCameraFilters, type HostCameraFilters } from '../../lib/hostCameraFilters';
+import { DEFAULT_HOST_LIVE_OPTIONS, loadHostLiveOptions, saveHostLiveOptions, type HostLiveOptions } from '../../lib/hostLiveOptions';
 import {
   SettingsSheet,
   GuestsSheet,
@@ -55,6 +56,16 @@ export interface SoloHostOverlayProps {
 
   // Host profile id (for persisting camera filter slider values)
   profileId?: string;
+
+  // Camera filter state (prefer controlled from host screen so changes affect publishing pipeline)
+  cameraFilters?: HostCameraFilters;
+  onCameraFiltersChange?: (patch: Partial<HostCameraFilters>) => void;
+
+  // Optional real track control wiring (if host screen provides it)
+  micMuted?: boolean;
+  onSetMicMuted?: (next: boolean) => void;
+  cameraDisabled?: boolean;
+  onSetCameraDisabled?: (next: boolean) => void;
   
   // Handlers (placeholder)
   onEndStream: () => void;
@@ -79,15 +90,26 @@ export default function SoloHostOverlay({
   isCameraFlipped,
   chatFontColor = '#FFFFFF',
   profileId,
+  micMuted,
+  onSetMicMuted,
+  cameraDisabled,
+  onSetCameraDisabled,
   onEndStream,
   onShare,
   onFlipCamera,
   onToggleMute,
+  cameraFilters: cameraFiltersProp,
+  onCameraFiltersChange: onCameraFiltersChangeProp,
 }: SoloHostOverlayProps) {
   const insets = useSafeAreaInsets();
   const storageProfileId = profileId ?? 'anonymous';
-  const [cameraFilters, setCameraFilters] = useState<HostCameraFilters>(DEFAULT_HOST_CAMERA_FILTERS);
+  const [uncontrolledCameraFilters, setUncontrolledCameraFilters] =
+    useState<HostCameraFilters>(DEFAULT_HOST_CAMERA_FILTERS);
   const didUserEditCameraFiltersRef = useRef(false);
+
+  const cameraFilters = cameraFiltersProp ?? uncontrolledCameraFilters;
+  const onCameraFiltersChange = onCameraFiltersChangeProp;
+  const [hostOptions, setHostOptions] = useState<HostLiveOptions>(DEFAULT_HOST_LIVE_OPTIONS);
 
   // Load persisted camera filter sliders
   useEffect(() => {
@@ -95,13 +117,30 @@ export default function SoloHostOverlay({
     (async () => {
       const loaded = await loadHostCameraFilters(storageProfileId);
       if (!cancelled && !didUserEditCameraFiltersRef.current) {
-        setCameraFilters(loaded);
+        setUncontrolledCameraFilters(loaded);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [storageProfileId]);
+
+  // Load persisted host live options
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const loaded = await loadHostLiveOptions(storageProfileId);
+      if (!cancelled) setHostOptions(loaded);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [storageProfileId]);
+
+  const updateHostOptions = (next: HostLiveOptions) => {
+    setHostOptions(next);
+    void saveHostLiveOptions(storageProfileId, next);
+  };
   
   // Sheet visibility states
   const [showSettings, setShowSettings] = useState(false);
@@ -118,7 +157,9 @@ export default function SoloHostOverlay({
   return (
     <View style={styles.container} pointerEvents="box-none">
       {/* Bottom Gradient: darkest at bottom edge, fading towards center */}
-      <View style={styles.bottomGradient} pointerEvents="none" />
+      {!showFilters && <View style={styles.bottomGradient} pointerEvents="none" />}
+      {/* Slightly lighter when Filters is open so you can see the camera preview */}
+      {showFilters && <View style={styles.bottomGradientWhileFiltering} pointerEvents="none" />}
 
       {/* C. Top Bar - Web parity: Left (avatar+name), Right (viewer near X, then X) */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
@@ -229,7 +270,12 @@ export default function SoloHostOverlay({
 
       {/* E. Chat Overlay (above bottom bar, closer to buttons) */}
       <View style={[styles.chatContainer, { bottom: insets.bottom + 56 }]}>
-        <ChatOverlay messages={messages} fontColor={chatFontColor} />
+        <ChatOverlay
+          messages={messages}
+          fontColor={chatFontColor}
+          chatSize={hostOptions.chatSize}
+          mutedWords={hostOptions.mutedWords}
+        />
       </View>
 
       {/* F. Bottom Host Controls - Order: Battle, CoHost, Guests, Settings, Filters (web parity) */}
@@ -244,7 +290,22 @@ export default function SoloHostOverlay({
       </View>
 
       {/* Modal Sheets */}
-      <SettingsSheet visible={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsSheet
+        visible={showSettings}
+        onClose={() => setShowSettings(false)}
+        options={hostOptions}
+        onOptionsChange={updateHostOptions}
+        micMuted={micMuted ?? isMuted}
+        onSetMicMuted={
+          onSetMicMuted ??
+          ((next) => {
+            if (next !== isMuted) onToggleMute?.();
+          })
+        }
+        cameraDisabled={cameraDisabled ?? false}
+        onSetCameraDisabled={onSetCameraDisabled}
+        onFlipCamera={onFlipCamera}
+      />
       <GuestsSheet visible={showGuests} onClose={() => setShowGuests(false)} />
       <BattleSheet visible={showBattle} onClose={() => setShowBattle(false)} />
       <CoHostSheet visible={showCoHost} onClose={() => setShowCoHost(false)} />
@@ -252,10 +313,17 @@ export default function SoloHostOverlay({
         visible={showFilters}
         onClose={() => setShowFilters(false)}
         filters={cameraFilters}
-        onChange={(next) => {
+        onChange={(patch) => {
           didUserEditCameraFiltersRef.current = true;
-          setCameraFilters(next);
-          void saveHostCameraFilters(storageProfileId, next);
+          if (onCameraFiltersChange) {
+            onCameraFiltersChange(patch);
+            return;
+          }
+          setUncontrolledCameraFilters((prev) => {
+            const next = { ...prev, ...patch };
+            void saveHostCameraFilters(storageProfileId, next);
+            return next;
+          });
         }}
       />
       <ShareSheet visible={showShare} onClose={() => setShowShare(false)} />
@@ -281,6 +349,14 @@ const styles = StyleSheet.create({
     right: 0,
     height: 80,
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  bottomGradientWhileFiltering: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+    backgroundColor: 'rgba(0,0,0,0.18)',
   },
 
   // Top bar (web parity: left avatar+name, right viewer+X)

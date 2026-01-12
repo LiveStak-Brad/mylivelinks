@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { DEFAULT_HOST_CAMERA_FILTERS, type HostCameraFilters } from '../../../lib/hostCameraFilters';
+import { DEFAULT_HOST_LIVE_OPTIONS, type ChatSize, type HostLiveOptions } from '../../../lib/hostLiveOptions';
 
 interface BaseSheetProps {
   visible: boolean;
@@ -37,25 +38,172 @@ function SheetContainer({ visible, onClose, title, children }: BaseSheetProps & 
 }
 
 // Settings Sheet
-export function SettingsSheet({ visible, onClose }: BaseSheetProps) {
+export function SettingsSheet({
+  visible,
+  onClose,
+  options = DEFAULT_HOST_LIVE_OPTIONS,
+  onOptionsChange,
+  micMuted = false,
+  onSetMicMuted,
+  cameraDisabled = false,
+  onSetCameraDisabled,
+  onFlipCamera,
+}: BaseSheetProps & {
+  options?: HostLiveOptions;
+  onOptionsChange?: (next: HostLiveOptions) => void;
+  micMuted?: boolean;
+  onSetMicMuted?: (next: boolean) => void;
+  cameraDisabled?: boolean;
+  onSetCameraDisabled?: (next: boolean) => void;
+  onFlipCamera?: () => void;
+}) {
+  const [newMutedWord, setNewMutedWord] = useState('');
+  const [newModerator, setNewModerator] = useState('');
+
+  const updateOptions = (patch: Partial<HostLiveOptions>) => {
+    onOptionsChange?.({ ...options, ...patch });
+  };
+
+  const cycleChatSize = () => {
+    const next: ChatSize = options.chatSize === 'small' ? 'medium' : options.chatSize === 'medium' ? 'large' : 'small';
+    updateOptions({ chatSize: next });
+  };
+
+  const addMutedWord = () => {
+    const w = newMutedWord.trim();
+    if (!w) return;
+    const next = Array.from(new Set([...(options.mutedWords || []), w]));
+    updateOptions({ mutedWords: next });
+    setNewMutedWord('');
+  };
+
+  const removeMutedWord = (w: string) => {
+    updateOptions({ mutedWords: (options.mutedWords || []).filter((x) => x !== w) });
+  };
+
+  const addModerator = () => {
+    const u = newModerator.trim().replace(/^@+/, '');
+    if (!u) return;
+    const next = Array.from(new Set([...(options.moderators || []), u]));
+    updateOptions({ moderators: next });
+    setNewModerator('');
+  };
+
+  const removeModerator = (u: string) => {
+    updateOptions({ moderators: (options.moderators || []).filter((x) => x !== u) });
+  };
+
   return (
     <SheetContainer visible={visible} onClose={onClose} title="Stream Settings">
-      <View style={styles.row}>
-        <Ionicons name="camera-reverse-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Flip Camera</Text>
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
-      </View>
+      {/* Mute mic */}
       <View style={styles.row}>
         <Ionicons name="mic-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Microphone</Text>
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
+        <Text style={styles.rowText}>Mute mic</Text>
+        <Switch value={micMuted} onValueChange={(v) => onSetMicMuted?.(v)} />
       </View>
+
+      {/* Disable cam */}
       <View style={styles.row}>
         <Ionicons name="videocam-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Video Quality</Text>
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
+        <Text style={styles.rowText}>Disable cam</Text>
+        <Switch value={cameraDisabled} onValueChange={(v) => onSetCameraDisabled?.(v)} />
       </View>
-      <Text style={styles.placeholder}>Settings are UI-only placeholders</Text>
+
+      {/* Switch camera */}
+      <Pressable style={styles.row} onPress={onFlipCamera}>
+        <Ionicons name="camera-reverse-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Switch camera</Text>
+        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.5)" />
+      </Pressable>
+
+      {/* Mirror camera */}
+      <View style={styles.row}>
+        <Ionicons name="swap-horizontal-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Mirror camera</Text>
+        <Switch value={!!options.mirrorCamera} onValueChange={(v) => updateOptions({ mirrorCamera: v })} />
+      </View>
+
+      {/* Allow guest requests */}
+      <View style={styles.row}>
+        <Ionicons name="people-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Allow guest requests</Text>
+        <Switch value={!!options.allowGuestRequests} onValueChange={(v) => updateOptions({ allowGuestRequests: v })} />
+      </View>
+
+      {/* Muted words */}
+      <Text style={styles.sectionLabel}>Muted words</Text>
+      <View style={styles.inputRow}>
+        <TextInput
+          value={newMutedWord}
+          onChangeText={setNewMutedWord}
+          placeholder="Add word"
+          placeholderTextColor="rgba(255,255,255,0.35)"
+          style={styles.input}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="done"
+          onSubmitEditing={addMutedWord}
+        />
+        <Pressable style={styles.addButton} onPress={addMutedWord}>
+          <Ionicons name="add" size={18} color="#FFFFFF" />
+        </Pressable>
+      </View>
+      <View style={styles.chipWrap}>
+        {(options.mutedWords || []).map((w) => (
+          <Pressable key={w} onPress={() => removeMutedWord(w)} style={styles.chip}>
+            <Text style={styles.chipText}>{w}</Text>
+            <Ionicons name="close" size={14} color="rgba(255,255,255,0.8)" />
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Moderators */}
+      <Text style={styles.sectionLabel}>Moderators</Text>
+      <View style={styles.inputRow}>
+        <TextInput
+          value={newModerator}
+          onChangeText={setNewModerator}
+          placeholder="Add @username"
+          placeholderTextColor="rgba(255,255,255,0.35)"
+          style={styles.input}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="done"
+          onSubmitEditing={addModerator}
+        />
+        <Pressable style={styles.addButton} onPress={addModerator}>
+          <Ionicons name="add" size={18} color="#FFFFFF" />
+        </Pressable>
+      </View>
+      <View style={styles.chipWrap}>
+        {(options.moderators || []).map((u) => (
+          <Pressable key={u} onPress={() => removeModerator(u)} style={styles.chip}>
+            <Text style={styles.chipText}>@{u}</Text>
+            <Ionicons name="close" size={14} color="rgba(255,255,255,0.8)" />
+          </Pressable>
+        ))}
+      </View>
+
+      {/* Merge chat */}
+      <View style={[styles.row, { opacity: 0.6 }]}>
+        <Ionicons name="git-merge-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Merge chat</Text>
+        <View style={styles.valuePill}>
+          <Text style={styles.valuePillText}>Coming soon</Text>
+        </View>
+      </View>
+
+      {/* Chat size */}
+      <Pressable style={styles.row} onPress={cycleChatSize}>
+        <Ionicons name="text-outline" size={22} color="#FFFFFF" />
+        <Text style={styles.rowText}>Chat size</Text>
+        <View style={styles.valuePill}>
+          <Text style={styles.valuePillText}>
+            {options.chatSize === 'small' ? 'Small' : options.chatSize === 'large' ? 'Large' : 'Medium'}
+          </Text>
+          <Ionicons name="sync" size={14} color="rgba(255,255,255,0.7)" />
+        </View>
+      </Pressable>
     </SheetContainer>
   );
 }
@@ -116,36 +264,107 @@ export function FiltersSheet({
   onChange,
 }: BaseSheetProps & {
   filters?: HostCameraFilters;
-  onChange?: (next: HostCameraFilters) => void;
+  onChange?: (patch: Partial<HostCameraFilters>) => void;
 }) {
-  const update = (patch: Partial<HostCameraFilters>) => onChange?.({ ...filters, ...patch });
+  const update = (patch: Partial<HostCameraFilters>) => onChange?.(patch);
+
+  const softSkin = (filters.softSkinLevel ?? 0) as 0 | 1 | 2;
+
+  const presets: Array<{
+    id: string;
+    label: string;
+    apply: Partial<HostCameraFilters>;
+  }> = [
+    { id: 'normal', label: 'Normal', apply: DEFAULT_HOST_CAMERA_FILTERS },
+    { id: 'bright', label: 'Bright', apply: { brightness: 1.2, contrast: 1.05, saturation: 1.05 } },
+    { id: 'contrast', label: 'High Contrast', apply: { brightness: 1.0, contrast: 1.25, saturation: 1.0 } },
+    { id: 'vibrant', label: 'Vibrant', apply: { brightness: 1.05, contrast: 1.1, saturation: 1.45 } },
+    { id: 'muted', label: 'Muted', apply: { brightness: 0.95, contrast: 0.95, saturation: 0.75 } },
+    { id: 'warm', label: 'Warm Pop', apply: { brightness: 1.05, contrast: 1.1, saturation: 1.25 } },
+  ];
+
+  const isActive = (p: Partial<HostCameraFilters>) => {
+    // Only compare the Phase 1 params we actually apply to the stream today (BCS)
+    return (
+      typeof p.brightness === 'number' &&
+      typeof p.contrast === 'number' &&
+      typeof p.saturation === 'number' &&
+      Math.abs(filters.brightness - p.brightness) < 0.001 &&
+      Math.abs(filters.contrast - p.contrast) < 0.001 &&
+      Math.abs(filters.saturation - p.saturation) < 0.001
+    );
+  };
 
   return (
     <SheetContainer visible={visible} onClose={onClose} title="Video Filters">
-      <View style={styles.row}>
+      <Text style={styles.sectionLabel}>Presets</Text>
+      <View style={styles.presetWrap}>
+        {presets.map((p) => {
+          const active = isActive(p.apply);
+          return (
+            <Pressable
+              key={p.id}
+              onPress={() => update(p.apply)}
+              style={({ pressed }) => [
+                styles.presetPill,
+                active && styles.presetPillActive,
+                pressed && styles.presetPillPressed,
+              ]}
+            >
+              <Text style={[styles.presetPillText, active && styles.presetPillTextActive]}>{p.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.sectionLabel}>Current</Text>
+      <View style={styles.currentRow}>
+        <Text style={styles.currentText}>
+          B {filters.brightness.toFixed(2)} • C {filters.contrast.toFixed(2)} • S {filters.saturation.toFixed(2)} • SS{' '}
+          {(filters.softSkinLevel ?? 0).toFixed(0)}
+        </Text>
+        <Pressable onPress={() => update(DEFAULT_HOST_CAMERA_FILTERS)} style={styles.resetButton}>
+          <Ionicons name="refresh" size={16} color="#FFFFFF" />
+          <Text style={styles.resetText}>Reset</Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.sectionLabel}>Soft Skin</Text>
+      <View style={[styles.row, { marginTop: 6 }]}>
         <Ionicons name="sparkles-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Smoothing</Text>
-        <MiniSlider value={filters.smoothing} min={0} max={3} step={1} onValueChange={(v) => update({ smoothing: v })} />
-      </View>
-      <View style={styles.row}>
-        <Ionicons name="sunny-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Brightness</Text>
-        <MiniSlider value={filters.brightness} min={0.5} max={1.5} step={0.05} onValueChange={(v) => update({ brightness: v })} />
-      </View>
-      <View style={styles.row}>
-        <Ionicons name="contrast-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Contrast</Text>
-        <MiniSlider value={filters.contrast} min={0.5} max={1.5} step={0.05} onValueChange={(v) => update({ contrast: v })} />
-      </View>
-      <View style={styles.row}>
-        <Ionicons name="color-palette-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Saturation</Text>
-        <MiniSlider value={filters.saturation} min={0} max={2} step={0.1} onValueChange={(v) => update({ saturation: v })} />
-      </View>
-      <View style={styles.row}>
-        <Ionicons name="water-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.rowText}>Blur</Text>
-        <MiniSlider value={filters.blur} min={0} max={4} step={0.5} onValueChange={(v) => update({ blur: v })} />
+        <Text style={styles.rowText}>Soft Skin</Text>
+        <View style={styles.segmented}>
+          <Pressable
+            onPress={() => update({ softSkinLevel: 0 })}
+            style={({ pressed }) => [
+              styles.segment,
+              softSkin === 0 && styles.segmentActive,
+              pressed && styles.segmentPressed,
+            ]}
+          >
+            <Text style={[styles.segmentText, softSkin === 0 && styles.segmentTextActive]}>Off</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => update({ softSkinLevel: 1 })}
+            style={({ pressed }) => [
+              styles.segment,
+              softSkin === 1 && styles.segmentActive,
+              pressed && styles.segmentPressed,
+            ]}
+          >
+            <Text style={[styles.segmentText, softSkin === 1 && styles.segmentTextActive]}>Low</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => update({ softSkinLevel: 2 })}
+            style={({ pressed }) => [
+              styles.segment,
+              softSkin === 2 && styles.segmentActive,
+              pressed && styles.segmentPressed,
+            ]}
+          >
+            <Text style={[styles.segmentText, softSkin === 2 && styles.segmentTextActive]}>Medium</Text>
+          </Pressable>
+        </View>
       </View>
     </SheetContainer>
   );
@@ -598,6 +817,91 @@ export function LeaderboardSheet({ visible, onClose }: BaseSheetProps) {
 }
 
 const styles = StyleSheet.create({
+  presetWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 14,
+  },
+  presetPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  presetPillActive: {
+    backgroundColor: 'rgba(99,102,241,0.35)',
+    borderColor: 'rgba(99,102,241,0.65)',
+  },
+  presetPillPressed: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  presetPillText: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  presetPillTextActive: {
+    color: '#FFFFFF',
+  },
+  currentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 8,
+  },
+  currentText: {
+    flex: 1,
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  resetText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  segmented: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    overflow: 'hidden',
+  },
+  segment: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  segmentActive: {
+    backgroundColor: 'rgba(99,102,241,0.45)',
+  },
+  segmentPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  segmentText: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  segmentTextActive: {
+    color: '#FFFFFF',
+  },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -683,6 +987,61 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
   },
   valuePillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.9)',
+  },
+  sectionLabel: {
+    marginTop: 14,
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.6)',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  input: {
+    flex: 1,
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    color: '#FFFFFF',
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(99,102,241,0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 6,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+  },
+  chipText: {
     fontSize: 12,
     fontWeight: '700',
     color: 'rgba(255,255,255,0.9)',

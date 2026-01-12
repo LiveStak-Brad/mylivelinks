@@ -7,6 +7,8 @@ import { VideoView } from '@livekit/react-native';
 import { Room, RoomEvent, LocalVideoTrack, LocalAudioTrack, createLocalTracks, VideoPresets } from 'livekit-client';
 import { useAuth } from '../state/AuthContext';
 import { fetchMobileToken, disconnectAndCleanup } from '../lib/livekit';
+import { attachFiltersToLocalVideoTrack, setFilterParams as setNativeFilterParams } from '../lib/videoFilters';
+import { loadHostCameraFilters } from '../lib/hostCameraFilters';
 
 type LiveScreenParams = {
   roomName?: string;
@@ -96,6 +98,18 @@ export default function LiveScreen() {
         for (const track of tracks) {
           if (track.kind === 'video') {
             localVideo = track as LocalVideoTrack;
+            // Attach filter processor before publishing
+            attachFiltersToLocalVideoTrack(localVideo);
+            // Apply saved params (Phase 1)
+            if (user?.id) {
+              const saved = await loadHostCameraFilters(user.id);
+              setNativeFilterParams({
+                brightness: saved.brightness,
+                contrast: saved.contrast,
+                saturation: saved.saturation,
+                softSkinLevel: saved.softSkinLevel,
+              });
+            }
           } else if (track.kind === 'audio') {
             localAudio = track as LocalAudioTrack;
           }

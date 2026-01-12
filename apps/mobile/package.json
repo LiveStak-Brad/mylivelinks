@@ -27,7 +27,8 @@
     "react-native-gesture-handler": "^2.30.0",
     "react-native-reanimated": "^4.2.1",
     "react-native-safe-area-context": "^5.6.2",
-    "react-native-screens": "^4.19.0"
+    "react-native-screens": "^4.19.0",
+    "mll-video-filters": "file:packages/mll-video-filters"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

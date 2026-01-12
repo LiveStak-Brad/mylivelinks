@@ -31,8 +31,11 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "CAMERA",
+        "RECORD_AUDIO",
+        "CAMERA",
         "RECORD_AUDIO"
-      ]
+      ],
+      "package": "com.bradmorrismusic.mylivelinks"
     },
     "web": {
       "favicon": "./assets/favicon.png"

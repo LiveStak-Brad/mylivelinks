@@ -13,6 +13,13 @@ import SoloHostOverlay from '../components/live/SoloHostOverlay';
 import type { ChatMessage, ChatFontColor } from '../components/live/ChatOverlay';
 import { getGifterTierFromCoins } from '../components/live/ChatOverlay';
 import type { TopGifter } from '../components/live/TopGifterBubbles';
+import { attachFiltersToLocalVideoTrack, setFilterParams as setNativeFilterParams } from '../lib/videoFilters';
+import {
+  DEFAULT_HOST_CAMERA_FILTERS,
+  loadHostCameraFilters,
+  saveHostCameraFilters,
+  type HostCameraFilters,
+} from '../lib/hostCameraFilters';
 
 // Default font color for chat
 const DEFAULT_CHAT_FONT_COLOR: ChatFontColor = '#FFFFFF';
@@ -36,6 +43,32 @@ export default function GoLiveScreen() {
   const [audioTrack, setAudioTrack] = useState<LocalAudioTrack | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [cameraFilters, setCameraFilters] = useState<HostCameraFilters>(DEFAULT_HOST_CAMERA_FILTERS);
+  const didUserEditCameraFiltersRef = useRef(false);
+
+  // Load persisted camera filter params (host camera filters)
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const saved = await loadHostCameraFilters(user.id);
+      if (cancelled) return;
+      if (!didUserEditCameraFiltersRef.current) setCameraFilters(saved);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Apply native filter params whenever JS cameraFilters changes (Phase 1: brightness/contrast/saturation)
+  useEffect(() => {
+    setNativeFilterParams({
+      brightness: cameraFilters.brightness,
+      contrast: cameraFilters.contrast,
+      saturation: cameraFilters.saturation,
+      softSkinLevel: cameraFilters.softSkinLevel,
+    });
+  }, [cameraFilters.brightness, cameraFilters.contrast, cameraFilters.saturation, cameraFilters.softSkinLevel]);
 
   // Live state
   const [isLive, setIsLive] = useState(false);
@@ -71,6 +104,10 @@ export default function GoLiveScreen() {
     ],
     []
   );
+
+  const selectedCategoryLabel = useMemo(() => {
+    return categories.find((c) => c.id === selectedCategoryId)?.label ?? 'IRL';
+  }, [categories, selectedCategoryId]);
 
   const needsPermissions = !cameraGranted || !micGranted;
 
@@ -557,6 +594,13 @@ export default function GoLiveScreen() {
         facingMode: newFacing,
         resolution: VideoPresets.h720.resolution,
       });
+      attachFiltersToLocalVideoTrack(newTrack);
+      setNativeFilterParams({
+        brightness: cameraFilters.brightness,
+        contrast: cameraFilters.contrast,
+        saturation: cameraFilters.saturation,
+        softSkinLevel: cameraFilters.softSkinLevel,
+      });
       setVideoTrack(newTrack);
       
       // If live, republish the new track
@@ -591,6 +635,13 @@ export default function GoLiveScreen() {
         facingMode: cameraFacing,
         resolution: VideoPresets.h720.resolution,
       });
+      attachFiltersToLocalVideoTrack(video);
+      setNativeFilterParams({
+        brightness: cameraFilters.brightness,
+        contrast: cameraFilters.contrast,
+        saturation: cameraFilters.saturation,
+        softSkinLevel: cameraFilters.softSkinLevel,
+      });
       
       const audio = await createLocalAudioTrack();
 
@@ -621,11 +672,23 @@ export default function GoLiveScreen() {
     
     // If we were live, end the stream record
     if (isLive && user?.id) {
+      // Also clear room presence so you stop appearing in category rooms (IRL/Music/etc)
+      try {
+        const userName = user.email?.split('@')[0] || 'Host';
+        await supabase.rpc('upsert_room_presence', {
+          p_profile_id: user.id,
+          p_username: userName,
+          p_room_id: selectedCategoryId,
+          p_is_live_available: false,
+        });
+      } catch (err) {
+        console.warn('[GoLive] Failed to clear room presence on close:', err);
+      }
       await endLiveStreamRecord(user.id);
     }
     
     navigation.goBack();
-  }, [navigation, videoTrack, audioTrack, isLive, user]);
+  }, [navigation, videoTrack, audioTrack, isLive, user, selectedCategoryId]);
 
   // Handle Go Live - connect and publish on SAME screen
   const handleGoLive = useCallback(async () => {
@@ -648,6 +711,19 @@ export default function GoLiveScreen() {
       const roomName = generateSoloRoomName(user.id);
       const userName = user.email?.split('@')[0] || 'Host';
 
+      // Mark host as live in the selected category "room" (IRL/Music/etc).
+      // This is what powers room-based LiveTV sections on the backend (room_presence.room_id).
+      try {
+        await supabase.rpc('upsert_room_presence', {
+          p_profile_id: user.id,
+          p_username: userName,
+          p_room_id: selectedCategoryId,
+          p_is_live_available: true,
+        });
+      } catch (err) {
+        console.warn('[GoLive] Failed to upsert room presence:', err);
+      }
+
       // Create live_streams record in database (makes stream visible on LiveTV)
       // Matches web GoLiveButton.tsx implementation
       const { liveStreamId: newLiveStreamId, error: dbError } = await startLiveStreamRecord(user.id);
@@ -658,6 +734,22 @@ export default function GoLiveScreen() {
         console.log('[GoLive] Created live_stream ID:', newLiveStreamId);
         // Store the live_stream_id so we can fetch chat/gifters/viewers like web
         setLiveStreamId(newLiveStreamId ?? null);
+
+        // Best-effort: tag the live_stream row with the selected category label
+        // so LiveTV category tabs (IRL/Music/etc) can match it.
+        try {
+          if (newLiveStreamId) {
+            const { error: tagError } = await supabase
+              .from('live_streams')
+              .update({ room_name: selectedCategoryLabel })
+              .eq('id', newLiveStreamId);
+            if (tagError) {
+              console.warn('[GoLive] Failed to tag live_stream room_name:', tagError.message);
+            }
+          }
+        } catch (err) {
+          console.warn('[GoLive] Failed to tag live_stream room_name exception:', err);
+        }
       }
 
       // Fetch token
@@ -683,6 +775,13 @@ export default function GoLiveScreen() {
       // Publish existing tracks
       await room.localParticipant.publishTrack(videoTrack);
       await room.localParticipant.publishTrack(audioTrack);
+      // Ensure processor params are applied after publish as well (some platforms start capturer on publish)
+      setNativeFilterParams({
+        brightness: cameraFilters.brightness,
+        contrast: cameraFilters.contrast,
+        saturation: cameraFilters.saturation,
+        softSkinLevel: cameraFilters.softSkinLevel,
+      });
 
       setIsLive(true);
       console.log('[GoLive] Now live! Stream should appear on LiveTV.');
@@ -690,13 +789,25 @@ export default function GoLiveScreen() {
       console.error('[GoLive] Connect error:', err);
       // If we created a DB record but connection failed, clean it up
       if (user?.id) {
+        // Clear room presence if we failed to go live
+        try {
+          const userName = user.email?.split('@')[0] || 'Host';
+          await supabase.rpc('upsert_room_presence', {
+            p_profile_id: user.id,
+            p_username: userName,
+            p_room_id: selectedCategoryId,
+            p_is_live_available: false,
+          });
+        } catch (presenceErr) {
+          console.warn('[GoLive] Failed to clear room presence after connect error:', presenceErr);
+        }
         await endLiveStreamRecord(user.id);
       }
       Alert.alert('Connection Failed', err.message || 'Failed to go live.');
     } finally {
       setIsConnecting(false);
     }
-  }, [streamTitle, user, needsPermissions, videoTrack, audioTrack]);
+  }, [streamTitle, user, needsPermissions, videoTrack, audioTrack, selectedCategoryId, selectedCategoryLabel]);
 
   // Handle End Live - full cleanup and reset to preview state
   const handleEndLive = useCallback(() => {
@@ -726,6 +837,18 @@ export default function GoLiveScreen() {
           
           // End the live_streams record in database
           if (user?.id) {
+            // Clear room presence so you stop appearing in category rooms (IRL/Music/etc)
+            try {
+              const userName = user.email?.split('@')[0] || 'Host';
+              await supabase.rpc('upsert_room_presence', {
+                p_profile_id: user.id,
+                p_username: userName,
+                p_room_id: selectedCategoryId,
+                p_is_live_available: false,
+              });
+            } catch (err) {
+              console.warn('[GoLive] Failed to clear room presence on end:', err);
+            }
             await endLiveStreamRecord(user.id);
           }
           
@@ -745,7 +868,7 @@ export default function GoLiveScreen() {
         },
       },
     ]);
-  }, [user, videoTrack, audioTrack]);
+  }, [user, videoTrack, audioTrack, selectedCategoryId]);
 
   return (
     <View style={styles.container}>
@@ -923,22 +1046,34 @@ export default function GoLiveScreen() {
 
       {/* Solo Host Overlay - Full UI when live (web parity - real data from Supabase) */}
       {isLive && (
-        <SoloHostOverlay
-          profileId={user?.id}
-          hostName={hostProfile?.displayName || user?.email?.split('@')[0] || 'Host'}
-          hostAvatarUrl={hostProfile?.avatarUrl}
-          isPro={hostProfile?.isPro ?? false}
-          viewerCount={viewerCount}
-          trendingRank={trendingRank}
-          leaderboardRank={leaderboardRank ?? undefined}
-          topGifters={topGifters}
-          messages={chatMessages}
-          isMuted={false}
-          isCameraFlipped={cameraFacing === 'environment'}
-          chatFontColor={DEFAULT_CHAT_FONT_COLOR}
-          onEndStream={handleEndLive}
-          onFlipCamera={handleFlipCamera}
-        />
+        <View style={styles.liveOverlay} pointerEvents="box-none">
+          <SoloHostOverlay
+            profileId={user?.id}
+            hostName={hostProfile?.displayName || user?.email?.split('@')[0] || 'Host'}
+            hostAvatarUrl={hostProfile?.avatarUrl}
+            isPro={hostProfile?.isPro ?? false}
+            viewerCount={viewerCount}
+            trendingRank={trendingRank}
+            leaderboardRank={leaderboardRank ?? undefined}
+            topGifters={topGifters}
+            messages={chatMessages}
+            isMuted={false}
+            isCameraFlipped={cameraFacing === 'environment'}
+            chatFontColor={DEFAULT_CHAT_FONT_COLOR}
+            cameraFilters={cameraFilters}
+            onCameraFiltersChange={(patch) => {
+              if (!user?.id) return;
+              didUserEditCameraFiltersRef.current = true;
+              setCameraFilters((prev) => {
+                const next = { ...prev, ...patch };
+                void saveHostCameraFilters(user.id, next);
+                return next;
+              });
+            }}
+            onEndStream={handleEndLive}
+            onFlipCamera={handleFlipCamera}
+          />
+        </View>
       )}
     </View>
   );
@@ -966,6 +1101,12 @@ const styles = StyleSheet.create({
   cameraPreview: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0A0A0A',
+    zIndex: 0,
+  },
+  liveOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    elevation: 50,
   },
   videoView: {
     flex: 1,

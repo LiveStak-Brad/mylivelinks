@@ -1,0 +1,8 @@
+{
+  "name": "mll-video-filters",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.ts",
+  "react-native": "src/index.ts"
+}
+

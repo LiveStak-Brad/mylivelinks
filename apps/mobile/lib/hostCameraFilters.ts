@@ -7,6 +7,7 @@ export interface HostCameraFilters {
   brightness: number; // 0.5..1.5 (1 = normal)
   contrast: number; // 0.5..1.5 (1 = normal)
   saturation: number; // 0..2 (1 = normal)
+  softSkinLevel: 0 | 1 | 2; // 0=off, 1=low, 2=medium
 }
 
 export const DEFAULT_HOST_CAMERA_FILTERS: HostCameraFilters = {
@@ -15,6 +16,7 @@ export const DEFAULT_HOST_CAMERA_FILTERS: HostCameraFilters = {
   brightness: 1,
   contrast: 1,
   saturation: 1,
+  softSkinLevel: 0,
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -36,6 +38,7 @@ function normalize(input: unknown): Partial<HostCameraFilters> {
   const c = obj.contrast;
   const s = obj.saturation;
   const bl = obj.blur;
+  const ss = (obj as any).softSkinLevel;
 
   // Migration: older builds stored 0..1 values for brightness/contrast/saturation/blur and had no smoothing.
   const isOld01 =
@@ -59,6 +62,7 @@ function normalize(input: unknown): Partial<HostCameraFilters> {
     out.brightness = clamp(0.5 + b, 0.5, 1.5);
     out.contrast = clamp(0.5 + c, 0.5, 1.5);
     out.saturation = clamp(s * 2, 0, 2);
+    out.softSkinLevel = 0;
     return out;
   }
 
@@ -67,6 +71,7 @@ function normalize(input: unknown): Partial<HostCameraFilters> {
   if (typeof b === 'number' && Number.isFinite(b)) out.brightness = clamp(b, 0.5, 1.5);
   if (typeof c === 'number' && Number.isFinite(c)) out.contrast = clamp(c, 0.5, 1.5);
   if (typeof s === 'number' && Number.isFinite(s)) out.saturation = clamp(s, 0, 2);
+  if (typeof ss === 'number' && Number.isFinite(ss)) out.softSkinLevel = clamp(Math.round(ss), 0, 2) as 0 | 1 | 2;
 
   return out;
 }

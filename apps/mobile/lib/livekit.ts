@@ -6,6 +6,8 @@
 
 import { Room, RoomEvent, LocalVideoTrack, LocalAudioTrack, createLocalTracks, VideoPresets } from 'livekit-client';
 import { supabase } from './supabase';
+import { attachFiltersToLocalVideoTrack, setFilterParams as setNativeFilterParams } from './videoFilters';
+import { loadHostCameraFilters } from './hostCameraFilters';
 
 export interface TokenResponse {
   token: string;
@@ -84,7 +86,8 @@ export async function fetchMobileToken(
 export async function connectAndPublish(
   url: string,
   token: string,
-  publish: boolean = true
+  publish: boolean = true,
+  profileId?: string
 ): Promise<{
   room: Room;
   videoTrack: LocalVideoTrack | null;
@@ -128,6 +131,16 @@ export async function connectAndPublish(
       for (const track of tracks) {
         if (track.kind === 'video') {
           videoTrack = track as LocalVideoTrack;
+          attachFiltersToLocalVideoTrack(videoTrack);
+          if (profileId) {
+            const saved = await loadHostCameraFilters(profileId);
+            setNativeFilterParams({
+              brightness: saved.brightness,
+              contrast: saved.contrast,
+              saturation: saved.saturation,
+              softSkinLevel: saved.softSkinLevel,
+            });
+          }
         } else if (track.kind === 'audio') {
           audioTrack = track as LocalAudioTrack;
         }

@@ -198,10 +198,13 @@ export const CHAT_FONT_COLORS = [
 ] as const;
 
 export type ChatFontColor = typeof CHAT_FONT_COLORS[number];
+export type ChatSize = 'small' | 'medium' | 'large';
 
 interface ChatOverlayProps {
   messages: ChatMessage[];
   fontColor?: ChatFontColor;
+  chatSize?: ChatSize;
+  mutedWords?: string[];
 }
 
 const PLACEHOLDER_AVATAR = 'https://via.placeholder.com/28/6366F1/FFFFFF?text=?';
@@ -209,14 +212,30 @@ const PLACEHOLDER_AVATAR = 'https://via.placeholder.com/28/6366F1/FFFFFF?text=?'
 export default function ChatOverlay({
   messages,
   fontColor = '#FFFFFF',
+  chatSize = 'medium',
+  mutedWords = [],
 }: ChatOverlayProps) {
   const flatListRef = useRef<FlatList>(null);
 
   // No need for auto-scroll since we use inverted list (new messages appear at bottom automatically)
 
+  const safeMutedWords = Array.from(new Set(mutedWords.map((w) => String(w || '').trim()).filter(Boolean)));
+
+  const maskMutedWords = (text: string) => {
+    if (!safeMutedWords.length) return text;
+    let out = text;
+    for (const w of safeMutedWords) {
+      const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(escaped, 'gi');
+      out = out.replace(re, (m) => '*'.repeat(m.length));
+    }
+    return out;
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     // Use user's chosen chat color, fall back to default fontColor
     const textColor = item.chatColor || fontColor;
+    const safeText = maskMutedWords(item.text);
     
     // Get gifter tier for badge (matches web - show if lifetime_coins > 0)
     const tier = item.gifterTierKey ? getTierByKey(item.gifterTierKey) : undefined;
@@ -233,7 +252,7 @@ export default function ChatOverlay({
             />
             <View style={styles.messageContent}>
               <View style={styles.usernameRow}>
-                <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
+                <Text style={[styles.username, fontSizeStyles.username[chatSize], { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
                 {/* Gifter badge (web parity - pill with icon + level) */}
@@ -262,8 +281,8 @@ export default function ChatOverlay({
                   <Text style={styles.giftAmount}>{item.giftAmount}</Text>
                 </View>
               </View>
-              <Text style={[styles.messageText, { color: textColor }]} numberOfLines={2}>
-                {item.text}
+              <Text style={[styles.messageText, fontSizeStyles.message[chatSize], { color: textColor }]} numberOfLines={2}>
+                {safeText}
               </Text>
             </View>
           </View>
@@ -279,12 +298,12 @@ export default function ChatOverlay({
             />
             <View style={styles.messageContent}>
               <View style={styles.usernameRow}>
-                <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
+                <Text style={[styles.username, fontSizeStyles.username[chatSize], { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
                 <Ionicons name="person-add" size={10} color={textColor} style={{ marginLeft: 4, opacity: 0.7 }} />
               </View>
-              <Text style={[styles.messageText, { color: textColor, opacity: 0.8 }]} numberOfLines={1}>
+              <Text style={[styles.messageText, fontSizeStyles.message[chatSize], { color: textColor, opacity: 0.8 }]} numberOfLines={1}>
                 followed you
               </Text>
             </View>
@@ -295,8 +314,8 @@ export default function ChatOverlay({
         return (
           <View style={styles.systemRow}>
             <Ionicons name="information-circle-outline" size={12} color={textColor} style={{ opacity: 0.5 }} />
-            <Text style={[styles.systemText, { color: textColor }]} numberOfLines={1}>
-              {item.text}
+            <Text style={[styles.systemText, fontSizeStyles.system[chatSize], { color: textColor }]} numberOfLines={1}>
+              {safeText}
             </Text>
           </View>
         );
@@ -312,7 +331,7 @@ export default function ChatOverlay({
             />
             <View style={styles.messageContent}>
               <View style={styles.usernameRow}>
-                <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
+                <Text style={[styles.username, fontSizeStyles.username[chatSize], { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
                 {/* Gifter badge (web parity - pill with icon + level) */}
@@ -337,8 +356,8 @@ export default function ChatOverlay({
                   <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
                 )}
               </View>
-              <Text style={[styles.messageText, { color: textColor }]} numberOfLines={2}>
-                {item.text}
+              <Text style={[styles.messageText, fontSizeStyles.message[chatSize], { color: textColor }]} numberOfLines={2}>
+                {safeText}
               </Text>
             </View>
           </View>
@@ -360,6 +379,24 @@ export default function ChatOverlay({
     </View>
   );
 }
+
+const fontSizeStyles = {
+  username: {
+    small: { fontSize: 11 },
+    medium: { fontSize: 12 },
+    large: { fontSize: 13 },
+  } as const,
+  message: {
+    small: { fontSize: 12, lineHeight: 16 },
+    medium: { fontSize: 13, lineHeight: 17 },
+    large: { fontSize: 15, lineHeight: 19 },
+  } as const,
+  system: {
+    small: { fontSize: 10 },
+    medium: { fontSize: 11 },
+    large: { fontSize: 12 },
+  } as const,
+};
 
 const styles = StyleSheet.create({
   container: {
