@@ -297,8 +297,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   proBadgeImage: {
-    width: 28,
-    height: 14,
+    width: 56,
+    height: 28,
   },
   rankRow: {
     flexDirection: 'row',
