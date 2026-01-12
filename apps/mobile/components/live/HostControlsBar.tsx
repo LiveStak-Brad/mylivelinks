@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     // No background - buttons float on gradient
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 0,
   },
   button: {
     width: 48,
