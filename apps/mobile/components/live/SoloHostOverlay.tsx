@@ -265,16 +265,18 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   hostInfo: {
-    flex: 1,
-    maxWidth: '55%',
+    alignSelf: 'flex-start',
+    maxWidth: '60%',
   },
   hostBubble: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderRadius: 20,
     paddingVertical: 5,
     paddingHorizontal: 6,
+    paddingRight: 2,
     gap: 6,
   },
   hostAvatar: {
@@ -299,9 +301,10 @@ const styles = StyleSheet.create({
   proBadgeImage: {
     width: 80,
     height: 40,
-    marginLeft: -12,
-    marginTop: -6,
-    marginBottom: -6,
+    marginLeft: -18,
+    marginRight: -18,
+    marginTop: -10,
+    marginBottom: -10,
   },
   rankRow: {
     flexDirection: 'row',
