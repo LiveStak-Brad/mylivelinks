@@ -278,6 +278,7 @@ export default function GoLiveScreen() {
             chatColor: chatSettingsMap.get(msg.profile_id) || undefined,
             gifterTierKey: gifterInfo.tierKey,
             gifterLevelInTier: gifterInfo.levelInTier,
+            lifetimeCoins: lifetimeCoins,
           };
         });
 
@@ -336,6 +337,7 @@ export default function GoLiveScreen() {
             chatColor: chatSettings?.chat_bubble_color || undefined,
             gifterTierKey: gifterInfo.tierKey,
             gifterLevelInTier: gifterInfo.levelInTier,
+            lifetimeCoins: lifetimeCoins,
           };
 
           // Prepend new message (array is newest-first for inverted FlatList)

@@ -14,6 +14,7 @@ export interface ChatMessage {
   // Gifter status for showing badge (matches web gifter-tiers.ts)
   gifterTierKey?: string;
   gifterLevelInTier?: number;
+  lifetimeCoins?: number; // For checking if badge should show
   // Pro badge
   isPro?: boolean;
 }
@@ -101,9 +102,9 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
     // Use user's chosen chat color, fall back to default fontColor
     const textColor = item.chatColor || fontColor;
     
-    // Get gifter tier for badge (matches web)
+    // Get gifter tier for badge (matches web - show if lifetime_coins > 0)
     const tier = item.gifterTierKey ? getTierByKey(item.gifterTierKey) : undefined;
-    const showGifterBadge = tier && tier.key !== 'starter'; // Don't show starter badge
+    const showGifterBadge = tier && (item.lifetimeCoins ?? 0) > 0;
     
     switch (item.type) {
       case 'gift':
