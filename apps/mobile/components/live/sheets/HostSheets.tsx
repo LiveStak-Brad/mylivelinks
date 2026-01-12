@@ -198,52 +198,79 @@ export function GiftersSheet({ visible, onClose }: BaseSheetProps) {
   );
 }
 
-// Trending Sheet (flame icon - trending streamers)
+// Trending Sheet (flame icon - currently live streams ranked by trending score)
+// NOTE: This is different from LeaderboardSheet - shows LIVE streams only, no tabs
 export function TrendingSheet({ visible, onClose }: BaseSheetProps) {
-  const [period, setPeriod] = React.useState<'streamers' | 'gifters'>('streamers');
-  const [timeframe, setTimeframe] = React.useState<'daily' | 'weekly' | 'monthly' | 'alltime'>('daily');
+  // Mock trending entries (will be fetched from rpc_get_trending_live_streams)
+  const mockTrendingEntries = [
+    { rank: 1, username: 'TopStreamer', views: 1250, likes: 340, score: 2850 },
+    { rank: 2, username: 'PopularHost', views: 890, likes: 210, score: 1920 },
+    { rank: 3, username: 'RisingStart', views: 650, likes: 180, score: 1450 },
+    { rank: 4, username: 'LiveNow', views: 420, likes: 95, score: 890 },
+    { rank: 5, username: 'StreamKing', views: 310, likes: 72, score: 650 },
+  ];
   
   return (
-    <SheetContainer visible={visible} onClose={onClose} title="Trending">
-      {/* Type Tabs */}
-      <View style={styles.tabRow}>
-        <Pressable
-          onPress={() => setPeriod('streamers')}
-          style={[styles.tab, period === 'streamers' && styles.tabActive]}
-        >
-          <Ionicons name="videocam" size={16} color={period === 'streamers' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
-          <Text style={[styles.tabText, period === 'streamers' && styles.tabTextActive]}>Streamers</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setPeriod('gifters')}
-          style={[styles.tab, period === 'gifters' && styles.tabActive]}
-        >
-          <Ionicons name="gift" size={16} color={period === 'gifters' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} />
-          <Text style={[styles.tabText, period === 'gifters' && styles.tabTextActive]}>Gifters</Text>
-        </Pressable>
-      </View>
+    <SheetContainer visible={visible} onClose={onClose} title="Trending Now">
+      <Text style={styles.trendingSubtitle}>{mockTrendingEntries.length} live streams</Text>
       
-      {/* Timeframe Tabs */}
-      <View style={styles.timeframeTabs}>
-        {(['daily', 'weekly', 'monthly', 'alltime'] as const).map((tf) => (
-          <Pressable
-            key={tf}
-            onPress={() => setTimeframe(tf)}
-            style={[styles.timeframeTab, timeframe === tf && styles.timeframeTabActive]}
+      {/* Trending List */}
+      <View style={styles.trendingList}>
+        {mockTrendingEntries.map((entry) => (
+          <View 
+            key={entry.rank} 
+            style={[
+              styles.trendingRow,
+              entry.rank <= 3 && styles.trendingRowTop3,
+            ]}
           >
-            <Text style={[styles.timeframeText, timeframe === tf && styles.timeframeTextActive]}>
-              {tf === 'alltime' ? 'All Time' : tf.charAt(0).toUpperCase() + tf.slice(1)}
+            {/* Rank */}
+            <Text style={[
+              styles.trendingRank,
+              entry.rank === 1 && styles.trendingRank1,
+              entry.rank === 2 && styles.trendingRank2,
+              entry.rank === 3 && styles.trendingRank3,
+            ]}>
+              {entry.rank}
             </Text>
-          </Pressable>
+            
+            {/* Avatar placeholder */}
+            <View style={[
+              styles.trendingAvatar,
+              entry.rank === 1 && styles.trendingAvatar1,
+              entry.rank === 2 && styles.trendingAvatar2,
+              entry.rank === 3 && styles.trendingAvatar3,
+            ]}>
+              <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
+            </View>
+            
+            {/* Username & stats */}
+            <View style={styles.trendingInfo}>
+              <View style={styles.trendingNameRow}>
+                <Text style={styles.trendingUsername}>{entry.username}</Text>
+                {entry.rank <= 3 && (
+                  <Ionicons name="flash" size={12} color="#EAB308" />
+                )}
+              </View>
+              <View style={styles.trendingStats}>
+                <Ionicons name="eye" size={10} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.trendingStat}>{entry.views}</Text>
+                <Text style={styles.trendingDot}>•</Text>
+                <Ionicons name="heart" size={10} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.trendingStat}>{entry.likes}</Text>
+              </View>
+            </View>
+            
+            {/* Score */}
+            <View style={styles.trendingScore}>
+              <Ionicons name="flame" size={12} color="#F97316" />
+              <Text style={styles.trendingScoreText}>{entry.score}</Text>
+            </View>
+          </View>
         ))}
       </View>
       
-      <View style={styles.emptyState}>
-        <Ionicons name="flame" size={48} color="#F97316" />
-        <Text style={styles.emptyTitle}>Trending {period === 'streamers' ? 'Streamers' : 'Gifters'}</Text>
-        <Text style={styles.emptySubtitle}>{timeframe === 'alltime' ? 'All Time' : timeframe.charAt(0).toUpperCase() + timeframe.slice(1)} rankings</Text>
-      </View>
-      <Text style={styles.placeholder}>Trending data is UI-only (mocked)</Text>
+      <Text style={styles.placeholder}>Trending data is mocked (will fetch from Supabase)</Text>
     </SheetContainer>
   );
 }
@@ -465,5 +492,110 @@ const styles = StyleSheet.create({
   },
   timeframeTextActive: {
     color: '#FFFFFF',
+  },
+  
+  // Trending sheet styles
+  trendingSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: 16,
+  },
+  trendingList: {
+    gap: 8,
+  },
+  trendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    gap: 10,
+  },
+  trendingRowTop3: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  trendingRank: {
+    width: 24,
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+  },
+  trendingRank1: {
+    fontSize: 18,
+    color: '#EAB308',
+  },
+  trendingRank2: {
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  trendingRank3: {
+    fontSize: 15,
+    color: '#F97316',
+  },
+  trendingAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  trendingAvatar1: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderColor: '#A855F7',
+  },
+  trendingAvatar2: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderColor: '#EC4899',
+  },
+  trendingAvatar3: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderColor: '#F97316',
+  },
+  trendingInfo: {
+    flex: 1,
+  },
+  trendingNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trendingUsername: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  trendingStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  trendingStat: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  trendingDot: {
+    fontSize: 8,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  trendingScore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  trendingScoreText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F97316',
   },
 });
