@@ -129,8 +129,22 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
       }
 
       if (mountedRef.current) {
-        setProfiles(result);
-        saveToCache(currentUserId, result);
+        if (currentUserId && result.length > 0) {
+          const { data: following } = await supabase
+            .from('follows')
+            .select('followee_id')
+            .eq('follower_id', currentUserId)
+            .limit(100);
+          
+          const followingIds = following?.map((f: { followee_id: string }) => f.followee_id) || [];
+          const filtered = result.filter(p => !followingIds.includes(p.id));
+          
+          setProfiles(filtered);
+          saveToCache(currentUserId, filtered);
+        } else {
+          setProfiles(result);
+          saveToCache(currentUserId, result);
+        }
         setLoading(false);
         setError(null);
       }
@@ -283,14 +297,33 @@ export default function ProfileCarousel({ title, currentUserId }: ProfileCarouse
   useEffect(() => {
     if (!authResolved) return;
 
-    const cached = loadFromCache(currentUserId);
-    if (cached && cached.length > 0) {
-      setProfiles(cached);
-      setLoading(false);
-    }
+    const loadWithFilter = async () => {
+      const cached = loadFromCache(currentUserId);
+      
+      if (cached && cached.length > 0 && currentUserId) {
+        const { data: following } = await supabase
+          .from('follows')
+          .select('followee_id')
+          .eq('follower_id', currentUserId)
+          .limit(100);
+        
+        const followingIds = following?.map((f: { followee_id: string }) => f.followee_id) || [];
+        const filtered = cached.filter(p => !followingIds.includes(p.id));
+        
+        if (filtered.length > 0) {
+          setProfiles(filtered);
+          setLoading(false);
+        }
+      } else if (cached && cached.length > 0) {
+        setProfiles(cached);
+        setLoading(false);
+      }
 
-    loadProfiles();
-  }, [authResolved, currentUserId, loadProfiles, loadFromCache]);
+      loadProfiles();
+    };
+
+    loadWithFilter();
+  }, [authResolved, currentUserId, loadProfiles, loadFromCache, supabase]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
