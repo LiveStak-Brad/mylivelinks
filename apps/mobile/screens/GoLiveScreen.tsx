@@ -236,11 +236,12 @@ export default function GoLiveScreen() {
             profile:profiles!chat_messages_profile_id_fkey(
               username,
               display_name,
-              avatar_url
+              avatar_url,
+              gifter_level
             )
           `)
           .eq('live_stream_id', liveStreamId)
-          .order('created_at', { ascending: true })
+          .order('created_at', { ascending: false })
           .limit(50);
 
         if (error) {
@@ -250,13 +251,27 @@ export default function GoLiveScreen() {
 
         if (cancelled) return;
 
-        const messages: ChatMessage[] = (data ?? []).map((msg: any) => ({
+        // Get unique profile IDs and fetch their chat settings
+        const profileIds = [...new Set((data ?? []).map((msg: any) => msg.profile_id).filter(Boolean))];
+        const { data: chatSettingsData } = await supabase
+          .from('chat_settings')
+          .select('profile_id, chat_bubble_color')
+          .in('profile_id', profileIds);
+        
+        const chatSettingsMap = new Map(
+          (chatSettingsData ?? []).map((s: any) => [s.profile_id, s.chat_bubble_color])
+        );
+
+        // Reverse to show oldest first, but FlatList is inverted so newest appears at bottom
+        const messages: ChatMessage[] = (data ?? []).reverse().map((msg: any) => ({
           id: String(msg.id),
           type: mapMessageType(msg.message_type),
           username: msg.profile?.display_name || msg.profile?.username || 'User',
           text: msg.content || '',
           avatarUrl: msg.profile?.avatar_url || undefined,
           giftAmount: msg.message_type === 'gift' ? extractGiftAmount(msg.content) : undefined,
+          chatColor: chatSettingsMap.get(msg.profile_id) || undefined,
+          gifterLevel: msg.profile?.gifter_level || 0,
         }));
 
         setChatMessages(messages);
@@ -279,30 +294,41 @@ export default function GoLiveScreen() {
           table: 'chat_messages',
           filter: `live_stream_id=eq.${liveStreamId}`,
         },
-        (payload) => {
+        async (payload) => {
           if (cancelled) return;
           
           const msg = payload.new as any;
-          // Fetch profile info for new message
-          supabase
-            .from('profiles')
-            .select('username, display_name, avatar_url')
-            .eq('id', msg.profile_id)
-            .single()
-            .then(({ data: profile }) => {
-              if (cancelled) return;
-              
-              const newMessage: ChatMessage = {
-                id: String(msg.id),
-                type: mapMessageType(msg.message_type),
-                username: profile?.display_name || profile?.username || 'User',
-                text: msg.content || '',
-                avatarUrl: profile?.avatar_url || undefined,
-                giftAmount: msg.message_type === 'gift' ? extractGiftAmount(msg.content) : undefined,
-              };
+          // Fetch profile info and chat settings for new message
+          const [profileResult, chatSettingsResult] = await Promise.all([
+            supabase
+              .from('profiles')
+              .select('username, display_name, avatar_url, gifter_level')
+              .eq('id', msg.profile_id)
+              .single(),
+            supabase
+              .from('chat_settings')
+              .select('chat_bubble_color')
+              .eq('profile_id', msg.profile_id)
+              .maybeSingle(),
+          ]);
+          
+          if (cancelled) return;
+          
+          const profile = profileResult.data;
+          const chatSettings = chatSettingsResult.data;
+          
+          const newMessage: ChatMessage = {
+            id: String(msg.id),
+            type: mapMessageType(msg.message_type),
+            username: profile?.display_name || profile?.username || 'User',
+            text: msg.content || '',
+            avatarUrl: profile?.avatar_url || undefined,
+            giftAmount: msg.message_type === 'gift' ? extractGiftAmount(msg.content) : undefined,
+            chatColor: chatSettings?.chat_bubble_color || undefined,
+            gifterLevel: profile?.gifter_level || 0,
+          };
 
-              setChatMessages((prev) => [...prev.slice(-49), newMessage]);
-            });
+          setChatMessages((prev) => [...prev.slice(-49), newMessage]);
         }
       )
       .subscribe();

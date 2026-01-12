@@ -195,8 +195,8 @@ export default function SoloHostOverlay({
         </View>
       </View>
 
-      {/* E. Chat Overlay (above bottom bar, not overlapping controls) */}
-      <View style={[styles.chatContainer, { bottom: insets.bottom + 72 }]}>
+      {/* E. Chat Overlay (above bottom bar, closer to buttons) */}
+      <View style={[styles.chatContainer, { bottom: insets.bottom + 56 }]}>
         <ChatOverlay messages={messages} fontColor={chatFontColor} />
       </View>
 

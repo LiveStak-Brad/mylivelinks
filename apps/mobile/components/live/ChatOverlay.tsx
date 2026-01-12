@@ -9,6 +9,12 @@ export interface ChatMessage {
   text: string;
   avatarUrl?: string;
   giftAmount?: number;
+  // User's chosen chat color from chat_settings (web parity)
+  chatColor?: string;
+  // Gifter level for showing badge (0 = no badge)
+  gifterLevel?: number;
+  // Pro badge
+  isPro?: boolean;
 }
 
 // Approved bright font colors palette
@@ -32,24 +38,26 @@ interface ChatOverlayProps {
 
 const PLACEHOLDER_AVATAR = 'https://via.placeholder.com/28/6366F1/FFFFFF?text=?';
 
+// Helper to get gifter badge color based on level
+const getGifterBadgeColor = (level: number): string | null => {
+  if (level >= 50) return '#FFD700'; // Gold
+  if (level >= 30) return '#E5E4E2'; // Platinum
+  if (level >= 20) return '#C0C0C0'; // Silver
+  if (level >= 10) return '#CD7F32'; // Bronze
+  if (level >= 5) return '#9966CC'; // Purple
+  if (level >= 1) return '#3B82F6'; // Blue
+  return null;
+};
+
 export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOverlayProps) {
   const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    // Auto-scroll to bottom when new messages arrive
-    if (messages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  }, [messages.length]);
+  // No need for auto-scroll since we use inverted list (new messages appear at bottom automatically)
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
-    // NEW CHAT SPEC: Compact rows with 1:1 avatar, no backgrounds
-    // Username on top line, message on second line
-    // Same fontColor for both username and message text
-    
-    const textColor = fontColor;
+    // Use user's chosen chat color, fall back to default fontColor
+    const textColor = item.chatColor || fontColor;
+    const gifterBadgeColor = getGifterBadgeColor(item.gifterLevel || 0);
     
     switch (item.type) {
       case 'gift':
@@ -65,6 +73,18 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
                 <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
                   {item.username}
                 </Text>
+                {/* Gifter badge */}
+                {gifterBadgeColor && (
+                  <View style={[styles.badgeIcon, { backgroundColor: gifterBadgeColor }]}>
+                    <Ionicons name="diamond" size={8} color="#FFFFFF" />
+                  </View>
+                )}
+                {/* Pro badge */}
+                {item.isPro && (
+                  <View style={styles.proBadge}>
+                    <Text style={styles.proBadgeText}>PRO</Text>
+                  </View>
+                )}
                 <View style={styles.giftBadge}>
                   <Ionicons name="gift" size={10} color="#FFD700" />
                   <Text style={styles.giftAmount}>{item.giftAmount}</Text>
@@ -119,9 +139,23 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
               resizeMode="cover"
             />
             <View style={styles.messageContent}>
-              <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
-                {item.username}
-              </Text>
+              <View style={styles.usernameRow}>
+                <Text style={[styles.username, { color: textColor }]} numberOfLines={1}>
+                  {item.username}
+                </Text>
+                {/* Gifter badge */}
+                {gifterBadgeColor && (
+                  <View style={[styles.badgeIcon, { backgroundColor: gifterBadgeColor }]}>
+                    <Ionicons name="diamond" size={8} color="#FFFFFF" />
+                  </View>
+                )}
+                {/* Pro badge */}
+                {item.isPro && (
+                  <View style={styles.proBadge}>
+                    <Text style={styles.proBadgeText}>PRO</Text>
+                  </View>
+                )}
+              </View>
               <Text style={[styles.messageText, { color: textColor }]} numberOfLines={2}>
                 {item.text}
               </Text>
@@ -140,6 +174,7 @@ export default function ChatOverlay({ messages, fontColor = '#FFFFFF' }: ChatOve
         renderItem={renderMessage}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        inverted
       />
     </View>
   );
@@ -193,6 +228,30 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginTop: 1,
     // color applied dynamically via fontColor prop
+  },
+  
+  // Gifter badge icon
+  badgeIcon: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  
+  // Pro badge
+  proBadge: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    marginLeft: 4,
+  },
+  proBadgeText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   
   // Gift badge (small inline indicator)
