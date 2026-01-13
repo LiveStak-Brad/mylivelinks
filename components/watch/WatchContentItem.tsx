@@ -130,12 +130,17 @@ export function WatchContentItem({
     return () => observer.disconnect();
   }, []);
 
-  // Pause video when scrolling away (but let autoPlay handle initial play)
+  // Play when visible, pause when scrolling away
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !isVideo) return;
     
-    if (!isVisible) {
+    if (isVisible) {
+      // Ensure video plays when visible (autoPlay may not work on all browsers)
+      video.play().catch(() => {
+        // Autoplay blocked - user needs to interact first
+      });
+    } else {
       video.pause();
     }
   }, [isVisible, isVideo]);
