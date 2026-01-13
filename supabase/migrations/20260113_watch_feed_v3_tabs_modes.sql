@@ -81,6 +81,16 @@ AS $$
   viewer_following AS (
     SELECT f.followee_id FROM public.follows f WHERE f.follower_id = COALESCE(p_viewer_profile_id, auth.uid())
   ),
+  comment_counts AS (
+    SELECT pc.post_id, COUNT(*)::bigint AS comment_count
+    FROM public.post_comments pc
+    GROUP BY pc.post_id
+  ),
+  like_counts AS (
+    SELECT pl.post_id, COUNT(*)::bigint AS like_count
+    FROM public.post_likes pl
+    GROUP BY pl.post_id
+  ),
   nearby_zips AS (
     SELECT nz.zip_code 
     FROM public.get_nearby_zip_codes(
@@ -107,8 +117,8 @@ AS $$
       prof.avatar_url AS author_avatar_url,
       COALESCE(prof.kyc_verified, false) AS author_is_verified,
       COALESCE(prof.is_mll_pro, false) AS author_is_mll_pro,
-      COALESCE(p.like_count, 0)::bigint AS like_count,
-      COALESCE(p.comment_count, 0)::bigint AS comment_count,
+      COALESCE(lc.like_count, p.likes_count, p.like_count, 0)::bigint AS like_count,
+      COALESCE(cc.comment_count, 0)::bigint AS comment_count,
       COALESCE(p.favorite_count, 0)::bigint AS favorite_count,
       COALESCE(p.share_count, 0)::bigint AS share_count,
       COALESCE(p.repost_count, 0)::bigint AS repost_count,
@@ -118,9 +128,11 @@ AS $$
       EXISTS(SELECT 1 FROM viewer_favorites vf WHERE vf.post_id = p.id) AS is_favorited,
       EXISTS(SELECT 1 FROM viewer_reposts vr WHERE vr.post_id = p.id) AS is_reposted,
       EXISTS(SELECT 1 FROM viewer_following vf WHERE vf.followee_id = prof.id) AS is_following,
-      (COALESCE(p.like_count, 0) * 3 + COALESCE(p.repost_count, 0) * 4 + COALESCE(p.favorite_count, 0) * 2 + COALESCE(p.views_count, 0) * 0.1)::numeric AS trending_score
+      (COALESCE(lc.like_count, p.likes_count, p.like_count, 0) * 3 + COALESCE(p.repost_count, 0) * 4 + COALESCE(p.favorite_count, 0) * 2 + COALESCE(p.views_count, 0) * 0.1)::numeric AS trending_score
     FROM public.posts p
     JOIN public.profiles prof ON prof.id = p.author_id
+    LEFT JOIN comment_counts cc ON cc.post_id = p.id
+    LEFT JOIN like_counts lc ON lc.post_id = p.id
     WHERE p.visibility = 'public'
       AND p.media_url IS NOT NULL
       AND (p_mode = 'all' OR p_mode = 'video_only' OR (p_mode = 'creator_only' AND prof.id = p_creator_profile_id))
