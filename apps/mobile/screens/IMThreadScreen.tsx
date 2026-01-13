@@ -484,7 +484,7 @@ export default function IMThreadScreen() {
                 ) : decoded.type === 'gift' ? (
                   <View style={[styles.giftBubble, mine ? styles.giftBubbleMine : styles.giftBubbleTheirs]}>
                     <View style={styles.giftContent}>
-                      {decoded.giftIcon ? (
+                      {decoded.giftIcon && (decoded.giftIcon.startsWith('http://') || decoded.giftIcon.startsWith('https://')) ? (
                         <Image
                           source={{ uri: decoded.giftIcon }}
                           style={styles.giftIcon}
