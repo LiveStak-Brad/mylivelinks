@@ -145,6 +145,13 @@ export function WatchContentItem({
     }
   }, [isVisible, isVideo]);
 
+  // Sync muted state with video element
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isVideo) return;
+    video.muted = globalMuted;
+  }, [globalMuted, isVideo]);
+
   // Track view when visible
   const postId = (item as any).postId || item.id;
   const itemType = isVideo ? 'video' : isLive ? 'live' : 'photo';
@@ -163,8 +170,17 @@ export function WatchContentItem({
                 className="w-full h-full object-cover"
                 loop
                 playsInline
-                muted={globalMuted}
+                muted
                 autoPlay
+                preload="auto"
+                webkit-playsinline="true"
+                x-webkit-airplay="allow"
+                onLoadedData={() => {
+                  // Ensure video plays once data is loaded (mobile PWA fix)
+                  if (isVisible && videoRef.current) {
+                    videoRef.current.play().catch(() => {});
+                  }
+                }}
                 style={{
                   position: 'absolute',
                   top: 0,

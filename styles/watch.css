@@ -702,10 +702,13 @@
   }
 }
 
-/* Large desktop - full width, no constraint */
+/* Large desktop - constrain width based on viewport height to maintain video aspect ratio */
 @media (min-width: 1280px) {
   .watch-screen-scroll {
-    max-width: 100%;
-    margin: 0;
+    /* 9:16 aspect ratio - width = height * (9/16) */
+    max-width: calc((100dvh - var(--watch-header-height) - var(--watch-bottom-nav-height)) * 9 / 16);
+    margin: 0 auto;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
   }
 }
