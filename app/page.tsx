@@ -58,9 +58,16 @@ export default function LandingPage() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      // Always redirect logged-in users to /watch (the main feed)
-      router.push('/watch');
-      return;
+      // Show home page for logged-in users
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+      
+      setCurrentUser({ id: user.id, username: profile?.username });
+      setCanOpenLive(isLiveOwnerUser({ id: user.id, email: user.email }));
+      setLoading(false);
     } else {
       // Public landing page should be accessible when logged out.
       // Redirecting to /login causes confusing loops (especially when OAuth cookies

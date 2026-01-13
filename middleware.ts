@@ -61,13 +61,7 @@ export async function middleware(request: NextRequest) {
     // Do not race this with a timeout. Supabase may need to set refreshed auth cookies
     // on the response. If we return early, those cookie writes are lost and users get
     // stuck in a login loop (especially on localhost during OAuth flows).
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // Redirect logged-in users from home page to /watch
-    const pathname = request.nextUrl.pathname;
-    if (user && pathname === '/') {
-      return NextResponse.redirect(new URL('/watch', request.url));
-    }
+    await supabase.auth.getUser();
   } catch {
     // Never block requests due to transient auth/network issues
   }
