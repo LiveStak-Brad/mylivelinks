@@ -335,7 +335,7 @@
 .watch-content-actions {
   position: absolute;
   right: 8px;
-  bottom: 140px;
+  bottom: 20px;
   z-index: 20;
 }
 
@@ -466,7 +466,7 @@
   position: absolute;
   left: 16px;
   right: 80px;
-  bottom: 120px;
+  bottom: 20px;
   z-index: 20;
 }
 

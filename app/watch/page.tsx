@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { WatchScreen } from '@/components/watch/WatchScreen';
 import { CommentModal } from '@/components/CommentModal';
@@ -10,6 +10,45 @@ import { UploadModal } from '@/components/watch/UploadModal';
 import { useWatchFeed, type WatchTab } from '@/hooks/useWatchFeed';
 import { createClient } from '@/lib/supabase';
 import '@/styles/watch.css';
+
+// Wake Lock hook to keep screen on during video watching
+function useWakeLock() {
+  useEffect(() => {
+    let wakeLock: WakeLockSentinel | null = null;
+    
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log('[WakeLock] Screen wake lock acquired');
+        }
+      } catch (err) {
+        console.log('[WakeLock] Failed to acquire:', err);
+      }
+    };
+    
+    // Request wake lock on mount
+    requestWakeLock();
+    
+    // Re-acquire wake lock when page becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLock) {
+        wakeLock.release().then(() => {
+          console.log('[WakeLock] Screen wake lock released');
+        });
+      }
+    };
+  }, []);
+}
 
 /* =============================================================================
    WATCH PAGE
@@ -43,6 +82,9 @@ import '@/styles/watch.css';
 ============================================================================= */
 
 export default function WatchPage() {
+  // Keep screen on while watching videos
+  useWakeLock();
+  
   const router = useRouter();
   const supabase = createClient();
   const [commentModalPostId, setCommentModalPostId] = useState<string | null>(null);
