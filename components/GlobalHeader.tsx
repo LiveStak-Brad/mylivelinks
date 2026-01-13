@@ -357,7 +357,7 @@ export default function GlobalHeader() {
 
           <div className="hidden w-full items-center gap-4 md:flex">
             <div className="flex min-w-0 flex-1 items-center gap-4">
-              <Link href="/" aria-label="MyLiveLinks Home" className="flex items-center flex-shrink-0">
+              <Link href="/home" aria-label="MyLiveLinks Home" className="flex items-center flex-shrink-0">
                 <SmartBrandLogo size={140} className="h-8 w-auto" />
               </Link>
               <div className="w-full max-w-xl">

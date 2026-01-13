@@ -87,7 +87,7 @@ export default async function ProfileSharePage({ params }: { params: { username:
             Continue
           </Link>
         ) : (
-          <Link className="underline" href="/">
+          <Link className="underline" href="/home">
             Continue
           </Link>
         )}

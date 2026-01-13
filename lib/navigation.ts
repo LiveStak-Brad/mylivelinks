@@ -104,7 +104,7 @@ export interface NavItem {
  */
 export const MAIN_NAV_ITEMS: NavItem[] = [
   { 
-    href: '/', 
+    href: '/home', 
     label: 'Home',
     icon: Home,
     matchType: 'exact',

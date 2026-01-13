@@ -250,7 +250,7 @@ function SignUpPageInner() {
         {/* Back to Home */}
         <div className="text-center mt-4">
           <Link 
-            href="/" 
+            href="/home" 
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -54,7 +54,7 @@ export default class LiveRoomErrorBoundary extends Component<Props, State> {
                 Reload Page
               </button>
               <a
-                href="/"
+                href="/home"
                 className="px-6 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-600 transition"
               >
                 Go to Homepage

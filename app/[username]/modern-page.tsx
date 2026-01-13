@@ -834,7 +834,7 @@ export default function ModernProfilePage() {
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             The user @{username} doesn't exist.
           </p>
-          <Link href="/" className="text-blue-500 hover:text-blue-600">
+          <Link href="/home" className="text-blue-500 hover:text-blue-600">
             Go Home
           </Link>
         </div>
