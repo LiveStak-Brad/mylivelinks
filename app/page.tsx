@@ -58,28 +58,9 @@ export default function LandingPage() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      // Only redirect to /watch on initial app load (first visit in this session)
-      // This allows users to explicitly navigate to home page after initial redirect
-      const hasRedirectedKey = 'mll:home_redirected';
-      const hasAlreadyRedirected = sessionStorage.getItem(hasRedirectedKey);
-      
-      if (!hasAlreadyRedirected) {
-        // First visit this session - redirect to watch and mark as done
-        sessionStorage.setItem(hasRedirectedKey, 'true');
-        router.push('/watch');
-        return;
-      }
-      
-      // User explicitly navigated to home - show the home page
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
-      
-      setCurrentUser({ id: user.id, username: profile?.username });
-      setCanOpenLive(isLiveOwnerUser({ id: user.id, email: user.email }));
-      setLoading(false);
+      // Always redirect logged-in users to /watch (the main feed)
+      router.push('/watch');
+      return;
     } else {
       // Public landing page should be accessible when logged out.
       // Redirecting to /login causes confusing loops (especially when OAuth cookies
