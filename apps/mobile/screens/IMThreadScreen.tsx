@@ -32,6 +32,53 @@ type DecodedIm =
   | { type: 'gift'; giftName?: string; giftCoins?: number; giftIcon?: string }
   | { type: 'image'; url?: string; width?: number; height?: number };
 
+const getGiftEmoji = (name: string) => {
+  const emojiMap: { [key: string]: string } = {
+    'Poo': '💩',
+    'Rose': '🌹',
+    'Heart': '❤️',
+    'Star': '⭐',
+    'Diamond': '💎',
+    'Super Star': '🌟',
+    'Crown': '👑',
+    'Platinum': '💠',
+    'Legendary': '🏆',
+    'Fire': '🔥',
+    'Rocket': '🚀',
+    'Rainbow': '🌈',
+    'Unicorn': '🦄',
+    'Party': '🎉',
+    'Confetti': '🎊',
+    'Champagne': '🍾',
+    'Money': '💰',
+    'Cash': '💵',
+    'Gold': '🥇',
+    'Silver': '🥈',
+    'Bronze': '🥉',
+    'Kiss': '💋',
+    'Hug': '🤗',
+    'Love': '💕',
+    'Sparkle': '✨',
+    'Gem': '💎',
+    'Crystal': '🔮',
+    'Music': '🎵',
+    'Microphone': '🎤',
+    'Camera': '📸',
+    'Clap': '👏',
+    'Thumbs Up': '👍',
+    'Wave': '👋',
+    'Flex': '💪',
+    'Cool': '😎',
+    'Hot': '🥵',
+    'VIP': '🎯',
+    'King': '🤴',
+    'Queen': '👸',
+    'Angel': '😇',
+    'Devil': '😈',
+  };
+  return emojiMap[name] || '🎁';
+};
+
 function decodeImContent(content: string): DecodedIm {
   if (typeof content !== 'string') return { type: 'text', text: '' };
   if (content.startsWith('__img__:')) {
@@ -491,7 +538,7 @@ export default function IMThreadScreen() {
                           resizeMode="contain"
                         />
                       ) : (
-                        <Text style={styles.giftEmoji}>{decoded.giftIcon || '🎁'}</Text>
+                        <Text style={styles.giftEmoji}>{decoded.giftIcon || getGiftEmoji(decoded.giftName || 'Gift')}</Text>
                       )}
                       <View style={styles.giftTextWrap}>
                         <Text style={styles.giftTitle}>{mine ? 'You sent a gift!' : 'Sent you a gift!'}</Text>
