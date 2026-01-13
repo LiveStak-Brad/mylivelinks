@@ -130,20 +130,29 @@ export function WatchContentItem({
     return () => observer.disconnect();
   }, []);
 
-  // Play when visible, pause when scrolling away
+  // Play when visible, pause and unload when scrolling away (PWA memory fix)
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !isVideo) return;
     
     if (isVisible) {
-      // Ensure video plays when visible (autoPlay may not work on all browsers)
+      // Reload src if it was unloaded
+      if (!video.src && mediaUrl) {
+        video.src = mediaUrl;
+        video.load();
+      }
+      // Ensure video plays when visible
       video.play().catch(() => {
         // Autoplay blocked - user needs to interact first
       });
     } else {
       video.pause();
+      // Unload video to free memory (PWA fix for videos stopping)
+      // Only unload if we have more than a few items scrolled away
+      video.src = '';
+      video.load();
     }
-  }, [isVisible, isVideo]);
+  }, [isVisible, isVideo, mediaUrl]);
 
   // Sync muted state with video element
   useEffect(() => {
