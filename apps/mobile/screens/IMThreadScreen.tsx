@@ -758,15 +758,56 @@ type GiftModalMiniProps = {
   stylesVars: StylesVars;
 };
 
+type GiftType = {
+  id: number;
+  name: string;
+  coin_cost: number;
+  emoji?: string;
+  icon_url?: string;
+};
+
 function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars }: GiftModalMiniProps) {
-  const GIFTS = [
-    { id: 1, name: 'Rose', coins: 10, emoji: '🌹' },
-    { id: 2, name: 'Heart', coins: 25, emoji: '❤️' },
-    { id: 3, name: 'Star', coins: 50, emoji: '⭐' },
-    { id: 4, name: 'Diamond', coins: 100, emoji: '💎' },
-    { id: 5, name: 'Crown', coins: 250, emoji: '👑' },
-    { id: 6, name: 'Fire', coins: 500, emoji: '🔥' },
-  ];
+  const [gifts, setGifts] = React.useState<GiftType[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [coinBalance, setCoinBalance] = React.useState(0);
+
+  React.useEffect(() => {
+    if (visible) {
+      loadGifts();
+    }
+  }, [visible]);
+
+  const loadGifts = async () => {
+    setLoading(true);
+    try {
+      const { data: giftTypes } = await supabase
+        .from('gift_types')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order');
+
+      if (giftTypes) {
+        setGifts(giftTypes);
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('coin_balance')
+          .eq('id', user.id)
+          .single();
+
+        if (profile) {
+          setCoinBalance(profile.coin_balance || 0);
+        }
+      }
+    } catch (err) {
+      console.error('[GiftModal] Error loading gifts:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!visible) return null;
 
@@ -801,6 +842,12 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
       color: stylesVars.mutedText,
       marginTop: 2,
     },
+    balance: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: '#F59E0B',
+      marginRight: 8,
+    },
     closeBtn: {
       width: 32,
       height: 32,
@@ -808,6 +855,12 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: stylesVars.mutedBg,
+    },
+    emptyText: {
+      textAlign: 'center',
+      color: stylesVars.mutedText,
+      fontSize: 13,
+      padding: 20,
     },
     grid: {
       gap: 12,
@@ -824,6 +877,9 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
     },
     giftCardPressed: {
       opacity: 0.7,
+    },
+    giftCardDisabled: {
+      opacity: 0.4,
     },
     giftCardEmoji: {
       fontSize: 32,
@@ -848,29 +904,44 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
     <Pressable style={modalStyles.overlay} onPress={onClose}>
       <Pressable style={modalStyles.modal} onPress={(e) => e.stopPropagation()}>
         <View style={modalStyles.header}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={modalStyles.title}>Send a Gift</Text>
             <Text style={modalStyles.subtitle}>to {recipientName}</Text>
           </View>
+          <Text style={modalStyles.balance}>{coinBalance.toLocaleString()} 💰</Text>
           <Pressable accessibilityRole="button" onPress={onClose} style={modalStyles.closeBtn}>
             <Feather name="x" size={18} color={stylesVars.text} />
           </Pressable>
         </View>
         <View style={modalStyles.grid}>
-          {GIFTS.map((gift) => (
-            <Pressable
-              key={gift.id}
-              accessibilityRole="button"
-              onPress={() => onSendGift(gift.id, gift.name, gift.coins, gift.emoji)}
-              style={({ pressed }) => [modalStyles.giftCard, pressed && modalStyles.giftCardPressed]}
-            >
-              <Text style={modalStyles.giftCardEmoji}>{gift.emoji}</Text>
-              <View style={modalStyles.giftCardInfo}>
-                <Text style={modalStyles.giftCardName}>{gift.name}</Text>
-                <Text style={modalStyles.giftCardCoins}>{gift.coins} 💰 coins</Text>
-              </View>
-            </Pressable>
-          ))}
+          {loading ? (
+            <ActivityIndicator size="large" color={stylesVars.primary} style={{ padding: 20 }} />
+          ) : gifts.length === 0 ? (
+            <Text style={modalStyles.emptyText}>No gifts available</Text>
+          ) : (
+            gifts.map((gift) => {
+              const canAfford = coinBalance >= gift.coin_cost;
+              return (
+              <Pressable
+                key={gift.id}
+                accessibilityRole="button"
+                onPress={() => canAfford && onSendGift(gift.id, gift.name, gift.coin_cost, gift.emoji)}
+                disabled={!canAfford}
+                style={({ pressed }) => [
+                  modalStyles.giftCard,
+                  pressed && modalStyles.giftCardPressed,
+                  !canAfford && modalStyles.giftCardDisabled,
+                ]}
+              >
+                <Text style={modalStyles.giftCardEmoji}>{gift.emoji || '🎁'}</Text>
+                <View style={modalStyles.giftCardInfo}>
+                  <Text style={modalStyles.giftCardName}>{gift.name}</Text>
+                  <Text style={modalStyles.giftCardCoins}>{gift.coin_cost} 💰</Text>
+                </View>
+              </Pressable>
+              );
+            })
+          )}
         </View>
       </Pressable>
     </Pressable>
