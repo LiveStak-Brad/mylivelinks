@@ -7,7 +7,8 @@ import { CommentModal } from '@/components/CommentModal';
 import { ShareModal } from '@/components/ShareModal';
 import GiftModal from '@/components/GiftModal';
 import { UploadModal } from '@/components/watch/UploadModal';
-import { useWatchFeed, type WatchTab } from '@/hooks/useWatchFeed';
+import { useWatchFeed, type WatchTab, type WatchMode } from '@/hooks/useWatchFeed';
+import type { WatchSwipeMode } from '@/components/watch/WatchScreen';
 import { createClient } from '@/lib/supabase';
 import '@/styles/watch.css';
 
@@ -98,6 +99,8 @@ export default function WatchPage() {
     loading, 
     setTab,
     currentTab,
+    setMode,
+    currentMode,
     loadMore,
     hasMore,
     optimisticLike,
@@ -105,10 +108,30 @@ export default function WatchPage() {
     optimisticRepost,
   } = useWatchFeed();
 
+  // Map WatchSwipeMode (UI) to WatchMode (hook)
+  const mapSwipeModeToHookMode = (swipeMode: WatchSwipeMode): WatchMode => {
+    if (swipeMode === 'live-only') return 'live_only';
+    if (swipeMode === 'creator-only') return 'creator_only';
+    return 'all';
+  };
+
+  // Map WatchMode (hook) to WatchSwipeMode (UI)
+  const mapHookModeToSwipeMode = (hookMode: WatchMode): WatchSwipeMode => {
+    if (hookMode === 'live_only') return 'live-only';
+    if (hookMode === 'creator_only') return 'creator-only';
+    return 'default';
+  };
+
   // Handle tab change from WatchTabSelector
   const handleTabChange = useCallback((tab: string) => {
     setTab(tab as WatchTab);
   }, [setTab]);
+
+  // Handle mode change from horizontal swipe
+  const handleModeChange = useCallback((swipeMode: WatchSwipeMode, creatorProfileId?: string | null) => {
+    const hookMode = mapSwipeModeToHookMode(swipeMode);
+    setMode(hookMode, creatorProfileId);
+  }, [setMode]);
 
   // Handle like action - toggle like/unlike for posts
   const handleLike = useCallback(async (postId: string) => {
@@ -326,7 +349,9 @@ export default function WatchPage() {
         items={items}
         loading={loading}
         currentTab={currentTab}
+        currentMode={mapHookModeToSwipeMode(currentMode)}
         onTabChange={handleTabChange}
+        onModeChange={handleModeChange}
         onLike={handleLike}
         onLiveLike={handleLiveLike}
         onFavorite={handleFavorite}

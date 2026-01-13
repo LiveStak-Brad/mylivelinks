@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect, useCallback, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { WatchTabSelector } from './WatchTabSelector';
 import { WatchModeIndicator } from './WatchModeIndicator';
 import { WatchContentItem, type WatchItemData } from './WatchContentItem';
+
+export type WatchSwipeMode = 'default' | 'live-only' | 'creator-only';
 
 interface WatchScreenProps {
   items?: WatchItemData[];
@@ -11,6 +14,8 @@ interface WatchScreenProps {
   className?: string;
   onTabChange?: (tab: string) => void;
   currentTab?: string;
+  currentMode?: WatchSwipeMode;
+  onModeChange?: (mode: WatchSwipeMode, creatorProfileId?: string | null) => void;
   onLike?: (postId: string) => void;
   onLiveLike?: (profileId: string) => void;
   onFavorite?: (postId: string) => void;
@@ -43,6 +48,8 @@ export function WatchScreen({
   className = '',
   onTabChange,
   currentTab,
+  currentMode = 'default',
+  onModeChange,
   onLike,
   onLiveLike,
   onFavorite,
@@ -60,6 +67,13 @@ export function WatchScreen({
   const currentIndexRef = useRef(0);
   // Global mute state - persists across all videos in the feed
   const [globalMuted, setGlobalMuted] = useState(true);
+  
+  // Mode change toast state
+  const [modeToast, setModeToast] = useState<string | null>(null);
+  const modeToastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Horizontal swipe detection state
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Watch renders INSIDE the app shell - header and bottom nav remain visible
   // Content area accounts for header (top) and bottom nav (bottom) spacing
@@ -116,6 +130,120 @@ export function WatchScreen({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  // Get currently visible item based on scroll position
+  const getCurrentVisibleItem = useCallback((): WatchItemData | null => {
+    if (items.length === 0) return null;
+    const index = Math.max(0, Math.min(currentIndexRef.current, items.length - 1));
+    return items[index] || null;
+  }, [items]);
+
+  // Show mode toast briefly
+  const showModeToast = useCallback((message: string) => {
+    if (modeToastTimeoutRef.current) {
+      clearTimeout(modeToastTimeoutRef.current);
+    }
+    setModeToast(message);
+    modeToastTimeoutRef.current = setTimeout(() => {
+      setModeToast(null);
+    }, 800);
+  }, []);
+
+  // Handle arrow click for desktop mode switching
+  // Left = "back" direction, Right = "forward" direction
+  // From All: Left → Live Only, Right → Creator Only
+  // From Live Only: Right → back to All
+  // From Creator Only: Left → back to All
+  const handleArrowClick = useCallback((direction: 'left' | 'right') => {
+    if (!onModeChange) return;
+    
+    if (direction === 'left') {
+      if (currentMode === 'creator-only') {
+        // In Creator Only, left goes back to All
+        onModeChange('default');
+        showModeToast('ALL');
+      } else if (currentMode === 'default') {
+        // In All, left goes to Live Only
+        onModeChange('live-only');
+        showModeToast('LIVE ONLY');
+      }
+      // If already in live-only, left does nothing (can't go further left)
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      // direction === 'right'
+      if (currentMode === 'live-only') {
+        // In Live Only, right goes back to All
+        onModeChange('default');
+        showModeToast('ALL');
+      } else if (currentMode === 'default') {
+        // In All, right goes to Creator Only
+        const currentItem = getCurrentVisibleItem();
+        if (currentItem) {
+          const creatorId = (currentItem as any).authorId || currentItem.id;
+          onModeChange('creator-only', creatorId);
+          showModeToast(`${currentItem.displayName || currentItem.username}'s CONTENT`);
+        }
+      }
+      // If already in creator-only, right does nothing (can't go further right)
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentMode, onModeChange, getCurrentVisibleItem, showModeToast]);
+
+  // Horizontal swipe handlers
+  // Thresholds: dx >= 60px, dx > dy * 1.5 (to distinguish from vertical scroll)
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    swipeStartRef.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!swipeStartRef.current || !onModeChange) {
+      swipeStartRef.current = null;
+      return;
+    }
+
+    const dx = e.clientX - swipeStartRef.current.x;
+    const dy = e.clientY - swipeStartRef.current.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    // Check if this is a horizontal swipe (threshold: 60px, angle ratio: 1.5)
+    if (absDx >= 60 && absDx > absDy * 1.5) {
+      if (dx > 0) {
+        // Swipe LEFT → RIGHT = Live Only mode
+        if (currentMode === 'live-only') {
+          // Already in live-only, go back to default
+          onModeChange('default');
+          showModeToast('ALL');
+        } else {
+          onModeChange('live-only');
+          showModeToast('LIVE ONLY');
+        }
+        // Scroll to top after mode change
+        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        // Swipe RIGHT → LEFT = Creator Only mode
+        const currentItem = getCurrentVisibleItem();
+        if (currentMode === 'creator-only') {
+          // Already in creator-only, go back to default
+          onModeChange('default');
+          showModeToast('ALL');
+        } else if (currentItem) {
+          // Use the currently visible item's author as the creator seed
+          const creatorId = (currentItem as any).authorId || currentItem.id;
+          onModeChange('creator-only', creatorId);
+          showModeToast(`${currentItem.displayName || currentItem.username}'s CONTENT`);
+        }
+        // Scroll to top after mode change
+        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    swipeStartRef.current = null;
+  }, [currentMode, onModeChange, getCurrentVisibleItem, showModeToast]);
+
+  const handlePointerCancel = useCallback(() => {
+    swipeStartRef.current = null;
+  }, []);
+
   return (
     <div className={`watch-screen ${className}`}>
       {/* Top UI Layer */}
@@ -125,15 +253,42 @@ export function WatchScreen({
           onTabChange={onTabChange}
         />
         {/* Mode indicator is non-interactive; only shows when in live-only or creator-only mode */}
-        {/* Modes are switched via horizontal swipe (not implemented yet) */}
-        <WatchModeIndicator mode="default" />
+        <WatchModeIndicator mode={currentMode} />
       </div>
+
+      {/* Mode change toast */}
+      {modeToast && (
+        <div className="watch-mode-toast" aria-live="polite">
+          {modeToast}
+        </div>
+      )}
+
+      {/* Desktop mode arrows (hidden on touch devices) */}
+      <button
+        className="watch-mode-arrow watch-mode-arrow-left"
+        onClick={() => handleArrowClick('left')}
+        aria-label="Live Only mode"
+        title="Live Only"
+      >
+        <ChevronLeft className="w-8 h-8" />
+      </button>
+      <button
+        className="watch-mode-arrow watch-mode-arrow-right"
+        onClick={() => handleArrowClick('right')}
+        aria-label="Creator Only mode"
+        title="Creator Only"
+      >
+        <ChevronRight className="w-8 h-8" />
+      </button>
 
       {/* Scrollable Content */}
       <div
         ref={scrollContainerRef}
         className="watch-screen-scroll"
         onScroll={handleScroll}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       >
         {loading ? (
           <div className="watch-screen-empty">

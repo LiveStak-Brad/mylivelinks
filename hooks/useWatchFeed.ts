@@ -5,11 +5,12 @@ import { createClient } from '@/lib/supabase';
 import type { WatchItemData } from '@/components/watch/WatchContentItem';
 
 export type WatchTab = 'trending' | 'new' | 'nearby' | 'following' | 'for_you';
-export type WatchMode = 'all' | 'live_only' | 'video_only';
+export type WatchMode = 'all' | 'live_only' | 'creator_only';
 
 interface UseWatchFeedOptions {
   tab?: WatchTab;
   mode?: WatchMode;
+  creatorProfileId?: string | null;
   limit?: number;
 }
 
@@ -21,9 +22,10 @@ interface WatchFeedResult {
   loadMore: () => Promise<void>;
   refresh: () => Promise<void>;
   setTab: (tab: WatchTab) => void;
-  setMode: (mode: WatchMode) => void;
+  setMode: (mode: WatchMode, creatorProfileId?: string | null) => void;
   currentTab: WatchTab;
   currentMode: WatchMode;
+  currentCreatorProfileId: string | null;
   // Optimistic update functions
   optimisticLike: (itemId: string) => void;
   optimisticFavorite: (itemId: string) => void;
@@ -34,6 +36,7 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
   const { 
     tab: initialTab = 'for_you', 
     mode: initialMode = 'all',
+    creatorProfileId: initialCreatorProfileId = null,
     limit = 50  // Increased for better infinite scroll
   } = options;
 
@@ -43,6 +46,7 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
   const [hasMore, setHasMore] = useState(true);
   const [currentTab, setCurrentTab] = useState<WatchTab>(initialTab);
   const [currentMode, setCurrentMode] = useState<WatchMode>(initialMode);
+  const [currentCreatorProfileId, setCurrentCreatorProfileId] = useState<string | null>(initialCreatorProfileId);
   const [cursor, setCursor] = useState<{ created_at: string; id: string } | null>(null);
 
   const supabase = createClient();
@@ -105,6 +109,11 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
         p_limit: limit,
       };
 
+      // Pass creator profile ID for creator_only mode
+      if (currentMode === 'creator_only' && currentCreatorProfileId) {
+        params.p_creator_profile_id = currentCreatorProfileId;
+      }
+
       if (isLoadMore && cursor) {
         params.p_before_created_at = cursor.created_at;
         params.p_before_id = cursor.id;
@@ -141,13 +150,13 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
     } finally {
       setLoading(false);
     }
-  }, [supabase, currentTab, currentMode, limit, cursor]);
+  }, [supabase, currentTab, currentMode, currentCreatorProfileId, limit, cursor]);
 
-  // Initial load and when tab/mode changes
+  // Initial load and when tab/mode/creator changes
   useEffect(() => {
     setCursor(null);
     fetchFeed(false);
-  }, [currentTab, currentMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentTab, currentMode, currentCreatorProfileId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
@@ -165,11 +174,13 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
     }
   }, [currentTab]);
 
-  const setMode = useCallback((mode: WatchMode) => {
-    if (mode !== currentMode) {
+  const setMode = useCallback((mode: WatchMode, creatorProfileId?: string | null) => {
+    const newCreatorId = mode === 'creator_only' ? (creatorProfileId ?? null) : null;
+    if (mode !== currentMode || newCreatorId !== currentCreatorProfileId) {
       setCurrentMode(mode);
+      setCurrentCreatorProfileId(newCreatorId);
     }
-  }, [currentMode]);
+  }, [currentMode, currentCreatorProfileId]);
 
   // Optimistic update for like action
   const optimisticLike = useCallback((itemId: string) => {
@@ -225,6 +236,7 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
     setMode,
     currentTab,
     currentMode,
+    currentCreatorProfileId,
     optimisticLike,
     optimisticFavorite,
     optimisticRepost,

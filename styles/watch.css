@@ -673,6 +673,104 @@
 }
 
 /* =============================================================================
+   DESKTOP MODE ARROWS
+   
+   Clickable arrows on far left/right for desktop mode switching.
+   Hidden on touch devices - only shown on hover-capable devices.
+   ============================================================================= */
+
+.watch-mode-arrow {
+  display: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 60;
+  width: 48px;
+  height: 80px;
+  background: rgba(0, 0, 0, 0.4);
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-mode-arrow:hover {
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+.watch-mode-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.watch-mode-arrow-left {
+  left: 0;
+  border-radius: 0 8px 8px 0;
+}
+
+.watch-mode-arrow-right {
+  right: 0;
+  border-radius: 8px 0 0 8px;
+}
+
+/* Show arrows only on desktop/non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  .watch-mode-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* Hide arrows on smaller screens even if hover capable */
+@media (max-width: 767px) {
+  .watch-mode-arrow {
+    display: none !important;
+  }
+}
+
+/* =============================================================================
+   MODE CHANGE TOAST
+   
+   Brief non-blocking toast shown when swipe mode changes.
+   Displays for 800ms then fades out.
+   ============================================================================= */
+
+.watch-mode-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  padding: 12px 24px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  pointer-events: none;
+  animation: watch-toast-fade 0.8s ease-out forwards;
+}
+
+@keyframes watch-toast-fade {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+}
+
+/* =============================================================================
    RESPONSIVE ADJUSTMENTS
    ============================================================================= */
 
