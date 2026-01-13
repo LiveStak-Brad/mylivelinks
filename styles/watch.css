@@ -492,6 +492,23 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.watch-caption-username-text {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* PRO badge in Watch caption - larger, no padding, close to name */
+.watch-pro-badge {
+  height: 1.4em !important;
+  width: 1.4em !important;
+  padding: 0 !important;
+  margin-left: 2px;
+}
+
+.watch-pro-badge img {
+  transform: scale(1.5) !important;
+}
+
 .watch-caption-displayname {
   font-weight: 400;
   opacity: 0.7;

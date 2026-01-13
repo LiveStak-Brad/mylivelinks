@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { MapPin, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 
 interface WatchCaptionOverlayProps {
   username: string;
   displayName?: string;
+  profileId?: string;
   title?: string;
   caption?: string;
   hashtags?: string[];
@@ -32,6 +34,7 @@ const MAX_CAPTION_LENGTH = 80;
 export function WatchCaptionOverlay({
   username,
   displayName,
+  profileId,
   title,
   caption = '',
   hashtags = [],
@@ -69,13 +72,15 @@ export function WatchCaptionOverlay({
       
       {/* Display Name + View Count */}
       <div className="flex items-center gap-3">
-        <button
-          type="button"
+        <UserNameWithBadges
+          profileId={profileId}
+          name={displayName || username}
+          textSize="text-base"
+          nameClassName="watch-caption-username"
+          clickable
           onClick={onUsernameClick}
-          className="watch-caption-username"
-        >
-          {displayName || username}
-        </button>
+          showGifterBadge={false}
+        />
         {viewCount > 0 && (
           <span className="flex items-center gap-1 text-white/70 text-sm">
             <Eye className="w-4 h-4" />

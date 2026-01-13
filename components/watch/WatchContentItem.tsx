@@ -16,6 +16,7 @@ export interface WatchItemData {
   avatarUrl?: string;
   authorId?: string; // Profile UUID for live stream room name
   isVerified?: boolean;
+  isMllPro?: boolean;
   isFollowing?: boolean;
   title?: string;
   caption?: string;
@@ -86,6 +87,7 @@ export function WatchContentItem({
     username,
     displayName,
     avatarUrl,
+    isMllPro = false,
     isFollowing = false,
     title,
     caption,
@@ -296,6 +298,7 @@ export function WatchContentItem({
       <WatchCaptionOverlay
         username={username}
         displayName={displayName}
+        profileId={item.authorId}
         title={title}
         caption={caption}
         hashtags={hashtags}

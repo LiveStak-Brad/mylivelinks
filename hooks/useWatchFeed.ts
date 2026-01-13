@@ -73,6 +73,7 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
       avatarUrl: row.author_avatar_url || undefined,
       authorId: row.author_id, // Profile UUID for live stream room name
       isVerified: row.author_is_verified || false,
+      isMllPro: row.author_is_mll_pro || false,
       isFollowing: row.is_following || false,
       title: row.title || undefined,
       caption: row.caption || undefined,

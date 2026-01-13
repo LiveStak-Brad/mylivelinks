@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { Repeat2, Play } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import MllProBadge from '@/components/mll/MllProBadge';
 
 interface RepostItem {
   repost_id: string;
@@ -20,6 +21,7 @@ interface RepostItem {
   author_id: string;
   author_username: string;
   author_avatar_url: string | null;
+  author_is_mll_pro: boolean;
   post_created_at: string;
 }
 
@@ -137,9 +139,10 @@ export default function ProfileRepostsTab({
             </div>
             
             {/* Original author */}
-            <div className="absolute bottom-2 right-2">
-              <span className="text-white text-[10px] bg-black/50 px-1.5 py-0.5 rounded">
+            <div className="absolute bottom-2 right-2 flex items-center gap-1">
+              <span className="text-white text-[10px] bg-black/50 px-1.5 py-0.5 rounded flex items-center gap-1">
                 @{item.author_username}
+                {item.author_is_mll_pro && <MllProBadge size="compact" className="!h-[1.2em] !w-[1.2em]" clickable={false} />}
               </span>
             </div>
           </Link>

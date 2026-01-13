@@ -959,7 +959,7 @@ export default function ModernProfilePage() {
   const isProfileLiveContext = Boolean(profile.is_live && liveStreamId);
   
   return (
-    <div className={`min-h-screen overflow-y-auto overflow-x-hidden ${fontClass}`}>
+    <div className={`min-h-screen overflow-x-hidden ${fontClass}`}>
       {/* Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         {profile.profile_bg_url ? (
@@ -979,7 +979,7 @@ export default function ModernProfilePage() {
       </div>
       
       {/* Content - Scrollable */}
-      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-20 md:pb-8 pointer-events-auto">
+      <div className="relative z-10 max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8 pb-48 sm:pb-40 md:pb-24 pointer-events-auto">
         {/* MLL PRO Hero - Only on own profile */}
         {isOwnProfile && (
           <div className="mb-4 sm:mb-6">

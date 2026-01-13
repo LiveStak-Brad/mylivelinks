@@ -206,10 +206,25 @@ export function WatchScreen({
     const absDy = Math.abs(dy);
 
     // Check if this is a horizontal swipe (threshold: 60px, angle ratio: 1.5)
-    // Swipe direction matches arrow click logic (back/forward navigation)
+    // Swipe LEFT (finger moves right to left, dx < 0) = Live Only
+    // Swipe RIGHT (finger moves left to right, dx > 0) = Creator Only
+    // Opposite swipe goes back to All
     if (absDx >= 60 && absDx > absDy * 1.5) {
-      if (dx > 0) {
-        // Swipe LEFT → RIGHT (like clicking right arrow = "forward")
+      if (dx < 0) {
+        // Swipe LEFT (finger right to left) = Live Only
+        if (currentMode === 'creator-only') {
+          // In Creator Only, swipe left goes back to All
+          onModeChange('default');
+          showModeToast('ALL');
+        } else if (currentMode === 'default') {
+          // In All, swipe left goes to Live Only
+          onModeChange('live-only');
+          showModeToast('LIVE ONLY');
+        }
+        // If in live-only, can't go further left
+        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        // Swipe RIGHT (finger left to right) = Creator Only
         if (currentMode === 'live-only') {
           // In Live Only, swipe right goes back to All
           onModeChange('default');
@@ -224,19 +239,6 @@ export function WatchScreen({
           }
         }
         // If in creator-only, can't go further right
-        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        // Swipe RIGHT → LEFT (like clicking left arrow = "back")
-        if (currentMode === 'creator-only') {
-          // In Creator Only, swipe left goes back to All
-          onModeChange('default');
-          showModeToast('ALL');
-        } else if (currentMode === 'default') {
-          // In All, swipe left goes to Live Only
-          onModeChange('live-only');
-          showModeToast('LIVE ONLY');
-        }
-        // If in live-only, can't go further left
         scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
