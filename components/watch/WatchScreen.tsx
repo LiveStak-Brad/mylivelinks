@@ -206,33 +206,37 @@ export function WatchScreen({
     const absDy = Math.abs(dy);
 
     // Check if this is a horizontal swipe (threshold: 60px, angle ratio: 1.5)
+    // Swipe direction matches arrow click logic (back/forward navigation)
     if (absDx >= 60 && absDx > absDy * 1.5) {
       if (dx > 0) {
-        // Swipe LEFT → RIGHT = Live Only mode
+        // Swipe LEFT → RIGHT (like clicking right arrow = "forward")
         if (currentMode === 'live-only') {
-          // Already in live-only, go back to default
+          // In Live Only, swipe right goes back to All
           onModeChange('default');
           showModeToast('ALL');
-        } else {
+        } else if (currentMode === 'default') {
+          // In All, swipe right goes to Creator Only
+          const currentItem = getCurrentVisibleItem();
+          if (currentItem) {
+            const creatorId = (currentItem as any).authorId || currentItem.id;
+            onModeChange('creator-only', creatorId);
+            showModeToast(`${currentItem.displayName || currentItem.username}'s CONTENT`);
+          }
+        }
+        // If in creator-only, can't go further right
+        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        // Swipe RIGHT → LEFT (like clicking left arrow = "back")
+        if (currentMode === 'creator-only') {
+          // In Creator Only, swipe left goes back to All
+          onModeChange('default');
+          showModeToast('ALL');
+        } else if (currentMode === 'default') {
+          // In All, swipe left goes to Live Only
           onModeChange('live-only');
           showModeToast('LIVE ONLY');
         }
-        // Scroll to top after mode change
-        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        // Swipe RIGHT → LEFT = Creator Only mode
-        const currentItem = getCurrentVisibleItem();
-        if (currentMode === 'creator-only') {
-          // Already in creator-only, go back to default
-          onModeChange('default');
-          showModeToast('ALL');
-        } else if (currentItem) {
-          // Use the currently visible item's author as the creator seed
-          const creatorId = (currentItem as any).authorId || currentItem.id;
-          onModeChange('creator-only', creatorId);
-          showModeToast(`${currentItem.displayName || currentItem.username}'s CONTENT`);
-        }
-        // Scroll to top after mode change
+        // If in live-only, can't go further left
         scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
