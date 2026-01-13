@@ -840,9 +840,8 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       paddingTop: 20,
-      paddingBottom: 40,
-      paddingHorizontal: 16,
-      maxHeight: '70%',
+      paddingBottom: 20,
+      maxHeight: '80%',
     },
     header: {
       flexDirection: 'row',
@@ -881,17 +880,23 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
       padding: 20,
     },
     grid: {
-      gap: 12,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+    },
+    scrollContent: {
+      maxHeight: 400,
     },
     giftCard: {
-      flexDirection: 'row',
+      flexDirection: 'column',
       alignItems: 'center',
-      padding: 14,
-      borderRadius: 12,
+      padding: 12,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: stylesVars.border,
       backgroundColor: stylesVars.mutedBg,
-      gap: 12,
+      gap: 8,
+      width: '23%',
+      marginBottom: 12,
     },
     giftCardPressed: {
       opacity: 0.7,
@@ -899,22 +904,50 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
     giftCardDisabled: {
       opacity: 0.4,
     },
+    giftCardImage: {
+      width: 48,
+      height: 48,
+      borderRadius: 8,
+    },
     giftCardEmoji: {
-      fontSize: 32,
+      fontSize: 40,
     },
     giftCardInfo: {
-      flex: 1,
+      alignItems: 'center',
+      width: '100%',
     },
     giftCardName: {
-      fontSize: 15,
-      fontWeight: '800',
+      fontSize: 11,
+      fontWeight: '700',
       color: stylesVars.text,
+      textAlign: 'center',
     },
     giftCardCoins: {
-      fontSize: 13,
-      fontWeight: '700',
+      fontSize: 10,
+      fontWeight: '600',
       color: stylesVars.primary,
       marginTop: 2,
+    },
+    purchaseCoinsBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      marginHorizontal: 16,
+      marginTop: 8,
+      marginBottom: 16,
+      borderRadius: 12,
+      backgroundColor: '#F59E0B',
+    },
+    purchaseCoinsBtnPressed: {
+      opacity: 0.8,
+    },
+    purchaseCoinsText: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: '#FFFFFF',
     },
   });
 
@@ -931,36 +964,64 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
             <Feather name="x" size={18} color={stylesVars.text} />
           </Pressable>
         </View>
-        <View style={modalStyles.grid}>
+        <View style={[modalStyles.grid, modalStyles.scrollContent]}>
           {loading ? (
             <ActivityIndicator size="large" color={stylesVars.primary} style={{ padding: 20 }} />
           ) : gifts.length === 0 ? (
             <Text style={modalStyles.emptyText}>No gifts available</Text>
           ) : (
-            gifts.map((gift) => {
-              const canAfford = coinBalance >= gift.coin_cost;
-              return (
-              <Pressable
-                key={gift.id}
-                accessibilityRole="button"
-                onPress={() => canAfford && onSendGift(gift.id, gift.name, gift.coin_cost, gift.emoji)}
-                disabled={!canAfford}
-                style={({ pressed }) => [
-                  modalStyles.giftCard,
-                  pressed && modalStyles.giftCardPressed,
-                  !canAfford && modalStyles.giftCardDisabled,
-                ]}
-              >
-                <Text style={modalStyles.giftCardEmoji}>{gift.emoji || '🎁'}</Text>
-                <View style={modalStyles.giftCardInfo}>
-                  <Text style={modalStyles.giftCardName}>{gift.name}</Text>
-                  <Text style={modalStyles.giftCardCoins}>{gift.coin_cost} 💰</Text>
-                </View>
-              </Pressable>
-              );
-            })
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+              {gifts.map((gift) => {
+                const canAfford = coinBalance >= gift.coin_cost;
+                return (
+                  <Pressable
+                    key={gift.id}
+                    accessibilityRole="button"
+                    onPress={() => canAfford && onSendGift(gift.id, gift.name, gift.coin_cost, gift.emoji)}
+                    disabled={!canAfford}
+                    style={({ pressed }) => [
+                      modalStyles.giftCard,
+                      pressed && modalStyles.giftCardPressed,
+                      !canAfford && modalStyles.giftCardDisabled,
+                    ]}
+                  >
+                    {gift.icon_url ? (
+                      <Image
+                        source={{ uri: gift.icon_url }}
+                        style={modalStyles.giftCardImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={modalStyles.giftCardEmoji}>{gift.emoji || '🎁'}</Text>
+                    )}
+                    <View style={modalStyles.giftCardInfo}>
+                      <Text style={modalStyles.giftCardName} numberOfLines={1}>{gift.name}</Text>
+                      <Text style={modalStyles.giftCardCoins}>{gift.coin_cost} 💰</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
           )}
         </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            onClose();
+            Alert.alert(
+              'Purchase Coins',
+              'Coin packs will be available soon via iOS/Android in-app purchases!',
+              [{ text: 'OK' }]
+            );
+          }}
+          style={({ pressed }) => [
+            modalStyles.purchaseCoinsBtn,
+            pressed && modalStyles.purchaseCoinsBtnPressed,
+          ]}
+        >
+          <Feather name="shopping-cart" size={18} color="#FFFFFF" />
+          <Text style={modalStyles.purchaseCoinsText}>Purchase More Coins</Text>
+        </Pressable>
       </Pressable>
     </Pressable>
   );
