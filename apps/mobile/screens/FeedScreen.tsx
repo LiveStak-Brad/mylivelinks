@@ -48,13 +48,10 @@ type FeedPost = {
 
 type ReactionType = 'love' | 'haha' | 'wow' | 'sad' | 'fire';
 const REACTIONS: ReactionType[] = ['love', 'haha', 'wow', 'sad', 'fire'];
-const REACTION_ICON: Record<
-  ReactionType,
-  React.ComponentProps<typeof MaterialCommunityIcons>['name']
-> = {
+const REACTION_ICONS: Record<ReactionType, string> = {
   love: 'heart',
   haha: 'emoticon-happy-outline',
-  wow: 'emoticon-surprised-outline',
+  wow: 'emoticon-excited-outline',
   sad: 'emoticon-cry-outline',
   fire: 'fire',
 };
@@ -925,7 +922,7 @@ export default function FeedScreen() {
           <View style={styles.linkOrNahRow}>
             <View style={styles.linkOrNahIconCol}>
               <View style={styles.linkOrNahSparkleBadge}>
-              <MaterialCommunityIcons name={'sparkles' as any} size={14} color="#FFFFFF" />
+              <MaterialCommunityIcons name="shimmer" size={14} color="#FFFFFF" />
               </View>
               <View style={styles.linkOrNahIconBox}>
                 <MaterialCommunityIcons name="link-variant" size={22} color="#FFFFFF" />
@@ -976,7 +973,7 @@ export default function FeedScreen() {
 
           <View style={styles.comingSoonRow} accessibilityRole="text">
             <View style={styles.comingSoonChip}>
-              <MaterialCommunityIcons name={'sparkles' as any} size={14} color={stylesVars.primary} />
+              <MaterialCommunityIcons name="shimmer" size={14} color={stylesVars.primary} />
               <Text style={styles.comingSoonText}>Post creation coming soon</Text>
             </View>
           </View>

@@ -5,6 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
+const API_BASE_URL = 'https://www.mylivelinks.com';
+
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
@@ -244,7 +246,7 @@ export default function IMThreadScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
       base64: false,
@@ -283,9 +285,17 @@ export default function IMThreadScreen() {
         type,
       } as any);
 
-      const uploadRes = await fetch('/api/messages/upload-url', {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const uploadRes = await fetch(`${API_BASE_URL}/api/messages/upload-url`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ mimeType: type, otherProfileId }),
       });
 
@@ -365,9 +375,17 @@ export default function IMThreadScreen() {
     setMessages((prev) => [...prev, optimistic]);
 
     try {
-      const response = await fetch('/api/gifts/send', {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/gifts/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
           toUserId: otherProfileId,
           coinsAmount: giftCoins,
