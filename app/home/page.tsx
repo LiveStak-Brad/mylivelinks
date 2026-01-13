@@ -29,7 +29,7 @@ const LIVE_REACTIONS = [
   { emoji: '🔥', label: 'Fire' },
 ];
 
-export default function HomePage() {
+export default function LandingPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(true);
@@ -58,7 +58,7 @@ export default function HomePage() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      // Show home page for logged-in users (no redirect - this is /home)
+      // Show home page content for logged-in users (no redirect - this is /home)
       const { data: profile } = await supabase
         .from('profiles')
         .select('username')
@@ -70,6 +70,8 @@ export default function HomePage() {
       setLoading(false);
     } else {
       // Public landing page should be accessible when logged out.
+      // Redirecting to /login causes confusing loops (especially when OAuth cookies
+      // are not yet established on localhost).
       setCurrentUser(null);
       setCanOpenLive(false);
       setLoading(false);
@@ -203,169 +205,413 @@ export default function HomePage() {
     };
   }, [fetchNewTeams]);
 
-  const handleTeamClick = (slug: string) => {
+  useEffect(() => {
+    const onRefresh = () => {
+      void checkUser();
+      void fetchNewTeams();
+    };
+
+    window.addEventListener('mll:refresh', onRefresh);
+    return () => {
+      window.removeEventListener('mll:refresh', onRefresh);
+    };
+  }, [fetchNewTeams]);
+
+  const primaryTeamSlug = ownedTeamSlug || memberTeamSlug;
+
+  const teamsPrimaryCtaLabel = useMemo(
+    () => (primaryTeamSlug ? 'Visit My Team' : 'Create a Team'),
+    [primaryTeamSlug]
+  );
+
+  const newTeamsCards = useMemo(() => {
+    const real = (newTeams ?? []).slice(0, 12);
+
+    if (real.length >= 3) {
+      return real.map((t) => ({ kind: 'team' as const, team: t }));
+    }
+
+    const cards: Array<
+      | { kind: 'team'; team: (typeof real)[number] }
+      | { kind: 'cta' }
+      | { kind: 'placeholder' }
+    > = real.map((t) => ({ kind: 'team', team: t }));
+
+    cards.push({ kind: 'cta' });
+    while (cards.length < 3) cards.push({ kind: 'placeholder' });
+    return cards;
+  }, [newTeams]);
+
+  const mobileTeamsScrollable = newTeamsCards.length > 3;
+  const mobileTeamsFill = !mobileTeamsScrollable && newTeamsCards.length === 3;
+
+  const handleTeamsPrimaryCtaClick = async () => {
+    if (routingTeams) return;
     setRoutingTeams(true);
-    router.push(`/teams/${slug}`);
+
+    try {
+      if (primaryTeamSlug) {
+        router.push(`/teams/${primaryTeamSlug}`);
+        return;
+      }
+
+      router.push('/teams/setup');
+    } catch (error) {
+      console.error('[home][teams] routing error:', error);
+      router.push(primaryTeamSlug ? `/teams/${primaryTeamSlug}` : '/teams/setup');
+    } finally {
+      setRoutingTeams(false);
+    }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
+      <main id="main" className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary pb-20 md:pb-8">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto space-y-4">
+            <Skeleton className="h-20 w-full rounded-2xl bg-white/20" />
+            <Skeleton className="h-16 w-full rounded-2xl bg-white/20" />
+            <Skeleton className="h-32 w-full rounded-2xl bg-white/20" />
+          </div>
+        </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
-        <div className="relative max-w-7xl mx-auto px-4 py-16 sm:py-24">
-          <div className="text-center space-y-6">
-            <div className="flex justify-center mb-6">
-              <Image
-                src="/branding/mylivelinksdarkbanner.png"
-                alt="MyLiveLinks"
-                width={280}
-                height={70}
-                className="h-16 w-auto"
-                priority
-              />
-            </div>
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
-                Live Streaming
-              </span>
-              <br />
-              <span className="text-foreground">Reimagined</span>
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Connect with creators, join live streams, and be part of an amazing community.
-            </p>
-            
-            {!currentUser && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-                <Link href="/signup">
-                  <Button size="lg" className="w-full sm:w-auto">
-                    Get Started
-                  </Button>
-                </Link>
-                <Link href="/login">
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                    Sign In
-                  </Button>
-                </Link>
-              </div>
-            )}
-            
-            {currentUser && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-                <Link href="/watch">
-                  <Button size="lg" className="w-full sm:w-auto">
-                    Watch Now
-                  </Button>
-                </Link>
-                <Link href="/feed">
-                  <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                    View Feed
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 px-4">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-bold text-center mb-12">Discover</h2>
-          
-          {/* Profile Carousel */}
-          <div className="mb-12">
-            <ProfileCarousel />
-          </div>
-          
-          {/* Teams Section */}
-          {newTeams.length > 0 && (
-            <div className="mb-12">
-              <h3 className="text-xl font-semibold mb-6 flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Teams
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {newTeams.slice(0, 6).map((team) => (
-                  <button
-                    key={team.id}
-                    onClick={() => handleTeamClick(team.slug)}
-                    disabled={routingTeams}
-                    className="group relative aspect-square rounded-xl overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all"
-                  >
-                    {team.banner_url ? (
-                      <Image
-                        src={team.banner_url}
-                        alt={team.name}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-primary/30 to-purple-500/30" />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                    <div className="absolute bottom-2 left-2 right-2">
-                      <p className="text-white text-sm font-medium truncate">{team.name}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Rooms Carousel */}
-          <RoomsCarousel />
-        </div>
-      </section>
-
-      {/* MLL Pro Section */}
-      <section className="py-16 px-4 bg-muted/30">
-        <div className="max-w-7xl mx-auto">
+    <main id="main" tabIndex={-1} className="min-h-screen bg-gradient-to-br from-primary via-accent to-primary pb-20 md:pb-8">
+      {/* MLL PRO Hero */}
+      <div className="container mx-auto px-4 pt-6">
+        <div className="max-w-4xl mx-auto">
           <MllProHero />
         </div>
-      </section>
+      </div>
 
-      {/* Referral Section */}
+      {/* Section 1: Teams Banner (Compact + Exciting) */}
+      <div className="container mx-auto px-4 pt-3 pb-3">
+        <div className="max-w-4xl mx-auto">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-white/10 shadow-xl">
+            {/* Animated gradient accent */}
+            <div className="absolute inset-0">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(236,72,153,0.15),transparent_50%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_50%,rgba(139,92,246,0.1),transparent_50%)]" />
+            </div>
+            
+            <div className="relative px-5 py-5 sm:px-8 sm:py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4 text-center sm:text-left">
+                <div className="hidden sm:flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500/30 to-purple-500/30 border border-pink-500/30">
+                  <Users className="w-6 h-6 text-pink-400" />
+                </div>
+                <div>
+                  <div className="flex items-center justify-center sm:justify-start gap-3 mb-1">
+                    <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+                      TEAMS
+                    </h1>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 shadow-lg shadow-pink-500/25">
+                      <Sparkles className="w-3.5 h-3.5 text-white" />
+                      <span className="text-xs font-bold text-white uppercase tracking-wide">New</span>
+                    </span>
+                  </div>
+                  <p className="text-sm text-white/70">My Team. My People. My Community.</p>
+                  <p className="mt-1 text-xs text-white/60">
+                    Create communities around shared ideas. Chat, posts, lives, group gifting.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex w-full sm:w-auto flex-col sm:flex-row gap-3 sm:items-center">
+                <Button
+                  size="sm"
+                  className="w-full sm:w-auto px-6 font-semibold shadow-lg whitespace-nowrap bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 border-0"
+                  onClick={handleTeamsPrimaryCtaClick}
+                  disabled={routingTeams}
+                >
+                  {teamsPrimaryCtaLabel}
+                </Button>
+                <PwaInstallButton
+                  size="sm"
+                  className="w-full sm:w-auto font-semibold shadow-lg"
+                  variant="gradient"
+                  label="Download App"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 pb-3">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">New Teams</p>
+          </div>
+
+          <div className="sm:hidden">
+            <div
+              className={
+                mobileTeamsScrollable
+                  ? 'flex gap-3 overflow-x-auto overflow-y-hidden touch-pan-x overscroll-x-contain snap-x snap-mandatory'
+                  : 'flex gap-3 overflow-x-hidden overflow-y-hidden'
+              }
+            >
+              {newTeamsCards.map((card, idx) => {
+                const fallbackGradients = [
+                  'from-pink-500/30 to-purple-500/30',
+                  'from-purple-500/30 to-blue-500/30',
+                  'from-blue-500/30 to-teal-500/30',
+                  'from-teal-500/30 to-green-500/30',
+                ];
+                const gradient = fallbackGradients[idx % fallbackGradients.length];
+                const team = card.kind === 'team' ? card.team : null;
+                // Use display_photo_preference to determine which photo to show
+                const preference = team?.display_photo_preference || 'banner';
+                const imageUrl = team ? (preference === 'icon' ? (team.icon_url || team.banner_url) : (team.banner_url || team.icon_url)) : null;
+
+                const cardInner = (
+                  <>
+                    <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br">
+                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={team?.name ?? 'Team'}
+                          className="absolute inset-0 h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : null}
+                      {!imageUrl && card.kind === 'team' ? (
+                        <div className="absolute inset-0 flex items-center justify-center px-3 text-center">
+                          <div className="line-clamp-2 text-[13px] font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
+                            {team?.name ?? 'Team'}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="absolute top-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white">
+                        NEW
+                      </div>
+                      {card.kind === 'cta' ? (
+                        <div className="absolute inset-0 flex items-center justify-center px-3">
+                          <div className="w-full text-center">
+                            <p className="text-sm font-extrabold text-white tracking-tight drop-shadow-sm">
+                              Your Team Here
+                            </p>
+                            <p className="mt-0.5 text-[10px] font-medium text-white/75">
+                              Start something new
+                            </p>
+                            <div className="mt-2 inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold shadow-lg whitespace-nowrap bg-gradient-to-r from-pink-500 to-purple-500">
+                              <span className="text-[11px] text-white">Create a Team</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-[11px] font-semibold text-white/90 truncate">
+                      {card.kind === 'cta' ? 'Your Team Here' : team?.name ?? 'New Team'}
+                    </p>
+                  </>
+                );
+
+                const cardClassName = mobileTeamsFill
+                  ? 'block flex-1 min-w-0 transition-transform duration-200 ease-out active:scale-[0.98]'
+                  : `${mobileTeamsScrollable ? 'snap-start ' : ''}block flex-shrink-0 w-28 transition-transform duration-200 ease-out active:scale-[0.98]`;
+
+                if (card.kind === 'placeholder') {
+                  return (
+                    <div key={`new-team-carousel-placeholder-${idx}`} className={cardClassName}>
+                      {cardInner}
+                    </div>
+                  );
+                }
+
+                if (card.kind === 'cta') {
+                  return (
+                    <Link
+                      key={`new-team-carousel-cta-${idx}`}
+                      href="/teams/setup"
+                      className={`${cardClassName} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-xl`}
+                    >
+                      {cardInner}
+                    </Link>
+                  );
+                }
+
+                const t = card.team;
+                return (
+                  <Link
+                    key={`new-team-carousel-${t.id}`}
+                    href={`/teams/${t.slug}`}
+                    className={`${cardClassName} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-xl`}
+                  >
+                    {cardInner}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="hidden sm:grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {newTeamsCards.map((card, idx) => {
+              const fallbackGradients = [
+                'from-pink-500/30 to-purple-500/30',
+                'from-purple-500/30 to-blue-500/30',
+                'from-blue-500/30 to-teal-500/30',
+                'from-teal-500/30 to-green-500/30',
+              ];
+              const gradient = fallbackGradients[idx % fallbackGradients.length];
+              const team = card.kind === 'team' ? card.team : null;
+              // Use display_photo_preference to determine which photo to show
+              const preference = team?.display_photo_preference || 'banner';
+              const imageUrl = team ? (preference === 'icon' ? (team.icon_url || team.banner_url) : (team.banner_url || team.icon_url)) : null;
+
+              const tile = (
+                <>
+                  <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={team?.name ?? 'Team'}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : null}
+                    {!imageUrl && card.kind === 'team' ? (
+                      <div className="absolute inset-0 flex items-center justify-center px-3 text-center">
+                        <div className="line-clamp-2 text-sm font-extrabold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)]">
+                          {team?.name ?? 'Team'}
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className="absolute top-2 left-2 rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-bold text-white">
+                      NEW
+                    </div>
+                    {card.kind === 'cta' ? (
+                      <div className="absolute inset-0 flex items-center justify-center px-3">
+                        <div className="w-full text-center">
+                          <p className="text-sm font-extrabold text-white tracking-tight drop-shadow-sm">
+                            Your Team Here
+                          </p>
+                          <p className="mt-0.5 text-[10px] font-medium text-white/75">Start something new</p>
+                          <div className="mt-2 inline-flex items-center justify-center px-3 py-1 rounded-full font-semibold shadow-lg whitespace-nowrap bg-gradient-to-r from-pink-500 to-purple-500">
+                            <span className="text-[11px] text-white">Create a Team</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-xs font-semibold text-white/90 truncate">
+                    {card.kind === 'cta' ? 'Your Team Here' : team?.name ?? 'New Team'}
+                  </p>
+                </>
+              );
+
+              const baseClass =
+                'transition-transform duration-200 ease-out hover:scale-[1.02] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded-xl';
+
+              if (card.kind === 'placeholder') {
+                return (
+                  <div key={`new-team-grid-placeholder-${idx}`} className={baseClass}>
+                    {tile}
+                  </div>
+                );
+              }
+
+              if (card.kind === 'cta') {
+                return (
+                  <Link key={`new-team-grid-cta-${idx}`} href="/teams/setup" className={baseClass}>
+                    {tile}
+                  </Link>
+                );
+              }
+
+              const t = card.team;
+              return (
+                <Link key={`new-team-grid-${t.id}`} href={`/teams/${t.slug}`} className={baseClass}>
+                  {tile}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Section 2: Referral Network */}
       {currentUser && (
-        <section className="py-16 px-4">
-          <div className="max-w-2xl mx-auto">
+        <div className="container mx-auto px-4 py-3">
+          <div className="max-w-4xl mx-auto">
             <ReferralCard />
           </div>
-        </section>
-      )}
-
-      {/* Email Signup for non-logged in users */}
-      {!currentUser && (
-        <section className="py-16 px-4 bg-muted/30">
-          <div className="max-w-2xl mx-auto">
-            <EmailSignupCard />
-          </div>
-        </section>
-      )}
-
-      {/* PWA Install */}
-      <section className="py-8 px-4">
-        <div className="max-w-2xl mx-auto text-center">
-          <PwaInstallButton />
         </div>
-      </section>
+      )}
 
-      {/* Support */}
-      <div className="fixed bottom-20 right-4 z-50">
-        <LinklerSupportButton />
+      {/* Main Content Section */}
+      <div className="container mx-auto px-4 py-4">
+        <div className="max-w-4xl mx-auto space-y-6">
+
+          {/* Recommended Profiles Carousel */}
+          <Card className="border-border/50 shadow-xl">
+            <CardContent className="p-5 sm:p-6">
+              <ProfileCarousel 
+                title={currentUser ? "Recommended for You" : "Popular Creators"} 
+                currentUserId={currentUser?.id || null}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Coming Soon Rooms Carousel */}
+          <Card className="border-border/50 shadow-xl">
+            <CardContent className="p-5 sm:p-6">
+              <RoomsCarousel />
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card className="border-border/50 shadow-xl">
+            <CardContent className="p-5 sm:p-6 text-center">
+              <h2 className="text-lg font-bold text-foreground mb-4">
+                Ready to Get Started?
+              </h2>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                {currentUser?.username ? (
+                  <Link href={`/${currentUser.username}`}>
+                    <Button size="md" className="w-full sm:w-auto">
+                      View My Profile
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href="/settings/profile">
+                    <Button size="md" className="w-full sm:w-auto">
+                      Complete Your Profile
+                    </Button>
+                  </Link>
+                )}
+                {canOpenLive ? (
+                  <Link href="/room/live-central">
+                    <Button variant="outline" size="md" className="w-full sm:w-auto">
+                      🔴 Go Live
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href="/liveTV">
+                    <Button variant="outline" size="md" className="w-full sm:w-auto">
+                      Browse Live Streams
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Coming Soon Email Signup */}
+          <div className="flex justify-center py-4">
+            <EmailSignupCard placement="banner" />
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
       <PolicyFooter />
-    </div>
+      {!loading && <LinklerSupportButton />}
+    </main>
   );
 }

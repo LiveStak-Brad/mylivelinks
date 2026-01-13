@@ -109,7 +109,7 @@ export default function BottomNav() {
       matchType: 'exact',
     },
     {
-      href: '/',
+      href: '/home',
       ariaLabel: 'Home',
       icon: Home,
       matchType: 'exact',
