@@ -41,8 +41,7 @@ export default function PostMedia({
           src={mediaUrl} 
           controls 
           playsInline
-          muted
-          preload="metadata"
+          preload="auto"
           className="w-full h-auto block" 
         />
       ) : (
