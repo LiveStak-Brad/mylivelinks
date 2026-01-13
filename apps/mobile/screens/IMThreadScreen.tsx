@@ -999,7 +999,7 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
                   <Pressable
                     key={gift.id}
                     accessibilityRole="button"
-                    onPress={() => canAfford && onSendGift(gift.id, gift.name, gift.coin_cost, gift.emoji)}
+                    onPress={() => canAfford && onSendGift(gift.id, gift.name, gift.coin_cost, gift.icon_url || gift.emoji)}
                     disabled={!canAfford}
                     style={({ pressed }) => [
                       modalStyles.giftCard,
