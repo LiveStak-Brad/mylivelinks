@@ -529,23 +529,16 @@ export default function IMThreadScreen() {
                     <View pointerEvents="none" style={styles.imageBubbleOverlay} />
                   </Pressable>
                 ) : decoded.type === 'gift' ? (
-                  <View style={[styles.giftBubble, mine ? styles.giftBubbleMine : styles.giftBubbleTheirs]}>
-                    <View style={styles.giftContent}>
+                  <View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: 16, borderWidth: 1, borderColor: '#FCD34D' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       {decoded.giftIcon && (decoded.giftIcon.startsWith('http://') || decoded.giftIcon.startsWith('https://')) ? (
-                        <Image
-                          source={{ uri: decoded.giftIcon }}
-                          style={styles.giftIcon}
-                          resizeMode="contain"
-                        />
+                        <Image source={{ uri: decoded.giftIcon }} style={{ width: 40, height: 40, marginRight: 12 }} resizeMode="contain" />
                       ) : (
-                        <Text style={styles.giftEmoji}>{decoded.giftIcon || getGiftEmoji(decoded.giftName || 'Gift')}</Text>
+                        <Text style={{ fontSize: 32, marginRight: 12 }}>{getGiftEmoji(decoded.giftName || 'Gift')}</Text>
                       )}
-                      <View style={styles.giftTextWrap}>
-                        <Text style={styles.giftTitle}>{mine ? 'You sent a gift!' : 'Sent you a gift!'}</Text>
-                        <Text style={styles.giftDetails}>
-                          {decoded.giftName || 'Gift'} • {decoded.giftCoins || 0} 💰{' '}
-                          <Text style={styles.giftDiamonds}>(+{decoded.giftCoins || 0} 💎)</Text>
-                        </Text>
+                      <View>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#78350F' }}>{mine ? 'You sent a gift!' : 'Sent you a gift!'}</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#92400E' }}>{String(decoded.giftName || 'Gift')} • {String(decoded.giftCoins || 0)} 🔥 <Text style={{ color: '#059669' }}>(+{String(decoded.giftCoins || 0)} 💎)</Text></Text>
                       </View>
                     </View>
                   </View>
@@ -789,13 +782,15 @@ function createStyles(stylesVars: StylesVars) {
     opacity: 0.4,
   },
   giftBubble: {
-    maxWidth: '85%',
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
     backgroundColor: '#FEF3C7',
     borderColor: '#FCD34D',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   giftBubbleMine: {
     borderTopRightRadius: 6,
@@ -1061,7 +1056,7 @@ function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars
                         resizeMode="contain"
                       />
                     ) : (
-                      <Text style={modalStyles.giftCardEmoji}>{gift.emoji || '🎁'}</Text>
+                      <Text style={modalStyles.giftCardEmoji}>{getGiftEmoji(gift.name)}</Text>
                     )}
                     <View style={modalStyles.giftCardInfo}>
                       <Text style={modalStyles.giftCardName} numberOfLines={1}>{gift.name}</Text>
