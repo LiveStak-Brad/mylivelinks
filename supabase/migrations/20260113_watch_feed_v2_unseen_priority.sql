@@ -1,17 +1,16 @@
 -- ============================================================================
--- WATCH FEED V2 - Unlimited scrolling + Unseen content priority
+-- WATCH FEED V2 - Unlimited scrolling
 -- ============================================================================
 -- Updates rpc_get_watch_feed to:
 -- 1. Remove 50 item hard limit for unlimited scrolling
--- 2. Prioritize content user hasn't viewed yet
+-- 2. Better sorting for discovery
 -- ============================================================================
 
 BEGIN;
 
 -- ============================================================================
--- RPC: get_watch_feed (V2 - Unseen Priority)
+-- RPC: get_watch_feed (V2 - Unlimited Scrolling)
 -- Returns mixed video posts + live streams for Watch tab
--- Prioritizes content the user hasn't seen yet
 -- ============================================================================
 
 DROP FUNCTION IF EXISTS public.rpc_get_watch_feed(text, text, integer, timestamptz, uuid);
@@ -72,10 +71,6 @@ AS $$
   viewer_following AS (
     SELECT followee_id FROM public.follows WHERE follower_id = auth.uid()
   ),
-  -- Get posts the user has already viewed
-  viewer_views AS (
-    SELECT post_id FROM public.post_views WHERE profile_id = auth.uid()
-  ),
   -- Video posts
   video_posts AS (
     SELECT
@@ -104,9 +99,7 @@ AS $$
       EXISTS(SELECT 1 FROM viewer_likes vl WHERE vl.post_id = p.id) AS is_liked,
       EXISTS(SELECT 1 FROM viewer_favorites vf WHERE vf.post_id = p.id) AS is_favorited,
       EXISTS(SELECT 1 FROM viewer_reposts vr WHERE vr.post_id = p.id) AS is_reposted,
-      EXISTS(SELECT 1 FROM viewer_following vf WHERE vf.followee_id = pr.id) AS is_following,
-      -- Has user seen this content?
-      EXISTS(SELECT 1 FROM viewer_views vv WHERE vv.post_id = p.id) AS has_viewed
+      EXISTS(SELECT 1 FROM viewer_following vf WHERE vf.followee_id = pr.id) AS is_following
     FROM public.posts p
     JOIN public.profiles pr ON pr.id = p.author_id
     WHERE p.visibility = 'public'
@@ -150,8 +143,7 @@ AS $$
       false AS is_liked,
       false AS is_favorited,
       false AS is_reposted,
-      EXISTS(SELECT 1 FROM viewer_following vf WHERE vf.followee_id = pr.id) AS is_following,
-      false AS has_viewed  -- Live streams are always "new"
+      EXISTS(SELECT 1 FROM viewer_following vf WHERE vf.followee_id = pr.id) AS is_following
     FROM public.live_streams ls
     JOIN public.profiles pr ON pr.id = ls.profile_id
     WHERE ls.started_at IS NOT NULL  -- Only show streams that have actually started
@@ -199,8 +191,6 @@ AS $$
   ORDER BY
     -- Live streams always first
     CASE WHEN item_type = 'live' THEN 0 ELSE 1 END,
-    -- Then unseen content before seen content
-    CASE WHEN has_viewed THEN 1 ELSE 0 END,
     -- Then by engagement for trending
     CASE WHEN p_tab = 'trending' THEN like_count + comment_count * 2 + share_count * 3 ELSE 0 END DESC,
     -- Otherwise by date
