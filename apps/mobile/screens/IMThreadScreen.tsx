@@ -483,12 +483,23 @@ export default function IMThreadScreen() {
                   </Pressable>
                 ) : decoded.type === 'gift' ? (
                   <View style={[styles.giftBubble, mine ? styles.giftBubbleMine : styles.giftBubbleTheirs]}>
-                    <Text style={styles.giftEmoji}>🎁</Text>
-                    <View style={styles.giftTextWrap}>
-                      <Text style={styles.giftLabel}>{decoded.giftName || 'Gift'}</Text>
-                      {decoded.giftCoins ? (
-                        <Text style={styles.giftCoins}>+{decoded.giftCoins} 💰</Text>
-                      ) : null}
+                    <View style={styles.giftContent}>
+                      {decoded.giftIcon ? (
+                        <Image
+                          source={{ uri: decoded.giftIcon }}
+                          style={styles.giftIcon}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Text style={styles.giftEmoji}>{decoded.giftIcon || '🎁'}</Text>
+                      )}
+                      <View style={styles.giftTextWrap}>
+                        <Text style={styles.giftTitle}>{mine ? 'You sent a gift!' : 'Sent you a gift!'}</Text>
+                        <Text style={styles.giftDetails}>
+                          {decoded.giftName || 'Gift'} • {decoded.giftCoins || 0} 💰{' '}
+                          <Text style={styles.giftDiamonds}>(+{decoded.giftCoins || 0} 💎)</Text>
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 ) : (
@@ -731,16 +742,13 @@ function createStyles(stylesVars: StylesVars) {
     opacity: 0.4,
   },
   giftBubble: {
-    maxWidth: '82%',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    maxWidth: '85%',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
     backgroundColor: '#FEF3C7',
     borderColor: '#FCD34D',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   giftBubbleMine: {
     borderTopRightRadius: 6,
@@ -748,22 +756,36 @@ function createStyles(stylesVars: StylesVars) {
   giftBubbleTheirs: {
     borderTopLeftRadius: 6,
   },
+  giftContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  giftIcon: {
+    width: 40,
+    height: 40,
+  },
   giftEmoji: {
-    fontSize: 28,
+    fontSize: 32,
   },
   giftTextWrap: {
     flex: 1,
   },
-  giftLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#78350F',
-  },
-  giftCoins: {
-    fontSize: 12,
+  giftTitle: {
+    fontSize: 13,
     fontWeight: '700',
+    color: '#78350F',
+    marginBottom: 2,
+  },
+  giftDetails: {
+    fontSize: 11,
+    fontWeight: '600',
     color: '#92400E',
-    marginTop: 2,
+  },
+  giftDiamonds: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
   },
   });
 }

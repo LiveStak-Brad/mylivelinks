@@ -29,7 +29,7 @@ export function PresenceProvider({ children }: PresenceProviderProps) {
 
   const refresh = useCallback(async () => {
     try {
-      const cutoff = new Date(Date.now() - 90 * 1000).toISOString();
+      const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('room_presence')
         .select('profile_id')
