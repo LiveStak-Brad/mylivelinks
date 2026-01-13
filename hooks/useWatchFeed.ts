@@ -34,7 +34,7 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
   const { 
     tab: initialTab = 'for_you', 
     mode: initialMode = 'all',
-    limit = 20 
+    limit = 50  // Increased for better infinite scroll
   } = options;
 
   const [items, setItems] = useState<WatchItemData[]>([]);

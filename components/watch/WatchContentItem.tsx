@@ -127,33 +127,15 @@ export function WatchContentItem({
     );
 
     observer.observe(container);
-
-    // Check initial visibility immediately
-    const rect = container.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
-    const isInitiallyVisible = rect.top >= 0 && rect.top < viewportHeight * 0.5;
-    if (isInitiallyVisible) {
-      setIsVisible(true);
-    }
-
     return () => observer.disconnect();
   }, []);
 
-  // Play/pause video based on visibility - stops audio when scrolling away
+  // Pause video when scrolling away (but let autoPlay handle initial play)
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !isVideo) return;
     
-    if (isVisible) {
-      // Small delay to ensure video element is ready
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          // Auto-play was prevented, user needs to interact first
-          console.log('[Video] Autoplay prevented:', err.message);
-        });
-      }
-    } else {
+    if (!isVisible) {
       video.pause();
     }
   }, [isVisible, isVideo]);
