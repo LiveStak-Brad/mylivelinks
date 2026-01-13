@@ -1,34 +1,225 @@
-﻿import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+﻿import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/useTheme';
+import { useAuth } from '../state/AuthContext';
+import { supabase } from '../lib/supabase';
+import { navigateToTeamDetail, navigateToTeamsSearch, navigateToTeamsSetup } from '../lib/teamNavigation';
 
-const PLACEHOLDER_TEAMS = [
-  { id: '1', name: 'Team Alpha', slug: 'team-alpha', members: 24, role: 'owner' },
-  { id: '2', name: 'Beta Squad', slug: 'beta-squad', members: 18, role: 'member' },
-  { id: '3', name: 'Gamma Crew', slug: 'gamma-crew', members: 32, role: 'member' },
-];
+type MyTeam = {
+  id: string;
+  slug: string;
+  name: string;
+  approved_member_count: number;
+  role: string;
+  icon_url?: string | null;
+  banner_url?: string | null;
+};
 
-const PLACEHOLDER_NEW_TEAMS = [
-  { id: '4', name: 'Delta Force', slug: 'delta-force', members: 15, status: 'NEW' },
-  { id: '5', name: 'Echo Team', slug: 'echo-team', members: 22, status: 'NEW' },
-  { id: '6', name: 'Foxtrot Group', slug: 'foxtrot-group', members: 19, status: 'NEW' },
-];
+type DiscoveryTeam = {
+  id: string;
+  slug: string;
+  name: string;
+  approved_member_count: number;
+  icon_url?: string | null;
+  banner_url?: string | null;
+};
 
-const PLACEHOLDER_INVITES = [
-  { id: '1', teamName: 'Zeta Alliance', inviterName: 'John Doe', message: 'Join us!' },
-  { id: '2', teamName: 'Theta Network', inviterName: 'Jane Smith', message: null },
-];
+type TeamInvite = {
+  id: number;
+  team_id: string;
+  team_name: string;
+  inviter_name: string | null;
+  message: string | null;
+};
 
 export default function TeamsScreen() {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
-  const [showCreateCta] = useState(false);
+  
+  const [myTeams, setMyTeams] = useState<MyTeam[]>([]);
+  const [myTeamsLoading, setMyTeamsLoading] = useState(true);
+  const [myTeamsError, setMyTeamsError] = useState<string | null>(null);
+  
+  const [discoveryTeams, setDiscoveryTeams] = useState<DiscoveryTeam[]>([]);
+  const [discoveryLoading, setDiscoveryLoading] = useState(true);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  
+  const [invites, setInvites] = useState<TeamInvite[]>([]);
+  const [invitesLoading, setInvitesLoading] = useState(true);
+  const [invitesError, setInvitesError] = useState<string | null>(null);
+  
+  const [refreshing, setRefreshing] = useState(false);
+  
+  const loadMyTeams = useCallback(async () => {
+    if (!user?.id) return;
+    setMyTeamsLoading(true);
+    setMyTeamsError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('team_memberships')
+        .select(`
+          team_id,
+          role,
+          status,
+          teams!inner (
+            id,
+            slug,
+            name,
+            approved_member_count,
+            icon_url,
+            banner_url
+          )
+        `)
+        .eq('profile_id', user.id)
+        .eq('status', 'approved')
+        .order('approved_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      const teams = (data || []).map((row: any) => ({
+        id: row.teams.id,
+        slug: row.teams.slug,
+        name: row.teams.name,
+        approved_member_count: row.teams.approved_member_count || 0,
+        role: row.role,
+        icon_url: row.teams.icon_url,
+        banner_url: row.teams.banner_url,
+      }));
+      
+      setMyTeams(teams);
+    } catch (err: any) {
+      console.error('[TeamsScreen] loadMyTeams error:', err);
+      setMyTeamsError(err.message || 'Failed to load teams');
+    } finally {
+      setMyTeamsLoading(false);
+    }
+  }, [user?.id]);
+  
+  const loadDiscoveryTeams = useCallback(async () => {
+    setDiscoveryLoading(true);
+    setDiscoveryError(null);
+    
+    try {
+      const { data, error } = await supabase.rpc('rpc_get_teams_discovery_ordered', {
+        p_limit: 10,
+        p_offset: 0,
+      });
+      
+      if (error) throw error;
+      
+      setDiscoveryTeams((data as any) || []);
+    } catch (err: any) {
+      console.error('[TeamsScreen] loadDiscoveryTeams error:', err);
+      setDiscoveryError(err.message || 'Failed to load discovery teams');
+    } finally {
+      setDiscoveryLoading(false);
+    }
+  }, []);
+  
+  const loadInvites = useCallback(async () => {
+    if (!user?.id) return;
+    setInvitesLoading(true);
+    setInvitesError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from('team_invites')
+        .select(`
+          id,
+          team_id,
+          message,
+          teams!inner (
+            name
+          ),
+          inviter:profiles!team_invites_inviter_id_fkey (
+            display_name,
+            username
+          )
+        `)
+        .eq('invitee_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      const mapped = (data || []).map((row: any) => ({
+        id: row.id,
+        team_id: row.team_id,
+        team_name: row.teams?.name || 'Unknown Team',
+        inviter_name: row.inviter?.display_name || row.inviter?.username || 'Someone',
+        message: row.message,
+      }));
+      
+      setInvites(mapped);
+    } catch (err: any) {
+      console.error('[TeamsScreen] loadInvites error:', err);
+      setInvitesError(err.message || 'Failed to load invites');
+    } finally {
+      setInvitesLoading(false);
+    }
+  }, [user?.id]);
+  
+  const loadAll = useCallback(async () => {
+    await Promise.all([loadMyTeams(), loadDiscoveryTeams(), loadInvites()]);
+  }, [loadMyTeams, loadDiscoveryTeams, loadInvites]);
+  
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadAll();
+    setRefreshing(false);
+  }, [loadAll]);
+  
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+  
+  const handleAcceptInvite = async (inviteId: number) => {
+    try {
+      const { error } = await supabase.rpc('rpc_accept_team_invite', {
+        p_invite_id: inviteId,
+      });
+      
+      if (error) throw error;
+      
+      setInvites((prev) => prev.filter((inv) => inv.id !== inviteId));
+      await loadMyTeams();
+    } catch (err: any) {
+      console.error('[TeamsScreen] handleAcceptInvite error:', err);
+    }
+  };
+  
+  const handleDeclineInvite = async (inviteId: number) => {
+    try {
+      const { error } = await supabase.rpc('rpc_decline_team_invite', {
+        p_invite_id: inviteId,
+      });
+      
+      if (error) throw error;
+      
+      setInvites((prev) => prev.filter((inv) => inv.id !== inviteId));
+    } catch (err: any) {
+      console.error('[TeamsScreen] handleDeclineInvite error:', err);
+    }
+  };
+  
+  const ownerTeam = myTeams.find((t) => t.role === 'Team_Admin');
+  const showCreateCta = myTeams.length === 0;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['left', 'right']}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
+        }
+      >
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.headerLabel}>
@@ -41,7 +232,10 @@ export default function TeamsScreen() {
             </Text>
           </View>
           {showCreateCta && (
-            <TouchableOpacity style={styles.createButton}>
+            <TouchableOpacity 
+              style={styles.createButton}
+              onPress={() => navigateToTeamsSetup(navigation)}
+            >
               <Ionicons name="add" size={18} color="#fff" />
               <Text style={styles.createButtonText}>Create Team</Text>
             </TouchableOpacity>
@@ -55,7 +249,10 @@ export default function TeamsScreen() {
             <Text style={styles.ctaDescription}>
               Spin up live rooms, posts, and chats in minutes. Invite collaborators and grow your community.
             </Text>
-            <TouchableOpacity style={styles.ctaButton}>
+            <TouchableOpacity 
+              style={styles.ctaButton}
+              onPress={() => navigateToTeamsSetup(navigation)}
+            >
               <Ionicons name="add" size={18} color="#ec4899" />
               <Text style={styles.ctaButtonText}>Start a team</Text>
             </TouchableOpacity>
@@ -71,19 +268,22 @@ export default function TeamsScreen() {
               </View>
             </View>
           </View>
-        ) : (
+        ) : ownerTeam ? (
           <View style={styles.heroCard}>
             <Text style={styles.heroLabel}>OWNER DASHBOARD</Text>
             <View style={styles.heroTeam}>
               <View style={styles.heroAvatar}>
-                <Text style={styles.heroAvatarText}>T</Text>
+                <Text style={styles.heroAvatarText}>{ownerTeam.name.charAt(0).toUpperCase()}</Text>
               </View>
               <View style={styles.heroTeamInfo}>
-                <Text style={styles.heroTeamName}>Team Alpha</Text>
-                <Text style={styles.heroTeamSlug}>/team-alpha</Text>
+                <Text style={styles.heroTeamName}>{ownerTeam.name}</Text>
+                <Text style={styles.heroTeamSlug}>/{ownerTeam.slug}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.heroButton}>
+            <TouchableOpacity 
+              style={styles.heroButton}
+              onPress={() => navigateToTeamDetail(navigation, { teamId: ownerTeam.id, slug: ownerTeam.slug })}
+            >
               <Text style={styles.heroButtonText}>Jump back in</Text>
               <Ionicons name="arrow-up-outline" size={16} color="#fff" />
             </TouchableOpacity>
@@ -92,11 +292,11 @@ export default function TeamsScreen() {
                 <Text style={styles.heroStatText}>1 OWNER TEAM</Text>
               </View>
               <View style={styles.heroStat}>
-                <Text style={styles.heroStatText}>24 MEMBERS</Text>
+                <Text style={styles.heroStatText}>{ownerTeam.approved_member_count} MEMBERS</Text>
               </View>
             </View>
           </View>
-        )}
+        ) : null}
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -104,35 +304,55 @@ export default function TeamsScreen() {
               <Text style={styles.sectionLabel}>DISCOVER</Text>
               <Text style={styles.sectionTitle}>New teams</Text>
             </View>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigateToTeamsSearch(navigation)}>
               <Text style={styles.exploreLink}>Explore all →</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel}>
-            {PLACEHOLDER_NEW_TEAMS.map((team) => (
-              <TouchableOpacity key={team.id} style={styles.newTeamCard}>
-                <View style={styles.newTeamImage}>
-                  <View style={styles.newTeamGradient}>
-                    <Text style={styles.newTeamImageText}>{team.name}</Text>
-                  </View>
-                  <View style={styles.newTeamBadge}>
-                    <Text style={styles.newTeamBadgeText}>{team.status}</Text>
-                  </View>
-                </View>
-                <Text style={styles.newTeamName}>{team.name}</Text>
-                <View style={styles.newTeamAvatars}>
-                  <View style={[styles.miniAvatar, { backgroundColor: '#F97316' }]}>
-                    <Text style={styles.miniAvatarText}>A</Text>
-                  </View>
-                  <View style={[styles.miniAvatar, { backgroundColor: '#EC4899', marginLeft: -6 }]}>
-                    <Text style={styles.miniAvatarText}>B</Text>
-                  </View>
-                  <View style={[styles.miniAvatar, { backgroundColor: '#38BDF8', marginLeft: -6 }]}>
-                    <Text style={styles.miniAvatarText}>C</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {discoveryLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.loadingText}>Loading teams...</Text>
+              </View>
+            ) : discoveryError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>Error: {discoveryError}</Text>
+              </View>
+            ) : discoveryTeams.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No teams to discover yet</Text>
+              </View>
+            ) : (
+              discoveryTeams.map((team) => {
+                const displayPhoto = team.banner_url || team.icon_url;
+                return (
+                  <TouchableOpacity 
+                    key={team.id} 
+                    style={styles.newTeamCard}
+                    onPress={() => navigateToTeamDetail(navigation, { teamId: team.id, slug: team.slug })}
+                  >
+                    <View style={styles.newTeamImage}>
+                      {displayPhoto ? (
+                        <Image 
+                          source={{ uri: displayPhoto }} 
+                          style={styles.newTeamImagePhoto}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.newTeamGradient}>
+                          <Text style={styles.newTeamImageText}>{team.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
+                      <View style={styles.newTeamBadge}>
+                        <Text style={styles.newTeamBadgeText}>NEW</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.newTeamName}>{team.name}</Text>
+                    <Text style={styles.newTeamMembers}>{team.approved_member_count} members</Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </ScrollView>
         </View>
 
@@ -145,6 +365,7 @@ export default function TeamsScreen() {
               placeholderTextColor="rgba(255,255,255,0.4)"
               value={searchQuery}
               onChangeText={setSearchQuery}
+              onFocus={() => navigateToTeamsSearch(navigation)}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
@@ -155,36 +376,42 @@ export default function TeamsScreen() {
           <Text style={styles.searchHint}>Find teams by name, tag, or slug across your memberships.</Text>
         </View>
 
-        {PLACEHOLDER_INVITES.length > 0 && (
+        {!invitesLoading && invites.length > 0 && (
           <View style={styles.section}>
             <View style={styles.invitesHeader}>
               <Ionicons name="mail-outline" size={16} color="#5eead4" />
               <Text style={styles.invitesTitle}>Teams you're invited to</Text>
               <View style={styles.invitesBadge}>
-                <Text style={styles.invitesBadgeText}>{PLACEHOLDER_INVITES.length}</Text>
+                <Text style={styles.invitesBadgeText}>{invites.length}</Text>
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.invitesScroll}>
-              {PLACEHOLDER_INVITES.map((invite) => (
+              {invites.map((invite) => (
                 <View key={invite.id} style={styles.inviteCard}>
                   <View style={styles.inviteHeader}>
                     <View style={styles.inviteAvatar}>
-                      <Text style={styles.inviteAvatarText}>{invite.teamName[0]}</Text>
+                      <Text style={styles.inviteAvatarText}>{invite.team_name.charAt(0).toUpperCase()}</Text>
                     </View>
                     <View style={styles.inviteInfo}>
-                      <Text style={styles.inviteTeamName}>{invite.teamName}</Text>
-                      <Text style={styles.inviteInviter}>Invited by {invite.inviterName}</Text>
+                      <Text style={styles.inviteTeamName}>{invite.team_name}</Text>
+                      <Text style={styles.inviteInviter}>Invited by {invite.inviter_name}</Text>
                     </View>
                   </View>
                   {invite.message && (
                     <Text style={styles.inviteMessage}>"{invite.message}"</Text>
                   )}
                   <View style={styles.inviteActions}>
-                    <TouchableOpacity style={styles.inviteAcceptButton}>
+                    <TouchableOpacity 
+                      style={styles.inviteAcceptButton}
+                      onPress={() => handleAcceptInvite(invite.id)}
+                    >
                       <Ionicons name="checkmark" size={14} color="#fff" />
                       <Text style={styles.inviteAcceptText}>Join</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.inviteDeclineButton}>
+                    <TouchableOpacity 
+                      style={styles.inviteDeclineButton}
+                      onPress={() => handleDeclineInvite(invite.id)}
+                    >
                       <Ionicons name="close" size={14} color="rgba(255,255,255,0.8)" />
                       <Text style={styles.inviteDeclineText}>Decline</Text>
                     </TouchableOpacity>
@@ -201,41 +428,63 @@ export default function TeamsScreen() {
               <Text style={styles.sectionLabel}>YOUR SPACE</Text>
               <Text style={styles.sectionTitle}>Your teams</Text>
             </View>
-            <TouchableOpacity style={styles.discoverButton}>
+            <TouchableOpacity 
+              style={styles.discoverButton}
+              onPress={() => navigateToTeamsSearch(navigation)}
+            >
               <Ionicons name="compass-outline" size={16} color="rgba(255,255,255,0.7)" />
               <Text style={styles.discoverButtonText}>Discover</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.teamsGrid}>
-            {PLACEHOLDER_TEAMS.map((team) => (
-              <TouchableOpacity key={team.id} style={styles.teamCard}>
-                <View style={styles.teamImage}>
-                  <View style={styles.teamGradient}>
-                    <Text style={styles.teamImageText}>{team.name}</Text>
-                  </View>
-                  {team.role === 'owner' && (
-                    <View style={styles.ownerBadge}>
-                      <Text style={styles.ownerBadgeText}>Owner</Text>
+            {myTeamsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.loadingText}>Loading your teams...</Text>
+              </View>
+            ) : myTeamsError ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>Error: {myTeamsError}</Text>
+              </View>
+            ) : myTeams.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>You haven't joined any teams yet</Text>
+              </View>
+            ) : (
+              myTeams.map((team) => {
+                const displayPhoto = team.banner_url || team.icon_url;
+                return (
+                  <TouchableOpacity 
+                    key={team.id} 
+                    style={styles.teamCard}
+                    onPress={() => navigateToTeamDetail(navigation, { teamId: team.id, slug: team.slug })}
+                  >
+                    <View style={styles.teamImage}>
+                      {displayPhoto ? (
+                        <Image 
+                          source={{ uri: displayPhoto }} 
+                          style={styles.teamImagePhoto}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.teamGradient}>
+                          <Text style={styles.teamImageText}>{team.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                      )}
+                      {team.role === 'Team_Admin' && (
+                        <View style={styles.ownerBadge}>
+                          <Text style={styles.ownerBadgeText}>Owner</Text>
+                        </View>
+                      )}
                     </View>
-                  )}
-                </View>
-                <View style={styles.teamInfo}>
-                  <Text style={styles.teamName}>{team.name}</Text>
-                  <Text style={styles.teamMembers}>{team.members} members</Text>
-                </View>
-                <View style={styles.teamAvatars}>
-                  <View style={[styles.miniAvatar, { backgroundColor: '#F97316' }]}>
-                    <Text style={styles.miniAvatarText}>A</Text>
-                  </View>
-                  <View style={[styles.miniAvatar, { backgroundColor: '#EC4899', marginLeft: -6 }]}>
-                    <Text style={styles.miniAvatarText}>B</Text>
-                  </View>
-                  <View style={[styles.miniAvatar, { backgroundColor: '#38BDF8', marginLeft: -6 }]}>
-                    <Text style={styles.miniAvatarText}>C</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                    <View style={styles.teamInfo}>
+                      <Text style={styles.teamName}>{team.name}</Text>
+                      <Text style={styles.teamMembers}>{team.approved_member_count} members</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </View>
         </View>
       </ScrollView>
@@ -251,7 +500,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     gap: 24,
   },
   header: {
@@ -485,6 +735,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
+  newTeamImagePhoto: {
+    width: '100%',
+    height: '100%',
+  },
   newTeamGradient: {
     flex: 1,
     backgroundColor: '#a855f7',
@@ -519,9 +773,41 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     marginTop: 8,
   },
+  newTeamMembers: {
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 4,
+  },
   newTeamAvatars: {
     flexDirection: 'row',
     marginTop: 8,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  errorContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#ef4444',
+  },
+  emptyContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
   },
   miniAvatar: {
     width: 20,
@@ -707,6 +993,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
   },
+  teamImagePhoto: {
+    width: '100%',
+    height: '100%',
+  },
   teamGradient: {
     flex: 1,
     backgroundColor: '#ec4899',
@@ -748,5 +1038,6 @@ const styles = StyleSheet.create({
   },
   teamAvatars: {
     flexDirection: 'row',
+    marginTop: 8,
   },
 });

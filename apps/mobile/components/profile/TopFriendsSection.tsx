@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { TopFriend } from '../../types/profile';
+import { supabase } from '../../lib/supabase';
 
 interface TopFriendsSectionProps {
   profileId: string;
@@ -25,11 +26,46 @@ export default function TopFriendsSection({
   const [friends, setFriends] = React.useState<TopFriend[]>([]);
   const [loading, setLoading] = React.useState(true);
 
-  // TODO: Fetch top friends from API
   React.useEffect(() => {
-    // Placeholder - will implement in Phase 2
-    setLoading(false);
+    loadTopFriends();
   }, [profileId]);
+
+  const loadTopFriends = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('top_friends')
+        .select(`
+          friend_profile_id,
+          display_order,
+          profiles:friend_profile_id (
+            id,
+            username,
+            display_name,
+            avatar_url,
+            is_live
+          )
+        `)
+        .eq('profile_id', profileId)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      const formattedFriends: TopFriend[] = (data || []).map((item: any) => ({
+        id: item.profiles.id,
+        username: item.profiles.username,
+        display_name: item.profiles.display_name,
+        avatar_url: item.profiles.avatar_url,
+        is_live: item.profiles.is_live,
+        display_order: item.display_order,
+      }));
+
+      setFriends(formattedFriends);
+    } catch (error) {
+      console.error('Error loading top friends:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading || friends.length === 0) {
     return null;

@@ -58,51 +58,27 @@ export default function LandingPage() {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (user) {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
+      // Only redirect to /watch on initial app load (first visit in this session)
+      // This allows users to explicitly navigate to home page after initial redirect
+      const hasRedirectedKey = 'mll:home_redirected';
+      const hasAlreadyRedirected = sessionStorage.getItem(hasRedirectedKey);
       
-      if (!profile && !profileError) {
-        await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            username: null,
-            coin_balance: 0,
-            earnings_balance: 0,
-            gifter_level: 0
-          });
+      if (!hasAlreadyRedirected) {
+        // First visit this session - redirect to watch and mark as done
+        sessionStorage.setItem(hasRedirectedKey, 'true');
+        router.push('/watch');
+        return;
       }
-
-      const [{ data: ownedTeams }, { data: memberships }] = await Promise.all([
-        supabase
-          .from('teams')
-          .select('slug')
-          .eq('created_by', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1),
-        supabase
-          .from('team_memberships')
-          .select(
-            `
-            requested_at,
-            team:teams!team_memberships_team_id_fkey (
-              slug
-            )
-          `
-          )
-          .eq('profile_id', user.id)
-          .in('status', ['approved'])
-          .order('requested_at', { ascending: false })
-          .limit(1),
-      ]);
-
-      setOwnedTeamSlug((ownedTeams ?? [])?.[0]?.slug ?? null);
-      setMemberTeamSlug(((memberships as any[]) ?? [])?.[0]?.team?.slug ?? null);
-      setCanOpenLive(!!(LIVE_LAUNCH_ENABLED || isLiveOwnerUser({ id: user.id, email: user.email })));
-      setCurrentUser(profile || { id: user.id, email: user.email });
+      
+      // User explicitly navigated to home - show the home page
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+      
+      setCurrentUser({ id: user.id, username: profile?.username });
+      setCanOpenLive(isLiveOwnerUser({ id: user.id, email: user.email }));
       setLoading(false);
     } else {
       // Public landing page should be accessible when logged out.
@@ -579,76 +555,6 @@ export default function LandingPage() {
           </div>
         </div>
       )}
-
-      {/* Section 2.5: Live Feature Highlight */}
-      <div className="container mx-auto px-4 pb-3">
-        <div className="max-w-4xl mx-auto">
-          <Card className="border-white/10 bg-gradient-to-r from-slate-950/90 via-slate-900/90 to-slate-950/90 shadow-2xl">
-            <CardContent className="p-5 sm:p-6 flex flex-col gap-5 md:flex-row md:items-center">
-              <div className="flex-1 text-center md:text-left space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50">Live feature</p>
-                <h2 className="text-2xl font-extrabold text-white">Live is happening</h2>
-                <p className="text-sm text-white/80">
-                  Join Live Central to go live together, or start your own Solo Live stream!
-                </p>
-                <p className="text-xs text-white/60">
-                  Discover live rooms on LiveTV. Trending and Discovery help streams get seen.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-start justify-center pt-1">
-                  <Link href="/liveTV" className="w-full sm:w-auto">
-                    <Button size="sm" className="w-full sm:w-auto px-6 font-semibold shadow-lg">
-                      Watch Live
-                    </Button>
-                  </Link>
-                  <Link
-                    href="/room/live-central"
-                    className="text-sm font-semibold text-white/80 hover:text-white underline decoration-dotted decoration-white/40 underline-offset-4"
-                  >
-                    Go Live in Live Central
-                  </Link>
-                </div>
-              </div>
-
-              <div className="w-full md:max-w-[220px]">
-                <div className="relative rounded-2xl border border-white/15 bg-white/5 p-4 shadow-[0_20px_45px_rgba(15,23,42,0.65)]">
-                  <div className="flex items-center justify-between text-[10px] font-semibold text-white/70 uppercase tracking-wide mb-3">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" aria-hidden />
-                      Live Central
-                    </span>
-                    <span className="text-white/50">Group room</span>
-                  </div>
-                  <div className="rounded-xl border border-white/10 bg-black/30 aspect-video flex items-center justify-center overflow-hidden">
-                    <Image
-                      src="/livecentral.png"
-                      alt="Live Central group room"
-                      width={180}
-                      height={120}
-                      className="object-contain opacity-90"
-                      priority={false}
-                    />
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <div className="flex -space-x-2">
-                      {['/livecentral.png', '/no-profile-pic.png', '/coin-icon.png'].map((src, idx) => (
-                        <Image
-                          key={`${src}-${idx}`}
-                          src={src}
-                          alt="Live participant"
-                          width={32}
-                          height={32}
-                          className="rounded-full border border-white/20 bg-white/10 object-cover shadow"
-                        />
-                      ))}
-                    </div>
-                    <span className="text-xs font-semibold text-white/70">Rooms are filling up</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
 
       {/* Main Content Section */}
       <div className="container mx-auto px-4 py-4">

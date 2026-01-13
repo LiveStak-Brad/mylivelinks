@@ -175,27 +175,29 @@ export interface TopFriend {
 
 // Music Track
 export interface MusicTrack {
-  id: number;
+  id: string;
   profile_id: string;
   title: string;
   artist_name?: string | null;
   audio_url: string;
   cover_art_url?: string | null;
-  duration_seconds?: number | null;
-  play_count: number;
-  display_order: number;
+  sort_order: number;
+  rights_confirmed: boolean;
+  rights_confirmed_at?: string | null;
   created_at: string;
 }
 
 // Music Video
 export interface MusicVideo {
-  id: number;
+  id: string;
   profile_id: string;
   title: string;
-  youtube_url: string;
-  youtube_id: string;
-  thumbnail_url?: string | null;
-  display_order: number;
+  video_type: 'upload' | 'youtube';
+  video_url: string;
+  youtube_id?: string | null;
+  sort_order: number;
+  rights_confirmed: boolean;
+  rights_confirmed_at?: string | null;
   created_at: string;
 }
 

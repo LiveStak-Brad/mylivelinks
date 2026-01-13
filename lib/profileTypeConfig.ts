@@ -22,7 +22,7 @@ export type ProfileType =
 // TABS DEFINITION
 // ============================================================================
 
-export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products';
+export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products' | 'reposts' | 'highlights';
 
 export interface TabConfig {
   id: ProfileTab;
@@ -98,11 +98,13 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   // ========================================================================
   streamer: {
     tabs: [
+      { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
+      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
+      { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
+      { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
-      { id: 'reels', label: 'Vlog', icon: 'Clapperboard', enabled: true },
       { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -218,11 +220,13 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   // ========================================================================
   creator: {
     tabs: [
+      { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
+      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
+      { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
+      { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
-      { id: 'reels', label: 'Vlog', icon: 'Clapperboard', enabled: true },
       { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },

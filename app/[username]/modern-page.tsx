@@ -26,6 +26,8 @@ import {
   ShoppingCart,
   Flag,
   Camera,
+  Repeat2,
+  Bookmark,
 } from 'lucide-react';
 import SocialCountsWidget from '@/components/profile/SocialCountsWidget';
 import TopSupportersWidget from '@/components/profile/TopSupportersWidget';
@@ -66,6 +68,8 @@ import type { ScheduleItemRow } from '@/components/profile/sections/Schedule';
 import PublicFeedClient from '@/components/feed/PublicFeedClient';
 import ProfilePhotosClient from '@/components/photos/ProfilePhotosClient';
 import VlogReelsClient from '@/components/profile/VlogReelsClient';
+import ProfileRepostsTab from '@/components/profile/tabs/ProfileRepostsTab';
+import ProfileFavoritesTab from '@/components/profile/tabs/ProfileFavoritesTab';
 import { ReferralProgressModule } from '@/components/referral';
 import ReportModal from '@/components/ReportModal';
 import { LocationBadge } from '@/components/location/LocationBadge';
@@ -865,6 +869,8 @@ export default function ModernProfilePage() {
     music: Music,
     events: Calendar,
     products: ShoppingCart,
+    reposts: Repeat2,
+    highlights: Bookmark,
   };
   
   // Apply customization
@@ -1698,6 +1704,31 @@ export default function ModernProfilePage() {
             cardStyle={cardStyle}
             borderRadiusClass={borderRadiusClass}
           />
+        )}
+        
+        {/* Reposts Tab */}
+        {activeTab === 'reposts' && (
+          <ProfileRepostsTab
+            profileId={profile.id}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
+        )}
+        
+        {/* Highlights Tab (renamed from Favorites) */}
+        {activeTab === 'highlights' && (
+          isOwnProfile ? (
+            <ProfileFavoritesTab
+              profileId={profile.id}
+              cardStyle={cardStyle}
+              borderRadiusClass={borderRadiusClass}
+            />
+          ) : (
+            <div className={`${borderRadiusClass} p-8 text-center`} style={cardStyle}>
+              <Bookmark className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+              <p className="text-gray-500">Highlights are private</p>
+            </div>
+          )
         )}
         
         {/* Type-specific tab placeholders (kept for backward compatibility) */}

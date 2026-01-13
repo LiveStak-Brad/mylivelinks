@@ -561,6 +561,106 @@ function MessageBubble({
     );
   }
 
+  // Share message bubble with preview card
+  if (message.type === 'share') {
+    const shareUrl = message.shareUrl || '';
+    // Only use thumbnail if it's a valid image URL (not a video file)
+    const rawThumb = message.shareThumbnail?.trim();
+    const isVideoUrl = rawThumb && /\.(mp4|mov|webm|avi|mkv|m4v)(\?|$)/i.test(rawThumb);
+    const isValidImageUrl = rawThumb && (rawThumb.startsWith('http') || rawThumb.startsWith('/')) && !isVideoUrl;
+    const shareThumbnail = isValidImageUrl ? rawThumb : null;
+    const shareText = message.shareText || 'Shared content';
+    const contentType = message.shareContentType || 'video';
+    const isLive = contentType === 'live';
+    const isPhoto = contentType === 'photo';
+
+    return (
+      <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+        <div
+          className={`w-[280px] overflow-hidden rounded-2xl border border-border shadow-sm ${
+            isOwn ? 'bg-card' : 'bg-card'
+          }`}
+        >
+          {/* Clickable preview card */}
+          <a href={shareUrl} className="block hover:opacity-95 transition">
+            {/* Thumbnail - horizontal for photos, vertical for videos/live */}
+            <div className={`relative ${isPhoto ? 'aspect-square' : 'aspect-video'} bg-gray-900 overflow-hidden`}>
+              {shareThumbnail ? (
+                <>
+                  <img 
+                    src={shareThumbnail} 
+                    alt={shareText} 
+                    className="w-full h-full object-cover"
+                  />
+                  {/* Play/Live badge overlay */}
+                  {!isPhoto && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {isLive ? (
+                        <span className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg">
+                          🔴 LIVE
+                        </span>
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                          <span className="text-white text-2xl ml-1">▶</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                  {isLive ? (
+                    <span className="px-3 py-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                      🔴 LIVE
+                    </span>
+                  ) : isPhoto ? (
+                    <span className="text-4xl">📷</span>
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-black/30 flex items-center justify-center">
+                      <span className="text-white text-2xl ml-1">▶</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Text preview */}
+            <div className="px-3 py-2.5 bg-muted/30">
+              <p className="text-sm font-medium text-foreground line-clamp-2">{shareText}</p>
+              <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+                <span className="inline-block w-3 h-3">🔗</span>
+                <span className="truncate">{shareUrl.replace(/^https?:\/\//, '').split('/')[0]}</span>
+              </p>
+            </div>
+          </a>
+          {/* Time and status */}
+          <div className={`px-3 py-1.5 text-[10px] ${isOwn ? 'text-right' : 'text-left'} text-muted-foreground border-t border-border/30`}>
+            {time}
+            {isOwn && (
+              <span className="ml-1">
+                {message.status === 'sending' && <span className="opacity-60">○</span>}
+                {message.status === 'sent' && <span className="opacity-80">✓</span>}
+                {message.status === 'delivered' && <span className="opacity-80">✓✓</span>}
+                {message.status === 'read' && <span className="text-blue-400 font-medium">✓✓</span>}
+                {message.status === 'failed' && <span className="text-red-500">⚠️</span>}
+              </span>
+            )}
+            {!isOwn && onReport && (
+              <button
+                type="button"
+                onClick={onReport}
+                className="ml-2 underline underline-offset-2 hover:opacity-80"
+                title="Report message"
+                aria-label="Report message"
+              >
+                Report
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Regular text message bubble
   return (
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>

@@ -91,7 +91,7 @@ function ReactionPickerModal({
                   style={[styles.reactionChip, selected ? styles.reactionChipSelected : null]}
                 >
                   <MaterialCommunityIcons
-                    name={REACTION_ICON[r]}
+                    name={REACTION_ICONS[r]}
                     size={22}
                     color={selected ? stylesVars.primary : stylesVars.mutedText}
                   />
@@ -343,7 +343,7 @@ function FeedPostCard({
           {userReaction ? (
             <View style={styles.reactionEmojiWrap}>
               <MaterialCommunityIcons
-                name={REACTION_ICON[userReaction]}
+                name={REACTION_ICONS[userReaction]}
                 size={18}
                 color={stylesVars.primary}
                 accessibilityLabel="Reaction"
@@ -838,7 +838,7 @@ export default function FeedScreen() {
                 renderItem={({ item }) => {
                   const avatarUrl = resolvePublicStorageUrl('avatars', item.avatar_url);
                   const reactionType = (item.reaction_type as ReactionType) || 'love';
-                  const iconName = REACTION_ICON[reactionType] ?? 'heart';
+                  const iconName = REACTION_ICONS[reactionType] ?? 'heart';
                   return (
                     <View style={styles.reactionsModalRow}>
                       <View style={styles.reactionsModalAvatar}>

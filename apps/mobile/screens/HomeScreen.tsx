@@ -3,6 +3,7 @@ import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInp
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { navigateToTeamDetail, navigateToTeamsLanding, navigateToTeamsSetup } from '../lib/teamNavigation';
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
@@ -39,23 +40,6 @@ type ComingSoonRoom = {
   fallback_gradient: string | null;
   current_interest_count: number | null;
   effective_interest_threshold: number | null;
-};
-
-type TrendingStream = {
-  stream_id: number;
-  profile_id: string;
-  username: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  trending_score: number | null;
-};
-
-type LiveRoom = {
-  id: string;
-  slug: string;
-  name: string;
-  current_viewer_count: number;
-  current_streamer_count: number;
 };
 
 type NewTeam = {
@@ -240,14 +224,6 @@ export default function HomeScreen() {
   const [roomsActionError, setRoomsActionError] = useState<string | null>(null);
   const [interestedRoomIds, setInterestedRoomIds] = useState<Set<string>>(new Set());
   const [roomInterestBusyIds, setRoomInterestBusyIds] = useState<Set<string>>(new Set());
-
-  const [trendingStreams, setTrendingStreams] = useState<TrendingStream[]>([]);
-  const [trendingLoading, setTrendingLoading] = useState(true);
-  const [trendingError, setTrendingError] = useState<string | null>(null);
-
-  const [liveRooms, setLiveRooms] = useState<LiveRoom[]>([]);
-  const [liveRoomsLoading, setLiveRoomsLoading] = useState(true);
-  const [liveRoomsError, setLiveRoomsError] = useState<string | null>(null);
 
   const [newTeams, setNewTeams] = useState<NewTeam[]>([]);
   const [newTeamsLoading, setNewTeamsLoading] = useState(true);
@@ -533,40 +509,6 @@ export default function HomeScreen() {
     [user]
   );
 
-  const loadTrendingStreams = useCallback(async () => {
-    setTrendingLoading(true);
-    setTrendingError(null);
-
-    const { data, error } = await supabase.rpc('rpc_get_trending_live_streams', { p_limit: 5, p_offset: 0 });
-
-    if (error) {
-      setTrendingStreams([]);
-      setTrendingError(error.message);
-      setTrendingLoading(false);
-      return;
-    }
-
-    setTrendingStreams((data as any) ?? []);
-    setTrendingLoading(false);
-  }, []);
-
-  const loadLiveRooms = useCallback(async () => {
-    setLiveRoomsLoading(true);
-    setLiveRoomsError(null);
-
-    const { data, error } = await supabase.rpc('rpc_get_live_rooms');
-
-    if (error) {
-      setLiveRooms([]);
-      setLiveRoomsError(error.message);
-      setLiveRoomsLoading(false);
-      return;
-    }
-
-    setLiveRooms((data as any) ?? []);
-    setLiveRoomsLoading(false);
-  }, []);
-
   const loadNewTeams = useCallback(async () => {
     setNewTeamsLoading(true);
     setNewTeamsError(null);
@@ -607,11 +549,9 @@ export default function HomeScreen() {
       loadMyProfile(user.id),
       loadRecommendedProfiles(user.id),
       loadComingSoonRooms(user.id),
-      loadTrendingStreams(),
-      loadLiveRooms(),
       loadNewTeams(),
     ]);
-  }, [loadComingSoonRooms, loadLiveRooms, loadMyProfile, loadNewTeams, loadRecommendedProfiles, loadTrendingStreams, user]);
+  }, [loadComingSoonRooms, loadMyProfile, loadNewTeams, loadRecommendedProfiles, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -691,8 +631,8 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.teamsButtonsRow}>
-              <PrimaryButton label="Create a Team" onPress={() => navigation.navigate('TeamsSetupScreen' as never)} />
-              <OutlineButton label="Visit Teams" onPress={() => navigation.navigate('TeamsScreen' as never)} />
+              <PrimaryButton label="Create a Team" onPress={() => navigateToTeamsSetup(navigation)} />
+              <OutlineButton label="Visit Teams" onPress={() => navigateToTeamsLanding(navigation)} />
             </View>
           </Card>
         </View>
@@ -745,7 +685,7 @@ export default function HomeScreen() {
                 const membersLabel =
                   t.approved_member_count != null ? `${Number(t.approved_member_count)} members` : '—';
                 return (
-                  <View key={t.id} style={styles.teamsTileWrap}>
+                  <Pressable key={t.id} style={styles.teamsTileWrap} onPress={() => navigateToTeamDetail(navigation, { teamId: t.id, slug: t.slug })}>
                     <SquareTile title={t.name} imageUrl={imageUrl} size={156} showText={false} imageResizeMode="stretch" />
                     <Text style={styles.tileCaption} numberOfLines={1}>
                       {t.name}
@@ -753,7 +693,7 @@ export default function HomeScreen() {
                     <Text style={styles.teamMembersCaption} numberOfLines={1}>
                       {membersLabel}
                     </Text>
-                  </View>
+                  </Pressable>
                 );
               })
             )}
@@ -795,66 +735,6 @@ export default function HomeScreen() {
                   <Text style={styles.referralGridTitle}>Earn Rewards</Text>
                   <Text style={styles.referralGridSubtitle}>Quality matters</Text>
                 </View>
-              </View>
-            </View>
-          </Card>
-        </View>
-
-        {/* Section 2.5: Live Feature Highlight */}
-        <View style={styles.container}>
-          <Card>
-            <Text style={styles.kickerTight}>Live feature</Text>
-            <Text style={styles.liveTitle}>Live is happening</Text>
-            <Text style={styles.liveBody}>
-              Join Live Central to go live together, or start your own Solo Live stream!
-            </Text>
-            <Text style={styles.liveSubbody}>
-              Discover live rooms on LiveTV. Trending and Discovery help streams get seen.
-            </Text>
-
-            <View style={styles.liveButtonsRow}>
-              <PrimaryButton label="Watch Live" onPress={() => navigation.navigate('Tabs' as never, { screen: 'LiveTV' } as never)} />
-              <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Tabs' as never, { screen: 'Go Live' } as never)} style={({ pressed }) => [styles.textLink, pressed && styles.pressed]}>
-                <Text style={styles.textLinkText}>Go Live in Live Central</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.liveMiniCard}>
-              <View style={styles.liveMiniCardHeader}>
-                <View style={styles.liveMiniCardHeaderLeft}>
-                  <View style={styles.liveDot} />
-                  <Text style={styles.liveMiniCardHeaderTitle}>Live Central</Text>
-                </View>
-                <Text style={styles.liveMiniCardHeaderRight}>Group room</Text>
-              </View>
-              <View style={styles.liveVideoPlaceholder}>
-                <Text style={styles.liveVideoPlaceholderText}>
-                  {trendingLoading || liveRoomsLoading
-                    ? 'Loading live…'
-                    : trendingError || liveRoomsError
-                      ? 'Live preview unavailable'
-                      : trendingStreams[0]?.username
-                        ? `Top live: @${trendingStreams[0].username}`
-                        : liveRooms.length > 0
-                          ? `${liveRooms.length} live rooms now`
-                          : 'No live items yet'}
-                </Text>
-              </View>
-              <View style={styles.liveMiniCardFooter}>
-                <View style={styles.liveAvatars}>
-                  <View style={styles.liveAvatar} />
-                  <View style={styles.liveAvatar} />
-                  <View style={styles.liveAvatar} />
-                </View>
-                <Text style={styles.liveMiniCardFooterText}>
-                  {liveRoomsLoading
-                    ? 'Updating…'
-                    : liveRoomsError
-                      ? 'Live rooms unavailable'
-                      : liveRooms.length > 0
-                        ? `${liveRooms.length} live rooms`
-                        : 'No live rooms yet'}
-                </Text>
               </View>
             </View>
           </Card>
@@ -1432,111 +1312,6 @@ function createStyles(stylesVars: StylesVars) {
     color: softMuted,
     fontSize: 11,
     fontWeight: '700',
-  },
-
-  liveTitle: {
-    color: softText,
-    fontSize: 22,
-    fontWeight: '900',
-    marginBottom: 6,
-  },
-  liveBody: {
-    color: isDark ? 'rgba(255,255,255,0.82)' : stylesVars.mutedText,
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 6,
-  },
-  liveSubbody: {
-    color: softMuted,
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 12,
-  },
-  liveButtonsRow: {
-    gap: 10,
-    marginBottom: 14,
-  },
-  textLink: {
-    paddingVertical: 6,
-  },
-  textLinkText: {
-    color: isDark ? 'rgba(255,255,255,0.85)' : stylesVars.primary,
-    fontSize: 13,
-    fontWeight: '800',
-    textDecorationLine: 'underline',
-    textDecorationStyle: 'dotted',
-  },
-  liveMiniCard: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    padding: 14,
-    gap: 10,
-  },
-  liveMiniCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  liveMiniCardHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 99,
-    backgroundColor: '#EF4444',
-  },
-  liveMiniCardHeaderTitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  liveMiniCardHeaderRight: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  liveVideoPlaceholder: {
-    height: 120,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(0,0,0,0.28)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  liveVideoPlaceholderText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  liveMiniCardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  liveAvatars: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  liveAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 99,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  liveMiniCardFooterText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    fontWeight: '800',
   },
 
   quickRow: {

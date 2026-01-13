@@ -8,7 +8,25 @@ import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/useTheme';
 import { supabase } from '../lib/supabase';
 import { ProfileData } from '../types/profile';
-import { getEnabledSections, isSectionEnabled } from '../config/profileTypeConfig';
+import { getEnabledSections, getEnabledTabs, ProfileTab } from '../config/profileTypeConfig';
+import ProfileTabBar from '../components/profile/ProfileTabBar';
+import InfoTab from '../components/profile/tabs/InfoTab';
+import FeedTab from '../components/profile/tabs/FeedTab';
+import PhotosTab from '../components/profile/tabs/PhotosTab';
+import VideosTab from '../components/profile/tabs/VideosTab';
+import MusicTab from '../components/profile/tabs/MusicTab';
+import EventsTab from '../components/profile/tabs/EventsTab';
+import ProductsTab from '../components/profile/tabs/ProductsTab';
+import ReelsTab from '../components/profile/tabs/ReelsTab';
+import TopFriendsSection from '../components/profile/TopFriendsSection';
+import ReferralNetworkSection from '../components/profile/ReferralNetworkSection';
+import SocialMediaBar from '../components/profile/SocialMediaBar';
+import MusicShowcaseSection from '../components/profile/MusicShowcaseSection';
+import MusicVideosSection from '../components/profile/MusicVideosSection';
+import TopSupportersSection from '../components/profile/TopSupportersSection';
+import TopStreamersSection from '../components/profile/TopStreamersSection';
+import ProfileBadges from '../components/profile/ProfileBadges';
+import LiveIndicatorBanner from '../components/profile/LiveIndicatorBanner';
 
 const API_BASE_URL = 'https://www.mylivelinks.com';
 
@@ -32,6 +50,7 @@ export default function ProfileViewScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<ProfileTab>('info');
 
   const loadingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -54,6 +73,24 @@ export default function ProfileViewScreen() {
     if (!currentUser.userId || !profileData?.profile?.id) return false;
     return currentUser.userId === profileData.profile.id;
   }, [currentUser.userId, profileData?.profile?.id]);
+
+  const enabledSections = useMemo(() => {
+    if (!profileData?.profile) return [];
+    return getEnabledSections(profileData.profile.profile_type, profileData.profile.enabled_modules);
+  }, [profileData?.profile]);
+
+  const enabledTabs = useMemo(() => {
+    if (!profileData?.profile) return [];
+    return getEnabledTabs(profileData.profile.profile_type, profileData.profile.enabled_tabs);
+  }, [profileData?.profile]);
+
+  const shouldShowSection = useCallback((sectionId: string) => {
+    return enabledSections.some(s => s.id === sectionId);
+  }, [enabledSections]);
+
+  const navigateToProfile = useCallback((profileId: string, username: string) => {
+    navigation.navigate('ProfileViewScreen', { profileId, username });
+  }, [navigation]);
 
   const loadProfile = useCallback(async () => {
     if (loadingRef.current) return;
@@ -285,55 +322,57 @@ export default function ProfileViewScreen() {
         }
       >
         <View style={styles.container}>
+          {profile.is_live && (
+            <LiveIndicatorBanner
+              onWatchLive={() => {}}
+              colors={stylesVars}
+            />
+          )}
+
           <View style={[styles.card, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}>
             <View style={styles.heroTopRow}>
-              <View style={[styles.heroAvatar, { backgroundColor: `${stylesVars.primary}20`, borderColor: `${stylesVars.primary}40` }]}>
+              <View style={[styles.heroAvatarSmall, { backgroundColor: `${stylesVars.primary}20`, borderColor: `${stylesVars.primary}40` }]}>
                 {avatarUrl ? (
                   <Image source={{ uri: avatarUrl }} style={styles.heroAvatarImage} />
                 ) : (
-                  <Text style={[styles.heroAvatarText, { color: stylesVars.primary }]}>{avatarFallback}</Text>
+                  <Text style={[styles.heroAvatarTextSmall, { color: stylesVars.primary }]}>{avatarFallback}</Text>
                 )}
               </View>
 
               <View style={styles.heroInfoCol}>
                 <View style={styles.heroNameRow}>
-                  <Text style={[styles.heroName, { color: stylesVars.text }]} numberOfLines={1}>
+                  <Text style={[styles.heroNameSmall, { color: stylesVars.text }]} numberOfLines={1}>
                     {displayName}
                   </Text>
                 </View>
 
                 <View style={styles.heroMetaRow}>
                   {profile.username ? (
-                    <Text style={[styles.heroUsername, { color: stylesVars.mutedText }]} numberOfLines={1}>
+                    <Text style={[styles.heroUsernameSmall, { color: stylesVars.mutedText }]} numberOfLines={1}>
                       @{profile.username}
                     </Text>
                   ) : null}
                   {profile.profile_type && (
-                    <View style={[styles.pill, { backgroundColor: `${stylesVars.primary}15`, borderColor: `${stylesVars.primary}30` }]}>
-                      <Feather name="star" size={12} color={stylesVars.primary} />
-                      <Text style={[styles.pillText, { color: stylesVars.primary }]}>
+                    <View style={[styles.pillSmall, { backgroundColor: `${stylesVars.primary}15`, borderColor: `${stylesVars.primary}30` }]}>
+                      <Feather name="star" size={10} color={stylesVars.primary} />
+                      <Text style={[styles.pillTextSmall, { color: stylesVars.primary }]}>
                         {profile.profile_type}
                       </Text>
                     </View>
                   )}
                 </View>
 
-                {locationText && !profile.location_hidden && (
-                  <View style={styles.heroLocationRow}>
-                    <Feather name="map-pin" size={14} color={stylesVars.mutedText} />
-                    <Text style={[styles.heroLocationText, { color: stylesVars.mutedText }]} numberOfLines={1}>
-                      {locationText}
-                    </Text>
-                  </View>
-                )}
+                <ProfileBadges
+                  isMllPro={profile.is_mll_pro}
+                  gifterTier={profileData.gifter_statuses?.[profile.id]?.tier}
+                  gifterLevel={profileData.gifter_statuses?.[profile.id]?.level}
+                  streakDays={profileData.streak_days}
+                  gifterRank={profileData.gifter_rank}
+                  streamerRank={profileData.streamer_rank}
+                  colors={stylesVars}
+                />
               </View>
             </View>
-
-            {profile.bio && (
-              <Text style={[styles.heroBio, { color: stylesVars.text }]}>
-                {profile.bio}
-              </Text>
-            )}
 
             <View style={styles.heroButtonsRow}>
               {!isOwnProfile && followBtnConfig && (
@@ -404,41 +443,29 @@ export default function ProfileViewScreen() {
             </View>
           </View>
 
-          {profileData.stream_stats && profileData.stream_stats.total_streams > 0 && (
-            <View style={[styles.card, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}>
-              <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>Streaming Stats</Text>
-              <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: stylesVars.primary }]}>
-                    {profileData.stream_stats.total_streams}
-                  </Text>
-                  <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Total Streams</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: stylesVars.primary }]}>
-                    {profileData.stream_stats.total_viewers.toLocaleString()}
-                  </Text>
-                  <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Total Viewers</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: stylesVars.primary }]}>
-                    {profileData.stream_stats.peak_viewers}
-                  </Text>
-                  <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Peak Viewers</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: stylesVars.primary }]}>
-                    {profileData.stream_stats.diamonds_earned_lifetime}
-                  </Text>
-                  <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Diamonds</Text>
-                </View>
-              </View>
-            </View>
+          {shouldShowSection('social_media') && (
+            <SocialMediaBar
+              instagram={profile.social_instagram}
+              twitter={profile.social_twitter}
+              youtube={profile.social_youtube}
+              tiktok={profile.social_tiktok}
+              facebook={profile.social_facebook}
+              twitch={profile.social_twitch}
+              discord={profile.social_discord}
+              snapchat={profile.social_snapchat}
+              linkedin={profile.social_linkedin}
+              github={profile.social_github}
+              spotify={profile.social_spotify}
+              onlyfans={profile.social_onlyfans}
+              colors={stylesVars}
+            />
           )}
 
-          {profileData.links && profileData.links.length > 0 && (
+          {shouldShowSection('links') && profileData.links && profileData.links.length > 0 && (
             <View style={[styles.card, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}>
-              <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>Links</Text>
+              <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>
+                {profile.links_section_title || 'Links'}
+              </Text>
               {profileData.links.map((link) => (
                 <Pressable
                   key={link.id}
@@ -456,6 +483,123 @@ export default function ProfileViewScreen() {
               ))}
             </View>
           )}
+
+          {enabledTabs.length > 1 && (
+            <ProfileTabBar
+              tabs={enabledTabs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              colors={stylesVars}
+            />
+          )}
+
+          {activeTab === 'info' ? (
+            <InfoTab
+              profile={profile}
+              locationText={locationText}
+              colors={stylesVars}
+            >
+              {shouldShowSection('top_supporters') && profileData.top_supporters && profileData.top_supporters.length > 0 && (
+                <TopSupportersSection
+                  supporters={profileData.top_supporters}
+                  gifterStatuses={profileData.gifter_statuses}
+                  onPressProfile={navigateToProfile}
+                  colors={stylesVars}
+                />
+              )}
+
+              {shouldShowSection('top_streamers') && profileData.top_streamers && profileData.top_streamers.length > 0 && (
+                <TopStreamersSection
+                  streamers={profileData.top_streamers}
+                  onPressProfile={navigateToProfile}
+                  colors={stylesVars}
+                />
+              )}
+
+              {shouldShowSection('top_friends') && profile.show_top_friends !== false && (
+                <TopFriendsSection
+                  profileId={profile.id}
+                  isOwnProfile={isOwnProfile}
+                  title={profile.top_friends_title}
+                  avatarStyle={profile.top_friends_avatar_style}
+                  maxCount={profile.top_friends_max_count}
+                  onManage={() => {}}
+                  colors={stylesVars}
+                />
+              )}
+
+              {shouldShowSection('referral_network') && isOwnProfile && (
+                <ReferralNetworkSection
+                  profileId={profile.id}
+                  colors={stylesVars}
+                />
+              )}
+
+              {shouldShowSection('music_showcase') && (
+                <MusicShowcaseSection
+                  profileId={profile.id}
+                  isOwnProfile={isOwnProfile}
+                  onEdit={() => {}}
+                  colors={stylesVars}
+                />
+              )}
+
+              {shouldShowSection('music_showcase') && (
+                <MusicVideosSection
+                  profileId={profile.id}
+                  isOwnProfile={isOwnProfile}
+                  onEdit={() => {}}
+                  colors={stylesVars}
+                />
+              )}
+
+              {shouldShowSection('streaming_stats') && !profile.hide_streaming_stats && profileData.stream_stats && profileData.stream_stats.total_streams > 0 && (
+                <View style={[styles.card, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}>
+                  <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>Streaming Stats</Text>
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: stylesVars.primary }]}>
+                        {profileData.stream_stats.total_streams}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Total Streams</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: stylesVars.primary }]}>
+                        {profileData.stream_stats.total_viewers.toLocaleString()}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Total Viewers</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: stylesVars.primary }]}>
+                        {profileData.stream_stats.peak_viewers}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Peak Viewers</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: stylesVars.primary }]}>
+                        {profileData.stream_stats.diamonds_earned_lifetime}
+                      </Text>
+                      <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Diamonds</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </InfoTab>
+      ) : activeTab === 'feed' ? (
+        <FeedTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'photos' ? (
+        <PhotosTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'videos' ? (
+        <VideosTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'music' ? (
+        <MusicTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'events' ? (
+        <EventsTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'products' ? (
+        <ProductsTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'reels' ? (
+        <ReelsTab profileId={profile.id} colors={stylesVars} />
+      ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -532,12 +676,25 @@ function createStyles(stylesVars: {
       justifyContent: 'center',
       overflow: 'hidden',
     },
+    heroAvatarSmall: {
+      height: 48,
+      width: 48,
+      borderRadius: 24,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
     heroAvatarImage: {
       width: '100%',
       height: '100%',
     },
     heroAvatarText: {
       fontSize: 26,
+      fontWeight: '800',
+    },
+    heroAvatarTextSmall: {
+      fontSize: 20,
       fontWeight: '800',
     },
     heroInfoCol: {
@@ -556,6 +713,12 @@ function createStyles(stylesVars: {
       flex: 1,
       minWidth: 0,
     },
+    heroNameSmall: {
+      fontSize: 18,
+      fontWeight: '700',
+      flex: 1,
+      minWidth: 0,
+    },
     heroMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -564,6 +727,10 @@ function createStyles(stylesVars: {
     },
     heroUsername: {
       fontSize: 14,
+      fontWeight: '600',
+    },
+    heroUsernameSmall: {
+      fontSize: 13,
       fontWeight: '600',
     },
     pill: {
@@ -575,8 +742,21 @@ function createStyles(stylesVars: {
       borderRadius: 999,
       borderWidth: 1,
     },
+    pillSmall: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
     pillText: {
       fontSize: 12,
+      fontWeight: '700',
+    },
+    pillTextSmall: {
+      fontSize: 11,
       fontWeight: '700',
     },
     heroLocationRow: {

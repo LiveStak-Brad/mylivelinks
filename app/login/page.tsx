@@ -67,8 +67,10 @@ function LoginPageInner() {
         }
         
         if (profile?.username && profile?.date_of_birth) {
-          // Profile complete, redirect to return URL or user's own profile
-          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || `/${profile.username}`;
+          // Profile complete, redirect to return URL or Watch (default landing)
+          // Set flag so home page knows initial redirect is done
+          try { sessionStorage.setItem('mll:home_redirected', 'true'); } catch {}
+          const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/watch';
           router.push(returnUrl);
         } else {
           // Profile incomplete, redirect to onboarding
@@ -236,8 +238,10 @@ function LoginPageInner() {
           }
           
           if (profile?.username && profile?.date_of_birth) {
-            // Profile complete, redirect to return URL or user's own profile
-            const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || `/${profile.username}`;
+            // Profile complete, redirect to return URL or Watch (default landing)
+            // Set flag so home page knows initial redirect is done
+            try { sessionStorage.setItem('mll:home_redirected', 'true'); } catch {}
+            const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/watch';
             router.push(returnUrl);
           } else {
             // Profile incomplete, redirect to onboarding

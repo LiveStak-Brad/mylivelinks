@@ -61,7 +61,7 @@ function emptySystemHealth(checkedAt: string): SystemHealth {
     services: {
       database: { status: 'degraded', checked_at: checkedAt, latency_ms: null, error: 'not_wired' },
       storage: { status: 'degraded', checked_at: checkedAt, latency_ms: null, error: 'not_wired' },
-      livekit: { status: 'degraded', checked_at: checkedAt, latency_ms: null, error: 'not_wired' },
+      livekit: { status: 'degraded', checked_at: checkedAt, latency_ms: null, error: 'not_wired', token_success_rate: null, avg_join_time_ms: null, live_count: null },
       stripe: { status: 'degraded', checked_at: checkedAt, latency_ms: null, error: 'not_wired' },
     },
   };
@@ -111,7 +111,7 @@ async function buildSystemHealth(reqId: string): Promise<{ value: SystemHealth; 
       latency_ms: storageOk ? storageLatency : null,
       error: storageOk ? null : storageError,
     },
-    livekit: { status: 'degraded', checked_at: checkedAt, latency_ms: null, error: 'not_wired' },
+    livekit: { status: 'degraded', checked_at: checkedAt, latency_ms: null, error: 'not_wired', token_success_rate: null, avg_join_time_ms: null, live_count: null },
     stripe: { status: 'degraded', checked_at: checkedAt, latency_ms: null, error: 'not_wired' },
   };
 

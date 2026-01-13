@@ -1,0 +1,713 @@
+/* =============================================================================
+   WATCH SCREEN STYLES
+   
+   TikTok-style full-viewport vertical scroll feed.
+   Scoped styles - no global CSS modifications.
+   
+   Design tokens used from globals.css:
+   - --primary, --accent (brand colors)
+   - --font-family-sans (Outfit)
+   - --radius-* (border radius scale)
+   - --shadow-* (shadow scale)
+   ============================================================================= */
+
+/* =============================================================================
+   WATCH SCREEN CONTAINER
+   
+   Watch renders INSIDE the app shell with header (top) and bottom nav (bottom).
+   Uses CSS custom properties for consistent spacing across breakpoints.
+   
+   Layout:
+   - Top: Header ~56px (mobile) / ~64px (desktop)
+   - Bottom: BottomNav ~70px (mobile only, hidden on desktop)
+   ============================================================================= */
+
+/* CSS Variables for app shell spacing */
+:root {
+  --watch-header-height: 56px;
+  --watch-bottom-nav-height: 70px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --watch-header-height: 64px;
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    /* Bottom nav hidden on desktop */
+    --watch-bottom-nav-height: 0px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --watch-header-height: 60px;
+  }
+}
+
+.watch-screen {
+  position: fixed;
+  top: var(--watch-header-height);
+  left: 0;
+  right: 0;
+  bottom: var(--watch-bottom-nav-height);
+  width: 100%;
+  height: calc(100dvh - var(--watch-header-height) - var(--watch-bottom-nav-height));
+  height: calc(100svh - var(--watch-header-height) - var(--watch-bottom-nav-height));
+  background: #000;
+  overflow: hidden;
+  font-family: var(--font-family-sans, 'Outfit', sans-serif);
+  /* Ensure bottom nav can overlay if needed */
+  z-index: 1;
+}
+
+.watch-screen-scroll {
+  width: 100%;
+  height: 100%;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.watch-screen-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* =============================================================================
+   TOP UI LAYER (Tabs + Mode Indicator)
+   ============================================================================= */
+
+.watch-screen-top-ui {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.4) 60%, transparent 100%);
+  pointer-events: none;
+}
+
+.watch-screen-top-ui > * {
+  pointer-events: auto;
+}
+
+/* =============================================================================
+   TAB SELECTOR
+   ============================================================================= */
+
+.watch-tab-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.watch-tab-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.watch-tab-list::-webkit-scrollbar {
+  display: none;
+}
+
+.watch-tab-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-tab-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.watch-tab-active .watch-tab-label {
+  color: #fff;
+  font-weight: 700;
+}
+
+.watch-tab-indicator {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 3px;
+  background: #fff;
+  border-radius: 2px;
+}
+
+.watch-tab-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-tab-search:hover {
+  opacity: 0.8;
+}
+
+/* =============================================================================
+   MODE INDICATOR (Non-interactive label)
+   
+   Shows current swipe mode when active (live-only or creator-only).
+   NOT a clickable control - modes are switched via horizontal swipe.
+   ============================================================================= */
+
+.watch-mode-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* =============================================================================
+   CONTENT ITEM
+   ============================================================================= */
+
+.watch-content-item {
+  position: relative;
+  width: 100%;
+  /* Height matches the watch-screen container (viewport minus header/nav) */
+  height: calc(100dvh - var(--watch-header-height) - var(--watch-bottom-nav-height));
+  height: calc(100svh - var(--watch-header-height) - var(--watch-bottom-nav-height));
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow: hidden;
+}
+
+.watch-content-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.watch-content-gradient-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.3) 0%,
+    transparent 20%,
+    transparent 60%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+  pointer-events: none;
+}
+
+/* =============================================================================
+   LIVE BADGE
+   ============================================================================= */
+
+.watch-content-live-badge {
+  position: absolute;
+  top: 80px;
+  left: 16px;
+  z-index: 20;
+}
+
+.watch-live-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.watch-live-badge-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #ff3b5c 0%, #e91e63 100%);
+  border-radius: 4px;
+  animation: watch-live-pulse 2s ease-in-out infinite;
+}
+
+.watch-live-badge-dot {
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 50%;
+  animation: watch-live-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.watch-live-badge-text {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+
+.watch-live-badge-viewers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@keyframes watch-live-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 59, 92, 0);
+  }
+}
+
+@keyframes watch-live-dot-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(255, 59, 92, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 92, 0);
+  }
+}
+
+/* =============================================================================
+   ACTION STACK (Right Side)
+   ============================================================================= */
+
+.watch-content-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 100px;
+  z-index: 20;
+}
+
+.watch-action-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Avatar with Follow Badge */
+.watch-action-avatar-wrap {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.watch-action-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  min-width: 44px;
+  min-height: 44px;
+  background: linear-gradient(135deg, hsl(258 90% 58%) 0%, hsl(328 85% 60%) 100%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-action-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.watch-action-avatar-fallback {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.watch-action-follow-badge {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: #ff3b5c;
+  border: 2px solid #000;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Action Buttons */
+.watch-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-action-btn:active {
+  transform: scale(0.9);
+}
+
+.watch-action-btn svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.watch-action-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Liked state */
+.watch-action-liked {
+  color: #ff3b5c;
+}
+
+.watch-action-liked svg {
+  filter: drop-shadow(0 0 4px rgba(255, 59, 92, 0.5));
+}
+
+/* Favorited state */
+.watch-action-favorited {
+  color: #ffc107;
+}
+
+.watch-action-favorited svg {
+  filter: drop-shadow(0 0 4px rgba(255, 193, 7, 0.5));
+}
+
+/* Create button */
+.watch-action-create {
+  margin-top: 8px;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #00f2ea 0%, #ff0050 100%);
+  border-radius: 12px;
+}
+
+/* =============================================================================
+   CAPTION OVERLAY (Bottom)
+   ============================================================================= */
+
+.watch-content-caption {
+  position: absolute;
+  left: 16px;
+  right: 80px;
+  bottom: 80px;
+  z-index: 20;
+}
+
+.watch-caption-overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.watch-caption-username {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-caption-displayname {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.watch-caption-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  line-height: 1.3;
+}
+
+.watch-caption-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.watch-caption-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.watch-caption-more {
+  display: inline;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-caption-more:hover {
+  color: #fff;
+}
+
+.watch-caption-less {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-caption-hashtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.watch-caption-hashtag {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-caption-hashtag:hover {
+  text-decoration: underline;
+}
+
+.watch-caption-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.watch-caption-location:hover {
+  color: #fff;
+}
+
+/* =============================================================================
+   EMPTY STATE
+   ============================================================================= */
+
+.watch-screen-empty {
+  width: 100%;
+  height: calc(100dvh - var(--watch-header-height) - var(--watch-bottom-nav-height));
+  height: calc(100svh - var(--watch-header-height) - var(--watch-bottom-nav-height));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: start;
+}
+
+.watch-screen-empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.watch-screen-empty-icon {
+  font-size: 48px;
+}
+
+.watch-screen-empty-content h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.watch-screen-empty-content p {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* =============================================================================
+   KEYBOARD HINT (Desktop Only)
+   ============================================================================= */
+
+.watch-screen-keyboard-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.watch-screen-keyboard-hint span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* Show keyboard hint on desktop/non-touch devices */
+@media (hover: hover) and (pointer: fine) {
+  .watch-screen-keyboard-hint {
+    display: flex;
+  }
+}
+
+/* =============================================================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================================================= */
+
+/* Desktop - wider action stack spacing */
+@media (min-width: 768px) {
+  .watch-content-actions {
+    right: 24px;
+  }
+  
+  .watch-content-caption {
+    right: 120px;
+    left: 24px;
+  }
+  
+  .watch-action-stack {
+    gap: 20px;
+  }
+  
+  .watch-action-avatar {
+    width: 56px;
+    height: 56px;
+  }
+  
+  .watch-action-btn svg {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Large desktop - constrain max width */
+@media (min-width: 1280px) {
+  .watch-screen-scroll {
+    max-width: 600px;
+    margin: 0 auto;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}

@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
+import WatchScreen from '../screens/WatchScreen';
 import HomeScreen from '../screens/HomeScreen';
 import FeedScreen from '../screens/FeedScreen';
 import GoLiveScreen from '../screens/GoLiveScreen';
@@ -98,42 +99,41 @@ function TabsNavigator() {
   const { colors } = useTheme();
   return (
     <Tabs.Navigator
+      initialRouteName="Watch"
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '600',
+        },
         tabBarStyle: {
           backgroundColor: (colors as any).tabBarBg ?? colors.surface,
           borderTopColor: (colors as any).tabBarBorder ?? colors.border,
         },
-        tabBarIcon: ({ size, focused }) => {
+        tabBarActiveTintColor: (colors as any).tabIconActive ?? brand.primary,
+        tabBarInactiveTintColor: (colors as any).tabIconInactive ?? colors.mutedText,
+        tabBarIcon: ({ size, focused, color }) => {
           let name: React.ComponentProps<typeof Ionicons>['name'];
-          let iconColor = (colors as any).tabIconInactive ?? colors.mutedText;
-          const active = (colors as any).tabIconActive ?? colors.text;
 
           switch (route.name) {
+            case 'Watch':
+              name = focused ? 'play-circle' : 'play-circle-outline';
+              break;
             case 'Home':
               name = focused ? 'home' : 'home-outline';
-              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
             case 'Feed':
-              name = 'logo-rss';
-              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
+              name = focused ? 'newspaper' : 'newspaper-outline';
               break;
             case 'Go Live':
               name = focused ? 'videocam' : 'videocam-outline';
-              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
             case 'LiveTV':
               name = focused ? 'tv' : 'tv-outline';
-              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
               break;
-            case 'Messages':
-              name = focused ? 'chatbubble' : 'chatbubble-outline';
-              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
-              break;
-            case 'Noties':
-              name = focused ? 'notifications' : 'notifications-outline';
-              iconColor = focused ? active : ((colors as any).tabIconInactive ?? colors.mutedText);
+            case 'Profile':
+              name = focused ? 'person' : 'person-outline';
               break;
             default:
               name = focused ? 'ellipse' : 'ellipse-outline';
@@ -142,13 +142,18 @@ function TabsNavigator() {
           return (
             <Ionicons
               name={name}
-              size={focused ? size + 2 : size}
-              color={iconColor}
+              size={focused ? size : size - 2}
+              color={color}
             />
           );
         },
       })}
     >
+      {/* Bottom nav order: Watch, Home, Feed, Go Live, LiveTV, Profile */}
+      <Tabs.Screen 
+        name="Watch" 
+        component={WatchScreen}
+      />
       <Tabs.Screen name="Home" component={HomeScreen} />
       <Tabs.Screen name="Feed" component={FeedScreen} />
       <Tabs.Screen
@@ -157,8 +162,7 @@ function TabsNavigator() {
         options={{ tabBarStyle: { display: 'none' } }}
       />
       <Tabs.Screen name="LiveTV" component={LiveTVScreen} />
-      <Tabs.Screen name="Messages" component={MessagesScreen} />
-      <Tabs.Screen name="Noties" component={NotiesScreen} />
+      <Tabs.Screen name="Profile" component={ProfileScreen} />
     </Tabs.Navigator>
   );
 }
@@ -202,7 +206,7 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
         name="Tabs"
         component={TabsNavigator}
         options={({ route }) => {
-          const routeName = getFocusedRouteNameFromRoute(route) ?? 'Home';
+          const routeName = getFocusedRouteNameFromRoute(route) ?? 'Watch';
           return {
             headerShown: routeName !== 'Go Live',
           };
@@ -242,9 +246,11 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="LiveHostScreen" component={LiveHostScreen} />
       <RootStack.Screen name="LiveScreen" component={LiveScreen} />
       <RootStack.Screen name="LiveUserScreen" component={LiveUserScreen} />
+      <RootStack.Screen name="MessagesScreen" component={MessagesScreen} />
       <RootStack.Screen name="MllProApplyScreen" component={MllProApplyScreen} />
       <RootStack.Screen name="MllProScreen" component={MllProScreen} />
       <RootStack.Screen name="MyAnalyticsScreen" component={MyAnalyticsScreen} />
+      <RootStack.Screen name="NotiesScreen" component={NotiesScreen} />
       <RootStack.Screen name="OAuthConsentScreen" component={OAuthConsentScreen} />
       <RootStack.Screen name="OnboardingScreen" component={OnboardingScreen} />
       <RootStack.Screen name="PoliciesDataDeletionScreen" component={PoliciesDataDeletionScreen} />

@@ -3,12 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Rss, Video, Tv, MessageCircle, Bell } from 'lucide-react';
+import { Home, Rss, Video, Tv, User, Play } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 import { isRouteActive } from '@/lib/navigation';
 import { canUserGoLive } from '@/lib/livekit-constants';
-import { useMessages } from './messages';
-import { useNoties } from './noties';
 import { Modal } from './ui/Modal';
 
 interface NavItem {
@@ -16,18 +14,25 @@ interface NavItem {
   ariaLabel: string;
   icon: React.ComponentType<{ className?: string }>;
   matchType?: 'exact' | 'prefix';
-  badge?: number;
   requiresAuth?: boolean;
 }
 
 /**
- * BottomNav Component v2.0
+ * BottomNav Component v3.0
  * 
  * Mobile-first bottom navigation bar for web and mobile app.
+ * 
+ * Items (in order):
+ * 1. Watch - TikTok-style vertical feed
+ * 2. Home - Landing/dashboard
+ * 3. Feed - Community posts
+ * 4. Go Live - Start streaming
+ * 5. LiveTV - Browse live streams
+ * 6. Profile - User profile
+ * 
  * Features:
- * - 5 primary navigation items with ONLY TEXT LABELS (NO NUMBERS!)
+ * - 6 primary navigation items
  * - Active state indicators
- * - Dot badge for unread items (NO COUNT NUMBERS)
  * - Responsive: shows on mobile/tablet, hidden on desktop
  * - Consistent with iOS/Android bottom navigation patterns
  * - Safe area padding for mobile devices
@@ -36,11 +41,11 @@ export default function BottomNav() {
   const pathname = usePathname() ?? '';
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);
-  const { totalUnreadCount: unreadMessages } = useMessages();
-  const { unreadCount: unreadNoties } = useNoties();
   const supabase = createClient();
 
   useEffect(() => {
@@ -60,11 +65,26 @@ export default function BottomNav() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setIsLoggedIn(!!user);
+      setUserId(user?.id ?? null);
       const canGoLive = canUserGoLive(user ? { id: user.id, email: user.email } : null);
       setIsOwner(canGoLive);
+      
+      // Get username for profile link
+      if (user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .single();
+        setUsername(profile?.username ?? null);
+      } else {
+        setUsername(null);
+      }
     } catch (error) {
       setIsLoggedIn(false);
       setIsOwner(false);
+      setUserId(null);
+      setUsername(null);
     }
   };
 
@@ -78,7 +98,16 @@ export default function BottomNav() {
     return null;
   }
 
+  // Profile href - use username if available, otherwise /login
+  const profileHref = isLoggedIn && username ? `/${username}` : '/login';
+
   const navItems: NavItem[] = [
+    {
+      href: '/watch',
+      ariaLabel: 'Watch',
+      icon: Play,
+      matchType: 'exact',
+    },
     {
       href: '/',
       ariaLabel: 'Home',
@@ -104,18 +133,11 @@ export default function BottomNav() {
       matchType: 'exact',
     },
     {
-      href: '/messages',
-      ariaLabel: 'Messages',
-      icon: MessageCircle,
+      href: profileHref,
+      ariaLabel: 'Profile',
+      icon: User,
       matchType: 'prefix',
-      badge: mounted && unreadMessages > 0 ? unreadMessages : undefined,
-    },
-    {
-      href: '/noties',
-      ariaLabel: 'Noties',
-      icon: Bell,
-      matchType: 'exact',
-      badge: mounted && unreadNoties > 0 ? unreadNoties : undefined,
+      requiresAuth: true,
     },
   ];
 
@@ -171,11 +193,6 @@ export default function BottomNav() {
             >
               <div className="relative">
                 <Icon />
-                
-                {/* Dot indicator for unread items - NEVER show count as text */}
-                {mounted && item.badge && item.badge > 0 && (
-                  <span className="bottom-nav-badge-dot" aria-label={`${item.badge} unread`} />
-                )}
               </div>
             </Link>
           );

@@ -330,7 +330,9 @@ export default function GlobalHeader() {
         role="banner"
       >
         <div className="mx-auto flex h-14 sm:h-16 lg:h-[60px] w-full items-center justify-between gap-4 px-3 md:px-6 lg:px-8">
+          {/* MOBILE TOP BAR: Hamburger | Search Bar | Messages | Noties | Avatar */}
           <div className="flex w-full items-center gap-2 md:hidden">
+            {/* Hamburger menu */}
             <IconButton
               aria-label="Open app menu"
               size="lg"
@@ -341,15 +343,16 @@ export default function GlobalHeader() {
               <Menu className="h-5 w-5" />
             </IconButton>
 
-            <Link href="/" className="flex items-center flex-shrink-0" aria-label="MyLiveLinks Home">
-              <SmartBrandLogo size={120} className="h-6 w-auto" />
-            </Link>
-
+            {/* Search bar - takes remaining space */}
             <div className="flex-1 min-w-0">
               <GlobalSearchTrigger className="w-full" mobileVariant="none" />
             </div>
 
-            <UserMenuSheet className="header-profile-trigger flex-shrink-0" />
+            {/* Right side: Messages + Noties + Avatar */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {isLoggedIn && <HeaderIcons />}
+              <UserMenuSheet className="header-profile-trigger flex-shrink-0" />
+            </div>
           </div>
 
           <div className="hidden w-full items-center gap-4 md:flex">

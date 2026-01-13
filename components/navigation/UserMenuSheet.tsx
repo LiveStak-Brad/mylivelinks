@@ -96,6 +96,8 @@ export default function UserMenuSheet({
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
+    // Clear the home redirect flag so next login will redirect to watch
+    try { sessionStorage.removeItem('mll:home_redirected'); } catch {}
     close();
     router.push('/login');
   }, [router, supabase]);

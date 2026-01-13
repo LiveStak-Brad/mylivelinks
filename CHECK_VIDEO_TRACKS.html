@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Track Checker</title>
+</head>
+<body>
+    <h1>Check Video Tracks</h1>
+    <p>Paste video URL below to check if it has video and audio tracks:</p>
+    <input type="text" id="videoUrl" value="https://dfiyrmqobjfsdsgklweg.supabase.co/storage/v1/object/public/post-media/4054a1de-20af-4c01-bf77-86858e293fd0/feed/1768067376138-505eba64-c6ba-4c55-af6b-58bfd546f1ad.mp4" style="width: 500px" placeholder="https://...">
+    <button onclick="checkVideo()">Check</button>
+    
+    <div id="results" style="margin-top: 20px;"></div>
+    
+    <video id="testVideo" style="width: 640px; height: 360px; background: black; margin-top: 20px;"></video>
+    
+    <script>
+        function checkVideo() {
+            const url = document.getElementById('videoUrl').value;
+            const video = document.getElementById('testVideo');
+            const results = document.getElementById('results');
+            
+            video.src = url;
+            
+            video.onloadedmetadata = () => {
+                const info = {
+                    duration: video.duration,
+                    videoWidth: video.videoWidth,
+                    videoHeight: video.videoHeight,
+                    hasVideo: video.videoWidth > 0 && video.videoHeight > 0,
+                    readyState: video.readyState,
+                    networkState: video.networkState
+                };
+                
+                results.innerHTML = `
+                    <h3>Video Info:</h3>
+                    <pre>${JSON.stringify(info, null, 2)}</pre>
+                    <p><strong>Has Video Track:</strong> ${info.hasVideo ? 'YES ✅' : 'NO ❌ (Audio only!)'}</p>
+                    <p><strong>Dimensions:</strong> ${info.videoWidth} x ${info.videoHeight}</p>
+                    <p><strong>Duration:</strong> ${info.duration.toFixed(2)}s</p>
+                `;
+                
+                video.play();
+            };
+            
+            video.onerror = (e) => {
+                results.innerHTML = `<p style="color: red;">Error loading video: ${e.message}</p>`;
+            };
+        }
+    </script>
+</body>
+</html>

@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback,
 import { createClient } from '@/lib/supabase';
 import type { AuthChangeEvent, RealtimePostgresChangesPayload, Session } from '@supabase/supabase-js';
 
-export type MessageType = 'text' | 'gift' | 'image';
+export type MessageType = 'text' | 'gift' | 'image' | 'share';
 
 export interface Message {
   id: string;
@@ -24,6 +24,11 @@ export interface Message {
   imageMime?: string;
   imageWidth?: number;
   imageHeight?: number;
+  // Share-specific fields
+  shareText?: string;
+  shareUrl?: string;
+  shareThumbnail?: string;
+  shareContentType?: string;
 }
 
 export interface Conversation {
@@ -97,7 +102,8 @@ function decodeIMContent(
 ):
   | { type: 'text'; text: string }
   | { type: 'gift'; giftId?: number; giftName?: string; giftCoins?: number; giftIcon?: string }
-  | { type: 'image'; url?: string; mime?: string; width?: number; height?: number } {
+  | { type: 'image'; url?: string; mime?: string; width?: number; height?: number }
+  | { type: 'share'; text?: string; url?: string; thumbnail?: string; contentType?: string } {
   if (typeof content !== 'string') return { type: 'text', text: '' };
   if (content.startsWith('__img__:')) {
     try {
@@ -114,20 +120,41 @@ function decodeIMContent(
       return { type: 'text', text: '' };
     }
   }
-  if (!content.startsWith('__gift__:')) return { type: 'text', text: content };
-  try {
-    const raw = content.slice('__gift__:'.length);
-    const parsed = JSON.parse(raw);
-    return {
-      type: 'gift',
-      giftId: typeof parsed?.giftId === 'number' ? parsed.giftId : undefined,
-      giftName: typeof parsed?.giftName === 'string' ? parsed.giftName : undefined,
-      giftCoins: typeof parsed?.giftCoins === 'number' ? parsed.giftCoins : undefined,
-      giftIcon: typeof parsed?.giftIcon === 'string' ? parsed.giftIcon : undefined,
-    };
-  } catch {
-    return { type: 'text', text: content };
+  if (content.startsWith('__gift__:')) {
+    try {
+      const raw = content.slice('__gift__:'.length);
+      const parsed = JSON.parse(raw);
+      return {
+        type: 'gift',
+        giftId: typeof parsed?.giftId === 'number' ? parsed.giftId : undefined,
+        giftName: typeof parsed?.giftName === 'string' ? parsed.giftName : undefined,
+        giftCoins: typeof parsed?.giftCoins === 'number' ? parsed.giftCoins : undefined,
+        giftIcon: typeof parsed?.giftIcon === 'string' ? parsed.giftIcon : undefined,
+      };
+    } catch {
+      return { type: 'text', text: content };
+    }
   }
+  // Check for share message (JSON with type: 'share')
+  if (content.startsWith('{') && content.includes('"type":"share"')) {
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed?.type === 'share') {
+        // Filter out empty string thumbnails so gradient fallback shows
+        const thumb = typeof parsed?.thumbnail === 'string' && parsed.thumbnail.trim() ? parsed.thumbnail : undefined;
+        return {
+          type: 'share',
+          text: typeof parsed?.text === 'string' ? parsed.text : undefined,
+          url: typeof parsed?.url === 'string' ? parsed.url : undefined,
+          thumbnail: thumb,
+          contentType: typeof parsed?.contentType === 'string' ? parsed.contentType : undefined,
+        };
+      }
+    } catch {
+      return { type: 'text', text: content };
+    }
+  }
+  return { type: 'text', text: content };
 }
 
 function encodeGiftContent(gift: { giftId: number; giftName: string; giftCoins: number; giftIcon?: string }) {
@@ -536,6 +563,20 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
               imageMime: decoded.mime,
               imageWidth: decoded.width,
               imageHeight: decoded.height,
+              timestamp: r.created_at ? new Date(r.created_at) : new Date(),
+              status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
+            };
+          }
+          if (decoded.type === 'share') {
+            return {
+              id: String(r.id),
+              senderId,
+              content: '',
+              type: 'share',
+              shareText: decoded.text,
+              shareUrl: decoded.url,
+              shareThumbnail: decoded.thumbnail,
+              shareContentType: decoded.contentType,
               timestamp: r.created_at ? new Date(r.created_at) : new Date(),
               status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
             };

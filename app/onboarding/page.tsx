@@ -75,8 +75,8 @@ export default function OnboardingPage() {
     }
     
     if (profile?.username && profile?.date_of_birth) {
-      // Profile complete, redirect to homepage
-      router.push('/');
+      // Profile complete, redirect to Watch (default landing)
+      router.push('/watch');
       return;
     }
     
@@ -255,8 +255,8 @@ export default function OnboardingPage() {
         }
       }
       
-      // Redirect to homepage
-      router.push('/');
+      // Redirect to Watch (default landing)
+      router.push('/watch');
     } catch (err: any) {
       console.error('Onboarding error:', err);
       setError(err.message || 'Failed to complete profile setup');

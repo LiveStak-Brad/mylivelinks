@@ -1,46 +1,69 @@
-﻿import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, Pressable, FlatList, StyleSheet } from 'react-native';
+﻿import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
+import { navigateToTeamDetail } from '../lib/teamNavigation';
 
-type PlaceholderTeam = {
+type Team = {
   id: string;
   name: string;
-  members: number;
-  privacy: 'Public' | 'Private';
   slug: string;
+  approved_member_count: number;
+  icon_url: string | null;
+  banner_url: string | null;
 };
 
-const PLACEHOLDER_TEAMS: PlaceholderTeam[] = [
-  { id: 't-1', name: 'Creator Labs', members: 128, privacy: 'Public', slug: 'creator-labs' },
-  { id: 't-2', name: 'Live Drops Weekly', members: 74, privacy: 'Public', slug: 'live-drops-weekly' },
-  { id: 't-3', name: 'Battle Practice', members: 51, privacy: 'Public', slug: 'battle-practice' },
-  { id: 't-4', name: 'Verified Hosts', members: 19, privacy: 'Private', slug: 'verified-hosts' },
-  { id: 't-5', name: 'LA Night Rooms', members: 203, privacy: 'Public', slug: 'la-night-rooms' },
-  { id: 't-6', name: 'Music Collabs', members: 96, privacy: 'Public', slug: 'music-collabs' },
-  { id: 't-7', name: 'Ops Watch', members: 33, privacy: 'Private', slug: 'ops-watch' },
-  { id: 't-8', name: 'Comedy Clip Crew', members: 61, privacy: 'Public', slug: 'comedy-clip-crew' },
-  { id: 't-9', name: 'Gaming Duos', members: 87, privacy: 'Public', slug: 'gaming-duos' },
-  { id: 't-10', name: 'Team Builders', members: 42, privacy: 'Public', slug: 'team-builders' },
-];
-
 export default function SearchTeamsScreen() {
+  const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
-
-  const filteredTeams = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return PLACEHOLDER_TEAMS;
-    return PLACEHOLDER_TEAMS.filter((t) => {
-      const name = t.name.toLowerCase();
-      const slug = t.slug.toLowerCase();
-      return name.includes(q) || slug.includes(q);
-    });
-  }, [searchQuery]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+  
+  const searchTeams = useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setTeams([]);
+      setSearched(false);
+      return;
+    }
+    
+    setLoading(true);
+    setSearched(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('teams')
+        .select('id, name, slug, approved_member_count, icon_url, banner_url')
+        .or(`name.ilike.%${trimmed}%,slug.ilike.%${trimmed}%,team_tag.ilike.%${trimmed}%`)
+        .order('approved_member_count', { ascending: false })
+        .limit(50);
+      
+      if (error) throw error;
+      
+      setTeams((data as any) || []);
+    } catch (err: any) {
+      console.error('[SearchTeamsScreen] searchTeams error:', err);
+      setTeams([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchTeams(searchQuery);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchTeams]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
-        data={filteredTeams}
+        data={teams}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
@@ -75,57 +98,69 @@ export default function SearchTeamsScreen() {
             </View>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.cardLeft}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{item.name.slice(0, 1).toUpperCase()}</Text>
-              </View>
-              <View style={styles.meta}>
-                <Text numberOfLines={1} style={styles.teamName}>
-                  {item.name}
-                </Text>
-                <View style={styles.teamSubRow}>
-                  <Ionicons name="people" size={14} color="#6B7280" />
-                  <Text style={styles.teamSubText}>{item.members} members</Text>
-                  <View style={styles.dot} />
-                  <Ionicons name={item.privacy === 'Private' ? 'lock-closed' : 'globe-outline'} size={14} color="#6B7280" />
-                  <Text style={styles.teamSubText}>{item.privacy}</Text>
+        renderItem={({ item }) => {
+          const displayPhoto = item.icon_url || item.banner_url;
+          return (
+            <Pressable
+              style={styles.card}
+              onPress={() => navigateToTeamDetail(navigation, { teamId: item.id, slug: item.slug })}
+            >
+              <View style={styles.cardLeft}>
+                <View style={styles.avatar}>
+                  {displayPhoto ? (
+                    <Image 
+                      source={{ uri: displayPhoto }} 
+                      style={styles.avatarImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+                  )}
+                </View>
+                <View style={styles.meta}>
+                  <Text numberOfLines={1} style={styles.teamName}>
+                    {item.name}
+                  </Text>
+                  <View style={styles.teamSubRow}>
+                    <Ionicons name="people" size={14} color="#6B7280" />
+                    <Text style={styles.teamSubText}>{item.approved_member_count} members</Text>
+                    <View style={styles.dot} />
+                    <Text style={styles.teamSubText}>/{item.slug}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Join ${item.name}`}
-              onPress={() => {}}
-              style={({ pressed }) => [styles.joinButton, pressed && styles.joinButtonPressed]}
-            >
-              <Text style={styles.joinButtonText}>Join</Text>
-              <Ionicons name="arrow-forward" size={16} color="#FFF" />
+              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
             </Pressable>
-          </View>
-        )}
+          );
+        }}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="people-outline" size={28} color="#8B5CF6" />
+          loading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.loadingText}>Searching teams...</Text>
             </View>
-            <Text style={styles.emptyTitle}>No teams found</Text>
-            <Text style={styles.emptyDescription}>
-              Try a different name or slug, or clear your search to see suggested teams.
-            </Text>
-            {searchQuery.trim().length > 0 && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setSearchQuery('')}
-                style={({ pressed }) => [styles.emptyCta, pressed && styles.emptyCtaPressed]}
-              >
-                <Ionicons name="close-circle" size={18} color="#111827" />
-                <Text style={styles.emptyCtaText}>Clear search</Text>
-              </Pressable>
-            )}
-          </View>
+          ) : searched ? (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="search-outline" size={28} color="#8B5CF6" />
+              </View>
+              <Text style={styles.emptyTitle}>No teams found</Text>
+              <Text style={styles.emptyDescription}>
+                Try a different name, slug, or tag to find teams.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="people-outline" size={28} color="#8B5CF6" />
+              </View>
+              <Text style={styles.emptyTitle}>Search for teams</Text>
+              <Text style={styles.emptyDescription}>
+                Enter a team name, slug, or tag to find communities to join.
+              </Text>
+            </View>
+          )
         }
       />
     </SafeAreaView>
@@ -213,6 +248,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(139, 92, 246, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 16,
@@ -263,10 +303,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 48,
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 28,
+    paddingTop: 48,
     paddingHorizontal: 16,
     gap: 10,
   },

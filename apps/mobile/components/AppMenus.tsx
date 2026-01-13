@@ -4,6 +4,8 @@ import { useMenus } from '../state/MenusContext';
 import { navTo, navToTab } from '../navigation/navigationRef';
 import { useTheme } from '../theme/useTheme';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { navigateToTeamsLanding } from '../lib/teamNavigation';
+import { navigationRef } from '../navigation/navigationRef';
 
 export default function AppMenus() {
   const menus = useMenus();
@@ -13,11 +15,12 @@ export default function AppMenus() {
   const leftItems = useMemo<SlideMenuItem[]>(
     () => [
       { key: 'owner', label: 'Owner Panel', onPress: () => navTo('OwnerPanelScreen') },
+      { key: 'watch', label: 'Watch', onPress: () => navToTab('Watch') },
       { key: 'home', label: 'Home', onPress: () => navToTab('Home') },
       { key: 'feed', label: 'Feed', onPress: () => navToTab('Feed') },
       { key: 'trending', label: 'Trending', onPress: () => navTo('TrendingScreen') },
       { key: 'livetv', label: 'Live TV', onPress: () => navToTab('LiveTV') },
-      { key: 'teams', label: 'Teams', onPress: () => navTo('TeamsScreen') },
+      { key: 'teams', label: 'Teams', onPress: () => navigateToTeamsLanding(navigationRef as any) },
       { key: 'leaderboards', label: 'Leaderboards', onPress: () => navTo('LeaderboardsScreen') },
       { key: 'gifter', label: 'Gifter Levels', onPress: () => navTo('GifterLevelsScreen') },
       { key: 'link', label: 'Link', onPress: () => navTo('LinkScreen') },
@@ -48,8 +51,8 @@ export default function AppMenus() {
       { key: 'login-security', label: 'Login & Security', onPress: () => navTo('SettingsPasswordScreen') },
       { key: 'wallet', label: 'Wallet & Coins', onPress: () => navTo('WalletScreen') },
       { key: 'referrals', label: 'Referrals', onPress: () => navTo('ReferralsScreen') },
-      { key: 'notifications', label: 'Notifications', onPress: () => navToTab('Noties') },
-      { key: 'messages', label: 'Messages', onPress: () => navToTab('Messages') },
+      { key: 'notifications', label: 'Notifications', onPress: () => navTo('NotiesScreen') },
+      { key: 'messages', label: 'Messages', onPress: () => navTo('MessagesScreen') },
       { key: 'link-profile', label: 'Link Profile', onPress: () => navTo('LinkProfileScreen') },
       { key: 'link-mutuals', label: 'Link Mutuals', onPress: () => navTo('LinkMutualsScreen') },
       { key: 'creator-analytics', label: 'Creator Analytics', onPress: () => navTo('MyAnalyticsScreen') },

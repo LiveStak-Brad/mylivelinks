@@ -740,16 +740,16 @@ button:active:not(:disabled),
   grid-template-columns: repeat(6, 1fr);
   max-width: 600px;
   margin: 0 auto;
-  padding: clamp(0.35rem, 1.8vw, 0.5rem) clamp(0.15rem, 1.2vw, 0.25rem) 0;
+  padding: clamp(0.35rem, 1.8vw, 0.5rem) clamp(0.15rem, 1.2vw, 0.25rem);
 }
 
 .bottom-nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 0;
-  padding: clamp(0.28rem, 1.4vw, 0.375rem) clamp(0.05rem, 0.9vw, 0.125rem) clamp(0.4rem, 1.7vw, 0.5rem);
+  padding: clamp(0.35rem, 1.5vw, 0.5rem) clamp(0.05rem, 0.9vw, 0.125rem);
   color: hsl(var(--muted-foreground));
   transition: all 0.2s ease-out;
   border-radius: 0.75rem;
@@ -765,11 +765,7 @@ button:active:not(:disabled),
 }
 
 .bottom-nav-item-active {
-  color: hsl(var(--primary));
-}
-
-.bottom-nav-item-active svg {
-  transform: scale(1.05);
+  color: hsl(258 90% 58%); /* Purple for active */
 }
 
 .bottom-nav-label {
@@ -817,72 +813,24 @@ button:active:not(:disabled),
   width: clamp(1.5rem, 6.2vw, 1.75rem);
   height: clamp(1.5rem, 6.2vw, 1.75rem);
   display: block;
+  color: hsl(var(--muted-foreground)); /* Grey for inactive */
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
-/* Tab-specific colors and sizes - all icons aligned */
-.bottom-nav-item[data-href="/"] svg {
-  color: hsl(258 90% 58%); /* Purple - Home */
-}
-
-.bottom-nav-item[data-href="/feed"] svg {
-  color: hsl(328 85% 60%); /* Pink - Feed */
-}
-
-.bottom-nav-item[data-href="/live"] svg {
-  color: hsl(0 84% 60%); /* Bright Red - Rooms/Live */
-}
-
-.bottom-nav-item[data-href="/liveTV"] svg {
-  color: hsl(330 100% 63%); /* Hot Pink - LiveTV */
-}
-
-.bottom-nav-item[data-href="/messages"] svg {
-  color: hsl(200 98% 50%); /* Blue - Messages */
-}
-
-.bottom-nav-item[data-href="/noties"] svg {
-  color: hsl(43 96% 56%); /* Amber - Noties */
-}
-
-/* Active state keeps the color vibrant and slightly bigger */
-.bottom-nav-item-active[data-href="/"] svg {
-  color: hsl(258 90% 58%);
-  transform: scale(1.05);
-}
-
-.bottom-nav-item-active[data-href="/feed"] svg {
-  color: hsl(328 85% 60%);
-  transform: scale(1.05);
-}
-
-.bottom-nav-item-active[data-href="/live"] svg {
-  color: hsl(0 84% 60%);
-  transform: scale(1.05);
-}
-
-.bottom-nav-item-active[data-href="/liveTV"] svg {
-  color: hsl(330 100% 63%);
-  transform: scale(1.05);
-}
-
-.bottom-nav-item-active[data-href="/messages"] svg {
-  color: hsl(200 98% 50%);
-  transform: scale(1.05);
-}
-
-.bottom-nav-item-active[data-href="/noties"] svg {
-  color: hsl(43 96% 56%);
+/* Active state - purple highlight */
+.bottom-nav-item-active svg {
+  color: hsl(258 90% 58%) !important; /* Purple for active */
   transform: scale(1.05);
 }
 
 /* Tighten spacing for small phones while keeping tap targets */
 @media (max-width: 420px) {
   .bottom-nav-container {
-    padding: 0.4rem 0.2rem 0;
+    padding: 0.4rem 0.2rem;
   }
 
   .bottom-nav-item {
-    padding: 0.325rem 0.1rem 0.45rem;
+    padding: 0.35rem 0.1rem;
     height: 54px;
   }
 
@@ -895,13 +843,13 @@ button:active:not(:disabled),
 /* Facebook-tight on the smallest screens */
 @media (max-width: 360px) {
   .bottom-nav-container {
-    padding: 0.35rem 0.15rem 0;
+    padding: 0.35rem 0.15rem;
     max-width: 520px;
   }
 
   .bottom-nav-item {
     height: 52px;
-    padding: 0.3rem 0.05rem 0.4rem;
+    padding: 0.3rem 0.05rem;
     border-radius: 0.6rem;
   }
 
@@ -914,11 +862,11 @@ button:active:not(:disabled),
 /* Ultra-tight at 320px: shrink glyphs, keep hitbox */
 @media (max-width: 320px) {
   .bottom-nav-container {
-    padding: 0.3rem 0.1rem 0;
+    padding: 0.3rem 0.1rem;
   }
 
   .bottom-nav-item {
-    padding: 0.3rem 0.05rem 0.4rem;
+    padding: 0.3rem 0.05rem;
     height: 52px;
   }
 

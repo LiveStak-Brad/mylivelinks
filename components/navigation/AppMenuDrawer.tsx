@@ -31,8 +31,8 @@ type AppMenuItem = {
 };
 
 const BASE_MENU_ITEMS: AppMenuItem[] = [
-  { label: 'Home', href: '/', icon: Home },
-  { label: 'Feed', href: '/feed', icon: Rss },
+  { label: 'Home', href: '/feed', icon: Home },
+  { label: 'Watch', href: '/watch', icon: Tv },
   { label: 'Trending', href: '/trending', icon: Flame },
   { label: 'Live TV', href: '/liveTV', icon: Tv },
   { label: 'Teams', href: '/teams', icon: Users },

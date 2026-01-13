@@ -78,7 +78,8 @@ export async function GET(request: NextRequest) {
       }
 
       if (profile?.username && profile?.date_of_birth) {
-        return NextResponse.redirect(`${requestUrl.origin}/${profile.username}`);
+        // Profile complete, redirect to Watch (default landing)
+        return NextResponse.redirect(`${requestUrl.origin}/watch`);
       } else {
         return NextResponse.redirect(`${requestUrl.origin}/onboarding`);
       }

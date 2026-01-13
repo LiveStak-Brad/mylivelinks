@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
   const degraded = !aiResult.ok || !parsedReply;
   const finalReply = degraded ? fallbackReply : parsedReply!;
   const recommendHuman = degraded ? false : recommendHumanFromAi;
+  const cooldownSeconds = DEFAULT_COOLDOWN_SECONDS;
 
   await supabase.from('support_companion_messages').insert({
     profile_id: user.id,

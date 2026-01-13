@@ -31,7 +31,7 @@ import { PRIMARY_TABS, QUICK_JUMP_TARGETS, SearchTab, SEARCH_RECENTS_STORAGE_KEY
 
 interface GlobalSearchTriggerProps {
   className?: string;
-  mobileVariant?: 'pill' | 'none';
+  mobileVariant?: 'pill' | 'icon' | 'none';
   overlayOpen?: boolean;
   onOverlayOpenChange?: (open: boolean) => void;
 }
@@ -304,7 +304,8 @@ export function GlobalSearchTrigger({
         </div>
       </div>
 
-      {mobileVariant !== 'none' && (
+      {/* Mobile pill variant - full-width search bar */}
+      {mobileVariant === 'pill' && (
         <button
           type="button"
           className="md:hidden flex items-center justify-between w-full rounded-full bg-white/10 border border-white/15 px-4 py-2.5 text-left text-white shadow-lg shadow-primary/20 active:scale-[0.99]"
@@ -319,6 +320,18 @@ export function GlobalSearchTrigger({
             </span>
           </div>
           <span className="text-xs font-semibold text-white/70">Tap to search</span>
+        </button>
+      )}
+
+      {/* Mobile icon variant - compact icon button for header */}
+      {mobileVariant === 'icon' && (
+        <button
+          type="button"
+          className="md:hidden flex items-center justify-center w-11 h-11 rounded-xl hover:bg-muted/50 active:scale-95 transition-all"
+          onClick={() => setOverlayOpen(true)}
+          aria-label="Search"
+        >
+          <Search className="h-5 w-5 text-muted-foreground" />
         </button>
       )}
 
