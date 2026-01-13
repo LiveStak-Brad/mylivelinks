@@ -116,6 +116,9 @@ export function WatchContentItem({
 
   // Track visibility with intersection observer
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         setIsVisible(entry.isIntersecting && entry.intersectionRatio > 0.5);
@@ -123,8 +126,14 @@ export function WatchContentItem({
       { threshold: 0.5 }
     );
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
+    observer.observe(container);
+
+    // Check initial visibility immediately
+    const rect = container.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const isInitiallyVisible = rect.top >= 0 && rect.top < viewportHeight * 0.5;
+    if (isInitiallyVisible) {
+      setIsVisible(true);
     }
 
     return () => observer.disconnect();
@@ -132,12 +141,20 @@ export function WatchContentItem({
 
   // Play/pause video based on visibility - stops audio when scrolling away
   useEffect(() => {
-    if (!videoRef.current || !isVideo) return;
+    const video = videoRef.current;
+    if (!video || !isVideo) return;
     
     if (isVisible) {
-      videoRef.current.play().catch(() => {});
+      // Small delay to ensure video element is ready
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          // Auto-play was prevented, user needs to interact first
+          console.log('[Video] Autoplay prevented:', err.message);
+        });
+      }
     } else {
-      videoRef.current.pause();
+      video.pause();
     }
   }, [isVisible, isVideo]);
 
@@ -160,7 +177,7 @@ export function WatchContentItem({
                 loop
                 playsInline
                 muted={globalMuted}
-                autoPlay={false}
+                autoPlay
                 style={{
                   position: 'absolute',
                   top: 0,
