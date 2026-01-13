@@ -23,7 +23,8 @@ type CompanionAIShape = {
   suggestSendToHuman?: boolean;
 };
 
-const DEFAULT_COOLDOWN_SECONDS = Number(process.env.COMPANION_COOLDOWN_SECONDS ?? 0);
+// Cooldown disabled - Linkler should respond instantly without rate limiting
+const DEFAULT_COOLDOWN_SECONDS = 0;
 const COMPANION_TIMEOUT_MS = Number(process.env.LINKLER_COMPANION_TIMEOUT_MS ?? 25_000);
 
 function sanitizeContext(value: unknown) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const cooldownSeconds = DEFAULT_COOLDOWN_SECONDS;
+  // No cooldown - Linkler responds instantly
   const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const { data: recentMessages } = await supabase
@@ -69,24 +70,6 @@ export async function POST(request: NextRequest) {
     .gte('created_at', sinceIso)
     .order('created_at', { ascending: false })
     .limit(100);
-
-  if (cooldownSeconds > 0) {
-    const lastUserMessage = (recentMessages ?? []).find((item) => item.role === 'user');
-    if (lastUserMessage) {
-      const lastAt = new Date(lastUserMessage.created_at).getTime();
-      const diffSeconds = (Date.now() - lastAt) / 1000;
-      if (diffSeconds < cooldownSeconds) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: 'Hang on a sec... Try again in a few seconds.',
-            retryAfterSeconds: Math.ceil(cooldownSeconds - diffSeconds),
-          },
-          { status: 429 }
-        );
-      }
-    }
-  }
 
   const sessionId = payload.sessionId ?? randomUUID();
 

@@ -99,6 +99,9 @@ export type SystemHealth = {
       checked_at: string;
       latency_ms: number | null;
       error: string | null;
+      token_success_rate: number | null;
+      avg_join_time_ms: number | null;
+      live_count: number | null;
     };
     stripe: {
       status: "ok" | "degraded" | "down";
@@ -142,6 +145,32 @@ type OwnerPanelError = {
   details?: unknown | null;
 };
 
+// Time series data point for charts
+export type TimeSeriesPoint = {
+  date: string; // YYYY-MM-DD
+  value: number;
+};
+
+// Top creator by gifts received today
+export type TopCreatorToday = {
+  profile_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  gifts_received: number;
+  coins_received: number;
+};
+
+// Referral snapshot for today
+export type ReferralSnapshot = {
+  clicks_today: number;
+  signups_today: number;
+  top_referrer: {
+    username: string;
+    signups: number;
+  } | null;
+};
+
 type OwnerSummaryData = {
   generated_at: string;
   stats: DashboardStats;
@@ -151,6 +180,13 @@ type OwnerSummaryData = {
   live_streams: PaginatedList<LiveStreamRow>;
   reports: PaginatedList<ReportRow>;
   audit_logs: PaginatedList<AuditLogRow>;
+  // Analytics time series (7 days)
+  gifts_over_time: TimeSeriesPoint[];
+  users_over_time: TimeSeriesPoint[];
+  streams_over_time: TimeSeriesPoint[];
+  // Snapshots
+  top_creators_today: TopCreatorToday[];
+  referrals_today: ReferralSnapshot;
 };
 
 export type OwnerSummaryResponse =

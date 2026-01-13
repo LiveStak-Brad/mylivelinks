@@ -21,7 +21,8 @@ function toPositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-const SUPPORT_COOLDOWN_SECONDS = toPositiveInt(process.env.SUPPORT_COOLDOWN_SECONDS, 1);
+// Cooldown disabled - Linkler should respond instantly without rate limiting
+const SUPPORT_COOLDOWN_SECONDS = 0;
 
 type SupportAIShape = {
   summary: string;
@@ -77,22 +78,9 @@ export async function POST(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(1);
 
-  const lastTicket = recentTickets?.[0];
-  if (lastTicket?.created_at) {
-    const lastAt = new Date(lastTicket.created_at).getTime();
-    const diffSeconds = (Date.now() - lastAt) / 1000;
-    if (diffSeconds < SUPPORT_COOLDOWN_SECONDS) {
-      const retryAfterSeconds = Math.max(1, Math.ceil(SUPPORT_COOLDOWN_SECONDS - diffSeconds));
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `Please wait ${retryAfterSeconds}s before sending another support request.`,
-          retryAfterSeconds,
-        },
-        { status: 429 }
-      );
-    }
-  }
+  // Cooldown check disabled - no rate limiting for Linkler
+  // const lastTicket = recentTickets?.[0];
+  // if (SUPPORT_COOLDOWN_SECONDS > 0 && lastTicket?.created_at) { ... }
 
   const config = await getLinklerRuntimeConfig().catch((err) => {
     console.warn('[Linkler][support-intake] failed to load config, using fallback:', err);

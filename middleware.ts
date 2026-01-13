@@ -57,10 +57,11 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired
   try {
-    await Promise.race([
-      supabase.auth.getUser(),
-      new Promise((resolve) => setTimeout(resolve, 1500)),
-    ]);
+    // IMPORTANT:
+    // Do not race this with a timeout. Supabase may need to set refreshed auth cookies
+    // on the response. If we return early, those cookie writes are lost and users get
+    // stuck in a login loop (especially on localhost during OAuth flows).
+    await supabase.auth.getUser();
   } catch {
     // Never block requests due to transient auth/network issues
   }

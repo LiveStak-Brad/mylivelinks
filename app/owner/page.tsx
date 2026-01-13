@@ -110,22 +110,31 @@ export default function OwnerDashboard() {
   // Pending reports (wired)
   const pendingReports = data.stats?.pendingReports || 0;
 
-  // UI-only chart data (wire-ready placeholders)
-  const giftsChartData: ChartDataPoint[] = [];
-  const usersChartData: ChartDataPoint[] = [];
-  const streamsChartData: ChartDataPoint[] = [];
+  // Chart data from API - map date to label for AnalyticsChart component
+  const giftsChartData: ChartDataPoint[] = (data.giftsOverTime || []).map((p) => ({
+    label: p.date.slice(5), // MM-DD format
+    value: p.value,
+  }));
+  const usersChartData: ChartDataPoint[] = (data.usersOverTime || []).map((p) => ({
+    label: p.date.slice(5),
+    value: p.value,
+  }));
+  const streamsChartData: ChartDataPoint[] = (data.streamsOverTime || []).map((p) => ({
+    label: p.date.slice(5),
+    value: p.value,
+  }));
 
-  // UI-only top creators snapshot (wire-ready)
-  const topCreatorsToday: Array<{
-    id: string;
-    username: string;
-    avatarUrl: string | null;
-    giftsReceived: number;
-    revenueUsd: number;
-  }> = [];
+  // Top creators from API
+  const topCreatorsToday = (data.topCreatorsToday || []).map((c) => ({
+    id: c.id,
+    username: c.username,
+    avatarUrl: c.avatarUrl,
+    giftsReceived: c.giftsReceived,
+    revenueUsd: (c.coinsReceived * 0.01).toFixed(2), // Convert coins to approx USD
+  }));
 
-  // UI-only referrals snapshot (wire-ready)
-  const referralsToday = {
+  // Referrals from API
+  const referralsToday = data.referralsToday || {
     clicks: 0,
     signups: 0,
     topReferrer: null as { username: string; signups: number } | null,
@@ -293,18 +302,18 @@ export default function OwnerDashboard() {
 
       {/* Snapshot Widgets Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Creators Today */}
+        {/* Top Creators (7d) */}
         <Card>
           <CardHeader
-            title="Top Creators Today"
+            title="Top Creators (7d)"
             subtitle="By gifts received"
           />
           <CardBody>
             {topCreatorsToday.length === 0 ? (
               <EmptyState
                 icon={Crown}
-                title="No Data"
-                description="Top creators data will appear here once wired."
+                title="No Recent Activity"
+                description="No gifts sent in the last 7 days."
                 variant="default"
               />
             ) : (
@@ -329,18 +338,18 @@ export default function OwnerDashboard() {
           </CardBody>
         </Card>
 
-        {/* Referrals Snapshot */}
+        {/* Referrals Snapshot (7d) */}
         <Card>
           <CardHeader
-            title="Referrals Today"
+            title="Referrals (7d)"
             subtitle="Growth from referrals"
           />
           <CardBody>
             {referralsToday.clicks === 0 && referralsToday.signups === 0 ? (
               <EmptyState
                 icon={Target}
-                title="No Data"
-                description="Referral activity will appear here once wired."
+                title="No Recent Referrals"
+                description="No referral activity in the last 7 days."
                 variant="default"
               />
             ) : (

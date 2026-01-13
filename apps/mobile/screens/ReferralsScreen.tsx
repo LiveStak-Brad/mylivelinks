@@ -1,11 +1,27 @@
-﻿import React, { useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, Share, Clipboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/useTheme';
+import { useAuth } from '../state/AuthContext';
+import { supabase } from '../lib/supabase';
+
+type ReferralStats = {
+  click_count: number;
+  referral_count: number;
+  activation_count: number;
+};
 
 export default function ReferralsScreen() {
   const { mode, colors } = useTheme();
+  const { user } = useAuth();
+  const navigation = useNavigation();
+  const [username, setUsername] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [rank, setRank] = useState<number | null>(null);
 
   const themed = useMemo(
     () => ({
@@ -21,6 +37,121 @@ export default function ReferralsScreen() {
     }),
     [mode, colors]
   );
+
+  const inviteLink = useMemo(() => {
+    if (!username) return 'https://www.mylivelinks.com/invite/username';
+    return `https://www.mylivelinks.com/invite/${username}`;
+  }, [username]);
+
+  const loadUsername = useCallback(async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.error('[ReferralsScreen] Error loading username:', error);
+      setUsername(null);
+    } else {
+      setUsername(data?.username ?? null);
+    }
+    setLoading(false);
+  }, [user]);
+
+  const loadReferralStats = useCallback(async () => {
+    if (!user) {
+      setStatsLoading(false);
+      return;
+    }
+
+    setStatsLoading(true);
+    
+    // Fetch referral rollup stats
+    const { data: rollupData, error: rollupError } = await supabase
+      .from('referral_rollups')
+      .select('click_count, referral_count, activation_count')
+      .eq('referrer_profile_id', user.id)
+      .single();
+
+    if (rollupError && rollupError.code !== 'PGRST116') {
+      console.error('[ReferralsScreen] Error loading stats:', rollupError);
+    }
+
+    if (rollupData) {
+      setStats({
+        click_count: Number(rollupData.click_count || 0),
+        referral_count: Number(rollupData.referral_count || 0),
+        activation_count: Number(rollupData.activation_count || 0),
+      });
+    } else {
+      setStats({
+        click_count: 0,
+        referral_count: 0,
+        activation_count: 0,
+      });
+    }
+
+    // Fetch rank from leaderboard using direct query
+    try {
+      const { data: rollups, error: rankError } = await supabase
+        .from('referral_rollups')
+        .select('referrer_profile_id, referral_count, activation_count')
+        .order('activation_count', { ascending: false })
+        .order('referral_count', { ascending: false })
+        .limit(100);
+
+      if (rankError) {
+        console.error('[ReferralsScreen] Error loading rank:', rankError);
+        setRank(null);
+      } else if (rollups && Array.isArray(rollups)) {
+        const userIndex = rollups.findIndex((entry: any) => entry.referrer_profile_id === user.id);
+        if (userIndex !== -1) {
+          setRank(userIndex + 1);
+        } else {
+          setRank(null);
+        }
+      } else {
+        setRank(null);
+      }
+    } catch (error) {
+      console.error('[ReferralsScreen] Exception loading rank:', error);
+      setRank(null);
+    }
+
+    setStatsLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    loadUsername();
+    loadReferralStats();
+  }, [loadUsername, loadReferralStats]);
+
+  const handleCopyLink = useCallback(() => {
+    try {
+      Clipboard.setString(inviteLink);
+      Alert.alert('Copied!', 'Your referral link has been copied to clipboard.');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to copy link to clipboard.');
+    }
+  }, [inviteLink]);
+
+  const handleShareLink = useCallback(async () => {
+    try {
+      await Share.share({
+        message: `Join me on MyLiveLinks! Use my invite link: ${inviteLink}`,
+        url: inviteLink,
+      });
+    } catch (error) {
+      console.error('[ReferralsScreen] Error sharing:', error);
+    }
+  }, [inviteLink]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: themed.bg }]} edges={['top']}>
@@ -43,15 +174,32 @@ export default function ReferralsScreen() {
           </View>
           
           <View style={[styles.linkBox, { backgroundColor: themed.linkBoxBg, borderColor: themed.cardBorder }]}>
-            <Text style={[styles.linkText, { color: themed.mutedText }]}>https://www.mylivelinks.com/invite/username</Text>
+            <Text style={[styles.linkText, { color: loading ? themed.mutedText : themed.text }]}>
+              {loading ? 'Loading your invite link...' : inviteLink}
+            </Text>
           </View>
           
+          {!username && !loading ? (
+            <View style={[styles.warningBox, { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' }]}>
+              <Ionicons name="warning-outline" size={16} color="#f59e0b" />
+              <Text style={[styles.warningText, { color: '#f59e0b' }]}>Set your username in profile settings to get your invite link</Text>
+            </View>
+          ) : null}
+          
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.button, styles.buttonSecondary]}>
+            <TouchableOpacity 
+              style={[styles.button, styles.buttonSecondary, (!username || loading) && styles.buttonDisabled]}
+              onPress={handleCopyLink}
+              disabled={!username || loading}
+            >
               <Ionicons name="copy-outline" size={16} color="#fff" />
               <Text style={styles.buttonText}>Copy Link</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.buttonPrimary]}>
+            <TouchableOpacity 
+              style={[styles.button, styles.buttonPrimary, (!username || loading) && styles.buttonDisabled]}
+              onPress={handleShareLink}
+              disabled={!username || loading}
+            >
               <Ionicons name="share-outline" size={16} color="#fff" />
               <Text style={styles.buttonText}>Share</Text>
             </TouchableOpacity>
@@ -60,19 +208,27 @@ export default function ReferralsScreen() {
 
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, { backgroundColor: themed.statCardBg, borderColor: themed.cardBorder }]}>
-            <Text style={[styles.statValue, { color: themed.text }]}>0</Text>
+            <Text style={[styles.statValue, { color: themed.text }]}>
+              {statsLoading ? '...' : stats?.click_count ?? 0}
+            </Text>
             <Text style={[styles.statLabel, { color: themed.mutedText }]}>Link Clicks</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: themed.statCardBg, borderColor: themed.cardBorder }]}>
-            <Text style={[styles.statValue, styles.statValueSuccess]}>0</Text>
-            <Text style={[styles.statLabel, { color: themed.mutedText }]}>Signups</Text>
+            <Text style={[styles.statValue, styles.statValueSuccess]}>
+              {statsLoading ? '...' : stats?.activation_count ?? 0}
+            </Text>
+            <Text style={[styles.statLabel, { color: themed.mutedText }]}>Active Signups</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: themed.statCardBg, borderColor: themed.cardBorder }]}>
-            <Text style={[styles.statValue, styles.statValueWarning]}>0</Text>
-            <Text style={[styles.statLabel, { color: themed.mutedText }]}>Coins Earned</Text>
+            <Text style={[styles.statValue, styles.statValueWarning]}>
+              {statsLoading ? '...' : stats?.referral_count ?? 0}
+            </Text>
+            <Text style={[styles.statLabel, { color: themed.mutedText }]}>Total Signups</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: themed.statCardBg, borderColor: themed.cardBorder }]}>
-            <Text style={[styles.statValue, styles.statValuePrimary]}>—</Text>
+            <Text style={[styles.statValue, styles.statValuePrimary]}>
+              {statsLoading ? '...' : rank ? `#${rank}` : '—'}
+            </Text>
             <Text style={[styles.statLabel, { color: themed.mutedText }]}>Your Rank</Text>
           </View>
         </View>
@@ -131,7 +287,10 @@ export default function ReferralsScreen() {
             <Text style={styles.ctaDescription}>
               See how you rank against other top referrers and compete for exclusive prizes.
             </Text>
-            <TouchableOpacity style={styles.ctaButton}>
+            <TouchableOpacity 
+              style={styles.ctaButton}
+              onPress={() => navigation.navigate('LeaderboardsScreen' as never, { tab: 'referrals' } as never)}
+            >
               <Ionicons name="ribbon" size={16} color="#fff" />
               <Text style={styles.ctaButtonText}>View Leaderboard</Text>
               <Ionicons name="arrow-forward" size={16} color="#fff" />
@@ -211,6 +370,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
     color: '#fff',
+  },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
   buttonRow: {
     flexDirection: 'row',

@@ -1,5 +1,26 @@
-// Owner Panel Data Hook - Type Definitions and Stub Implementation
-// This is a placeholder hook that will be wired to Supabase by other agents
+/**
+ * ============================================================================
+ * OWNER PANEL DATA HOOK
+ * ============================================================================
+ * 
+ * ⚠️ DO NOT MODIFY without testing against the owner dashboard UI at /owner
+ * 
+ * This hook fetches data from /api/owner/summary and maps it to UI types.
+ * 
+ * Key mappings (API → UI):
+ * - stats.users_total → totalUsers
+ * - stats.users_new_24h → usersNew24h
+ * - stats.users_active_24h → dailyActiveUsers
+ * - stats.gifts_today_count → giftsTodayCount
+ * - stats.gifts_today_coins → giftsTodayCoins
+ * - stats.reports_pending → pendingReports
+ * - stats.revenue_today_usd_cents → revenueTodayUsdCents
+ * - system_health.services.livekit.token_success_rate → tokenSuccessRate
+ * - system_health.services.livekit.avg_join_time_ms → avgJoinTime
+ * 
+ * If you change any field names, update BOTH the API route AND this hook.
+ * ============================================================================
+ */
 
 import { useState, useEffect } from 'react';
 import type { OwnerSummaryResponse } from '@/lib/ownerPanel';
@@ -253,6 +274,12 @@ export interface OwnerPanelData {
   platformHealth: PlatformHealth | null;
   liveStreamInfo: LiveStreamInfo[];
   recentReports: ReportInfo[];
+  // Analytics chart data
+  giftsOverTime: ChartDataPoint[];
+  usersOverTime: ChartDataPoint[];
+  streamsOverTime: ChartDataPoint[];
+  topCreatorsToday: TopCreatorInfo[];
+  referralsToday: ReferralInfo;
 }
 
 export interface UseOwnerPanelDataReturn {
@@ -296,6 +323,26 @@ export interface PlatformHealth {
   avgJoinTime: number;
 }
 
+// Analytics types for charts
+export interface ChartDataPoint {
+  date: string;
+  value: number;
+}
+
+export interface TopCreatorInfo {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+  giftsReceived: number;
+  coinsReceived: number;
+}
+
+export interface ReferralInfo {
+  clicks: number;
+  signups: number;
+  topReferrer: { username: string; signups: number } | null;
+}
+
 // ============================================================================
 // MOCK DATA (Only used in development, removed in production)
 // ============================================================================
@@ -321,6 +368,11 @@ const MOCK_DATA: OwnerPanelData = {
   platformHealth: null,
   liveStreamInfo: [],
   recentReports: [],
+  giftsOverTime: [],
+  usersOverTime: [],
+  streamsOverTime: [],
+  topCreatorsToday: [],
+  referralsToday: { clicks: 0, signups: 0, topReferrer: null },
 };
 
 function coerceServiceStatus(v: unknown): 'ok' | 'degraded' | 'down' {
@@ -340,12 +392,17 @@ function mapSummaryToOwnerPanelData(res: OwnerSummaryResponse): OwnerPanelData {
   const supabaseStatus: PlatformHealth['supabase'] = coerceServiceStatus(systemHealth?.services?.database?.status);
   const livekitStatus: PlatformHealth['livekit'] = coerceServiceStatus(systemHealth?.services?.livekit?.status);
 
+  // Get LiveKit metrics from system_health if available
+  const livekitService = systemHealth?.services?.livekit;
+  const tokenSuccessRate = typeof livekitService?.token_success_rate === 'number' ? livekitService.token_success_rate : 0;
+  const avgJoinTime = typeof livekitService?.avg_join_time_ms === 'number' ? livekitService.avg_join_time_ms : 0;
+
   const platformHealth: PlatformHealth = {
     api: apiStatus,
     supabase: supabaseStatus,
     livekit: livekitStatus,
-    tokenSuccessRate: 0,
-    avgJoinTime: 0,
+    tokenSuccessRate,
+    avgJoinTime,
   };
 
   const liveStreamInfo: LiveStreamInfo[] = (res.data.live_streams?.items ?? []).map((s) => ({
@@ -390,12 +447,48 @@ function mapSummaryToOwnerPanelData(res: OwnerSummaryResponse): OwnerPanelData {
     },
   };
 
+  // Map analytics time series data
+  const giftsOverTime: ChartDataPoint[] = (res.data.gifts_over_time ?? []).map((p) => ({
+    date: p.date,
+    value: Number(p.value ?? 0),
+  }));
+
+  const usersOverTime: ChartDataPoint[] = (res.data.users_over_time ?? []).map((p) => ({
+    date: p.date,
+    value: Number(p.value ?? 0),
+  }));
+
+  const streamsOverTime: ChartDataPoint[] = (res.data.streams_over_time ?? []).map((p) => ({
+    date: p.date,
+    value: Number(p.value ?? 0),
+  }));
+
+  const topCreatorsToday: TopCreatorInfo[] = (res.data.top_creators_today ?? []).map((c) => ({
+    id: c.profile_id,
+    username: c.username,
+    avatarUrl: c.avatar_url ?? null,
+    giftsReceived: Number(c.gifts_received ?? 0),
+    coinsReceived: Number(c.coins_received ?? 0),
+  }));
+
+  const referralsData = res.data.referrals_today;
+  const referralsToday: ReferralInfo = {
+    clicks: Number(referralsData?.clicks_today ?? 0),
+    signups: Number(referralsData?.signups_today ?? 0),
+    topReferrer: referralsData?.top_referrer ?? null,
+  };
+
   return {
     ...MOCK_DATA,
     stats: mappedStats,
     platformHealth,
     liveStreamInfo,
     recentReports,
+    giftsOverTime,
+    usersOverTime,
+    streamsOverTime,
+    topCreatorsToday,
+    referralsToday,
   };
 }
 

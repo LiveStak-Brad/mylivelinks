@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
@@ -15,6 +16,7 @@ type HomeProfile = {
   username: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  is_mll_pro: boolean;
 };
 
 type RecommendedProfile = {
@@ -79,6 +81,7 @@ function getInitials(label: string) {
 export default function HomeScreen() {
   const { user } = useAuth();
   const { mode, colors } = useTheme();
+  const navigation = useNavigation();
 
   const stylesVars = useMemo(
     () => ({
@@ -104,17 +107,17 @@ export default function HomeScreen() {
     return <View style={styles.card}>{children}</View>;
   }
 
-  function PrimaryButton({ label }: { label: string }) {
+  function PrimaryButton({ label, onPress }: { label: string; onPress?: () => void }) {
     return (
-      <Pressable accessibilityRole="button" style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
         <Text style={styles.primaryButtonText}>{label}</Text>
       </Pressable>
     );
   }
 
-  function OutlineButton({ label }: { label: string }) {
+  function OutlineButton({ label, onPress }: { label: string; onPress?: () => void }) {
     return (
-      <Pressable accessibilityRole="button" style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
+      <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}>
         <Text style={styles.outlineButtonText}>{label}</Text>
       </Pressable>
     );
@@ -260,7 +263,7 @@ export default function HomeScreen() {
     setMyProfileError(null);
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, display_name, avatar_url')
+      .select('id, username, display_name, avatar_url, is_mll_pro')
       .eq('id', userId)
       .single();
 
@@ -659,19 +662,17 @@ export default function HomeScreen() {
                 )}
               </View>
             </View>
-            <Text style={styles.heroBody}>
-              {myProfileLoading
-                ? 'Loading your profile…'
-                : myProfileError
-                  ? `Profile error: ${myProfileError}`
-                  : myProfile?.username
-                    ? `@${myProfile.username}`
-                    : 'Complete your profile to show your username here.'}
-            </Text>
-            <View style={styles.heroButtonsRow}>
-              <PrimaryButton label="Apply for MLL PRO" />
-              <OutlineButton label="What is MLL PRO?" />
-            </View>
+            {myProfile?.is_mll_pro ? (
+              <Text style={styles.heroBody}>Thanks for being a PRO — welcome back!</Text>
+            ) : (
+              <>
+                <Text style={styles.heroBody}>Interested in becoming an MLL PRO?</Text>
+                <View style={styles.heroButtonsRow}>
+                  <PrimaryButton label="Apply for MLL PRO" onPress={() => navigation.navigate('MllProApplyScreen' as never)} />
+                  <OutlineButton label="What is MLL PRO?" onPress={() => navigation.navigate('MllProScreen' as never)} />
+                </View>
+              </>
+            )}
           </Card>
         </View>
 
@@ -690,8 +691,8 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.teamsButtonsRow}>
-              <PrimaryButton label="Create a Team" />
-              <OutlineButton label="Download App" />
+              <PrimaryButton label="Create a Team" onPress={() => navigation.navigate('TeamsSetupScreen' as never)} />
+              <OutlineButton label="Visit Teams" onPress={() => navigation.navigate('TeamsScreen' as never)} />
             </View>
           </Card>
         </View>
@@ -774,7 +775,7 @@ export default function HomeScreen() {
               <Text style={styles.referralHintText}>Top referrers unlock perks 👀</Text>
             </View>
 
-            <PrimaryButton label="Get My Invite Link" />
+            <PrimaryButton label="Get My Invite Link" onPress={() => navigation.navigate('ReferralsScreen' as never)} />
 
             <View style={styles.referralGrid}>
               <View style={styles.referralGridItem}>
@@ -812,8 +813,8 @@ export default function HomeScreen() {
             </Text>
 
             <View style={styles.liveButtonsRow}>
-              <PrimaryButton label="Watch Live" />
-              <Pressable accessibilityRole="button" style={({ pressed }) => [styles.textLink, pressed && styles.pressed]}>
+              <PrimaryButton label="Watch Live" onPress={() => navigation.navigate('Tabs' as never, { screen: 'LiveTV' } as never)} />
+              <Pressable accessibilityRole="button" onPress={() => navigation.navigate('Tabs' as never, { screen: 'Go Live' } as never)} style={({ pressed }) => [styles.textLink, pressed && styles.pressed]}>
                 <Text style={styles.textLinkText}>Go Live in Live Central</Text>
               </Pressable>
             </View>
@@ -960,8 +961,8 @@ export default function HomeScreen() {
           <Card>
             <Text style={styles.ctaTitle}>Ready to Get Started?</Text>
             <View style={styles.ctaButtonsRow}>
-              <PrimaryButton label="Complete Your Profile" />
-              <OutlineButton label="Browse Live Streams" />
+              <PrimaryButton label="Complete Your Profile" onPress={() => navigation.navigate('ProfileViewScreen' as never, { profileId: user?.id } as never)} />
+              <OutlineButton label="Browse Live Streams" onPress={() => navigation.navigate('Tabs' as never, { screen: 'LiveTV' } as never)} />
             </View>
           </Card>
         </View>
@@ -996,18 +997,38 @@ export default function HomeScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <View style={styles.footerLinksRow}>
-            <Text style={styles.footerLinkStrong}>MLL PRO</Text>
-            <Text style={styles.footerLink}>Safety &amp; Policies</Text>
+            <Pressable onPress={() => navigation.navigate('MllProScreen' as never)}>
+              <Text style={styles.footerLinkStrong}>MLL PRO</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('PoliciesScreen' as never)}>
+              <Text style={styles.footerLink}>Safety &amp; Policies</Text>
+            </Pressable>
           </View>
           <View style={styles.footerLinksWrap}>
-            <Text style={styles.footerLink}>Terms of Service</Text>
-            <Text style={styles.footerLink}>Privacy Policy</Text>
-            <Text style={styles.footerLink}>Community Guidelines</Text>
-            <Text style={styles.footerLink}>Payments &amp; Virtual Currency Policy</Text>
-            <Text style={styles.footerLink}>Fraud &amp; Chargeback Policy</Text>
-            <Text style={styles.footerLink}>Creator Earnings &amp; Payout Policy</Text>
-            <Text style={styles.footerLink}>Dispute Resolution &amp; Arbitration</Text>
-            <Text style={styles.footerLink}>Account Enforcement &amp; Termination Policy</Text>
+            <Pressable onPress={() => navigation.navigate('TermsScreen' as never)}>
+              <Text style={styles.footerLink}>Terms of Service</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('PrivacyScreen' as never)}>
+              <Text style={styles.footerLink}>Privacy Policy</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('PoliciesScreen' as never)}>
+              <Text style={styles.footerLink}>Community Guidelines</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('PoliciesScreen' as never)}>
+              <Text style={styles.footerLink}>Payments &amp; Virtual Currency Policy</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('PoliciesScreen' as never)}>
+              <Text style={styles.footerLink}>Fraud &amp; Chargeback Policy</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('PoliciesScreen' as never)}>
+              <Text style={styles.footerLink}>Creator Earnings &amp; Payout Policy</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('PoliciesScreen' as never)}>
+              <Text style={styles.footerLink}>Dispute Resolution &amp; Arbitration</Text>
+            </Pressable>
+            <Pressable onPress={() => navigation.navigate('PoliciesScreen' as never)}>
+              <Text style={styles.footerLink}>Account Enforcement &amp; Termination Policy</Text>
+            </Pressable>
           </View>
           <Text style={styles.footerCopy}>© 2026 MyLiveLinks. All rights reserved.</Text>
         </View>

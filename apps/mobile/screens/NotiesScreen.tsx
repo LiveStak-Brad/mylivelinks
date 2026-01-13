@@ -280,7 +280,7 @@ export default function NotiesScreen() {
         case 'profile': {
           const username = resolved.params?.username;
           if (username) {
-            navigation.navigate('PublicProfileScreen', { username });
+            navigation.navigate('ProfileViewScreen', { username });
             return;
           }
           break;

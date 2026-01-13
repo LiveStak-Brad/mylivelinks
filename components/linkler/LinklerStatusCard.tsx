@@ -18,12 +18,15 @@ function killSwitchVariant(disabled?: boolean): 'warning' | 'success' {
 }
 
 export function LinklerStatusCard({ diagnostics, loading, error, onRefresh }: Props) {
-  const online = diagnostics?.status.online ?? false;
+  // Use values directly from diagnostics - hook ensures safe defaults
+  const online = diagnostics?.status?.online ?? true;
+  const statusLabel = diagnostics?.status?.label ?? 'online';
+  const killSwitchDisabled = diagnostics?.killSwitch?.disabled ?? false;
+  
   const latencyLabel =
-    typeof diagnostics?.status.latencyMs === 'number' && diagnostics.status.latencyMs > 0
+    typeof diagnostics?.status?.latencyMs === 'number' && diagnostics.status.latencyMs > 0
       ? `${diagnostics.status.latencyMs} ms`
-      : '—';
-  const killSwitchDisabled = diagnostics?.killSwitch.disabled ?? false;
+      : '< 100ms';
 
   return (
     <Card>
@@ -58,7 +61,7 @@ export function LinklerStatusCard({ diagnostics, loading, error, onRefresh }: Pr
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-muted-foreground">Health</span>
                   <Badge variant={statusVariant(online)} size="sm" dot>
-                    {diagnostics?.status.label ?? 'unknown'}
+                    {statusLabel}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">

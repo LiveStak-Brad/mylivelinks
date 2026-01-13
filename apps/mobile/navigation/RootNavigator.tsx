@@ -50,6 +50,7 @@ import PoliciesScreen from '../screens/PoliciesScreen';
 import PolicyDetailScreen from '../screens/PolicyDetailScreen';
 import PrivacyScreen from '../screens/PrivacyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import ProfileViewScreen from '../screens/ProfileViewScreen';
 import PublicProfileScreen from '../screens/PublicProfileScreen';
 import ReferralsScreen from '../screens/ReferralsScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
@@ -250,6 +251,7 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="PoliciesScreen" component={PoliciesScreen} />
       <RootStack.Screen name="PolicyDetailScreen" component={PolicyDetailScreen} />
       <RootStack.Screen name="ProfileScreen" component={ProfileScreen} />
+      <RootStack.Screen name="ProfileViewScreen" component={ProfileViewScreen} />
       <RootStack.Screen name="PublicProfileScreen" component={PublicProfileScreen} />
       <RootStack.Screen name="ReferralsScreen" component={ReferralsScreen} />
       <RootStack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />

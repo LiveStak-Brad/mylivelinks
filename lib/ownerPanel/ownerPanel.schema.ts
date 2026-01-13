@@ -10,9 +10,12 @@ import type {
   OwnerPanelDataSource,
   OwnerReportsResponse,
   OwnerSummaryResponse,
+  ReferralSnapshot,
   ReportRow,
   RevenueSummary,
   SystemHealth,
+  TimeSeriesPoint,
+  TopCreatorToday,
 } from "./ownerPanel.types";
 
 const UuidSchema = z.string().uuid();
@@ -145,6 +148,9 @@ export const SystemHealthSchema = z
         checked_at: DateTimeSchema,
         latency_ms: z.number().int().nonnegative().nullable(),
         error: z.string().nullable(),
+        token_success_rate: z.number().nonnegative().nullable(),
+        avg_join_time_ms: z.number().nonnegative().nullable(),
+        live_count: z.number().int().nonnegative().nullable(),
       }),
       stripe: z.object({
         status: z.enum(["ok", "degraded", "down"]),
@@ -169,6 +175,29 @@ export const AuditLogRowSchema = z
     metadata: z.record(z.string(), z.unknown()).nullable(),
   }) satisfies z.ZodType<AuditLogRow>;
 
+export const TimeSeriesPointSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
+  value: z.number().int().nonnegative(),
+}) satisfies z.ZodType<TimeSeriesPoint>;
+
+export const TopCreatorTodaySchema = z.object({
+  profile_id: z.string().uuid(),
+  username: z.string().min(1),
+  display_name: z.string().nullable(),
+  avatar_url: z.string().nullable(),
+  gifts_received: z.number().int().nonnegative(),
+  coins_received: z.number().int().nonnegative(),
+}) satisfies z.ZodType<TopCreatorToday>;
+
+export const ReferralSnapshotSchema = z.object({
+  clicks_today: z.number().int().nonnegative(),
+  signups_today: z.number().int().nonnegative(),
+  top_referrer: z.object({
+    username: z.string().min(1),
+    signups: z.number().int().nonnegative(),
+  }).nullable(),
+}) satisfies z.ZodType<ReferralSnapshot>;
+
 const OwnerPanelErrorSchema = z.object({
   code: z.string().min(1),
   message: z.string().min(1),
@@ -187,6 +216,13 @@ const OwnerSummaryDataSchema = z.object({
   live_streams: PaginatedListSchema(LiveStreamRowSchema),
   reports: PaginatedListSchema(ReportRowSchema),
   audit_logs: PaginatedListSchema(AuditLogRowSchema),
+  // Analytics time series (7 days)
+  gifts_over_time: z.array(TimeSeriesPointSchema),
+  users_over_time: z.array(TimeSeriesPointSchema),
+  streams_over_time: z.array(TimeSeriesPointSchema),
+  // Snapshots
+  top_creators_today: z.array(TopCreatorTodaySchema),
+  referrals_today: ReferralSnapshotSchema,
 });
 
 export const OwnerSummaryResponseSchema = (z.union([

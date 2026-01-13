@@ -1069,7 +1069,7 @@ export default function FeedScreen() {
               userReaction={userReactionByPostId[item.post_id] ?? null}
               mediaAspectRatio={item.media_url ? mediaAspectRatios[item.media_url] ?? null : null}
               onPressProfile={() =>
-                navigation.navigate('PublicProfileScreen', {
+                navigation.navigate('ProfileViewScreen', {
                   profileId: item.author_profile_id,
                   username: item.author_username,
                 })

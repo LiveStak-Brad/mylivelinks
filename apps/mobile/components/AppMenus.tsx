@@ -3,10 +3,12 @@ import SlideMenu, { SlideMenuItem } from './SlideMenu';
 import { useMenus } from '../state/MenusContext';
 import { navTo, navToTab } from '../navigation/navigationRef';
 import { useTheme } from '../theme/useTheme';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 
 export default function AppMenus() {
   const menus = useMenus();
   const { mode, setMode } = useTheme();
+  const currentUser = useCurrentUser();
 
   const leftItems = useMemo<SlideMenuItem[]>(
     () => [
@@ -36,7 +38,11 @@ export default function AppMenus() {
 
   const rightItems = useMemo<SlideMenuItem[]>(
     () => [
-      { key: 'my-profile', label: 'My Profile', onPress: () => navTo('UserProfileScreen') },
+      { 
+        key: 'my-profile', 
+        label: 'My Profile', 
+        onPress: () => navTo('ProfileViewScreen', { profileId: currentUser.userId }) 
+      },
       { key: 'edit-profile', label: 'Edit Profile', onPress: () => navTo('SettingsProfileScreen') },
       { key: 'account-settings', label: 'Account Settings', onPress: () => navTo('SettingsAccountScreen') },
       { key: 'login-security', label: 'Login & Security', onPress: () => navTo('SettingsPasswordScreen') },
@@ -52,7 +58,7 @@ export default function AppMenus() {
       { key: 'purchases', label: 'Purchases', disabled: true, pillText: 'SOON' },
       { key: 'logout', label: 'Logout', tone: 'danger' },
     ],
-    []
+    [currentUser.userId]
   );
 
   return (
