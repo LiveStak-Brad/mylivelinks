@@ -82,6 +82,7 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): WatchFeedResult
       isLiked: row.is_liked || false,
       isFavorited: row.is_favorited || false,
       viewerCount: row.viewer_count || 0,
+      viewCount: Number(row.view_count) || 0,
       // Use thumbnail_url, or media_url if it's an image (not video)
       thumbnailUrl: row.thumbnail_url || (row.media_url && /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(row.media_url) ? row.media_url : undefined),
       mediaUrl: row.media_url || undefined,

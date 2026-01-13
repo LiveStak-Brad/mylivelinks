@@ -29,6 +29,7 @@ export interface WatchItemData {
   isLiked?: boolean;
   isFavorited?: boolean;
   viewerCount?: number;
+  viewCount?: number; // Total views for videos
   thumbnailUrl?: string;
   mediaUrl?: string;
   gradientFrom?: string;
@@ -98,6 +99,7 @@ export function WatchContentItem({
     isLiked = false,
     isFavorited = false,
     viewerCount = 0,
+    viewCount = 0,
     thumbnailUrl,
     gradientFrom = '#1a1a2e',
     gradientTo = '#16213e',
@@ -278,6 +280,7 @@ export function WatchContentItem({
         caption={caption}
         hashtags={hashtags}
         location={location}
+        viewCount={isLive ? viewerCount : viewCount}
         isLive={isLive}
         onUsernameClick={onUsernameClick}
         onHashtagClick={onHashtagClick}

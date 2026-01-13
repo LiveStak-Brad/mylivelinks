@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 
 interface WatchCaptionOverlayProps {
   username: string;
@@ -10,6 +10,7 @@ interface WatchCaptionOverlayProps {
   caption?: string;
   hashtags?: string[];
   location?: string;
+  viewCount?: number;
   isLive?: boolean;
   onUsernameClick?: () => void;
   onHashtagClick?: (hashtag: string) => void;
@@ -35,6 +36,7 @@ export function WatchCaptionOverlay({
   caption = '',
   hashtags = [],
   location,
+  viewCount = 0,
   isLive = false,
   onUsernameClick,
   onHashtagClick,
@@ -42,6 +44,12 @@ export function WatchCaptionOverlay({
   className = '',
 }: WatchCaptionOverlayProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  
+  const formatCount = (count: number): string => {
+    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+    return count.toString();
+  };
 
   const shouldTruncate = caption.length > MAX_CAPTION_LENGTH;
   const displayCaption = isExpanded || !shouldTruncate
@@ -59,14 +67,22 @@ export function WatchCaptionOverlay({
         </div>
       )}
       
-      {/* Display Name */}
-      <button
-        type="button"
-        onClick={onUsernameClick}
-        className="watch-caption-username"
-      >
-        {displayName || username}
-      </button>
+      {/* Display Name + View Count */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onUsernameClick}
+          className="watch-caption-username"
+        >
+          {displayName || username}
+        </button>
+        {viewCount > 0 && (
+          <span className="flex items-center gap-1 text-white/70 text-sm">
+            <Eye className="w-4 h-4" />
+            {formatCount(viewCount)}
+          </span>
+        )}
+      </div>
 
       {/* Title */}
       {title && (
