@@ -37,7 +37,14 @@ export default function PostMedia({
   return (
     <div className={`w-full ${className}`} onClick={onClick}>
       {isVideo ? (
-        <video src={mediaUrl} controls className="w-full h-auto block" />
+        <video 
+          src={mediaUrl} 
+          controls 
+          playsInline
+          muted
+          preload="metadata"
+          className="w-full h-auto block" 
+        />
       ) : (
         <img src={mediaUrl} alt={alt || 'Post media'} className="w-full h-auto block" />
       )}
