@@ -38,6 +38,8 @@ export interface WatchItemData {
 
 interface WatchContentItemProps {
   item: WatchItemData;
+  globalMuted?: boolean;
+  onMuteToggle?: () => void;
   onAvatarClick?: () => void;
   onFollowClick?: () => void;
   onLikeClick?: () => void;
@@ -62,6 +64,8 @@ interface WatchContentItemProps {
  */
 export function WatchContentItem({
   item,
+  globalMuted = true,
+  onMuteToggle,
   onAvatarClick,
   onFollowClick,
   onLikeClick,
@@ -104,7 +108,6 @@ export function WatchContentItem({
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
   
   // Detect if media is video based on URL (same logic as feed)
   const isVideo = !!mediaUrl && /(\.mp4|\.webm|\.mov|\.m4v)(\?|$)/i.test(mediaUrl);
@@ -125,6 +128,17 @@ export function WatchContentItem({
     return () => observer.disconnect();
   }, []);
 
+  // Play/pause video based on visibility - stops audio when scrolling away
+  useEffect(() => {
+    if (!videoRef.current || !isVideo) return;
+    
+    if (isVisible) {
+      videoRef.current.play().catch(() => {});
+    } else {
+      videoRef.current.pause();
+    }
+  }, [isVisible, isVideo]);
+
   // Track view when visible
   const postId = (item as any).postId || item.id;
   const itemType = isVideo ? 'video' : isLive ? 'live' : 'photo';
@@ -143,8 +157,8 @@ export function WatchContentItem({
                 className="w-full h-full object-cover"
                 loop
                 playsInline
-                muted={isMuted}
-                autoPlay
+                muted={globalMuted}
+                autoPlay={false}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -159,11 +173,11 @@ export function WatchContentItem({
               {/* Volume Toggle Button - Top Right */}
               <button
                 type="button"
-                onClick={() => setIsMuted(!isMuted)}
+                onClick={onMuteToggle}
                 className="absolute top-16 right-4 z-20 p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
-                aria-label={isMuted ? 'Unmute' : 'Mute'}
+                aria-label={globalMuted ? 'Unmute' : 'Mute'}
               >
-                {isMuted ? (
+                {globalMuted ? (
                   <VolumeX className="w-5 h-5 text-white" />
                 ) : (
                   <Volume2 className="w-5 h-5 text-white" />

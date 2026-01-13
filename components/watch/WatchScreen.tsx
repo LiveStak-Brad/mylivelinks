@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { WatchTabSelector } from './WatchTabSelector';
 import { WatchModeIndicator } from './WatchModeIndicator';
 import { WatchContentItem, type WatchItemData } from './WatchContentItem';
@@ -58,6 +58,8 @@ export function WatchScreen({
 }: WatchScreenProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentIndexRef = useRef(0);
+  // Global mute state - persists across all videos in the feed
+  const [globalMuted, setGlobalMuted] = useState(true);
 
   // Watch renders INSIDE the app shell - header and bottom nav remain visible
   // Content area accounts for header (top) and bottom nav (bottom) spacing
@@ -153,6 +155,8 @@ export function WatchScreen({
             <WatchContentItem
               key={item.id}
               item={item}
+              globalMuted={globalMuted}
+              onMuteToggle={() => setGlobalMuted(!globalMuted)}
               onAvatarClick={() => onProfileClick?.(item.username)}
               onFollowClick={() => onFollow?.(item.id)}
               onLikeClick={() => {
