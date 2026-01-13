@@ -318,8 +318,13 @@ export default function MessagesScreen() {
       avatarUrl: f.avatar_url ?? null,
     }));
 
+    // Deduplicate by ID to prevent duplicate key warnings
+    const uniqueList = list.filter((friend, index, self) => 
+      index === self.findIndex(f => f.id === friend.id)
+    );
+
     // Keep the existing feel: live first, then online, then alphabetical.
-    list.sort((a, b) => {
+    uniqueList.sort((a, b) => {
       if (Boolean(a.isLive) && !Boolean(b.isLive)) return -1;
       if (!Boolean(a.isLive) && Boolean(b.isLive)) return 1;
       if (Boolean(a.isOnline) && !Boolean(b.isOnline)) return -1;
@@ -327,7 +332,7 @@ export default function MessagesScreen() {
       return a.displayName.localeCompare(b.displayName);
     });
 
-    setFriends(list);
+    setFriends(uniqueList);
   }, [user?.id]);
 
   const loadInbox = useCallback(async () => {

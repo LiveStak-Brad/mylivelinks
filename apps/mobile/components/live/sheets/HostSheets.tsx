@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { DEFAULT_HOST_CAMERA_FILTERS, type HostCameraFilters } from '../../../lib/hostCameraFilters';
@@ -11,6 +12,8 @@ interface BaseSheetProps {
 }
 
 function SheetContainer({ visible, onClose, title, children }: BaseSheetProps & { title: string; children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  
   return (
     <Modal
       visible={visible}
@@ -20,7 +23,7 @@ function SheetContainer({ visible, onClose, title, children }: BaseSheetProps & 
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
@@ -920,7 +923,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A2E',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingBottom: 34,
     maxHeight: '70%',
   },
   handle: {

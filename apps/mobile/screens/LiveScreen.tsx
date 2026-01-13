@@ -204,7 +204,7 @@ export default function LiveScreen() {
         </View>
 
         {/* Top overlay */}
-        <View style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}>
+        <View style={[styles.topOverlay, { paddingTop: insets.top + 12 }]}>
           <View style={styles.topRow}>
             {/* Stream info */}
             <View style={styles.hostCard}>

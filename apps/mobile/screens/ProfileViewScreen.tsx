@@ -7,53 +7,14 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/useTheme';
 import { supabase } from '../lib/supabase';
+import { ProfileData } from '../types/profile';
+import { getEnabledSections, isSectionEnabled } from '../config/profileTypeConfig';
 
 const API_BASE_URL = 'https://www.mylivelinks.com';
 
 type ProfileViewRouteParams = {
   profileId?: string;
   username?: string;
-};
-
-type ProfileData = {
-  profile: {
-    id: string;
-    username: string;
-    display_name?: string;
-    avatar_url?: string;
-    bio?: string;
-    is_live: boolean;
-    follower_count: number;
-    profile_type?: string;
-    location_city?: string;
-    location_region?: string;
-    location_label?: string;
-    location_hidden?: boolean;
-  };
-  follower_count: number;
-  following_count: number;
-  friends_count: number;
-  relationship: 'none' | 'following' | 'followed_by' | 'friends';
-  links: Array<{
-    id: number;
-    title: string;
-    url: string;
-    icon?: string;
-  }>;
-  top_supporters: Array<{
-    id: string;
-    username: string;
-    display_name?: string;
-    avatar_url?: string;
-    total_gifted: number;
-  }>;
-  stream_stats: {
-    total_streams: number;
-    total_minutes_live: number;
-    total_viewers: number;
-    peak_viewers: number;
-    diamonds_earned_lifetime: number;
-  };
 };
 
 export default function ProfileViewScreen() {

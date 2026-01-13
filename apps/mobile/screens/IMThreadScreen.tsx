@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
@@ -26,7 +27,7 @@ type ImRow = {
 
 type DecodedIm =
   | { type: 'text'; text: string }
-  | { type: 'gift'; label: string }
+  | { type: 'gift'; giftName?: string; giftCoins?: number; giftIcon?: string }
   | { type: 'image'; url?: string; width?: number; height?: number };
 
 function decodeImContent(content: string): DecodedIm {
@@ -45,7 +46,20 @@ function decodeImContent(content: string): DecodedIm {
       return { type: 'text', text: 'Photo' };
     }
   }
-  if (content.startsWith('__gift__:')) return { type: 'gift', label: 'Gift' };
+  if (content.startsWith('__gift__:')) {
+    try {
+      const raw = content.slice('__gift__:'.length);
+      const parsed = JSON.parse(raw);
+      return {
+        type: 'gift',
+        giftName: typeof parsed?.giftName === 'string' ? parsed.giftName : undefined,
+        giftCoins: typeof parsed?.giftCoins === 'number' ? parsed.giftCoins : undefined,
+        giftIcon: typeof parsed?.giftIcon === 'string' ? parsed.giftIcon : undefined,
+      };
+    } catch {
+      return { type: 'gift', giftName: 'Gift' };
+    }
+  }
   return { type: 'text', text: content };
 }
 
@@ -62,6 +76,8 @@ export default function IMThreadScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [composerText, setComposerText] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
   const listRef = useRef<FlatList>(null);
 
   const myId = user?.id ?? null;
@@ -106,7 +122,11 @@ export default function IMThreadScreen() {
     }
 
     const rows = (((data as any) ?? []) as ImRow[]).slice().reverse();
-    setMessages(rows);
+    // Deduplicate by ID to prevent duplicate key warnings
+    const uniqueRows = rows.filter((row, index, self) => 
+      index === self.findIndex(r => String(r.id) === String(row.id))
+    );
+    setMessages(uniqueRows);
     setLoading(false);
 
     // Mark unread messages from the other user as read.
@@ -148,6 +168,11 @@ export default function IMThreadScreen() {
           if (!isThisThread) return;
 
           setMessages((prev) => {
+            // Deduplicate: check if message already exists
+            const rowId = String((row as ImRow).id);
+            if (prev.some(m => String(m.id) === rowId)) {
+              return prev;
+            }
             const next = [...prev, row as ImRow];
             next.sort((a, b) => Date.parse(String(a.created_at)) - Date.parse(String(b.created_at)));
             return next.slice(-200);
@@ -166,9 +191,11 @@ export default function IMThreadScreen() {
     if (!myId || !otherProfileId) return;
     const text = composerText.trim();
     if (!text) return;
+    if (isSending) return;
 
     setComposerText('');
     setError(null);
+    setIsSending(true);
 
     const tempId = `temp-${Date.now()}`;
     const nowIso = new Date().toISOString();
@@ -194,6 +221,8 @@ export default function IMThreadScreen() {
       .select('*')
       .single();
 
+    setIsSending(false);
+
     if (insertError) {
       console.error('[im] send error:', insertError.message);
       setError(insertError.message);
@@ -202,7 +231,190 @@ export default function IMThreadScreen() {
     }
 
     setMessages((prev) => prev.map((m) => (String(m.id) === tempId ? ((data as any) as ImRow) : m)));
-  }, [composerText, myId, otherProfileId]);
+  }, [composerText, isSending, myId, otherProfileId]);
+
+  const pickAndSendImage = useCallback(async () => {
+    if (!myId || !otherProfileId) return;
+    if (isSending) return;
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library to send images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      base64: false,
+    });
+
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+    if (!asset?.uri) return;
+
+    setIsSending(true);
+    setError(null);
+
+    const tempId = `temp-img-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    const optimistic: ImRow = {
+      id: tempId,
+      sender_id: myId,
+      recipient_id: otherProfileId,
+      content: `__img__:${JSON.stringify({ url: asset.uri })}`,
+      created_at: nowIso,
+      read_at: null,
+    };
+
+    setMessages((prev) => [...prev, optimistic]);
+
+    try {
+      const filename = asset.uri.split('/').pop() || 'image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        name: filename,
+        type,
+      } as any);
+
+      const uploadRes = await fetch('/api/messages/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mimeType: type, otherProfileId }),
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData?.error || 'Failed to prepare upload');
+      }
+
+      const bucket = String(uploadData?.bucket || '');
+      const path = String(uploadData?.path || '');
+      const token = String(uploadData?.token || '');
+      const publicUrl = String(uploadData?.publicUrl || '');
+
+      if (!bucket || !path || !token || !publicUrl) {
+        throw new Error('Upload response missing required fields');
+      }
+
+      const file = await fetch(asset.uri);
+      const blob = await file.blob();
+
+      const { error: uploadErr } = await supabase.storage.from(bucket).uploadToSignedUrl(path, token, blob, {
+        contentType: type,
+      });
+
+      if (uploadErr) throw uploadErr;
+
+      const content = `__img__:${JSON.stringify({
+        url: publicUrl,
+        mime: type,
+        width: asset.width,
+        height: asset.height,
+      })}`;
+
+      const { data, error: insertError } = await supabase
+        .from('instant_messages')
+        .insert({
+          sender_id: myId,
+          recipient_id: otherProfileId,
+          content,
+        })
+        .select('*')
+        .single();
+
+      if (insertError) throw insertError;
+
+      setMessages((prev) => prev.map((m) => (String(m.id) === tempId ? ((data as any) as ImRow) : m)));
+    } catch (err: any) {
+      console.error('[im] send image error:', err);
+      setError(err?.message || 'Failed to send image');
+      setMessages((prev) => prev.filter((m) => String(m.id) !== tempId));
+    } finally {
+      setIsSending(false);
+    }
+  }, [isSending, myId, otherProfileId]);
+
+  const sendGift = useCallback(async (giftId: number, giftName: string, giftCoins: number, giftIcon?: string) => {
+    if (!myId || !otherProfileId) return;
+    if (isSending) return;
+
+    setIsSending(true);
+    setError(null);
+    setShowGiftModal(false);
+
+    const tempId = `temp-gift-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    const requestId = `${myId}-${Date.now()}`;
+
+    const optimistic: ImRow = {
+      id: tempId,
+      sender_id: myId,
+      recipient_id: otherProfileId,
+      content: `__gift__:${JSON.stringify({ giftId, giftName, giftCoins, giftIcon })}`,
+      created_at: nowIso,
+      read_at: null,
+    };
+
+    setMessages((prev) => [...prev, optimistic]);
+
+    try {
+      const response = await fetch('/api/gifts/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toUserId: otherProfileId,
+          coinsAmount: giftCoins,
+          giftTypeId: giftId,
+          context: 'dm',
+          requestId,
+        }),
+      });
+
+      const raw = await response.text();
+      let data: any = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        const errMsg =
+          (data && typeof data?.error === 'string' && data.error.length ? data.error : null) ||
+          (raw && raw.length ? raw : null) ||
+          'Failed to send gift';
+        throw new Error(errMsg);
+      }
+
+      const giftContent = `__gift__:${JSON.stringify({ giftId, giftName, giftCoins, giftIcon })}`;
+      const { data: imRow, error: imErr } = await supabase
+        .from('instant_messages')
+        .insert({
+          sender_id: myId,
+          recipient_id: otherProfileId,
+          content: giftContent,
+        })
+        .select('*')
+        .single();
+
+      if (imErr) throw imErr;
+
+      setMessages((prev) => prev.map((m) => (String(m.id) === tempId ? ((imRow as any) as ImRow) : m)));
+    } catch (err: any) {
+      console.error('[im] send gift error:', err);
+      setError(err?.message || 'Failed to send gift');
+      setMessages((prev) => prev.filter((m) => String(m.id) !== tempId));
+    } finally {
+      setIsSending(false);
+    }
+  }, [isSending, myId, otherProfileId]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -251,10 +463,20 @@ export default function IMThreadScreen() {
                     />
                     <View pointerEvents="none" style={styles.imageBubbleOverlay} />
                   </Pressable>
+                ) : decoded.type === 'gift' ? (
+                  <View style={[styles.giftBubble, mine ? styles.giftBubbleMine : styles.giftBubbleTheirs]}>
+                    <Text style={styles.giftEmoji}>🎁</Text>
+                    <View style={styles.giftTextWrap}>
+                      <Text style={styles.giftLabel}>{decoded.giftName || 'Gift'}</Text>
+                      {decoded.giftCoins ? (
+                        <Text style={styles.giftCoins}>+{decoded.giftCoins} 💰</Text>
+                      ) : null}
+                    </View>
+                  </View>
                 ) : (
                   <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
                     <Text style={[styles.bubbleText, mine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
-                      {decoded.type === 'text' ? decoded.text : decoded.label}
+                      {decoded.text}
                     </Text>
                   </View>
                 )}
@@ -264,6 +486,24 @@ export default function IMThreadScreen() {
         />
 
         <View style={styles.composer}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Send gift"
+            onPress={() => setShowGiftModal(true)}
+            disabled={isSending}
+            style={({ pressed }) => [styles.composerIconBtn, pressed && styles.composerIconBtnPressed, isSending && styles.composerIconBtnDisabled]}
+          >
+            <Feather name="gift" size={20} color={isSending ? stylesVars.mutedText : stylesVars.primary} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Send photo"
+            onPress={pickAndSendImage}
+            disabled={isSending}
+            style={({ pressed }) => [styles.composerIconBtn, pressed && styles.composerIconBtnPressed, isSending && styles.composerIconBtnDisabled]}
+          >
+            <Feather name="image" size={20} color={isSending ? stylesVars.mutedText : stylesVars.primary} />
+          </Pressable>
           <TextInput
             value={composerText}
             onChangeText={setComposerText}
@@ -271,11 +511,31 @@ export default function IMThreadScreen() {
             placeholderTextColor={stylesVars.mutedText}
             style={styles.composerInput}
             multiline
+            editable={!isSending}
           />
-          <Pressable accessibilityRole="button" onPress={send} style={({ pressed }) => [styles.sendBtn, pressed && styles.sendBtnPressed]}>
-            <Feather name="send" size={16} color="#FFFFFF" />
+          <Pressable
+            accessibilityRole="button"
+            onPress={send}
+            disabled={!composerText.trim() || isSending}
+            style={({ pressed }) => [styles.sendBtn, pressed && styles.sendBtnPressed, (!composerText.trim() || isSending) && styles.sendBtnDisabled]}
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Feather name="send" size={16} color="#FFFFFF" />
+            )}
           </Pressable>
         </View>
+
+        {showGiftModal && (
+          <GiftModalMini
+            visible={showGiftModal}
+            onClose={() => setShowGiftModal(false)}
+            onSendGift={sendGift}
+            recipientName={title}
+            stylesVars={stylesVars}
+          />
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -436,6 +696,184 @@ function createStyles(stylesVars: StylesVars) {
   sendBtnPressed: {
     opacity: 0.92,
   },
+  sendBtnDisabled: {
+    opacity: 0.4,
+  },
+  composerIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerIconBtnPressed: {
+    opacity: 0.7,
+  },
+  composerIconBtnDisabled: {
+    opacity: 0.4,
+  },
+  giftBubble: {
+    maxWidth: '82%',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FCD34D',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  giftBubbleMine: {
+    borderTopRightRadius: 6,
+  },
+  giftBubbleTheirs: {
+    borderTopLeftRadius: 6,
+  },
+  giftEmoji: {
+    fontSize: 28,
+  },
+  giftTextWrap: {
+    flex: 1,
+  },
+  giftLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#78350F',
+  },
+  giftCoins: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+    marginTop: 2,
+  },
   });
+}
+
+type GiftModalMiniProps = {
+  visible: boolean;
+  onClose: () => void;
+  onSendGift: (giftId: number, giftName: string, giftCoins: number, giftIcon?: string) => void;
+  recipientName: string;
+  stylesVars: StylesVars;
+};
+
+function GiftModalMini({ visible, onClose, onSendGift, recipientName, stylesVars }: GiftModalMiniProps) {
+  const GIFTS = [
+    { id: 1, name: 'Rose', coins: 10, emoji: '🌹' },
+    { id: 2, name: 'Heart', coins: 25, emoji: '❤️' },
+    { id: 3, name: 'Star', coins: 50, emoji: '⭐' },
+    { id: 4, name: 'Diamond', coins: 100, emoji: '💎' },
+    { id: 5, name: 'Crown', coins: 250, emoji: '👑' },
+    { id: 6, name: 'Fire', coins: 500, emoji: '🔥' },
+  ];
+
+  if (!visible) return null;
+
+  const modalStyles = StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'flex-end',
+    },
+    modal: {
+      backgroundColor: stylesVars.bg,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      paddingTop: 20,
+      paddingBottom: 40,
+      paddingHorizontal: 16,
+      maxHeight: '70%',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: stylesVars.text,
+    },
+    subtitle: {
+      fontSize: 13,
+      color: stylesVars.mutedText,
+      marginTop: 2,
+    },
+    closeBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: stylesVars.mutedBg,
+    },
+    grid: {
+      gap: 12,
+    },
+    giftCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: stylesVars.border,
+      backgroundColor: stylesVars.mutedBg,
+      gap: 12,
+    },
+    giftCardPressed: {
+      opacity: 0.7,
+    },
+    giftCardEmoji: {
+      fontSize: 32,
+    },
+    giftCardInfo: {
+      flex: 1,
+    },
+    giftCardName: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: stylesVars.text,
+    },
+    giftCardCoins: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: stylesVars.primary,
+      marginTop: 2,
+    },
+  });
+
+  return (
+    <Pressable style={modalStyles.overlay} onPress={onClose}>
+      <Pressable style={modalStyles.modal} onPress={(e) => e.stopPropagation()}>
+        <View style={modalStyles.header}>
+          <View>
+            <Text style={modalStyles.title}>Send a Gift</Text>
+            <Text style={modalStyles.subtitle}>to {recipientName}</Text>
+          </View>
+          <Pressable accessibilityRole="button" onPress={onClose} style={modalStyles.closeBtn}>
+            <Feather name="x" size={18} color={stylesVars.text} />
+          </Pressable>
+        </View>
+        <View style={modalStyles.grid}>
+          {GIFTS.map((gift) => (
+            <Pressable
+              key={gift.id}
+              accessibilityRole="button"
+              onPress={() => onSendGift(gift.id, gift.name, gift.coins, gift.emoji)}
+              style={({ pressed }) => [modalStyles.giftCard, pressed && modalStyles.giftCardPressed]}
+            >
+              <Text style={modalStyles.giftCardEmoji}>{gift.emoji}</Text>
+              <View style={modalStyles.giftCardInfo}>
+                <Text style={modalStyles.giftCardName}>{gift.name}</Text>
+                <Text style={modalStyles.giftCardCoins}>{gift.coins} 💰 coins</Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      </Pressable>
+    </Pressable>
+  );
 }
 

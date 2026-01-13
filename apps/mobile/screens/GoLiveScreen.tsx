@@ -972,7 +972,7 @@ export default function GoLiveScreen() {
 
         {/* Permissions Banner */}
         {needsPermissions && !isLive && (
-          <View style={[styles.permissionsBanner, { top: insets.top + 60 }]}>
+          <View style={[styles.permissionsBanner, { top: insets.top + 64 }]}>
             <View style={styles.permissionsContent}>
               <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.warning} />
               <View style={styles.permissionsText}>
@@ -997,7 +997,7 @@ export default function GoLiveScreen() {
 
       {/* Top Controls - Only show when NOT live (overlay has its own) */}
       {!isLive && (
-        <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+        <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
           <Pressable
             onPress={handleClose}
             style={({ pressed }) => [styles.topButton, pressed && styles.topButtonPressed]}

@@ -57,7 +57,7 @@ export default function MediaViewer({ kind, url, onRequestClose }: MediaViewerPr
           accessibilityRole="button"
           accessibilityLabel="Close media viewer"
           onPress={onRequestClose}
-          style={[styles.closeBtn, { top: insets.top + 8, right: 14 }]}
+          style={[styles.closeBtn, { top: insets.top + 12, right: 14 }]}
           hitSlop={12}
         >
           <Feather name="x" size={22} color="#FFFFFF" />
@@ -76,7 +76,7 @@ export default function MediaViewer({ kind, url, onRequestClose }: MediaViewerPr
         accessibilityRole="button"
         accessibilityLabel="Close media viewer"
         onPress={onRequestClose}
-        style={[styles.closeBtn, { top: insets.top + 8, right: 14 }]}
+        style={[styles.closeBtn, { top: insets.top + 12, right: 14 }]}
         hitSlop={12}
       >
         <Feather name="x" size={22} color="#FFFFFF" />

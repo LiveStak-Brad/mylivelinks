@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
 import { darkPalette, lightPalette } from '../theme/colors';
@@ -30,6 +30,7 @@ export default function SlideMenu({
   onRequestClose: () => void;
 }) {
   const { mode, colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const translate = useRef(new Animated.Value(0)).current;
   const panelWidth = 300;
 
@@ -65,10 +66,17 @@ export default function SlideMenu({
             styles.panel,
             { backgroundColor: colors.surface, borderColor: colors.border },
             side === 'left' ? styles.panelLeft : styles.panelRight,
-            { width: panelWidth, transform: [{ translateX: translate }] },
+            { 
+              width: panelWidth, 
+              transform: [{ translateX: translate }],
+              paddingTop: insets.top,
+              paddingBottom: insets.bottom,
+              paddingLeft: side === 'left' ? insets.left : 0,
+              paddingRight: side === 'right' ? insets.right : 0,
+            },
           ]}
         >
-          <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
+          <View style={styles.safeArea}>
             {title ? <Text style={[styles.title, { color: colors.text }]}>{title}</Text> : null}
 
             <View style={styles.list}>
@@ -121,7 +129,7 @@ export default function SlideMenu({
                 );
               })}
             </View>
-          </SafeAreaView>
+          </View>
         </Animated.View>
       </View>
     </Modal>
@@ -153,12 +161,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop: 10,
   },
   title: {
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingTop: 16,
+    paddingBottom: 12,
     fontSize: 16,
     fontWeight: '900',
   },

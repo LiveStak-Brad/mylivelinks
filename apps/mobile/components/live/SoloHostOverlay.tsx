@@ -167,7 +167,7 @@ export default function SoloHostOverlay({
       {showFilters && <View style={styles.bottomGradientWhileFiltering} pointerEvents="none" />}
 
       {/* C. Top Bar - Web parity: Left (avatar+name), Right (viewer near X, then X) */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
         {/* Left: Host info bubble */}
         <View style={styles.hostInfo}>
           <View style={styles.hostBubble}>
@@ -254,7 +254,7 @@ export default function SoloHostOverlay({
       </View>
 
       {/* D. Second Row: Top Gifters + Share */}
-      <View style={[styles.secondRow, { top: insets.top + 56 }]}>
+      <View style={[styles.secondRow, { top: insets.top + 60 }]}>
         {/* Top gifters + Share */}
         <View style={styles.secondRowRight}>
           <TopGifterBubbles
