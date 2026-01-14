@@ -1,18 +1,33 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
+import { supabase } from '../lib/supabase';
+
+type SignupRouteParams = {
+  SignupScreen: {
+    ref?: string;
+    click_id?: string;
+  };
+};
 
 export default function SignupScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<RouteProp<SignupRouteParams, 'SignupScreen'>>();
   const { signUp } = useAuth();
   const { mode, colors } = useTheme();
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  const referralCode = route.params?.ref?.trim() || '';
+  const referralClickId = route.params?.click_id?.trim() || '';
 
   const themed = useMemo(
     () => ({
@@ -34,8 +49,30 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     const trimmedEmail = email.trim();
+    const trimmedUsername = username.trim().toLowerCase();
+
+    if (!trimmedUsername) {
+      setError('Username is required.');
+      return;
+    }
+    if (trimmedUsername.length < 4) {
+      setError('Username must be at least 4 characters.');
+      return;
+    }
+    if (!/^[a-z0-9_]+$/.test(trimmedUsername)) {
+      setError('Username can only contain letters, numbers, and underscores.');
+      return;
+    }
     if (!trimmedEmail || !password) {
       setError('Please enter an email and password.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
 
@@ -43,14 +80,56 @@ export default function SignupScreen() {
     setError(null);
     setMessage(null);
 
-    const result = await signUp(trimmedEmail, password);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      setMessage('Account created. You may need to confirm your email before signing in.');
-    }
+    try {
+      const result = await signUp(trimmedEmail, password);
+      if (result.error) {
+        setError(result.error);
+        setSubmitting(false);
+        return;
+      }
 
-    setSubmitting(false);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          username: trimmedUsername,
+          display_name: username.trim(),
+          coin_balance: 0,
+          earnings_balance: 0,
+          gifter_level: 0,
+        });
+
+        if (profileError) {
+          if (profileError.code === '23505') {
+            setError(`Username "${trimmedUsername}" is already taken.`);
+            setSubmitting(false);
+            return;
+          }
+          console.error('Profile creation error:', profileError);
+        }
+
+        if (referralCode) {
+          try {
+            await supabase.rpc('claim_referral', {
+              p_code: referralCode,
+              p_click_id: referralClickId || null,
+              p_device_id: null,
+            });
+          } catch (claimErr) {
+            console.warn('[referrals] claim_referral failed (non-blocking):', claimErr);
+          }
+        }
+      }
+
+      setMessage('Account created! Redirecting to complete your profile...');
+      setTimeout(() => {
+        navigation.navigate('OnboardingScreen');
+      }, 1000);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred during signup.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -82,17 +161,24 @@ export default function SignupScreen() {
 
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: themed.text }]}>Name</Text>
+              <Text style={[styles.label, { color: themed.text }]}>Username</Text>
               <TextInput
                 style={[styles.input, { backgroundColor: themed.surface, borderColor: themed.border, color: themed.text }]}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter your name"
+                value={username}
+                onChangeText={(t) => {
+                  setUsername(t.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+                  setError(null);
+                }}
+                placeholder="username"
                 placeholderTextColor={themed.subtleText}
-                autoCapitalize="words"
+                autoCapitalize="none"
                 autoCorrect={false}
+                maxLength={20}
                 editable={!submitting}
               />
+              <Text style={[styles.hint, { color: themed.mutedText }]}>
+                Letters, numbers, and underscores only (4-20 characters)
+              </Text>
             </View>
 
             <View style={styles.inputGroup}>
@@ -122,7 +208,25 @@ export default function SignupScreen() {
                   setPassword(t);
                   setError(null);
                 }}
-                placeholder="Enter your password"
+                placeholder="Minimum 6 characters"
+                placeholderTextColor={themed.subtleText}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!submitting}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: themed.text }]}>Confirm Password</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: themed.surface, borderColor: themed.border, color: themed.text }]}
+                value={confirmPassword}
+                onChangeText={(t) => {
+                  setConfirmPassword(t);
+                  setError(null);
+                }}
+                placeholder="Re-enter your password"
                 placeholderTextColor={themed.subtleText}
                 secureTextEntry
                 autoCapitalize="none"
@@ -228,6 +332,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     color: '#fff',
+  },
+  hint: {
+    fontSize: 12,
+    marginTop: 4,
   },
   signupButton: {
     backgroundColor: '#007AFF',
