@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Gift, Pause, Play, SkipBack, SkipForward, Video as VideoIcon } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronDown, ExternalLink, Gift, Pause, Play, SkipBack, SkipForward, Video as VideoIcon } from 'lucide-react';
 import GiftModal from '@/components/GiftModal';
 
 export type VideoPlaylistSourceType = 'upload' | 'youtube';
@@ -31,6 +32,8 @@ type Props = {
   artistProfileId?: string;
   /** Username of the artist (for gifting) */
   artistUsername?: string;
+  /** Optional function to build canonical URL for an item */
+  itemLinkBuilder?: (item: VideoPlaylistItem) => string | null;
 };
 
 declare global {
@@ -101,6 +104,7 @@ export default function VideoPlaylistPlayer({
   emptyOwnerCTA,
   artistProfileId,
   artistUsername,
+  itemLinkBuilder,
 }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -457,6 +461,21 @@ export default function VideoPlaylistPlayer({
               <Gift className="w-5 h-5 text-white" />
             </button>
           )}
+
+          {/* View full page link */}
+          {current && itemLinkBuilder && (() => {
+            const href = itemLinkBuilder(current);
+            if (!href) return null;
+            return (
+              <Link
+                href={href}
+                className="w-10 h-10 rounded-full bg-white dark:bg-gray-900 border border-purple-200/60 dark:border-purple-700/30 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                title="Open full page"
+              >
+                <ExternalLink className="w-4 h-4 text-gray-900 dark:text-white" />
+              </Link>
+            );
+          })()}
         </div>
       </div>
 

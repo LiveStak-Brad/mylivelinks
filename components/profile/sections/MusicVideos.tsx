@@ -12,10 +12,11 @@
 
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
 import { uploadProfileMedia } from '@/lib/storage';
 import VideoPlaylistPlayer, { type VideoPlaylistItem } from './VideoPlaylistPlayer';
+import { useCreatorStudioItems, type CreatorStudioItem } from '@/hooks/useCreatorStudioItems';
 
 type VideoType = 'upload' | 'youtube';
 
@@ -78,6 +79,15 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<MusicVideoRow[]>([]);
+  
+  // Also fetch Creator Studio music_video items
+  const { items: creatorStudioItems, loading: csLoading } = useCreatorStudioItems({
+    profileId,
+    itemType: 'music_video',
+  });
+  
+  // Track which items came from Creator Studio (by ID) for link building
+  const creatorStudioIds = useMemo(() => new Set(creatorStudioItems.map(i => i.id)), [creatorStudioItems]);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // modal state
@@ -147,19 +157,63 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
   }, [profileId]);
 
   const active = rows.find((r) => r.id === activeId) ?? rows[0] ?? null;
-  const hasAny = rows.length > 0;
-
-  const playlistItems: VideoPlaylistItem[] = rows.map((r) => ({
+  
+  // Convert Creator Studio items to playlist format
+  const csPlaylistItems: VideoPlaylistItem[] = creatorStudioItems.map((item) => ({
+    id: item.id,
+    title: item.title,
+    video_type: item.media_url?.includes('youtube') ? 'youtube' as const : 'upload' as const,
+    video_url: item.media_url || '',
+    youtube_id: item.media_url?.includes('youtube') ? extractYoutubeId(item.media_url) : null,
+  }));
+  
+  // Convert legacy items to playlist format
+  const legacyPlaylistItems: VideoPlaylistItem[] = rows.map((r) => ({
     id: r.id,
     title: r.title,
     video_type: r.video_type,
     video_url: r.video_url,
     youtube_id: r.youtube_id,
   }));
+  
+  // Combine: Creator Studio first, then legacy (dedupe by title to avoid duplicates)
+  const seenTitles = new Set<string>();
+  const playlistItems: VideoPlaylistItem[] = [];
+  
+  for (const item of csPlaylistItems) {
+    if (!seenTitles.has(item.title.toLowerCase())) {
+      playlistItems.push(item);
+      seenTitles.add(item.title.toLowerCase());
+    }
+  }
+  for (const item of legacyPlaylistItems) {
+    if (!seenTitles.has(item.title.toLowerCase())) {
+      playlistItems.push(item);
+      seenTitles.add(item.title.toLowerCase());
+    }
+  }
+  
+  const hasAny = playlistItems.length > 0;
+  
+  // Link builder for canonical routes (only for Creator Studio items)
+  const itemLinkBuilder = useCallback((item: VideoPlaylistItem): string | null => {
+    if (!artistUsername) return null;
+    // Only Creator Studio items have canonical routes
+    if (creatorStudioIds.has(item.id)) {
+      return `/${artistUsername}/music-video/${item.id}`;
+    }
+    return null;
+  }, [artistUsername, creatorStudioIds]);
+
+  // Helper to extract YouTube ID
+  function extractYoutubeId(url: string): string | null {
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([^?&/]+)/i);
+    return match?.[1] || null;
+  }
 
   return (
     <>
-      {loading ? (
+      {(loading || csLoading) ? (
         <div
           className={`backdrop-blur-sm ${borderRadiusClass} p-6 border border-gray-200/50 dark:border-gray-700/50 shadow-lg mb-6`}
           style={cardStyle}
@@ -173,10 +227,17 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
           isOwner={isOwner}
           onAdd={openAdd}
           onEdit={(it) => {
+            // Only allow editing legacy items (not Creator Studio items)
+            if (creatorStudioIds.has(it.id)) return;
             const row = rows.find((r) => r.id === it.id);
             if (row) openEdit(row);
           }}
           onDelete={async (it) => {
+            // Only allow deleting legacy items (not Creator Studio items)
+            if (creatorStudioIds.has(it.id)) {
+              alert('To delete Creator Studio items, use the Creator Studio dashboard.');
+              return;
+            }
             if (!confirm('Delete this video?')) return;
             try {
               const { error } = await supabase.rpc('delete_music_video', { p_id: it.id });
@@ -194,6 +255,7 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
           emptyOwnerCTA="+ Add Video"
           artistProfileId={profileId}
           artistUsername={artistUsername}
+          itemLinkBuilder={itemLinkBuilder}
         />
       )}
 

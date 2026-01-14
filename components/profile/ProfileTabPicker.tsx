@@ -62,6 +62,28 @@ const OPTIONAL_TABS: Record<string, TabMetadata> = {
     label: 'Products',
     description: 'Merchandise & portfolio',
   },
+  
+  // Creator Studio Content Tabs
+  podcasts: {
+    id: 'podcasts',
+    label: 'Podcasts',
+    description: 'Podcast episodes & shows',
+  },
+  movies: {
+    id: 'movies',
+    label: 'Movies',
+    description: 'Films & long-form content',
+  },
+  series: {
+    id: 'series',
+    label: 'Series',
+    description: 'Episodic content & shows',
+  },
+  education: {
+    id: 'education',
+    label: 'Education',
+    description: 'Tutorials & courses',
+  },
 };
 
 // ============================================================================

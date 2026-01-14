@@ -19,6 +19,9 @@ import MusicTab from '../components/profile/tabs/MusicTab';
 import EventsTab from '../components/profile/tabs/EventsTab';
 import ProductsTab from '../components/profile/tabs/ProductsTab';
 import ReelsTab from '../components/profile/tabs/ReelsTab';
+import PodcastsTab from '../components/profile/tabs/PodcastsTab';
+import SeriesTab from '../components/profile/tabs/SeriesTab';
+import EducationTab from '../components/profile/tabs/EducationTab';
 import TopFriendsSection from '../components/profile/TopFriendsSection';
 import ReferralNetworkSection from '../components/profile/ReferralNetworkSection';
 import SocialMediaBar from '../components/profile/SocialMediaBar';
@@ -745,6 +748,12 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         <ProductsTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'reels' ? (
         <ReelsTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'podcasts' ? (
+        <PodcastsTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'series' ? (
+        <SeriesTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'education' ? (
+        <EducationTab profileId={profile.id} colors={stylesVars} />
       ) : null}
         </View>
       </ScrollView>

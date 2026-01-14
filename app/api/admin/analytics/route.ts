@@ -218,7 +218,8 @@ export async function GET(request: NextRequest) {
       const { data: allHolders, error } = await admin
         .from('profiles')
         .select('earnings_balance')
-        .gt('earnings_balance', 0);
+        .gt('earnings_balance', 0)
+        .limit(10000);
 
       if (!error && allHolders) {
         diamondsOutstanding = allHolders.reduce(

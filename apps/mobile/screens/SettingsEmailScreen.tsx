@@ -1,10 +1,46 @@
-﻿import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { showComingSoon } from '../lib/showComingSoon';
 import { Feather } from '@expo/vector-icons';
+import { supabase } from '../lib/supabase';
 
 export default function SettingsEmailScreen() {
+  const [newEmail, setNewEmail] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim());
+
+  const handleChangeEmail = useCallback(async () => {
+    if (!isValidEmail) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        email: newEmail.trim(),
+      });
+
+      if (updateError) throw updateError;
+
+      Alert.alert(
+        'Confirmation Sent',
+        'Please check your new email inbox and click the confirmation link to complete the change.',
+        [{ text: 'OK' }]
+      );
+      setNewEmail('');
+    } catch (err: any) {
+      console.error('[SettingsEmailScreen] Error:', err);
+      setError(err?.message || 'Failed to update email');
+    } finally {
+      setSaving(false);
+    }
+  }, [isValidEmail, newEmail]);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -31,21 +67,30 @@ export default function SettingsEmailScreen() {
                 spellCheck={false}
                 textContentType="emailAddress"
                 style={styles.input}
+                value={newEmail}
+                onChangeText={setNewEmail}
+                editable={!saving}
               />
               <Text style={styles.helper}>
-                We’ll send a confirmation link to the new address. The change completes after you confirm.
+                We'll send a confirmation link to the new address. The change completes after you confirm.
               </Text>
+              {error && <Text style={styles.errorText}>{error}</Text>}
             </View>
           </View>
 
-          {/* Action (UI only) */}
+          {/* Action */}
           <View style={styles.actionsRow}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => showComingSoon('Change email')}
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+              onPress={handleChangeEmail}
+              disabled={saving || !newEmail.trim()}
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed, (saving || !newEmail.trim()) && styles.buttonDisabled]}
             >
-              <Text style={styles.primaryButtonText}>Save</Text>
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Save</Text>
+              )}
             </Pressable>
           </View>
         </View>
@@ -158,5 +203,14 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.9,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '600',
   },
 });

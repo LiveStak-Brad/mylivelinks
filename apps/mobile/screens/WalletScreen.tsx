@@ -53,6 +53,15 @@ export default function WalletScreen() {
   // Cashout modal state
   const [cashoutModalVisible, setCashoutModalVisible] = useState(false);
 
+  // Diamond conversion state
+  const [conversionModalVisible, setConversionModalVisible] = useState(false);
+  const [diamondsToConvert, setDiamondsToConvert] = useState('');
+  const [converting, setConverting] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
+
+  const MIN_DIAMONDS = 2;
+  const CONVERSION_RATE = 0.6; // 60% (40% platform fee)
+
   // Transaction history state
   const [transactions, setTransactions] = useState<NormalizedTransaction[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
@@ -226,6 +235,63 @@ export default function WalletScreen() {
     } catch (err) {
       console.error('[wallet] Linking error:', err);
       Alert.alert('Error', 'Failed to open cashout page');
+    }
+  };
+
+  const calculateConversion = (diamonds: number) => {
+    if (diamonds < MIN_DIAMONDS) return { coins: 0, fee: 0, valid: false };
+    const coins = Math.floor(diamonds * CONVERSION_RATE);
+    const fee = diamonds - coins;
+    return { coins, fee, valid: coins >= 1 };
+  };
+
+  const handleConvertDiamonds = async () => {
+    const requestedDiamonds = parseInt(diamondsToConvert);
+    const diamonds = Math.min(requestedDiamonds, diamondBalance);
+
+    if (isNaN(requestedDiamonds) || requestedDiamonds < MIN_DIAMONDS) {
+      setConversionError(`Minimum ${MIN_DIAMONDS} diamonds required`);
+      return;
+    }
+
+    if (diamonds < MIN_DIAMONDS) {
+      setConversionError(`You only have ${diamondBalance} diamonds`);
+      return;
+    }
+
+    setConverting(true);
+    setConversionError(null);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/wallet/convert-diamonds`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({ diamonds }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Conversion failed');
+      }
+
+      const result = await response.json();
+      await fetchBalances();
+      setConversionModalVisible(false);
+      setDiamondsToConvert('');
+      Alert.alert('Success!', `Converted ${diamonds} diamonds to ${result.coins || Math.floor(diamonds * CONVERSION_RATE)} coins!`);
+    } catch (err: any) {
+      console.error('[wallet] Conversion error:', err);
+      setConversionError(err?.message || 'Conversion failed');
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -406,14 +472,24 @@ export default function WalletScreen() {
             </View>
           </View>
 
-          {/* Cashout Button */}
-          <TouchableOpacity
-            style={[styles.cashoutButton, { backgroundColor: '#22c55e' }]}
-            onPress={handleCashoutPress}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.cashoutButtonText}>💵 Cash Out Diamonds</Text>
-          </TouchableOpacity>
+          {/* Action Buttons */}
+          <View style={styles.actionButtonsRow}>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#22c55e' }]}
+              onPress={handleCashoutPress}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.actionButtonText}>💵 Cash Out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#a855f7' }]}
+              onPress={() => setConversionModalVisible(true)}
+              activeOpacity={0.8}
+              disabled={diamondBalance < MIN_DIAMONDS}
+            >
+              <Text style={styles.actionButtonText}>🔄 Convert to Coins</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.packsSection}>
@@ -544,6 +620,82 @@ export default function WalletScreen() {
                 disabled={!selectedPack}
               >
                 <Text style={styles.modalConfirmButtonText}>Purchase</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Diamond Conversion Modal */}
+      <Modal
+        visible={conversionModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConversionModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themed.cardBg }]}>
+            <Text style={[styles.modalTitle, { color: themed.text }]}>🔄 Convert Diamonds to Coins</Text>
+            
+            <Text style={[styles.conversionDescription, { color: themed.mutedText }]}>
+              Convert your earned diamonds back to coins for gifting. 60% conversion rate (40% platform fee).
+            </Text>
+
+            <View style={styles.conversionInputRow}>
+              <Text style={styles.conversionEmoji}>💎</Text>
+              <TextInput
+                style={[styles.conversionInput, { color: themed.text, borderColor: themed.border }]}
+                value={diamondsToConvert}
+                onChangeText={setDiamondsToConvert}
+                keyboardType="numeric"
+                placeholder={`Min ${MIN_DIAMONDS}`}
+                placeholderTextColor={themed.subtleText}
+              />
+            </View>
+
+            {diamondsToConvert && parseInt(diamondsToConvert) >= MIN_DIAMONDS && (
+              <View style={styles.conversionPreview}>
+                <Text style={[styles.conversionPreviewText, { color: themed.mutedText }]}>
+                  You'll receive: <Text style={{ color: '#f59e0b', fontWeight: '700' }}>
+                    {calculateConversion(Math.min(parseInt(diamondsToConvert) || 0, diamondBalance)).coins} 🪙
+                  </Text>
+                </Text>
+                <Text style={[styles.conversionFeeText, { color: themed.subtleText }]}>
+                  Platform fee: {calculateConversion(Math.min(parseInt(diamondsToConvert) || 0, diamondBalance)).fee} 💎
+                </Text>
+              </View>
+            )}
+
+            {conversionError && (
+              <Text style={styles.conversionErrorText}>{conversionError}</Text>
+            )}
+
+            <Text style={[styles.conversionBalance, { color: themed.subtleText }]}>
+              Available: {diamondBalance.toLocaleString()} 💎
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton, { borderColor: themed.border }]}
+                onPress={() => {
+                  setConversionModalVisible(false);
+                  setDiamondsToConvert('');
+                  setConversionError(null);
+                }}
+              >
+                <Text style={[styles.modalButtonText, { color: themed.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.conversionConfirmButton, converting && { opacity: 0.6 }]}
+                onPress={handleConvertDiamonds}
+                disabled={converting || !diamondsToConvert || parseInt(diamondsToConvert) < MIN_DIAMONDS}
+              >
+                {converting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.conversionConfirmButtonText}>Convert</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -838,16 +990,76 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  // Cashout button styles
-  cashoutButton: {
+  // Action buttons row
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cashoutButtonText: {
-    fontSize: 16,
+  actionButtonText: {
+    fontSize: 14,
     fontWeight: '700',
+    color: '#fff',
+  },
+  // Conversion modal styles
+  conversionDescription: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  conversionInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+    width: '100%',
+  },
+  conversionEmoji: {
+    fontSize: 28,
+  },
+  conversionInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  conversionPreview: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  conversionPreviewText: {
+    fontSize: 14,
+  },
+  conversionFeeText: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  conversionErrorText: {
+    color: '#ef4444',
+    fontSize: 12,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  conversionBalance: {
+    fontSize: 12,
+    marginBottom: 16,
+  },
+  conversionConfirmButton: {
+    backgroundColor: '#a855f7',
+  },
+  conversionConfirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#fff',
   },
   // Cashout modal styles

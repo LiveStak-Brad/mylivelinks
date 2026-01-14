@@ -58,7 +58,7 @@ export default function AppMenus() {
       { key: 'link-profile', label: 'Link Profile', onPress: () => navTo('LinkProfileScreen') },
       { key: 'link-mutuals', label: 'Link Mutuals', onPress: () => navTo('LinkMutualsScreen') },
       { key: 'creator-analytics', label: 'Creator Analytics', onPress: () => navTo('MyAnalyticsScreen') },
-      { key: 'composer', label: 'Composer', disabled: true, pillText: 'SOON', onPress: () => showComingSoon('Composer') },
+      { key: 'creator-studio', label: 'Creator Studio', onPress: () => navTo('CreatorStudioHomeScreen') },
       { key: 'go-live', label: 'Go Live', onPress: () => navToTab('Go Live') },
       { key: 'purchases', label: 'Purchases', disabled: true, pillText: 'SOON', onPress: () => showComingSoon('Purchases') },
       { key: 'logout', label: 'Logout', tone: 'danger', onPress: () => signOut() },

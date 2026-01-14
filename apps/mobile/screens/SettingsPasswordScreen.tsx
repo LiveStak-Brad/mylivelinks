@@ -1,15 +1,49 @@
-﻿import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { showComingSoon } from '../lib/showComingSoon';
+import { supabase } from '../lib/supabase';
 
 export default function SettingsPasswordScreen() {
-  // UI only (no API/auth). Local state is purely for input rendering.
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isValid = newPassword.length >= 6 && newPassword === confirmPassword;
+
+  const handleUpdatePassword = useCallback(async () => {
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) throw updateError;
+
+      Alert.alert('Success', 'Your password has been updated.', [{ text: 'OK' }]);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      console.error('[SettingsPasswordScreen] Error:', err);
+      setError(err?.message || 'Failed to update password');
+    } finally {
+      setSaving(false);
+    }
+  }, [confirmPassword, newPassword]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -81,14 +115,21 @@ export default function SettingsPasswordScreen() {
             </View>
           </View>
 
+          {error && <Text style={styles.errorText}>{error}</Text>}
+
           {/* Actions */}
           <View style={styles.actionsRow}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => showComingSoon('Update password')}
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+              onPress={handleUpdatePassword}
+              disabled={saving || !isValid}
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed, (saving || !isValid) && styles.buttonDisabled]}
             >
-              <Text style={styles.primaryButtonText}>Update Password</Text>
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Update Password</Text>
+              )}
             </Pressable>
           </View>
         </View>
@@ -216,5 +257,14 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.9,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '600',
+    marginBottom: 8,
   },
 });

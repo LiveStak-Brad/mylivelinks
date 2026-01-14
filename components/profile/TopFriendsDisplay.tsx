@@ -171,9 +171,9 @@ export default function TopFriendsDisplay({
             <Link
               key={friend.friend_id}
               href={`/${friend.username}`}
-              className="group relative"
+              className="group relative flex flex-col items-center"
             >
-              <div className={`relative aspect-square ${avatarShapeClass} overflow-hidden bg-gray-200 dark:bg-gray-800 transition-transform duration-200 group-hover:scale-105 shadow-md group-hover:shadow-xl`}>
+              <div className={`relative aspect-square w-full ${avatarShapeClass} overflow-hidden bg-gray-200 dark:bg-gray-800 transition-transform duration-200 group-hover:scale-105 shadow-md group-hover:shadow-xl`}>
                 {/* Avatar */}
                 {friend.avatar_url ? (
                   <Image
@@ -208,24 +208,43 @@ export default function TopFriendsDisplay({
                   {friend.position}
                 </div>
 
-                {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                {/* Gradient Overlay + Name inside - ONLY for square avatars */}
+                {topFriendsAvatarStyle === 'square' && (
+                  <>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                    <div className="absolute bottom-2 left-2 right-2">
+                      <UserNameWithBadges
+                        profileId={friend.profile_id}
+                        name={friend.display_name || friend.username}
+                        isMllPro={friend.is_mll_pro}
+                        textSize="text-sm"
+                        nameClassName="text-white font-bold truncate"
+                        showGifterBadge={false}
+                      />
+                      <p className="text-white/80 text-xs truncate">
+                        @{friend.username}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
 
-                {/* Name */}
-                <div className="absolute bottom-2 left-2 right-2">
+              {/* Name below avatar - ONLY for circle avatars */}
+              {topFriendsAvatarStyle === 'circle' && (
+                <div className="mt-2 text-center w-full px-1">
                   <UserNameWithBadges
                     profileId={friend.profile_id}
                     name={friend.display_name || friend.username}
                     isMllPro={friend.is_mll_pro}
-                    textSize="text-sm"
-                    nameClassName="text-white font-bold truncate"
+                    textSize="text-xs"
+                    nameClassName="text-gray-900 dark:text-white font-semibold truncate"
                     showGifterBadge={false}
                   />
-                  <p className="text-white/80 text-xs truncate">
+                  <p className="text-gray-500 dark:text-gray-400 text-xs truncate">
                     @{friend.username}
                   </p>
                 </div>
-              </div>
+              )}
             </Link>
           ))}
 

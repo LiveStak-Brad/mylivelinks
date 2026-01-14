@@ -19,6 +19,16 @@ import ComposerNewScreen from '../screens/ComposerNewScreen';
 import ComposerProjectIdScreen from '../screens/ComposerProjectIdScreen';
 import ComposerProjectScreen from '../screens/ComposerProjectScreen';
 import ComposerScreen from '../screens/ComposerScreen';
+import CreatorStudioHomeScreen from '../screens/CreatorStudioHomeScreen';
+import CreatorStudioContentScreen from '../screens/CreatorStudioContentScreen';
+import CreatorStudioUploadScreen from '../screens/CreatorStudioUploadScreen';
+import CreatorStudioSeriesScreen from '../screens/CreatorStudioSeriesScreen';
+import CreatorStudioPodcastsScreen from '../screens/CreatorStudioPodcastsScreen';
+import CreatorStudioMoviesScreen from '../screens/CreatorStudioMoviesScreen';
+import CreatorStudioMusicVideosScreen from '../screens/CreatorStudioMusicVideosScreen';
+import CreatorStudioItemDetailScreen from '../screens/CreatorStudioItemDetailScreen';
+import CreatorStudioMusicScreen from '../screens/CreatorStudioMusicScreen';
+import CreatorStudioSettingsScreen from '../screens/CreatorStudioSettingsScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
 import GifterLevelsScreen from '../screens/GifterLevelsScreen';
 import HelpSafetyScreen from '../screens/HelpSafetyScreen';
@@ -39,6 +49,7 @@ import LinkSettingsScreen from '../screens/LinkSettingsScreen';
 import LiveHostScreen from '../screens/LiveHostScreen';
 import LiveScreen from '../screens/LiveScreen';
 import LiveUserScreen from '../screens/LiveUserScreen';
+import LongFormPlayerScreen from '../screens/LongFormPlayerScreen';
 import LoginScreen from '../screens/LoginScreen';
 import MllProApplyScreen from '../screens/MllProApplyScreen';
 import MllProScreen from '../screens/MllProScreen';
@@ -227,6 +238,16 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="ComposerProjectIdScreen" component={ComposerProjectIdScreen} />
       <RootStack.Screen name="ComposerProjectScreen" component={ComposerProjectScreen} />
       <RootStack.Screen name="ComposerScreen" component={ComposerScreen} />
+      <RootStack.Screen name="CreatorStudioHomeScreen" component={CreatorStudioHomeScreen} />
+      <RootStack.Screen name="CreatorStudioContentScreen" component={CreatorStudioContentScreen} />
+      <RootStack.Screen name="CreatorStudioUploadScreen" component={CreatorStudioUploadScreen} />
+      <RootStack.Screen name="CreatorStudioSeriesScreen" component={CreatorStudioSeriesScreen} />
+      <RootStack.Screen name="CreatorStudioPodcastsScreen" component={CreatorStudioPodcastsScreen} />
+      <RootStack.Screen name="CreatorStudioMoviesScreen" component={CreatorStudioMoviesScreen} />
+      <RootStack.Screen name="CreatorStudioMusicVideosScreen" component={CreatorStudioMusicVideosScreen} />
+      <RootStack.Screen name="CreatorStudioItemDetailScreen" component={CreatorStudioItemDetailScreen} />
+      <RootStack.Screen name="CreatorStudioMusicScreen" component={CreatorStudioMusicScreen} />
+      <RootStack.Screen name="CreatorStudioSettingsScreen" component={CreatorStudioSettingsScreen} />
       <RootStack.Screen name="DiscoverScreen" component={DiscoverScreen} />
       <RootStack.Screen name="GifterLevelsScreen" component={GifterLevelsScreen} />
       <RootStack.Screen name="InviteUserScreen" component={InviteUserScreen} />
@@ -247,6 +268,7 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="LiveHostScreen" component={LiveHostScreen} />
       <RootStack.Screen name="LiveScreen" component={LiveScreen} />
       <RootStack.Screen name="LiveUserScreen" component={LiveUserScreen} />
+      <RootStack.Screen name="LongFormPlayerScreen" component={LongFormPlayerScreen} />
       <RootStack.Screen name="MessagesScreen" component={MessagesScreen} />
       <RootStack.Screen name="MllProApplyScreen" component={MllProApplyScreen} />
       <RootStack.Screen name="MllProScreen" component={MllProScreen} />

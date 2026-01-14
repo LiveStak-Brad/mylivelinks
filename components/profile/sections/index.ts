@@ -15,3 +15,4 @@ export { default as BusinessInfo } from './BusinessInfo';
 export { default as Portfolio } from './Portfolio';
 export { default as TabEmptyState } from './TabEmptyState';
 export { default as Schedule } from './Schedule';
+export { default as CreatorStudioSection } from './CreatorStudioSection';

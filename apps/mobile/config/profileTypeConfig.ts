@@ -20,7 +20,7 @@ export type ProfileType =
 // TABS DEFINITION
 // ============================================================================
 
-export type ProfileTab = 'info' | 'feed' | 'reels' | 'media' | 'music_videos' | 'music' | 'events' | 'products';
+export type ProfileTab = 'info' | 'feed' | 'reels' | 'media' | 'music_videos' | 'music' | 'events' | 'products' | 'podcasts' | 'series' | 'education';
 
 export interface TabConfig {
   id: ProfileTab;
@@ -226,6 +226,9 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'reels', label: 'Vlog', icon: 'film', enabled: true },
       { id: 'media', label: 'Media', icon: 'image', enabled: true },
       { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
+      { id: 'podcasts', label: 'Podcasts', icon: 'mic', enabled: false },
+      { id: 'series', label: 'Series', icon: 'layers', enabled: false },
+      { id: 'education', label: 'Education', icon: 'book-open', enabled: false },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -256,6 +259,9 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
       { id: 'media', label: 'Media', icon: 'image', enabled: true },
       { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
+      { id: 'podcasts', label: 'Podcasts', icon: 'mic', enabled: false },
+      { id: 'series', label: 'Series', icon: 'layers', enabled: false },
+      { id: 'education', label: 'Education', icon: 'book-open', enabled: false },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },

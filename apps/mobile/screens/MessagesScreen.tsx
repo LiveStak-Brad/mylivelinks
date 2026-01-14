@@ -8,7 +8,6 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
 import { brand, darkPalette, lightPalette } from '../theme/colors';
-import { showComingSoon } from '../lib/showComingSoon';
 import MllProBadge from '../components/shared/MllProBadge';
 
 const TAB_BAR_SAFE_PADDING = 96;
@@ -84,7 +83,7 @@ function AvatarPlaceholder({
   );
 }
 
-function FriendsStrip({ friends, styles, stylesVars }: { friends: MockFriend[]; styles: any; stylesVars: any }) {
+function FriendsStrip({ friends, styles, stylesVars, navigation }: { friends: MockFriend[]; styles: any; stylesVars: any; navigation: any }) {
   return (
     <View style={styles.friendsSection}>
       <View style={styles.friendsHeaderRow}>
@@ -101,7 +100,7 @@ function FriendsStrip({ friends, styles, stylesVars }: { friends: MockFriend[]; 
         contentContainerStyle={styles.friendsListContent}
         renderItem={({ item }) => {
           return (
-            <Pressable accessibilityRole="button" onPress={() => showComingSoon('Friend profile')} style={({ pressed }) => [styles.friendItem, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('ProfileViewScreen', { profileId: item.id, username: item.displayName })} style={({ pressed }) => [styles.friendItem, pressed && styles.pressed]}>
               <View>
                 <AvatarPlaceholder
                   label={item.displayName}
@@ -500,7 +499,7 @@ export default function MessagesScreen() {
             </View>
 
             {/* Friends strip */}
-            <FriendsStrip friends={friends} styles={styles} stylesVars={stylesVars} />
+            <FriendsStrip friends={friends} styles={styles} stylesVars={stylesVars} navigation={navigation} />
 
             <View style={styles.sectionDivider} />
           </View>

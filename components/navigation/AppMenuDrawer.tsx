@@ -18,6 +18,7 @@ import {
   Lock,
   X,
   Crown,
+  Film,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -35,6 +36,7 @@ const BASE_MENU_ITEMS: AppMenuItem[] = [
   { label: 'Watch', href: '/watch', icon: Tv },
   { label: 'Trending', href: '/trending', icon: Flame },
   { label: 'Live TV', href: '/liveTV', icon: Tv },
+  { label: 'Creator Studio', href: '/creator-studio', icon: Film },
   { label: 'Teams', href: '/teams', icon: Users },
   { label: 'Leaderboards', href: '/leaderboards', icon: Trophy },
   { label: 'Gifter Levels', href: '/gifter-levels', icon: Sparkles },

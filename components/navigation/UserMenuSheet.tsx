@@ -133,13 +133,7 @@ export default function UserMenuSheet({
     { label: 'Link Profile', href: '/link/profile', icon: Link2 },
     { label: 'Link Mutuals', href: '/link/mutuals', icon: Users },
     { label: 'Creator Analytics', href: '/me/analytics', icon: BarChart3 },
-    {
-      label: 'Creator Studio',
-      icon: Film,
-      action: 'comingSoon',
-      badge: 'Soon',
-      comingSoonMessage: 'Creator Studio (advanced editor) is coming soon. Use Feed to post now.',
-    },
+    { label: 'Creator Studio', href: '/creator-studio', icon: Film },
     { label: 'Go Live', href: '/live/host', icon: Radio },
     {
       label: 'Purchases',

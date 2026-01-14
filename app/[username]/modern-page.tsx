@@ -59,6 +59,7 @@ import {
   Portfolio,
   Schedule,
   TabEmptyState,
+  CreatorStudioSection,
 } from '@/components/profile/sections';
 import SectionEditModal from '@/components/profile/edit/SectionEditModal';
 import type { MusicTrackRow } from '@/components/profile/sections/MusicShowcase';
@@ -856,6 +857,10 @@ export default function ModernProfilePage() {
     products: ShoppingCart,
     reposts: Repeat2,
     highlights: Bookmark,
+    podcasts: Music,
+    movies: Clapperboard,
+    series: Video,
+    education: Info,
   };
   
   // Apply customization
@@ -1714,6 +1719,66 @@ export default function ModernProfilePage() {
               <p className="text-gray-500">Highlights are private</p>
             </div>
           )
+        )}
+        
+        {/* Podcasts Tab - Creator Studio content */}
+        {activeTab === 'podcasts' && (
+          <CreatorStudioSection
+            profileId={profile.id}
+            username={profile.username}
+            itemType="podcast"
+            title="🎙️ Podcasts"
+            emptyTitle="No Podcasts Yet"
+            emptyText="Check back later for podcast episodes."
+            isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
+        )}
+        
+        {/* Movies Tab - Creator Studio content */}
+        {activeTab === 'movies' && (
+          <CreatorStudioSection
+            profileId={profile.id}
+            username={profile.username}
+            itemType="movie"
+            title="🎬 Movies"
+            emptyTitle="No Movies Yet"
+            emptyText="Check back later for films and long-form content."
+            isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
+        )}
+        
+        {/* Series Tab - Creator Studio content */}
+        {activeTab === 'series' && (
+          <CreatorStudioSection
+            profileId={profile.id}
+            username={profile.username}
+            itemType="series_episode"
+            title="📺 Series"
+            emptyTitle="No Series Yet"
+            emptyText="Check back later for episodic content."
+            isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
+        )}
+        
+        {/* Education Tab - Creator Studio content */}
+        {activeTab === 'education' && (
+          <CreatorStudioSection
+            profileId={profile.id}
+            username={profile.username}
+            itemType="education"
+            title="📚 Education"
+            emptyTitle="No Educational Content Yet"
+            emptyText="Check back later for tutorials and courses."
+            isOwner={isOwnProfile}
+            cardStyle={cardStyle}
+            borderRadiusClass={borderRadiusClass}
+          />
         )}
         
         {/* Type-specific tab placeholders (kept for backward compatibility) */}

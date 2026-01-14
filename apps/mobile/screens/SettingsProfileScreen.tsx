@@ -1,6 +1,8 @@
 ﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -12,11 +14,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useNavigation } from '@react-navigation/native';
 
 import { supabase } from '../lib/supabase';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/useTheme';
-import { showComingSoon } from '../lib/showComingSoon';
 
 type PickerItem = {
   id: string;
@@ -341,6 +344,10 @@ const COLORS = {
 export default function SettingsProfileScreen() {
   const { mode, colors } = useTheme();
   const currentUser = useCurrentUser();
+  const navigation = useNavigation<any>();
+
+  // Avatar upload state
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Theme-driven colors that override the static COLORS object
   const themed = useMemo(
@@ -433,6 +440,63 @@ export default function SettingsProfileScreen() {
       setSaving(false);
     }
   }, [bio, currentUser, displayName, profile, userId]);
+
+  const handleChangeAvatar = useCallback(async () => {
+    if (!userId) return;
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library to change your avatar.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets[0]?.uri) return;
+
+    setAvatarUploading(true);
+    try {
+      const asset = result.assets[0];
+      const fileExt = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${userId}/avatar.${fileExt}`;
+
+      // Fetch the image as blob
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, blob, { upsert: true, contentType: `image/${fileExt}` });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      const avatarUrl = urlData?.publicUrl ? `${urlData.publicUrl}?t=${Date.now()}` : null;
+
+      // Update profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      await currentUser.refresh();
+      Alert.alert('Success', 'Avatar updated successfully!');
+    } catch (err: any) {
+      console.error('[SettingsProfileScreen] Avatar upload error:', err);
+      Alert.alert('Upload failed', err?.message || 'Failed to upload avatar');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, [currentUser, userId]);
 
   const [modulesModalOpen, setModulesModalOpen] = useState(false);
   const [tabsModalOpen, setTabsModalOpen] = useState(false);
@@ -566,13 +630,22 @@ export default function SettingsProfileScreen() {
         >
           <View style={styles.photoRow}>
             <View style={[styles.avatar, { backgroundColor: themed.avatarBg, borderColor: themed.infoCardBorder }]}>
-              <Text style={[styles.avatarText, { color: themed.avatarText }]}>
-                {(profileDisplayName || profileUsername || 'U').trim().slice(0, 1).toUpperCase() || 'U'}
-              </Text>
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+              ) : (
+                <Text style={[styles.avatarText, { color: themed.avatarText }]}>
+                  {(profileDisplayName || profileUsername || 'U').trim().slice(0, 1).toUpperCase() || 'U'}
+                </Text>
+              )}
+              {avatarUploading && (
+                <View style={styles.avatarLoadingOverlay}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                </View>
+              )}
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                <Button label="Change Photo" iconName="image-outline" />
+                <Button label={avatarUploading ? 'Uploading...' : 'Change Photo'} iconName="image-outline" onPress={handleChangeAvatar} disabled={avatarUploading} />
                 <Button
                   label={saving ? 'Saving…' : 'Save Profile'}
                   iconName="save-outline"
@@ -606,7 +679,7 @@ export default function SettingsProfileScreen() {
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
-              <Button label="Change Username" iconName="create-outline" disabled />
+              <Button label="Change Username" iconName="create-outline" onPress={() => navigation.navigate('SettingsUsernameScreen')} />
             </View>
             <Text style={[styles.fieldHelper, { color: themed.muted }]}>Your unique identifier: mylivelinks.com/username</Text>
           </View>
@@ -723,9 +796,8 @@ export default function SettingsProfileScreen() {
         <Card title="Profile Type" icon={<Ionicons name="pricetag-outline" size={18} color={themed.blue600} />}>
           <Row
             label="Current Type"
-            value="creator"
-            hint="Tap to change (UI only)"
-            onPress={() => showComingSoon('Profile type selection')}
+            value={profile?.profile_type || 'creator'}
+            hint="Profile type determines default modules and tabs"
           />
           <Text style={[styles.smallMuted, { marginTop: 10, color: themed.amber600 }]}>
             ⚠️ Changing profile type may hide or show different sections on your profile. Nothing is deleted.
@@ -860,7 +932,6 @@ export default function SettingsProfileScreen() {
             label="Background Overlay"
             value="Dark (Medium)"
             hint="Helps text remain readable over background images"
-            onPress={() => showComingSoon('Background overlay settings')}
           />
         </Card>
 
@@ -881,14 +952,13 @@ export default function SettingsProfileScreen() {
             label="Card Opacity"
             value="95%"
             hint="Lower opacity lets your background show through the cards (slider on web)"
-            onPress={() => showComingSoon('Card opacity settings')}
           />
 
-          <Row label="Border Radius" value="Medium (Balanced)" onPress={() => showComingSoon('Border radius settings')} />
+          <Row label="Border Radius" value="Medium (Balanced)" />
         </Card>
 
         <Card title="Colors & Typography" icon={<Ionicons name="text-outline" size={18} color={themed.blue600} />}>
-          <Row label="Font Style" value="Modern (Sans-serif)" onPress={() => showComingSoon('Font style settings')} />
+          <Row label="Font Style" value="Modern (Sans-serif)" />
 
           <View style={{ marginTop: 12 }}>
             <Text style={[styles.fieldLabel, { color: themed.text }]}>🎯 Button Color</Text>
@@ -1045,7 +1115,7 @@ export default function SettingsProfileScreen() {
             <Button label="Delete Pinned Post" iconName="trash-outline" tone="danger" disabled />
           </View>
           <View style={{ marginTop: 12 }}>
-            <Row label="Filter" value="None" hint="Filters available for images on web (UI only)" onPress={() => showComingSoon('Image filters')} />
+            <Row label="Filter" value="None" hint="Filters available for images on web" />
             <View style={[styles.chipsWrap, { marginTop: 10 }]}>
               <Chip label="None" selected />
               <Chip label="Warm" disabled />
@@ -1227,6 +1297,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { color: COLORS.white, fontSize: 26, fontWeight: '900' },
+  avatarImage: { width: 74, height: 74, borderRadius: 999 },
+  avatarLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   noticeBox: {
     borderWidth: 1,

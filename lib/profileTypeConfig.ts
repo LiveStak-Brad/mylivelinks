@@ -22,7 +22,7 @@ export type ProfileType =
 // TABS DEFINITION
 // ============================================================================
 
-export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products' | 'reposts' | 'highlights';
+export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products' | 'reposts' | 'highlights' | 'podcasts' | 'movies' | 'series' | 'education';
 
 export interface TabConfig {
   id: ProfileTab;

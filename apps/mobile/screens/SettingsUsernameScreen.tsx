@@ -1,15 +1,64 @@
-﻿import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import React, { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { showComingSoon } from '../lib/showComingSoon';
+import { supabase } from '../lib/supabase';
+import { useCurrentUser } from '../hooks/useCurrentUser';
+
+const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,15}$/;
 
 export default function SettingsUsernameScreen() {
-  const navigation = useNavigation();
-  // UI-only placeholder state (no API, no validation).
-  const [currentUsername] = useState('current_username');
+  const navigation = useNavigation<any>();
+  const currentUser = useCurrentUser();
+  const currentUsername = currentUser.profile?.username || '';
   const [newUsername, setNewUsername] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const trimmed = newUsername.trim().toLowerCase();
+  const isValid = USERNAME_REGEX.test(trimmed) && trimmed !== currentUsername.toLowerCase();
+
+  const handleChangeUsername = useCallback(async () => {
+    if (!currentUser.userId || !isValid) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      // Check if username is taken
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', trimmed)
+        .neq('id', currentUser.userId)
+        .maybeSingle();
+
+      if (existing) {
+        setError('Username is already taken');
+        setSaving(false);
+        return;
+      }
+
+      // Update username
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ username: trimmed })
+        .eq('id', currentUser.userId);
+
+      if (updateError) throw updateError;
+
+      await currentUser.refresh();
+      Alert.alert('Success', 'Username changed successfully!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    } catch (err: any) {
+      console.error('[SettingsUsernameScreen] Error:', err);
+      setError(err?.message || 'Failed to change username');
+    } finally {
+      setSaving(false);
+    }
+  }, [currentUser, isValid, navigation, trimmed]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -54,6 +103,7 @@ export default function SettingsUsernameScreen() {
               <Text style={styles.helper}>
                 Only letters, numbers, underscores, and hyphens. 3-15 characters.
               </Text>
+              {error && <Text style={styles.errorText}>{error}</Text>}
             </View>
           </View>
 
@@ -67,10 +117,15 @@ export default function SettingsUsernameScreen() {
           <View style={styles.actionsRow}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => showComingSoon('Change username')}
-              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
+              onPress={handleChangeUsername}
+              disabled={saving || !isValid}
+              style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed, (saving || !isValid) && styles.buttonDisabled]}
             >
-              <Text style={styles.primaryButtonText}>Change Username</Text>
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Change Username</Text>
+              )}
             </Pressable>
 
             <Pressable
@@ -241,6 +296,15 @@ const styles = StyleSheet.create({
   },
   buttonPressed: {
     opacity: 0.9,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '600',
   },
 
   warningCard: {
