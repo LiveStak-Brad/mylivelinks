@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,34 +6,51 @@ import { useNavigation } from '@react-navigation/native';
 
 import SoloHostOverlay from '../components/live/SoloHostOverlay';
 import type { ChatMessage } from '../components/live/ChatOverlay';
-import { getGifterTierFromCoins } from '../components/live/ChatOverlay';
 import type { TopGifter } from '../components/live/TopGifterBubbles';
 import { useAuth } from '../state/AuthContext';
-import { supabase } from '../lib/supabase';
 
 // ============================================================================
-// HELPER FUNCTIONS
+// MOCK DATA - Host info, gifters, and chat messages
 // ============================================================================
 
-// Map message_type from DB to ChatMessage type
-const mapMessageType = (type: string): 'chat' | 'gift' | 'follow' | 'system' => {
-  switch (type) {
-    case 'gift':
-      return 'gift';
-    case 'follow':
-      return 'follow';
-    case 'system':
-      return 'system';
-    default:
-      return 'chat';
-  }
+const MOCK_HOST = {
+  name: 'DemoHost',
+  avatarUrl: 'https://i.pravatar.cc/100?u=demohost',
 };
 
-// Extract gift amount from content (e.g., "💎+100")
-const extractGiftAmount = (content: string): number | undefined => {
-  const match = content?.match(/💎\+(\d+)/);
-  return match ? parseInt(match[1], 10) : undefined;
-};
+const MOCK_TOP_GIFTERS: TopGifter[] = [
+  { id: '1', username: 'BigSpender', avatarUrl: 'https://i.pravatar.cc/100?u=bigspender', totalCoins: 5000 },
+  { id: '2', username: 'GenGifter', avatarUrl: 'https://i.pravatar.cc/100?u=gengifter', totalCoins: 2500 },
+  { id: '3', username: 'CoinKing', avatarUrl: 'https://i.pravatar.cc/100?u=coinking', totalCoins: 1200 },
+];
+
+const MOCK_MESSAGES: ChatMessage[] = [
+  { id: '1', type: 'system', username: 'System', text: 'Stream started' },
+  { id: '2', type: 'follow', username: 'NewFollower123', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=newfollower123' },
+  { id: '3', type: 'chat', username: 'CoolViewer', text: 'Hey! Great stream!', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
+  { id: '4', type: 'chat', username: 'MusicFan', text: 'Love this vibe 🔥', avatarUrl: 'https://i.pravatar.cc/100?u=musicfan' },
+  { id: '5', type: 'gift', username: 'BigSpender', text: 'sent a Rose', giftAmount: 100, avatarUrl: 'https://i.pravatar.cc/100?u=bigspender' },
+  { id: '6', type: 'chat', username: 'RandomUser', text: 'First time here, this is awesome!', avatarUrl: 'https://i.pravatar.cc/100?u=randomuser' },
+  { id: '7', type: 'chat', username: 'NightOwl', text: 'What city are you in?', avatarUrl: 'https://i.pravatar.cc/100?u=nightowl' },
+  { id: '8', type: 'follow', username: 'StreamWatcher', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=streamwatcher' },
+  { id: '9', type: 'chat', username: 'CoolViewer', text: 'The quality is so good!', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
+  { id: '10', type: 'gift', username: 'GenGifter', text: 'sent a Diamond', giftAmount: 500, avatarUrl: 'https://i.pravatar.cc/100?u=gengifter' },
+  { id: '11', type: 'chat', username: 'MusicFan', text: 'Can you play some jazz?', avatarUrl: 'https://i.pravatar.cc/100?u=musicfan' },
+  { id: '12', type: 'chat', username: 'ChillMode', text: '👋👋👋', avatarUrl: 'https://i.pravatar.cc/100?u=chillmode' },
+  { id: '13', type: 'chat', username: 'ViewerX', text: 'How long have you been streaming?', avatarUrl: 'https://i.pravatar.cc/100?u=viewerx' },
+  { id: '14', type: 'gift', username: 'CoinKing', text: 'sent a Crown', giftAmount: 1000, avatarUrl: 'https://i.pravatar.cc/100?u=coinking' },
+  { id: '15', type: 'chat', username: 'NightOwl', text: 'This chat is so chill', avatarUrl: 'https://i.pravatar.cc/100?u=nightowl' },
+  { id: '16', type: 'follow', username: 'LateNightFan', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=latenightfan' },
+  { id: '17', type: 'chat', username: 'RandomUser', text: 'Followed! Keep it up!', avatarUrl: 'https://i.pravatar.cc/100?u=randomuser' },
+  { id: '18', type: 'chat', username: 'CoolViewer', text: 'The lighting is perfect', avatarUrl: 'https://i.pravatar.cc/100?u=coolviewer' },
+  { id: '19', type: 'system', username: 'System', text: '100 viewers reached!' },
+  { id: '20', type: 'chat', username: 'ChillMode', text: 'Love this community', avatarUrl: 'https://i.pravatar.cc/100?u=chillmode' },
+  { id: '21', type: 'gift', username: 'BigSpender', text: 'sent a Universe', giftAmount: 2500, avatarUrl: 'https://i.pravatar.cc/100?u=bigspender' },
+  { id: '22', type: 'chat', username: 'MusicFan', text: 'That gift animation was crazy!', avatarUrl: 'https://i.pravatar.cc/100?u=musicfan' },
+  { id: '23', type: 'chat', username: 'ViewerX', text: 'Stream goals 🎯', avatarUrl: 'https://i.pravatar.cc/100?u=viewerx' },
+  { id: '24', type: 'follow', username: 'NewbieFan', text: '', avatarUrl: 'https://i.pravatar.cc/100?u=newbiefan' },
+  { id: '25', type: 'chat', username: 'NightOwl', text: 'Best stream of the night!', avatarUrl: 'https://i.pravatar.cc/100?u=nightowl' },
+];
 
 // ============================================================================
 // MAIN COMPONENT
@@ -60,25 +77,8 @@ export default function LiveHostScreen() {
 
   // LIVE STATE - toggles between setup and live overlay
   const [isLive, setIsLive] = useState(false);
-  const [viewerCount, setViewerCount] = useState(0);
+  const [viewerCount, setViewerCount] = useState(127);
   const profileId = user?.id ?? 'anonymous';
-
-  // TODO: liveStreamId should be set when stream is created via API
-  // Currently null - real subscriptions will only activate when this is set
-  const [liveStreamId, setLiveStreamId] = useState<number | null>(null);
-
-  // Host profile (fetched from Supabase)
-  const [hostProfile, setHostProfile] = useState<{
-    displayName: string;
-    avatarUrl?: string;
-    isPro?: boolean;
-  } | null>(null);
-
-  // Top gifters (fetched from gifts table)
-  const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
-
-  // Chat messages (fetched from chat_messages table)
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   // Host controls state (UI-only)
   const [isMuted, setIsMuted] = useState(false);
@@ -100,353 +100,6 @@ export default function LiveHostScreen() {
     () => categories.find((c) => c.id === selectedCategoryId) ?? categories[0],
     [categories, selectedCategoryId]
   );
-
-  // ============================================================================
-  // REAL-TIME SUBSCRIPTIONS
-  // ============================================================================
-
-  // Load host profile from Supabase
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const loadHostProfile = async () => {
-      try {
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('username, display_name, avatar_url, is_mll_pro')
-          .eq('id', user.id)
-          .single();
-
-        if (error) {
-          console.error('[LiveHost] Error loading host profile:', error);
-          return;
-        }
-
-        if (profile) {
-          setHostProfile({
-            displayName: profile.display_name || profile.username || 'Host',
-            avatarUrl: profile.avatar_url || undefined,
-            isPro: profile.is_mll_pro ?? false,
-          });
-        }
-      } catch (err) {
-        console.error('[LiveHost] Error loading host profile:', err);
-      }
-    };
-
-    loadHostProfile();
-  }, [user?.id]);
-
-  // Load top gifters from gifts table
-  useEffect(() => {
-    if (!liveStreamId || !isLive) {
-      setTopGifters([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadTopGifters = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('gifts')
-          .select(`
-            sender_id,
-            coin_amount,
-            sender:profiles!gifts_sender_id_fkey(
-              id,
-              username,
-              display_name,
-              avatar_url
-            )
-          `)
-          .eq('live_stream_id', liveStreamId)
-          .not('sender_id', 'is', null);
-
-        if (error) {
-          console.error('[LiveHost] Error loading top gifters:', error);
-          return;
-        }
-
-        if (cancelled) return;
-
-        // Aggregate by sender
-        const gifterMap = new Map<string, { total: number; profile: any }>();
-        (data ?? []).forEach((gift: any) => {
-          const senderId = gift?.sender_id;
-          const profile = gift?.sender;
-          if (!senderId || !profile) return;
-
-          const amount = Number(gift?.coin_amount ?? 0);
-          const existing = gifterMap.get(senderId);
-          if (existing) {
-            existing.total += amount;
-          } else {
-            gifterMap.set(senderId, { total: amount, profile });
-          }
-        });
-
-        // Sort and take top 3
-        const sorted = Array.from(gifterMap.entries())
-          .sort((a, b) => b[1].total - a[1].total)
-          .slice(0, 3)
-          .map(([senderId, v]) => ({
-            id: senderId,
-            username: v.profile?.username || 'Unknown',
-            avatarUrl: v.profile?.avatar_url || undefined,
-            totalCoins: v.total,
-          }));
-
-        setTopGifters(sorted);
-      } catch (err) {
-        console.error('[LiveHost] Error loading top gifters:', err);
-      }
-    };
-
-    // Initial load
-    loadTopGifters();
-
-    // Subscribe to new gifts
-    const giftChannel = supabase
-      .channel(`gifts-host-${liveStreamId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'gifts',
-          filter: `live_stream_id=eq.${liveStreamId}`,
-        },
-        () => {
-          if (!cancelled) loadTopGifters();
-        }
-      )
-      .subscribe();
-
-    // Fallback polling every 30s
-    const interval = setInterval(() => {
-      if (!cancelled) loadTopGifters();
-    }, 30000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      giftChannel.unsubscribe();
-    };
-  }, [liveStreamId, isLive]);
-
-  // Load and subscribe to chat messages
-  useEffect(() => {
-    if (!liveStreamId || !isLive) {
-      setChatMessages([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadMessages = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('chat_messages')
-          .select(`
-            id,
-            profile_id,
-            content,
-            message_type,
-            created_at,
-            profile:profiles!chat_messages_profile_id_fkey(
-              username,
-              display_name,
-              avatar_url,
-              lifetime_coins_gifted
-            )
-          `)
-          .eq('live_stream_id', liveStreamId)
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        if (error) {
-          console.error('[LiveHost] Error loading chat messages:', error);
-          return;
-        }
-
-        if (cancelled) return;
-
-        // Get unique profile IDs and fetch their chat settings
-        const profileIds = [...new Set((data ?? []).map((msg: any) => msg.profile_id).filter(Boolean))];
-        const { data: chatSettingsData } = await supabase
-          .from('chat_settings')
-          .select('profile_id, chat_bubble_color')
-          .in('profile_id', profileIds);
-
-        const chatSettingsMap = new Map(
-          (chatSettingsData ?? []).map((s: any) => [s.profile_id, s.chat_bubble_color])
-        );
-
-        // Data is newest-first from DB, pass directly to inverted FlatList
-        const messages: ChatMessage[] = (data ?? []).map((msg: any) => {
-          const lifetimeCoins = msg.profile?.lifetime_coins_gifted || 0;
-          const gifterInfo = getGifterTierFromCoins(lifetimeCoins);
-
-          return {
-            id: String(msg.id),
-            type: mapMessageType(msg.message_type),
-            username: msg.profile?.display_name || msg.profile?.username || 'User',
-            text: msg.content || '',
-            avatarUrl: msg.profile?.avatar_url || undefined,
-            giftAmount: msg.message_type === 'gift' ? extractGiftAmount(msg.content) : undefined,
-            chatColor: chatSettingsMap.get(msg.profile_id) || undefined,
-            gifterTierKey: gifterInfo.tierKey,
-            gifterLevelInTier: gifterInfo.levelInTier,
-            lifetimeCoins: lifetimeCoins,
-          };
-        });
-
-        setChatMessages(messages);
-      } catch (err) {
-        console.error('[LiveHost] Error loading chat messages:', err);
-      }
-    };
-
-    // Initial load
-    loadMessages();
-
-    // Subscribe to new messages
-    const chatChannel = supabase
-      .channel(`chat-host-${liveStreamId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `live_stream_id=eq.${liveStreamId}`,
-        },
-        async (payload) => {
-          if (cancelled) return;
-
-          const msg = payload.new as any;
-          // Fetch profile info and chat settings for new message
-          const [profileResult, chatSettingsResult] = await Promise.all([
-            supabase
-              .from('profiles')
-              .select('username, display_name, avatar_url, lifetime_coins_gifted')
-              .eq('id', msg.profile_id)
-              .single(),
-            supabase
-              .from('chat_settings')
-              .select('chat_bubble_color')
-              .eq('profile_id', msg.profile_id)
-              .maybeSingle(),
-          ]);
-
-          if (cancelled) return;
-
-          const profile = profileResult.data;
-          const chatSettings = chatSettingsResult.data;
-          const lifetimeCoins = (profile as any)?.lifetime_coins_gifted || 0;
-          const gifterInfo = getGifterTierFromCoins(lifetimeCoins);
-
-          const newMessage: ChatMessage = {
-            id: String(msg.id),
-            type: mapMessageType(msg.message_type),
-            username: profile?.display_name || profile?.username || 'User',
-            text: msg.content || '',
-            avatarUrl: profile?.avatar_url || undefined,
-            giftAmount: msg.message_type === 'gift' ? extractGiftAmount(msg.content) : undefined,
-            chatColor: chatSettings?.chat_bubble_color || undefined,
-            gifterTierKey: gifterInfo.tierKey,
-            gifterLevelInTier: gifterInfo.levelInTier,
-            lifetimeCoins: lifetimeCoins,
-          };
-
-          // Prepend new message (array is newest-first for inverted FlatList)
-          setChatMessages((prev) => [newMessage, ...prev.slice(0, 49)]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      chatChannel.unsubscribe();
-    };
-  }, [liveStreamId, isLive]);
-
-  // Load viewer count from active_viewers table
-  useEffect(() => {
-    if (!liveStreamId || !isLive) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadViewerCount = async () => {
-      try {
-        const { count, error } = await supabase
-          .from('active_viewers')
-          .select('*', { count: 'exact', head: true })
-          .eq('live_stream_id', liveStreamId);
-
-        if (error) {
-          console.error('[LiveHost] Error loading viewer count:', error);
-          return;
-        }
-
-        if (!cancelled && typeof count === 'number') {
-          setViewerCount(count);
-        }
-      } catch (err) {
-        console.error('[LiveHost] Error loading viewer count:', err);
-      }
-    };
-
-    // Initial load
-    loadViewerCount();
-
-    // Subscribe to viewer changes
-    const viewerChannel = supabase
-      .channel(`active-viewers-host-${liveStreamId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'active_viewers',
-          filter: `live_stream_id=eq.${liveStreamId}`,
-        },
-        () => {
-          if (!cancelled) {
-            setViewerCount((prev) => prev + 1);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'active_viewers',
-          filter: `live_stream_id=eq.${liveStreamId}`,
-        },
-        () => {
-          if (!cancelled) {
-            setViewerCount((prev) => Math.max(0, prev - 1));
-          }
-        }
-      )
-      .subscribe();
-
-    // Fallback polling every 60s
-    const interval = setInterval(() => {
-      if (!cancelled) loadViewerCount();
-    }, 60000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      viewerChannel.unsubscribe();
-    };
-  }, [liveStreamId, isLive]);
 
   // Handler: Go Live (mock - transitions to live overlay)
   const handleGoLive = () => {
@@ -498,12 +151,13 @@ export default function LiveHostScreen() {
         {/* Solo Host Overlay */}
         <SoloHostOverlay
           profileId={profileId}
-          hostName={hostProfile?.displayName ?? 'Host'}
-          hostAvatarUrl={hostProfile?.avatarUrl}
-          isPro={hostProfile?.isPro}
+          hostName={MOCK_HOST.name}
+          hostAvatarUrl={MOCK_HOST.avatarUrl}
           viewerCount={viewerCount}
-          topGifters={topGifters}
-          messages={chatMessages}
+          trendingRank={5}
+          leaderboardRank={{ currentRank: 12, pointsToNextRank: 250 }}
+          topGifters={MOCK_TOP_GIFTERS}
+          messages={MOCK_MESSAGES}
           isMuted={isMuted}
           isCameraFlipped={isCameraFlipped}
           onEndStream={handleEndStream}
