@@ -29,7 +29,7 @@ const FILTER_CHIPS: Array<{
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }> = [
-  { id: 'verified', label: 'Verified', icon: 'checkmark-seal' },
+  { id: 'verified', label: 'Verified', icon: 'checkmark-circle' },
   { id: 'online', label: 'Online now', icon: 'flash' },
   { id: 'live', label: 'Live now', icon: 'radio' },
   { id: 'following', label: 'Following', icon: 'person' },
@@ -45,55 +45,14 @@ const SUGGESTED_QUERIES = [
   'live',
 ];
 
-// Types matching backend SearchResultsBundle from /api/search
-interface PersonResult {
-  id: string;
-  name: string;
-  handle: string;
-  avatarUrl?: string | null;
-  followerCount: number;
-  verified: boolean;
-  isMllPro?: boolean;
-}
-
-interface PostResult {
-  id: string;
-  authorId: string;
-  author: string;
-  authorHandle: string;
-  authorAvatarUrl?: string | null;
-  text: string;
-  createdAt: string;
-  likeCount: number;
-  commentCount: number;
-  mediaUrl?: string | null;
-  source: 'global' | 'team';
-  teamName?: string | null;
-}
-
-interface TeamResult {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string | null;
-  avatarUrl?: string | null;
-  memberCount: number;
-}
-
-interface LiveResult {
+// Types matching /api/search/users response
+interface UserResult {
   id: string;
   username: string;
-  displayName: string;
-  avatarUrl?: string | null;
-  viewerCount: number;
-  isLive: boolean;
-}
-
-interface SearchResults {
-  people: PersonResult[];
-  posts: PostResult[];
-  teams: TeamResult[];
-  live: LiveResult[];
+  display_name: string | null;
+  avatar_url: string | null;
+  is_live: boolean;
+  follower_count: number;
 }
 
 function SectionHeader({
@@ -206,17 +165,18 @@ export default function SearchScreen() {
     following: false,
   });
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [results, setResults] = useState<SearchResults | null>(null);
+  const [users, setUsers] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
   const suggestedQueries = useMemo(() => SUGGESTED_QUERIES, []);
 
+  // Uses existing /api/search/users endpoint
   const performSearch = useCallback(async (term: string) => {
     const trimmed = term.trim();
     if (!trimmed) {
-      setResults(null);
+      setUsers([]);
       setHasSearched(false);
       return;
     }
@@ -226,7 +186,7 @@ export default function SearchScreen() {
     setHasSearched(true);
 
     try {
-      const url = `${API_BASE_URL}/api/search?q=${encodeURIComponent(trimmed)}&people=10&posts=10&teams=10&live=10`;
+      const url = `${API_BASE_URL}/api/search/users?q=${encodeURIComponent(trimmed)}&limit=20`;
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -234,11 +194,11 @@ export default function SearchScreen() {
       }
 
       const data = await response.json();
-      setResults(data);
+      setUsers(data.users || []);
     } catch (err) {
       console.error('[SearchScreen] Search error:', err);
       setError(err instanceof Error ? err.message : 'Search failed');
-      setResults(null);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -257,20 +217,19 @@ export default function SearchScreen() {
     performSearch(term);
   }, [performSearch]);
 
-  // Filter results based on active filters
-  const filteredPeople = useMemo(() => {
-    if (!results?.people) return [];
-    let filtered = results.people;
-    if (filters.verified) {
-      filtered = filtered.filter((p) => p.verified || p.isMllPro);
+  // Filter users based on active filters
+  const filteredUsers = useMemo(() => {
+    let filtered = users;
+    if (filters.live) {
+      filtered = filtered.filter((u) => u.is_live);
     }
     return filtered;
-  }, [results, filters.verified]);
+  }, [users, filters.live]);
 
-  const filteredLive = useMemo(() => {
-    if (!results?.live) return [];
-    return results.live.filter((l) => l.isLive);
-  }, [results]);
+  // Users who are currently live
+  const liveUsers = useMemo(() => {
+    return users.filter((u) => u.is_live);
+  }, [users]);
 
   // Format follower count
   const formatCount = (count: number): string => {
@@ -408,7 +367,7 @@ export default function SearchScreen() {
           {/* Initial empty state */}
           {!hasSearched && !loading && (
             <View style={styles.emptyState}>
-              <Ionicons name="sparkles" size={48} color="#8B5CF6" />
+              <Ionicons name="checkmark-circle" size={48} color="#8B5CF6" />
               <Text style={styles.emptyTitle}>Search anything</Text>
               <Text style={styles.emptyDescription}>
                 People, posts, teams, live streams — one bar. Try "music" or "gaming".
@@ -417,11 +376,7 @@ export default function SearchScreen() {
           )}
 
           {/* No results state */}
-          {hasSearched && !loading && !error && results && 
-           filteredPeople.length === 0 && 
-           (results.posts?.length ?? 0) === 0 && 
-           (results.teams?.length ?? 0) === 0 && 
-           filteredLive.length === 0 && (
+          {hasSearched && !loading && !error && filteredUsers.length === 0 && (
             <View style={styles.emptyState}>
               <Ionicons name="search" size={48} color="#9CA3AF" />
               <Text style={styles.emptyTitle}>No results found</Text>
@@ -431,32 +386,35 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {/* People results */}
-          {(activeTab === 'top' || activeTab === 'people') && filteredPeople.length > 0 && (
+          {/* People results - uses /api/search/users */}
+          {(activeTab === 'top' || activeTab === 'people') && filteredUsers.length > 0 && (
             <View style={styles.resultsGroup}>
               <View style={styles.resultsGroupHeader}>
                 <Text style={styles.resultsGroupTitle}>People</Text>
-                <Text style={styles.resultsGroupMeta}>{filteredPeople.length} found</Text>
+                <Text style={styles.resultsGroupMeta}>{filteredUsers.length} found</Text>
               </View>
-              {filteredPeople.map((person) => (
+              {filteredUsers.map((user) => (
                 <ResultCard
-                  key={person.id}
-                  accessibilityLabel={`Result: ${person.name}`}
+                  key={user.id}
+                  accessibilityLabel={`Result: ${user.display_name || user.username}`}
                   onPress={() => {}}
                 >
                   <View style={styles.resultRow}>
-                    <Avatar text={person.name} ring="none" />
+                    <Avatar text={user.display_name || user.username} ring={user.is_live ? 'live' : 'none'} />
                     <View style={styles.resultTextCol}>
                       <View style={styles.resultTitleRow}>
                         <Text style={styles.resultTitle} numberOfLines={1}>
-                          {person.name}
+                          {user.display_name || user.username}
                         </Text>
-                        {(person.verified || person.isMllPro) && (
-                          <Ionicons name="checkmark-seal" size={14} color="#8B5CF6" />
+                        {user.is_live && (
+                          <View style={styles.livePill}>
+                            <View style={styles.liveDot} />
+                            <Text style={styles.livePillText}>LIVE</Text>
+                          </View>
                         )}
                       </View>
                       <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        {person.handle} • {formatCount(person.followerCount)} followers
+                        @{user.username} • {formatCount(user.follower_count)} followers
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -466,87 +424,43 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {/* Posts results */}
-          {(activeTab === 'top' || activeTab === 'posts') && (results?.posts?.length ?? 0) > 0 && (
-            <View style={styles.resultsGroup}>
-              <View style={styles.resultsGroupHeader}>
-                <Text style={styles.resultsGroupTitle}>Posts</Text>
-                <Text style={styles.resultsGroupMeta}>{results?.posts?.length ?? 0} found</Text>
-              </View>
-              {results?.posts?.map((post) => (
-                <ResultCard key={post.id} accessibilityLabel={`Result: post by ${post.author}`} onPress={() => {}}>
-                  <View style={styles.postCard}>
-                    <View style={styles.postHeader}>
-                      <Avatar text={post.author} />
-                      <View style={styles.postHeaderText}>
-                        <Text style={styles.postAuthor} numberOfLines={1}>
-                          {post.author}
-                        </Text>
-                        <Text style={styles.postHandle} numberOfLines={1}>
-                          {post.authorHandle}
-                        </Text>
-                      </View>
-                      {post.mediaUrl ? (
-                        <View style={styles.postMetaPill}>
-                          <Ionicons name="images" size={14} color="#6B7280" />
-                          <Text style={styles.postMetaPillText}>Media</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.postMetaPill}>
-                          <Text style={styles.postMetaPillText}>{post.source === 'team' ? 'Team' : 'Post'}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.postSnippet} numberOfLines={2}>
-                      {post.text}
-                    </Text>
-                  </View>
-                </ResultCard>
-              ))}
+          {/* Posts - no existing API endpoint */}
+          {(activeTab === 'posts') && hasSearched && (
+            <View style={styles.emptyState}>
+              <Ionicons name="newspaper" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>Post search coming soon</Text>
+              <Text style={styles.emptyDescription}>
+                Search for people above to find their content.
+              </Text>
             </View>
           )}
 
-          {/* Teams results */}
-          {(activeTab === 'top' || activeTab === 'teams') && (results?.teams?.length ?? 0) > 0 && (
-            <View style={styles.resultsGroup}>
-              <View style={styles.resultsGroupHeader}>
-                <Text style={styles.resultsGroupTitle}>Teams</Text>
-                <Text style={styles.resultsGroupMeta}>{results?.teams?.length ?? 0} found</Text>
-              </View>
-              {results?.teams?.map((team) => (
-                <ResultCard key={team.id} accessibilityLabel={`Result: team ${team.name}`} onPress={() => {}}>
-                  <View style={styles.resultRow}>
-                    <Avatar text={team.name} variant="square" />
-                    <View style={styles.resultTextCol}>
-                      <Text style={styles.resultTitle} numberOfLines={1}>
-                        {team.name}
-                      </Text>
-                      <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        {team.description ?? 'Team'} • {formatCount(team.memberCount)} members
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-                  </View>
-                </ResultCard>
-              ))}
+          {/* Teams - no existing API endpoint */}
+          {(activeTab === 'teams') && hasSearched && (
+            <View style={styles.emptyState}>
+              <Ionicons name="grid" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>Team search coming soon</Text>
+              <Text style={styles.emptyDescription}>
+                Search for people above to find their teams.
+              </Text>
             </View>
           )}
 
-          {/* Live results */}
-          {(activeTab === 'top' || activeTab === 'live') && filteredLive.length > 0 && (
+          {/* Live - shows live users from /api/search/users */}
+          {(activeTab === 'top' || activeTab === 'live') && liveUsers.length > 0 && (
             <View style={styles.resultsGroup}>
               <View style={styles.resultsGroupHeader}>
                 <Text style={styles.resultsGroupTitle}>Live now</Text>
-                <Text style={styles.resultsGroupMeta}>{filteredLive.length} streaming</Text>
+                <Text style={styles.resultsGroupMeta}>{liveUsers.length} streaming</Text>
               </View>
-              {filteredLive.map((live) => (
-                <ResultCard key={live.id} accessibilityLabel={`Result: live by ${live.displayName}`} onPress={() => {}}>
+              {liveUsers.map((user) => (
+                <ResultCard key={user.id} accessibilityLabel={`Result: live by ${user.display_name || user.username}`} onPress={() => {}}>
                   <View style={styles.resultRow}>
-                    <Avatar text={live.displayName} ring="live" />
+                    <Avatar text={user.display_name || user.username} ring="live" />
                     <View style={styles.resultTextCol}>
                       <View style={styles.resultTitleRow}>
                         <Text style={styles.resultTitle} numberOfLines={1}>
-                          {live.displayName}
+                          {user.display_name || user.username}
                         </Text>
                         <View style={styles.livePill}>
                           <View style={styles.liveDot} />
@@ -554,15 +468,24 @@ export default function SearchScreen() {
                         </View>
                       </View>
                       <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        @{live.username}
+                        @{user.username}
                       </Text>
                     </View>
-                    <Text style={styles.rightMeta} numberOfLines={1}>
-                      {formatCount(live.viewerCount)} watching
-                    </Text>
+                    <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
                   </View>
                 </ResultCard>
               ))}
+            </View>
+          )}
+
+          {/* Live tab with no live users */}
+          {activeTab === 'live' && hasSearched && liveUsers.length === 0 && !loading && (
+            <View style={styles.emptyState}>
+              <Ionicons name="radio" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>No one live right now</Text>
+              <Text style={styles.emptyDescription}>
+                Check back later or search for people.
+              </Text>
             </View>
           )}
         </View>
