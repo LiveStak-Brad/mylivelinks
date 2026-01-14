@@ -1,4 +1,4 @@
-const DEFAULT_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
+const DEFAULT_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'];
 
 function parseOwnerIdsEnv(value?: string | null): string[] {
   if (!value) return [];

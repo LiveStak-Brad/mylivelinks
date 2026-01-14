@@ -20,12 +20,17 @@ interface UserInfo {
   isOwner: boolean;
 }
 
-// Owner/Admin IDs from env vars only (no hardcoded IDs in client bundle)
+// Owner/Admin IDs - env vars with hardcoded fallback
+const FALLBACK_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'];
+const FALLBACK_OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'];
+
 function getOwnerIds(): string[] {
-  return (process.env.NEXT_PUBLIC_OWNER_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const fromEnv = (process.env.NEXT_PUBLIC_OWNER_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  return fromEnv.length > 0 ? fromEnv : FALLBACK_OWNER_IDS;
 }
 function getOwnerEmails(): string[] {
-  return (process.env.NEXT_PUBLIC_OWNER_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const fromEnv = (process.env.NEXT_PUBLIC_OWNER_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  return fromEnv.length > 0 ? fromEnv : FALLBACK_OWNER_EMAILS;
 }
 
 export default function CoinPurchaseSection() {

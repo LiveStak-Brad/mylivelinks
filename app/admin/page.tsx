@@ -64,12 +64,18 @@ export default function AdminDashboardPage() {
         return;
       }
 
-      // Check if user is admin via env vars only (no hardcoded IDs in client bundle)
+      // Check if user is admin - env vars with hardcoded fallback
+      const FALLBACK_ADMIN_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'];
+      const FALLBACK_ADMIN_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'];
+      
       const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
       const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
       
-      const idMatch = envIds.includes(user.id);
-      const emailMatch = user.email && envEmails.includes(user.email.toLowerCase());
+      const adminIds = envIds.length > 0 ? envIds : FALLBACK_ADMIN_IDS;
+      const adminEmails = envEmails.length > 0 ? envEmails : FALLBACK_ADMIN_EMAILS;
+      
+      const idMatch = adminIds.includes(user.id);
+      const emailMatch = user.email && adminEmails.includes(user.email.toLowerCase());
       
       if (!idMatch && !emailMatch) {
         // Not an admin, redirect

@@ -64,12 +64,17 @@ export const LIVE_LAUNCH_ENABLED = process.env.NEXT_PUBLIC_LIVE_LAUNCH_ENABLED =
  */
 export const SOLO_LIVE_ENABLED = process.env.NEXT_PUBLIC_SOLO_LIVE_ENABLED !== 'false';
 
-// Owner IDs from env vars only (no hardcoded IDs in client bundle)
+// Owner IDs - env vars with hardcoded fallback
+const FALLBACK_LIVE_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'];
+const FALLBACK_LIVE_OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'];
+
 function getLiveOwnerIds(): string[] {
-  return (process.env.NEXT_PUBLIC_OWNER_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  const fromEnv = (process.env.NEXT_PUBLIC_OWNER_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  return fromEnv.length > 0 ? fromEnv : FALLBACK_LIVE_OWNER_IDS;
 }
 function getLiveOwnerEmails(): string[] {
-  return (process.env.NEXT_PUBLIC_OWNER_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const fromEnv = (process.env.NEXT_PUBLIC_OWNER_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  return fromEnv.length > 0 ? fromEnv : FALLBACK_LIVE_OWNER_EMAILS;
 }
 
 export function isLiveOwnerUser(user: { id?: string; email?: string | null } | null | undefined) {
