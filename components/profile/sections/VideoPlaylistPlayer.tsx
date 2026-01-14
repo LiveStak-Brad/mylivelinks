@@ -329,12 +329,26 @@ export default function VideoPlaylistPlayer({
 
       <div className="rounded-xl overflow-hidden border border-gray-200/60 dark:border-gray-700/60 bg-black/5 dark:bg-black/30">
         <div className="px-4 py-3 flex items-start justify-between gap-3 bg-white/60 dark:bg-gray-900/40 backdrop-blur">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-xs font-bold text-purple-700 dark:text-purple-300">Now Playing</div>
             <div className="text-base font-extrabold text-gray-900 dark:text-white truncate">{current?.title ?? '—'}</div>
             {!!current?.subtitle && (
               <div className="text-sm font-semibold text-gray-600 dark:text-gray-400 truncate">{current.subtitle}</div>
             )}
+            {/* Open full page link for current item */}
+            {current && itemLinkBuilder && (() => {
+              const href = itemLinkBuilder(current);
+              if (!href) return null;
+              return (
+                <Link
+                  href={href}
+                  className="inline-flex items-center gap-1 mt-1 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
+                >
+                  Open full page
+                  <ExternalLink className="w-3 h-3" />
+                </Link>
+              );
+            })()}
           </div>
 
           <div className="relative flex-shrink-0">
@@ -374,34 +388,47 @@ export default function VideoPlaylistPlayer({
                           </div>
                         </button>
 
-                        {isOwner && (onEdit || onDelete) && (
-                          <div className="flex items-center gap-1">
-                            {onEdit && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onEdit(it);
-                                  setPlaylistOpen(false);
-                                }}
-                                className="px-2 py-1 rounded-md text-xs font-bold bg-gray-200/70 dark:bg-gray-800/70 hover:bg-gray-200 dark:hover:bg-gray-800"
+                        <div className="flex items-center gap-1">
+                          {/* Open in full page link */}
+                          {itemLinkBuilder && (() => {
+                            const href = itemLinkBuilder(it);
+                            if (!href) return null;
+                            return (
+                              <Link
+                                href={href}
+                                className="px-2 py-1 rounded-md text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white"
+                                onClick={() => setPlaylistOpen(false)}
                               >
-                                Edit
-                              </button>
-                            )}
-                            {onDelete && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onDelete(it);
-                                  setPlaylistOpen(false);
-                                }}
-                                className="px-2 py-1 rounded-md text-xs font-bold bg-red-600 hover:bg-red-700 text-white"
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        )}
+                                Open
+                              </Link>
+                            );
+                          })()}
+                          
+                          {isOwner && onEdit && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onEdit(it);
+                                setPlaylistOpen(false);
+                              }}
+                              className="px-2 py-1 rounded-md text-xs font-bold bg-gray-200/70 dark:bg-gray-800/70 hover:bg-gray-200 dark:hover:bg-gray-800"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {isOwner && onDelete && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onDelete(it);
+                                setPlaylistOpen(false);
+                              }}
+                              className="px-2 py-1 rounded-md text-xs font-bold bg-red-600 hover:bg-red-700 text-white"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}

@@ -79,8 +79,15 @@ function ItemCard({
   const hasRoute = hasCanonicalRoute(item.item_type);
   const thumbnailUrl = item.thumb_url || item.artwork_url;
 
+  // Wrap entire card in Link if has canonical route
+  const CardWrapper = hasRoute ? Link : 'div';
+  const cardProps = hasRoute ? { href: canonicalUrl } : {};
+
   return (
-    <div className="group relative bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:border-purple-500/50 transition-all">
+    <CardWrapper 
+      {...cardProps as any}
+      className="group relative bg-white dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:border-purple-500/50 transition-all cursor-pointer block"
+    >
       {/* Thumbnail / Artwork */}
       <div className="relative aspect-video bg-gradient-to-br from-purple-500/20 to-pink-500/20">
         {thumbnailUrl ? (
@@ -95,17 +102,12 @@ function ItemCard({
           </div>
         )}
         
-        {/* Play overlay */}
-        {item.media_url && onPlay && (
-          <button
-            onClick={() => onPlay(item)}
-            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center">
-              <Play className="w-6 h-6 text-gray-900 ml-1" fill="currentColor" />
-            </div>
-          </button>
-        )}
+        {/* Play overlay - shows on hover */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center">
+            <Play className="w-6 h-6 text-gray-900 ml-1" fill="currentColor" />
+          </div>
+        </div>
 
         {/* Duration badge */}
         {item.duration_seconds && (
@@ -144,17 +146,14 @@ function ItemCard({
           </div>
 
           {hasRoute && (
-            <Link
-              href={canonicalUrl}
-              className="flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-            >
-              View
+            <span className="flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400">
+              Watch now
               <ExternalLink className="w-3 h-3" />
-            </Link>
+            </span>
           )}
         </div>
       </div>
-    </div>
+    </CardWrapper>
   );
 }
 

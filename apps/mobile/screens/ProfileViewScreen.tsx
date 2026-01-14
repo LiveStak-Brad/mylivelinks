@@ -20,6 +20,7 @@ import EventsTab from '../components/profile/tabs/EventsTab';
 import ProductsTab from '../components/profile/tabs/ProductsTab';
 import ReelsTab from '../components/profile/tabs/ReelsTab';
 import PodcastsTab from '../components/profile/tabs/PodcastsTab';
+import MoviesTab from '../components/profile/tabs/MoviesTab';
 import SeriesTab from '../components/profile/tabs/SeriesTab';
 import EducationTab from '../components/profile/tabs/EducationTab';
 import TopFriendsSection from '../components/profile/TopFriendsSection';
@@ -750,6 +751,8 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         <ReelsTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'podcasts' ? (
         <PodcastsTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'movies' ? (
+        <MoviesTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'series' ? (
         <SeriesTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'education' ? (
