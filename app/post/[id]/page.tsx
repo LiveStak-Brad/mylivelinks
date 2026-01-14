@@ -430,7 +430,7 @@ export default function PostPage() {
           onClose={() => setShareModalOpen(false)}
           title={post.title || 'Check out this post'}
           url={`${typeof window !== 'undefined' ? window.location.origin : ''}/post/${postId}`}
-          thumbnailUrl={post.thumbnail_url || post.media_url || undefined}
+          thumbnailUrl={post.thumbnail_url || post.media_url || post.author_avatar_url || undefined}
         />
       )}
 

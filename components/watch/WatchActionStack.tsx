@@ -9,6 +9,7 @@ import {
   Plus,
   UserPlus,
   Gift,
+  MoreHorizontal,
 } from 'lucide-react';
 
 interface WatchActionStackProps {
@@ -24,6 +25,7 @@ interface WatchActionStackProps {
   giftCount?: number;
   isLiked?: boolean;
   isFavorited?: boolean;
+  isAuthor?: boolean;
   onAvatarClick?: () => void;
   onFollowClick?: () => void;
   onLikeClick?: () => void;
@@ -33,6 +35,7 @@ interface WatchActionStackProps {
   onShareClick?: () => void;
   onRepostClick?: () => void;
   onCreateClick?: () => void;
+  onMoreClick?: () => void;
   className?: string;
 }
 
@@ -64,6 +67,7 @@ export function WatchActionStack({
   giftCount = 0,
   isLiked = false,
   isFavorited = false,
+  isAuthor = false,
   onAvatarClick,
   onFollowClick,
   onLikeClick,
@@ -73,6 +77,7 @@ export function WatchActionStack({
   onShareClick,
   onRepostClick,
   onCreateClick,
+  onMoreClick,
   className = '',
 }: WatchActionStackProps) {
   const formatCount = (count: number): string => {
@@ -196,6 +201,16 @@ export function WatchActionStack({
         aria-label="Create"
       >
         <Plus className="w-7 h-7" />
+      </button>
+
+      {/* More (3-dot menu) */}
+      <button
+        type="button"
+        onClick={onMoreClick}
+        className="watch-action-btn"
+        aria-label="More options"
+      >
+        <MoreHorizontal className="w-7 h-7" />
       </button>
     </div>
   );

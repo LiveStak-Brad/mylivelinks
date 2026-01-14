@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator, Dimensions, Modal, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Video as ExpoVideo } from 'expo-av';
+import { Video as ExpoVideo, ResizeMode } from 'expo-av';
 import { supabase } from '../../../lib/supabase';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -17,7 +17,7 @@ interface VideosTabProps {
 interface Video {
   id: string;
   media_url: string;
-  content?: string;
+  text_content?: string;
   created_at: string;
   profiles?: {
     display_name: string;
@@ -43,22 +43,22 @@ export default function VideosTab({ profileId, colors }: VideosTabProps) {
         .select(`
           id,
           media_url,
-          content,
+          text_content,
           created_at,
-          profiles:profile_id (
+          profiles!posts_author_id_fkey (
             display_name,
             username,
             avatar_url
           )
         `)
-        .eq('profile_id', profileId)
+        .eq('author_id', profileId)
         .eq('media_type', 'video')
         .not('media_url', 'is', null)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      setVideos(data || []);
+      setVideos((data as any) || []);
     } catch (error) {
       console.error('Error loading videos:', error);
     } finally {
@@ -79,6 +79,11 @@ export default function VideosTab({ profileId, colors }: VideosTabProps) {
   const renderVideo = ({ item }: { item: Video }) => (
     <Pressable style={styles.videoItem} onPress={() => handleVideoPress(item)}>
       <View style={styles.videoThumbnail}>
+        <Image
+          source={{ uri: item.media_url }}
+          style={styles.thumbnailImage}
+          resizeMode="cover"
+        />
         <View style={styles.playOverlay}>
           <View style={[styles.playButton, { backgroundColor: colors.primary }]}>
             <Feather name="play" size={20} color="#fff" />
@@ -107,17 +112,23 @@ export default function VideosTab({ profileId, colors }: VideosTabProps) {
     );
   }
 
+  // Group videos into rows of NUM_COLUMNS
+  const rows: Video[][] = [];
+  for (let i = 0; i < videos.length; i += NUM_COLUMNS) {
+    rows.push(videos.slice(i, i + NUM_COLUMNS));
+  }
+
   return (
     <>
-      <FlatList
-        data={videos}
-        renderItem={renderVideo}
-        keyExtractor={(item) => item.id}
-        numColumns={NUM_COLUMNS}
-        contentContainerStyle={styles.gridContainer}
-        columnWrapperStyle={styles.row}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.gridContainer}>
+        {rows.map((row, rowIndex) => (
+          <View key={rowIndex} style={styles.row}>
+            {row.map((item) => (
+              <View key={item.id}>{renderVideo({ item })}</View>
+            ))}
+          </View>
+        ))}
+      </View>
 
       <Modal
         visible={modalVisible}
@@ -149,7 +160,7 @@ export default function VideosTab({ profileId, colors }: VideosTabProps) {
                 source={{ uri: selectedVideo.media_url }}
                 style={styles.modalVideo}
                 useNativeControls
-                resizeMode="contain"
+                resizeMode={ResizeMode.CONTAIN}
                 shouldPlay
               />
             )}
@@ -180,6 +191,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   row: {
+    flexDirection: 'row',
     gap: GRID_SPACING,
     marginBottom: GRID_SPACING,
   },
@@ -208,6 +220,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     overflow: 'hidden',
     position: 'relative',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
   },
   playOverlay: {
     position: 'absolute',

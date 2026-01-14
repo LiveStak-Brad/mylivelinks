@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function LinkDatingScreen() {
   return (
@@ -8,7 +9,7 @@ export default function LinkDatingScreen() {
         {/* Header / explainer (mirrors web hub structure) */}
         <View style={styles.headerRow}>
           <View style={styles.headerSpacer} />
-          <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.safetyBtn, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" onPress={() => showComingSoon('Safety tips')} style={({ pressed }) => [styles.safetyBtn, pressed && styles.pressed]}>
             <Text style={styles.safetyIcon}>🛡️</Text>
             <Text style={styles.safetyText}>Safety</Text>
           </Pressable>
@@ -31,7 +32,7 @@ export default function LinkDatingScreen() {
           <View style={styles.ctaRow}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Dating swipe')}
               style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]}
             >
               <Text style={styles.primaryCtaText}>Start Swiping</Text>
@@ -39,7 +40,7 @@ export default function LinkDatingScreen() {
 
             <Pressable
               accessibilityRole="button"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Dating profile')}
               style={({ pressed }) => [styles.secondaryCta, pressed && styles.pressed]}
             >
               <Text style={styles.secondaryCtaText}>Edit Dating Profile</Text>
@@ -54,28 +55,28 @@ export default function LinkDatingScreen() {
             subtitle="Browse profiles"
             meta="Ready"
             badgeLabel="Primary"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Dating swipe')}
           />
           <HubCard
             title="Matches"
             subtitle="Your mutual matches"
             meta="View"
             badgeLabel="💕"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Dating matches')}
           />
           <HubCard
             title="Profile"
             subtitle="Photos & preferences"
             meta="Edit"
             badgeLabel="Opt-in"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Dating profile')}
           />
           <HubCard
             title="Settings"
             subtitle="Controls & safety"
             meta="Manage"
             badgeLabel="Privacy"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Dating settings')}
           />
         </Section>
 

@@ -14,7 +14,8 @@ function decodeIMContent(
 ):
   | { type: 'text'; text: string }
   | { type: 'gift'; giftId?: number; giftName?: string; giftCoins?: number; giftIcon?: string }
-  | { type: 'image'; url?: string; mime?: string; width?: number; height?: number } {
+  | { type: 'image'; url?: string; mime?: string; width?: number; height?: number }
+  | { type: 'share'; text?: string; url?: string; thumbnail?: string; contentType?: string; teamId?: string; teamName?: string; teamSlug?: string } {
   if (typeof content !== 'string') return { type: 'text', text: '' };
   if (content.startsWith('__img__:')) {
     try {
@@ -31,20 +32,44 @@ function decodeIMContent(
       return { type: 'text', text: '' };
     }
   }
-  if (!content.startsWith('__gift__:')) return { type: 'text', text: content };
-  try {
-    const raw = content.slice('__gift__:'.length);
-    const parsed = JSON.parse(raw);
-    return {
-      type: 'gift',
-      giftId: typeof parsed?.giftId === 'number' ? parsed.giftId : undefined,
-      giftName: typeof parsed?.giftName === 'string' ? parsed.giftName : undefined,
-      giftCoins: typeof parsed?.giftCoins === 'number' ? parsed.giftCoins : undefined,
-      giftIcon: typeof parsed?.giftIcon === 'string' ? parsed.giftIcon : undefined,
-    };
-  } catch {
-    return { type: 'text', text: content };
+  if (content.startsWith('__gift__:')) {
+    try {
+      const raw = content.slice('__gift__:'.length);
+      const parsed = JSON.parse(raw);
+      return {
+        type: 'gift',
+        giftId: typeof parsed?.giftId === 'number' ? parsed.giftId : undefined,
+        giftName: typeof parsed?.giftName === 'string' ? parsed.giftName : undefined,
+        giftCoins: typeof parsed?.giftCoins === 'number' ? parsed.giftCoins : undefined,
+        giftIcon: typeof parsed?.giftIcon === 'string' ? parsed.giftIcon : undefined,
+      };
+    } catch {
+      return { type: 'text', text: content };
+    }
   }
+  // Check for share message (JSON with type: 'share')
+  // Try to parse any JSON that starts with { and check if it's a share message
+  if (content.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed?.type === 'share') {
+        const thumb = typeof parsed?.thumbnail === 'string' && parsed.thumbnail.trim() ? parsed.thumbnail : undefined;
+        return {
+          type: 'share',
+          text: typeof parsed?.text === 'string' ? parsed.text : undefined,
+          url: typeof parsed?.url === 'string' ? parsed.url : undefined,
+          thumbnail: thumb,
+          contentType: typeof parsed?.contentType === 'string' ? parsed.contentType : undefined,
+          teamId: typeof parsed?.teamId === 'string' ? parsed.teamId : undefined,
+          teamName: typeof parsed?.teamName === 'string' ? parsed.teamName : undefined,
+          teamSlug: typeof parsed?.teamSlug === 'string' ? parsed.teamSlug : undefined,
+        };
+      }
+    } catch {
+      // Not valid JSON, fall through to text
+    }
+  }
+  return { type: 'text', text: content };
 }
 
 interface ChatWindow {
@@ -203,6 +228,17 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
             ...base,
             type: 'image' as const,
             imageUrl: decoded.url,
+          };
+        }
+        if (decoded.type === 'share') {
+          return {
+            ...base,
+            type: 'share' as const,
+            shareText: decoded.text,
+            shareUrl: decoded.url,
+            shareThumbnail: decoded.thumbnail,
+            shareContentType: decoded.contentType,
+            shareTeamName: decoded.teamName,
           };
         }
         return { ...base, type: 'text' as const };
@@ -454,6 +490,13 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
                 }),
                 ...(decoded.type === 'image' && {
                   imageUrl: decoded.url,
+                }),
+                ...(decoded.type === 'share' && {
+                  shareText: decoded.text,
+                  shareUrl: decoded.url,
+                  shareThumbnail: decoded.thumbnail,
+                  shareContentType: decoded.contentType,
+                  shareTeamName: decoded.teamName,
                 }),
               };
               

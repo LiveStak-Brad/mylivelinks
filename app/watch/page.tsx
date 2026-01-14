@@ -7,8 +7,11 @@ import { CommentModal } from '@/components/CommentModal';
 import { ShareModal } from '@/components/ShareModal';
 import GiftModal from '@/components/GiftModal';
 import { UploadModal } from '@/components/watch/UploadModal';
+import { PostManagementModal } from '@/components/feed/PostManagementModal';
+import ReportModal from '@/components/ReportModal';
 import { useWatchFeed, type WatchTab, type WatchMode } from '@/hooks/useWatchFeed';
 import type { WatchSwipeMode } from '@/components/watch/WatchScreen';
+import type { WatchItemData } from '@/components/watch/WatchContentItem';
 import { createClient } from '@/lib/supabase';
 import '@/styles/watch.css';
 
@@ -93,6 +96,18 @@ export default function WatchPage() {
   const [giftModalOpen, setGiftModalOpen] = useState(false);
   const [giftTarget, setGiftTarget] = useState<any>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [moreModalItem, setMoreModalItem] = useState<WatchItemData | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Get current user ID on mount
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id ?? null);
+    };
+    fetchUser();
+  }, [supabase]);
   
   const { 
     items, 
@@ -343,6 +358,17 @@ export default function WatchPage() {
     setUploadModalOpen(true);
   }, [supabase, router]);
 
+  // Handle more click (3-dot menu) - open management modal
+  const handleMore = useCallback((item: WatchItemData) => {
+    setMoreModalItem(item);
+  }, []);
+
+  // Handle post deleted from more modal
+  const handlePostDeleted = useCallback(() => {
+    // Reload the feed to reflect deletion
+    window.location.reload();
+  }, []);
+
   return (
     <>
       <WatchScreen
@@ -362,8 +388,10 @@ export default function WatchPage() {
         onComment={handleComment}
         onGift={handleGift}
         onCreate={handleCreate}
+        onMore={handleMore}
         onLoadMore={loadMore}
         hasMore={hasMore}
+        currentUserId={currentUserId}
       />
       
       <CommentModal
@@ -403,6 +431,36 @@ export default function WatchPage() {
         onClose={() => setUploadModalOpen(false)}
         onSuccess={() => window.location.reload()}
       />
+
+      {/* Post Management Modal (3-dot menu) */}
+      {moreModalItem && moreModalItem.postId && (
+        <PostManagementModal
+          postId={moreModalItem.postId}
+          postType="personal"
+          isAuthor={currentUserId ? moreModalItem.authorId === currentUserId : false}
+          onClose={() => setMoreModalItem(null)}
+          onPostDeleted={handlePostDeleted}
+          onPostUpdated={() => window.location.reload()}
+          onReport={() => {
+            setMoreModalItem(null);
+            setShowReportModal(true);
+          }}
+        />
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && moreModalItem && (
+        <ReportModal
+          visible={showReportModal}
+          onClose={() => {
+            setShowReportModal(false);
+            setMoreModalItem(null);
+          }}
+          reportType="post"
+          reportedPostId={moreModalItem.postId}
+          reportedUserId={moreModalItem.authorId}
+        />
+      )}
     </>
   );
 }

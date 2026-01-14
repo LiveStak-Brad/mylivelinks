@@ -6,6 +6,8 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { loadLiveBrowseFilters, saveLiveBrowseFilters, type BrowseGenderFilter } from '../lib/liveBrowsePreferences';
 import { useAuth } from '../state/AuthContext';
+
+const ProBadgeImage = require('../assets/newprobadge.png');
 import { useTheme } from '../theme/useTheme';
 import { brand, darkPalette, lightPalette } from '../theme/colors';
 
@@ -336,7 +338,7 @@ export default function LiveTVScreen() {
   }, [streamsLoading, stylesVars.textSecondary]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <FlatList
         data={filteredStreams}
         keyExtractor={(item) => item.id}
@@ -347,44 +349,7 @@ export default function LiveTVScreen() {
         ListEmptyComponent={listEmpty}
         ListHeaderComponent={
           <View>
-            {/* Web parity: top hero + waitlist banner */}
-            <View style={styles.topPromos}>
-              <View style={styles.proHeroCard}>
-                <View style={styles.proHeroTopRow}>
-                  <View style={styles.proHeroBadge}>
-                    <Text style={styles.proHeroBadgeText}>PRO</Text>
-                  </View>
-                  <Text style={styles.proHeroPill}>Upgrade</Text>
-                </View>
-                <Text style={styles.proHeroTitle}>MLL PRO</Text>
-                <Text style={styles.proHeroSubtitle}>Premium LiveTV discovery, tuned for you.</Text>
-                <View style={styles.proHeroCta}>
-                  <Text style={styles.proHeroCtaText}>Learn more</Text>
-                  <Feather name="chevron-right" size={16} color="white" />
-                </View>
-              </View>
-
-              <View style={styles.waitlistCard}>
-                <View style={styles.waitlistHeaderRow}>
-                  <Text style={styles.waitlistTitle}>Mobile App Waitlist</Text>
-                  <View style={styles.waitlistLivePill}>
-                    <Text style={styles.waitlistLivePillText}>BETA</Text>
-                  </View>
-                </View>
-                <Text style={styles.waitlistSubtitle}>Get updates on the mobile app release.</Text>
-                <View style={styles.waitlistFormRow}>
-                  <TextInput
-                    placeholder="Email address"
-                    placeholderTextColor={stylesVars.textSecondary}
-                    style={styles.waitlistInput}
-                  />
-                  <View style={styles.waitlistButton}>
-                    <Text style={styles.waitlistButtonText}>Join</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-
+            {/* LiveTV header with search */}
             <View style={styles.header}>
               <View style={styles.headerTopRow}>
                 <Text style={styles.headerTitle}>LiveTV</Text>
@@ -403,6 +368,23 @@ export default function LiveTVScreen() {
                   value={search}
                   onChangeText={setSearch}
                 />
+              </View>
+            </View>
+
+            {/* MLL PRO promo card */}
+            <View style={styles.topPromos}>
+              <View style={styles.proHeroCard}>
+                <View style={styles.proHeroTopRow}>
+                  <View style={styles.proHeroTitleRow}>
+                    <Image source={ProBadgeImage} style={styles.proHeroBadgeImage} resizeMode="contain" />
+                    <Text style={styles.proHeroTitle}>MLL PRO</Text>
+                  </View>
+                  <View style={styles.proHeroCta}>
+                    <Text style={styles.proHeroCtaText}>APPLY</Text>
+                    <Feather name="chevron-right" size={14} color="white" />
+                  </View>
+                </View>
+                <Text style={styles.proHeroSubtitle}>Community leaders who receive premium placement and visibility for their continued help in platform growth.</Text>
               </View>
             </View>
 
@@ -556,7 +538,7 @@ function createStyles(COLORS: StylesVars) {
 
   listContent: {
     paddingHorizontal: GRID_SIDE_PADDING - CARD_SIDE_PADDING,
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 120, // prevents bottom tabs from obscuring content
   },
 
@@ -570,59 +552,49 @@ function createStyles(COLORS: StylesVars) {
     borderColor: COLORS.border,
     borderWidth: 1,
     borderRadius: 18,
-    padding: 14,
-    gap: 8,
+    padding: 12,
+    gap: 4,
   },
   proHeroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  proHeroBadge: {
-    backgroundColor: 'rgba(124,58,237,0.20)',
-    borderColor: 'rgba(124,58,237,0.35)',
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+  proHeroTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  proHeroBadgeText: {
-    color: COLORS.text,
-    fontWeight: '900',
-    letterSpacing: 1,
-    fontSize: 11,
-  },
-  proHeroPill: {
-    color: COLORS.textSecondary,
-    fontWeight: '900',
-    fontSize: 12,
+  proHeroBadgeImage: {
+    width: 48,
+    height: 48,
+    marginLeft: -6,
+    marginRight: -6,
   },
   proHeroTitle: {
     color: COLORS.text,
     fontWeight: '900',
-    fontSize: 20,
+    fontSize: 18,
     letterSpacing: -0.2,
   },
   proHeroSubtitle: {
     color: COLORS.textSecondary,
     fontWeight: '800',
-    fontSize: 13,
+    fontSize: 12,
   },
   proHeroCta: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 3,
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 2,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   proHeroCtaText: {
     color: 'white',
-    fontWeight: '900',
-    fontSize: 13,
+    fontWeight: '800',
+    fontSize: 11,
   },
 
   waitlistCard: {

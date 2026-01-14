@@ -2,6 +2,7 @@
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function TeamsRoomScreen() {
   const roomName = 'Team Room';
@@ -142,7 +143,7 @@ export default function TeamsRoomScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Join room"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Join room')}
             style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
           >
             <Ionicons name="log-in" size={18} color={COLORS.text} />
@@ -152,7 +153,7 @@ export default function TeamsRoomScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Chat"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Room chat')}
             style={({ pressed }) => [styles.chatAction, pressed && styles.pressed]}
           >
             <Ionicons name="chatbubble-ellipses" size={18} color={COLORS.textSecondary} />
@@ -162,7 +163,7 @@ export default function TeamsRoomScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Leave room"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Leave room')}
             style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}
           >
             <Ionicons name="log-out" size={18} color={COLORS.red} />

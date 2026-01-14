@@ -32,31 +32,19 @@ export default function TopFriendsSection({
 
   const loadTopFriends = async () => {
     try {
-      const { data, error } = await supabase
-        .from('top_friends')
-        .select(`
-          friend_profile_id,
-          display_order,
-          profiles:friend_profile_id (
-            id,
-            username,
-            display_name,
-            avatar_url,
-            is_live
-          )
-        `)
-        .eq('profile_id', profileId)
-        .order('display_order', { ascending: true });
+      const { data, error } = await supabase.rpc('get_top_friends', {
+        p_profile_id: profileId,
+      });
 
       if (error) throw error;
 
       const formattedFriends: TopFriend[] = (data || []).map((item: any) => ({
-        id: item.profiles.id,
-        username: item.profiles.username,
-        display_name: item.profiles.display_name,
-        avatar_url: item.profiles.avatar_url,
-        is_live: item.profiles.is_live,
-        display_order: item.display_order,
+        id: item.friend_id || item.id,
+        username: item.username,
+        display_name: item.display_name,
+        avatar_url: item.avatar_url,
+        is_live: item.is_live,
+        display_order: item.position ?? 0,
       }));
 
       setFriends(formattedFriends);

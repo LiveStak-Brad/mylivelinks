@@ -11,6 +11,7 @@ import type { TopGifter } from '../components/live/TopGifterBubbles';
 import { useAuth } from '../state/AuthContext';
 import { supabase } from '../lib/supabase';
 import { startLiveStreamRecord } from '../lib/livekit';
+import { showComingSoon } from '../lib/showComingSoon';
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -555,14 +556,14 @@ export default function LiveHostScreen() {
               title="Camera"
               value="Required"
               meta="Not requested"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Camera permissions')}
             />
             <InfoRow
               icon="mic-outline"
               title="Microphone"
               value="Required"
               meta="Not requested"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Microphone permissions')}
             />
           </View>
         </View>

@@ -8,6 +8,7 @@ export interface WatchItem {
   id: string;
   type: 'video' | 'live';
   postId: string | null;
+  liveStreamId: number | null;
   createdAt: string;
   authorId: string;
   username: string;
@@ -67,6 +68,7 @@ function mapRpcRowToWatchItem(row: any): WatchItem {
     id: row.item_id,
     type: row.item_type === 'live' ? 'live' : 'video',
     postId: row.post_id || null,
+    liveStreamId: row.live_stream_id || null,
     createdAt: row.created_at,
     authorId: row.author_id,
     username: row.author_username || '',
@@ -212,7 +214,12 @@ export function useWatchFeed(options: UseWatchFeedOptions = {}): UseWatchFeedRes
       const newItems = (data || []).map(mapRpcRowToWatchItem);
 
       if (isLoadMore) {
-        setItems(prev => [...prev, ...newItems]);
+        // Deduplicate: filter out items that already exist in the list
+        setItems(prev => {
+          const existingIds = new Set(prev.map(item => item.id));
+          const uniqueNewItems = newItems.filter((item: WatchItem) => !existingIds.has(item.id));
+          return [...prev, ...uniqueNewItems];
+        });
       } else {
         setItems(newItems);
       }

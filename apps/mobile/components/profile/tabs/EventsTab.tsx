@@ -81,7 +81,7 @@ export default function EventsTab({ profileId, colors }: EventsTabProps) {
       )}
       {item.ticket_url && (
         <Pressable style={[styles.ticketButton, { backgroundColor: colors.primary }]}>
-          <Feather name="ticket" size={16} color="#fff" />
+          <Feather name="calendar" size={16} color="#fff" />
           <Text style={styles.ticketButtonText}>Get Tickets</Text>
         </Pressable>
       )}

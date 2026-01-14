@@ -2,8 +2,11 @@
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function SettingsUsernameScreen() {
+  const navigation = useNavigation();
   // UI-only placeholder state (no API, no validation).
   const [currentUsername] = useState('current_username');
   const [newUsername, setNewUsername] = useState('');
@@ -64,7 +67,7 @@ export default function SettingsUsernameScreen() {
           <View style={styles.actionsRow}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Change username')}
               style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
             >
               <Text style={styles.primaryButtonText}>Change Username</Text>
@@ -72,7 +75,7 @@ export default function SettingsUsernameScreen() {
 
             <Pressable
               accessibilityRole="button"
-              onPress={() => {}}
+              onPress={() => navigation.goBack()}
               style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
             >
               <Text style={styles.secondaryButtonText}>Cancel</Text>

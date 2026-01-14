@@ -8,7 +8,7 @@ import { useTheme } from '../theme/useTheme';
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
   const { signInWithPassword } = useAuth();
-  const { colors } = useTheme();
+  const { mode, colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -22,11 +22,11 @@ export default function LoginScreen() {
       mutedText: colors.mutedText,
       border: colors.border,
       subtleText: (colors as any).subtleText ?? colors.mutedText,
-      dangerBg: colors.mode === 'dark' ? 'rgba(239,68,68,0.15)' : '#fee',
-      dangerBorder: colors.mode === 'dark' ? 'rgba(239,68,68,0.35)' : '#fcc',
+      dangerBg: mode === 'dark' ? 'rgba(239,68,68,0.15)' : '#fee',
+      dangerBorder: mode === 'dark' ? 'rgba(239,68,68,0.35)' : '#fcc',
       dangerText: colors.danger,
     }),
-    [colors]
+    [mode, colors]
   );
 
   const onSubmit = async () => {

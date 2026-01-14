@@ -14,12 +14,15 @@ import { getCachedViewFingerprint } from './viewFingerprint';
 type ContentType = 'feed_post' | 'team_post' | 'music_track' | 'music_video' | 'clip';
 type ViewSource = 'web' | 'mobile';
 type ViewType = 'page_load' | 'viewport' | 'playback';
+type ReferralSource = 'direct' | 'shared_link' | 'inbox_share' | 'external_share' | 'feed' | 'watch' | 'profile' | 'search';
 
 interface UseContentViewTrackingProps {
   contentType: ContentType;
   contentId: string | null | undefined;
   viewSource?: ViewSource;
   viewType?: ViewType;
+  referralSource?: ReferralSource;
+  sharerId?: string | null;
   enabled?: boolean;
 }
 
@@ -28,6 +31,8 @@ export function useContentViewTracking({
   contentId,
   viewSource = 'web',
   viewType = 'viewport',
+  referralSource = 'direct',
+  sharerId = null,
   enabled = true
 }: UseContentViewTrackingProps) {
   const hasTrackedRef = useRef(false);
@@ -64,7 +69,9 @@ export function useContentViewTracking({
           p_content_id: contentId,
           p_view_source: viewSource,
           p_view_type: viewType,
-          p_viewer_fingerprint: fingerprint
+          p_viewer_fingerprint: fingerprint,
+          p_referral_source: referralSource,
+          p_sharer_id: sharerId
         });
 
         if (error) {
@@ -112,7 +119,7 @@ export function useContentViewTracking({
         clearTimeout(timerRef.current);
       }
     };
-  }, [enabled, contentId, contentType, viewSource, viewType]);
+  }, [enabled, contentId, contentType, viewSource, viewType, referralSource, sharerId]);
 
   // Return ref to attach to the element to observe
   return {

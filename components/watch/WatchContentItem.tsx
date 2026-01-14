@@ -41,6 +41,7 @@ export interface WatchItemData {
 interface WatchContentItemProps {
   item: WatchItemData;
   globalMuted?: boolean;
+  isAuthor?: boolean;
   onMuteToggle?: () => void;
   onAvatarClick?: () => void;
   onFollowClick?: () => void;
@@ -51,6 +52,7 @@ interface WatchContentItemProps {
   onShareClick?: () => void;
   onRepostClick?: () => void;
   onCreateClick?: () => void;
+  onMoreClick?: () => void;
   onUsernameClick?: () => void;
   onHashtagClick?: (hashtag: string) => void;
   onLocationClick?: () => void;
@@ -67,6 +69,7 @@ interface WatchContentItemProps {
 export function WatchContentItem({
   item,
   globalMuted = true,
+  isAuthor = false,
   onMuteToggle,
   onAvatarClick,
   onFollowClick,
@@ -77,6 +80,7 @@ export function WatchContentItem({
   onShareClick,
   onRepostClick,
   onCreateClick,
+  onMoreClick,
   onUsernameClick,
   onHashtagClick,
   onLocationClick,
@@ -282,6 +286,7 @@ export function WatchContentItem({
         repostCount={repostCount}
         isLiked={isLiked}
         isFavorited={isFavorited}
+        isAuthor={isAuthor}
         onAvatarClick={onAvatarClick}
         onFollowClick={onFollowClick}
         onLikeClick={onLikeClick}
@@ -291,6 +296,7 @@ export function WatchContentItem({
         onShareClick={onShareClick}
         onRepostClick={onRepostClick}
         onCreateClick={onCreateClick}
+        onMoreClick={onMoreClick}
         className="watch-content-actions"
       />
 

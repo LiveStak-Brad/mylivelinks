@@ -20,7 +20,7 @@ export type ProfileType =
 // TABS DEFINITION
 // ============================================================================
 
-export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products';
+export type ProfileTab = 'info' | 'feed' | 'reels' | 'media' | 'music_videos' | 'music' | 'events' | 'products';
 
 export interface TabConfig {
   id: ProfileTab;
@@ -100,8 +100,8 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'info', label: 'Info', icon: 'info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
       { id: 'reels', label: 'Vlog', icon: 'film', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'image', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'video', enabled: true },
+      { id: 'media', label: 'Media', icon: 'image', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -133,9 +133,9 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'info', enabled: true },
       { id: 'music', label: 'Music', icon: 'music', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'video', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
       { id: 'events', label: 'Events', icon: 'calendar', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'image', enabled: true },
+      { id: 'media', label: 'Media', icon: 'image', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -164,9 +164,9 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   comedian: {
     tabs: [
       { id: 'info', label: 'Info', icon: 'info', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'video', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
       { id: 'events', label: 'Shows', icon: 'calendar', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'image', enabled: true },
+      { id: 'media', label: 'Media', icon: 'image', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -195,7 +195,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'About', icon: 'info', enabled: true },
       { id: 'products', label: 'Products', icon: 'shopping-cart', enabled: true },
-      { id: 'photos', label: 'Gallery', icon: 'image', enabled: true },
+      { id: 'media', label: 'Gallery', icon: 'image', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -224,8 +224,8 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'info', label: 'Info', icon: 'info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
       { id: 'reels', label: 'Vlog', icon: 'film', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'image', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'video', enabled: true },
+      { id: 'media', label: 'Media', icon: 'image', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -254,8 +254,8 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'image', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'video', enabled: true },
+      { id: 'media', label: 'Media', icon: 'image', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -302,7 +302,13 @@ export function getEnabledTabs(
   // If user has custom enabled tabs, use those
   // Note: empty array means user intentionally disabled all OPTIONAL tabs.
   if (Array.isArray(customEnabledTabs)) {
-    const allowed = new Set<ProfileTab>(['info', ...customEnabledTabs]);
+    // Map legacy tab IDs to new ones for backwards compatibility
+    const mappedTabs = customEnabledTabs.map(tab => {
+      if (tab === 'photos' as any) return 'media';
+      if (tab === 'videos' as any) return 'music_videos';
+      return tab;
+    });
+    const allowed = new Set<ProfileTab>(['info', ...mappedTabs]);
     return config.tabs.filter(tab => allowed.has(tab.id));
   }
   

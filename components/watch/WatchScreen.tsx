@@ -26,8 +26,10 @@ interface WatchScreenProps {
   onComment?: (postId: string) => void;
   onGift?: (item: WatchItemData) => void;
   onCreate?: () => void;
+  onMore?: (item: WatchItemData) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
+  currentUserId?: string | null;
 }
 
 /**
@@ -60,8 +62,10 @@ export function WatchScreen({
   onComment,
   onGift,
   onCreate,
+  onMore,
   onLoadMore,
   hasMore = false,
+  currentUserId,
 }: WatchScreenProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentIndexRef = useRef(0);
@@ -328,6 +332,7 @@ export function WatchScreen({
               key={item.id}
               item={item}
               globalMuted={globalMuted}
+              isAuthor={currentUserId ? item.authorId === currentUserId : false}
               onMuteToggle={() => setGlobalMuted(!globalMuted)}
               onAvatarClick={() => onProfileClick?.(item.username)}
               onFollowClick={() => onFollow?.(item.id)}
@@ -352,6 +357,7 @@ export function WatchScreen({
               onShareClick={() => onShare?.(item)}
               onRepostClick={() => onRepost?.((item as any).postId || item.id)}
               onCreateClick={onCreate}
+              onMoreClick={() => onMore?.(item)}
               onUsernameClick={() => onProfileClick?.(item.username)}
             />
           ))

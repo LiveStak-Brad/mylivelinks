@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View, Text, ActivityIndicator, RefreshControl } from 'react-native';
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, View, Text, ActivityIndicator, RefreshControl, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -7,13 +7,14 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/useTheme';
 import { supabase } from '../lib/supabase';
+import { showComingSoon } from '../lib/showComingSoon';
 import { ProfileData } from '../types/profile';
 import { getEnabledSections, getEnabledTabs, ProfileTab } from '../config/profileTypeConfig';
 import ProfileTabBar from '../components/profile/ProfileTabBar';
 import InfoTab from '../components/profile/tabs/InfoTab';
 import FeedTab from '../components/profile/tabs/FeedTab';
-import PhotosTab from '../components/profile/tabs/PhotosTab';
-import VideosTab from '../components/profile/tabs/VideosTab';
+import MediaTab from '../components/profile/tabs/MediaTab';
+import MusicVideosTab from '../components/profile/tabs/MusicVideosTab';
 import MusicTab from '../components/profile/tabs/MusicTab';
 import EventsTab from '../components/profile/tabs/EventsTab';
 import ProductsTab from '../components/profile/tabs/ProductsTab';
@@ -27,6 +28,9 @@ import TopSupportersSection from '../components/profile/TopSupportersSection';
 import TopStreamersSection from '../components/profile/TopStreamersSection';
 import ProfileBadges from '../components/profile/ProfileBadges';
 import LiveIndicatorBanner from '../components/profile/LiveIndicatorBanner';
+import MllProBadge from '../components/shared/MllProBadge';
+import ShareModal from '../components/ShareModal';
+import ReportModal from '../components/ReportModal';
 
 const API_BASE_URL = 'https://www.mylivelinks.com';
 
@@ -35,7 +39,11 @@ type ProfileViewRouteParams = {
   username?: string;
 };
 
-export default function ProfileViewScreen() {
+type ProfileViewScreenProps = {
+  routeParams?: ProfileViewRouteParams;
+};
+
+export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProps = {}) {
   const insets = useSafeAreaInsets();
   const bottomGuard = insets.bottom + 88;
   const navigation = useNavigation<any>();
@@ -43,7 +51,7 @@ export default function ProfileViewScreen() {
   const currentUser = useCurrentUser();
   const { colors } = useTheme();
 
-  const { profileId, username } = route.params || {};
+  const { profileId, username } = routeParams || route.params || {};
 
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +59,11 @@ export default function ProfileViewScreen() {
   const [error, setError] = useState<string | null>(null);
   const [followLoading, setFollowLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ProfileTab>('info');
+  const [showBlockMenu, setShowBlockMenu] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const loadingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -274,6 +287,120 @@ export default function ProfileViewScreen() {
 
   const followBtnConfig = getFollowButtonConfig();
 
+  // Check if user is blocked
+  const checkBlockStatus = useCallback(async () => {
+    if (!currentUser.userId || !profileData?.profile?.id) return;
+    if (currentUser.userId === profileData.profile.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('blocks')
+        .select('blocker_id')
+        .eq('blocker_id', currentUser.userId)
+        .eq('blocked_id', profileData.profile.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        setIsBlocked(true);
+      } else {
+        setIsBlocked(false);
+      }
+    } catch (err) {
+      console.error('[ProfileViewScreen] Check block status error:', err);
+    }
+  }, [currentUser.userId, profileData?.profile?.id]);
+
+  useEffect(() => {
+    if (profileData?.profile?.id) {
+      checkBlockStatus();
+    }
+  }, [profileData?.profile?.id, checkBlockStatus]);
+
+  const handleBlockUser = useCallback(async () => {
+    if (!currentUser.userId || !profileData?.profile?.id) return;
+
+    const targetUsername = profileData.profile.username || 'this user';
+
+    Alert.alert(
+      'Block User',
+      `Are you sure you want to block @${targetUsername}? They won't be able to message you or send you gifts.`,
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => setShowBlockMenu(false) },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            setShowBlockMenu(false);
+            setBlockLoading(true);
+            try {
+              const { error } = await supabase.rpc('block_user', {
+                p_blocker_id: currentUser.userId,
+                p_blocked_id: profileData.profile.id,
+                p_reason: null,
+              });
+
+              if (error) {
+                console.error('[ProfileViewScreen] Block error:', error);
+                Alert.alert('Error', 'Failed to block user. Please try again.');
+                return;
+              }
+
+              setIsBlocked(true);
+              Alert.alert('Blocked', `@${targetUsername} has been blocked.`);
+            } catch (err) {
+              console.error('[ProfileViewScreen] Block error:', err);
+              Alert.alert('Error', 'Failed to block user. Please try again.');
+            } finally {
+              setBlockLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [currentUser.userId, profileData?.profile?.id, profileData?.profile?.username]);
+
+  const handleUnblockUser = useCallback(async () => {
+    if (!currentUser.userId || !profileData?.profile?.id) return;
+
+    const targetUsername = profileData.profile.username || 'this user';
+
+    Alert.alert(
+      'Unblock User',
+      `Are you sure you want to unblock @${targetUsername}?`,
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => setShowBlockMenu(false) },
+        {
+          text: 'Unblock',
+          style: 'default',
+          onPress: async () => {
+            setShowBlockMenu(false);
+            setBlockLoading(true);
+            try {
+              const { error } = await supabase.rpc('unblock_user', {
+                p_blocker_id: currentUser.userId,
+                p_blocked_id: profileData.profile.id,
+              });
+
+              if (error) {
+                console.error('[ProfileViewScreen] Unblock error:', error);
+                Alert.alert('Error', 'Failed to unblock user. Please try again.');
+                return;
+              }
+
+              setIsBlocked(false);
+              Alert.alert('Unblocked', `@${targetUsername} has been unblocked.`);
+            } catch (err) {
+              console.error('[ProfileViewScreen] Unblock error:', err);
+              Alert.alert('Error', 'Failed to unblock user. Please try again.');
+            } finally {
+              setBlockLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [currentUser.userId, profileData?.profile?.id, profileData?.profile?.username]);
+
   if (loading && !profileData) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: stylesVars.bg }]} edges={['left', 'right', 'bottom']}>
@@ -324,7 +451,7 @@ export default function ProfileViewScreen() {
         <View style={styles.container}>
           {profile.is_live && (
             <LiveIndicatorBanner
-              onWatchLive={() => {}}
+              onWatchLive={() => navigation.navigate('LiveUserScreen', { username: profile.username })}
               colors={stylesVars}
             />
           )}
@@ -344,6 +471,7 @@ export default function ProfileViewScreen() {
                   <Text style={[styles.heroNameSmall, { color: stylesVars.text }]} numberOfLines={1}>
                     {displayName}
                   </Text>
+                  {profile.is_mll_pro && <MllProBadge size="md" />}
                 </View>
 
                 <View style={styles.heroMetaRow}>
@@ -391,7 +519,11 @@ export default function ProfileViewScreen() {
               {!isOwnProfile && (
                 <Pressable
                   style={[styles.button, styles.buttonSecondary, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}
-                  onPress={() => {}}
+                  onPress={() => navigation.navigate('IMThreadScreen', {
+                    otherProfileId: profile.id,
+                    otherDisplayName: profile.display_name || profile.username,
+                    otherAvatarUrl: profile.avatar_url,
+                  })}
                 >
                   <Feather name="message-circle" size={16} color={stylesVars.text} />
                   <Text style={[styles.buttonSecondaryText, { color: stylesVars.text }]}>Message</Text>
@@ -410,31 +542,45 @@ export default function ProfileViewScreen() {
 
               <Pressable
                 style={[styles.button, styles.buttonSecondary, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}
-                onPress={() => {}}
+                onPress={() => setShowShareModal(true)}
               >
                 <Feather name="share-2" size={16} color={stylesVars.text} />
                 <Text style={[styles.buttonSecondaryText, { color: stylesVars.text }]}>Share</Text>
               </Pressable>
+
+              {!isOwnProfile && (
+                <Pressable
+                  style={{ padding: 8 }}
+                  onPress={() => setShowBlockMenu(true)}
+                  disabled={blockLoading}
+                >
+                  {blockLoading ? (
+                    <ActivityIndicator size="small" color={stylesVars.text} />
+                  ) : (
+                    <Feather name="more-vertical" size={18} color={stylesVars.text} />
+                  )}
+                </Pressable>
+              )}
             </View>
 
             <View style={[styles.divider, { backgroundColor: stylesVars.border }]} />
 
             <View style={styles.countsRow}>
-              <Pressable style={styles.countChip}>
+              <Pressable style={styles.countChip} onPress={() => showComingSoon('Followers list')}>
                 <Text style={[styles.countValue, { color: stylesVars.primary }]}>
                   {profileData.follower_count.toLocaleString()}
                 </Text>
                 <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Followers</Text>
               </Pressable>
 
-              <Pressable style={styles.countChip}>
+              <Pressable style={styles.countChip} onPress={() => showComingSoon('Following list')}>
                 <Text style={[styles.countValue, { color: stylesVars.primary }]}>
                   {profileData.following_count.toLocaleString()}
                 </Text>
                 <Text style={[styles.countLabel, { color: stylesVars.mutedText }]}>Following</Text>
               </Pressable>
 
-              <Pressable style={styles.countChip}>
+              <Pressable style={styles.countChip} onPress={() => showComingSoon('Friends list')}>
                 <Text style={[styles.countValue, { color: stylesVars.primary }]}>
                   {profileData.friends_count.toLocaleString()}
                 </Text>
@@ -470,7 +616,7 @@ export default function ProfileViewScreen() {
                 <Pressable
                   key={link.id}
                   style={[styles.linkRow, { backgroundColor: `${stylesVars.primary}10`, borderColor: stylesVars.border }]}
-                  onPress={() => {}}
+                  onPress={() => link.url && Linking.openURL(link.url).catch(err => console.error('Failed to open link:', err))}
                 >
                   <View style={styles.linkRowLeft}>
                     <Feather name="link" size={16} color={stylesVars.primary} />
@@ -523,7 +669,7 @@ export default function ProfileViewScreen() {
                   title={profile.top_friends_title}
                   avatarStyle={profile.top_friends_avatar_style}
                   maxCount={profile.top_friends_max_count}
-                  onManage={() => {}}
+                  onManage={() => navigation.navigate('SettingsProfileScreen', { section: 'top_friends' })}
                   colors={stylesVars}
                 />
               )}
@@ -587,10 +733,10 @@ export default function ProfileViewScreen() {
             </InfoTab>
       ) : activeTab === 'feed' ? (
         <FeedTab profileId={profile.id} colors={stylesVars} />
-      ) : activeTab === 'photos' ? (
-        <PhotosTab profileId={profile.id} colors={stylesVars} />
-      ) : activeTab === 'videos' ? (
-        <VideosTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'media' ? (
+        <MediaTab profileId={profile.id} colors={stylesVars} />
+      ) : activeTab === 'music_videos' ? (
+        <MusicVideosTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'music' ? (
         <MusicTab profileId={profile.id} colors={stylesVars} />
       ) : activeTab === 'events' ? (
@@ -602,6 +748,75 @@ export default function ProfileViewScreen() {
       ) : null}
         </View>
       </ScrollView>
+
+      {/* Block/Unblock Menu Modal */}
+      <Modal
+        visible={showBlockMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBlockMenu(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowBlockMenu(false)}>
+          <View style={[styles.menuContainer, { backgroundColor: stylesVars.card, borderColor: stylesVars.border }]}>
+            <Pressable
+              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+              onPress={isBlocked ? handleUnblockUser : handleBlockUser}
+            >
+              <Feather
+                name={isBlocked ? 'user-check' : 'user-x'}
+                size={18}
+                color={isBlocked ? '#10B981' : '#EF4444'}
+              />
+              <Text style={[styles.menuItemText, { color: isBlocked ? '#10B981' : '#EF4444' }]}>
+                {isBlocked ? 'Unblock User' : 'Block User'}
+              </Text>
+            </Pressable>
+
+            <View style={[styles.menuDivider, { backgroundColor: stylesVars.border }]} />
+
+            <Pressable
+              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+              onPress={() => {
+                setShowBlockMenu(false);
+                setShowReportModal(true);
+              }}
+            >
+              <Feather name="flag" size={18} color="#F59E0B" />
+              <Text style={[styles.menuItemText, { color: '#F59E0B' }]}>Report User</Text>
+            </Pressable>
+
+            <View style={[styles.menuDivider, { backgroundColor: stylesVars.border }]} />
+
+            <Pressable
+              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+              onPress={() => setShowBlockMenu(false)}
+            >
+              <Feather name="x" size={18} color={stylesVars.mutedText} />
+              <Text style={[styles.menuItemText, { color: stylesVars.mutedText }]}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Share Profile Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        shareUrl={`https://www.mylivelinks.com/${profile.username}`}
+        shareText={`Check out ${profile.display_name || profile.username}'s profile on MyLiveLinks!`}
+        shareThumbnail={profile.avatar_url}
+        shareContentType="profile"
+      />
+
+      {/* Report User Modal */}
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        reportType="user"
+        reportedUserId={profile.id}
+        reportedUsername={profile.username}
+        contextDetails={`Profile page for @${profile.username}`}
+      />
     </SafeAreaView>
   );
 }
@@ -716,8 +931,7 @@ function createStyles(stylesVars: {
     heroNameSmall: {
       fontSize: 18,
       fontWeight: '700',
-      flex: 1,
-      minWidth: 0,
+      flexShrink: 1,
     },
     heroMetaRow: {
       flexDirection: 'row',
@@ -777,21 +991,23 @@ function createStyles(stylesVars: {
       marginTop: 12,
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 10,
+      gap: 8,
     },
     button: {
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
+      borderRadius: 10,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
+      gap: 4,
+      minWidth: 0,
     },
     buttonPrimary: {
       flex: 1,
     },
     buttonSecondary: {
+      flex: 1,
       borderWidth: 1,
     },
     buttonDisabled: {
@@ -799,12 +1015,12 @@ function createStyles(stylesVars: {
     },
     buttonPrimaryText: {
       color: '#FFFFFF',
-      fontWeight: '800',
-      fontSize: 14,
+      fontWeight: '700',
+      fontSize: 12,
     },
     buttonSecondaryText: {
-      fontWeight: '800',
-      fontSize: 14,
+      fontWeight: '700',
+      fontSize: 12,
     },
     divider: {
       height: 1,
@@ -877,6 +1093,37 @@ function createStyles(stylesVars: {
       fontSize: 14,
       fontWeight: '900',
       flex: 1,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    menuContainer: {
+      width: '100%',
+      maxWidth: 300,
+      borderRadius: 16,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+    },
+    menuItemPressed: {
+      opacity: 0.7,
+    },
+    menuItemText: {
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    menuDivider: {
+      height: 1,
     },
   });
 }

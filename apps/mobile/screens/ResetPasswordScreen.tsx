@@ -6,7 +6,7 @@ import { useTheme } from '../theme/useTheme';
 
 export default function ResetPasswordScreen() {
   const { resetPassword } = useAuth();
-  const { colors } = useTheme();
+  const { mode, colors } = useTheme();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -20,14 +20,14 @@ export default function ResetPasswordScreen() {
       mutedText: colors.mutedText,
       border: colors.border,
       subtleText: (colors as any).subtleText ?? colors.mutedText,
-      dangerBg: colors.mode === 'dark' ? 'rgba(239,68,68,0.15)' : '#fee',
-      dangerBorder: colors.mode === 'dark' ? 'rgba(239,68,68,0.35)' : '#fcc',
+      dangerBg: mode === 'dark' ? 'rgba(239,68,68,0.15)' : '#fee',
+      dangerBorder: mode === 'dark' ? 'rgba(239,68,68,0.35)' : '#fcc',
       dangerText: colors.danger,
-      successBg: colors.mode === 'dark' ? 'rgba(34,197,94,0.15)' : '#efe',
-      successBorder: colors.mode === 'dark' ? 'rgba(34,197,94,0.35)' : '#cfc',
+      successBg: mode === 'dark' ? 'rgba(34,197,94,0.15)' : '#efe',
+      successBorder: mode === 'dark' ? 'rgba(34,197,94,0.35)' : '#cfc',
       successText: colors.success,
     }),
-    [colors]
+    [mode, colors]
   );
 
   const handleResetPassword = async () => {

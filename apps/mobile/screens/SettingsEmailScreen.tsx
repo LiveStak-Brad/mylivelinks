@@ -1,6 +1,7 @@
 ﻿import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { showComingSoon } from '../lib/showComingSoon';
 import { Feather } from '@expo/vector-icons';
 
 export default function SettingsEmailScreen() {
@@ -41,7 +42,7 @@ export default function SettingsEmailScreen() {
           <View style={styles.actionsRow}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Change email')}
               style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
             >
               <Text style={styles.primaryButtonText}>Save</Text>

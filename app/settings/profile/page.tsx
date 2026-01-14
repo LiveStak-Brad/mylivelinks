@@ -91,6 +91,7 @@ export default function ProfileSettingsPage() {
   
   // Display preferences
   const [hideStreamingStats, setHideStreamingStats] = useState(false);
+  const [defaultPostVisibility, setDefaultPostVisibility] = useState<'public' | 'followers' | 'friends'>('public');
   
   // Top Friends Customization
   const [showTopFriends, setShowTopFriends] = useState(true);
@@ -143,6 +144,7 @@ export default function ProfileSettingsPage() {
           onlyfans: socialOnlyfans,
         },
         hideStreamingStats,
+        defaultPostVisibility,
         customization,
         showTopFriends,
         topFriendsTitle,
@@ -180,6 +182,7 @@ export default function ProfileSettingsPage() {
       socialSpotify,
       socialOnlyfans,
       hideStreamingStats,
+      defaultPostVisibility,
       customization,
       showTopFriends,
       topFriendsTitle,
@@ -347,6 +350,7 @@ export default function ProfileSettingsPage() {
         
         // Load display preferences
         setHideStreamingStats(p.hide_streaming_stats || false);
+        setDefaultPostVisibility(p.default_post_visibility || 'public');
         
         // Load top friends customization
         setShowTopFriends(p.show_top_friends !== false); // default true
@@ -493,6 +497,7 @@ export default function ProfileSettingsPage() {
           social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
           // Display preferences
           hide_streaming_stats: hideStreamingStats,
+          default_post_visibility: defaultPostVisibility,
           // Top Friends Customization
           show_top_friends: showTopFriends,
           top_friends_title: topFriendsTitle,

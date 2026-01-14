@@ -36,8 +36,9 @@ type TeamInvite = {
 };
 
 export default function TeamsScreen() {
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const { user } = useAuth();
+  const isDark = mode === 'dark';
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -217,17 +218,17 @@ export default function TeamsScreen() {
         style={styles.scrollView} 
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />
         }
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface, borderColor: colors.border }]}>
           <View style={styles.headerContent}>
             <View style={styles.headerLabel}>
-              <Ionicons name="people-outline" size={16} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.headerLabelText}>TEAMS</Text>
+              <Ionicons name="people-outline" size={16} color={colors.subtleText} />
+              <Text style={[styles.headerLabelText, { color: colors.subtleText }]}>TEAMS</Text>
             </View>
-            <Text style={styles.headerTitle}>Teams</Text>
-            <Text style={styles.headerDescription}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Teams</Text>
+            <Text style={[styles.headerDescription, { color: colors.mutedText }]}>
               Your communities — chat, posts, live rooms, and people you care about.
             </Text>
           </View>
@@ -243,10 +244,10 @@ export default function TeamsScreen() {
         </View>
 
         {showCreateCta ? (
-          <View style={styles.ctaCard}>
-            <Text style={styles.ctaLabel}>CREATE YOUR SPACE</Text>
-            <Text style={styles.ctaTitle}>Launch a home for your people</Text>
-            <Text style={styles.ctaDescription}>
+          <View style={[styles.ctaCard, { backgroundColor: isDark ? 'rgba(236,72,153,0.2)' : 'rgba(236,72,153,0.1)', borderColor: colors.border }]}>
+            <Text style={[styles.ctaLabel, { color: colors.mutedText }]}>CREATE YOUR SPACE</Text>
+            <Text style={[styles.ctaTitle, { color: colors.text }]}>Launch a home for your people</Text>
+            <Text style={[styles.ctaDescription, { color: colors.mutedText }]}>
               Spin up live rooms, posts, and chats in minutes. Invite collaborators and grow your community.
             </Text>
             <TouchableOpacity 
@@ -257,70 +258,70 @@ export default function TeamsScreen() {
               <Text style={styles.ctaButtonText}>Start a team</Text>
             </TouchableOpacity>
             <View style={styles.ctaBadges}>
-              <View style={styles.ctaBadge}>
-                <Text style={styles.ctaBadgeText}>FREE TO LAUNCH</Text>
+              <View style={[styles.ctaBadge, { borderColor: colors.border }]}>
+                <Text style={[styles.ctaBadgeText, { color: colors.mutedText }]}>FREE TO LAUNCH</Text>
               </View>
-              <View style={styles.ctaBadge}>
-                <Text style={styles.ctaBadgeText}>INVITE-ONLY</Text>
+              <View style={[styles.ctaBadge, { borderColor: colors.border }]}>
+                <Text style={[styles.ctaBadgeText, { color: colors.mutedText }]}>INVITE-ONLY</Text>
               </View>
-              <View style={styles.ctaBadge}>
-                <Text style={styles.ctaBadgeText}>LIVE READY</Text>
+              <View style={[styles.ctaBadge, { borderColor: colors.border }]}>
+                <Text style={[styles.ctaBadgeText, { color: colors.mutedText }]}>LIVE READY</Text>
               </View>
             </View>
           </View>
         ) : ownerTeam ? (
-          <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>OWNER DASHBOARD</Text>
+          <View style={[styles.heroCard, { backgroundColor: isDark ? 'rgba(27,22,48,1)' : colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.heroLabel, { color: colors.subtleText }]}>OWNER DASHBOARD</Text>
             <View style={styles.heroTeam}>
-              <View style={styles.heroAvatar}>
-                <Text style={styles.heroAvatarText}>{ownerTeam.name.charAt(0).toUpperCase()}</Text>
+              <View style={[styles.heroAvatar, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface2, borderColor: colors.border }]}>
+                <Text style={[styles.heroAvatarText, { color: colors.mutedText }]}>{ownerTeam.name.charAt(0).toUpperCase()}</Text>
               </View>
               <View style={styles.heroTeamInfo}>
-                <Text style={styles.heroTeamName}>{ownerTeam.name}</Text>
-                <Text style={styles.heroTeamSlug}>/{ownerTeam.slug}</Text>
+                <Text style={[styles.heroTeamName, { color: colors.text }]}>{ownerTeam.name}</Text>
+                <Text style={[styles.heroTeamSlug, { color: colors.subtleText }]}>/{ownerTeam.slug}</Text>
               </View>
             </View>
             <TouchableOpacity 
-              style={styles.heroButton}
+              style={[styles.heroButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface2 }]}
               onPress={() => navigateToTeamDetail(navigation, { teamId: ownerTeam.id, slug: ownerTeam.slug })}
             >
-              <Text style={styles.heroButtonText}>Jump back in</Text>
-              <Ionicons name="arrow-up-outline" size={16} color="#fff" />
+              <Text style={[styles.heroButtonText, { color: colors.text }]}>Jump back in</Text>
+              <Ionicons name="arrow-up-outline" size={16} color={colors.text} />
             </TouchableOpacity>
             <View style={styles.heroStats}>
-              <View style={styles.heroStat}>
-                <Text style={styles.heroStatText}>1 OWNER TEAM</Text>
+              <View style={[styles.heroStat, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface2 }]}>
+                <Text style={[styles.heroStatText, { color: colors.mutedText }]}>1 OWNER TEAM</Text>
               </View>
-              <View style={styles.heroStat}>
-                <Text style={styles.heroStatText}>{ownerTeam.approved_member_count} MEMBERS</Text>
+              <View style={[styles.heroStat, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface2 }]}>
+                <Text style={[styles.heroStatText, { color: colors.mutedText }]}>{ownerTeam.approved_member_count} MEMBERS</Text>
               </View>
             </View>
           </View>
         ) : null}
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface, borderColor: colors.border }]}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionLabel}>DISCOVER</Text>
-              <Text style={styles.sectionTitle}>New teams</Text>
+              <Text style={[styles.sectionLabel, { color: colors.subtleText }]}>DISCOVER</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>New teams</Text>
             </View>
             <TouchableOpacity onPress={() => navigateToTeamsSearch(navigation)}>
-              <Text style={styles.exploreLink}>Explore all →</Text>
+              <Text style={[styles.exploreLink, { color: colors.mutedText }]}>Explore all →</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.carousel}>
             {discoveryLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#fff" />
-                <Text style={styles.loadingText}>Loading teams...</Text>
+                <ActivityIndicator size="small" color={colors.text} />
+                <Text style={[styles.loadingText, { color: colors.mutedText }]}>Loading teams...</Text>
               </View>
             ) : discoveryError ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error: {discoveryError}</Text>
+                <Text style={[styles.errorText, { color: colors.danger }]}>Error: {discoveryError}</Text>
               </View>
             ) : discoveryTeams.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No teams to discover yet</Text>
+                <Text style={[styles.emptyText, { color: colors.subtleText }]}>No teams to discover yet</Text>
               </View>
             ) : (
               discoveryTeams.map((team) => {
@@ -331,7 +332,7 @@ export default function TeamsScreen() {
                     style={styles.newTeamCard}
                     onPress={() => navigateToTeamDetail(navigation, { teamId: team.id, slug: team.slug })}
                   >
-                    <View style={styles.newTeamImage}>
+                    <View style={[styles.newTeamImage, { borderColor: colors.border }]}>
                       {displayPhoto ? (
                         <Image 
                           source={{ uri: displayPhoto }} 
@@ -347,8 +348,8 @@ export default function TeamsScreen() {
                         <Text style={styles.newTeamBadgeText}>NEW</Text>
                       </View>
                     </View>
-                    <Text style={styles.newTeamName}>{team.name}</Text>
-                    <Text style={styles.newTeamMembers}>{team.approved_member_count} members</Text>
+                    <Text style={[styles.newTeamName, { color: colors.text }]}>{team.name}</Text>
+                    <Text style={[styles.newTeamMembers, { color: colors.subtleText }]}>{team.approved_member_count} members</Text>
                   </TouchableOpacity>
                 );
               })
@@ -356,49 +357,49 @@ export default function TeamsScreen() {
           </ScrollView>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface, borderColor: colors.border }]}>
           <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={16} color="rgba(255,255,255,0.4)" style={styles.searchIcon} />
+            <Ionicons name="search-outline" size={16} color={colors.subtleText} style={styles.searchIcon} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface2, borderColor: colors.border, color: colors.text }]}
               placeholder="Search teams by name, tag, or slug"
-              placeholderTextColor="rgba(255,255,255,0.4)"
+              placeholderTextColor={colors.subtleText}
               value={searchQuery}
               onChangeText={setSearchQuery}
               onFocus={() => navigateToTeamsSearch(navigation)}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
-                <Ionicons name="close" size={14} color="rgba(255,255,255,0.7)" />
+              <TouchableOpacity onPress={() => setSearchQuery('')} style={[styles.clearButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface2 }]}>
+                <Ionicons name="close" size={14} color={colors.mutedText} />
               </TouchableOpacity>
             )}
           </View>
-          <Text style={styles.searchHint}>Find teams by name, tag, or slug across your memberships.</Text>
+          <Text style={[styles.searchHint, { color: colors.subtleText }]}>Find teams by name, tag, or slug across your memberships.</Text>
         </View>
 
         {!invitesLoading && invites.length > 0 && (
-          <View style={styles.section}>
+          <View style={[styles.section, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface, borderColor: colors.border }]}>
             <View style={styles.invitesHeader}>
               <Ionicons name="mail-outline" size={16} color="#5eead4" />
-              <Text style={styles.invitesTitle}>Teams you're invited to</Text>
+              <Text style={[styles.invitesTitle, { color: colors.text }]}>Teams you're invited to</Text>
               <View style={styles.invitesBadge}>
                 <Text style={styles.invitesBadgeText}>{invites.length}</Text>
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.invitesScroll}>
               {invites.map((invite) => (
-                <View key={invite.id} style={styles.inviteCard}>
+                <View key={invite.id} style={[styles.inviteCard, { backgroundColor: isDark ? 'rgba(94,234,212,0.1)' : 'rgba(94,234,212,0.08)', borderColor: 'rgba(94,234,212,0.3)' }]}>
                   <View style={styles.inviteHeader}>
-                    <View style={styles.inviteAvatar}>
-                      <Text style={styles.inviteAvatarText}>{invite.team_name.charAt(0).toUpperCase()}</Text>
+                    <View style={[styles.inviteAvatar, { borderColor: colors.border }]}>
+                      <Text style={[styles.inviteAvatarText, { color: colors.mutedText }]}>{invite.team_name.charAt(0).toUpperCase()}</Text>
                     </View>
                     <View style={styles.inviteInfo}>
-                      <Text style={styles.inviteTeamName}>{invite.team_name}</Text>
-                      <Text style={styles.inviteInviter}>Invited by {invite.inviter_name}</Text>
+                      <Text style={[styles.inviteTeamName, { color: colors.text }]}>{invite.team_name}</Text>
+                      <Text style={[styles.inviteInviter, { color: colors.mutedText }]}>Invited by {invite.inviter_name}</Text>
                     </View>
                   </View>
                   {invite.message && (
-                    <Text style={styles.inviteMessage}>"{invite.message}"</Text>
+                    <Text style={[styles.inviteMessage, { color: colors.mutedText }]}>"{invite.message}"</Text>
                   )}
                   <View style={styles.inviteActions}>
                     <TouchableOpacity 
@@ -409,11 +410,11 @@ export default function TeamsScreen() {
                       <Text style={styles.inviteAcceptText}>Join</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
-                      style={styles.inviteDeclineButton}
+                      style={[styles.inviteDeclineButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : colors.surface2, borderColor: colors.border }]}
                       onPress={() => handleDeclineInvite(invite.id)}
                     >
-                      <Ionicons name="close" size={14} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.inviteDeclineText}>Decline</Text>
+                      <Ionicons name="close" size={14} color={colors.mutedText} />
+                      <Text style={[styles.inviteDeclineText, { color: colors.mutedText }]}>Decline</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -422,33 +423,33 @@ export default function TeamsScreen() {
           </View>
         )}
 
-        <View style={styles.section}>
+        <View style={[styles.section, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface, borderColor: colors.border }]}>
           <View style={styles.sectionHeader}>
             <View>
-              <Text style={styles.sectionLabel}>YOUR SPACE</Text>
-              <Text style={styles.sectionTitle}>Your teams</Text>
+              <Text style={[styles.sectionLabel, { color: colors.subtleText }]}>YOUR SPACE</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Your teams</Text>
             </View>
             <TouchableOpacity 
               style={styles.discoverButton}
               onPress={() => navigateToTeamsSearch(navigation)}
             >
-              <Ionicons name="compass-outline" size={16} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.discoverButtonText}>Discover</Text>
+              <Ionicons name="compass-outline" size={16} color={colors.mutedText} />
+              <Text style={[styles.discoverButtonText, { color: colors.mutedText }]}>Discover</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.teamsGrid}>
             {myTeamsLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#fff" />
-                <Text style={styles.loadingText}>Loading your teams...</Text>
+                <ActivityIndicator size="small" color={colors.text} />
+                <Text style={[styles.loadingText, { color: colors.mutedText }]}>Loading your teams...</Text>
               </View>
             ) : myTeamsError ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Error: {myTeamsError}</Text>
+                <Text style={[styles.errorText, { color: colors.danger }]}>Error: {myTeamsError}</Text>
               </View>
             ) : myTeams.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>You haven't joined any teams yet</Text>
+                <Text style={[styles.emptyText, { color: colors.subtleText }]}>You haven't joined any teams yet</Text>
               </View>
             ) : (
               myTeams.map((team) => {
@@ -456,10 +457,10 @@ export default function TeamsScreen() {
                 return (
                   <TouchableOpacity 
                     key={team.id} 
-                    style={styles.teamCard}
+                    style={[styles.teamCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : colors.surface, borderColor: colors.border }]}
                     onPress={() => navigateToTeamDetail(navigation, { teamId: team.id, slug: team.slug })}
                   >
-                    <View style={styles.teamImage}>
+                    <View style={[styles.teamImage, { borderColor: colors.border }]}>
                       {displayPhoto ? (
                         <Image 
                           source={{ uri: displayPhoto }} 
@@ -478,8 +479,8 @@ export default function TeamsScreen() {
                       )}
                     </View>
                     <View style={styles.teamInfo}>
-                      <Text style={styles.teamName}>{team.name}</Text>
-                      <Text style={styles.teamMembers}>{team.approved_member_count} members</Text>
+                      <Text style={[styles.teamName, { color: colors.text }]}>{team.name}</Text>
+                      <Text style={[styles.teamMembers, { color: colors.subtleText }]}>{team.approved_member_count} members</Text>
                     </View>
                   </TouchableOpacity>
                 );

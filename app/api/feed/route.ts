@@ -12,6 +12,8 @@ type FeedPost = {
   id: string;
   text_content: string;
   media_url: string | null;
+  feeling_emoji: string | null;
+  feeling_label: string | null;
   created_at: string;
   author: {
     id: string;
@@ -115,6 +117,8 @@ export async function GET(request: NextRequest) {
         id: postId,
         text_content: String(r.text_content ?? ''),
         media_url: r.media_url ? String(r.media_url) : null,
+        feeling_emoji: r.feeling_emoji ? String(r.feeling_emoji) : null,
+        feeling_label: r.feeling_label ? String(r.feeling_label) : null,
         created_at: String(r.created_at),
         author: {
           id: String(r.author_id),

@@ -5,9 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
+import { showComingSoon } from '../lib/showComingSoon';
 import { TeamsNavigationParams } from '../lib/teamNavigation';
 
-type TeamTab = 'Home' | 'Feed' | 'Chat' | 'Live' | 'Members' | 'About';
+type TeamTab = 'Home' | 'Feed' | 'Chat' | 'Live' | 'Members' | 'About' | 'Rooms';
 
 type TeamData = {
   id: string;
@@ -17,6 +18,8 @@ type TeamData = {
   approved_member_count: number;
   icon_url: string | null;
   banner_url: string | null;
+  created_at?: string;
+  rules?: string | null;
 };
 
 type MembershipData = {
@@ -99,8 +102,7 @@ export default function TeamsDetailScreen() {
     try {
       let query = supabase
         .from('teams')
-        .select('id, slug, name, description, approved_member_count, icon_url, banner_url')
-        .single();
+        .select('id, slug, name, description, approved_member_count, icon_url, banner_url');
       
       if (teamId) {
         query = query.eq('id', teamId);
@@ -108,7 +110,7 @@ export default function TeamsDetailScreen() {
         query = query.eq('slug', slug);
       }
       
-      const { data: teamData, error: teamError } = await query;
+      const { data: teamData, error: teamError } = await query.single();
       
       if (teamError) throw teamError;
       if (!teamData) throw new Error('Team not found');
@@ -535,7 +537,7 @@ export default function TeamsDetailScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Invite members"
-                onPress={() => {}}
+                onPress={() => showComingSoon('Invite members')}
                 style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
               >
                 <Ionicons name="person-add-outline" size={18} color="#fff" />
@@ -959,7 +961,7 @@ export default function TeamsDetailScreen() {
               <View style={styles.aboutInfoRow}>
                 <Ionicons name="calendar" size={16} color="rgba(255,255,255,0.6)" />
                 <Text style={styles.aboutInfoText}>
-                  Created {new Date(team.created_at).toLocaleDateString()}
+                  Created {team.created_at ? new Date(team.created_at).toLocaleDateString() : 'Unknown'}
                 </Text>
               </View>
               <View style={styles.aboutInfoRow}>
@@ -1948,5 +1950,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#fff',
+  },
+  aboutSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  aboutSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 8,
+  },
+  joinButton: {
+    backgroundColor: '#ec4899',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  joinButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  leaveButton: {
+    backgroundColor: 'rgba(239,68,68,0.2)',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.4)',
+  },
+  leaveButtonText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#ef4444',
   },
 });

@@ -1,7 +1,8 @@
-﻿import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 type PersonResult = {
   id: string;
@@ -26,6 +27,7 @@ function getInitials(name: string) {
 }
 
 export default function SearchPeopleScreen() {
+  const navigation = useNavigation();
   const [query, setQuery] = useState('');
   const [followingIds, setFollowingIds] = useState<Record<string, boolean>>({});
 
@@ -96,7 +98,7 @@ export default function SearchPeopleScreen() {
             const isFollowing = Boolean(followingIds[item.id]);
             return (
               <Pressable
-                onPress={() => {}}
+                onPress={() => navigation.navigate('ProfileViewScreen' as never, { profileId: item.id } as never)}
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${item.name} profile`}
                 style={styles.row}

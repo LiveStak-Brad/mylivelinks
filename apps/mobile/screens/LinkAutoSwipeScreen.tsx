@@ -2,6 +2,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function LinkAutoSwipeScreen() {
   // UI-only state (no networking / no background work).
@@ -134,7 +135,7 @@ export default function LinkAutoSwipeScreen() {
           />
           <Divider />
           <ToggleRow
-            iconName="checkmark-seal-outline"
+            iconName="checkmark-circle-outline"
             title="Verified only"
             subtitle="Only swipe verified profiles"
             value={allowVerifiedOnly}
@@ -225,7 +226,7 @@ export default function LinkAutoSwipeScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Start Auto Swipe"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Auto swipe')}
               style={({ pressed }) => [styles.ctaBtn, styles.ctaBtnPrimary, pressed && styles.pressed]}
             >
               <Ionicons name="play" size={16} color="#FFFFFF" />
@@ -235,7 +236,7 @@ export default function LinkAutoSwipeScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Stop Auto Swipe"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Auto swipe')}
               style={({ pressed }) => [styles.ctaBtn, styles.ctaBtnSecondary, pressed && styles.pressed]}
             >
               <Ionicons name="stop" size={16} color="#111827" />
@@ -321,7 +322,7 @@ function ValueRow({
   badge?: string;
 }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={() => {}} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={() => showComingSoon(title)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.rowLeft}>
         <View style={styles.rowIcon}>
           <Ionicons name={iconName} size={18} color="#111827" />

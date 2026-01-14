@@ -289,7 +289,7 @@ export default function ReferralsScreen() {
             </Text>
             <TouchableOpacity 
               style={styles.ctaButton}
-              onPress={() => navigation.navigate('LeaderboardsScreen' as never, { tab: 'referrals' } as never)}
+              onPress={() => (navigation.navigate as any)('LeaderboardsScreen', { tab: 'referrals' })}
             >
               <Ionicons name="ribbon" size={16} color="#fff" />
               <Text style={styles.ctaButtonText}>View Leaderboard</Text>

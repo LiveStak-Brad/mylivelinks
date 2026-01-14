@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import ReportModal from '../components/ReportModal';
+import ShareModal from '../components/ShareModal';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -30,7 +32,8 @@ type ImRow = {
 type DecodedIm =
   | { type: 'text'; text: string }
   | { type: 'gift'; giftName?: string; giftCoins?: number; giftIcon?: string }
-  | { type: 'image'; url?: string; width?: number; height?: number };
+  | { type: 'image'; url?: string; width?: number; height?: number }
+  | { type: 'share'; text?: string; url?: string; thumbnail?: string; contentType?: string; teamId?: string; teamName?: string; teamSlug?: string };
 
 const getGiftEmoji = (name: string) => {
   const emojiMap: { [key: string]: string } = {
@@ -109,6 +112,28 @@ function decodeImContent(content: string): DecodedIm {
       return { type: 'gift', giftName: 'Gift' };
     }
   }
+  // Check for share message (JSON with type: 'share')
+  // Try to parse any JSON that starts with { and check if it's a share message
+  if (content.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed?.type === 'share') {
+        const thumb = typeof parsed?.thumbnail === 'string' && parsed.thumbnail.trim() ? parsed.thumbnail : undefined;
+        return {
+          type: 'share',
+          text: typeof parsed?.text === 'string' ? parsed.text : undefined,
+          url: typeof parsed?.url === 'string' ? parsed.url : undefined,
+          thumbnail: thumb,
+          contentType: typeof parsed?.contentType === 'string' ? parsed.contentType : undefined,
+          teamId: typeof parsed?.teamId === 'string' ? parsed.teamId : undefined,
+          teamName: typeof parsed?.teamName === 'string' ? parsed.teamName : undefined,
+          teamSlug: typeof parsed?.teamSlug === 'string' ? parsed.teamSlug : undefined,
+        };
+      }
+    } catch {
+      // Not valid JSON, fall through to text
+    }
+  }
   return { type: 'text', text: content };
 }
 
@@ -127,6 +152,15 @@ export default function IMThreadScreen() {
   const [composerText, setComposerText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareModalData, setShareModalData] = useState<{
+    url: string;
+    text: string;
+    thumbnail?: string;
+    contentType?: 'video' | 'live' | 'photo';
+  } | null>(null);
   const listRef = useRef<FlatList>(null);
 
   const myId = user?.id ?? null;
@@ -493,6 +527,12 @@ export default function IMThreadScreen() {
           <Text style={styles.headerTitle} numberOfLines={1}>
             {title}
           </Text>
+          <Pressable
+            style={{ marginLeft: 'auto', padding: 8 }}
+            onPress={() => setShowOverflowMenu(true)}
+          >
+            <Feather name="more-vertical" size={20} color={stylesVars.mutedText} />
+          </Pressable>
         </View>
         {loading ? <Text style={styles.headerSub}>Loading…</Text> : null}
         {error ? (
@@ -542,10 +582,143 @@ export default function IMThreadScreen() {
                       </View>
                     </View>
                   </View>
+                ) : decoded.type === 'share' ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                    {/* Share button on left */}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Share this content"
+                      onPress={() => {
+                        if (decoded.url) {
+                          setShareModalData({
+                            url: decoded.url,
+                            text: decoded.text || 'Shared content',
+                            thumbnail: decoded.thumbnail,
+                            contentType: (decoded.contentType as 'video' | 'live' | 'photo') || 'video',
+                          });
+                          setShowShareModal(true);
+                        }
+                      }}
+                      style={({ pressed }) => [
+                        { width: 36, height: 36, borderRadius: 18, backgroundColor: stylesVars.mutedBg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: stylesVars.border },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Feather name="share" size={16} color={stylesVars.primary} />
+                    </Pressable>
+
+                    {/* Shared content card */}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Open shared content"
+                      onPress={() => {
+                        if (decoded.url) {
+                          const url = decoded.url;
+                          if (url.includes('/live/')) {
+                            const username = url.split('/live/')[1]?.split('?')[0];
+                            if (username) navigation.navigate('LiveUser', { username });
+                          } else if (url.includes('/post/')) {
+                            const postId = url.split('/post/')[1]?.split('?')[0];
+                            if (postId) navigation.navigate('PostDetailScreen', { postId });
+                          } else {
+                            // Check for profile URLs (e.g., /username or /p/username)
+                            const profileMatch = url.match(/mylivelinks\.com\/(?:p\/)?([^\/\?]+)$/);
+                            if (profileMatch && profileMatch[1]) {
+                              const username = profileMatch[1];
+                              // Skip if it's a known route
+                              const knownRoutes = ['feed', 'watch', 'live', 'messages', 'login', 'join', 'apply', 'admin', 'owner', 'me', 'settings', 'wallet', 'leaderboards'];
+                              if (!knownRoutes.includes(username.toLowerCase())) {
+                                navigation.navigate('ProfileViewScreen', { username });
+                                return;
+                              }
+                            }
+                            // Fallback to opening URL in browser - use static import
+                            import('expo-linking').then((Linking) => Linking.openURL(url)).catch(() => {});
+                          }
+                        }
+                      }}
+                      style={({ pressed }) => [
+                        { width: 220, borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: stylesVars.border, backgroundColor: stylesVars.mutedBg },
+                        pressed && { opacity: 0.9 },
+                      ]}
+                    >
+                      {/* Thumbnail */}
+                      <View style={{ aspectRatio: decoded.contentType === 'photo' ? 1 : 16/9, backgroundColor: '#1F2937', justifyContent: 'center', alignItems: 'center' }}>
+                        {decoded.thumbnail ? (
+                          <>
+                            <Image source={{ uri: decoded.thumbnail }} style={{ width: '100%', height: '100%', position: 'absolute' }} resizeMode="cover" />
+                            {decoded.contentType !== 'photo' && (
+                              <View style={{ position: 'absolute', justifyContent: 'center', alignItems: 'center' }}>
+                                {decoded.contentType === 'live' ? (
+                                  <View style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#EF4444', borderRadius: 999 }}>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>🔴 LIVE</Text>
+                                  </View>
+                                ) : (
+                                  <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}>
+                                    <Text style={{ color: '#FFFFFF', fontSize: 20, marginLeft: 3 }}>▶</Text>
+                                  </View>
+                                )}
+                              </View>
+                            )}
+                          </>
+                        ) : (
+                          <View style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+                            {decoded.contentType === 'live' ? (
+                              <View style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#EF4444', borderRadius: 999 }}>
+                                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>🔴 LIVE</Text>
+                              </View>
+                            ) : decoded.contentType === 'photo' ? (
+                              <Text style={{ fontSize: 32 }}>📷</Text>
+                            ) : (
+                              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+                                <Text style={{ color: '#FFFFFF', fontSize: 20, marginLeft: 3 }}>▶</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                      {/* Text preview */}
+                      <View style={{ paddingHorizontal: 12, paddingVertical: 10, backgroundColor: stylesVars.mutedBg }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: stylesVars.text }} numberOfLines={2}>{decoded.text || 'Shared content'}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
+                          <Text style={{ fontSize: 11 }}>🔗</Text>
+                          <Text style={{ fontSize: 11, color: stylesVars.mutedText }} numberOfLines={1}>{decoded.url?.replace(/^https?:\/\//, '').split('/')[0] || 'mylivelinks.com'}</Text>
+                        </View>
+                        {decoded.teamName && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#8B5CF6', borderRadius: 6, alignSelf: 'flex-start' }}>
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF' }}>🔒 Team: {decoded.teamName}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </Pressable>
+
+                    {/* Repost button on right */}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Repost this content"
+                      onPress={() => {
+                        if (decoded.url) {
+                          // Navigate to composer with the shared content for reposting
+                          navigation.navigate('ComposerNew', { 
+                            repostUrl: decoded.url,
+                            repostText: decoded.text,
+                            repostThumbnail: decoded.thumbnail,
+                            repostContentType: decoded.contentType,
+                          });
+                        }
+                      }}
+                      style={({ pressed }) => [
+                        { width: 36, height: 36, borderRadius: 18, backgroundColor: stylesVars.mutedBg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: stylesVars.border },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Feather name="repeat" size={16} color={stylesVars.primary} />
+                    </Pressable>
+                  </View>
                 ) : (
                   <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
                     <Text style={[styles.bubbleText, mine ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
-                      {decoded.text}
+                      {decoded.type === 'text' ? decoded.text : ''}
                     </Text>
                   </View>
                 )}
@@ -606,6 +779,94 @@ export default function IMThreadScreen() {
           />
         )}
       </KeyboardAvoidingView>
+
+      {/* Overflow Menu Modal */}
+      <Modal
+        visible={showOverflowMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowOverflowMenu(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'flex-end',
+          }}
+          onPress={() => setShowOverflowMenu(false)}
+        >
+          <View
+            style={{
+              backgroundColor: stylesVars.bg,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingBottom: insets.bottom + 16,
+            }}
+          >
+            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: stylesVars.border }} />
+            </View>
+            <Pressable
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+              }}
+              onPress={() => {
+                setShowOverflowMenu(false);
+                setShowReportModal(true);
+              }}
+            >
+              <Feather name="flag" size={20} color="#EF4444" />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#EF4444' }}>Report User</Text>
+            </Pressable>
+            <Pressable
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: stylesVars.border,
+              }}
+              onPress={() => setShowOverflowMenu(false)}
+            >
+              <Feather name="x" size={20} color={stylesVars.mutedText} />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: stylesVars.text }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        reportType="chat"
+        reportedUserId={otherProfileId}
+        reportedUsername={otherDisplayName ?? undefined}
+        contextDetails={JSON.stringify({
+          conversation_with: otherProfileId,
+          other_display_name: otherDisplayName,
+          source: 'mobile_dm_thread',
+        })}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => {
+          setShowShareModal(false);
+          setShareModalData(null);
+        }}
+        shareUrl={shareModalData?.url || ''}
+        shareText={shareModalData?.text || ''}
+        shareThumbnail={shareModalData?.thumbnail}
+        shareContentType={shareModalData?.contentType}
+      />
     </SafeAreaView>
   );
 }

@@ -2,6 +2,7 @@
 import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { showComingSoon } from '../lib/showComingSoon';
 
 interface DatingMatch {
   matched_profile_id: string;
@@ -111,7 +112,7 @@ export default function LinkDatingMatchesScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Open filters"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Match filters')}
             style={({ pressed }) => [styles.filterButton, pressed && styles.pressed]}
           >
             <Ionicons name="options-outline" size={18} color="#111827" />
@@ -136,7 +137,7 @@ export default function LinkDatingMatchesScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Open match ${item.display_name ?? item.username}`}
-            onPress={() => {}}
+            onPress={() => showComingSoon('Match profile')}
             style={({ pressed }) => [styles.matchCard, pressed && styles.pressed]}
           >
             <Image
@@ -161,7 +162,7 @@ export default function LinkDatingMatchesScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Message ${item.display_name ?? item.username}`}
-              onPress={() => {}}
+              onPress={() => showComingSoon('Match messaging')}
               style={({ pressed }) => [styles.messageButton, pressed && styles.pressed]}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={16} color="#111827" />
@@ -179,7 +180,7 @@ export default function LinkDatingMatchesScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Start swiping"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Dating swipe')}
               style={({ pressed }) => [styles.primaryCta, pressed && styles.pressed]}
             >
               <Text style={styles.primaryCtaText}>Start Swiping</Text>

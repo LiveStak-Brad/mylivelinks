@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import MllProBadge from '../shared/MllProBadge';
 
 interface ProfileBadgesProps {
   isMllPro?: boolean;
@@ -34,12 +35,6 @@ export default function ProfileBadges({
 
   return (
     <View style={styles.container}>
-      {isMllPro && (
-        <View style={[styles.badge, { backgroundColor: '#9333EA' }]}>
-          <Text style={styles.badgeText}>MLL PRO</Text>
-        </View>
-      )}
-      
       {gifterTier && gifterLevel && (
         <View style={[styles.badge, { backgroundColor: getTierColor(gifterTier) }]}>
           <Feather name="award" size={12} color="#fff" />
@@ -51,7 +46,8 @@ export default function ProfileBadges({
       
       {streakDays && streakDays > 0 && (
         <View style={[styles.badge, { backgroundColor: '#FF6B35' }]}>
-          <Text style={styles.badgeText}>🔥 {streakDays}</Text>
+          <Feather name="zap" size={12} color="#fff" />
+          <Text style={styles.badgeText}>Streak {streakDays}</Text>
         </View>
       )}
       

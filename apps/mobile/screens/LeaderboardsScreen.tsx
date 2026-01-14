@@ -2,6 +2,7 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import MllProBadge from '../components/shared/MllProBadge';
 import { useRoute } from '@react-navigation/native';
 import { useTheme } from '../theme/useTheme';
 import { useAuth } from '../state/AuthContext';
@@ -52,6 +53,7 @@ type LeaderboardEntry = {
   username: string;
   avatar_url: string | null;
   is_live: boolean;
+  is_mll_pro: boolean;
   gifter_level: number;
   metric_value: number;
   rank: number;
@@ -227,6 +229,7 @@ export default function LeaderboardsScreen() {
           avatar_url: lbEntry.avatar_url,
           rank: lbEntry.rank,
           is_live: lbEntry.is_live,
+          is_mll_pro: lbEntry.is_mll_pro,
         };
       }
     });
@@ -260,6 +263,7 @@ export default function LeaderboardsScreen() {
           avatar_url: lbEntry.avatar_url,
           trend: 'flat' as const,
           is_live: lbEntry.is_live,
+          is_mll_pro: lbEntry.is_mll_pro,
         };
       }
     });
@@ -459,6 +463,7 @@ export default function LeaderboardsScreen() {
                 trend={r.trend as 'up' | 'down' | 'flat'}
                 avatarUrl={r.avatar_url}
                 isLive={r.is_live}
+                isMllPro={r.is_mll_pro}
                 isLast={idx === rows.length - 1}
               />
             ))
@@ -583,6 +588,7 @@ function LeaderboardRow(props: {
   trend: 'up' | 'down' | 'flat';
   avatarUrl?: string | null;
   isLive?: boolean;
+  isMllPro?: boolean;
   isLast: boolean;
 }) {
   const themed = useLeaderboardTheme();
@@ -611,9 +617,12 @@ function LeaderboardRow(props: {
           )}
         </View>
         <View style={styles.userText}>
-          <Text style={[styles.userName, { color: themed.text }]} numberOfLines={1}>
-            {props.name}
-          </Text>
+          <View style={styles.userNameRow}>
+            <Text style={[styles.userName, { color: themed.text }]} numberOfLines={1}>
+              {props.name}
+            </Text>
+            {props.isMllPro && <MllProBadge size="sm" />}
+          </View>
           {props.handle ? (
             <Text style={[styles.userHandle, { color: themed.mutedText }]} numberOfLines={1}>
               {props.handle}
@@ -948,6 +957,11 @@ const styles = StyleSheet.create({
   userText: {
     flex: 1,
     minWidth: 0,
+  },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   userName: {
     fontSize: 14,

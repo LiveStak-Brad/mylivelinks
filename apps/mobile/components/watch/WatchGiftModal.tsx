@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   Pressable,
@@ -7,42 +7,183 @@ import {
   View,
   Image,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../../lib/supabase';
+
+interface GiftType {
+  id: number;
+  name: string;
+  coin_cost: number;
+  icon_url?: string;
+  emoji?: string;
+  tier: number;
+}
 
 interface WatchGiftModalProps {
   visible: boolean;
   onClose: () => void;
+  recipientId: string;
   recipientUsername: string;
   recipientDisplayName: string;
   recipientAvatarUrl: string | null;
+  postId?: string | null;
   isLive: boolean;
+  liveStreamId?: number | null;
 }
 
-const PLACEHOLDER_GIFTS = [
-  { id: 'rose', name: 'Rose', emoji: '🌹', coins: 1 },
-  { id: 'heart', name: 'Heart', emoji: '❤️', coins: 5 },
-  { id: 'star', name: 'Star', emoji: '⭐', coins: 10 },
-  { id: 'fire', name: 'Fire', emoji: '🔥', coins: 50 },
-  { id: 'diamond', name: 'Diamond', emoji: '💎', coins: 100 },
-  { id: 'crown', name: 'Crown', emoji: '👑', coins: 500 },
-];
+// Map gift names to emojis
+const getGiftEmoji = (name: string): string => {
+  const emojiMap: { [key: string]: string } = {
+    'Poo': '💩', 'Rose': '🌹', 'Heart': '❤️', 'Star': '⭐',
+    'Diamond': '💎', 'Super Star': '🌟', 'Crown': '👑',
+    'Platinum': '💠', 'Legendary': '🏆', 'Fire': '🔥',
+    'Rocket': '🚀', 'Rainbow': '🌈', 'Unicorn': '🦄',
+    'Party': '🎉', 'Confetti': '🎊', 'Champagne': '🍾',
+    'Money': '💰', 'Cash': '💵', 'Gold': '🥇',
+    'Kiss': '💋', 'Hug': '🤗', 'Love': '💕',
+  };
+  return emojiMap[name] || '🎁';
+};
 
 /**
  * Gift modal for Watch feed items.
- * Placeholder v1 - shows recipient info + gift grid.
+ * Fetches real gift types and sends gifts via API.
  */
 export default function WatchGiftModal({
   visible,
   onClose,
+  recipientId,
   recipientUsername,
   recipientDisplayName,
   recipientAvatarUrl,
+  postId,
   isLive,
+  liveStreamId,
 }: WatchGiftModalProps) {
-  const handleGiftSelect = (giftId: string) => {
-    // TODO: Wire to gift sending RPC when ready
-    console.log('[WatchGiftModal] Gift selected:', { giftId, recipientUsername });
+  const [giftTypes, setGiftTypes] = useState<GiftType[]>([]);
+  const [selectedGift, setSelectedGift] = useState<GiftType | null>(null);
+  const [userCoinBalance, setUserCoinBalance] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const loadGiftTypes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('gift_types')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order');
+
+      if (!error && data) {
+        setGiftTypes(data);
+      }
+    } catch (err) {
+      console.error('[WatchGiftModal] Error loading gift types:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadUserBalance = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('coin_balance')
+        .eq('id', user.id)
+        .single();
+
+      if (!error && data) {
+        setUserCoinBalance((data as any).coin_balance || 0);
+      }
+    } catch (err) {
+      console.error('[WatchGiftModal] Error loading balance:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (visible) {
+      loadGiftTypes();
+      loadUserBalance();
+      setSelectedGift(null);
+    }
+  }, [visible, loadGiftTypes, loadUserBalance]);
+
+  const handleGiftSelect = (gift: GiftType) => {
+    setSelectedGift(gift);
+  };
+
+  const handleSendGift = async () => {
+    if (!selectedGift || sending) return;
+
+    if (userCoinBalance < selectedGift.coin_cost) {
+      Alert.alert('Insufficient Balance', 'You need more coins to send this gift.');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        Alert.alert('Error', 'You must be logged in to send gifts.');
+        return;
+      }
+
+      const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL?.replace('/rest/v1', '')}/api/gifts/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          toUserId: recipientId,
+          coinsAmount: selectedGift.coin_cost,
+          giftTypeId: selectedGift.id,
+          streamId: liveStreamId || null,
+          requestId: `mobile-${Date.now()}`,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send gift');
+      }
+
+      // Update balance
+      if (data.senderBalance) {
+        setUserCoinBalance(data.senderBalance.coins);
+      } else {
+        await loadUserBalance();
+      }
+
+      // If this is a post gift, create a comment
+      if (postId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('post_comments').insert({
+            post_id: postId,
+            author_id: user.id,
+            text_content: `🎁 Sent a ${selectedGift.name} (${selectedGift.coin_cost} coins)`,
+          });
+        }
+      }
+
+      Alert.alert('Gift Sent!', `You sent a ${selectedGift.name} to @${recipientUsername}`);
+      setSelectedGift(null);
+      onClose();
+    } catch (err) {
+      console.error('[WatchGiftModal] Error sending gift:', err);
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to send gift');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -94,45 +235,68 @@ export default function WatchGiftModal({
 
           {/* Gift Grid */}
           <ScrollView style={styles.giftScrollView} showsVerticalScrollIndicator={false}>
-            <View style={styles.giftGrid}>
-              {PLACEHOLDER_GIFTS.map((gift) => (
-                <Pressable
-                  key={gift.id}
-                  style={({ pressed }) => [
-                    styles.giftItem,
-                    pressed && styles.giftItemPressed,
-                  ]}
-                  onPress={() => handleGiftSelect(gift.id)}
-                >
-                  <Text style={styles.giftEmoji}>{gift.emoji}</Text>
-                  <Text style={styles.giftName}>{gift.name}</Text>
-                  <View style={styles.giftCoinRow}>
-                    <Ionicons name="logo-bitcoin" size={12} color="#FBBF24" />
-                    <Text style={styles.giftCoins}>{gift.coins}</Text>
-                  </View>
-                </Pressable>
-              ))}
-            </View>
-
-            {/* Coming Soon Notice */}
-            <View style={styles.comingSoonNotice}>
-              <Ionicons name="information-circle-outline" size={20} color="#6B7280" />
-              <Text style={styles.comingSoonText}>
-                Full gifting system coming soon! Your coins will be charged when sending.
-              </Text>
-            </View>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#EC4899" />
+                <Text style={styles.loadingText}>Loading gifts...</Text>
+              </View>
+            ) : (
+              <View style={styles.giftGrid}>
+                {giftTypes.map((gift) => {
+                  const isSelected = selectedGift?.id === gift.id;
+                  const canAfford = userCoinBalance >= gift.coin_cost;
+                  return (
+                    <Pressable
+                      key={gift.id}
+                      style={[
+                        styles.giftItem,
+                        isSelected && styles.giftItemSelected,
+                        !canAfford && styles.giftItemDisabled,
+                      ]}
+                      onPress={() => handleGiftSelect(gift)}
+                      disabled={!canAfford}
+                    >
+                      <Text style={styles.giftEmoji}>{getGiftEmoji(gift.name)}</Text>
+                      <Text style={[styles.giftName, !canAfford && styles.giftNameDisabled]}>
+                        {gift.name}
+                      </Text>
+                      <View style={styles.giftCoinRow}>
+                        <Ionicons name="logo-bitcoin" size={12} color={canAfford ? "#FBBF24" : "#6B7280"} />
+                        <Text style={[styles.giftCoins, !canAfford && styles.giftCoinsDisabled]}>
+                          {gift.coin_cost}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </ScrollView>
 
-          {/* Coin Balance Placeholder */}
+          {/* Balance + Send Button */}
           <View style={styles.balanceSection}>
             <View style={styles.balanceRow}>
               <Ionicons name="wallet-outline" size={20} color="#FBBF24" />
-              <Text style={styles.balanceLabel}>Your Balance:</Text>
-              <Text style={styles.balanceAmount}>0 coins</Text>
+              <Text style={styles.balanceLabel}>Balance:</Text>
+              <Text style={styles.balanceAmount}>{userCoinBalance} coins</Text>
             </View>
-            <Pressable style={styles.rechargeButton}>
-              <Text style={styles.rechargeButtonText}>Get Coins</Text>
-            </Pressable>
+            {selectedGift ? (
+              <Pressable
+                style={[styles.sendButton, sending && styles.sendButtonDisabled]}
+                onPress={handleSendGift}
+                disabled={sending}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.sendButtonText}>
+                    Send {selectedGift.name} ({selectedGift.coin_cost})
+                  </Text>
+                )}
+              </Pressable>
+            ) : (
+              <Text style={styles.selectHint}>Select a gift to send</Text>
+            )}
           </View>
         </View>
       </View>
@@ -243,9 +407,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 8,
   },
-  giftItemPressed: {
-    backgroundColor: '#4B5563',
-    transform: [{ scale: 0.95 }],
+  giftItemSelected: {
+    backgroundColor: '#EC4899',
+    borderWidth: 2,
+    borderColor: '#F472B6',
+  },
+  giftItemDisabled: {
+    opacity: 0.4,
   },
   giftEmoji: {
     fontSize: 32,
@@ -267,19 +435,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FBBF24',
   },
-  comingSoonNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginHorizontal: 12,
-    marginBottom: 12,
-    backgroundColor: '#374151',
-    borderRadius: 8,
-    gap: 8,
+  giftNameDisabled: {
+    color: '#6B7280',
   },
-  comingSoonText: {
-    flex: 1,
-    fontSize: 12,
+  giftCoinsDisabled: {
+    color: '#6B7280',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
     color: '#9CA3AF',
   },
   balanceSection: {
@@ -304,15 +472,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FBBF24',
   },
-  rechargeButton: {
+  sendButton: {
     backgroundColor: '#EC4899',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
+    minWidth: 120,
+    alignItems: 'center',
   },
-  rechargeButtonText: {
+  sendButtonDisabled: {
+    opacity: 0.6,
+  },
+  sendButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  selectHint: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontStyle: 'italic',
   },
 });

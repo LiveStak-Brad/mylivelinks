@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -6,7 +6,6 @@ import {
   PanResponder,
   Pressable,
   RefreshControl,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 
 import WatchTopTabs, { WatchTabId } from '../components/watch/WatchTopTabs';
 import WatchModeLabel, { WatchMode } from '../components/watch/WatchModeLabel';
@@ -23,8 +23,10 @@ import WatchCaptionOverlay from '../components/watch/WatchCaptionOverlay';
 import WatchContentItem from '../components/watch/WatchContentItem';
 import WatchCommentsModal from '../components/watch/WatchCommentsModal';
 import WatchGiftModal from '../components/watch/WatchGiftModal';
+import ShareModal from '../components/ShareModal';
 import { useWatchFeed, WatchItem } from '../hooks/useWatchFeed';
 import { supabase } from '../lib/supabase';
+import { showComingSoon } from '../lib/showComingSoon';
 
 // ============================================================================
 // WATCH SCREEN COMPONENT
@@ -38,9 +40,21 @@ export default function WatchScreen() {
   const viewedItemsRef = useRef<Set<string>>(new Set());
   const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Modal state for comments and gifts
+  // Global mute state for all videos
+  const [globalMuted, setGlobalMuted] = useState(true);
+
+  // Keep screen awake while on Watch screen
+  useEffect(() => {
+    activateKeepAwakeAsync('watch-screen').catch(() => {});
+    return () => {
+      deactivateKeepAwake('watch-screen');
+    };
+  }, []);
+
+  // Modal state for comments, gifts, and share
   const [commentsModalVisible, setCommentsModalVisible] = useState(false);
   const [giftModalVisible, setGiftModalVisible] = useState(false);
+  const [shareModalVisible, setShareModalVisible] = useState(false);
   const [modalTargetItem, setModalTargetItem] = useState<WatchItem | null>(null);
 
   // Real feed data from RPC
@@ -96,23 +110,29 @@ export default function WatchScreen() {
         const absDy = Math.abs(dy);
 
         if (absDx >= SWIPE_THRESHOLD && absDx > absDy * ANGLE_RATIO) {
-          if (dx > 0) {
-            // Swipe RIGHT (finger left to right) → Live Only or back to All
+          if (dx < 0) {
+            // Swipe LEFT (finger right to left) → Live Only or back to All
             if (currentMode === 'creator_only') {
+              // In Creator Only, swipe left goes back to All
               setMode('all');
             } else if (currentMode === 'all') {
+              // In All, swipe left goes to Live Only
               setMode('live_only');
             }
+            // If in live_only, can't go further left
           } else {
-            // Swipe LEFT (finger right to left) → Creator Only or back to All
+            // Swipe RIGHT (finger left to right) → Creator Only or back to All
             if (currentMode === 'live_only') {
+              // In Live Only, swipe right goes back to All
               setMode('all');
             } else if (currentMode === 'all') {
+              // In All, swipe right goes to Creator Only (current user's content)
               const currentItem = getCurrentItem();
               if (currentItem) {
                 setMode('creator_only', currentItem.authorId);
               }
             }
+            // If in creator_only, can't go further right
           }
           // Scroll to top on mode change
           flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -282,15 +302,9 @@ export default function WatchScreen() {
     }
   }, [optimisticFollow]);
 
-  const handleShare = useCallback(async (item: WatchItem) => {
-    try {
-      await Share.share({
-        message: `Check out ${item.displayName} on MyLiveLinks! https://www.mylivelinks.com/${item.username}`,
-        url: `https://www.mylivelinks.com/${item.username}`,
-      });
-    } catch (err) {
-      console.warn('[WatchScreen] Share error:', err);
-    }
+  const handleShare = useCallback((item: WatchItem) => {
+    setModalTargetItem(item);
+    setShareModalVisible(true);
   }, []);
 
   const handleComment = useCallback((item: WatchItem) => {
@@ -304,11 +318,11 @@ export default function WatchScreen() {
   }, []);
 
   const handleAvatarPress = useCallback((item: WatchItem) => {
-    (navigation as any).navigate('PublicProfileScreen', { username: item.username });
+    (navigation as any).navigate('ProfileViewScreen', { username: item.username });
   }, [navigation]);
 
   const handleUsernamePress = useCallback((item: WatchItem) => {
-    (navigation as any).navigate('PublicProfileScreen', { username: item.username });
+    (navigation as any).navigate('ProfileViewScreen', { username: item.username });
   }, [navigation]);
 
   const handleCreate = useCallback(() => {
@@ -326,13 +340,23 @@ export default function WatchScreen() {
   // RENDER ITEM
   // ============================================================================
   const renderItem = useCallback(
-    ({ item }: { item: WatchItem }) => {
+    ({ item, index }: { item: WatchItem; index: number }) => {
       const isLive = item.type === 'live';
-      const thumbnailUrl = item.thumbnailUrl || item.avatarUrl || 'https://picsum.photos/seed/default/720/1280';
+      const isVisible = index === currentIndex;
+      // Priority: thumbnailUrl > mediaUrl > placeholder (never avatar for content)
+      const thumbnailUrl = item.thumbnailUrl || item.mediaUrl || 'https://picsum.photos/seed/default/720/1280';
 
       return (
         <Pressable onPress={() => isLive && handleLiveItemPress(item)}>
-          <WatchContentItem thumbnailUrl={thumbnailUrl} isLive={isLive} height={containerHeight}>
+          <WatchContentItem 
+            thumbnailUrl={thumbnailUrl} 
+            mediaUrl={item.mediaUrl}
+            isLive={isLive} 
+            isVisible={isVisible}
+            isMuted={globalMuted}
+            onMuteToggle={() => setGlobalMuted(prev => !prev)}
+            height={containerHeight}
+          >
             {/* Top section: Tabs + Mode label + Live badge */}
             <View style={styles.topSection}>
               <WatchTopTabs 
@@ -340,12 +364,25 @@ export default function WatchScreen() {
                 onTabPress={handleTabPress}
               />
 
-              {/* Mode label + Live badge row (below tabs) */}
+              {/* Mode label + Live badge + Mute toggle row (below tabs) */}
               <View style={styles.secondRow}>
                 <View style={styles.secondRowLeft}>
                   <WatchModeLabel mode={currentMode} />
                   <WatchLiveBadge visible={isLive} viewerCount={item.viewerCount} />
                 </View>
+                {/* Mute toggle button */}
+                <Pressable
+                  style={styles.muteButton}
+                  onPress={() => setGlobalMuted(prev => !prev)}
+                  accessibilityRole="button"
+                  accessibilityLabel={globalMuted ? 'Unmute' : 'Mute'}
+                >
+                  <Ionicons
+                    name={globalMuted ? 'volume-mute' : 'volume-high'}
+                    size={20}
+                    color="#FFFFFF"
+                  />
+                </Pressable>
               </View>
             </View>
 
@@ -364,6 +401,7 @@ export default function WatchScreen() {
                 onFollowPress={() => handleFollow(item)}
                 onLikePress={() => handleLike(item)}
                 onCommentPress={() => handleComment(item)}
+                onGiftPress={() => handleGift(item)}
                 onFavoritePress={() => handleFavorite(item)}
                 onSharePress={() => handleShare(item)}
                 onRepostPress={() => handleRepost(item)}
@@ -376,13 +414,15 @@ export default function WatchScreen() {
               <WatchCaptionOverlay
                 username={item.username}
                 displayName={item.displayName}
+                isMllPro={item.isMllPro}
                 title={item.title || ''}
                 caption={item.caption || ''}
                 hashtags={item.hashtags}
                 location={item.location || undefined}
+                viewCount={item.viewCount}
                 onUsernamePress={() => handleUsernamePress(item)}
-                onHashtagPress={() => {}}
-                onLocationPress={() => {}}
+                onHashtagPress={() => showComingSoon('Hashtag search')}
+                onLocationPress={() => showComingSoon('Location search')}
               />
             </View>
           </WatchContentItem>
@@ -390,7 +430,7 @@ export default function WatchScreen() {
       );
     },
     [
-      containerHeight, currentTab, currentMode, handleTabPress,
+      containerHeight, currentTab, currentMode, currentIndex, globalMuted, handleTabPress,
       handleAvatarPress, handleFollow, handleLike, handleComment,
       handleFavorite, handleShare, handleRepost, handleCreate,
       handleUsernamePress, handleLiveItemPress,
@@ -449,7 +489,7 @@ export default function WatchScreen() {
         <FlatList
           ref={flatListRef}
           data={items}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
           renderItem={renderItem}
           pagingEnabled
           showsVerticalScrollIndicator={false}
@@ -489,10 +529,33 @@ export default function WatchScreen() {
       <WatchGiftModal
         visible={giftModalVisible}
         onClose={() => setGiftModalVisible(false)}
+        recipientId={modalTargetItem?.authorId || ''}
         recipientUsername={modalTargetItem?.username || ''}
         recipientDisplayName={modalTargetItem?.displayName || ''}
         recipientAvatarUrl={modalTargetItem?.avatarUrl || null}
+        postId={modalTargetItem?.postId || modalTargetItem?.id || null}
         isLive={modalTargetItem?.type === 'live'}
+        liveStreamId={modalTargetItem?.liveStreamId || null}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={shareModalVisible}
+        onClose={() => {
+          setShareModalVisible(false);
+          setModalTargetItem(null);
+        }}
+        shareUrl={modalTargetItem?.type === 'live'
+          ? `https://www.mylivelinks.com/live/${modalTargetItem?.username}`
+          : `https://www.mylivelinks.com/post/${modalTargetItem?.postId || modalTargetItem?.id}`}
+        shareText={modalTargetItem?.caption || `Check out ${modalTargetItem?.displayName || modalTargetItem?.username} on MyLiveLinks!`}
+        shareThumbnail={
+          modalTargetItem?.thumbnailUrl ||
+          (modalTargetItem?.mediaUrl && !modalTargetItem.mediaUrl.match(/\.(mp4|mov|webm|avi|mkv|m4v)(\?|$)/i) ? modalTargetItem.mediaUrl : null) ||
+          modalTargetItem?.avatarUrl ||
+          null
+        }
+        shareContentType={modalTargetItem?.type === 'live' ? 'live' : modalTargetItem?.type === 'photo' ? 'photo' : 'video'}
       />
     </View>
   );
@@ -525,6 +588,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  muteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionStackContainer: {
     position: 'absolute',

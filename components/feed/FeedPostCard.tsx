@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { Heart, MessageCircle, Gift, Flag, Coins, Pin, MoreHorizontal, Eye } from 'lucide-react';
+import { Heart, MessageCircle, Gift, Flag, Coins, Pin, MoreHorizontal, Eye, Share2 } from 'lucide-react';
 import { PostManagementModal } from './PostManagementModal';
 import { Card } from '@/components/ui/Card';
 import LiveAvatar from '@/components/LiveAvatar';
@@ -51,6 +51,10 @@ export interface FeedPostCardProps {
   authorIsLive?: boolean;
   /** Author's gifter status */
   authorGifterStatus?: any;
+  /** Feeling emoji (e.g. 😊) */
+  feelingEmoji?: string | null;
+  /** Feeling label (e.g. "happy") */
+  feelingLabel?: string | null;
   /** Post text content */
   content?: string;
   /** Timestamp as Date or ISO string */
@@ -93,6 +97,8 @@ export interface FeedPostCardProps {
   onComment?: () => void;
   /** Callback when gift button clicked */
   onGift?: () => void;
+  /** Callback when share button clicked */
+  onShare?: () => void;
   /** Callback when more options clicked */
   onMore?: () => void;
   /** Callback when profile photo/username clicked */
@@ -231,6 +237,8 @@ const FeedPostCard = memo(function FeedPostCard({
   authorAvatarUrl,
   authorIsLive = false,
   authorGifterStatus,
+  feelingEmoji,
+  feelingLabel,
   content,
   timestamp,
   media,
@@ -252,6 +260,7 @@ const FeedPostCard = memo(function FeedPostCard({
   onLike,
   onComment,
   onGift,
+  onShare,
   onMore,
   onProfileClick,
   onClipAction,
@@ -333,7 +342,7 @@ const FeedPostCard = memo(function FeedPostCard({
           </div>
           
           <div className="flex-1 min-w-0 leading-tight">
-            <div className="mb-0.5 flex items-center gap-2">
+            <div className="mb-0.5 flex items-center gap-2 flex-wrap">
               <UserNameWithBadges
                 profileId={authorProfileId}
                 name={authorName}
@@ -343,6 +352,11 @@ const FeedPostCard = memo(function FeedPostCard({
                 clickable={!!onProfileClick}
                 onClick={onProfileClick}
               />
+              {feelingEmoji && feelingLabel && (
+                <span className="text-[14px] text-muted-foreground">
+                  is feeling {feelingEmoji} {feelingLabel}
+                </span>
+              )}
               {isPinned && (
                 <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
                   <Pin className="w-3 h-3 text-primary fill-current" />
@@ -354,23 +368,13 @@ const FeedPostCard = memo(function FeedPostCard({
           </div>
           
           <div className="flex items-center gap-1">
-            {canManage && postId && (
+            {postId && (
               <button
                 onClick={() => setShowManagementModal(true)}
                 className="flex-shrink-0 p-2 -mr-2 rounded-lg hover:bg-muted/60 transition-colors"
-                aria-label="Manage post"
+                aria-label="More options"
               >
                 <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
-              </button>
-            )}
-            {!canManage && typeof onMore === 'function' && (
-              <button
-                onClick={onMore}
-                className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 -mr-1 rounded-lg hover:bg-muted/60 transition-colors text-sm font-semibold text-muted-foreground"
-                aria-label="Report post"
-              >
-                <Flag className="w-4 h-4" aria-hidden="true" />
-                <span>Report</span>
               </button>
             )}
           </div>
@@ -428,6 +432,11 @@ const FeedPostCard = memo(function FeedPostCard({
                   label="Gift"
                   onClick={onGift}
                   variant="gift"
+                />
+                <ActionButton
+                  icon={Share2}
+                  label="Share"
+                  onClick={onShare}
                 />
                 {(coinCount > 0 || diamondCount > 0 || topGifters.length > 0) && (
                   <div className="flex items-center gap-2 px-2">
@@ -504,6 +513,7 @@ const FeedPostCard = memo(function FeedPostCard({
           onClose={() => setShowManagementModal(false)}
           onPostDeleted={onPostDeleted}
           onPostUpdated={onPostUpdated}
+          onReport={onMore}
         />
       )}
     </>

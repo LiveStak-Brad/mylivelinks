@@ -1,9 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-// Pro badge image
-const PRO_BADGE_IMAGE = require('../../assets/pro.png');
+import MllProBadge from '../shared/MllProBadge';
 
 export interface ChatMessage {
   id: string;
@@ -272,10 +270,7 @@ export default function ChatOverlay({
                     )}
                   </View>
                 )}
-                {/* Pro badge */}
-                {item.isPro && (
-                  <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
-                )}
+                {item.isPro && <MllProBadge size="sm" />}
                 <View style={styles.giftBadge}>
                   <Ionicons name="gift" size={10} color="#FFD700" />
                   <Text style={styles.giftAmount}>{item.giftAmount}</Text>
@@ -351,10 +346,7 @@ export default function ChatOverlay({
                     )}
                   </View>
                 )}
-                {/* Pro badge */}
-                {item.isPro && (
-                  <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
-                )}
+                {item.isPro && <MllProBadge size="sm" />}
               </View>
               <Text style={[styles.messageText, fontSizeStyles.message[chatSize], { color: textColor }]} numberOfLines={2}>
                 {safeText}
@@ -465,13 +457,6 @@ const styles = StyleSheet.create({
   gifterBadgeLevel: {
     fontSize: 9,
     fontWeight: '700',
-  },
-  
-  // Pro badge image
-  proBadgeImage: {
-    width: 28,
-    height: 14,
-    marginLeft: 4,
   },
   
   // Gift badge (small inline indicator)

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function ComposerScreen() {
   type TabView = 'drafts' | 'posted';
@@ -62,7 +63,7 @@ export default function ComposerScreen() {
               </View>
             </View>
 
-            <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.newProjectButton, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" onPress={() => showComingSoon('New project')} style={({ pressed }) => [styles.newProjectButton, pressed && styles.pressed]}>
               <Ionicons name="add" size={16} color="#FFFFFF" />
               <Text style={styles.newProjectButtonText}>New Project</Text>
             </Pressable>
@@ -199,7 +200,7 @@ function IconAction({
   label: string;
 }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => {}} style={({ pressed }) => [styles.iconAction, pressed && styles.pressedSoft]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => showComingSoon(label)} style={({ pressed }) => [styles.iconAction, pressed && styles.pressedSoft]}>
       <Ionicons name={icon} size={16} color="rgba(255,255,255,0.85)" />
     </Pressable>
   );
@@ -219,7 +220,7 @@ function ProjectRow({
   variant: 'drafts' | 'posted';
 }) {
   return (
-    <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.rowShell, pressed && styles.pressedSoft]}>
+    <Pressable accessibilityRole="button" onPress={() => showComingSoon('Project details')} style={({ pressed }) => [styles.rowShell, pressed && styles.pressedSoft]}>
       <View style={styles.rowLeftIcon}>
         <Ionicons name={variant === 'drafts' ? 'document-text-outline' : 'checkmark-circle-outline'} size={18} color="rgba(255,255,255,0.8)" />
       </View>
@@ -255,7 +256,7 @@ function ProjectCard({
   updatedAtLabel: string;
 }) {
   return (
-    <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.projectCard, pressed && styles.pressedSoft]}>
+    <Pressable accessibilityRole="button" onPress={() => showComingSoon('Project details')} style={({ pressed }) => [styles.projectCard, pressed && styles.pressedSoft]}>
       <View style={styles.projectThumb}>
         <Ionicons name="film-outline" size={26} color="rgba(255,255,255,0.22)" />
       </View>

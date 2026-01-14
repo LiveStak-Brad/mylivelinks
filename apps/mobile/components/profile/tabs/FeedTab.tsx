@@ -10,9 +10,8 @@ interface FeedTabProps {
 
 interface Post {
   id: string;
-  content: string;
+  text_content?: string;
   media_url?: string;
-  media_type?: string;
   created_at: string;
   profiles: {
     display_name: string;
@@ -39,22 +38,21 @@ export default function FeedTab({ profileId, colors }: FeedTabProps) {
         .from('posts')
         .select(`
           id,
-          content,
+          text_content,
           media_url,
-          media_type,
           created_at,
-          profiles:profile_id (
+          profiles!posts_author_id_fkey (
             display_name,
             username,
             avatar_url
           )
         `)
-        .eq('profile_id', profileId)
+        .eq('author_id', profileId)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) throw error;
-      setPosts(data || []);
+      setPosts((data as any) || []);
     } catch (error) {
       console.error('Error loading posts:', error);
     } finally {
@@ -79,13 +77,13 @@ export default function FeedTab({ profileId, colors }: FeedTabProps) {
         </View>
       </View>
 
-      {item.content && (
+      {item.text_content && (
         <Text style={[styles.content, { color: colors.text }]}>
-          {item.content}
+          {item.text_content}
         </Text>
       )}
 
-      {item.media_url && item.media_type === 'image' && (
+      {item.media_url && (
         <Image
           source={{ uri: item.media_url }}
           style={styles.postImage}
@@ -133,13 +131,11 @@ export default function FeedTab({ profileId, colors }: FeedTabProps) {
   }
 
   return (
-    <FlatList
-      data={posts}
-      renderItem={renderPost}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.listContainer}
-      showsVerticalScrollIndicator={false}
-    />
+    <View style={styles.listContainer}>
+      {posts.map((item) => (
+        <View key={item.id}>{renderPost({ item })}</View>
+      ))}
+    </View>
   );
 }
 

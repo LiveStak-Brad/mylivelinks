@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 interface FAQItem {
   q: string;
@@ -187,6 +188,7 @@ const RECOMMENDED_POLICIES: PolicyItem[] = [
 ];
 
 export default function HelpSafetyScreen() {
+  const navigation = useNavigation<any>();
   const [expandedCategory, setExpandedCategory] = useState<string | null>('Getting Started');
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
 
@@ -211,6 +213,27 @@ export default function HelpSafetyScreen() {
         <View style={styles.header}>
           <MaterialIcons name="help-outline" size={28} color="#10B981" />
           <Text style={styles.headerTitle}>Help & Safety</Text>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Safety Actions</Text>
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('BlockedUsersScreen')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.actionLeft}>
+              <View style={[styles.actionIcon, { backgroundColor: '#FEE2E2' }]}>
+                <MaterialIcons name="block" size={20} color="#EF4444" />
+              </View>
+              <View style={styles.actionTextCol}>
+                <Text style={styles.actionTitle}>Blocked Users</Text>
+                <Text style={styles.actionDescription}>View and manage users you've blocked</Text>
+              </View>
+            </View>
+            <MaterialIcons name="chevron-right" size={24} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -422,6 +445,42 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     color: '#3B82F6',
+  },
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 16,
+  },
+  actionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionTextCol: {
+    flex: 1,
+  },
+  actionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  actionDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
   },
 });
 

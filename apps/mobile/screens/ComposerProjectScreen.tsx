@@ -2,6 +2,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function ComposerProjectScreen() {
   type TabView = 'drafts' | 'posted';
@@ -29,7 +30,7 @@ export default function ComposerProjectScreen() {
               </View>
             </View>
 
-            <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.newProjectButton, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" onPress={() => showComingSoon('New project')} style={({ pressed }) => [styles.newProjectButton, pressed && styles.pressed]}>
               <Ionicons name="add" size={16} color="#FFFFFF" />
               <Text style={styles.newProjectButtonText}>New Project</Text>
             </Pressable>
@@ -46,7 +47,7 @@ export default function ComposerProjectScreen() {
         {currentProjects.length === 0 ? (
           <Card variant="dashed">
             <EmptyState
-              iconName={activeTab === 'drafts' ? 'inbox-outline' : 'checkmark-circle-outline'}
+              iconName={activeTab === 'drafts' ? 'file-tray-outline' : 'checkmark-circle-outline'}
               title={activeTab === 'drafts' ? 'No drafts yet' : 'No posted projects'}
               description={activeTab === 'drafts' ? 'Your draft projects will appear here' : 'Your published projects will appear here'}
             />
@@ -109,7 +110,7 @@ function EmptyState({
 
 function ProjectCard({ title, updatedAtLabel }: { title: string; updatedAtLabel: string }) {
   return (
-    <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.projectCard, pressed && styles.pressedSoft]}>
+    <Pressable accessibilityRole="button" onPress={() => showComingSoon('Project details')} style={({ pressed }) => [styles.projectCard, pressed && styles.pressedSoft]}>
       <View style={styles.projectThumb}>
         <Ionicons name="film-outline" size={26} color="rgba(255,255,255,0.22)" />
       </View>

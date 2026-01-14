@@ -29,6 +29,9 @@ export interface Message {
   shareUrl?: string;
   shareThumbnail?: string;
   shareContentType?: string;
+  shareTeamId?: string;
+  shareTeamName?: string;
+  shareTeamSlug?: string;
 }
 
 export interface Conversation {
@@ -136,7 +139,8 @@ function decodeIMContent(
     }
   }
   // Check for share message (JSON with type: 'share')
-  if (content.startsWith('{') && content.includes('"type":"share"')) {
+  // Try to parse any JSON that starts with { and check if it's a share message
+  if (content.startsWith('{')) {
     try {
       const parsed = JSON.parse(content);
       if (parsed?.type === 'share') {
@@ -148,10 +152,13 @@ function decodeIMContent(
           url: typeof parsed?.url === 'string' ? parsed.url : undefined,
           thumbnail: thumb,
           contentType: typeof parsed?.contentType === 'string' ? parsed.contentType : undefined,
+          teamId: typeof parsed?.teamId === 'string' ? parsed.teamId : undefined,
+          teamName: typeof parsed?.teamName === 'string' ? parsed.teamName : undefined,
+          teamSlug: typeof parsed?.teamSlug === 'string' ? parsed.teamSlug : undefined,
         };
       }
     } catch {
-      return { type: 'text', text: content };
+      // Not valid JSON, fall through to text
     }
   }
   return { type: 'text', text: content };
@@ -275,6 +282,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
               ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
               : decoded.type === 'image'
                 ? 'Sent a photo 📷'
+              : decoded.type === 'share'
+                ? decoded.contentType === 'live' ? '🔴 Shared a live stream' : decoded.contentType === 'profile' ? '👤 Shared a profile' : decoded.contentType === 'photo' ? '📷 Shared a photo' : '🎬 Shared a video'
               : decoded.text;
           const sentByMe = senderId === currentUserId;
           convoByOther.set(otherId, {
@@ -404,6 +413,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
             ? `Sent ${decoded.giftName || 'a gift'} 🎁 (+${decoded.giftCoins ?? 0} 💰)`
             : decoded.type === 'image'
               ? 'Sent a photo 📷'
+            : decoded.type === 'share'
+              ? decoded.contentType === 'live' ? '🔴 Shared a live stream' : decoded.contentType === 'profile' ? '👤 Shared a profile' : decoded.contentType === 'photo' ? '📷 Shared a photo' : '🎬 Shared a video'
             : decoded.text;
         const statusInfo = lastMessageStatusMap.get(otherId);
         return {
@@ -577,6 +588,9 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
               shareUrl: decoded.url,
               shareThumbnail: decoded.thumbnail,
               shareContentType: decoded.contentType,
+              shareTeamId: decoded.teamId,
+              shareTeamName: decoded.teamName,
+              shareTeamSlug: decoded.teamSlug,
               timestamp: r.created_at ? new Date(r.created_at) : new Date(),
               status: senderId === currentUserId ? (readAt ? 'read' : 'sent') : 'delivered',
             };

@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function PoliciesDataDeletionScreen() {
   return (
@@ -57,7 +58,7 @@ export default function PoliciesDataDeletionScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Request data deletion"
-          onPress={() => {}}
+          onPress={() => showComingSoon('Data deletion request')}
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
         >
           <Text style={styles.ctaText}>Request Data Deletion</Text>

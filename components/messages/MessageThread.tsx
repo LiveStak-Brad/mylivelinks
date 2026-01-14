@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type KeyboardEvent, type ChangeEvent } from 'react';
-import { Send, Gift, Smile, ArrowLeft, Loader2, ExternalLink, ImagePlus } from 'lucide-react';
+import { Send, Gift, Smile, ArrowLeft, Loader2, ExternalLink, ImagePlus, Share2 } from 'lucide-react';
 import { useMessages, Message, Conversation } from './MessagesContext';
 import GiftPickerMini from './GiftPickerMini';
 import { useIM } from '@/components/im';
@@ -574,10 +574,38 @@ function MessageBubble({
     const isLive = contentType === 'live';
     const isPhoto = contentType === 'photo';
 
+    const handleShare = () => {
+      if (navigator.share) {
+        navigator.share({
+          title: shareText,
+          text: shareText,
+          url: shareUrl,
+        }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(shareUrl);
+      }
+    };
+
+    const handleRepost = () => {
+      // Navigate to composer with repost data
+      window.location.href = `/composer?repost=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+    };
+
     return (
-      <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+      <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} items-start gap-2`}>
+        {/* Share button on left */}
+        <button
+          type="button"
+          onClick={handleShare}
+          className="w-9 h-9 rounded-full bg-muted/50 border border-border flex items-center justify-center hover:bg-muted transition flex-shrink-0"
+          title="Share"
+        >
+          <Share2 className="w-4 h-4 text-primary" />
+        </button>
+
+        {/* Shared content card */}
         <div
-          className={`w-[280px] overflow-hidden rounded-2xl border border-border shadow-sm ${
+          className={`w-[220px] overflow-hidden rounded-2xl border border-border shadow-sm ${
             isOwn ? 'bg-card' : 'bg-card'
           }`}
         >
@@ -630,6 +658,11 @@ function MessageBubble({
                 <span className="inline-block w-3 h-3">🔗</span>
                 <span className="truncate">{shareUrl.replace(/^https?:\/\//, '').split('/')[0]}</span>
               </p>
+              {message.shareTeamName && (
+                <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 bg-purple-500 text-white text-[10px] font-bold rounded">
+                  🔒 Team: {message.shareTeamName}
+                </div>
+              )}
             </div>
           </a>
           {/* Time and status */}
@@ -657,6 +690,21 @@ function MessageBubble({
             )}
           </div>
         </div>
+
+        {/* Repost button on right */}
+        <button
+          type="button"
+          onClick={handleRepost}
+          className="w-9 h-9 rounded-full bg-muted/50 border border-border flex items-center justify-center hover:bg-muted transition flex-shrink-0"
+          title="Repost"
+        >
+          <svg className="w-4 h-4 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 1l4 4-4 4" />
+            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+            <path d="M7 23l-4-4 4-4" />
+            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+          </svg>
+        </button>
       </div>
     );
   }

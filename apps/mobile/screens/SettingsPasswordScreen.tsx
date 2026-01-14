@@ -1,6 +1,8 @@
 ﻿import React, { useState } from 'react';
-import { Pressable, ScrollView, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function SettingsPasswordScreen() {
   // UI only (no API/auth). Local state is purely for input rendering.
@@ -83,7 +85,7 @@ export default function SettingsPasswordScreen() {
           <View style={styles.actionsRow}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {}}
+              onPress={() => showComingSoon('Update password')}
               style={({ pressed }) => [styles.primaryButton, pressed && styles.buttonPressed]}
             >
               <Text style={styles.primaryButtonText}>Update Password</Text>

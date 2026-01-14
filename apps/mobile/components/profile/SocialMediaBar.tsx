@@ -18,23 +18,69 @@ interface SocialMediaBarProps {
   colors: any;
 }
 
+// Convert username/handle to full URL for each platform
+function buildSocialUrl(platform: string, value: string): string {
+  // If already a full URL, return as-is
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    return value;
+  }
+  
+  // Remove @ prefix if present
+  const handle = value.replace(/^@/, '');
+  
+  switch (platform) {
+    case 'instagram':
+      return `https://instagram.com/${handle}`;
+    case 'twitter':
+      return `https://twitter.com/${handle}`;
+    case 'youtube':
+      // Could be channel ID or username
+      return handle.startsWith('UC') || handle.startsWith('@') 
+        ? `https://youtube.com/${handle}` 
+        : `https://youtube.com/@${handle}`;
+    case 'tiktok':
+      return `https://tiktok.com/@${handle}`;
+    case 'facebook':
+      return `https://facebook.com/${handle}`;
+    case 'twitch':
+      return `https://twitch.tv/${handle}`;
+    case 'discord':
+      // Discord invites or server IDs
+      return value.includes('discord') ? value : `https://discord.gg/${handle}`;
+    case 'snapchat':
+      return `https://snapchat.com/add/${handle}`;
+    case 'linkedin':
+      return `https://linkedin.com/in/${handle}`;
+    case 'github':
+      return `https://github.com/${handle}`;
+    case 'spotify':
+      return value.includes('spotify') ? value : `https://open.spotify.com/artist/${handle}`;
+    case 'onlyfans':
+      return `https://onlyfans.com/${handle}`;
+    default:
+      return value;
+  }
+}
+
 export default function SocialMediaBar(props: SocialMediaBarProps) {
   const { colors } = props;
 
   const socials = [
-    { key: 'instagram', url: props.instagram, icon: 'instagram', library: 'Feather' },
-    { key: 'twitter', url: props.twitter, icon: 'twitter', library: 'Feather' },
-    { key: 'youtube', url: props.youtube, icon: 'youtube', library: 'Feather' },
-    { key: 'tiktok', url: props.tiktok, icon: 'musical-notes', library: 'Ionicons' },
-    { key: 'facebook', url: props.facebook, icon: 'facebook', library: 'Feather' },
-    { key: 'twitch', url: props.twitch, icon: 'twitch', library: 'FontAwesome' },
-    { key: 'discord', url: props.discord, icon: 'discord', library: 'FontAwesome5' },
-    { key: 'snapchat', url: props.snapchat, icon: 'snapchat-ghost', library: 'FontAwesome' },
-    { key: 'linkedin', url: props.linkedin, icon: 'linkedin', library: 'Feather' },
-    { key: 'github', url: props.github, icon: 'github', library: 'Feather' },
-    { key: 'spotify', url: props.spotify, icon: 'spotify', library: 'FontAwesome' },
-    { key: 'onlyfans', url: props.onlyfans, icon: 'link', library: 'Feather' },
-  ].filter(s => s.url);
+    { key: 'instagram', value: props.instagram, icon: 'instagram', library: 'Feather' },
+    { key: 'twitter', value: props.twitter, icon: 'twitter', library: 'Feather' },
+    { key: 'youtube', value: props.youtube, icon: 'youtube', library: 'Feather' },
+    { key: 'tiktok', value: props.tiktok, icon: 'musical-notes', library: 'Ionicons' },
+    { key: 'facebook', value: props.facebook, icon: 'facebook', library: 'Feather' },
+    { key: 'twitch', value: props.twitch, icon: 'twitch', library: 'FontAwesome' },
+    { key: 'discord', value: props.discord, icon: 'discord', library: 'FontAwesome5' },
+    { key: 'snapchat', value: props.snapchat, icon: 'snapchat-ghost', library: 'FontAwesome' },
+    { key: 'linkedin', value: props.linkedin, icon: 'linkedin', library: 'Feather' },
+    { key: 'github', value: props.github, icon: 'github', library: 'Feather' },
+    { key: 'spotify', value: props.spotify, icon: 'spotify', library: 'FontAwesome' },
+    { key: 'onlyfans', value: props.onlyfans, icon: 'link', library: 'Feather' },
+  ]
+    .filter(s => s.value)
+    .map(s => ({ ...s, url: buildSocialUrl(s.key, s.value!) }));
 
   if (socials.length === 0) {
     return null;

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { RefreshCw, Upload, X, Globe, Users, Lock, Heart } from 'lucide-react';
+import { RefreshCw, Upload, X, Globe, Users, Lock, Heart, Smile, UserCheck } from 'lucide-react';
 import { Button, Card, Textarea } from '@/components/ui';
 import { FeedPostWithLikes } from './FeedPostWithLikes';
 import PostMedia from './PostMedia';
@@ -10,6 +10,7 @@ import SafeRichText from '@/components/SafeRichText';
 import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
 import GiftModal from '@/components/GiftModal';
 import ReportModal from '@/components/ReportModal';
+import { ShareModal } from '@/components/ShareModal';
 import { createClient } from '@/lib/supabase';
 import { uploadPostMedia } from '@/lib/storage';
 import { PHOTO_FILTER_PRESETS, type PhotoFilterId, getPhotoFilterPreset } from '@/lib/photoFilters';
@@ -34,6 +35,8 @@ type FeedPost = {
   id: string;
   text_content: string;
   media_url: string | null;
+  feeling_emoji?: string | null;
+  feeling_label?: string | null;
   created_at: string;
   visibility?: 'public' | 'friends' | 'private';
   is_pinned?: boolean;
@@ -105,7 +108,10 @@ export default function PublicFeedClient({
   const [composerMediaPreviewUrl, setComposerMediaPreviewUrl] = useState<string | null>(null);
   const [composerMediaKind, setComposerMediaKind] = useState<'image' | 'video' | null>(null);
   const [composerPhotoFilterId, setComposerPhotoFilterId] = useState<PhotoFilterId>('original');
-  const [composerVisibility, setComposerVisibility] = useState<'public' | 'friends' | 'private'>('public');
+  const [composerVisibility, setComposerVisibility] = useState<'public' | 'friends' | 'followers'>('public');
+  const [composerFeeling, setComposerFeeling] = useState<{ id: number; emoji: string; label: string } | null>(null);
+  const [showFeelingPicker, setShowFeelingPicker] = useState(false);
+  const [availableFeelings, setAvailableFeelings] = useState<Array<{ id: number; slug: string; emoji: string; label: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -257,6 +263,22 @@ export default function PublicFeedClient({
     };
   }, []);
 
+  // Load feelings list
+  useEffect(() => {
+    const loadFeelings = async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase.rpc('get_post_feelings');
+        if (!error && Array.isArray(data)) {
+          setAvailableFeelings(data as Array<{ id: number; slug: string; emoji: string; label: string }>);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void loadFeelings();
+  }, []);
+
   // Load feed only once on mount or when username changes
   useEffect(() => {
     void loadFeed('replace');
@@ -321,7 +343,7 @@ export default function PublicFeedClient({
     }
 
     const text = composerText.trim();
-    if (!text && !composerMediaFile) return;
+    if (!text && !composerMediaFile && !composerFeeling) return;
 
     if (composerInFlightRef.current) return;
     composerInFlightRef.current = true;
@@ -355,7 +377,8 @@ export default function PublicFeedClient({
         body: JSON.stringify({ 
           text_content: safeTextContent, 
           media_url: mediaUrl,
-          visibility: composerVisibility 
+          visibility: composerVisibility,
+          feeling_id: composerFeeling?.id ?? null,
         }),
       });
 
@@ -373,6 +396,7 @@ export default function PublicFeedClient({
       setComposerMediaKind(null);
       setComposerPhotoFilterId('original');
       setComposerVisibility('public');
+      setComposerFeeling(null);
       await loadFeed('replace');
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to create post');
@@ -380,7 +404,7 @@ export default function PublicFeedClient({
       setIsPosting(false);
       composerInFlightRef.current = false;
     }
-  }, [composerMediaFile, composerMediaKind, composerMediaPreviewUrl, composerPhotoFilterId, composerText, currentUserId, exportFilteredImage, loadFeed]);
+  }, [composerMediaFile, composerMediaKind, composerMediaPreviewUrl, composerPhotoFilterId, composerText, composerVisibility, composerFeeling, currentUserId, exportFilteredImage, loadFeed]);
 
   const onComposerFileChange = useCallback((file: File | null) => {
     if (!file) return;
@@ -717,6 +741,15 @@ export default function PublicFeedClient({
     setGiftTargetComment(null);
   }, []);
 
+  // Share modal state
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareTargetPost, setShareTargetPost] = useState<FeedPost | null>(null);
+
+  const openShareModal = useCallback((post: FeedPost) => {
+    setShareTargetPost(post);
+    setShareModalOpen(true);
+  }, []);
+
   return (
     <div className="space-y-4">
       {loadError && (
@@ -790,6 +823,24 @@ export default function PublicFeedClient({
                 </div>
               )}
 
+              {/* Selected feeling display */}
+              {composerFeeling && (
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-sm">
+                    <span>{composerFeeling.emoji}</span>
+                    <span className="text-foreground font-medium">feeling {composerFeeling.label}</span>
+                    <button
+                      type="button"
+                      onClick={() => setComposerFeeling(null)}
+                      className="ml-1 text-muted-foreground hover:text-foreground"
+                      disabled={isPosting}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <input
@@ -810,26 +861,59 @@ export default function PublicFeedClient({
                     <span className="hidden sm:inline">Photo/Video</span>
                   </button>
 
+                  {/* Feeling Selector */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowFeelingPicker(!showFeelingPicker)}
+                      disabled={isPosting}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50"
+                    >
+                      <Smile className="w-4 h-4 text-amber-500" />
+                      <span className="hidden sm:inline">Feeling</span>
+                    </button>
+                    {showFeelingPicker && (
+                      <div className="absolute bottom-full left-0 mb-1 z-[100] w-72 max-h-64 overflow-y-auto rounded-lg border border-border bg-background shadow-xl p-2">
+                        <div className="grid grid-cols-4 gap-1">
+                          {availableFeelings.map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() => {
+                                setComposerFeeling({ id: f.id, emoji: f.emoji, label: f.label });
+                                setShowFeelingPicker(false);
+                              }}
+                              className="flex flex-col items-center gap-0.5 p-2 rounded-md hover:bg-muted transition-colors"
+                            >
+                              <span className="text-xl">{f.emoji}</span>
+                              <span className="text-[10px] text-muted-foreground truncate w-full text-center">{f.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Visibility Selector */}
                   <div className="relative">
                     <select
                       value={composerVisibility}
-                      onChange={(e) => setComposerVisibility(e.target.value as 'public' | 'friends' | 'private')}
+                      onChange={(e) => setComposerVisibility(e.target.value as 'public' | 'friends' | 'followers')}
                       disabled={isPosting}
                       className="appearance-none pl-8 pr-3 py-1.5 rounded-md border border-border bg-background text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       <option value="public">Public</option>
+                      <option value="followers">Followers</option>
                       <option value="friends">Friends</option>
-                      <option value="private">Private</option>
                     </select>
                     <div className="absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none">
                       {composerVisibility === 'public' && <Globe className="w-4 h-4 text-muted-foreground" />}
+                      {composerVisibility === 'followers' && <UserCheck className="w-4 h-4 text-muted-foreground" />}
                       {composerVisibility === 'friends' && <Users className="w-4 h-4 text-muted-foreground" />}
-                      {composerVisibility === 'private' && <Lock className="w-4 h-4 text-muted-foreground" />}
                     </div>
                   </div>
                 </div>
-                <Button onClick={createPost} disabled={isPosting || (!composerText.trim() && !composerMediaFile)} isLoading={isPosting} size="sm">
+                <Button onClick={createPost} disabled={isPosting || (!composerText.trim() && !composerMediaFile && !composerFeeling)} isLoading={isPosting} size="sm">
                   Post
                 </Button>
               </div>
@@ -871,6 +955,8 @@ export default function PublicFeedClient({
                   authorUsername={post.author.username}
                   authorAvatarUrl={post.author.avatar_url}
                   authorIsLive={post.author.is_live}
+                  feelingEmoji={post.feeling_emoji}
+                  feelingLabel={post.feeling_label}
                   content={post.text_content}
                   timestamp={post.created_at}
                   media={
@@ -885,6 +971,7 @@ export default function PublicFeedClient({
                   topGifters={post.top_gifters || []}
                   onComment={() => void toggleComments(post.id)}
                   onGift={() => openGiftModal(post)}
+                  onShare={() => openShareModal(post)}
                   onMore={() => openReportPost(post)}
                   onProfileClick={() => {
                     window.location.href = `/${post.author.username}`;
@@ -1204,6 +1291,19 @@ export default function PublicFeedClient({
           reportedUserId={reportTarget.reportedUserId}
           reportedUsername={reportTarget.reportedUsername}
           contextDetails={reportTarget.contextDetails}
+        />
+      )}
+
+      {shareModalOpen && shareTargetPost && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={() => {
+            setShareModalOpen(false);
+            setShareTargetPost(null);
+          }}
+          title={`Post by @${shareTargetPost.author.username}`}
+          url={`https://www.mylivelinks.com/post/${shareTargetPost.id}`}
+          thumbnailUrl={shareTargetPost.media_url || shareTargetPost.author.avatar_url || undefined}
         />
       )}
     </div>

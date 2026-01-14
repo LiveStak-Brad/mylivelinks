@@ -29,11 +29,16 @@ export interface IMMessage {
   content: string;
   timestamp: Date;
   status: 'sending' | 'sent' | 'delivered' | 'read';
-  type?: 'text' | 'gift' | 'image';
+  type?: 'text' | 'gift' | 'image' | 'share';
   giftName?: string;
   giftCoins?: number;
   giftIcon?: string;
   imageUrl?: string;
+  shareText?: string;
+  shareUrl?: string;
+  shareThumbnail?: string;
+  shareContentType?: string;
+  shareTeamName?: string;
 }
 
 export interface IMChatWindowProps {
@@ -377,6 +382,87 @@ export default function IMChatWindow({
                       {formatTime(msg.timestamp)}
                     </p>
                   </div>
+                </div>
+              );
+            }
+
+            // Share message rendering
+            if (msg.type === 'share') {
+              const isLive = msg.shareContentType === 'live';
+              const isPhoto = msg.shareContentType === 'photo';
+              const rawThumb = msg.shareThumbnail?.trim();
+              const isVideoUrl = rawThumb && /\.(mp4|mov|webm|avi|mkv|m4v)(\?|$)/i.test(rawThumb);
+              const isValidImageUrl = rawThumb && (rawThumb.startsWith('http') || rawThumb.startsWith('/')) && !isVideoUrl;
+              const shareThumbnail = isValidImageUrl ? rawThumb : null;
+              
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                >
+                  <a
+                    href={msg.shareUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block max-w-[80%] rounded-2xl overflow-hidden border border-border hover:opacity-95 transition"
+                  >
+                    {/* Thumbnail */}
+                    <div className={`relative ${isPhoto ? 'aspect-square' : 'aspect-video'} bg-gray-900 overflow-hidden`}>
+                      {shareThumbnail ? (
+                        <>
+                          <img 
+                            src={shareThumbnail} 
+                            alt={msg.shareText || 'Shared content'} 
+                            className="w-full h-full object-cover"
+                          />
+                          {!isPhoto && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              {isLive ? (
+                                <span className="px-2 py-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                                  🔴 LIVE
+                                </span>
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+                                  <span className="text-white text-lg ml-0.5">▶</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                          {isLive ? (
+                            <span className="px-2 py-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                              🔴 LIVE
+                            </span>
+                          ) : isPhoto ? (
+                            <span className="text-2xl">📷</span>
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-black/30 flex items-center justify-center">
+                              <span className="text-white text-lg ml-0.5">▶</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {/* Text preview */}
+                    <div className="px-2.5 py-2 bg-muted/30">
+                      <p className="text-xs font-medium text-foreground line-clamp-2">{msg.shareText || 'Shared content'}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                        <span>🔗</span>
+                        <span className="truncate">{msg.shareUrl?.replace(/^https?:\/\//, '').split('/')[0] || 'mylivelinks.com'}</span>
+                      </p>
+                      {msg.shareTeamName && (
+                        <div className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-500 text-white text-[9px] font-bold rounded">
+                          🔒 Team: {msg.shareTeamName}
+                        </div>
+                      )}
+                    </div>
+                    {/* Time */}
+                    <p className={`text-[10px] px-2 py-1 ${isOwn ? 'text-right' : 'text-left'} text-muted-foreground border-t border-border/30`}>
+                      {formatTime(msg.timestamp)}
+                    </p>
+                  </a>
                 </div>
               );
             }

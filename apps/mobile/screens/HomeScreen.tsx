@@ -841,8 +841,8 @@ export default function HomeScreen() {
           <Card>
             <Text style={styles.ctaTitle}>Ready to Get Started?</Text>
             <View style={styles.ctaButtonsRow}>
-              <PrimaryButton label="Complete Your Profile" onPress={() => navigation.navigate('ProfileViewScreen' as never, { profileId: user?.id } as never)} />
-              <OutlineButton label="Browse Live Streams" onPress={() => navigation.navigate('Tabs' as never, { screen: 'LiveTV' } as never)} />
+              <PrimaryButton label="Complete Your Profile" onPress={() => (navigation.navigate as any)('ProfileViewScreen', { profileId: user?.id })} />
+              <OutlineButton label="Browse Live Streams" onPress={() => (navigation.navigate as any)('Tabs', { screen: 'LiveTV' })} />
             </View>
           </Card>
         </View>

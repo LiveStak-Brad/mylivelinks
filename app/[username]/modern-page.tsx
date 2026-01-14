@@ -72,6 +72,7 @@ import ProfileRepostsTab from '@/components/profile/tabs/ProfileRepostsTab';
 import ProfileFavoritesTab from '@/components/profile/tabs/ProfileFavoritesTab';
 import { ReferralProgressModule } from '@/components/referral';
 import ReportModal from '@/components/ReportModal';
+import { ShareModal } from '@/components/ShareModal';
 import { LocationBadge } from '@/components/location/LocationBadge';
 import LinklerSupportButton from '@/components/linkler/LinklerSupportButton';
 import type { ProfileLocation } from '@/lib/location';
@@ -568,27 +569,11 @@ export default function ModernProfilePage() {
     }
   };
   
-  const handleShare = async () => {
-    const url = `${window.location.origin}/p/${username}`;
-    const title = `${profileData?.profile.display_name || username} on MyLiveLinks`;
-    const text = `Check out ${profileData?.profile.display_name || username}'s profile on MyLiveLinks - Live streaming, links, and exclusive content! 🔥`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title,
-          text,
-          url
-        });
-      } catch (error) {
-        // User cancelled share
-      }
-    } else {
-      // Fallback: copy to clipboard with better message
-      const shareText = `${text}\n${url}`;
-      navigator.clipboard.writeText(shareText);
-      alert('Profile link and message copied to clipboard! 🎉');
-    }
+  // Share modal state
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  
+  const handleShare = () => {
+    setShareModalOpen(true);
   };
 
   // ---------------------------------------------------------------------------
@@ -1898,6 +1883,17 @@ export default function ModernProfilePage() {
           reportedUserId={profile.id}
           reportedUsername={profile.username}
           contextDetails={reportProfileContextDetails}
+        />
+      )}
+
+      {shareModalOpen && profileData && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          title={`${profileData.profile.display_name || profileData.profile.username} on MyLiveLinks`}
+          url={`https://www.mylivelinks.com/${profileData.profile.username}`}
+          thumbnailUrl={profileData.profile.avatar_url || undefined}
+          contentType="profile"
         />
       )}
 

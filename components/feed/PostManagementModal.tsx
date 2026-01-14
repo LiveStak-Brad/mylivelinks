@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Pin, Trash2, Eye, Users, Lock, X } from 'lucide-react';
+import { Pin, Trash2, Eye, Users, Lock, X, Flag, Edit3 } from 'lucide-react';
 import { createClient } from '@/lib/supabase';
 
 interface PostManagementModalProps {
@@ -14,6 +14,8 @@ interface PostManagementModalProps {
   onClose: () => void;
   onPostDeleted?: () => void;
   onPostUpdated?: () => void;
+  onReport?: () => void;
+  onEdit?: () => void;
 }
 
 export function PostManagementModal({
@@ -26,6 +28,8 @@ export function PostManagementModal({
   onClose,
   onPostDeleted,
   onPostUpdated,
+  onReport,
+  onEdit,
 }: PostManagementModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const supabase = createClient();
@@ -182,6 +186,24 @@ export function PostManagementModal({
             </div>
           )}
 
+          {/* Edit - only for authors */}
+          {isAuthor && onEdit && (
+            <button
+              onClick={() => {
+                onClose();
+                onEdit();
+              }}
+              disabled={isLoading}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted/60 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Edit3 className="w-5 h-5 text-muted-foreground" />
+              <div className="flex-1">
+                <div className="font-medium text-foreground">Edit Post</div>
+                <div className="text-sm text-muted-foreground">Modify your post content</div>
+              </div>
+            </button>
+          )}
+
           {/* Delete */}
           {canDelete && (
             <button
@@ -193,6 +215,24 @@ export function PostManagementModal({
               <div className="flex-1">
                 <div className="font-medium text-destructive">Delete Post</div>
                 <div className="text-sm text-muted-foreground">This action cannot be undone</div>
+              </div>
+            </button>
+          )}
+
+          {/* Report - only for non-authors */}
+          {!isAuthor && onReport && (
+            <button
+              onClick={() => {
+                onClose();
+                onReport();
+              }}
+              disabled={isLoading}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-destructive/10 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Flag className="w-5 h-5 text-destructive" />
+              <div className="flex-1">
+                <div className="font-medium text-destructive">Report Post</div>
+                <div className="text-sm text-muted-foreground">Report inappropriate content</div>
               </div>
             </button>
           )}

@@ -2,6 +2,7 @@
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function SearchMusicScreen() {
   const [query, setQuery] = useState('');
@@ -134,7 +135,7 @@ export default function SearchMusicScreen() {
         renderItem={({ item }) => {
           return (
             <Pressable
-              onPress={() => {}}
+              onPress={() => showComingSoon('Music player')}
               accessibilityRole="button"
               accessibilityLabel={`Track: ${item.title} by ${item.artist}`}
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}

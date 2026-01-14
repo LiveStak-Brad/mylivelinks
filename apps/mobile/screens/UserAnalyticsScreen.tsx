@@ -2,10 +2,12 @@
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/useTheme';
 
 type PublicAnalyticsTab = 'overview' | 'engagement' | 'economy' | 'live';
 
 export default function UserAnalyticsScreen({ route }: { route?: any }) {
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<PublicAnalyticsTab>('overview');
 
   const user = useMemo(() => {
@@ -27,56 +29,56 @@ export default function UserAnalyticsScreen({ route }: { route?: any }) {
   }, [user.displayName]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]} edges={['top']}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.identityRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+          <View style={[styles.avatar, { backgroundColor: colors.surface2, borderColor: colors.border }]}>
+            <Text style={[styles.avatarText, { color: colors.link }]}>{initials}</Text>
           </View>
 
           <View style={styles.identityMeta}>
             <View style={styles.identityTitleRow}>
-              <Text style={styles.title} numberOfLines={1}>
+              <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
                 {user.displayName}
               </Text>
-              <View style={styles.publicPill}>
-                <Ionicons name="globe-outline" size={14} color="#2563eb" />
-                <Text style={styles.publicPillText}>Public</Text>
+              <View style={[styles.publicPill, { backgroundColor: colors.surface2, borderColor: colors.border }]}>
+                <Ionicons name="globe-outline" size={14} color={colors.link} />
+                <Text style={[styles.publicPillText, { color: colors.link }]}>Public</Text>
               </View>
             </View>
 
-            <Text style={styles.subtitle} numberOfLines={1}>
+            <Text style={[styles.subtitle, { color: colors.mutedText }]} numberOfLines={1}>
               @{user.username} • User analytics
             </Text>
-            {user.userId ? <Text style={styles.userId}>ID: {user.userId}</Text> : null}
+            {user.userId ? <Text style={[styles.userId, { color: colors.subtleText }]}>ID: {user.userId}</Text> : null}
           </View>
         </View>
 
-        <Text style={styles.headerHint}>Placeholder metrics for a public analytics view (overview + key cards).</Text>
+        <Text style={[styles.headerHint, { color: colors.subtleText }]}>Placeholder metrics for a public analytics view (overview + key cards).</Text>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsContainer} contentContainerStyle={styles.tabsContent}>
-        <TabButton icon="apps" label="Overview" active={activeTab === 'overview'} onPress={() => setActiveTab('overview')} />
-        <TabButton icon="people" label="Engagement" active={activeTab === 'engagement'} onPress={() => setActiveTab('engagement')} />
-        <TabButton icon="gift" label="Economy" active={activeTab === 'economy'} onPress={() => setActiveTab('economy')} />
-        <TabButton icon="radio" label="Live" active={activeTab === 'live'} onPress={() => setActiveTab('live')} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.tabsContainer, { borderBottomColor: colors.border }]} contentContainerStyle={styles.tabsContent}>
+        <TabButton icon="apps" label="Overview" active={activeTab === 'overview'} onPress={() => setActiveTab('overview')} colors={colors} />
+        <TabButton icon="people" label="Engagement" active={activeTab === 'engagement'} onPress={() => setActiveTab('engagement')} colors={colors} />
+        <TabButton icon="gift" label="Economy" active={activeTab === 'economy'} onPress={() => setActiveTab('economy')} colors={colors} />
+        <TabButton icon="radio" label="Live" active={activeTab === 'live'} onPress={() => setActiveTab('live')} colors={colors} />
       </ScrollView>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {activeTab === 'overview' && <OverviewTab />}
-        {activeTab === 'engagement' && <EngagementTab />}
-        {activeTab === 'economy' && <EconomyTab />}
-        {activeTab === 'live' && <LiveTab />}
+        {activeTab === 'overview' && <OverviewTab colors={colors} />}
+        {activeTab === 'engagement' && <EngagementTab colors={colors} />}
+        {activeTab === 'economy' && <EconomyTab colors={colors} />}
+        {activeTab === 'live' && <LiveTab colors={colors} />}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function TabButton({ icon, label, active, onPress }: { icon: any; label: string; active: boolean; onPress: () => void }) {
+function TabButton({ icon, label, active, onPress, colors }: { icon: any; label: string; active: boolean; onPress: () => void; colors: any }) {
   return (
-    <Pressable onPress={onPress} style={[styles.tab, active && styles.tabActive]}>
-      <Ionicons name={icon} size={18} color={active ? '#2563eb' : '#6b7280'} />
-      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
+    <Pressable onPress={onPress} style={[styles.tab, active && [styles.tabActive, { borderBottomColor: colors.link }]]}>
+      <Ionicons name={icon} size={18} color={active ? colors.link : colors.mutedText} />
+      <Text style={[styles.tabLabel, { color: colors.mutedText }, active && { color: colors.link }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -86,150 +88,152 @@ function KpiCard({
   value,
   icon,
   subtitle,
+  colors,
 }: {
   title: string;
   value: string | number;
   icon: any;
   subtitle?: string;
+  colors: any;
 }) {
   return (
-    <View style={styles.kpiCard}>
+    <View style={[styles.kpiCard, { backgroundColor: colors.surface2, borderColor: colors.border }]}>
       <View style={styles.kpiHeader}>
-        <Ionicons name={icon} size={18} color="#2563eb" />
-        <Text style={styles.kpiTitle}>{title}</Text>
+        <Ionicons name={icon} size={18} color={colors.link} />
+        <Text style={[styles.kpiTitle, { color: colors.mutedText }]}>{title}</Text>
       </View>
-      <Text style={styles.kpiValue}>{typeof value === 'number' ? value.toLocaleString() : value}</Text>
-      {subtitle ? <Text style={styles.kpiSubtitle}>{subtitle}</Text> : null}
+      <Text style={[styles.kpiValue, { color: colors.text }]}>{typeof value === 'number' ? value.toLocaleString() : value}</Text>
+      {subtitle ? <Text style={[styles.kpiSubtitle, { color: colors.subtleText }]}>{subtitle}</Text> : null}
     </View>
   );
 }
 
-function RowItem({ left, right, icon }: { left: string; right: string; icon?: any }) {
+function RowItem({ left, right, icon, colors }: { left: string; right: string; icon?: any; colors: any }) {
   return (
-    <View style={styles.rowItem}>
+    <View style={[styles.rowItem, { borderTopColor: colors.border }]}>
       <View style={styles.rowLeft}>
-        {icon ? <Ionicons name={icon} size={18} color="#6b7280" /> : null}
-        <Text style={styles.rowLeftText} numberOfLines={1}>
+        {icon ? <Ionicons name={icon} size={18} color={colors.mutedText} /> : null}
+        <Text style={[styles.rowLeftText, { color: colors.text }]} numberOfLines={1}>
           {left}
         </Text>
       </View>
-      <Text style={styles.rowRightText} numberOfLines={1}>
+      <Text style={[styles.rowRightText, { color: colors.text }]} numberOfLines={1}>
         {right}
       </Text>
     </View>
   );
 }
 
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Section({ title, subtitle, children, colors }: { title: string; subtitle?: string; children: React.ReactNode; colors: any }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+      {subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.mutedText }]}>{subtitle}</Text> : null}
       {children}
     </View>
   );
 }
 
-function ChartPlaceholder({ icon, label }: { icon: any; label: string }) {
+function ChartPlaceholder({ icon, label, colors }: { icon: any; label: string; colors: any }) {
   return (
-    <View style={styles.chartPlaceholder}>
-      <Ionicons name={icon} size={44} color="#cbd5e1" />
-      <Text style={styles.chartPlaceholderText}>{label}</Text>
+    <View style={[styles.chartPlaceholder, { backgroundColor: colors.surface2, borderColor: colors.border }]}>
+      <Ionicons name={icon} size={44} color={colors.subtleText} />
+      <Text style={[styles.chartPlaceholderText, { color: colors.subtleText }]}>{label}</Text>
     </View>
   );
 }
 
-function OverviewTab() {
+function OverviewTab({ colors }: { colors: any }) {
   return (
     <View style={styles.tabContent}>
       <View style={styles.kpiGrid}>
-        <KpiCard title="Followers" value={12840} icon="people" subtitle="public count (placeholder)" />
-        <KpiCard title="Profile views" value={92500} icon="eye" subtitle="last 30 days (placeholder)" />
-        <KpiCard title="Total gifts received" value={1732} icon="gift" subtitle="lifetime (placeholder)" />
-        <KpiCard title="Diamonds earned" value={48210} icon="diamond" subtitle="lifetime (placeholder)" />
+        <KpiCard title="Followers" value={12840} icon="people" subtitle="public count (placeholder)" colors={colors} />
+        <KpiCard title="Profile views" value={92500} icon="eye" subtitle="last 30 days (placeholder)" colors={colors} />
+        <KpiCard title="Total gifts received" value={1732} icon="gift" subtitle="lifetime (placeholder)" colors={colors} />
+        <KpiCard title="Diamonds earned" value={48210} icon="diamond" subtitle="lifetime (placeholder)" colors={colors} />
       </View>
 
-      <Section title="Highlights" subtitle="Key public stats (placeholder)">
-        <View style={styles.card}>
-          <RowItem icon="trophy-outline" left="Best live session" right="458 peak viewers" />
-          <RowItem icon="time-outline" left="Longest session" right="3h 20m" />
-          <RowItem icon="sparkles-outline" left="Top gift" right="5,000 🪙" />
+      <Section title="Highlights" subtitle="Key public stats (placeholder)" colors={colors}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <RowItem icon="trophy-outline" left="Best live session" right="458 peak viewers" colors={colors} />
+          <RowItem icon="time-outline" left="Longest session" right="3h 20m" colors={colors} />
+          <RowItem icon="sparkles-outline" left="Top gift" right="5,000 🪙" colors={colors} />
         </View>
       </Section>
 
-      <Section title="Trends" subtitle="Visuals coming soon">
-        <ChartPlaceholder icon="bar-chart-outline" label="Followers & views trend chart (placeholder)" />
+      <Section title="Trends" subtitle="Visuals coming soon" colors={colors}>
+        <ChartPlaceholder icon="bar-chart-outline" label="Followers & views trend chart (placeholder)" colors={colors} />
       </Section>
     </View>
   );
 }
 
-function EngagementTab() {
+function EngagementTab({ colors }: { colors: any }) {
   return (
     <View style={styles.tabContent}>
       <View style={styles.kpiGrid}>
-        <KpiCard title="Avg viewers" value={127} icon="people-outline" subtitle="per live (placeholder)" />
-        <KpiCard title="Peak viewers" value={458} icon="trending-up-outline" subtitle="best live (placeholder)" />
-        <KpiCard title="Chat messages" value={18340} icon="chatbubbles-outline" subtitle="last 30 days (placeholder)" />
-        <KpiCard title="Shares" value={920} icon="share-social-outline" subtitle="last 30 days (placeholder)" />
+        <KpiCard title="Avg viewers" value={127} icon="people-outline" subtitle="per live (placeholder)" colors={colors} />
+        <KpiCard title="Peak viewers" value={458} icon="trending-up-outline" subtitle="best live (placeholder)" colors={colors} />
+        <KpiCard title="Chat messages" value={18340} icon="chatbubbles-outline" subtitle="last 30 days (placeholder)" colors={colors} />
+        <KpiCard title="Shares" value={920} icon="share-social-outline" subtitle="last 30 days (placeholder)" colors={colors} />
       </View>
 
-      <Section title="Audience" subtitle="Breakdown (placeholder)">
-        <View style={styles.card}>
-          <RowItem icon="compass-outline" left="Top region" right="United States" />
-          <RowItem icon="calendar-outline" left="Top active day" right="Friday" />
-          <RowItem icon="time-outline" left="Top active hour" right="8–10 PM" />
+      <Section title="Audience" subtitle="Breakdown (placeholder)" colors={colors}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <RowItem icon="compass-outline" left="Top region" right="United States" colors={colors} />
+          <RowItem icon="calendar-outline" left="Top active day" right="Friday" colors={colors} />
+          <RowItem icon="time-outline" left="Top active hour" right="8–10 PM" colors={colors} />
         </View>
       </Section>
 
-      <Section title="Engagement trend" subtitle="Visuals coming soon">
-        <ChartPlaceholder icon="pulse-outline" label="Engagement trend chart (placeholder)" />
+      <Section title="Engagement trend" subtitle="Visuals coming soon" colors={colors}>
+        <ChartPlaceholder icon="pulse-outline" label="Engagement trend chart (placeholder)" colors={colors} />
       </Section>
     </View>
   );
 }
 
-function EconomyTab() {
+function EconomyTab({ colors }: { colors: any }) {
   return (
     <View style={styles.tabContent}>
       <View style={styles.kpiGrid}>
-        <KpiCard title="Gifts received" value={1732} icon="gift-outline" subtitle="lifetime (placeholder)" />
-        <KpiCard title="Diamonds earned" value={48210} icon="diamond-outline" subtitle="lifetime (placeholder)" />
-        <KpiCard title="Est. USD value" value="$241.05" icon="cash-outline" subtitle="estimate (placeholder)" />
-        <KpiCard title="Top gifter" value="@topfan" icon="person-outline" subtitle="placeholder" />
+        <KpiCard title="Gifts received" value={1732} icon="gift-outline" subtitle="lifetime (placeholder)" colors={colors} />
+        <KpiCard title="Diamonds earned" value={48210} icon="diamond-outline" subtitle="lifetime (placeholder)" colors={colors} />
+        <KpiCard title="Est. USD value" value="$241.05" icon="cash-outline" subtitle="estimate (placeholder)" colors={colors} />
+        <KpiCard title="Top gifter" value="@topfan" icon="person-outline" subtitle="placeholder" colors={colors} />
       </View>
 
-      <Section title="Top gifts" subtitle="Most valuable gifts (placeholder)">
-        <View style={styles.card}>
-          <RowItem icon="sparkles-outline" left="Galaxy" right="1 × 5,000 🪙" />
-          <RowItem icon="sparkles-outline" left="Rocket" right="3 × 1,000 🪙" />
-          <RowItem icon="sparkles-outline" left="Rose" right="120 × 10 🪙" />
+      <Section title="Top gifts" subtitle="Most valuable gifts (placeholder)" colors={colors}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <RowItem icon="sparkles-outline" left="Galaxy" right="1 × 5,000 🪙" colors={colors} />
+          <RowItem icon="sparkles-outline" left="Rocket" right="3 × 1,000 🪙" colors={colors} />
+          <RowItem icon="sparkles-outline" left="Rose" right="120 × 10 🪙" colors={colors} />
         </View>
       </Section>
 
-      <Section title="Economy trend" subtitle="Visuals coming soon">
-        <ChartPlaceholder icon="trending-up-outline" label="Gifts & diamonds trend chart (placeholder)" />
+      <Section title="Economy trend" subtitle="Visuals coming soon" colors={colors}>
+        <ChartPlaceholder icon="trending-up-outline" label="Gifts & diamonds trend chart (placeholder)" colors={colors} />
       </Section>
     </View>
   );
 }
 
-function LiveTab() {
+function LiveTab({ colors }: { colors: any }) {
   return (
     <View style={styles.tabContent}>
       <View style={styles.kpiGrid}>
-        <KpiCard title="Live sessions" value={45} icon="radio-outline" subtitle="last 90 days (placeholder)" />
-        <KpiCard title="Total live time" value="32h 15m" icon="time-outline" subtitle="last 90 days (placeholder)" />
-        <KpiCard title="Avg session" value="43m" icon="hourglass-outline" subtitle="placeholder" />
-        <KpiCard title="Battle wins" value={18} icon="trophy-outline" subtitle="placeholder" />
+        <KpiCard title="Live sessions" value={45} icon="radio-outline" subtitle="last 90 days (placeholder)" colors={colors} />
+        <KpiCard title="Total live time" value="32h 15m" icon="time-outline" subtitle="last 90 days (placeholder)" colors={colors} />
+        <KpiCard title="Avg session" value="43m" icon="hourglass-outline" subtitle="placeholder" colors={colors} />
+        <KpiCard title="Battle wins" value={18} icon="trophy-outline" subtitle="placeholder" colors={colors} />
       </View>
 
-      <Section title="Recent sessions" subtitle="Last sessions (placeholder)">
-        <View style={styles.card}>
-          <RowItem icon="calendar-outline" left="Jan 10 • 2h 15m" right="245 peak viewers" />
-          <RowItem icon="calendar-outline" left="Jan 9 • 1h 45m" right="189 peak viewers" />
-          <RowItem icon="calendar-outline" left="Jan 8 • 3h 00m" right="458 peak viewers" />
-          <RowItem icon="calendar-outline" left="Jan 7 • 1h 30m" right="156 peak viewers" />
+      <Section title="Recent sessions" subtitle="Last sessions (placeholder)" colors={colors}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <RowItem icon="calendar-outline" left="Jan 10 • 2h 15m" right="245 peak viewers" colors={colors} />
+          <RowItem icon="calendar-outline" left="Jan 9 • 1h 45m" right="189 peak viewers" colors={colors} />
+          <RowItem icon="calendar-outline" left="Jan 8 • 3h 00m" right="458 peak viewers" colors={colors} />
+          <RowItem icon="calendar-outline" left="Jan 7 • 1h 30m" right="156 peak viewers" colors={colors} />
         </View>
       </Section>
     </View>

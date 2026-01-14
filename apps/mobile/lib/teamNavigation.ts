@@ -1,4 +1,5 @@
-import { NavigationProp } from '@react-navigation/native';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyNavigation = any;
 
 /**
  * Canonical Teams Navigation Contract
@@ -29,7 +30,7 @@ export type TeamsNavigationParams = {
 /**
  * Navigate to Teams Landing page
  */
-export function navigateToTeamsLanding(navigation: NavigationProp<any>) {
+export function navigateToTeamsLanding(navigation: AnyNavigation) {
   navigation.navigate('TeamsScreen' as never);
 }
 
@@ -39,7 +40,7 @@ export function navigateToTeamsLanding(navigation: NavigationProp<any>) {
  * @param slug - Optional team slug for display
  */
 export function navigateToTeamDetail(
-  navigation: NavigationProp<any>,
+  navigation: AnyNavigation,
   params: { teamId: string; slug?: string }
 ) {
   if (!params.teamId) {
@@ -52,21 +53,21 @@ export function navigateToTeamDetail(
 /**
  * Navigate to Teams Search/Discovery
  */
-export function navigateToTeamsSearch(navigation: NavigationProp<any>) {
+export function navigateToTeamsSearch(navigation: AnyNavigation) {
   navigation.navigate('SearchTeamsScreen' as never);
 }
 
 /**
  * Navigate to Create Team flow
  */
-export function navigateToTeamsSetup(navigation: NavigationProp<any>) {
+export function navigateToTeamsSetup(navigation: AnyNavigation) {
   navigation.navigate('TeamsSetupScreen' as never);
 }
 
 /**
  * Navigate to Team Invite Management
  */
-export function navigateToTeamInvite(navigation: NavigationProp<any>, teamId: string) {
+export function navigateToTeamInvite(navigation: AnyNavigation, teamId: string) {
   if (!teamId) {
     console.error('[teamNavigation] navigateToTeamInvite requires teamId');
     return;
@@ -77,7 +78,7 @@ export function navigateToTeamInvite(navigation: NavigationProp<any>, teamId: st
 /**
  * Navigate to Team Admin Panel
  */
-export function navigateToTeamAdmin(navigation: NavigationProp<any>, teamId: string) {
+export function navigateToTeamAdmin(navigation: AnyNavigation, teamId: string) {
   if (!teamId) {
     console.error('[teamNavigation] navigateToTeamAdmin requires teamId');
     return;
@@ -89,7 +90,7 @@ export function navigateToTeamAdmin(navigation: NavigationProp<any>, teamId: str
  * Navigate to Team Live Room
  */
 export function navigateToTeamRoom(
-  navigation: NavigationProp<any>,
+  navigation: AnyNavigation,
   params: { teamId: string; roomSlug?: string }
 ) {
   if (!params.teamId) {

@@ -1130,7 +1130,7 @@ export default function GoLiveScreen() {
             hostAvatarUrl={hostProfile?.avatarUrl}
             isPro={hostProfile?.isPro ?? false}
             viewerCount={viewerCount}
-            trendingRank={trendingRank}
+            trendingRank={trendingRank ?? undefined}
             leaderboardRank={leaderboardRank ?? undefined}
             topGifters={topGifters}
             messages={chatMessages}

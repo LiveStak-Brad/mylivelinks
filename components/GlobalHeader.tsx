@@ -127,24 +127,96 @@ function LinkOrNahIconLink({
   );
 }
 
-function HeaderIcons() {
-  const [showNotiesModal, setShowNotiesModal] = useState(false);
-  const [showMessagesModal, setShowMessagesModal] = useState(false);
+function HeaderIcons({
+  showMessagesModal,
+  setShowMessagesModal,
+  showNotiesModal,
+  setShowNotiesModal,
+}: {
+  showMessagesModal: boolean;
+  setShowMessagesModal: (v: boolean) => void;
+  showNotiesModal: boolean;
+  setShowNotiesModal: (v: boolean) => void;
+}) {
+  const { unreadCount: unreadNoties } = useNoties();
+  const { totalUnreadCount: unreadMessages } = useMessages();
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setShowNotiesModal(false);
+      setShowMessagesModal(false);
+    }
+  }, [setShowMessagesModal, setShowNotiesModal]);
+
+  return (
+    <div className="header-icon-cluster flex items-center" onKeyDown={handleKeyDown}>
+      <button
+        onClick={() => {
+          setShowMessagesModal(!showMessagesModal);
+          setShowNotiesModal(false);
+        }}
+        className={`group relative nav-icon-button ${showMessagesModal ? 'nav-icon-button-active' : ''}`}
+        aria-label={`Messages${unreadMessages > 0 ? `, ${unreadMessages} unread` : ''}`}
+        aria-expanded={showMessagesModal}
+        aria-haspopup="dialog"
+        title="Messages"
+      >
+        <MessageCircle className={`${HEADER_ICON_CLASS} text-emerald-500 dark:text-emerald-400`} strokeWidth={2} />
+        {unreadMessages > 0 && (
+          <span className="notification-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>
+        )}
+        <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+          Messages
+        </span>
+      </button>
+
+      <button
+        onClick={() => {
+          setShowNotiesModal(!showNotiesModal);
+          setShowMessagesModal(false);
+        }}
+        className={`group relative nav-icon-button ${showNotiesModal ? 'nav-icon-button-active' : ''}`}
+        aria-label={`Noties${unreadNoties > 0 ? `, ${unreadNoties} unread` : ''}`}
+        aria-expanded={showNotiesModal}
+        aria-haspopup="dialog"
+        title="Noties"
+      >
+        <Bell className={`${HEADER_ICON_CLASS} text-amber-500 dark:text-amber-400`} strokeWidth={2} />
+        {unreadNoties > 0 && (
+          <span className="notification-badge">{unreadNoties > 99 ? '99+' : unreadNoties}</span>
+        )}
+        <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
+          Noties
+        </span>
+      </button>
+    </div>
+  );
+}
+
+export default function GlobalHeader() {
   const rawPathname = usePathname();
   const pathname = rawPathname ?? '';
   const router = useRouter();
   const searchParams = useSearchParams();
-  const query = searchParams ?? new URLSearchParams();
+  const [isOwner, setIsOwner] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [appMenuOpen, setAppMenuOpen] = useState(false);
+  const [showMessagesModal, setShowMessagesModal] = useState(false);
+  const [showNotiesModal, setShowNotiesModal] = useState(false);
+  const dmHandledRef = useRef<string | null>(null);
 
-  const notiesButtonRef = useRef<HTMLButtonElement>(null);
-  const messagesButtonRef = useRef<HTMLButtonElement>(null);
+  const supabase = useMemo(() => createClient(), []);
+  const { openConversationWith } = useMessages();
 
-  const { unreadCount: unreadNoties } = useNoties();
-  const { totalUnreadCount: unreadMessages, openConversationWith } = useMessages();
-
+  // Handle dm query param - runs once in parent, not in each HeaderIcons instance
   useEffect(() => {
+    const query = searchParams ?? new URLSearchParams();
     const dm = query.get('dm');
     if (!dm) return;
+    // Prevent double-execution when openConversationWith reference changes
+    if (dmHandledRef.current === dm) return;
+    dmHandledRef.current = dm;
 
     void (async () => {
       setShowMessagesModal(true);
@@ -155,87 +227,10 @@ function HeaderIcons() {
       next.delete('dm');
       const qs = next.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
+      // Reset after URL is cleaned so future dm params work
+      dmHandledRef.current = null;
     })();
   }, [openConversationWith, pathname, router, searchParams]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      setShowNotiesModal(false);
-      setShowMessagesModal(false);
-    }
-  }, []);
-
-  return (
-    <div className="header-icon-cluster flex items-center" onKeyDown={handleKeyDown}>
-      <div className="relative z-[70]">
-        <button
-          ref={messagesButtonRef}
-          onClick={() => {
-            setShowMessagesModal(!showMessagesModal);
-            setShowNotiesModal(false);
-          }}
-          className={`group relative nav-icon-button ${showMessagesModal ? 'nav-icon-button-active' : ''}`}
-          aria-label={`Messages${unreadMessages > 0 ? `, ${unreadMessages} unread` : ''}`}
-          aria-expanded={showMessagesModal}
-          aria-haspopup="dialog"
-          title="Messages"
-        >
-          <MessageCircle className={`${HEADER_ICON_CLASS} text-emerald-500 dark:text-emerald-400`} strokeWidth={2} />
-          {unreadMessages > 0 && (
-            <span className="notification-badge">{unreadMessages > 99 ? '99+' : unreadMessages}</span>
-          )}
-          <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-            Messages
-          </span>
-        </button>
-        <MessagesModal
-          isOpen={showMessagesModal}
-          onClose={() => setShowMessagesModal(false)}
-          anchorRef={messagesButtonRef}
-        />
-      </div>
-
-      <div className="relative z-[70]">
-        <button
-          ref={notiesButtonRef}
-          onClick={() => {
-            setShowNotiesModal(!showNotiesModal);
-            setShowMessagesModal(false);
-          }}
-          className={`group relative nav-icon-button ${showNotiesModal ? 'nav-icon-button-active' : ''}`}
-          aria-label={`Noties${unreadNoties > 0 ? `, ${unreadNoties} unread` : ''}`}
-          aria-expanded={showNotiesModal}
-          aria-haspopup="dialog"
-          title="Noties"
-        >
-          <Bell className={`${HEADER_ICON_CLASS} text-amber-500 dark:text-amber-400`} strokeWidth={2} />
-          {unreadNoties > 0 && (
-            <span className="notification-badge">{unreadNoties > 99 ? '99+' : unreadNoties}</span>
-          )}
-          <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-sm font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100] hidden md:block">
-            Noties
-          </span>
-        </button>
-        <NotiesModal
-          isOpen={showNotiesModal}
-          onClose={() => setShowNotiesModal(false)}
-          anchorRef={notiesButtonRef}
-        />
-      </div>
-    </div>
-  );
-}
-
-export default function GlobalHeader() {
-  const rawPathname = usePathname();
-  const pathname = rawPathname ?? '';
-  const router = useRouter();
-  const [isOwner, setIsOwner] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [appMenuOpen, setAppMenuOpen] = useState(false);
-
-  const supabase = useMemo(() => createClient(), []);
 
   const checkOwnerStatus = useCallback(async () => {
     try {
@@ -350,7 +345,7 @@ export default function GlobalHeader() {
 
             {/* Right side: Messages + Noties + Avatar */}
             <div className="flex items-center gap-1 flex-shrink-0">
-              {isLoggedIn && <HeaderIcons />}
+              {isLoggedIn && <HeaderIcons showMessagesModal={showMessagesModal} setShowMessagesModal={setShowMessagesModal} showNotiesModal={showNotiesModal} setShowNotiesModal={setShowNotiesModal} />}
               <UserMenuSheet className="header-profile-trigger flex-shrink-0" />
             </div>
           </div>
@@ -408,7 +403,7 @@ export default function GlobalHeader() {
             </div>
 
             <div className="flex min-w-[220px] flex-1 items-center justify-end gap-2">
-              {isLoggedIn && <HeaderIcons />}
+              {isLoggedIn && <HeaderIcons showMessagesModal={showMessagesModal} setShowMessagesModal={setShowMessagesModal} showNotiesModal={showNotiesModal} setShowNotiesModal={setShowNotiesModal} />}
               {isOwner && (
                 <Link
                   href="/owner"
@@ -438,6 +433,14 @@ export default function GlobalHeader() {
       </header>
 
       <LeaderboardModal isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
+      <MessagesModal
+        isOpen={showMessagesModal}
+        onClose={() => setShowMessagesModal(false)}
+      />
+      <NotiesModal
+        isOpen={showNotiesModal}
+        onClose={() => setShowNotiesModal(false)}
+      />
     </>
   );
 }

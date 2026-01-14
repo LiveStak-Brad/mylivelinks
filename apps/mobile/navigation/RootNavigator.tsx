@@ -52,7 +52,6 @@ import PolicyDetailScreen from '../screens/PolicyDetailScreen';
 import PrivacyScreen from '../screens/PrivacyScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ProfileViewScreen from '../screens/ProfileViewScreen';
-import PublicProfileScreen from '../screens/PublicProfileScreen';
 import ReferralsScreen from '../screens/ReferralsScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import RoomScreen from '../screens/RoomScreen';
@@ -83,9 +82,10 @@ import UnsubscribeScreen from '../screens/UnsubscribeScreen';
 import UserAnalyticsScreen from '../screens/UserAnalyticsScreen';
 import UserFeedScreen from '../screens/UserFeedScreen';
 import UserPhotosScreen from '../screens/UserPhotosScreen';
-import UserProfileScreen from '../screens/UserProfileScreen';
 import WalletScreen from '../screens/WalletScreen';
 import MediaViewerScreen from '../screens/MediaViewerScreen';
+import BlockedUsersScreen from '../screens/BlockedUsersScreen';
+import PostDetailScreen from '../screens/PostDetailScreen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, View } from 'react-native';
 import { useAuth } from '../state/AuthContext';
@@ -110,6 +110,7 @@ function TabsNavigator() {
         tabBarStyle: {
           backgroundColor: (colors as any).tabBarBg ?? colors.surface,
           borderTopColor: (colors as any).tabBarBorder ?? colors.border,
+          paddingTop: 8,
         },
         tabBarActiveTintColor: (colors as any).tabIconActive ?? brand.primary,
         tabBarInactiveTintColor: (colors as any).tabIconInactive ?? colors.mutedText,
@@ -200,6 +201,7 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
     <RootStack.Navigator
       screenOptions={{
         header,
+        headerShadowVisible: false,
       }}
     >
       <RootStack.Screen
@@ -258,7 +260,6 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="PolicyDetailScreen" component={PolicyDetailScreen} />
       <RootStack.Screen name="ProfileScreen" component={ProfileScreen} />
       <RootStack.Screen name="ProfileViewScreen" component={ProfileViewScreen} />
-      <RootStack.Screen name="PublicProfileScreen" component={PublicProfileScreen} />
       <RootStack.Screen name="ReferralsScreen" component={ReferralsScreen} />
       <RootStack.Screen name="ResetPasswordScreen" component={ResetPasswordScreen} />
       <RootStack.Screen name="RoomScreen" component={RoomScreen} />
@@ -288,8 +289,9 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="UserAnalyticsScreen" component={UserAnalyticsScreen} />
       <RootStack.Screen name="UserFeedScreen" component={UserFeedScreen} />
       <RootStack.Screen name="UserPhotosScreen" component={UserPhotosScreen} />
-      <RootStack.Screen name="UserProfileScreen" component={UserProfileScreen} />
       <RootStack.Screen name="WalletScreen" component={WalletScreen} />
+      <RootStack.Screen name="BlockedUsersScreen" component={BlockedUsersScreen} />
+      <RootStack.Screen name="PostDetailScreen" component={PostDetailScreen} />
 
       {/* Full-screen media viewer (Facebook-style expand) */}
       <RootStack.Screen

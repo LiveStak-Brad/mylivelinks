@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { MessageCircle, Search, Gift, Send } from 'lucide-react';
 import GiftPickerMini from '@/components/messages/GiftPickerMini';
 import { Input, EmptyState } from '@/components/ui';
@@ -22,6 +22,8 @@ import FriendsList from '@/components/messages/FriendsList';
  */
 function MessagesPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname() ?? '/messages';
   const {
     conversations,
     activeConversationId,
@@ -37,6 +39,7 @@ function MessagesPageContent() {
   const { refresh: refreshPresence } = usePresence();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const withHandledRef = useRef<string | null>(null);
 
   const [reportTarget, setReportTarget] = useState<{
     reportedUserId?: string;
@@ -91,8 +94,21 @@ function MessagesPageContent() {
   useEffect(() => {
     const target = searchParams?.get('with');
     if (!target) return;
-    void openConversationWith(target);
-  }, [openConversationWith, searchParams]);
+    // Prevent double-execution when openConversationWith reference changes
+    if (withHandledRef.current === target) return;
+    withHandledRef.current = target;
+
+    void (async () => {
+      await openConversationWith(target);
+      // Clean up URL after handling
+      const next = new URLSearchParams(searchParams?.toString() ?? '');
+      next.delete('with');
+      const qs = next.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+      // Reset after URL is cleaned so future 'with' params work
+      withHandledRef.current = null;
+    })();
+  }, [openConversationWith, pathname, router, searchParams]);
 
   // Refresh presence on mount
   useEffect(() => {
@@ -278,6 +294,57 @@ function MessagesPageContent() {
                         {msg.type === 'gift' && <p>🎁 {msg.giftName} (+{msg.giftCoins} coins)</p>}
                         {msg.type === 'image' && msg.imageUrl && (
                           <img src={msg.imageUrl} alt="Sent image" className="rounded-lg max-w-full" />
+                        )}
+                        {msg.type === 'share' && (
+                          <a
+                            href={msg.shareUrl || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block rounded-xl overflow-hidden border border-border/50 hover:opacity-95 transition"
+                          >
+                            <div className={`relative ${msg.shareContentType === 'photo' ? 'aspect-square' : 'aspect-video'} bg-gray-900 overflow-hidden`}>
+                              {msg.shareThumbnail && !msg.shareThumbnail.match(/\.(mp4|mov|webm|avi|mkv|m4v)(\?|$)/i) ? (
+                                <>
+                                  <img src={msg.shareThumbnail} alt={msg.shareText || 'Shared content'} className="w-full h-full object-cover" />
+                                  {msg.shareContentType !== 'photo' && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                      {msg.shareContentType === 'live' ? (
+                                        <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">🔴 LIVE</span>
+                                      ) : (
+                                        <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center">
+                                          <span className="text-white text-xl ml-0.5">▶</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                                  {msg.shareContentType === 'live' ? (
+                                    <span className="px-2 py-1 bg-red-500 text-white text-xs font-bold rounded-full">🔴 LIVE</span>
+                                  ) : msg.shareContentType === 'photo' ? (
+                                    <span className="text-3xl">📷</span>
+                                  ) : (
+                                    <div className="w-12 h-12 rounded-full bg-black/30 flex items-center justify-center">
+                                      <span className="text-white text-xl ml-0.5">▶</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            <div className="px-3 py-2 bg-muted/30">
+                              <p className="text-sm font-medium line-clamp-2">{msg.shareText || 'Shared content'}</p>
+                              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                <span>🔗</span>
+                                <span className="truncate">{msg.shareUrl?.replace(/^https?:\/\//, '').split('/')[0] || 'mylivelinks.com'}</span>
+                              </p>
+                              {msg.shareTeamName && (
+                                <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 bg-purple-500 text-white text-[10px] font-bold rounded">
+                                  🔒 Team: {msg.shareTeamName}
+                                </div>
+                              )}
+                            </div>
+                          </a>
                         )}
                       </div>
                     </div>

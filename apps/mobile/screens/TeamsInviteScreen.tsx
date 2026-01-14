@@ -1,5 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function TeamsInviteScreen() {
   const [query, setQuery] = useState('');
@@ -64,7 +65,7 @@ export default function TeamsInviteScreen() {
               </View>
 
               <Pressable
-                onPress={() => {}}
+                onPress={() => showComingSoon('Send invite')}
                 disabled={disabled}
                 accessibilityRole="button"
                 accessibilityLabel={disabled ? 'Invited' : 'Invite'}

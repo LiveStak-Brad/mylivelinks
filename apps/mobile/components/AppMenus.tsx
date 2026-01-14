@@ -4,13 +4,16 @@ import { useMenus } from '../state/MenusContext';
 import { navTo, navToTab } from '../navigation/navigationRef';
 import { useTheme } from '../theme/useTheme';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useAuth } from '../state/AuthContext';
 import { navigateToTeamsLanding } from '../lib/teamNavigation';
 import { navigationRef } from '../navigation/navigationRef';
+import { showComingSoon } from '../lib/showComingSoon';
 
 export default function AppMenus() {
   const menus = useMenus();
   const { mode, setMode } = useTheme();
   const currentUser = useCurrentUser();
+  const { signOut } = useAuth();
 
   const leftItems = useMemo<SlideMenuItem[]>(
     () => [
@@ -56,12 +59,12 @@ export default function AppMenus() {
       { key: 'link-profile', label: 'Link Profile', onPress: () => navTo('LinkProfileScreen') },
       { key: 'link-mutuals', label: 'Link Mutuals', onPress: () => navTo('LinkMutualsScreen') },
       { key: 'creator-analytics', label: 'Creator Analytics', onPress: () => navTo('MyAnalyticsScreen') },
-      { key: 'composer', label: 'Composer', onPress: () => navTo('ComposerScreen') },
+      { key: 'composer', label: 'Composer', disabled: true, pillText: 'SOON', onPress: () => showComingSoon('Composer') },
       { key: 'go-live', label: 'Go Live', onPress: () => navToTab('Go Live') },
-      { key: 'purchases', label: 'Purchases', disabled: true, pillText: 'SOON' },
-      { key: 'logout', label: 'Logout', tone: 'danger' },
+      { key: 'purchases', label: 'Purchases', disabled: true, pillText: 'SOON', onPress: () => showComingSoon('Purchases') },
+      { key: 'logout', label: 'Logout', tone: 'danger', onPress: () => signOut() },
     ],
-    [currentUser.userId]
+    [currentUser.userId, signOut]
   );
 
   return (

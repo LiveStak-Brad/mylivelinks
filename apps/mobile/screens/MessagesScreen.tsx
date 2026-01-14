@@ -8,6 +8,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
 import { brand, darkPalette, lightPalette } from '../theme/colors';
+import { showComingSoon } from '../lib/showComingSoon';
+import MllProBadge from '../components/shared/MllProBadge';
 
 const TAB_BAR_SAFE_PADDING = 96;
 const NO_PROFILE_PIC = require('../assets/no-profile-pic.png');
@@ -36,6 +38,7 @@ type ProfileLite = {
   display_name: string | null;
   avatar_url: string | null;
   is_live: boolean | null;
+  is_mll_pro: boolean | null;
 };
 
 type FriendsListRpc = {
@@ -98,7 +101,7 @@ function FriendsStrip({ friends, styles, stylesVars }: { friends: MockFriend[]; 
         contentContainerStyle={styles.friendsListContent}
         renderItem={({ item }) => {
           return (
-            <Pressable accessibilityRole="button" onPress={() => {}} style={({ pressed }) => [styles.friendItem, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" onPress={() => showComingSoon('Friend profile')} style={({ pressed }) => [styles.friendItem, pressed && styles.pressed]}>
               <View>
                 <AvatarPlaceholder
                   label={item.displayName}
@@ -157,6 +160,21 @@ function formatImPreview(content: string | null | undefined) {
     }
   }
   if (text.startsWith('__img__:')) return '📷 Photo';
+  // Check for share message (JSON with type: 'share')
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.type === 'share') {
+        const contentType = parsed?.contentType || 'video';
+        if (contentType === 'live') return '🔴 Shared a live stream';
+        if (contentType === 'profile') return '👤 Shared a profile';
+        if (contentType === 'photo') return '📷 Shared a photo';
+        return '🎬 Shared a video';
+      }
+    } catch {
+      // Not valid JSON, fall through
+    }
+  }
   return text;
 }
 
@@ -175,6 +193,7 @@ function ConversationRow({
     unreadCount: number;
     isLive?: boolean;
     isOnline?: boolean;
+    isMllPro?: boolean;
     lastMessageSentByMe?: boolean;
     lastMessageRead?: boolean;
   };
@@ -198,7 +217,7 @@ function ConversationRow({
       ]}
     >
       <AvatarPlaceholder
-        label={conversation.displayName || conversation.username}
+        label={conversation.displayName || conversation.username || 'Unknown'}
         size={48}
         isLive={conversation.isLive}
         isOnline={conversation.isOnline}
@@ -208,9 +227,12 @@ function ConversationRow({
 
       <View style={styles.conversationBody}>
         <View style={styles.conversationTopRow}>
-          <Text numberOfLines={1} style={[styles.conversationName, showUnread && styles.conversationNameUnread]}>
-            {conversation.displayName || conversation.username}
-          </Text>
+          <View style={styles.conversationNameRow}>
+            <Text numberOfLines={1} style={[styles.conversationName, showUnread && styles.conversationNameUnread]}>
+              {conversation.displayName || conversation.username}
+            </Text>
+            {conversation.isMllPro && <MllProBadge size="sm" />}
+          </View>
           <Text style={[styles.conversationTime, showUnread && styles.conversationTimeUnread]}>{conversation.timeLabel}</Text>
         </View>
 
@@ -273,6 +295,7 @@ export default function MessagesScreen() {
       timeLabel: string;
       unreadCount: number;
       isLive?: boolean;
+      isMllPro?: boolean;
       lastMessageSentByMe?: boolean;
       lastMessageRead?: boolean;
     }>
@@ -357,7 +380,7 @@ export default function MessagesScreen() {
     if (otherIds.length > 0) {
       const { data: profiles, error: profileError } = await supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url, is_live')
+        .select('id, username, display_name, avatar_url, is_live, is_mll_pro')
         .in('id', otherIds);
 
       if (profileError) {
@@ -397,6 +420,7 @@ export default function MessagesScreen() {
         unreadCount,
         isLive,
         isOnline,
+        isMllPro: Boolean(p?.is_mll_pro),
         lastMessageSentByMe,
         // IM table doesn't track per-message read for sender in a way we can reliably show here; keep UI consistent.
         lastMessageRead: false,
@@ -688,12 +712,18 @@ function createStyles(stylesVars: StylesVars) {
     gap: 10,
     marginBottom: 4,
   },
-  conversationName: {
+  conversationNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
     minWidth: 0,
+    gap: 4,
+  },
+  conversationName: {
     fontSize: 14,
     fontWeight: '700',
     color: stylesVars.text,
+    flexShrink: 1,
   },
   conversationNameUnread: {
     fontWeight: '900',

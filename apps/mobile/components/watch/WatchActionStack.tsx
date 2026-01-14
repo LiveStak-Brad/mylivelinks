@@ -15,6 +15,7 @@ interface WatchActionStackProps {
   onFollowPress?: () => void;
   onLikePress?: () => void;
   onCommentPress?: () => void;
+  onGiftPress?: () => void;
   onFavoritePress?: () => void;
   onSharePress?: () => void;
   onRepostPress?: () => void;
@@ -49,6 +50,7 @@ export default function WatchActionStack({
   onFollowPress,
   onLikePress,
   onCommentPress,
+  onGiftPress,
   onFavoritePress,
   onSharePress,
   onRepostPress,
@@ -96,6 +98,13 @@ export default function WatchActionStack({
         count={commentCount}
         label="Comment"
         onPress={onCommentPress}
+      />
+
+      {/* Gift */}
+      <ActionButton
+        icon={<Ionicons name="gift" size={26} color="#EC4899" />}
+        label="Gift"
+        onPress={onGiftPress}
       />
 
       {/* Favorite / Bookmark */}

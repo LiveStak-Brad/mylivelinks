@@ -816,6 +816,9 @@ const styles = StyleSheet.create({
     color: '#111',
     marginBottom: 8,
   },
+  diamondAmount: {
+    color: '#a855f7',
+  },
   walletUsd: {
     fontSize: 14,
     color: '#666',

@@ -1,5 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput } from 'react-native';
+import ReportModal from '../components/ReportModal';
+import ShareModal from '../components/ShareModal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -11,6 +13,8 @@ const MOCK_CHAT_MESSAGES = [
 
 export default function LiveUserScreen() {
   const [chatInput, setChatInput] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -38,7 +42,7 @@ export default function LiveUserScreen() {
               <Ionicons name="eye" size={14} color="#fff" />
               <Text style={styles.viewerCountText}>1.2K</Text>
             </View>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => setShowReportModal(true)}>
               <Ionicons name="flag-outline" size={20} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
@@ -59,7 +63,7 @@ export default function LiveUserScreen() {
             <Text style={styles.railActionText}>234</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.railAction}>
+          <TouchableOpacity style={styles.railAction} onPress={() => setShowShareModal(true)}>
             <Ionicons name="share-social-outline" size={26} color="#fff" />
             <Text style={styles.railActionText}>Share</Text>
           </TouchableOpacity>
@@ -120,6 +124,27 @@ export default function LiveUserScreen() {
           </View>
         </View>
       </View>
+    {/* Report Modal */}
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        reportType="stream"
+        reportedUserId={undefined}
+        reportedUsername="username"
+        contextDetails={JSON.stringify({
+          stream_username: 'username',
+          source: 'mobile_live_viewer',
+        })}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        shareUrl="https://www.mylivelinks.com/live/username"
+        shareText="Check out this live stream on MyLiveLinks!"
+        shareContentType="live"
+      />
     </SafeAreaView>
   );
 }

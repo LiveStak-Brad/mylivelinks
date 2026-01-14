@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import MllProBadge from '../shared/MllProBadge';
 
 interface WatchCaptionOverlayProps {
   username: string;
   displayName?: string;
+  isMllPro?: boolean;
   title?: string;
   caption: string;
   hashtags: string[];
   location?: string;
+  viewCount?: number;
   // Handler placeholders
   onUsernamePress?: () => void;
   onHashtagPress?: (tag: string) => void;
@@ -22,13 +25,26 @@ const MAX_COLLAPSED_LENGTH = 80;
  * Includes expand-on-tap behavior for long captions (UI only).
  * Subtle bottom gradient for readability.
  */
+// Format view count for display
+function formatViewCount(count: number): string {
+  if (count >= 1_000_000) {
+    return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  }
+  if (count >= 1_000) {
+    return `${(count / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  }
+  return String(count);
+}
+
 export default function WatchCaptionOverlay({
   username,
   displayName,
+  isMllPro,
   title,
   caption,
   hashtags,
   location,
+  viewCount,
   onUsernamePress,
   onHashtagPress,
   onLocationPress,
@@ -42,24 +58,24 @@ export default function WatchCaptionOverlay({
 
   return (
     <View style={styles.container} pointerEvents="box-none">
-      {/* Bottom gradient for readability (stacked opacity layers) */}
-      <View style={styles.gradientWrapper} pointerEvents="none">
-        <View style={[styles.gradientLayer, styles.gradientLayer1]} />
-        <View style={[styles.gradientLayer, styles.gradientLayer2]} />
-        <View style={[styles.gradientLayer, styles.gradientLayer3]} />
-        <View style={[styles.gradientLayer, styles.gradientLayer4]} />
-      </View>
-
       <View style={styles.content}>
-        {/* Username + Display Name (web parity) */}
-        <Pressable
-          accessibilityRole="button"
-          onPress={onUsernamePress}
-          style={({ pressed }) => [styles.usernameRow, pressed && styles.pressed]}
-        >
-          <Text style={styles.username}>@{username}</Text>
-          {displayName && <Text style={styles.displayName}>{displayName}</Text>}
-        </Pressable>
+        {/* Display Name + PRO Badge + View Count (inline, not spread) */}
+        <View style={styles.topRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onUsernamePress}
+            style={({ pressed }) => [styles.usernameRow, pressed && styles.pressed]}
+          >
+            <Text style={styles.displayNameText}>{displayName || username}</Text>
+          </Pressable>
+          {isMllPro && <MllProBadge size="md" />}
+          {viewCount !== undefined && viewCount > 0 && (
+            <View style={styles.viewCountRow}>
+              <Ionicons name="eye-outline" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.viewCountText}>{formatViewCount(viewCount)}</Text>
+            </View>
+          )}
+        </View>
 
         {/* Title - bold separate line (web parity) */}
         {title && (
@@ -122,41 +138,14 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
   },
-  gradientWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 200,
-  },
-  gradientLayer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-  },
-  gradientLayer1: {
-    bottom: 0,
-    height: 200,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  gradientLayer2: {
-    bottom: 0,
-    height: 150,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-  gradientLayer3: {
-    bottom: 0,
-    height: 100,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  gradientLayer4: {
-    bottom: 0,
-    height: 50,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
   content: {
     paddingHorizontal: 16,
     paddingBottom: 12,
+    gap: 6,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   usernameRow: {
@@ -164,18 +153,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  username: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
+  viewCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  viewCountText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  displayName: {
+  displayNameText: {
     fontSize: 15,
-    fontWeight: '500',
-    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '700',
+    color: '#FFFFFF',
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,

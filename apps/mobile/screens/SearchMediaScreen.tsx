@@ -4,13 +4,14 @@ import {
   Image,
   Keyboard,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { showComingSoon } from '../lib/showComingSoon';
 
 type MediaType = 'Video' | 'Photo' | 'GIF' | 'Audio' | 'Doc';
 
@@ -102,7 +103,7 @@ export default function SearchMediaScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Open ${item.type}: ${item.title}`}
-              onPress={() => {}}
+              onPress={() => showComingSoon('Media viewer')}
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}
             >
               <View style={styles.thumbnail}>

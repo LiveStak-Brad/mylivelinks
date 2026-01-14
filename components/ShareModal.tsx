@@ -10,7 +10,7 @@ interface ShareModalProps {
   // Support both formats: item object OR direct title/url
   item?: {
     id: string;
-    type: 'video' | 'live' | 'photo';
+    type: 'video' | 'live' | 'photo' | 'profile';
     username: string;
     displayName?: string;
     title?: string;
@@ -19,11 +19,15 @@ interface ShareModalProps {
     thumbnailUrl?: string;
     avatarUrl?: string;
     mediaUrl?: string;
+    teamId?: string;
+    teamName?: string;
+    teamSlug?: string;
   };
   // Direct props (alternative to item)
   title?: string;
   url?: string;
   thumbnailUrl?: string;
+  contentType?: 'video' | 'live' | 'photo' | 'profile';
 }
 
 interface Friend {
@@ -31,13 +35,27 @@ interface Friend {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  is_live?: boolean;
+  is_online?: boolean;
+  last_shared_at?: string | null;
 }
 
-export function ShareModal({ isOpen, onClose, item, title, url, thumbnailUrl }: ShareModalProps) {
+interface Follower {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_live?: boolean;
+  is_online?: boolean;
+}
+
+export function ShareModal({ isOpen, onClose, item, title, url, thumbnailUrl, contentType }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
   const [friends, setFriends] = useState<Friend[]>([]);
-  const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
+  const [followers, setFollowers] = useState<Follower[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
   // Support both item-based and direct props
@@ -49,11 +67,13 @@ export function ShareModal({ isOpen, onClose, item, title, url, thumbnailUrl }: 
 
   useEffect(() => {
     if (isOpen) {
-      loadFriends();
+      loadData();
+      setSelectedIds(new Set());
     }
   }, [isOpen]);
 
-  const loadFriends = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -61,51 +81,138 @@ export function ShareModal({ isOpen, onClose, item, title, url, thumbnailUrl }: 
       // Use get_friends_list RPC (mutual follows) - same as messenger
       const { data: rpcData, error: rpcError } = await supabase.rpc('get_friends_list', {
         p_profile_id: user.id,
-        p_limit: 50,
+        p_limit: 200,
         p_offset: 0,
       });
 
-      if (rpcError) {
-        console.error('Error loading friends:', rpcError);
-        // Fallback to follows if RPC doesn't exist
-        const { data, error } = await supabase
-          .from('follows')
-          .select(`
-            followee_id,
-            profiles!follows_followee_id_fkey(
-              id,
-              username,
-              display_name,
-              avatar_url
-            )
-          `)
-          .eq('follower_id', user.id)
-          .limit(20);
+      // Load recent share recipients (messages with share content sent by current user)
+      const { data: recentShares } = await supabase
+        .from('instant_messages')
+        .select('recipient_id, created_at')
+        .eq('sender_id', user.id)
+        .like('content', '%"type":"share"%')
+        .order('created_at', { ascending: false })
+        .limit(100);
 
-        if (!error && data) {
-          const friendsList = data.map((f: any) => ({
-            id: f.profiles.id,
-            username: f.profiles.username,
-            display_name: f.profiles.display_name,
-            avatar_url: f.profiles.avatar_url,
-          }));
-          setFriends(friendsList);
+      const recentMap = new Map<string, string>();
+      if (recentShares) {
+        for (const share of recentShares) {
+          if (share.recipient_id && !recentMap.has(share.recipient_id)) {
+            recentMap.set(share.recipient_id, share.created_at);
+          }
         }
-        return;
       }
 
-      // Map RPC response
-      const friendsRaw = (rpcData as any)?.friends ?? [];
-      const friendsList = (Array.isArray(friendsRaw) ? friendsRaw : []).map((p: any) => ({
-        id: String(p.id),
-        username: String(p.username ?? ''),
-        display_name: p.display_name ?? null,
-        avatar_url: p.avatar_url ?? null,
-      }));
+      // Process friends
+      let friendIds = new Set<string>();
+      let allUserIds: string[] = [];
+      
+      if (!rpcError) {
+        const friendsRaw = (rpcData as any)?.friends ?? [];
+        allUserIds = friendsRaw.map((p: any) => String(p.id));
+        friendIds = new Set(allUserIds);
+      }
 
-      setFriends(friendsList);
+      // Load followers (people who follow you but are NOT mutual friends)
+      const { data: followersData, error: followersError } = await supabase
+        .from('follows')
+        .select(`
+          follower_id,
+          profiles!follows_follower_id_fkey(
+            id,
+            username,
+            display_name,
+            avatar_url,
+            is_live
+          )
+        `)
+        .eq('followee_id', user.id)
+        .limit(200);
+
+      const followerIds: string[] = [];
+      if (!followersError && followersData) {
+        for (const f of followersData) {
+          if (f.profiles && !friendIds.has(String((f.profiles as any).id))) {
+            followerIds.push(String((f.profiles as any).id));
+          }
+        }
+      }
+
+      // Combine all user IDs and fetch online status
+      const allIds = [...allUserIds, ...followerIds];
+      const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+      const { data: onlineData } = allIds.length
+        ? await supabase.from('room_presence').select('profile_id').in('profile_id', allIds).gt('last_seen_at', cutoff)
+        : { data: [] };
+      const onlineSet = new Set((onlineData ?? []).map((o: any) => String(o.profile_id)));
+
+      // Now build friends list with online status
+      if (!rpcError) {
+        const friendsRaw = (rpcData as any)?.friends ?? [];
+        const friendsList = (Array.isArray(friendsRaw) ? friendsRaw : []).map((p: any) => ({
+          id: String(p.id),
+          username: String(p.username ?? ''),
+          display_name: p.display_name ?? null,
+          avatar_url: p.avatar_url ?? null,
+          is_live: Boolean(p.is_live),
+          is_online: onlineSet.has(String(p.id)),
+          last_shared_at: recentMap.get(String(p.id)) ?? null,
+        }));
+
+        // Sort: live first, then online, then by recent shares, then alphabetical
+        friendsList.sort((a: Friend, b: Friend) => {
+          if (a.is_live && !b.is_live) return -1;
+          if (!a.is_live && b.is_live) return 1;
+          if (a.is_online && !b.is_online) return -1;
+          if (!a.is_online && b.is_online) return 1;
+          if (a.last_shared_at && !b.last_shared_at) return -1;
+          if (!a.last_shared_at && b.last_shared_at) return 1;
+          if (a.last_shared_at && b.last_shared_at) {
+            return new Date(b.last_shared_at).getTime() - new Date(a.last_shared_at).getTime();
+          }
+          const aName = (a.display_name || a.username || '').toLowerCase();
+          const bName = (b.display_name || b.username || '').toLowerCase();
+          return aName.localeCompare(bName);
+        });
+
+        setFriends(friendsList);
+      } else {
+        console.error('Error loading friends:', rpcError);
+        setFriends([]);
+      }
+
+      // Build followers list with online status
+      if (!followersError && followersData) {
+        const followersList: Follower[] = followersData
+          .filter((f: any) => f.profiles && !friendIds.has(String(f.profiles.id)))
+          .map((f: any) => ({
+            id: String(f.profiles.id),
+            username: String(f.profiles.username ?? ''),
+            display_name: f.profiles.display_name ?? null,
+            avatar_url: f.profiles.avatar_url ?? null,
+            is_live: Boolean(f.profiles.is_live),
+            is_online: onlineSet.has(String(f.profiles.id)),
+          }));
+
+        // Sort: live first, then online, then alphabetical
+        followersList.sort((a, b) => {
+          if (a.is_live && !b.is_live) return -1;
+          if (!a.is_live && b.is_live) return 1;
+          if (a.is_online && !b.is_online) return -1;
+          if (!a.is_online && b.is_online) return 1;
+          const aName = (a.display_name || a.username || '').toLowerCase();
+          const bName = (b.display_name || b.username || '').toLowerCase();
+          return aName.localeCompare(bName);
+        });
+
+        setFollowers(followersList);
+      } else {
+        setFollowers([]);
+      }
     } catch (err) {
-      console.error('Error loading friends:', err);
+      console.error('Error loading data:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -133,18 +240,18 @@ export function ShareModal({ isOpen, onClose, item, title, url, thumbnailUrl }: 
     }
   };
 
-  const toggleFriend = (friendId: string) => {
-    const newSelected = new Set(selectedFriends);
-    if (newSelected.has(friendId)) {
-      newSelected.delete(friendId);
+  const toggleSelection = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
     } else {
-      newSelected.add(friendId);
+      newSelected.add(id);
     }
-    setSelectedFriends(newSelected);
+    setSelectedIds(newSelected);
   };
 
   const handleSendToInbox = async () => {
-    if (selectedFriends.size === 0) return;
+    if (selectedIds.size === 0) return;
 
     setSending(true);
     try {
@@ -153,24 +260,25 @@ export function ShareModal({ isOpen, onClose, item, title, url, thumbnailUrl }: 
 
       let successCount = 0;
       
-      // Send DM to each selected friend using instant_messages table (same as messenger)
-      for (const friendId of selectedFriends) {
-        // Build share message with thumbnail info if available (fallback to avatar, NOT mediaUrl which might be video)
-        const shareThumbnail = thumbnailUrl || item?.thumbnailUrl || item?.avatarUrl || null;
-        // Always send as JSON share format for proper rendering
+      // Send DM to each selected person using instant_messages table
+      for (const recipientId of selectedIds) {
+        // Fallback: thumbnailUrl prop > item.thumbnailUrl > item.mediaUrl (if image) > item.avatarUrl
+        const mediaIsImage = item?.mediaUrl && !item.mediaUrl.match(/\.(mp4|mov|webm|avi|mkv|m4v)(\?|$)/i);
+        const shareThumbnail = thumbnailUrl || item?.thumbnailUrl || (mediaIsImage ? item.mediaUrl : null) || item?.avatarUrl || null;
         const messageContent = JSON.stringify({
           type: 'share',
           text: shareText,
           url: shareUrl,
           thumbnail: shareThumbnail,
-          contentType: item?.type || 'video',
+          contentType: contentType || item?.type || 'video',
+          ...(item?.teamId && { teamId: item.teamId, teamName: item.teamName, teamSlug: item.teamSlug }),
         });
 
         const { error: msgError } = await supabase
           .from('instant_messages')
           .insert({
             sender_id: user.id,
-            recipient_id: friendId,
+            recipient_id: recipientId,
             content: messageContent,
           });
 
@@ -182,9 +290,8 @@ export function ShareModal({ isOpen, onClose, item, title, url, thumbnailUrl }: 
       }
 
       if (successCount > 0) {
-        // Success - close modal
         onClose();
-        setSelectedFriends(new Set());
+        setSelectedIds(new Set());
       } else {
         alert('Failed to send messages. Please try again.');
       }
@@ -218,46 +325,131 @@ export function ShareModal({ isOpen, onClose, item, title, url, thumbnailUrl }: 
           </button>
         </div>
 
-        {/* Send to Friends - Compact */}
-        {friends.length > 0 && (
-          <div className="p-3 border-b border-gray-200 dark:border-gray-800">
-            <div className="text-xs font-semibold text-gray-500 mb-2">Send to</div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {friends.slice(0, 8).map((friend) => (
-                <button
-                  key={friend.id}
-                  onClick={() => toggleFriend(friend.id)}
-                  className="flex flex-col items-center gap-1 min-w-[56px]"
-                >
-                  <div className={`relative w-12 h-12 rounded-full overflow-hidden ${
-                    selectedFriends.has(friend.id) ? 'ring-2 ring-blue-500' : ''
-                  }`}>
-                    <img
-                      src={friend.avatar_url || `https://ui-avatars.com/api/?name=${friend.username}`}
-                      alt={friend.username}
-                      className="w-full h-full object-cover"
-                    />
-                    {selectedFriends.has(friend.id) && (
-                      <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
-                        <Check className="w-5 h-5 text-white" />
+        {loading ? (
+          <div className="p-6 flex justify-center">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            {/* Friends - Horizontal Scroll */}
+            {friends.length > 0 && (
+              <div className="py-3 border-b border-gray-200 dark:border-gray-800">
+                <div className="text-xs font-semibold text-gray-500 mb-2 px-4">Friends ({friends.length})</div>
+                <div className="flex gap-3 overflow-x-auto px-4 pb-1">
+                  {friends.map((person) => (
+                    <button
+                      key={person.id}
+                      onClick={() => toggleSelection(person.id)}
+                      className="flex flex-col items-center gap-1 flex-shrink-0"
+                    >
+                      <div className={`relative w-14 h-14 rounded-full overflow-hidden ${
+                        selectedIds.has(person.id) ? 'ring-2 ring-blue-500' : ''
+                      }`}>
+                        <img
+                          src={person.avatar_url || `https://ui-avatars.com/api/?name=${person.username}`}
+                          alt={person.username}
+                          className="w-full h-full object-cover"
+                        />
+                        {selectedIds.has(person.id) && (
+                          <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                            <Check className="w-5 h-5 text-white" />
+                          </div>
+                        )}
+                        {person.is_live && (
+                          <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-red-500 rounded-full">
+                            <span className="text-[8px] font-bold text-white">LIVE</span>
+                          </div>
+                        )}
+                        {!person.is_live && person.is_online && (
+                          <div className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-purple-500 border-2 border-white dark:border-gray-900" />
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <span className="text-[10px] truncate max-w-[56px]">
-                    {friend.display_name?.split(' ')[0] || friend.username}
-                  </span>
-                </button>
-              ))}
-            </div>
-            {selectedFriends.size > 0 && (
-              <button
-                onClick={handleSendToInbox}
-                disabled={sending}
-                className="w-full mt-2 px-3 py-1.5 bg-blue-500 text-white rounded-full text-sm font-semibold disabled:opacity-50 hover:bg-blue-600 transition"
-              >
-                {sending ? 'Sending...' : `Send (${selectedFriends.size})`}
-              </button>
+                      <span className="text-[10px] truncate max-w-[60px]">
+                        {person.display_name?.split(' ')[0] || person.username}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
+
+            {/* Followers - Horizontal Scroll */}
+            {followers.length > 0 && (
+              <div className="py-3 border-b border-gray-200 dark:border-gray-800">
+                <div className="text-xs font-semibold text-gray-500 mb-2 px-4">Followers ({followers.length})</div>
+                <div className="flex gap-3 overflow-x-auto px-4 pb-1">
+                  {followers.map((person) => (
+                    <button
+                      key={person.id}
+                      onClick={() => toggleSelection(person.id)}
+                      className="flex flex-col items-center gap-1 flex-shrink-0"
+                    >
+                      <div className={`relative w-14 h-14 rounded-full overflow-hidden ${
+                        selectedIds.has(person.id) ? 'ring-2 ring-blue-500' : ''
+                      }`}>
+                        <img
+                          src={person.avatar_url || `https://ui-avatars.com/api/?name=${person.username}`}
+                          alt={person.username}
+                          className="w-full h-full object-cover"
+                        />
+                        {selectedIds.has(person.id) && (
+                          <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
+                            <Check className="w-5 h-5 text-white" />
+                          </div>
+                        )}
+                        {person.is_live && (
+                          <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-red-500 rounded-full">
+                            <span className="text-[8px] font-bold text-white">LIVE</span>
+                          </div>
+                        )}
+                        {!person.is_live && person.is_online && (
+                          <div className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-purple-500 border-2 border-white dark:border-gray-900" />
+                        )}
+                      </div>
+                      <span className="text-[10px] truncate max-w-[60px]">
+                        {person.display_name?.split(' ')[0] || person.username}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {friends.length === 0 && followers.length === 0 && (
+              <div className="p-4 text-center text-gray-500 text-sm">No friends or followers yet</div>
+            )}
+
+            {/* Snapchat Section */}
+            <div className="py-3 border-b border-gray-200 dark:border-gray-800">
+              <div className="text-xs font-semibold text-gray-500 mb-2 px-4">Snapchat</div>
+              <div className="flex gap-3 overflow-x-auto px-4 pb-1">
+                {/* Share to Snapchat - opens Snapchat with link sticker */}
+                <a
+                  href={`https://www.snapchat.com/scan?attachmentUrl=${encodeURIComponent(shareUrl)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex flex-col items-center gap-1 flex-shrink-0"
+                >
+                  <div className="w-14 h-14 rounded-full bg-[#FFFC00] flex items-center justify-center">
+                    <span className="text-2xl">👻</span>
+                  </div>
+                  <span className="text-[10px] truncate max-w-[60px]">Snapchat</span>
+                </a>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Send Button */}
+        {selectedIds.size > 0 && (
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+            <button
+              onClick={handleSendToInbox}
+              disabled={sending}
+              className="w-full px-3 py-2.5 bg-blue-500 text-white rounded-full text-sm font-semibold disabled:opacity-50 hover:bg-blue-600 transition"
+            >
+              {sending ? 'Sending...' : `Send (${selectedIds.size})`}
+            </button>
           </div>
         )}
 

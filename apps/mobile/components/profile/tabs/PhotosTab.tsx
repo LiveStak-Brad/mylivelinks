@@ -16,7 +16,7 @@ interface PhotosTabProps {
 interface Photo {
   id: string;
   media_url: string;
-  content?: string;
+  text_content?: string;
   created_at: string;
   profiles?: {
     display_name: string;
@@ -42,22 +42,22 @@ export default function PhotosTab({ profileId, colors }: PhotosTabProps) {
         .select(`
           id,
           media_url,
-          content,
+          text_content,
           created_at,
-          profiles:profile_id (
+          profiles!posts_author_id_fkey (
             display_name,
             username,
             avatar_url
           )
         `)
-        .eq('profile_id', profileId)
+        .eq('author_id', profileId)
         .eq('media_type', 'image')
         .not('media_url', 'is', null)
         .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
-      setPhotos(data || []);
+      setPhotos((data as any) || []);
     } catch (error) {
       console.error('Error loading photos:', error);
     } finally {
@@ -104,17 +104,23 @@ export default function PhotosTab({ profileId, colors }: PhotosTabProps) {
     );
   }
 
+  // Group photos into rows of NUM_COLUMNS
+  const rows: Photo[][] = [];
+  for (let i = 0; i < photos.length; i += NUM_COLUMNS) {
+    rows.push(photos.slice(i, i + NUM_COLUMNS));
+  }
+
   return (
     <>
-      <FlatList
-        data={photos}
-        renderItem={renderPhoto}
-        keyExtractor={(item) => item.id}
-        numColumns={NUM_COLUMNS}
-        contentContainerStyle={styles.gridContainer}
-        columnWrapperStyle={styles.row}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.gridContainer}>
+        {rows.map((row, rowIndex) => (
+          <View key={rowIndex} style={styles.row}>
+            {row.map((item) => (
+              <View key={item.id}>{renderPhoto({ item })}</View>
+            ))}
+          </View>
+        ))}
+      </View>
 
       <Modal
         visible={modalVisible}
@@ -173,6 +179,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   row: {
+    flexDirection: 'row',
     gap: GRID_SPACING,
     marginBottom: GRID_SPACING,
   },

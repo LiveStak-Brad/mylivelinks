@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -18,15 +19,25 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
 import { brand, darkPalette, lightPalette } from '../theme/colors';
+import FeedCommentsModal from '../components/feed/FeedCommentsModal';
+import FeedComposerModal from '../components/feed/FeedComposerModal';
+import WatchGiftModal from '../components/watch/WatchGiftModal';
+import ReportModal from '../components/ReportModal';
+import ShareModal from '../components/ShareModal';
+import MllProBadge from '../components/shared/MllProBadge';
 
 type FeedRow = {
   post_id: string;
   text_content: string | null;
   media_url: string | null;
+  feeling_id?: number | null;
+  feeling_emoji?: string | null;
+  feeling_label?: string | null;
   created_at: string;
   author_id: string;
   author_username: string | null;
   author_avatar_url: string | null;
+  author_is_mll_pro?: boolean | null;
   comment_count?: number | null;
   likes_count?: number | null;
   views_count?: number | null;
@@ -38,9 +49,12 @@ type FeedPost = {
   author_username: string;
   author_display_name: string;
   author_avatar_url: string | null;
+  author_is_mll_pro: boolean;
   created_at: string;
   text_content: string;
   media_url: string | null;
+  feeling_emoji: string | null;
+  feeling_label: string | null;
   comment_count: number;
   likes_count: number;
   views_count: number;
@@ -48,7 +62,7 @@ type FeedPost = {
 
 type ReactionType = 'love' | 'haha' | 'wow' | 'sad' | 'fire';
 const REACTIONS: ReactionType[] = ['love', 'haha', 'wow', 'sad', 'fire'];
-const REACTION_ICONS: Record<ReactionType, string> = {
+const REACTION_ICONS: Record<ReactionType, React.ComponentProps<typeof MaterialCommunityIcons>['name']> = {
   love: 'heart',
   haha: 'emoticon-happy-outline',
   wow: 'emoticon-excited-outline',
@@ -209,8 +223,11 @@ function FeedPostCard({
   onPressMedia,
   onOpenReactionPicker,
   onPressComment,
+  onPressGift,
+  onPressShare,
   onPressReactions,
   onVideoReadyAspectRatio,
+  onPressOverflow,
 }: {
   post: FeedPost;
   isLiked: boolean;
@@ -220,8 +237,11 @@ function FeedPostCard({
   onPressMedia: (args: { kind: 'image' | 'video'; url: string }) => void;
   onOpenReactionPicker: () => void;
   onPressComment: () => void;
+  onPressGift: () => void;
+  onPressShare: () => void;
   onPressReactions: () => void;
   onVideoReadyAspectRatio: (aspectRatio: number) => void;
+  onPressOverflow: () => void;
 }) {
   const { styles, stylesVars } = useFeedStyles();
   const { colors } = useTheme();
@@ -272,11 +292,19 @@ function FeedPostCard({
           onPress={onPressProfile}
           style={styles.postHeaderTextCol}
         >
-          <Text style={styles.postAuthorName}>{post.author_display_name}</Text>
+          <View style={styles.authorNameRow}>
+            <Text style={styles.postAuthorName}>{post.author_display_name}</Text>
+            {post.author_is_mll_pro && <MllProBadge size="sm" />}
+            {post.feeling_emoji && post.feeling_label && (
+              <Text style={styles.feelingText}>
+                {' '}is feeling {post.feeling_emoji} {post.feeling_label}
+              </Text>
+            )}
+          </View>
           <Text style={styles.postTimestamp}>{timestamp}</Text>
         </Pressable>
 
-        <Pressable accessibilityRole="button" style={styles.iconButton}>
+        <Pressable accessibilityRole="button" style={styles.iconButton} onPress={onPressOverflow}>
           <Feather name="more-horizontal" size={18} color={stylesVars.mutedText} />
         </Pressable>
       </View>
@@ -358,15 +386,23 @@ function FeedPostCard({
           <Feather name="message-circle" size={18} color={stylesVars.mutedText} />
           <Text style={styles.actionButtonText}>Comment</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" style={styles.actionButton}>
-          <Feather name="gift" size={18} color={stylesVars.mutedText} />
-          <Text style={styles.actionButtonText}>Gift</Text>
+        <Pressable accessibilityRole="button" style={styles.actionButton} onPress={onPressGift}>
+          <Feather name="gift" size={18} color="#A855F7" />
+          <Text style={[styles.actionButtonText, { color: '#A855F7' }]}>Gift</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" style={styles.actionButton} onPress={onPressShare}>
+          <Feather name="share" size={18} color={stylesVars.mutedText} />
+          <Text style={styles.actionButtonText}>Share</Text>
         </Pressable>
       </View>
 
       <View style={styles.reactionsRow}>
         <Pressable accessibilityRole="button" onPress={onPressReactions}>
           <Text style={styles.reactionsTextClickable}>{post.likes_count} reactions</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={onPressComment} style={styles.viewsRow}>
+          <Feather name="message-circle" size={14} color={stylesVars.mutedText} />
+          <Text style={styles.viewsText}>{post.comment_count} comments</Text>
         </Pressable>
         <View style={styles.viewsRow}>
           <Feather name="eye" size={14} color={stylesVars.mutedText} />
@@ -408,6 +444,42 @@ export default function FeedScreen() {
     reaction_type: string;
   }>>([]);
   const [reactionsModalLoading, setReactionsModalLoading] = useState(false);
+
+  // Comments modal state
+  const [commentsModalPostId, setCommentsModalPostId] = useState<string | null>(null);
+  const [commentsModalAuthorUsername, setCommentsModalAuthorUsername] = useState<string>('');
+
+  // Gift modal state
+  const [giftModalVisible, setGiftModalVisible] = useState(false);
+  const [giftTarget, setGiftTarget] = useState<{
+    recipientId: string;
+    recipientUsername: string;
+    recipientDisplayName: string;
+    recipientAvatarUrl: string | null;
+    postId: string | null;
+  } | null>(null);
+
+  // Report modal state
+  const [showPostOverflowMenu, setShowPostOverflowMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{
+    postId: string;
+    authorId: string;
+    authorUsername: string;
+  } | null>(null);
+
+  // Composer modal state
+  const [showComposerModal, setShowComposerModal] = useState(false);
+
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareTarget, setShareTarget] = useState<{
+    postId: string;
+    text: string;
+    mediaUrl: string | null;
+    authorUsername: string;
+    authorAvatarUrl: string | null;
+  } | null>(null);
 
   const inFlightRef = useRef(false);
   const trackedViewsRef = useRef<Set<string>>(new Set());
@@ -523,9 +595,12 @@ export default function FeedScreen() {
           author_username: String(r.author_username ?? ''),
           author_display_name: String(r.author_username ?? ''),
           author_avatar_url: r.author_avatar_url ? String(r.author_avatar_url) : null,
+          author_is_mll_pro: r.author_is_mll_pro ?? false,
           created_at: String(r.created_at),
           text_content: String(r.text_content ?? ''),
           media_url: r.media_url ? String(r.media_url) : null,
+          feeling_emoji: r.feeling_emoji ? String(r.feeling_emoji) : null,
+          feeling_label: r.feeling_label ? String(r.feeling_label) : null,
           comment_count: Number(r.comment_count ?? 0),
           likes_count: Number(r.likes_count ?? 0),
           views_count: Number(r.views_count ?? 0),
@@ -798,6 +873,113 @@ export default function FeedScreen() {
     }
   }, []);
 
+  // Open comments modal for a post
+  const openCommentsModal = useCallback((post: FeedPost) => {
+    setCommentsModalPostId(post.post_id);
+    setCommentsModalAuthorUsername(post.author_username);
+  }, []);
+
+  // Open gift modal for a post
+  const openGiftModal = useCallback((post: FeedPost) => {
+    if (!user) {
+      setError('Please log in to send gifts');
+      return;
+    }
+    setGiftTarget({
+      recipientId: post.author_profile_id,
+      recipientUsername: post.author_username,
+      recipientDisplayName: post.author_display_name,
+      recipientAvatarUrl: post.author_avatar_url,
+      postId: post.post_id,
+    });
+    setGiftModalVisible(true);
+  }, [user]);
+
+  // Handle comment count change from comments modal
+  const handleCommentCountChange = useCallback((postId: string, delta: number) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.post_id === postId ? { ...p, comment_count: Math.max(0, p.comment_count + delta) } : p
+      )
+    );
+  }, []);
+
+  // Edit own post
+  const handleEditPost = useCallback((postId: string) => {
+    // Find the post to edit
+    const post = posts.find((p) => p.post_id === postId);
+    if (!post) return;
+
+    // For now, show a simple prompt to edit text content
+    Alert.prompt(
+      'Edit Post',
+      'Update your post text:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save',
+          onPress: async (newText) => {
+            if (!newText?.trim()) return;
+            try {
+              const { error: updateErr } = await supabase
+                .from('posts')
+                .update({ text_content: newText.trim() })
+                .eq('id', postId)
+                .eq('author_id', user?.id);
+
+              if (updateErr) throw new Error(updateErr.message);
+
+              // Update local state
+              setPosts((prev) =>
+                prev.map((p) =>
+                  p.post_id === postId ? { ...p, text_content: newText.trim() } : p
+                )
+              );
+            } catch (e: any) {
+              Alert.alert('Error', e?.message || 'Failed to update post');
+            }
+          },
+        },
+      ],
+      'plain-text',
+      post.text_content
+    );
+  }, [posts, user]);
+
+  // Delete own post
+  const handleDeletePost = useCallback(async (postId: string) => {
+    if (!user) return;
+
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this post? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error: deleteErr } = await supabase
+                .from('posts')
+                .delete()
+                .eq('id', postId)
+                .eq('author_id', user.id);
+
+              if (deleteErr) throw new Error(deleteErr.message);
+
+              // Remove from local state
+              setPosts((prev) => prev.filter((p) => p.post_id !== postId));
+              setReportTarget(null);
+            } catch (e: any) {
+              Alert.alert('Error', e?.message || 'Failed to delete post');
+            }
+          },
+        },
+      ]
+    );
+  }, [user]);
+
   // Reactions modal component
   const ReactionsModal = useMemo(() => {
     if (!reactionsModalPostId) return null;
@@ -889,93 +1071,78 @@ export default function FeedScreen() {
 
         {/* MLL PRO hero (web: components/mll-pro/MllProHero.tsx) */}
         <Card style={styles.proHeroCard}>
-          <View style={styles.proHeroRow}>
-            <View style={styles.proHeroTextCol}>
-              <Text style={styles.proHeroTitle}>
-                MLL PRO is where top streamers build real communities.
-              </Text>
-              <Text style={styles.proHeroBody}>
-                Get recognized across the app, featured placement when live, and help grow the
-                platform by bringing your community with you. No contracts. No quotas. Just quality
-                + intent.
-              </Text>
-              <View style={styles.proHeroButtonsRow}>
-                <Button label="Apply for MLL PRO" variant="primary" />
-                <Button label="What is MLL PRO?" variant="outline" />
-              </View>
-            </View>
-            <View style={styles.proBadgePlaceholder} accessibilityLabel="MLL PRO Badge">
-              <MaterialCommunityIcons name="shield-star" size={26} color="#FFFFFF" />
-              <Text style={styles.proBadgeText}>PRO</Text>
-            </View>
+          {/* Title row with badge */}
+          <View style={styles.proHeroTitleRow}>
+            <Text style={styles.proHeroTitle}>
+              MLL PRO is where top streamers build real communities.
+            </Text>
+            <Image
+              source={require('../assets/newprobadge.png')}
+              style={styles.proBadgeImage}
+              resizeMode="contain"
+              accessibilityLabel="MLL PRO Badge"
+            />
+          </View>
+          {/* Body text - full width */}
+          <Text style={styles.proHeroBody}>
+            Get recognized across the app, featured placement when live, and help grow the platform by bringing your community with you. No contracts. No quotas. Just quality + intent.
+          </Text>
+          {/* Buttons - full width */}
+          <View style={styles.proHeroButtonsRow}>
+            <Button label="Apply for MLL PRO" variant="primary" />
+            <Button label="What is MLL PRO?" variant="outline" />
           </View>
         </Card>
 
         {/* Link or Nah promo (web: components/link/LinkOrNahPromoCard.tsx) */}
         <Card style={styles.linkOrNahCard}>
-          <View style={styles.linkOrNahTopRow}>
-            <Pressable accessibilityRole="button" style={styles.linkOrNahDismiss}>
-              <Feather name="x" size={16} color="#FFFFFF" />
-            </Pressable>
-          </View>
-
           <View style={styles.linkOrNahRow}>
-            <View style={styles.linkOrNahIconCol}>
-              <View style={styles.linkOrNahSparkleBadge}>
-              <MaterialCommunityIcons name="shimmer" size={14} color="#FFFFFF" />
-              </View>
-              <View style={styles.linkOrNahIconBox}>
-                <MaterialCommunityIcons name="link-variant" size={22} color="#FFFFFF" />
-              </View>
+            <View style={styles.linkOrNahIconBox}>
+              <MaterialCommunityIcons name="link-variant" size={18} color="#FFFFFF" />
             </View>
-
             <View style={styles.linkOrNahTextCol}>
               <Text style={styles.linkOrNahTitle}>Link or Nah</Text>
-              <Text style={styles.linkOrNahBody}>Swipe to connect. Mutual links only. No DMs.</Text>
-              <View style={styles.linkOrNahCtaRow}>
-                <Button label="Try It" variant="primary" iconName="arrow-right" />
-                <Text style={styles.linkOrNahMicroCopy}>No messages unless you both link</Text>
-              </View>
+              <Text style={styles.linkOrNahBody}>Swipe to connect. Mutual links only.</Text>
             </View>
+            <Pressable accessibilityRole="button" style={styles.linkOrNahDismiss}>
+              <Feather name="x" size={14} color="rgba(255,255,255,0.7)" />
+            </Pressable>
+          </View>
+          <View style={styles.linkOrNahCtaRow}>
+            <Button label="Try It" variant="primary" iconName="arrow-right" />
+            <Text style={styles.linkOrNahMicroCopy}>No messages unless you both link</Text>
           </View>
         </Card>
 
-        {/* Feed composer (mobile placeholder mirroring web copy) */}
+        {/* Feed composer */}
         <Card>
           <Text style={styles.cardSectionTitle}>Create a post</Text>
 
-          <View style={styles.composerRow}>
+          <Pressable onPress={() => setShowComposerModal(true)} style={styles.composerRow}>
             <View style={styles.composerAvatar}>
               <Text style={styles.composerAvatarText}>✦</Text>
             </View>
             <View style={styles.composerInput}>
               <Text style={styles.composerPlaceholder}>Share something with the community...</Text>
-              <Feather name="lock" size={16} color={stylesVars.mutedText} />
+              <Feather name="edit-2" size={16} color={stylesVars.primary} />
             </View>
-          </View>
+          </Pressable>
 
           <Divider />
 
           <View style={styles.composerActionsRow} accessibilityRole="tablist">
-            <View style={styles.composerAction}>
-              <Feather name="image" size={18} color={stylesVars.mutedText} />
+            <Pressable onPress={() => setShowComposerModal(true)} style={styles.composerAction}>
+              <Feather name="image" size={18} color="#22C55E" />
               <Text style={styles.composerActionText}>Photo</Text>
-            </View>
-            <View style={styles.composerAction}>
-              <Feather name="video" size={18} color={stylesVars.mutedText} />
+            </Pressable>
+            <Pressable onPress={() => setShowComposerModal(true)} style={styles.composerAction}>
+              <Feather name="video" size={18} color="#EF4444" />
               <Text style={styles.composerActionText}>Video</Text>
-            </View>
-            <View style={styles.composerAction}>
-              <Feather name="smile" size={18} color={stylesVars.mutedText} />
+            </Pressable>
+            <Pressable onPress={() => setShowComposerModal(true)} style={styles.composerAction}>
+              <Feather name="smile" size={18} color="#F59E0B" />
               <Text style={styles.composerActionText}>Feeling</Text>
-            </View>
-          </View>
-
-          <View style={styles.comingSoonRow} accessibilityRole="text">
-            <View style={styles.comingSoonChip}>
-              <MaterialCommunityIcons name="shimmer" size={14} color={stylesVars.primary} />
-              <Text style={styles.comingSoonText}>Post creation coming soon</Text>
-            </View>
+            </Pressable>
           </View>
         </Card>
 
@@ -1021,6 +1188,46 @@ export default function FeedScreen() {
         }}
       />
       {ReactionsModal}
+
+      {/* Comments Modal */}
+      {commentsModalPostId && (
+        <FeedCommentsModal
+          visible={Boolean(commentsModalPostId)}
+          onClose={() => {
+            setCommentsModalPostId(null);
+            setCommentsModalAuthorUsername('');
+          }}
+          postId={commentsModalPostId}
+          postAuthorUsername={commentsModalAuthorUsername}
+          onCommentCountChange={(delta) => handleCommentCountChange(commentsModalPostId, delta)}
+        />
+      )}
+
+      {/* Gift Modal */}
+      {giftTarget && (
+        <WatchGiftModal
+          visible={giftModalVisible}
+          onClose={() => {
+            setGiftModalVisible(false);
+            setGiftTarget(null);
+          }}
+          recipientId={giftTarget.recipientId}
+          recipientUsername={giftTarget.recipientUsername}
+          recipientDisplayName={giftTarget.recipientDisplayName}
+          recipientAvatarUrl={giftTarget.recipientAvatarUrl}
+          postId={giftTarget.postId}
+          isLive={false}
+          liveStreamId={null}
+        />
+      )}
+
+      {/* Composer Modal */}
+      <FeedComposerModal
+        visible={showComposerModal}
+        onClose={() => setShowComposerModal(false)}
+        onPostCreated={() => fetchFeedPage({ reset: true })}
+      />
+
       <FlatList
         data={posts}
         keyExtractor={(item) => item.post_id}
@@ -1072,8 +1279,17 @@ export default function FeedScreen() {
                 })
               }
               onPressMedia={({ kind, url }) => navigation.navigate('MediaViewer', { kind, url })}
-              onPressComment={() => {
-                // No dedicated post comments screen in mobile yet; keep UI intact.
+              onPressComment={() => openCommentsModal(item)}
+              onPressGift={() => openGiftModal(item)}
+              onPressShare={() => {
+                setShareTarget({
+                  postId: item.post_id,
+                  text: item.text_content || `Check out this post by @${item.author_username}`,
+                  mediaUrl: item.media_url,
+                  authorUsername: item.author_username,
+                  authorAvatarUrl: item.author_avatar_url,
+                });
+                setShowShareModal(true);
               }}
               onOpenReactionPicker={() => setReactionPickerPostId(item.post_id)}
               onPressReactions={() => fetchPostReactions(item.post_id)}
@@ -1081,9 +1297,152 @@ export default function FeedScreen() {
                 if (!item.media_url) return;
                 setMediaAspectRatios((prev) => (prev[item.media_url!] != null ? prev : { ...prev, [item.media_url!]: ratio }));
               }}
+              onPressOverflow={() => {
+                setReportTarget({
+                  postId: item.post_id,
+                  authorId: item.author_profile_id,
+                  authorUsername: item.author_username,
+                });
+                setShowPostOverflowMenu(true);
+              }}
             />
           </View>
         )}
+      />
+
+      {/* Post Overflow Menu Modal */}
+      <Modal
+        visible={showPostOverflowMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPostOverflowMenu(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'flex-end',
+          }}
+          onPress={() => setShowPostOverflowMenu(false)}
+        >
+          <View
+            style={{
+              backgroundColor: stylesVars.card,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingBottom: insets.bottom + 16,
+            }}
+          >
+            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: stylesVars.border }} />
+            </View>
+            {/* Edit option - only for own posts */}
+            {reportTarget && user && reportTarget.authorId === user.id && (
+              <Pressable
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 16,
+                }}
+                onPress={() => {
+                  setShowPostOverflowMenu(false);
+                  handleEditPost(reportTarget.postId);
+                }}
+              >
+                <Feather name="edit-2" size={20} color={stylesVars.text} />
+                <Text style={{ fontSize: 16, fontWeight: '700', color: stylesVars.text }}>Edit Post</Text>
+              </Pressable>
+            )}
+            {/* Delete option - only for own posts */}
+            {reportTarget && user && reportTarget.authorId === user.id && (
+              <Pressable
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 16,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: stylesVars.border,
+                }}
+                onPress={() => {
+                  setShowPostOverflowMenu(false);
+                  handleDeletePost(reportTarget.postId);
+                }}
+              >
+                <Feather name="trash-2" size={20} color="#EF4444" />
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#EF4444' }}>Delete Post</Text>
+              </Pressable>
+            )}
+            {/* Report option - only for other users' posts */}
+            {reportTarget && user && reportTarget.authorId !== user.id && (
+              <Pressable
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 16,
+                }}
+                onPress={() => {
+                  setShowPostOverflowMenu(false);
+                  setShowReportModal(true);
+                }}
+              >
+                <Feather name="flag" size={20} color="#EF4444" />
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#EF4444' }}>Report Post</Text>
+              </Pressable>
+            )}
+            <Pressable
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                paddingHorizontal: 20,
+                paddingVertical: 16,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderTopColor: stylesVars.border,
+              }}
+              onPress={() => setShowPostOverflowMenu(false)}
+            >
+              <Feather name="x" size={20} color={stylesVars.mutedText} />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: stylesVars.text }}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={showReportModal}
+        onClose={() => {
+          setShowReportModal(false);
+          setReportTarget(null);
+        }}
+        reportType="user"
+        reportedUserId={reportTarget?.authorId}
+        reportedUsername={reportTarget?.authorUsername}
+        contextDetails={reportTarget ? JSON.stringify({
+          post_id: reportTarget.postId,
+          author_id: reportTarget.authorId,
+          author_username: reportTarget.authorUsername,
+          source: 'mobile_feed',
+        }) : undefined}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => {
+          setShowShareModal(false);
+          setShareTarget(null);
+        }}
+        shareUrl={shareTarget ? `https://www.mylivelinks.com/post/${shareTarget.postId}` : ''}
+        shareText={shareTarget?.text || ''}
+        shareThumbnail={shareTarget?.mediaUrl || shareTarget?.authorAvatarUrl || undefined}
+        shareContentType="photo"
       />
     </SafeAreaView>
   );
@@ -1231,16 +1590,14 @@ function createStyles(stylesVars: StylesVars) {
     backgroundColor: '#2E1065',
     borderColor: 'rgba(255,255,255,0.12)',
   },
-  proHeroRow: {
+  proHeroTitleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-  },
-  proHeroTextCol: {
-    flex: 1,
-    gap: 10,
+    gap: 8,
+    marginBottom: 8,
   },
   proHeroTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
@@ -1250,95 +1607,70 @@ function createStyles(stylesVars: StylesVars) {
     fontSize: 13,
     lineHeight: 18,
     color: 'rgba(255,255,255,0.82)',
+    marginBottom: 12,
   },
   proHeroButtonsRow: {
     flexDirection: 'column',
     gap: 10,
-    marginTop: 2,
   },
-  proBadgePlaceholder: {
-    width: 86,
-    height: 86,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  proBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    letterSpacing: 0.6,
+  proBadgeImage: {
+    width: 90,
+    height: 90,
+    marginTop: -4,
+    marginRight: 4,
+    marginBottom: -20,
+    flexShrink: 0,
   },
 
   linkOrNahCard: {
     backgroundColor: '#4F46E5',
     borderColor: 'rgba(255,255,255,0.12)',
-  },
-  linkOrNahTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    padding: 12,
   },
   linkOrNahDismiss: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   linkOrNahRow: {
     flexDirection: 'row',
-    gap: 14,
-    marginTop: 6,
-  },
-  linkOrNahIconCol: {
-    width: 64,
+    alignItems: 'center',
+    gap: 10,
   },
   linkOrNahIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  linkOrNahSparkleBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-    marginLeft: -8,
-    marginBottom: -10,
-    zIndex: 1,
-  },
   linkOrNahTextCol: {
     flex: 1,
-    gap: 8,
   },
   linkOrNahTitle: {
-    fontSize: 20,
-    fontWeight: '900',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   linkOrNahBody: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    lineHeight: 20,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.85)',
+    lineHeight: 16,
   },
   linkOrNahCtaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    flexWrap: 'wrap',
+    marginTop: 10,
   },
   linkOrNahMicroCopy: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.7)',
     fontWeight: '600',
   },
 
@@ -1494,6 +1826,16 @@ function createStyles(stylesVars: StylesVars) {
     fontSize: 15,
     fontWeight: '800',
     color: stylesVars.text,
+  },
+  authorNameRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  feelingText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: stylesVars.mutedText,
   },
   postTimestamp: {
     fontSize: 12,

@@ -2,8 +2,11 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import MllProBadge from '../components/shared/MllProBadge';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../theme/useTheme';
 import { supabase } from '../lib/supabase';
+import { showComingSoon } from '../lib/showComingSoon';
 
 // Tabs matching web search (components/search/constants.ts)
 type SearchTab = 'top' | 'people' | 'posts' | 'teams' | 'live';
@@ -194,6 +197,7 @@ function Avatar({
 
 export default function SearchScreen() {
   const { colors } = useTheme();
+  const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<SearchTab>('top');
   const [filters, setFilters] = useState<Record<FilterKey, boolean>>({
@@ -273,7 +277,7 @@ export default function SearchScreen() {
 
       setResults({
         people: (peopleRes.data as PersonResult[]) || [],
-        posts: (postsRes.data as PostResult[]) || [],
+        posts: (postsRes.data as unknown as PostResult[]) || [],
         teams: (teamsRes.data as TeamResult[]) || [],
         live: (liveRes.data as LiveResult[]) || [],
       });
@@ -481,7 +485,7 @@ export default function SearchScreen() {
                 <ResultCard
                   key={person.id}
                   accessibilityLabel={`Result: ${person.display_name || person.username}`}
-                  onPress={() => {}}
+                  onPress={() => navigation.navigate('ProfileViewScreen' as never, { profileId: person.id } as never)}
                 >
                   <View style={styles.resultRow}>
                     <Avatar text={person.display_name || person.username} ring={person.is_live ? 'live' : 'none'} />
@@ -490,9 +494,7 @@ export default function SearchScreen() {
                         <Text style={styles.resultTitle} numberOfLines={1}>
                           {person.display_name || person.username}
                         </Text>
-                        {person.is_mll_pro && (
-                          <Ionicons name="checkmark-circle" size={14} color="#8B5CF6" />
-                        )}
+                        {person.is_mll_pro && <MllProBadge size="sm" />}
                         {person.is_live && (
                           <View style={styles.livePill}>
                             <View style={styles.liveDot} />
@@ -519,7 +521,7 @@ export default function SearchScreen() {
                 <Text style={styles.resultsGroupMeta}>{results.posts.length} found</Text>
               </View>
               {results.posts.map((post) => (
-                <ResultCard key={post.id} accessibilityLabel={`Result: post by ${post.author?.display_name || post.author?.username || 'Unknown'}`} onPress={() => {}}>
+                <ResultCard key={post.id} accessibilityLabel={`Result: post by ${post.author?.display_name || post.author?.username || 'Unknown'}`} onPress={() => post.author?.id && navigation.navigate('ProfileViewScreen' as never, { profileId: post.author.id } as never)}>
                   <View style={styles.postCard}>
                     <View style={styles.postHeader}>
                       <Avatar text={post.author?.display_name || post.author?.username || '?'} />
@@ -560,7 +562,7 @@ export default function SearchScreen() {
                 <Text style={styles.resultsGroupMeta}>{results.teams.length} found</Text>
               </View>
               {results.teams.map((team) => (
-                <ResultCard key={team.id} accessibilityLabel={`Result: team ${team.name}`} onPress={() => {}}>
+                <ResultCard key={team.id} accessibilityLabel={`Result: team ${team.name}`} onPress={() => navigation.navigate('TeamsDetailScreen' as never, { teamId: team.id, slug: team.slug } as never)}>
                   <View style={styles.resultRow}>
                     <Avatar text={team.name} variant="square" />
                     <View style={styles.resultTextCol}>
@@ -586,7 +588,7 @@ export default function SearchScreen() {
                 <Text style={styles.resultsGroupMeta}>{results.live.length} streaming</Text>
               </View>
               {results.live.map((live) => (
-                <ResultCard key={live.id} accessibilityLabel={`Result: live by ${live.display_name || live.username}`} onPress={() => {}}>
+                <ResultCard key={live.id} accessibilityLabel={`Result: live by ${live.display_name || live.username}`} onPress={() => navigation.navigate('ProfileViewScreen' as never, { profileId: live.id } as never)}>
                   <View style={styles.resultRow}>
                     <Avatar text={live.display_name || live.username} ring="live" />
                     <View style={styles.resultTextCol}>

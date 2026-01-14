@@ -1,4 +1,5 @@
 import { createRouteHandlerClient } from '@/lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 function parseOwnerInboxProfileIds(): string[] {
@@ -41,10 +42,37 @@ function isUuid(v: unknown): v is string {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createRouteHandlerClient(request);
+    // Check for Bearer token (mobile) or use cookies (web)
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || '';
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : null;
     
-    // Authenticate user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    let supabase;
+    let user;
+    let authError;
+    
+    if (bearerToken) {
+      // Mobile: validate Bearer token via Supabase
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+      
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${bearerToken}` } },
+      });
+      
+      const result = await supabase.auth.getUser(bearerToken);
+      user = result.data?.user || null;
+      authError = result.error || null;
+    } else {
+      // Web: use cookie-based auth
+      supabase = createRouteHandlerClient(request);
+      const result = await supabase.auth.getUser();
+      user = result.data?.user || null;
+      authError = result.error || null;
+    }
     
     if (!user || authError) {
       return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });

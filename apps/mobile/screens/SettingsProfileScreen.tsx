@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/useTheme';
+import { showComingSoon } from '../lib/showComingSoon';
 
 type PickerItem = {
   id: string;
@@ -724,7 +725,7 @@ export default function SettingsProfileScreen() {
             label="Current Type"
             value="creator"
             hint="Tap to change (UI only)"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Profile type selection')}
           />
           <Text style={[styles.smallMuted, { marginTop: 10, color: themed.amber600 }]}>
             ⚠️ Changing profile type may hide or show different sections on your profile. Nothing is deleted.
@@ -859,7 +860,7 @@ export default function SettingsProfileScreen() {
             label="Background Overlay"
             value="Dark (Medium)"
             hint="Helps text remain readable over background images"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Background overlay settings')}
           />
         </Card>
 
@@ -880,14 +881,14 @@ export default function SettingsProfileScreen() {
             label="Card Opacity"
             value="95%"
             hint="Lower opacity lets your background show through the cards (slider on web)"
-            onPress={() => {}}
+            onPress={() => showComingSoon('Card opacity settings')}
           />
 
-          <Row label="Border Radius" value="Medium (Balanced)" onPress={() => {}} />
+          <Row label="Border Radius" value="Medium (Balanced)" onPress={() => showComingSoon('Border radius settings')} />
         </Card>
 
         <Card title="Colors & Typography" icon={<Ionicons name="text-outline" size={18} color={themed.blue600} />}>
-          <Row label="Font Style" value="Modern (Sans-serif)" onPress={() => {}} />
+          <Row label="Font Style" value="Modern (Sans-serif)" onPress={() => showComingSoon('Font style settings')} />
 
           <View style={{ marginTop: 12 }}>
             <Text style={[styles.fieldLabel, { color: themed.text }]}>🎯 Button Color</Text>
@@ -1044,7 +1045,7 @@ export default function SettingsProfileScreen() {
             <Button label="Delete Pinned Post" iconName="trash-outline" tone="danger" disabled />
           </View>
           <View style={{ marginTop: 12 }}>
-            <Row label="Filter" value="None" hint="Filters available for images on web (UI only)" onPress={() => {}} />
+            <Row label="Filter" value="None" hint="Filters available for images on web (UI only)" onPress={() => showComingSoon('Image filters')} />
             <View style={[styles.chipsWrap, { marginTop: 10 }]}>
               <Chip label="None" selected />
               <Chip label="Warm" disabled />
