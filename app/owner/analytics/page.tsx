@@ -71,6 +71,7 @@ interface AnalyticsData {
   // Top users
   topCoinBuyers: TopUser[];
   topDiamondEarners: TopUser[];
+  topDiamondHolders: TopUser[];
   
   // Stripe events
   stripeEvents: StripeEvent[];
@@ -591,10 +592,10 @@ export default function AnalyticsPage() {
               />
             </div>
 
-            {/* Top Diamond Holders */}
+            {/* Top Diamond Holders - uses CURRENT wallet balance, not lifetime earned */}
             <TopUsersTable
               title="Top Diamond Holders (Highest Payout Risk)"
-              users={data?.topDiamondEarners ?? []}
+              users={data?.topDiamondHolders ?? []}
               columns={{
                 primary: { label: 'Diamonds Held', suffix: ' 💎' },
                 secondary: { label: 'Est. Payout', prefix: '$' },

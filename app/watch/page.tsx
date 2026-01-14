@@ -411,8 +411,8 @@ export default function WatchPage() {
 
       {giftModalOpen && giftTarget && (
         <GiftModal
-          recipientId={giftTarget.author?.id || giftTarget.id}
-          recipientUsername={giftTarget.author?.username || giftTarget.username}
+          recipientId={giftTarget.authorId || giftTarget.author?.id || giftTarget.id}
+          recipientUsername={giftTarget.username || giftTarget.author?.username}
           postId={giftTarget.postId}
           commentId={giftTarget.text_content ? giftTarget.id : undefined}
           onGiftSent={() => {

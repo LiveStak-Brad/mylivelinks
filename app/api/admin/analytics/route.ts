@@ -490,6 +490,26 @@ export async function GET(request: NextRequest) {
             .slice(0, 50);
         })();
 
+    // Top Diamond Holders: CURRENT wallet balance (profiles.earnings_balance)
+    // This is the authoritative source for payout exposure - NOT lifetime earned
+    const topDiamondHolders = await (async () => {
+      const { data: holders, error } = await admin
+        .from('profiles')
+        .select('id, username, earnings_balance')
+        .gt('earnings_balance', 0)
+        .order('earnings_balance', { ascending: false })
+        .limit(50);
+
+      if (error || !holders) return [];
+
+      return holders.map((h: any) => ({
+        id: String(h.id ?? ''),
+        username: String(h.username ?? ''),
+        primaryValue: safeNumber(h.earnings_balance),
+        secondaryValue: safeNumber(h.earnings_balance) * 0.01, // Est. USD at $0.01/diamond
+      }));
+    })();
+
     const data = {
       grossCoinSales: grossRevenueUsd,
       stripeFees: stripeFeesUsd,
@@ -523,6 +543,7 @@ export async function GET(request: NextRequest) {
 
       topCoinBuyers,
       topDiamondEarners,
+      topDiamondHolders,
 
       stripeEvents,
 
