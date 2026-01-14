@@ -3,10 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Activi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
+import { supabase } from '../lib/supabase';
 
-const API_BASE_URL = 'https://www.mylivelinks.com';
-
-// Supported search tabs (music/videos/media hidden - not yet searchable via this endpoint)
+// Tabs matching web search (components/search/constants.ts)
 type SearchTab = 'top' | 'people' | 'posts' | 'teams' | 'live';
 
 interface TabDefinition {
@@ -35,7 +34,7 @@ const FILTER_CHIPS: Array<{
   { id: 'following', label: 'Following', icon: 'person' },
 ];
 
-// Static suggested queries (not fetched from backend)
+// Static suggested queries (matching web MOCK_SUGGESTED_QUERIES pattern)
 const SUGGESTED_QUERIES = [
   'music',
   'gaming',
@@ -45,14 +44,53 @@ const SUGGESTED_QUERIES = [
   'live',
 ];
 
-// Types matching /api/search/users response
-interface UserResult {
+// Result types matching web lib/search.ts and types/search.ts
+interface PersonResult {
   id: string;
   username: string;
   display_name: string | null;
   avatar_url: string | null;
   is_live: boolean;
   follower_count: number;
+  is_mll_pro?: boolean;
+}
+
+interface PostResult {
+  id: string;
+  text_content: string;
+  created_at: string;
+  media_url: string | null;
+  likes_count: number;
+  author: {
+    id: string;
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
+interface TeamResult {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon_url: string | null;
+  approved_member_count: number;
+}
+
+interface LiveResult {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  is_live: boolean;
+}
+
+interface SearchResults {
+  people: PersonResult[];
+  posts: PostResult[];
+  teams: TeamResult[];
+  live: LiveResult[];
 }
 
 function SectionHeader({
@@ -165,18 +203,18 @@ export default function SearchScreen() {
     following: false,
   });
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [users, setUsers] = useState<UserResult[]>([]);
+  const [results, setResults] = useState<SearchResults>({ people: [], posts: [], teams: [], live: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
   const suggestedQueries = useMemo(() => SUGGESTED_QUERIES, []);
 
-  // Uses existing /api/search/users endpoint
+  // Direct Supabase queries matching web lib/search.ts fetchSearchResults()
   const performSearch = useCallback(async (term: string) => {
     const trimmed = term.trim();
     if (!trimmed) {
-      setUsers([]);
+      setResults({ people: [], posts: [], teams: [], live: [] });
       setHasSearched(false);
       return;
     }
@@ -186,19 +224,63 @@ export default function SearchScreen() {
     setHasSearched(true);
 
     try {
-      const url = `${API_BASE_URL}/api/search/users?q=${encodeURIComponent(trimmed)}&limit=20`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Search failed: ${response.status}`);
-      }
+      const likePattern = `%${trimmed.toLowerCase()}%`;
 
-      const data = await response.json();
-      setUsers(data.users || []);
+      // Parallel queries matching web lib/search.ts
+      const [peopleRes, postsRes, teamsRes, liveRes] = await Promise.all([
+        // People: profiles table (same as web)
+        supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url, is_live, follower_count, is_mll_pro')
+          .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
+          .order('follower_count', { ascending: false })
+          .limit(10),
+        // Posts: posts table with author join (same as web)
+        supabase
+          .from('posts')
+          .select(`
+            id,
+            text_content,
+            created_at,
+            media_url,
+            likes_count,
+            author:profiles!posts_author_id_fkey (
+              id,
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .ilike('text_content', likePattern)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        // Teams: teams table (same as web)
+        supabase
+          .from('teams')
+          .select('id, name, slug, description, icon_url, approved_member_count')
+          .or(`name.ilike.${likePattern},description.ilike.${likePattern}`)
+          .order('approved_member_count', { ascending: false })
+          .limit(10),
+        // Live: profiles where is_live=true (same as web)
+        supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url, is_live')
+          .eq('is_live', true)
+          .or(`username.ilike.${likePattern},display_name.ilike.${likePattern}`)
+          .order('username')
+          .limit(10),
+      ]);
+
+      setResults({
+        people: (peopleRes.data as PersonResult[]) || [],
+        posts: (postsRes.data as PostResult[]) || [],
+        teams: (teamsRes.data as TeamResult[]) || [],
+        live: (liveRes.data as LiveResult[]) || [],
+      });
     } catch (err) {
       console.error('[SearchScreen] Search error:', err);
       setError(err instanceof Error ? err.message : 'Search failed');
-      setUsers([]);
+      setResults({ people: [], posts: [], teams: [], live: [] });
     } finally {
       setLoading(false);
     }
@@ -217,19 +299,17 @@ export default function SearchScreen() {
     performSearch(term);
   }, [performSearch]);
 
-  // Filter users based on active filters
-  const filteredUsers = useMemo(() => {
-    let filtered = users;
+  // Filter people based on active filters
+  const filteredPeople = useMemo(() => {
+    let filtered = results.people;
+    if (filters.verified) {
+      filtered = filtered.filter((p) => p.is_mll_pro);
+    }
     if (filters.live) {
-      filtered = filtered.filter((u) => u.is_live);
+      filtered = filtered.filter((p) => p.is_live);
     }
     return filtered;
-  }, [users, filters.live]);
-
-  // Users who are currently live
-  const liveUsers = useMemo(() => {
-    return users.filter((u) => u.is_live);
-  }, [users]);
+  }, [results.people, filters.verified, filters.live]);
 
   // Format follower count
   const formatCount = (count: number): string => {
@@ -375,8 +455,12 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {/* No results state */}
-          {hasSearched && !loading && !error && filteredUsers.length === 0 && (
+          {/* No results state - only when all categories are empty */}
+          {hasSearched && !loading && !error && 
+           filteredPeople.length === 0 && 
+           results.posts.length === 0 && 
+           results.teams.length === 0 && 
+           results.live.length === 0 && (
             <View style={styles.emptyState}>
               <Ionicons name="search" size={48} color="#9CA3AF" />
               <Text style={styles.emptyTitle}>No results found</Text>
@@ -386,27 +470,30 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {/* People results - uses /api/search/users */}
-          {(activeTab === 'top' || activeTab === 'people') && filteredUsers.length > 0 && (
+          {/* People results - direct Supabase query on profiles table */}
+          {(activeTab === 'top' || activeTab === 'people') && filteredPeople.length > 0 && (
             <View style={styles.resultsGroup}>
               <View style={styles.resultsGroupHeader}>
                 <Text style={styles.resultsGroupTitle}>People</Text>
-                <Text style={styles.resultsGroupMeta}>{filteredUsers.length} found</Text>
+                <Text style={styles.resultsGroupMeta}>{filteredPeople.length} found</Text>
               </View>
-              {filteredUsers.map((user) => (
+              {filteredPeople.map((person) => (
                 <ResultCard
-                  key={user.id}
-                  accessibilityLabel={`Result: ${user.display_name || user.username}`}
+                  key={person.id}
+                  accessibilityLabel={`Result: ${person.display_name || person.username}`}
                   onPress={() => {}}
                 >
                   <View style={styles.resultRow}>
-                    <Avatar text={user.display_name || user.username} ring={user.is_live ? 'live' : 'none'} />
+                    <Avatar text={person.display_name || person.username} ring={person.is_live ? 'live' : 'none'} />
                     <View style={styles.resultTextCol}>
                       <View style={styles.resultTitleRow}>
                         <Text style={styles.resultTitle} numberOfLines={1}>
-                          {user.display_name || user.username}
+                          {person.display_name || person.username}
                         </Text>
-                        {user.is_live && (
+                        {person.is_mll_pro && (
+                          <Ionicons name="checkmark-circle" size={14} color="#8B5CF6" />
+                        )}
+                        {person.is_live && (
                           <View style={styles.livePill}>
                             <View style={styles.liveDot} />
                             <Text style={styles.livePillText}>LIVE</Text>
@@ -414,7 +501,7 @@ export default function SearchScreen() {
                         )}
                       </View>
                       <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        @{user.username} • {formatCount(user.follower_count)} followers
+                        @{person.username} • {formatCount(person.follower_count)} followers
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -424,43 +511,88 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {/* Posts - no existing API endpoint */}
-          {(activeTab === 'posts') && hasSearched && (
-            <View style={styles.emptyState}>
-              <Ionicons name="newspaper" size={48} color="#9CA3AF" />
-              <Text style={styles.emptyTitle}>Post search coming soon</Text>
-              <Text style={styles.emptyDescription}>
-                Search for people above to find their content.
-              </Text>
+          {/* Posts results - direct Supabase query on posts table */}
+          {(activeTab === 'top' || activeTab === 'posts') && results.posts.length > 0 && (
+            <View style={styles.resultsGroup}>
+              <View style={styles.resultsGroupHeader}>
+                <Text style={styles.resultsGroupTitle}>Posts</Text>
+                <Text style={styles.resultsGroupMeta}>{results.posts.length} found</Text>
+              </View>
+              {results.posts.map((post) => (
+                <ResultCard key={post.id} accessibilityLabel={`Result: post by ${post.author?.display_name || post.author?.username || 'Unknown'}`} onPress={() => {}}>
+                  <View style={styles.postCard}>
+                    <View style={styles.postHeader}>
+                      <Avatar text={post.author?.display_name || post.author?.username || '?'} />
+                      <View style={styles.postHeaderText}>
+                        <Text style={styles.postAuthor} numberOfLines={1}>
+                          {post.author?.display_name || post.author?.username || 'Unknown'}
+                        </Text>
+                        <Text style={styles.postHandle} numberOfLines={1}>
+                          @{post.author?.username || 'unknown'}
+                        </Text>
+                      </View>
+                      {post.media_url ? (
+                        <View style={styles.postMetaPill}>
+                          <Ionicons name="images" size={14} color="#6B7280" />
+                          <Text style={styles.postMetaPillText}>Media</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.postMetaPill}>
+                          <Ionicons name="heart" size={14} color="#6B7280" />
+                          <Text style={styles.postMetaPillText}>{post.likes_count}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.postSnippet} numberOfLines={2}>
+                      {post.text_content}
+                    </Text>
+                  </View>
+                </ResultCard>
+              ))}
             </View>
           )}
 
-          {/* Teams - no existing API endpoint */}
-          {(activeTab === 'teams') && hasSearched && (
-            <View style={styles.emptyState}>
-              <Ionicons name="grid" size={48} color="#9CA3AF" />
-              <Text style={styles.emptyTitle}>Team search coming soon</Text>
-              <Text style={styles.emptyDescription}>
-                Search for people above to find their teams.
-              </Text>
+          {/* Teams results - direct Supabase query on teams table */}
+          {(activeTab === 'top' || activeTab === 'teams') && results.teams.length > 0 && (
+            <View style={styles.resultsGroup}>
+              <View style={styles.resultsGroupHeader}>
+                <Text style={styles.resultsGroupTitle}>Teams</Text>
+                <Text style={styles.resultsGroupMeta}>{results.teams.length} found</Text>
+              </View>
+              {results.teams.map((team) => (
+                <ResultCard key={team.id} accessibilityLabel={`Result: team ${team.name}`} onPress={() => {}}>
+                  <View style={styles.resultRow}>
+                    <Avatar text={team.name} variant="square" />
+                    <View style={styles.resultTextCol}>
+                      <Text style={styles.resultTitle} numberOfLines={1}>
+                        {team.name}
+                      </Text>
+                      <Text style={styles.resultSubtitle} numberOfLines={1}>
+                        {team.description || 'Community'} • {formatCount(team.approved_member_count)} members
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                  </View>
+                </ResultCard>
+              ))}
             </View>
           )}
 
-          {/* Live - shows live users from /api/search/users */}
-          {(activeTab === 'top' || activeTab === 'live') && liveUsers.length > 0 && (
+          {/* Live results - direct Supabase query on profiles where is_live=true */}
+          {(activeTab === 'top' || activeTab === 'live') && results.live.length > 0 && (
             <View style={styles.resultsGroup}>
               <View style={styles.resultsGroupHeader}>
                 <Text style={styles.resultsGroupTitle}>Live now</Text>
-                <Text style={styles.resultsGroupMeta}>{liveUsers.length} streaming</Text>
+                <Text style={styles.resultsGroupMeta}>{results.live.length} streaming</Text>
               </View>
-              {liveUsers.map((user) => (
-                <ResultCard key={user.id} accessibilityLabel={`Result: live by ${user.display_name || user.username}`} onPress={() => {}}>
+              {results.live.map((live) => (
+                <ResultCard key={live.id} accessibilityLabel={`Result: live by ${live.display_name || live.username}`} onPress={() => {}}>
                   <View style={styles.resultRow}>
-                    <Avatar text={user.display_name || user.username} ring="live" />
+                    <Avatar text={live.display_name || live.username} ring="live" />
                     <View style={styles.resultTextCol}>
                       <View style={styles.resultTitleRow}>
                         <Text style={styles.resultTitle} numberOfLines={1}>
-                          {user.display_name || user.username}
+                          {live.display_name || live.username}
                         </Text>
                         <View style={styles.livePill}>
                           <View style={styles.liveDot} />
@@ -468,7 +600,7 @@ export default function SearchScreen() {
                         </View>
                       </View>
                       <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        @{user.username}
+                        @{live.username}
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -479,7 +611,7 @@ export default function SearchScreen() {
           )}
 
           {/* Live tab with no live users */}
-          {activeTab === 'live' && hasSearched && liveUsers.length === 0 && !loading && (
+          {activeTab === 'live' && hasSearched && results.live.length === 0 && !loading && (
             <View style={styles.emptyState}>
               <Ionicons name="radio" size={48} color="#9CA3AF" />
               <Text style={styles.emptyTitle}>No one live right now</Text>

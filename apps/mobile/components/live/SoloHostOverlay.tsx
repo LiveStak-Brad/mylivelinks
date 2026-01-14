@@ -184,24 +184,32 @@ export default function SoloHostOverlay({
                   <Image source={PRO_BADGE_IMAGE} style={styles.proBadgeImage} resizeMode="contain" />
                 )}
               </View>
-              {/* Trending + Leaderboard row (like web) */}
-              <View style={styles.rankRow}>
-                <Pressable
-                  onPress={() => setShowTrending(true)}
-                  style={styles.rankButton}
-                >
-                  <Ionicons name="flame" size={14} color="#F97316" />
-                  <Text style={styles.rankText}>{trendingRank ?? 0}</Text>
-                </Pressable>
-                <Text style={styles.rankDot}>•</Text>
-                <Pressable
-                  onPress={() => setShowLeaderboard(true)}
-                  style={styles.rankButton}
-                >
-                  <Ionicons name="trophy" size={14} color="#EAB308" />
-                  <Text style={styles.rankText}>{leaderboardRank?.currentRank ?? 0}</Text>
-                </Pressable>
-              </View>
+              {/* Trending + Leaderboard row (like web) - only show when data available */}
+              {(trendingRank != null || leaderboardRank != null) && (
+                <View style={styles.rankRow}>
+                  {trendingRank != null && (
+                    <Pressable
+                      onPress={() => setShowTrending(true)}
+                      style={styles.rankButton}
+                    >
+                      <Ionicons name="flame" size={14} color="#F97316" />
+                      <Text style={styles.rankText}>{trendingRank}</Text>
+                    </Pressable>
+                  )}
+                  {trendingRank != null && leaderboardRank != null && (
+                    <Text style={styles.rankDot}>•</Text>
+                  )}
+                  {leaderboardRank != null && (
+                    <Pressable
+                      onPress={() => setShowLeaderboard(true)}
+                      style={styles.rankButton}
+                    >
+                      <Ionicons name="trophy" size={14} color="#EAB308" />
+                      <Text style={styles.rankText}>{leaderboardRank.currentRank}</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
             </View>
           </View>
           {/* Leaderboard badge below bubble (like web) */}
