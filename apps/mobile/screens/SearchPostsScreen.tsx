@@ -1,6 +1,8 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -9,16 +11,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
 
-type MockPost = {
+type PostResult = {
   id: string;
-  authorName: string;
-  authorUsername: string;
-  timestamp: string;
-  content: string;
-  hasMedia?: boolean;
-  reactionsCount: number;
-  viewsCount: number;
+  text_content: string;
+  created_at: string;
+  media_url: string | null;
+  likes_count: number;
+  author: {
+    id: string;
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  } | null;
 };
 
 function Card({
@@ -31,68 +38,101 @@ function Card({
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-function FeedPostCard({ post }: { post: MockPost }) {
-  const initial = (post.authorName || post.authorUsername || '?').trim().slice(0, 1).toUpperCase();
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function FeedPostCard({ post, onPress }: { post: PostResult; onPress?: () => void }) {
+  const authorName = post.author?.display_name || post.author?.username || 'Unknown';
+  const initial = authorName.trim().slice(0, 1).toUpperCase();
 
   return (
-    <Card>
-      <View style={styles.postHeaderRow}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initial || '•'}</Text>
+    <Pressable onPress={onPress} accessibilityRole="button">
+      <Card>
+        <View style={styles.postHeaderRow}>
+          {post.author?.avatar_url ? (
+            <Image source={{ uri: post.author.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initial || '•'}</Text>
+            </View>
+          )}
+
+          <View style={styles.postHeaderTextCol}>
+            <Text style={styles.postAuthorName} numberOfLines={1}>
+              {authorName}
+            </Text>
+            <Text style={styles.postTimestamp} numberOfLines={1}>
+              @{post.author?.username || 'unknown'} • {formatTimeAgo(post.created_at)}
+            </Text>
+          </View>
+
+          <Pressable accessibilityRole="button" style={styles.iconButton}>
+            <Feather name="more-horizontal" size={18} color={stylesVars.mutedText} />
+          </Pressable>
         </View>
 
-        <View style={styles.postHeaderTextCol}>
-          <Text style={styles.postAuthorName} numberOfLines={1}>
-            {post.authorName}
-          </Text>
-          <Text style={styles.postTimestamp} numberOfLines={1}>
-            {post.timestamp}
-          </Text>
+        <View style={styles.postBody}>
+          <Text style={styles.postContent}>{post.text_content}</Text>
         </View>
 
-        <Pressable accessibilityRole="button" style={styles.iconButton}>
-          <Feather name="more-horizontal" size={18} color={stylesVars.mutedText} />
-        </Pressable>
-      </View>
+        {post.media_url ? (
+          <Image source={{ uri: post.media_url }} style={styles.mediaImage} resizeMode="cover" />
+        ) : null}
 
-      <View style={styles.postBody}>
-        <Text style={styles.postContent}>{post.content}</Text>
-      </View>
-
-      {post.hasMedia ? (
-        <View style={styles.mediaPlaceholder}>
-          <Feather name="image" size={18} color={stylesVars.mutedText} />
-          <Text style={styles.mediaPlaceholderText}>Image</Text>
+        <View style={styles.postActionsRow}>
+          <Pressable accessibilityRole="button" style={styles.actionButton}>
+            <Feather name="heart" size={18} color={stylesVars.mutedText} />
+            <Text style={styles.actionButtonText}>Like</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={styles.actionButton}>
+            <Feather name="message-circle" size={18} color={stylesVars.mutedText} />
+            <Text style={styles.actionButtonText}>Comment</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={styles.actionButton}>
+            <Feather name="gift" size={18} color={stylesVars.mutedText} />
+            <Text style={styles.actionButtonText}>Gift</Text>
+          </Pressable>
         </View>
-      ) : null}
 
-      <View style={styles.postActionsRow}>
-        <Pressable accessibilityRole="button" style={styles.actionButton}>
-          <Feather name="heart" size={18} color={stylesVars.mutedText} />
-          <Text style={styles.actionButtonText}>Like</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={styles.actionButton}>
-          <Feather name="message-circle" size={18} color={stylesVars.mutedText} />
-          <Text style={styles.actionButtonText}>Comment</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={styles.actionButton}>
-          <Feather name="gift" size={18} color={stylesVars.mutedText} />
-          <Text style={styles.actionButtonText}>Gift</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.reactionsRow}>
-        <Text style={styles.reactionsText}>{post.reactionsCount} reactions</Text>
-        <View style={styles.viewsRow}>
-          <Feather name="eye" size={14} color={stylesVars.mutedText} />
-          <Text style={styles.viewsText}>{post.viewsCount.toLocaleString()} views</Text>
+        <View style={styles.reactionsRow}>
+          <Text style={styles.reactionsText}>{post.likes_count} likes</Text>
         </View>
-      </View>
-    </Card>
+      </Card>
+    </Pressable>
   );
 }
 
-function EmptyState({ query }: { query: string }) {
+function EmptyState({ query, loading, error }: { query: string; loading?: boolean; error?: string | null }) {
+  if (loading) {
+    return (
+      <View style={styles.emptyStateWrap}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.emptyStateTitle}>Searching...</Text>
+      </View>
+    );
+  }
+  if (error) {
+    return (
+      <View style={styles.emptyStateWrap}>
+        <View style={styles.emptyStateIcon}>
+          <Feather name="alert-circle" size={20} color="#EF4444" />
+        </View>
+        <Text style={styles.emptyStateTitle}>Search failed</Text>
+        <Text style={styles.emptyStateBody}>{error}</Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.emptyStateWrap} accessibilityRole="text">
       <View style={styles.emptyStateIcon}>
@@ -100,77 +140,70 @@ function EmptyState({ query }: { query: string }) {
       </View>
       <Text style={styles.emptyStateTitle}>No posts found</Text>
       <Text style={styles.emptyStateBody}>
-        Try a different keyword{query.trim() ? ` for “${query.trim()}”.` : '.'}
+        Try a different keyword{query.trim() ? ` for "${query.trim()}".` : '.'}
       </Text>
     </View>
   );
 }
 
 export default function SearchPostsScreen() {
+  const navigation = useNavigation();
   const [query, setQuery] = useState('');
+  const [posts, setPosts] = useState<PostResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const posts = useMemo<MockPost[]>(
-    () => [
-      {
-        id: 'sp1',
-        authorName: 'Creator Name',
-        authorUsername: 'creatorname',
-        timestamp: 'Jan 11 • 2:05 PM',
-        content: 'Searching should feel like the web Posts search: intent-first and fast.',
-        reactionsCount: 12,
-        viewsCount: 1204,
-      },
-      {
-        id: 'sp2',
-        authorName: 'StreamQueen',
-        authorUsername: 'streamqueen',
-        timestamp: 'Jan 10 • 9:41 PM',
-        content: 'Try queries like “image”, “community”, “battle”, or a creator name.',
-        hasMedia: true,
-        reactionsCount: 48,
-        viewsCount: 9821,
-      },
-      {
-        id: 'sp3',
-        authorName: 'Brad',
-        authorUsername: 'brad',
-        timestamp: 'Jan 9 • 11:18 AM',
-        content: 'Placeholder actions: Like / Comment / Gift (UI only).',
-        reactionsCount: 3,
-        viewsCount: 214,
-      },
-      {
-        id: 'sp4',
-        authorName: 'NightOwl',
-        authorUsername: 'nightowl',
-        timestamp: 'Jan 8 • 6:32 PM',
-        content: 'Text-only post card. Spacing matches the feed cards for consistency.',
-        reactionsCount: 0,
-        viewsCount: 89,
-      },
-      {
-        id: 'sp5',
-        authorName: 'Ava',
-        authorUsername: 'ava',
-        timestamp: 'Jan 7 • 1:09 PM',
-        content: 'Image placeholder block. Search should surface moments from creators.',
-        hasMedia: true,
-        reactionsCount: 22,
-        viewsCount: 3310,
-      },
-    ],
-    []
-  );
+  const searchPosts = useCallback(async (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      setPosts([]);
+      setHasSearched(false);
+      return;
+    }
 
-  const filteredPosts = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return posts;
+    setLoading(true);
+    setError(null);
+    setHasSearched(true);
 
-    return posts.filter((p) => {
-      const haystack = `${p.authorName} ${p.authorUsername} ${p.content}`.toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [posts, query]);
+    try {
+      const likePattern = `%${trimmed.toLowerCase()}%`;
+      const { data, error: err } = await supabase
+        .from('posts')
+        .select(`
+          id,
+          text_content,
+          created_at,
+          media_url,
+          likes_count,
+          author:profiles!posts_author_id_fkey (
+            id,
+            username,
+            display_name,
+            avatar_url
+          )
+        `)
+        .ilike('text_content', likePattern)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (err) throw err;
+      setPosts((data as unknown as PostResult[]) || []);
+    } catch (err: any) {
+      console.error('[SearchPostsScreen] Search error:', err);
+      setError(err.message || 'Search failed');
+      setPosts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchPosts(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, searchPosts]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -208,19 +241,26 @@ export default function SearchPostsScreen() {
           ) : null}
         </View>
 
-        <View style={styles.resultsHeader}>
-          <Text style={styles.resultsTitle}>Posts</Text>
-          <Text style={styles.resultsCount}>{filteredPosts.length}</Text>
-        </View>
+        {hasSearched && !loading && !error && (
+          <View style={styles.resultsHeader}>
+            <Text style={styles.resultsTitle}>Posts</Text>
+            <Text style={styles.resultsCount}>{posts.length}</Text>
+          </View>
+        )}
 
         <FlatList
-          data={filteredPosts}
+          data={posts}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <FeedPostCard post={item} />}
-          ListEmptyComponent={<EmptyState query={query} />}
+          renderItem={({ item }) => (
+            <FeedPostCard 
+              post={item} 
+              onPress={() => item.author?.id && navigation.navigate('ProfileViewScreen' as never, { profileId: item.author.id } as never)}
+            />
+          )}
+          ListEmptyComponent={<EmptyState query={query} loading={loading} error={error} />}
           contentContainerStyle={[
             styles.listContent,
-            filteredPosts.length === 0 ? styles.listContentEmpty : null,
+            posts.length === 0 ? styles.listContentEmpty : null,
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -360,6 +400,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
   avatarText: {
     fontWeight: '800',
     color: stylesVars.mutedText,
@@ -392,6 +437,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: stylesVars.text,
+  },
+  mediaImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+    marginBottom: 10,
   },
   mediaPlaceholder: {
     height: 180,

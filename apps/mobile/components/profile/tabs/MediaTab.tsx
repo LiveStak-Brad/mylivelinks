@@ -18,13 +18,9 @@ interface MediaItem {
   id: string;
   media_url: string;
   media_type: string;
+  thumbnail_url?: string;
   text_content?: string;
   created_at: string;
-  profiles?: {
-    display_name: string;
-    username: string;
-    avatar_url?: string;
-  };
 }
 
 export default function MediaTab({ profileId, colors }: MediaTabProps) {
@@ -45,13 +41,9 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
           id,
           media_url,
           media_type,
+          thumbnail_url,
           text_content,
-          created_at,
-          profiles!posts_author_id_fkey (
-            display_name,
-            username,
-            avatar_url
-          )
+          created_at
         `)
         .eq('author_id', profileId)
         .in('media_type', ['image', 'video'])
@@ -78,22 +70,29 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
     setSelectedMedia(null);
   };
 
-  const renderMediaItem = ({ item }: { item: MediaItem }) => (
-    <Pressable style={styles.mediaItem} onPress={() => handleMediaPress(item)}>
-      <Image
-        source={{ uri: item.media_url }}
-        style={styles.mediaThumbnail}
-        resizeMode="cover"
-      />
-      {item.media_type === 'video' && (
-        <View style={styles.playOverlay}>
-          <View style={[styles.playButton, { backgroundColor: colors.primary }]}>
-            <Feather name="play" size={16} color="#fff" />
+  const renderMediaItem = ({ item }: { item: MediaItem }) => {
+    // Use thumbnail_url for videos if available, otherwise fall back to media_url
+    const displayUrl = item.media_type === 'video' && item.thumbnail_url 
+      ? item.thumbnail_url 
+      : item.media_url;
+    
+    return (
+      <Pressable style={styles.mediaItem} onPress={() => handleMediaPress(item)}>
+        <Image
+          source={{ uri: displayUrl }}
+          style={styles.mediaThumbnail}
+          resizeMode="cover"
+        />
+        {item.media_type === 'video' && (
+          <View style={styles.playOverlay}>
+            <View style={[styles.playButton, { backgroundColor: colors.primary }]}>
+              <Feather name="play" size={16} color="#fff" />
+            </View>
           </View>
-        </View>
-      )}
-    </Pressable>
-  );
+        )}
+      </Pressable>
+    );
+  };
 
   if (loading) {
     return (
@@ -143,17 +142,17 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
             <Pressable onPress={handleCloseModal} style={styles.closeButton}>
               <Feather name="x" size={24} color={colors.text} />
             </Pressable>
-            {selectedMedia?.profiles && (
-              <View style={styles.modalHeaderInfo}>
-                <Image
-                  source={{ uri: selectedMedia.profiles.avatar_url || undefined }}
-                  style={styles.modalAvatar}
-                />
-                <Text style={[styles.modalUsername, { color: colors.text }]}>
-                  {selectedMedia.profiles.display_name || selectedMedia.profiles.username}
-                </Text>
-              </View>
-            )}
+            <View style={styles.modalHeaderInfo}>
+              <Feather 
+                name={selectedMedia?.media_type === 'video' ? 'video' : 'image'} 
+                size={20} 
+                color={colors.primary} 
+                style={{ marginRight: 8 }} 
+              />
+              <Text style={[styles.modalUsername, { color: colors.text }]}>
+                {selectedMedia?.media_type === 'video' ? 'Video' : 'Photo'}
+              </Text>
+            </View>
           </View>
 
           <ScrollView contentContainerStyle={styles.modalContent}>

@@ -1,36 +1,73 @@
-﻿import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+﻿import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { showComingSoon } from '../lib/showComingSoon';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
+
+type TrackResult = {
+  id: string;
+  title: string;
+  artist_name: string | null;
+  duration_seconds: number | null;
+  profile_id: string;
+};
+
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return '--:--';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
 export default function SearchMusicScreen() {
+  const navigation = useNavigation();
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<TrackResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  type MockTrack = {
-    id: string;
-    title: string;
-    artist: string;
-    duration: string;
-  };
+  const searchTracks = useCallback(async (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      setResults([]);
+      setHasSearched(false);
+      return;
+    }
 
-  const MOCK_TRACKS: MockTrack[] = useMemo(
-    () => [
-      { id: 'm-1', title: 'Neon Skyline', artist: 'Kai Rivera', duration: '3:12' },
-      { id: 'm-2', title: 'Late Night Drive', artist: 'Ava Patel', duration: '2:48' },
-      { id: 'm-3', title: 'Glow Up Anthem', artist: 'Nova', duration: '4:05' },
-      { id: 'm-4', title: 'Acoustic Sunday', artist: 'Miles Hart', duration: '3:41' },
-      { id: 'm-5', title: 'City Lights (Live)', artist: 'Jordan Kim', duration: '2:59' },
-      { id: 'm-6', title: 'Midnight Loop', artist: 'Sage', duration: '3:33' },
-      { id: 'm-7', title: 'Soft Focus', artist: 'Luna', duration: '2:27' },
-      { id: 'm-8', title: 'Studio Warmup', artist: 'Remy', duration: '1:56' },
-    ],
-    []
-  );
+    setLoading(true);
+    setError(null);
+    setHasSearched(true);
 
-  // UI-only: we only switch between empty state and mocked results.
+    try {
+      const likePattern = `%${trimmed.toLowerCase()}%`;
+      const { data, error: err } = await supabase
+        .from('profile_music_tracks')
+        .select('id, title, artist_name, duration_seconds, profile_id')
+        .or(`title.ilike.${likePattern},artist_name.ilike.${likePattern}`)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (err) throw err;
+      setResults((data as TrackResult[]) || []);
+    } catch (err: any) {
+      console.error('[SearchMusicScreen] Search error:', err);
+      setError(err.message || 'Search failed');
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchTracks(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, searchTracks]);
+
   const trimmed = query.trim();
-  const results = trimmed.length === 0 ? [] : MOCK_TRACKS;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -95,14 +132,27 @@ export default function SearchMusicScreen() {
               </View>
             </ScrollView>
 
-            {trimmed.length === 0 ? (
+            {loading ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="large" color="#8B5CF6" />
+                <Text style={styles.emptyTitle}>Searching...</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.emptyState}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="alert-circle-outline" size={22} color="#EF4444" />
+                </View>
+                <Text style={styles.emptyTitle}>Search failed</Text>
+                <Text style={styles.emptySubtitle}>{error}</Text>
+              </View>
+            ) : !hasSearched ? (
               <View style={styles.emptyState}>
                 <View style={styles.emptyIcon}>
                   <Ionicons name="musical-notes-outline" size={22} color="#9CA3AF" />
                 </View>
                 <Text style={styles.emptyTitle}>Start typing to search</Text>
                 <Text style={styles.emptySubtitle}>
-                  Try “acoustic”, “live”, or an artist name. Results shown here are a UI mock.
+                  Try "acoustic", "live", or an artist name.
                 </Text>
               </View>
             ) : results.length === 0 ? (
@@ -135,9 +185,9 @@ export default function SearchMusicScreen() {
         renderItem={({ item }) => {
           return (
             <Pressable
-              onPress={() => showComingSoon('Music player')}
+              onPress={() => navigation.navigate('ProfileViewScreen' as never, { profileId: item.profile_id } as never)}
               accessibilityRole="button"
-              accessibilityLabel={`Track: ${item.title} by ${item.artist}`}
+              accessibilityLabel={`Track: ${item.title} by ${item.artist_name || 'Unknown'}`}
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}
             >
               <View style={styles.cardLeft}>
@@ -151,12 +201,12 @@ export default function SearchMusicScreen() {
                   {item.title}
                 </Text>
                 <Text style={styles.trackArtist} numberOfLines={1}>
-                  {item.artist}
+                  {item.artist_name || 'Unknown Artist'}
                 </Text>
               </View>
 
               <View style={styles.cardRight}>
-                <Text style={styles.duration}>{item.duration}</Text>
+                <Text style={styles.duration}>{formatDuration(item.duration_seconds)}</Text>
                 <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
               </View>
             </Pressable>

@@ -1,5 +1,7 @@
 ﻿import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,10 +13,15 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
+import { navigateToTeamDetail } from '../lib/teamNavigation';
 
 export default function TeamsSetupScreen() {
+  const navigation = useNavigation();
   const [teamName, setTeamName] = useState('');
   const [description, setDescription] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
   const [listInDiscover, setListInDiscover] = useState(true);
@@ -25,7 +32,59 @@ export default function TeamsSetupScreen() {
   const [notifMentionsOnly, setNotifMentionsOnly] = useState(false);
   const [notifChatMessages, setNotifChatMessages] = useState(true);
 
-  const canSubmit = useMemo(() => teamName.trim().length > 0, [teamName]);
+  const canSubmit = useMemo(() => teamName.trim().length > 0 && !creating, [teamName, creating]);
+
+  const generateSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 30);
+  };
+
+  const handleCreateTeam = async () => {
+    if (!canSubmit) return;
+
+    const name = teamName.trim();
+    const slug = generateSlug(name);
+    const teamTag = slug.toUpperCase().substring(0, 10);
+
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.rpc('rpc_create_team', {
+        p_name: name,
+        p_slug: slug,
+        p_team_tag: teamTag,
+        p_description: description.trim() || null,
+        p_rules: null,
+        p_icon_url: null,
+        p_banner_url: null,
+        p_theme_color: null,
+      });
+
+      if (error) {
+        if (error.message.includes('one_team_per_creator')) {
+          Alert.alert('Limit Reached', 'You can only create one team.');
+        } else if (error.message.includes('duplicate key') || error.message.includes('unique')) {
+          Alert.alert('Name Taken', 'A team with this name or slug already exists. Try a different name.');
+        } else {
+          Alert.alert('Error', error.message || 'Failed to create team');
+        }
+        return;
+      }
+
+      if (data) {
+        const team = data as { id: string; slug: string };
+        navigateToTeamDetail(navigation, { teamId: team.id, slug: team.slug });
+      }
+    } catch (err: any) {
+      console.error('[TeamsSetupScreen] handleCreateTeam error:', err);
+      Alert.alert('Error', err.message || 'Failed to create team');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const isDiscoverToggleEnabled = privacy === 'public';
   const isApprovalToggleEnabled = privacy === 'private';
@@ -227,11 +286,13 @@ export default function TeamsSetupScreen() {
             activeOpacity={0.9}
             style={[styles.primaryCta, !canSubmit && styles.primaryCtaDisabled]}
             disabled={!canSubmit}
-            onPress={() => {
-              // UI-only
-            }}
+            onPress={handleCreateTeam}
           >
-            <Text style={styles.primaryCtaText}>Create team</Text>
+            {creating ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.primaryCtaText}>Create team</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

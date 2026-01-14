@@ -1,6 +1,8 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -10,39 +12,66 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
 
-type VideoPlaceholder = {
+type VideoResult = {
   id: string;
   title: string;
-  duration: string;
+  youtube_url: string | null;
+  thumbnail_url: string | null;
+  profile_id: string;
 };
 
-const VIDEO_PLACEHOLDERS: VideoPlaceholder[] = [
-  { id: 'v1', title: 'Behind the scenes: battle prep', duration: '12:34' },
-  { id: 'v2', title: 'Top gifts recap (weekly)', duration: '08:10' },
-  { id: 'v3', title: 'Duet moments you missed', duration: '03:21' },
-  { id: 'v4', title: 'Live highlight: clutch comeback', duration: '01:07' },
-  { id: 'v5', title: 'Creator spotlight: night session', duration: '19:42' },
-  { id: 'v6', title: 'Quick tips: go live faster', duration: '00:58' },
-  { id: 'v7', title: 'Battle highlights: 3v3 chaos', duration: '06:45' },
-  { id: 'v8', title: 'First-time streamer mistakes', duration: '10:03' },
-  { id: 'v9', title: 'Best reactions (today)', duration: '04:59' },
-  { id: 'v10', title: 'Editing a clip in under a minute', duration: '01:00' },
-  { id: 'v11', title: 'Crowd favorites: MVP moments', duration: '07:12' },
-  { id: 'v12', title: 'Late-night vibes: highlight reel', duration: '14:06' },
-];
-
 export default function SearchVideosScreen() {
+  const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<VideoResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const numColumns = width >= 420 ? 3 : 2;
-  const normalizedQuery = query.trim().toLowerCase();
 
-  const filtered = useMemo(() => {
-    if (!normalizedQuery) return VIDEO_PLACEHOLDERS;
-    return VIDEO_PLACEHOLDERS.filter((v) => v.title.toLowerCase().includes(normalizedQuery));
-  }, [normalizedQuery]);
+  const searchVideos = useCallback(async (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      setResults([]);
+      setHasSearched(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const likePattern = `%${trimmed.toLowerCase()}%`;
+      const { data, error: err } = await supabase
+        .from('profile_music_videos')
+        .select('id, title, youtube_url, thumbnail_url, profile_id')
+        .ilike('title', likePattern)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (err) throw err;
+      setResults((data as VideoResult[]) || []);
+    } catch (err: any) {
+      console.error('[SearchVideosScreen] Search error:', err);
+      setError(err.message || 'Search failed');
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchVideos(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, searchVideos]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -77,7 +106,7 @@ export default function SearchVideosScreen() {
       </View>
 
       <FlatList
-        data={filtered}
+        data={results}
         key={numColumns}
         numColumns={numColumns}
         keyExtractor={(item) => item.id}
@@ -86,30 +115,52 @@ export default function SearchVideosScreen() {
         contentContainerStyle={styles.gridContent}
         columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => navigation.navigate('ProfileViewScreen' as never, { profileId: item.profile_id } as never)}
+            accessibilityRole="button"
+            accessibilityLabel={`Video: ${item.title}`}
+          >
             <View style={styles.thumbnail}>
+              {item.thumbnail_url ? (
+                <Image source={{ uri: item.thumbnail_url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+              ) : null}
               <Ionicons name="play" size={18} color="#FFFFFF" style={styles.playIcon} />
-              <View style={styles.durationBadge}>
-                <Text style={styles.durationText}>{item.duration}</Text>
-              </View>
             </View>
             <Text numberOfLines={2} style={styles.cardTitle}>
               {item.title}
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="videocam" size={44} color="#8B5CF6" />
-            <Text style={styles.emptyTitle}>
-              {normalizedQuery ? 'No videos found' : 'Search videos'}
-            </Text>
-            <Text style={styles.emptyDescription}>
-              {normalizedQuery
-                ? 'Try a different keyword or check spelling.'
-                : 'Type a title, creator, or moment you want to rewatch.'}
-            </Text>
-          </View>
+          loading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.emptyTitle}>Searching...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="alert-circle" size={44} color="#EF4444" />
+              <Text style={styles.emptyTitle}>Search failed</Text>
+              <Text style={styles.emptyDescription}>{error}</Text>
+            </View>
+          ) : !hasSearched ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="videocam" size={44} color="#8B5CF6" />
+              <Text style={styles.emptyTitle}>Search videos</Text>
+              <Text style={styles.emptyDescription}>
+                Type a title or keyword to find music videos.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="videocam" size={44} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>No videos found</Text>
+              <Text style={styles.emptyDescription}>
+                Try a different keyword or check spelling.
+              </Text>
+            </View>
+          )
         }
       />
     </SafeAreaView>

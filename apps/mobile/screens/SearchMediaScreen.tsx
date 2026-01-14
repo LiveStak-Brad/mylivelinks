@@ -1,5 +1,6 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Keyboard,
@@ -11,45 +12,76 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { showComingSoon } from '../lib/showComingSoon';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
 
-type MediaType = 'Video' | 'Photo' | 'GIF' | 'Audio' | 'Doc';
+type MediaType = 'Video' | 'Photo';
 
 type MediaItem = {
   id: string;
-  title: string;
-  type: MediaType;
-  thumbnailUri?: string;
+  text_content: string;
+  media_url: string;
+  author_id: string;
 };
 
-// UI-only placeholders: provides the intended “Search → Media” results layout without wiring up APIs.
-const MEDIA_PLACEHOLDERS: MediaItem[] = [
-  { id: 'm1', title: 'Battle recap (highlight)', type: 'Video' },
-  { id: 'm2', title: 'Creator promo shot', type: 'Photo' },
-  { id: 'm3', title: 'Funny reaction loop', type: 'GIF' },
-  { id: 'm4', title: 'Intro track (short)', type: 'Audio' },
-  { id: 'm5', title: 'Stream schedule', type: 'Doc' },
-  { id: 'm6', title: 'Top gifts moment', type: 'Video' },
-  { id: 'm7', title: 'Behind the scenes', type: 'Photo' },
-  { id: 'm8', title: 'Quick meme', type: 'GIF' },
-  { id: 'm9', title: 'Voice note snippet', type: 'Audio' },
-  { id: 'm10', title: 'Brand kit', type: 'Doc' },
-];
+function getMediaType(url: string): MediaType {
+  const lower = url.toLowerCase();
+  if (lower.includes('.mp4') || lower.includes('.mov') || lower.includes('.webm') || lower.includes('video')) {
+    return 'Video';
+  }
+  return 'Photo';
+}
 
 export default function SearchMediaScreen() {
+  const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<MediaItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const numColumns = width >= 420 ? 3 : 2;
-  const normalizedQuery = query.trim().toLowerCase();
 
-  const filtered = useMemo(() => {
-    if (!normalizedQuery) return MEDIA_PLACEHOLDERS;
-    return MEDIA_PLACEHOLDERS.filter((m) => {
-      const haystack = `${m.title} ${m.type}`.toLowerCase();
-      return haystack.includes(normalizedQuery);
-    });
-  }, [normalizedQuery]);
+  const searchMedia = useCallback(async (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      setResults([]);
+      setHasSearched(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const likePattern = `%${trimmed.toLowerCase()}%`;
+      const { data, error: err } = await supabase
+        .from('posts')
+        .select('id, text_content, media_url, author_id')
+        .not('media_url', 'is', null)
+        .ilike('text_content', likePattern)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (err) throw err;
+      setResults((data as MediaItem[]) || []);
+    } catch (err: any) {
+      console.error('[SearchMediaScreen] Search error:', err);
+      setError(err.message || 'Search failed');
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      searchMedia(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, searchMedia]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -88,7 +120,7 @@ export default function SearchMediaScreen() {
         </View>
 
         <FlatList
-          data={filtered}
+          data={results}
           key={numColumns}
           numColumns={numColumns}
           keyExtractor={(item) => item.id}
@@ -96,42 +128,36 @@ export default function SearchMediaScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.gridContent,
-            filtered.length === 0 ? styles.gridContentEmpty : null,
+            results.length === 0 ? styles.gridContentEmpty : null,
           ]}
           columnWrapperStyle={numColumns > 1 ? styles.gridRow : undefined}
-          renderItem={({ item }) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${item.type}: ${item.title}`}
-              onPress={() => showComingSoon('Media viewer')}
-              style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-            >
-              <View style={styles.thumbnail}>
-                {item.thumbnailUri ? (
+          renderItem={({ item }) => {
+            const mediaType = getMediaType(item.media_url);
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${mediaType}: ${item.text_content || 'Media'}`}
+                onPress={() => navigation.navigate('ProfileViewScreen' as never, { profileId: item.author_id } as never)}
+                style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+              >
+                <View style={styles.thumbnail}>
                   <Image
-                    source={{ uri: item.thumbnailUri }}
+                    source={{ uri: item.media_url }}
                     style={StyleSheet.absoluteFillObject}
                     resizeMode="cover"
                   />
-                ) : (
-                  <View style={styles.thumbnailPlaceholder}>
-                    <Text style={styles.thumbnailPlaceholderText}>
-                      {typeMark(item.type)}
-                    </Text>
+                  <View style={[styles.typeBadge, typeBadgeStyle(mediaType)]}>
+                    <Text style={styles.typeBadgeText}>{mediaType}</Text>
                   </View>
-                )}
-
-                <View style={[styles.typeBadge, typeBadgeStyle(item.type)]}>
-                  <Text style={styles.typeBadgeText}>{item.type}</Text>
                 </View>
-              </View>
 
-              <Text numberOfLines={2} style={styles.cardTitle}>
-                {item.title}
-              </Text>
-            </Pressable>
-          )}
-          ListEmptyComponent={<EmptyState query={query} />}
+                <Text numberOfLines={2} style={styles.cardTitle}>
+                  {item.text_content || 'Media'}
+                </Text>
+              </Pressable>
+            );
+          }}
+          ListEmptyComponent={<EmptyState query={query} loading={loading} error={error} hasSearched={hasSearched} />}
         />
       </Pressable>
     </SafeAreaView>
@@ -154,8 +180,46 @@ function typeBadgeStyle(type: MediaType) {
   return styles.badgeDoc;
 }
 
-function EmptyState({ query }: { query: string }) {
+function EmptyState({ query, loading, error, hasSearched }: { query: string; loading?: boolean; error?: string | null; hasSearched?: boolean }) {
   const q = query.trim();
+  
+  if (loading) {
+    return (
+      <View style={styles.emptyState}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.emptyTitle}>Searching...</Text>
+      </View>
+    );
+  }
+  
+  if (error) {
+    return (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIcon}>
+          <Text style={styles.emptyIconText}>⚠️</Text>
+        </View>
+        <Text style={styles.emptyTitle}>Search failed</Text>
+        <Text style={styles.emptyBody}>{error}</Text>
+      </View>
+    );
+  }
+  
+  if (!hasSearched) {
+    return (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyIcon}>
+          <Text style={styles.emptyIconText} accessibilityElementsHidden>
+            🔎
+          </Text>
+        </View>
+        <Text style={styles.emptyTitle}>Search media</Text>
+        <Text style={styles.emptyBody}>
+          Type a keyword to find photos and videos.
+        </Text>
+      </View>
+    );
+  }
+  
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
@@ -163,11 +227,9 @@ function EmptyState({ query }: { query: string }) {
           🔎
         </Text>
       </View>
-      <Text style={styles.emptyTitle}>{q ? 'No media found' : 'Search media'}</Text>
+      <Text style={styles.emptyTitle}>No media found</Text>
       <Text style={styles.emptyBody}>
-        {q
-          ? `Try a different keyword for “${q}”.`
-          : 'Type a title or media type (video, photo, gif) to see results.'}
+        {`Try a different keyword for "${q}".`}
       </Text>
     </View>
   );

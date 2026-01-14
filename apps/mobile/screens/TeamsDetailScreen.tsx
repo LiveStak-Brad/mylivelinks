@@ -6,7 +6,7 @@ import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
 import { showComingSoon } from '../lib/showComingSoon';
-import { TeamsNavigationParams } from '../lib/teamNavigation';
+import { TeamsNavigationParams, navigateToTeamInvite, navigateToTeamAdmin } from '../lib/teamNavigation';
 
 type TeamTab = 'Home' | 'Feed' | 'Chat' | 'Live' | 'Members' | 'About' | 'Rooms';
 
@@ -352,7 +352,7 @@ export default function TeamsDetailScreen() {
     
     setJoining(true);
     try {
-      const { error: joinError } = await supabase.rpc('rpc_join_team', {
+      const { error: joinError } = await supabase.rpc('rpc_request_join_team', {
         p_team_slug: team.slug,
       });
       
@@ -372,9 +372,11 @@ export default function TeamsDetailScreen() {
     
     setLeaving(true);
     try {
-      const { error: leaveError } = await supabase.rpc('rpc_leave_team', {
-        p_team_slug: team.slug,
-      });
+      const { error: leaveError } = await supabase
+        .from('team_memberships')
+        .delete()
+        .eq('team_id', team.id)
+        .eq('profile_id', user.id);
       
       if (leaveError) throw leaveError;
       
@@ -533,11 +535,11 @@ export default function TeamsDetailScreen() {
               </Pressable>
             )}
 
-            {isMember && (
+            {isMember && team && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Invite members"
-                onPress={() => showComingSoon('Invite members')}
+                onPress={() => navigateToTeamInvite(navigation, team.id)}
                 style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
               >
                 <Ionicons name="person-add-outline" size={18} color="#fff" />
@@ -545,11 +547,11 @@ export default function TeamsDetailScreen() {
               </Pressable>
             )}
 
-            {isOwner && (
+            {isOwner && team && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Team settings"
-                onPress={() => setSettingsModalVisible(true)}
+                onPress={() => navigateToTeamAdmin(navigation, team.id)}
                 style={({ pressed }) => [styles.iconOnlyButton, pressed && styles.pressed]}
               >
                 <Ionicons name="settings-outline" size={26} color="rgba(255,255,255,0.9)" />
@@ -860,8 +862,11 @@ export default function TeamsDetailScreen() {
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionLabel}>MEMBERS ({members.length})</Text>
-              {isOwner && (
-                <Pressable style={styles.manageButton}>
+              {isOwner && team && (
+                <Pressable 
+                  style={styles.manageButton}
+                  onPress={() => navigateToTeamAdmin(navigation, team.id)}
+                >
                   <Ionicons name="settings-outline" size={14} color="rgba(255,255,255,0.7)" />
                   <Text style={styles.manageButtonText}>Manage</Text>
                 </Pressable>

@@ -45,12 +45,13 @@ export default function MusicVideosTab({ profileId, colors }: MusicVideosTabProp
         .from('profile_music_videos')
         .select(`
           id,
-          youtube_url,
+          video_url,
+          youtube_id,
           title,
           created_at
         `)
         .eq('profile_id', profileId)
-        .order('display_order', { ascending: true })
+        .order('sort_order', { ascending: true })
         .limit(50);
 
       if (error) throw error;
@@ -58,7 +59,7 @@ export default function MusicVideosTab({ profileId, colors }: MusicVideosTabProp
       // Map to our interface
       const formattedVideos: MusicVideo[] = (data || []).map((item: any) => ({
         id: item.id,
-        media_url: item.youtube_url,
+        media_url: item.video_url,
         title: item.title,
         created_at: item.created_at,
       }));
