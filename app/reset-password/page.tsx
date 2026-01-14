@@ -18,91 +18,61 @@ function ResetPasswordInner() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [step, setStep] = useState<'request' | 'reset'>('request');
+  const [checkingSession, setCheckingSession] = useState(true);
   const supabase = createClient();
 
-  // Check if this is a password reset callback (from email link)
-  const code = searchParams?.get('code');
-  const accessToken = searchParams?.get('access_token');
-  const refreshToken = searchParams?.get('refresh_token');
-  const type = searchParams?.get('type');
+  // Check URL params for mode and errors
+  const mode = searchParams?.get('mode');
+  const urlError = searchParams?.get('error');
 
   useEffect(() => {
-    const handleRecoverySession = async () => {
+    const checkSession = async () => {
       try {
-        // PKCE code flow (query params)
-        if (code) {
-          console.log('Recovery: exchanging code for session');
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          
-          if (error) {
-            console.error('Recovery session exchange failed:', error);
-            
-            // Check if session was actually created despite the error
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData?.session) {
-              console.log('Recovery session exists despite error - proceeding');
-              setStep('reset');
-              return;
-            }
-            
-            setError(`Failed to verify reset link: ${error.message}`);
-            setStep('request');
-            return;
-          }
-          
-          console.log('Recovery session established via code');
-          setStep('reset');
-          return;
-        }
-        
-        // Implicit flow (hash fragments) - parse from window.location.hash
-        let hashAccessToken = accessToken;
-        let hashRefreshToken = refreshToken;
-        
-        if (!hashAccessToken && typeof window !== 'undefined' && window.location.hash) {
-          const hashParams = new URLSearchParams(window.location.hash.substring(1));
-          hashAccessToken = hashParams.get('access_token');
-          hashRefreshToken = hashParams.get('refresh_token');
-        }
-        
-        if (hashAccessToken && hashRefreshToken) {
-          console.log('Recovery: setting session from tokens');
-          const { data, error } = await supabase.auth.setSession({
-            access_token: hashAccessToken,
-            refresh_token: hashRefreshToken,
-          });
-          
-          if (error) {
-            console.error('Recovery session setup failed:', error);
-            setError(`Failed to verify reset link: ${error.message}`);
-            setStep('request');
-            return;
-          }
-          
-          console.log('Recovery session established via tokens');
-          setStep('reset');
-          
-          // Clean up hash from URL
+        // If there's an error from the callback, show it
+        if (urlError) {
+          setError(urlError);
+          setStep('request');
+          setCheckingSession(false);
+          // Clean up URL
           if (typeof window !== 'undefined') {
-            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            window.history.replaceState(null, '', '/reset-password');
           }
           return;
         }
-        
-        // Legacy: type=recovery check (fallback)
-        if (type === 'recovery' && (accessToken || hashAccessToken)) {
-          console.log('Recovery: legacy type=recovery flow');
-          setStep('reset');
+
+        // If mode=reset, the server-side callback already exchanged the code
+        // Check if we have a valid session
+        if (mode === 'reset') {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            console.log('Reset mode: session found, showing password form');
+            setStep('reset');
+            // Clean up URL
+            if (typeof window !== 'undefined') {
+              window.history.replaceState(null, '', '/reset-password');
+            }
+          } else {
+            console.log('Reset mode: no session found');
+            setError('Your reset link has expired. Please request a new one.');
+            setStep('request');
+          }
+          setCheckingSession(false);
+          return;
         }
-      } catch (err: any) {
-        console.error('Recovery session error:', err);
-        setError(`Failed to process reset link: ${err.message}`);
+
+        // Default: show request form
         setStep('request');
+        setCheckingSession(false);
+      } catch (err: any) {
+        console.error('Session check error:', err);
+        setError('Something went wrong. Please try again.');
+        setStep('request');
+        setCheckingSession(false);
       }
     };
 
-    handleRecoverySession();
-  }, [code, accessToken, refreshToken, type, supabase.auth]);
+    checkSession();
+  }, [mode, urlError, supabase.auth]);
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,8 +81,9 @@ function ResetPasswordInner() {
     setMessage(null);
 
     try {
+      // Use /auth/reset-callback for server-side PKCE code exchange
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/auth/reset-callback`,
       });
 
       if (resetError) throw resetError;
@@ -157,6 +128,27 @@ function ResetPasswordInner() {
       setLoading(false);
     }
   };
+
+  // Show loading state while checking session
+  if (checkingSession) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <Card className="shadow-xl border-0">
+            <CardContent className="p-8">
+              <div className="flex justify-center mb-8">
+                <SmartBrandLogo />
+              </div>
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+              <p className="text-center text-muted-foreground mt-4">Verifying reset link...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-primary/5 via-accent/5 to-primary/10 flex items-center justify-center p-4">

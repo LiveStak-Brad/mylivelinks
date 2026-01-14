@@ -20,6 +20,39 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/useTheme';
+import type { ProfileSection, ProfileTab, ProfileType } from '../config/profileTypeConfig';
+
+// Gender enum matching web (lib/link/dating-types.ts)
+type GenderEnum = 'male' | 'female' | 'nonbinary' | 'other' | 'prefer_not_to_say';
+
+const GENDER_OPTIONS: { value: GenderEnum; label: string }[] = [
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
+  { value: 'male', label: 'Man' },
+  { value: 'female', label: 'Woman' },
+  { value: 'nonbinary', label: 'Non-binary' },
+  { value: 'other', label: 'Other' },
+];
+
+// Profile type options matching web
+const PROFILE_TYPE_OPTIONS: { value: ProfileType; label: string; description: string }[] = [
+  { value: 'creator', label: 'Creator', description: 'Content creators, influencers' },
+  { value: 'streamer', label: 'Streamer', description: 'Live streamers, broadcasters' },
+  { value: 'musician', label: 'Musician / Artist', description: 'Musicians, bands, artists' },
+  { value: 'comedian', label: 'Comedian', description: 'Stand-up, comedy content' },
+  { value: 'business', label: 'Business / Brand', description: 'Companies, brands, services' },
+];
+
+// Location type matching web (lib/location.ts)
+interface ProfileLocation {
+  zip: string | null;
+  city: string | null;
+  region: string | null;
+  country: string;
+  label: string | null;
+  hidden: boolean;
+  showZip: boolean;
+  updatedAt: string | null;
+}
 
 type PickerItem = {
   id: string;
@@ -349,6 +382,63 @@ export default function SettingsProfileScreen() {
   // Avatar upload state
   const [avatarUploading, setAvatarUploading] = useState(false);
 
+  // ============================================================================
+  // ALL PROFILE STATE (matching web app/settings/profile/page.tsx)
+  // ============================================================================
+  
+  // Gender
+  const [gender, setGender] = useState<GenderEnum | null>(null);
+  
+  // Location
+  const [locationZip, setLocationZip] = useState('');
+  const [locationCity, setLocationCity] = useState('');
+  const [locationRegion, setLocationRegion] = useState('');
+  const [locationCountry, setLocationCountry] = useState('US');
+  const [locationLabel, setLocationLabel] = useState('');
+  const [locationHidden, setLocationHidden] = useState(false);
+  const [locationShowZip, setLocationShowZip] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  
+  // Social media (matching web exactly)
+  const [socialInstagram, setSocialInstagram] = useState('');
+  const [socialTwitter, setSocialTwitter] = useState('');
+  const [socialYoutube, setSocialYoutube] = useState('');
+  const [socialTiktok, setSocialTiktok] = useState('');
+  const [socialFacebook, setSocialFacebook] = useState('');
+  const [socialTwitch, setSocialTwitch] = useState('');
+  const [socialDiscord, setSocialDiscord] = useState('');
+  const [socialSnapchat, setSocialSnapchat] = useState('');
+  const [socialLinkedin, setSocialLinkedin] = useState('');
+  const [socialGithub, setSocialGithub] = useState('');
+  const [socialSpotify, setSocialSpotify] = useState('');
+  const [socialOnlyfans, setSocialOnlyfans] = useState('');
+  
+  // Profile type
+  const [profileType, setProfileType] = useState<ProfileType>('creator');
+  const [showProfileTypePicker, setShowProfileTypePicker] = useState(false);
+  
+  // Enabled modules and tabs
+  const [enabledModules, setEnabledModules] = useState<ProfileSection[] | null>(null);
+  const [enabledTabs, setEnabledTabs] = useState<ProfileTab[] | null>(null);
+  
+  // Top friends settings
+  const [showTopFriends, setShowTopFriends] = useState(true);
+  const [topFriendsTitle, setTopFriendsTitle] = useState('Top Friends');
+  const [topFriendsAvatarStyle, setTopFriendsAvatarStyle] = useState<'circle' | 'square'>('square');
+  const [topFriendsMaxCount, setTopFriendsMaxCount] = useState(8);
+  
+  // Display preferences
+  const [hideStreamingStats, setHideStreamingStats] = useState(false);
+  const [defaultPostVisibility, setDefaultPostVisibility] = useState<'public' | 'followers' | 'friends'>('public');
+  
+  // Referral
+  const [referralId, setReferralId] = useState<string | null>(null);
+  const [invitedByUsername, setInvitedByUsername] = useState('');
+  const [claimingReferral, setClaimingReferral] = useState(false);
+  
+  // Track if profile data has been loaded
+  const [profileLoaded, setProfileLoaded] = useState(false);
+
   // Theme-driven colors that override the static COLORS object
   const themed = useMemo(
     () => ({
@@ -391,39 +481,290 @@ export default function SettingsProfileScreen() {
   const [bio, setBio] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Load all profile fields when profile data arrives
   useEffect(() => {
     // Initialize (and re-sync when profile refreshes) as long as the user isn't actively editing/saving.
-    if (saving) return;
+    if (saving || !profile) return;
+    
+    const p = profile as any;
+    
+    // Basic info
     setDisplayName(profileDisplayName);
     setBio(profileBio);
-  }, [profileBio, profileDisplayName, saving]);
+    
+    // Gender
+    setGender((p.gender ?? null) as GenderEnum | null);
+    
+    // Location
+    setLocationZip(p.location_zip || '');
+    setLocationCity(p.location_city || '');
+    setLocationRegion(p.location_region || '');
+    setLocationCountry(p.location_country || 'US');
+    setLocationLabel(p.location_label || '');
+    setLocationHidden(p.location_hidden ?? false);
+    setLocationShowZip(p.location_show_zip ?? false);
+    
+    // Social media (strip @ if present, matching web)
+    setSocialInstagram((p.social_instagram || '').replace(/^@/, ''));
+    setSocialTwitter((p.social_twitter || '').replace(/^@/, ''));
+    setSocialYoutube((p.social_youtube || '').replace(/^@/, ''));
+    setSocialTiktok((p.social_tiktok || '').replace(/^@/, ''));
+    setSocialFacebook((p.social_facebook || '').replace(/^@/, ''));
+    setSocialTwitch((p.social_twitch || '').replace(/^@/, ''));
+    setSocialDiscord(p.social_discord || '');
+    setSocialSnapchat((p.social_snapchat || '').replace(/^@/, ''));
+    setSocialLinkedin((p.social_linkedin || '').replace(/^@/, ''));
+    setSocialGithub((p.social_github || '').replace(/^@/, ''));
+    setSocialSpotify(p.social_spotify || '');
+    setSocialOnlyfans((p.social_onlyfans || '').replace(/^@/, ''));
+    
+    // Profile type
+    setProfileType((p.profile_type || 'creator') as ProfileType);
+    
+    // Enabled modules (optional modules only)
+    if (p.enabled_modules && Array.isArray(p.enabled_modules)) {
+      setEnabledModules(p.enabled_modules as ProfileSection[]);
+    } else {
+      setEnabledModules(null);
+    }
+    
+    // Enabled tabs (optional tabs only)
+    if (Array.isArray(p.enabled_tabs)) {
+      setEnabledTabs((p.enabled_tabs as ProfileTab[]).filter((t: ProfileTab) => t !== 'info'));
+    } else {
+      setEnabledTabs(null);
+    }
+    
+    // Top friends customization
+    setShowTopFriends(p.show_top_friends !== false);
+    setTopFriendsTitle(p.top_friends_title || 'Top Friends');
+    setTopFriendsAvatarStyle(p.top_friends_avatar_style || 'square');
+    setTopFriendsMaxCount(p.top_friends_max_count || 8);
+    
+    // Display preferences
+    setHideStreamingStats(p.hide_streaming_stats || false);
+    setDefaultPostVisibility(p.default_post_visibility || 'public');
+    
+    setProfileLoaded(true);
+  }, [profile, profileBio, profileDisplayName, saving]);
 
+  // Load referral status
+  useEffect(() => {
+    if (!userId) return;
+    
+    const loadReferralStatus = async () => {
+      try {
+        const { data, error } = await (supabase.from('referrals') as any)
+          .select('id')
+          .eq('referred_profile_id', userId)
+          .maybeSingle();
+        if (error) return;
+        const id = typeof (data as any)?.id === 'string' ? (data as any).id : null;
+        setReferralId(id);
+      } catch {
+        // Ignore
+      }
+    };
+    
+    loadReferralStatus();
+  }, [userId]);
+
+  // Calculate if any field has changed (comprehensive dirty check)
   const dirty = useMemo(() => {
-    const nextDisplay = displayName.trim();
-    const nextBio = bio.trim();
-    return nextDisplay !== profileDisplayName.trim() || nextBio !== profileBio.trim();
-  }, [bio, displayName, profileBio, profileDisplayName]);
+    if (!profile || !profileLoaded) return false;
+    const p = profile as any;
+    
+    // Basic info
+    if (displayName.trim() !== (profileDisplayName || '').trim()) return true;
+    if (bio.trim() !== (profileBio || '').trim()) return true;
+    
+    // Gender
+    if (gender !== (p.gender ?? null)) return true;
+    
+    // Location
+    if (locationZip !== (p.location_zip || '')) return true;
+    if (locationLabel !== (p.location_label || '')) return true;
+    if (locationHidden !== (p.location_hidden ?? false)) return true;
+    if (locationShowZip !== (p.location_show_zip ?? false)) return true;
+    
+    // Social media
+    if (socialInstagram !== (p.social_instagram || '').replace(/^@/, '')) return true;
+    if (socialTwitter !== (p.social_twitter || '').replace(/^@/, '')) return true;
+    if (socialYoutube !== (p.social_youtube || '').replace(/^@/, '')) return true;
+    if (socialTiktok !== (p.social_tiktok || '').replace(/^@/, '')) return true;
+    if (socialFacebook !== (p.social_facebook || '').replace(/^@/, '')) return true;
+    if (socialTwitch !== (p.social_twitch || '').replace(/^@/, '')) return true;
+    if (socialDiscord !== (p.social_discord || '')) return true;
+    if (socialSnapchat !== (p.social_snapchat || '').replace(/^@/, '')) return true;
+    if (socialLinkedin !== (p.social_linkedin || '').replace(/^@/, '')) return true;
+    if (socialGithub !== (p.social_github || '').replace(/^@/, '')) return true;
+    if (socialSpotify !== (p.social_spotify || '')) return true;
+    if (socialOnlyfans !== (p.social_onlyfans || '').replace(/^@/, '')) return true;
+    
+    // Profile type
+    if (profileType !== (p.profile_type || 'creator')) return true;
+    
+    // Top friends
+    if (showTopFriends !== (p.show_top_friends !== false)) return true;
+    if (topFriendsTitle !== (p.top_friends_title || 'Top Friends')) return true;
+    if (topFriendsAvatarStyle !== (p.top_friends_avatar_style || 'square')) return true;
+    if (topFriendsMaxCount !== (p.top_friends_max_count || 8)) return true;
+    
+    // Display preferences
+    if (hideStreamingStats !== (p.hide_streaming_stats || false)) return true;
+    
+    return false;
+  }, [
+    profile, profileLoaded, displayName, profileDisplayName, bio, profileBio, gender,
+    locationZip, locationLabel, locationHidden, locationShowZip,
+    socialInstagram, socialTwitter, socialYoutube, socialTiktok, socialFacebook,
+    socialTwitch, socialDiscord, socialSnapchat, socialLinkedin, socialGithub,
+    socialSpotify, socialOnlyfans, profileType, showTopFriends, topFriendsTitle,
+    topFriendsAvatarStyle, topFriendsMaxCount, hideStreamingStats
+  ]);
 
   const canSave = Boolean(userId) && !currentUser.loading && !saving && dirty;
 
   const handleCancel = useCallback(() => {
+    if (!profile) return;
+    const p = profile as any;
+    
+    // Reset all fields to profile values
     setDisplayName(profileDisplayName);
     setBio(profileBio);
-  }, [profileBio, profileDisplayName]);
+    setGender((p.gender ?? null) as GenderEnum | null);
+    setLocationZip(p.location_zip || '');
+    setLocationLabel(p.location_label || '');
+    setLocationHidden(p.location_hidden ?? false);
+    setLocationShowZip(p.location_show_zip ?? false);
+    setSocialInstagram((p.social_instagram || '').replace(/^@/, ''));
+    setSocialTwitter((p.social_twitter || '').replace(/^@/, ''));
+    setSocialYoutube((p.social_youtube || '').replace(/^@/, ''));
+    setSocialTiktok((p.social_tiktok || '').replace(/^@/, ''));
+    setSocialFacebook((p.social_facebook || '').replace(/^@/, ''));
+    setSocialTwitch((p.social_twitch || '').replace(/^@/, ''));
+    setSocialDiscord(p.social_discord || '');
+    setSocialSnapchat((p.social_snapchat || '').replace(/^@/, ''));
+    setSocialLinkedin((p.social_linkedin || '').replace(/^@/, ''));
+    setSocialGithub((p.social_github || '').replace(/^@/, ''));
+    setSocialSpotify(p.social_spotify || '');
+    setSocialOnlyfans((p.social_onlyfans || '').replace(/^@/, ''));
+    setProfileType((p.profile_type || 'creator') as ProfileType);
+    setShowTopFriends(p.show_top_friends !== false);
+    setTopFriendsTitle(p.top_friends_title || 'Top Friends');
+    setTopFriendsAvatarStyle(p.top_friends_avatar_style || 'square');
+    setTopFriendsMaxCount(p.top_friends_max_count || 8);
+    setHideStreamingStats(p.hide_streaming_stats || false);
+  }, [profile, profileBio, profileDisplayName]);
+
+  // Handle referral claim (matching web behavior)
+  const handleClaimReferral = useCallback(async () => {
+    if (!userId) {
+      Alert.alert('Error', 'No user ID. Please log in again.');
+      return;
+    }
+
+    if (referralId) {
+      Alert.alert('Already claimed', 'Referral already claimed.');
+      return;
+    }
+
+    const raw = invitedByUsername.trim();
+    const normalized = raw.replace(/^@/, '').trim();
+    if (!normalized) {
+      Alert.alert('Error', 'Please enter the username of who invited you.');
+      return;
+    }
+
+    setClaimingReferral(true);
+    try {
+      const { data, error } = await (supabase as any).rpc('claim_referral_by_inviter_username', {
+        p_inviter_username: normalized,
+      });
+
+      if (error) {
+        const msg = String(error.message || '').toLowerCase();
+        if (msg.includes('inviter_not_found')) {
+          Alert.alert('Not found', 'That username was not found.');
+          return;
+        }
+        if (msg.includes('self_referral_not_allowed')) {
+          Alert.alert('Error', "You can't refer yourself.");
+          return;
+        }
+        if (msg.includes('invalid_username')) {
+          Alert.alert('Error', 'Please enter a valid username.');
+          return;
+        }
+        Alert.alert('Error', error.message || 'Failed to claim referral.');
+        return;
+      }
+
+      const id = typeof data === 'string' ? data : data ? String(data) : null;
+      setReferralId(id);
+      setInvitedByUsername('');
+      Alert.alert('Success', 'Referral saved!');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to claim referral.');
+    } finally {
+      setClaimingReferral(false);
+    }
+  }, [userId, referralId, invitedByUsername]);
+
+  // Handle gender selection (toggle like web)
+  const handleGenderSelect = useCallback((value: GenderEnum) => {
+    setGender((prev) => (prev === value ? null : value));
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (!userId) return;
 
     setSaving(true);
     try {
+      // Build comprehensive update payload matching web exactly
       const updates: Record<string, any> = {
         display_name: displayName.trim() || null,
+        bio: bio.trim() || null,
+        gender: gender ?? null,
+        
+        // Location fields
+        location_zip: locationZip.trim() || null,
+        location_label: locationLabel.trim() || null,
+        location_hidden: locationHidden,
+        location_show_zip: locationShowZip,
+        
+        // Social media fields (strip @ if user included it, matching web)
+        social_instagram: socialInstagram.trim().replace(/^@/, '') || null,
+        social_twitter: socialTwitter.trim().replace(/^@/, '') || null,
+        social_youtube: socialYoutube.trim().replace(/^@/, '') || null,
+        social_tiktok: socialTiktok.trim().replace(/^@/, '') || null,
+        social_facebook: socialFacebook.trim().replace(/^@/, '') || null,
+        social_twitch: socialTwitch.trim().replace(/^@/, '') || null,
+        social_discord: socialDiscord.trim() || null,
+        social_snapchat: socialSnapchat.trim().replace(/^@/, '') || null,
+        social_linkedin: socialLinkedin.trim().replace(/^@/, '') || null,
+        social_github: socialGithub.trim().replace(/^@/, '') || null,
+        social_spotify: socialSpotify.trim() || null,
+        social_onlyfans: socialOnlyfans.trim().replace(/^@/, '') || null,
+        
+        // Profile type
+        profile_type: profileType,
+        
+        // Enabled modules and tabs
+        enabled_modules: Array.isArray(enabledModules) ? enabledModules : null,
+        enabled_tabs: Array.isArray(enabledTabs) ? enabledTabs.filter((t) => t !== 'info') : null,
+        
+        // Top friends customization
+        show_top_friends: showTopFriends,
+        top_friends_title: topFriendsTitle,
+        top_friends_avatar_style: topFriendsAvatarStyle,
+        top_friends_max_count: topFriendsMaxCount,
+        
+        // Display preferences
+        hide_streaming_stats: hideStreamingStats,
+        
+        updated_at: new Date().toISOString(),
       };
-
-      // Only attempt columns that exist on the loaded row (avoids schema mismatch surprises).
-      if (profile && Object.prototype.hasOwnProperty.call(profile, 'bio')) {
-        updates.bio = bio.trim() || null;
-      }
 
       const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
       if (error) {
@@ -433,13 +774,22 @@ export default function SettingsProfileScreen() {
       }
 
       await currentUser.refresh();
+      Alert.alert('Success', 'Profile updated successfully!');
     } catch (e: any) {
       console.error('[SettingsProfileScreen] save exception:', e);
       Alert.alert('Save failed', e?.message || 'Unexpected error');
     } finally {
       setSaving(false);
     }
-  }, [bio, currentUser, displayName, profile, userId]);
+  }, [
+    bio, currentUser, displayName, userId, gender,
+    locationZip, locationLabel, locationHidden, locationShowZip,
+    socialInstagram, socialTwitter, socialYoutube, socialTiktok, socialFacebook,
+    socialTwitch, socialDiscord, socialSnapchat, socialLinkedin, socialGithub,
+    socialSpotify, socialOnlyfans, profileType, enabledModules, enabledTabs,
+    showTopFriends, topFriendsTitle, topFriendsAvatarStyle, topFriendsMaxCount,
+    hideStreamingStats
+  ]);
 
   const handleChangeAvatar = useCallback(async () => {
     if (!userId) return;
@@ -501,85 +851,157 @@ export default function SettingsProfileScreen() {
   const [modulesModalOpen, setModulesModalOpen] = useState(false);
   const [tabsModalOpen, setTabsModalOpen] = useState(false);
 
-  const modules = useMemo<PickerItem[]>(
-    () => [
-      {
-        id: 'social_counts',
-        label: 'Social Counts',
-        description: 'Follower/following/friends counts',
-        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
-      },
-      {
-        id: 'social_media',
-        label: 'Social Media Links',
-        description: 'Instagram, Twitter, TikTok icons',
-        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
-      },
-      {
-        id: 'links',
-        label: 'Custom Links',
-        description: 'Your Linktree-style link section',
-        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
-      },
-      {
-        id: 'connections',
-        label: 'Connections',
-        description: 'Friends and followers display',
-        right: <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
-      },
-      {
-        id: 'streaming_stats',
-        label: 'Streaming Stats',
-        description: 'Live hours, viewer counts',
-        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
-      },
-      {
-        id: 'top_supporters',
-        label: 'Top Supporters',
-        description: 'Users who gifted you',
-        right: <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
-      },
-      {
-        id: 'portfolio',
-        label: 'Portfolio / Products',
-        description: 'Your work showcase',
-        right: <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />,
-      },
-    ],
-    [themed]
-  );
+  // Module definitions with toggle handlers
+  const MODULE_DEFINITIONS: { id: ProfileSection; label: string; description: string }[] = [
+    { id: 'social_counts', label: 'Social Counts', description: 'Follower/following/friends counts' },
+    { id: 'social_media', label: 'Social Media Links', description: 'Instagram, Twitter, TikTok icons' },
+    { id: 'links', label: 'Custom Links', description: 'Your Linktree-style link section' },
+    { id: 'connections', label: 'Connections', description: 'Friends and followers display' },
+    { id: 'streaming_stats', label: 'Streaming Stats', description: 'Live hours, viewer counts' },
+    { id: 'top_supporters', label: 'Top Supporters', description: 'Users who gifted you' },
+    { id: 'top_friends', label: 'Top Friends', description: 'Your favorite people' },
+    { id: 'portfolio', label: 'Portfolio / Products', description: 'Your work showcase' },
+    { id: 'referral_network', label: 'Referral Network', description: 'Your referral connections' },
+  ];
 
-  const tabs = useMemo<PickerItem[]>(
-    () => [
-      { id: 'info', label: 'Info', description: 'Core tab (always on)', right: <Switch value={true} disabled /> },
-      { id: 'feed', label: 'Feed', description: 'Photo/video feed grid', right: <Switch value={true} disabled /> },
-      { id: 'reels', label: 'Reels', description: 'Short-form video content', right: <Switch value={false} disabled /> },
-      { id: 'photos', label: 'Photos', description: 'Photo gallery', right: <Switch value={false} disabled /> },
-      { id: 'videos', label: 'Videos', description: 'Video gallery', right: <Switch value={true} disabled /> },
-      { id: 'music', label: 'Music', description: 'Music tracks & playlists', right: <Switch value={false} disabled /> },
-      { id: 'events', label: 'Events', description: 'Shows & performances', right: <Switch value={false} disabled /> },
-      { id: 'products', label: 'Products', description: 'Merchandise & portfolio', right: <Switch value={false} disabled /> },
-    ],
-    []
-  );
+  // Tab definitions
+  const TAB_DEFINITIONS: { id: ProfileTab; label: string; description: string; core?: boolean }[] = [
+    { id: 'info', label: 'Info', description: 'Core tab (always on)', core: true },
+    { id: 'feed', label: 'Feed', description: 'Photo/video feed grid' },
+    { id: 'reels', label: 'Reels', description: 'Short-form video content' },
+    { id: 'media', label: 'Media', description: 'Photo gallery' },
+    { id: 'music_videos', label: 'Music Videos', description: 'Video gallery' },
+    { id: 'music', label: 'Music', description: 'Music tracks & playlists' },
+    { id: 'events', label: 'Events', description: 'Shows & performances' },
+    { id: 'products', label: 'Products', description: 'Merchandise & portfolio' },
+  ];
+
+  // Check if a module is enabled (uses profile type defaults if enabledModules is null)
+  const isModuleEnabled = useCallback((moduleId: ProfileSection): boolean => {
+    if (Array.isArray(enabledModules)) {
+      return enabledModules.includes(moduleId);
+    }
+    // Default: use profile type config defaults (simplified - enable common ones)
+    const defaultEnabled: ProfileSection[] = ['social_counts', 'social_media', 'links', 'streaming_stats', 'top_supporters', 'top_friends'];
+    return defaultEnabled.includes(moduleId);
+  }, [enabledModules]);
+
+  // Toggle a module
+  const toggleModule = useCallback((moduleId: ProfileSection) => {
+    setEnabledModules(prev => {
+      const current = Array.isArray(prev) ? prev : ['social_counts', 'social_media', 'links', 'streaming_stats', 'top_supporters', 'top_friends'];
+      if (current.includes(moduleId)) {
+        return current.filter(m => m !== moduleId);
+      } else {
+        return [...current, moduleId];
+      }
+    });
+  }, []);
+
+  // Check if a tab is enabled
+  const isTabEnabled = useCallback((tabId: ProfileTab): boolean => {
+    if (tabId === 'info') return true; // Core tab always on
+    if (Array.isArray(enabledTabs)) {
+      return enabledTabs.includes(tabId);
+    }
+    // Default: use profile type config defaults
+    const defaultEnabled: ProfileTab[] = ['feed', 'media', 'music_videos'];
+    return defaultEnabled.includes(tabId);
+  }, [enabledTabs]);
+
+  // Toggle a tab
+  const toggleTab = useCallback((tabId: ProfileTab) => {
+    if (tabId === 'info') return; // Can't toggle core tab
+    setEnabledTabs(prev => {
+      const current = Array.isArray(prev) ? prev : ['feed', 'media', 'music_videos'];
+      if (current.includes(tabId)) {
+        return current.filter(t => t !== tabId);
+      } else {
+        return [...current, tabId];
+      }
+    });
+  }, []);
 
   return (
     <ThemedColorsContext.Provider value={themed}>
     <SafeAreaView style={[styles.safeArea, { backgroundColor: themed.bg }]}>
-      <PickerModal
-        visible={modulesModalOpen}
-        title="Customize Profile Modules"
-        subtitle="Add or remove modules (UI only)"
-        items={modules}
-        onClose={() => setModulesModalOpen(false)}
-      />
-      <PickerModal
-        visible={tabsModalOpen}
-        title="Manage Profile Tabs"
-        subtitle="Select which tabs appear on your profile (UI only)"
-        items={tabs}
-        onClose={() => setTabsModalOpen(false)}
-      />
+      {/* Modules Picker Modal */}
+      <Modal visible={modulesModalOpen} transparent animationType="fade" onRequestClose={() => setModulesModalOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: themed.card, borderColor: themed.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, { color: themed.text }]}>Customize Profile Modules</Text>
+                <Text style={[styles.modalSubtitle, { color: themed.muted }]}>Add or remove sections from your profile</Text>
+              </View>
+              <Pressable onPress={() => setModulesModalOpen(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={20} color={themed.text} />
+              </Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ padding: 12 }}>
+              {MODULE_DEFINITIONS.map((mod, idx) => (
+                <View key={mod.id}>
+                  <View style={styles.modalRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.modalRowTitle, { color: themed.text }]}>{mod.label}</Text>
+                      <Text style={[styles.modalRowDesc, { color: themed.muted }]}>{mod.description}</Text>
+                    </View>
+                    <Switch
+                      value={isModuleEnabled(mod.id)}
+                      onValueChange={() => toggleModule(mod.id)}
+                      disabled={saving}
+                      trackColor={{ false: themed.muted2, true: themed.blue600 }}
+                    />
+                  </View>
+                  {idx < MODULE_DEFINITIONS.length - 1 && <Divider />}
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <Button label="Done" tone="primary" onPress={() => setModulesModalOpen(false)} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Tabs Picker Modal */}
+      <Modal visible={tabsModalOpen} transparent animationType="fade" onRequestClose={() => setTabsModalOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: themed.card, borderColor: themed.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, { color: themed.text }]}>Manage Profile Tabs</Text>
+                <Text style={[styles.modalSubtitle, { color: themed.muted }]}>Select which tabs appear on your profile</Text>
+              </View>
+              <Pressable onPress={() => setTabsModalOpen(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={20} color={themed.text} />
+              </Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ padding: 12 }}>
+              {TAB_DEFINITIONS.map((tab, idx) => (
+                <View key={tab.id}>
+                  <View style={styles.modalRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.modalRowTitle, { color: themed.text }]}>{tab.label}</Text>
+                      <Text style={[styles.modalRowDesc, { color: themed.muted }]}>{tab.description}</Text>
+                    </View>
+                    <Switch
+                      value={isTabEnabled(tab.id)}
+                      onValueChange={() => toggleTab(tab.id)}
+                      disabled={saving || tab.core}
+                      trackColor={{ false: themed.muted2, true: themed.blue600 }}
+                    />
+                  </View>
+                  {idx < TAB_DEFINITIONS.length - 1 && <Divider />}
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <Button label="Done" tone="primary" onPress={() => setTabsModalOpen(false)} />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header */}
@@ -724,32 +1146,53 @@ export default function SettingsProfileScreen() {
                   placeholderTextColor={themed.muted}
                   keyboardType="numeric"
                   maxLength={5}
+                  value={locationZip}
+                  onChangeText={setLocationZip}
+                  editable={!saving}
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
-              <Button label="Set" tone="primary" disabled />
             </View>
           </View>
 
-          <Field label="Area label (optional)" placeholder='e.g. "St. Louis Metro"' maxLength={48} />
+          <Field
+            label="Area label (optional)"
+            placeholder='e.g. "St. Louis Metro"'
+            maxLength={48}
+            value={locationLabel}
+            onChangeText={setLocationLabel}
+            disabled={saving}
+          />
 
           <View style={[styles.noticeBox, { borderColor: themed.infoCardBorder, backgroundColor: themed.infoCardBg }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="shield-checkmark-outline" size={18} color={themed.blue600} style={{ marginRight: 8 }} />
               <Text style={[styles.noticeTitle, { color: themed.text }]}>Self-reported only</Text>
             </View>
-            <Text style={[styles.noticeText, { color: themed.muted }]}>No location saved yet.</Text>
+            <Text style={[styles.noticeText, { color: themed.muted }]}>
+              {locationCity ? `${locationCity}${locationRegion ? `, ${locationRegion}` : ''}` : 'No location saved yet.'}
+            </Text>
           </View>
 
           <View style={{ marginTop: 10 }}>
             <View style={styles.toggleRow}>
               <Text style={[styles.toggleLabel, { color: themed.text }]}>Hide location from others</Text>
-              <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />
+              <Switch
+                value={locationHidden}
+                onValueChange={setLocationHidden}
+                disabled={saving}
+                trackColor={{ false: themed.muted2, true: themed.blue600 }}
+              />
             </View>
             <Divider />
-            <View style={[styles.toggleRow, { opacity: 0.6 }]}>
+            <View style={[styles.toggleRow, { opacity: locationHidden ? 0.6 : 1 }]}>
               <Text style={[styles.toggleLabel, { color: themed.text }]}>Show ZIP publicly</Text>
-              <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />
+              <Switch
+                value={locationShowZip}
+                onValueChange={setLocationShowZip}
+                disabled={saving || locationHidden}
+                trackColor={{ false: themed.muted2, true: themed.blue600 }}
+              />
             </View>
           </View>
         </Card>
@@ -759,16 +1202,18 @@ export default function SettingsProfileScreen() {
           <View style={{ marginBottom: 10 }}>
             <View style={styles.aboutHeaderRow}>
               <Text style={[styles.fieldLabel, { color: themed.text }]}>Gender (Optional)</Text>
-              <Text style={[styles.smallMuted, { color: themed.muted }]}>Not set</Text>
+              <Text style={[styles.smallMuted, { color: themed.muted }]}>
+                {gender ? GENDER_OPTIONS.find(o => o.value === gender)?.label || 'Not set' : 'Not set'}
+              </Text>
             </View>
             <Text style={[styles.smallMuted, { color: themed.muted }]}>Used for Dating filters. You can leave this blank.</Text>
           </View>
           <View style={styles.chipsWrap}>
-            <Chip label="Man" />
-            <Chip label="Woman" />
-            <Chip label="Non-binary" />
-            <Chip label="Other" />
-            <Chip label="Prefer not to say" />
+            {GENDER_OPTIONS.map((option) => (
+              <Pressable key={option.value} onPress={() => handleGenderSelect(option.value)} disabled={saving}>
+                <Chip label={option.label} selected={gender === option.value} disabled={saving} />
+              </Pressable>
+            ))}
           </View>
         </Card>
 
@@ -777,14 +1222,26 @@ export default function SettingsProfileScreen() {
           <View style={{ marginBottom: 8 }}>
             <Text style={[styles.fieldLabel, { color: themed.text }]}>Who invited you? (username)</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={[styles.inputWrap, { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder }]}>
+              <View style={[
+                styles.inputWrap,
+                { flex: 1, backgroundColor: themed.inputBg, borderColor: themed.inputBorder },
+                !!referralId && styles.inputWrapDisabled
+              ]}>
                 <TextInput
                   placeholder="username (no @)"
                   placeholderTextColor={themed.muted}
+                  value={invitedByUsername}
+                  onChangeText={setInvitedByUsername}
+                  editable={!referralId && !claimingReferral}
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
-              <Button label="Save" tone="primary" disabled />
+              <Button
+                label={claimingReferral ? 'Saving...' : referralId ? 'Saved' : 'Save'}
+                tone="primary"
+                disabled={!!referralId || claimingReferral || !invitedByUsername.trim()}
+                onPress={handleClaimReferral}
+              />
             </View>
             <Text style={[styles.fieldHelper, { color: themed.muted }]}>
               You can only set this once. If already claimed, it will be locked.
@@ -794,15 +1251,62 @@ export default function SettingsProfileScreen() {
 
         {/* Profile Type */}
         <Card title="Profile Type" icon={<Ionicons name="pricetag-outline" size={18} color={themed.blue600} />}>
-          <Row
-            label="Current Type"
-            value={profile?.profile_type || 'creator'}
-            hint="Profile type determines default modules and tabs"
-          />
+          <Pressable onPress={() => setShowProfileTypePicker(true)} disabled={saving}>
+            <Row
+              label="Current Type"
+              value={PROFILE_TYPE_OPTIONS.find(o => o.value === profileType)?.label || profileType}
+              hint="Profile type determines default modules and tabs"
+            />
+          </Pressable>
           <Text style={[styles.smallMuted, { marginTop: 10, color: themed.amber600 }]}>
             ⚠️ Changing profile type may hide or show different sections on your profile. Nothing is deleted.
           </Text>
         </Card>
+
+        {/* Profile Type Picker Modal */}
+        <Modal visible={showProfileTypePicker} transparent animationType="fade" onRequestClose={() => setShowProfileTypePicker(false)}>
+          <View style={styles.modalBackdrop}>
+            <View style={[styles.modalCard, { backgroundColor: themed.card, borderColor: themed.border }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.modalTitle, { color: themed.text }]}>Select Profile Type</Text>
+                  <Text style={[styles.modalSubtitle, { color: themed.muted }]}>Choose the type that best describes you</Text>
+                </View>
+                <Pressable onPress={() => setShowProfileTypePicker(false)} style={styles.modalCloseBtn}>
+                  <Ionicons name="close" size={20} color={themed.text} />
+                </Pressable>
+              </View>
+              <ScrollView style={{ maxHeight: 400 }} contentContainerStyle={{ padding: 12 }}>
+                {PROFILE_TYPE_OPTIONS.map((option, idx) => (
+                  <View key={option.value}>
+                    <Pressable
+                      onPress={() => {
+                        setProfileType(option.value);
+                        setShowProfileTypePicker(false);
+                      }}
+                      style={[
+                        styles.modalRow,
+                        profileType === option.value && { backgroundColor: 'rgba(37,99,235,0.12)', borderRadius: 12, marginHorizontal: -8, paddingHorizontal: 8 }
+                      ]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.modalRowTitle, { color: themed.text }]}>{option.label}</Text>
+                        <Text style={[styles.modalRowDesc, { color: themed.muted }]}>{option.description}</Text>
+                      </View>
+                      {profileType === option.value && (
+                        <Ionicons name="checkmark-circle" size={24} color={themed.blue600} />
+                      )}
+                    </Pressable>
+                    {idx < PROFILE_TYPE_OPTIONS.length - 1 && <Divider />}
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={styles.modalFooter}>
+                <Button label="Done" tone="primary" onPress={() => setShowProfileTypePicker(false)} />
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Profile Modules */}
         <Card
@@ -813,16 +1317,15 @@ export default function SettingsProfileScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.smallMuted, { color: themed.muted }]}>
-                Profile type is a starting point — add or remove any module (UI only).
+                Profile type is a starting point — add or remove any module.
               </Text>
             </View>
             <Button label="Customize Modules" iconName="add-outline" tone="primary" onPress={() => setModulesModalOpen(true)} />
           </View>
           <View style={[styles.chipsWrap, { marginTop: 12 }]}>
-            <Chip label="Social Counts" selected />
-            <Chip label="Social Media Links" selected />
-            <Chip label="Custom Links" selected />
-            <Chip label="Streaming Stats" selected />
+            {MODULE_DEFINITIONS.filter(m => isModuleEnabled(m.id)).map(m => (
+              <Chip key={m.id} label={m.label} selected />
+            ))}
           </View>
         </Card>
 
@@ -832,9 +1335,9 @@ export default function SettingsProfileScreen() {
             Choose which tabs appear on your profile. Visitors can navigate between enabled tabs.
           </Text>
           <View style={[styles.chipsWrap, { marginTop: 12 }]}>
-            <Chip label="Info" selected />
-            <Chip label="Feed" selected />
-            <Chip label="Videos" selected />
+            {TAB_DEFINITIONS.filter(t => isTabEnabled(t.id)).map(t => (
+              <Chip key={t.id} label={t.label} selected />
+            ))}
           </View>
           <View style={{ marginTop: 12 }}>
             <Button label="Add / Manage Tabs" iconName="add-outline" onPress={() => setTabsModalOpen(true)} />
@@ -852,59 +1355,89 @@ export default function SettingsProfileScreen() {
               <Text style={[styles.rowLabel, { color: themed.text }]}>Show Top Friends Section</Text>
               <Text style={[styles.rowHint, { color: themed.muted }]}>Display your favorite people on your profile</Text>
             </View>
-            <Switch value={true} disabled trackColor={{ false: themed.muted2, true: themed.purple600 }} />
-          </View>
-
-          <View style={{ marginTop: 12, opacity: 0.9 }}>
-            <Field
-              label="Section Title"
-              placeholder="Top Friends"
-              helper={'Examples: "Top G\'s", "My Crew", "Best Buds", "VIPs", etc.'}
+            <Switch
+              value={showTopFriends}
+              onValueChange={setShowTopFriends}
+              disabled={saving}
+              trackColor={{ false: themed.muted2, true: themed.purple600 }}
             />
-
-            <Text style={[styles.fieldLabel, { color: themed.text }]}>Avatar Style</Text>
-            <View style={styles.twoCol}>
-              <View
-                style={[
-                  styles.choiceCard,
-                  { backgroundColor: themed.card2, borderColor: themed.border },
-                  styles.choiceCardSelected,
-                  { opacity: 0.7 },
-                ]}
-              >
-                <Ionicons name="square-outline" size={24} color={themed.text} />
-                <Text style={[styles.choiceTitle, { color: themed.text }]}>Square</Text>
-                <Text style={[styles.choiceDesc, { color: themed.muted }]}>Classic look</Text>
-              </View>
-              <View style={[styles.choiceCard, { backgroundColor: themed.card2, borderColor: themed.border, opacity: 0.7 }]}>
-                <Ionicons name="ellipse-outline" size={24} color={themed.text} />
-                <Text style={[styles.choiceTitle, { color: themed.text }]}>Circle</Text>
-                <Text style={[styles.choiceDesc, { color: themed.muted }]}>Modern style</Text>
-              </View>
-            </View>
-
-            <View style={{ marginTop: 12 }}>
-              <Row
-                label="Maximum Friends to Display"
-                value="4"
-                hint="Slider on web (UI only)"
-                leftIcon={<Ionicons name="options-outline" size={18} color={themed.muted} />}
-                right={<Text style={[styles.rowHint, { color: themed.muted }]}>4</Text>}
-              />
-              <Text style={[styles.fieldHelper, { color: themed.muted }]}>
-                Grid will auto-center based on the number of friends you add
-              </Text>
-            </View>
-
-            <View style={[styles.previewBox, { backgroundColor: themed.card2, borderColor: themed.border }]}>
-              <Text style={[styles.previewTitle, { color: themed.text }]}>Preview Grid Layout</Text>
-              <View style={styles.previewGrid}>
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <View key={`pf-${i}`} style={styles.previewTile} />
-                ))}
-              </View>
-            </View>
           </View>
+
+          {showTopFriends && (
+            <View style={{ marginTop: 12 }}>
+              <Field
+                label="Section Title"
+                placeholder="Top Friends"
+                helper={'Examples: "Top G\'s", "My Crew", "Best Buds", "VIPs", etc.'}
+                value={topFriendsTitle}
+                onChangeText={setTopFriendsTitle}
+                disabled={saving}
+                maxLength={50}
+              />
+
+              <Text style={[styles.fieldLabel, { color: themed.text }]}>Avatar Style</Text>
+              <View style={styles.twoCol}>
+                <Pressable onPress={() => setTopFriendsAvatarStyle('square')} disabled={saving}>
+                  <View
+                    style={[
+                      styles.choiceCard,
+                      { backgroundColor: themed.card2, borderColor: themed.border },
+                      topFriendsAvatarStyle === 'square' && styles.choiceCardSelected,
+                    ]}
+                  >
+                    <Ionicons name="square-outline" size={24} color={themed.text} />
+                    <Text style={[styles.choiceTitle, { color: themed.text }]}>Square</Text>
+                    <Text style={[styles.choiceDesc, { color: themed.muted }]}>Classic look</Text>
+                  </View>
+                </Pressable>
+                <Pressable onPress={() => setTopFriendsAvatarStyle('circle')} disabled={saving}>
+                  <View
+                    style={[
+                      styles.choiceCard,
+                      { backgroundColor: themed.card2, borderColor: themed.border },
+                      topFriendsAvatarStyle === 'circle' && styles.choiceCardSelected,
+                    ]}
+                  >
+                    <Ionicons name="ellipse-outline" size={24} color={themed.text} />
+                    <Text style={[styles.choiceTitle, { color: themed.text }]}>Circle</Text>
+                    <Text style={[styles.choiceDesc, { color: themed.muted }]}>Modern style</Text>
+                  </View>
+                </Pressable>
+              </View>
+
+              <View style={{ marginTop: 12 }}>
+                <Row
+                  label="Maximum Friends to Display"
+                  value={String(topFriendsMaxCount)}
+                  hint="Tap to change (1-8)"
+                  leftIcon={<Ionicons name="options-outline" size={18} color={themed.muted} />}
+                  right={<Text style={[styles.rowHint, { color: themed.purple600, fontWeight: '900', fontSize: 18 }]}>{topFriendsMaxCount}</Text>}
+                  onPress={() => {
+                    // Cycle through 1-8
+                    setTopFriendsMaxCount(prev => prev >= 8 ? 1 : prev + 1);
+                  }}
+                />
+                <Text style={[styles.fieldHelper, { color: themed.muted }]}>
+                  Grid will auto-center based on the number of friends you add
+                </Text>
+              </View>
+
+              <View style={[styles.previewBox, { backgroundColor: themed.card2, borderColor: themed.border }]}>
+                <Text style={[styles.previewTitle, { color: themed.text }]}>Preview Grid Layout</Text>
+                <View style={styles.previewGrid}>
+                  {Array.from({ length: topFriendsMaxCount }).map((_, i) => (
+                    <View
+                      key={`pf-${i}`}
+                      style={[
+                        styles.previewTile,
+                        topFriendsAvatarStyle === 'circle' && { borderRadius: 22 }
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
         </Card>
 
         {/* Profile Customization */}
@@ -1069,7 +1602,12 @@ export default function SettingsProfileScreen() {
                 Hide streaming stats, top supporters, and top streamers widgets. Your profile will only show your links, social media, and bio.
               </Text>
             </View>
-            <Switch value={false} disabled trackColor={{ false: themed.muted2, true: themed.blue600 }} />
+            <Switch
+              value={hideStreamingStats}
+              onValueChange={setHideStreamingStats}
+              disabled={saving}
+              trackColor={{ false: themed.muted2, true: themed.blue600 }}
+            />
           </View>
         </Card>
 
@@ -1090,18 +1628,18 @@ export default function SettingsProfileScreen() {
           icon={<Ionicons name="share-social-outline" size={18} color={themed.blue600} />}
         >
           <View style={styles.twoColInputs}>
-            <Field label="Instagram" placeholder="username" />
-            <Field label="Twitter/X" placeholder="username" />
-            <Field label="YouTube" placeholder="username (no @)" />
-            <Field label="TikTok" placeholder="username" />
-            <Field label="Facebook" placeholder="username" />
-            <Field label="Twitch" placeholder="username" />
-            <Field label="Discord" placeholder="invite code or username" />
-            <Field label="Snapchat" placeholder="username" />
-            <Field label="LinkedIn" placeholder="username" />
-            <Field label="GitHub" placeholder="username" />
-            <Field label="Spotify" placeholder="artist/profile ID" />
-            <Field label="OnlyFans" placeholder="username" />
+            <Field label="Instagram" placeholder="username" value={socialInstagram} onChangeText={setSocialInstagram} disabled={saving} />
+            <Field label="Twitter/X" placeholder="username" value={socialTwitter} onChangeText={setSocialTwitter} disabled={saving} />
+            <Field label="YouTube" placeholder="username (no @)" value={socialYoutube} onChangeText={setSocialYoutube} disabled={saving} />
+            <Field label="TikTok" placeholder="username" value={socialTiktok} onChangeText={setSocialTiktok} disabled={saving} />
+            <Field label="Facebook" placeholder="username" value={socialFacebook} onChangeText={setSocialFacebook} disabled={saving} />
+            <Field label="Twitch" placeholder="username" value={socialTwitch} onChangeText={setSocialTwitch} disabled={saving} />
+            <Field label="Discord" placeholder="invite code or username" value={socialDiscord} onChangeText={setSocialDiscord} disabled={saving} />
+            <Field label="Snapchat" placeholder="username" value={socialSnapchat} onChangeText={setSocialSnapchat} disabled={saving} />
+            <Field label="LinkedIn" placeholder="username" value={socialLinkedin} onChangeText={setSocialLinkedin} disabled={saving} />
+            <Field label="GitHub" placeholder="username" value={socialGithub} onChangeText={setSocialGithub} disabled={saving} />
+            <Field label="Spotify" placeholder="artist/profile ID" value={socialSpotify} onChangeText={setSocialSpotify} disabled={saving} />
+            <Field label="OnlyFans" placeholder="username" value={socialOnlyfans} onChangeText={setSocialOnlyfans} disabled={saving} />
           </View>
         </Card>
 
