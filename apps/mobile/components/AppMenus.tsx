@@ -21,7 +21,6 @@ export default function AppMenus() {
       { key: 'watch', label: 'Watch', onPress: () => navToTab('Watch') },
       { key: 'home', label: 'Home', onPress: () => navToTab('Home') },
       { key: 'feed', label: 'Feed', onPress: () => navToTab('Feed') },
-      { key: 'trending', label: 'Trending', onPress: () => navTo('TrendingScreen') },
       { key: 'livetv', label: 'Live TV', onPress: () => navToTab('LiveTV') },
       { key: 'teams', label: 'Teams', onPress: () => navigateToTeamsLanding(navigationRef as any) },
       { key: 'leaderboards', label: 'Leaderboards', onPress: () => navTo('LeaderboardsScreen') },

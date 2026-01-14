@@ -77,7 +77,6 @@ import TeamsRoomScreen from '../screens/TeamsRoomScreen';
 import TeamsScreen from '../screens/TeamsScreen';
 import TeamsSetupScreen from '../screens/TeamsSetupScreen';
 import TermsScreen from '../screens/TermsScreen';
-import TrendingScreen from '../screens/TrendingScreen';
 import UnsubscribeScreen from '../screens/UnsubscribeScreen';
 import UserAnalyticsScreen from '../screens/UserAnalyticsScreen';
 import UserFeedScreen from '../screens/UserFeedScreen';
@@ -284,7 +283,6 @@ export default function RootNavigator({ header }: { header: () => React.ReactNod
       <RootStack.Screen name="TeamsRoomScreen" component={TeamsRoomScreen} />
       <RootStack.Screen name="TeamsScreen" component={TeamsScreen} />
       <RootStack.Screen name="TeamsSetupScreen" component={TeamsSetupScreen} />
-      <RootStack.Screen name="TrendingScreen" component={TrendingScreen} />
       <RootStack.Screen name="UnsubscribeScreen" component={UnsubscribeScreen} />
       <RootStack.Screen name="UserAnalyticsScreen" component={UserAnalyticsScreen} />
       <RootStack.Screen name="UserFeedScreen" component={UserFeedScreen} />
