@@ -64,27 +64,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!conversationId) {
-      if (!otherProfileId) {
-        return NextResponse.json({ error: 'conversationId or otherProfileId is required' }, { status: 400 });
-      }
+    if (!conversationId && !otherProfileId) {
+      return NextResponse.json({ error: 'conversationId or otherProfileId is required' }, { status: 400 });
+    }
 
+    // If no conversationId but we have otherProfileId, check blocking and use otherProfileId for path
+    if (!conversationId && otherProfileId) {
       if (await isBlockedBidirectional(supabase as any, user.id, otherProfileId)) {
         return NextResponse.json({ error: 'Messaging unavailable.' }, { status: 403 });
       }
-
-      const { data, error } = await supabase.rpc('get_or_create_dm_conversation', {
-        p_other_profile_id: otherProfileId,
-      });
-
-      if (error) {
-        if ((error as any)?.message === 'blocked') {
-          return NextResponse.json({ error: 'Messaging unavailable.' }, { status: 403 });
-        }
-        return NextResponse.json({ error: error.message }, { status: 400 });
-      }
-
-      conversationId = data;
+      // Use a deterministic folder based on both user IDs (sorted for consistency)
+      const sortedIds = [user.id, otherProfileId].sort();
+      conversationId = `dm_${sortedIds[0]}_${sortedIds[1]}`;
     }
 
     const bucket = process.env.NEXT_PUBLIC_SUPABASE_DM_MEDIA_BUCKET || 'pinned-posts';
