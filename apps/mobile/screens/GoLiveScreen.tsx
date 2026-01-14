@@ -96,8 +96,8 @@ export default function GoLiveScreen() {
   // Chat messages (fetched from chat_messages table like web)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
-  // Ranking data (mocked for now - will fetch from Supabase like web)
-  const [trendingRank, setTrendingRank] = useState<number>(0);
+  // Ranking data (fetched from Supabase RPCs - only shown when available)
+  const [trendingRank, setTrendingRank] = useState<number | null>(null);
   const [leaderboardRank, setLeaderboardRank] = useState<{ currentRank: number; pointsToNextRank: number } | null>(null);
 
   const categories = useMemo(
@@ -549,7 +549,7 @@ export default function GoLiveScreen() {
 
         if (data && Array.isArray(data) && !cancelled) {
           const rank = data.findIndex((s: any) => s.stream_id === liveStreamId);
-          setTrendingRank(rank !== -1 ? rank + 1 : 0);
+          setTrendingRank(rank !== -1 ? rank + 1 : null);
         }
       } catch (err) {
         console.error('[GoLive] Error loading trending rank:', err);
@@ -935,7 +935,7 @@ export default function GoLiveScreen() {
           setLiveStreamId(null);
           setTopGifters([]);
           setChatMessages([]);
-          setTrendingRank(0);
+          setTrendingRank(null);
           setLeaderboardRank(null);
           setCameraGranted(false);
           setMicGranted(false);

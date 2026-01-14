@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -8,27 +8,22 @@ import { loadLiveBrowseFilters, saveLiveBrowseFilters, type BrowseGenderFilter }
 import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
 
+const API_BASE_URL = 'https://www.mylivelinks.com';
+
 const SPECIAL_FILTERS = ['Trending', 'Featured', 'Rooms', 'Battles'] as const;
 const CATEGORY_FILTERS = ['IRL', 'Music', 'Gaming', 'Comedy', 'Just Chatting'] as const;
 const GENDER_FILTERS = ['All', 'Men', 'Women'] as const;
 
-type MockStream = {
+type LiveStream = {
   id: string;
-  name: string;
-  title: string;
-  viewers: string;
-  category: (typeof CATEGORY_FILTERS)[number];
-  gender: Exclude<BrowseGenderFilter, 'All'>;
+  slug: string;
+  streamer_display_name: string;
+  thumbnail_url: string;
+  viewer_count: number;
+  category: string | null;
+  badges: string[];
+  trendingRank: number;
 };
-
-const MOCK_TRENDING_STREAMS: MockStream[] = [
-  { id: 't-1', name: 'Ava', title: 'Chill vibes', viewers: '2.4K', category: 'Just Chatting', gender: 'Women' },
-  { id: 't-2', name: 'Jules', title: 'Just chatting', viewers: '1.8K', category: 'Just Chatting', gender: 'Men' },
-  { id: 't-3', name: 'Nova', title: 'Ranked grind', viewers: '1.5K', category: 'Gaming', gender: 'Women' },
-  { id: 't-4', name: 'Kai', title: 'Acoustic set', viewers: '1.1K', category: 'Music', gender: 'Men' },
-  { id: 't-5', name: 'Miles', title: 'Late night chat', viewers: '987', category: 'IRL', gender: 'Men' },
-  { id: 't-6', name: 'Finn', title: 'Highlights', viewers: '842', category: 'Gaming', gender: 'Men' },
-];
 
 export default function TrendingScreen() {
   const navigation = useNavigation<any>();
@@ -41,6 +36,11 @@ export default function TrendingScreen() {
   const [selectedGender, setSelectedGender] = useState<BrowseGenderFilter>('All');
   const [search, setSearch] = useState('');
   const [hydrated, setHydrated] = useState(false);
+
+  const [streams, setStreams] = useState<LiveStream[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const navigateToLiveTV = () => {
     navigation.navigate('Tabs', { screen: 'LiveTV' });
@@ -75,21 +75,59 @@ export default function TrendingScreen() {
     });
   }, [hydrated, loading, profileId, selectedCategory, selectedGender, selectedSpecial]);
 
+  const fetchStreams = useCallback(async (showRefresh = false) => {
+    if (showRefresh) setIsRefreshing(true);
+    else setIsLoading(true);
+    setFetchError(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/livetv/streams`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch streams: ${response.status}`);
+      }
+      const data = await response.json();
+      setStreams(data.streams || []);
+    } catch (err: any) {
+      console.error('[TrendingScreen] Fetch error:', err);
+      setFetchError(err?.message || 'Failed to load streams');
+      setStreams([]);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStreams();
+  }, [fetchStreams]);
+
+  const handleRefresh = useCallback(() => {
+    fetchStreams(true);
+  }, [fetchStreams]);
+
   const filteredStreams = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return MOCK_TRENDING_STREAMS.filter((s) => {
-      const matchesGender = selectedGender === 'All' ? true : s.gender === selectedGender;
+    return streams.filter((s) => {
       const matchesCategory = selectedCategory === 'All' ? true : s.category === selectedCategory;
-      const matchesSearch = !q ? true : `${s.name} ${s.title}`.toLowerCase().includes(q);
-      // Special filter currently only affects selection UI; keep behavior stable while data stays mock.
-      const matchesSpecial = true;
-      return matchesGender && matchesCategory && matchesSearch && matchesSpecial;
+      const matchesSearch = !q ? true : s.streamer_display_name.toLowerCase().includes(q);
+      return matchesCategory && matchesSearch;
     });
-  }, [search, selectedCategory, selectedGender, selectedSpecial]);
+  }, [search, selectedCategory, streams]);
+
+  const formatViewerCount = (count: number): string => {
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+    return String(count);
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bg }]}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} />
+        }
+      >
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
             <Text style={styles.headerTitle}>Trending</Text>
@@ -187,45 +225,69 @@ export default function TrendingScreen() {
             <Text style={styles.sectionTitle}>Trending Now</Text>
           </View>
 
-          <View style={styles.streamsList}>
-            {filteredStreams.map((stream) => (
-              <View key={stream.id} style={styles.streamCard}>
-                <View style={styles.streamThumb}>
-                  <View style={styles.streamThumbInner}>
-                    <View style={styles.streamThumbTopRow}>
-                      <View style={styles.liveBadge}>
-                        <View style={styles.liveDot} />
-                        <Text style={styles.liveBadgeText}>LIVE</Text>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.loadingText}>Loading streams...</Text>
+            </View>
+          ) : fetchError ? (
+            <View style={styles.emptyContainer}>
+              <Feather name="alert-circle" size={48} color={COLORS.textSecondary} />
+              <Text style={styles.emptyTitle}>Unable to load streams</Text>
+              <Text style={styles.emptySubtitle}>{fetchError}</Text>
+              <Pressable onPress={handleRefresh} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </Pressable>
+            </View>
+          ) : filteredStreams.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Feather name="tv" size={48} color={COLORS.textSecondary} />
+              <Text style={styles.emptyTitle}>No live streams</Text>
+              <Text style={styles.emptySubtitle}>Check back later for trending content</Text>
+            </View>
+          ) : (
+            <View style={styles.streamsList}>
+              {filteredStreams.map((stream) => (
+                <View key={stream.id} style={styles.streamCard}>
+                  <View style={styles.streamThumb}>
+                    <View style={styles.streamThumbInner}>
+                      <View style={styles.streamThumbTopRow}>
+                        <View style={styles.liveBadge}>
+                          <View style={styles.liveDot} />
+                          <Text style={styles.liveBadgeText}>LIVE</Text>
+                        </View>
+
+                        <View style={styles.viewerBadge}>
+                          <Feather name="eye" size={12} color={COLORS.textSecondary} />
+                          <Text style={styles.viewerBadgeText}>{formatViewerCount(stream.viewer_count)}</Text>
+                        </View>
                       </View>
 
-                      <View style={styles.viewerBadge}>
-                        <Feather name="eye" size={12} color={COLORS.textSecondary} />
-                        <Text style={styles.viewerBadgeText}>{stream.viewers}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.streamThumbBottomRow}>
-                      <View style={styles.trendingBadge}>
-                        <Text style={styles.trendingBadgeText}>🔥 Trending</Text>
-                      </View>
-                      <View style={styles.thumbMark}>
-                        <Text style={styles.thumbMarkText}>📺</Text>
+                      <View style={styles.streamThumbBottomRow}>
+                        {stream.badges.includes('Trending') && (
+                          <View style={styles.trendingBadge}>
+                            <Text style={styles.trendingBadgeText}>🔥 #{stream.trendingRank}</Text>
+                          </View>
+                        )}
+                        <View style={styles.thumbMark}>
+                          <Text style={styles.thumbMarkText}>📺</Text>
+                        </View>
                       </View>
                     </View>
                   </View>
-                </View>
 
-                <View style={styles.streamCardContent}>
-                  <Text numberOfLines={1} style={styles.streamName}>
-                    {stream.name}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.streamTitle}>
-                    {stream.title}
-                  </Text>
+                  <View style={styles.streamCardContent}>
+                    <Text numberOfLines={1} style={styles.streamName}>
+                      {stream.streamer_display_name}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.streamTitle}>
+                      @{stream.slug}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <Pressable
@@ -618,6 +680,47 @@ const styles = StyleSheet.create({
 
   pressed: {
     opacity: 0.85,
+  },
+
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  emptyContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  emptySubtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingHorizontal: 32,
+  },
+  retryButton: {
+    marginTop: 8,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '900',
+    fontSize: 14,
   },
 });
 

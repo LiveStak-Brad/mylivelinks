@@ -1,10 +1,13 @@
-﻿import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+﻿import React, { useCallback, useMemo, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
 
-type SearchTab = 'top' | 'people' | 'posts' | 'teams' | 'live' | 'media' | 'music' | 'videos' | 'more';
+const API_BASE_URL = 'https://www.mylivelinks.com';
+
+// Supported search tabs (music/videos/media hidden - not yet searchable via this endpoint)
+type SearchTab = 'top' | 'people' | 'posts' | 'teams' | 'live';
 
 interface TabDefinition {
   id: SearchTab;
@@ -18,9 +21,6 @@ const PRIMARY_TABS: TabDefinition[] = [
   { id: 'posts', label: 'Posts', icon: 'newspaper' },
   { id: 'teams', label: 'Teams', icon: 'grid' },
   { id: 'live', label: 'Live', icon: 'radio' },
-  { id: 'media', label: 'Media', icon: 'images' },
-  { id: 'music', label: 'Music', icon: 'musical-notes' },
-  { id: 'videos', label: 'Videos', icon: 'videocam' },
 ];
 
 type FilterKey = 'verified' | 'online' | 'live' | 'following';
@@ -35,94 +35,66 @@ const FILTER_CHIPS: Array<{
   { id: 'following', label: 'Following', icon: 'person' },
 ];
 
-const MOCK_SUGGESTED_QUERIES = [
-  'Verified creators in LA',
-  'Upcoming music lives',
-  'Teams for artists',
+// Static suggested queries (not fetched from backend)
+const SUGGESTED_QUERIES = [
   'music',
   'gaming',
   'art',
   'fitness',
+  'comedy',
+  'live',
 ];
 
-type MockPage = {
-  id: string;
-  title: string;
-  description: string;
-  icon: keyof typeof Ionicons.glyphMap;
-};
-
-type MockPerson = {
+// Types matching backend SearchResultsBundle from /api/search
+interface PersonResult {
   id: string;
   name: string;
   handle: string;
-  meta?: string;
-  badge?: 'LIVE' | 'VERIFIED';
-};
+  avatarUrl?: string | null;
+  followerCount: number;
+  verified: boolean;
+  isMllPro?: boolean;
+}
 
-type MockPost = {
+interface PostResult {
   id: string;
-  authorName: string;
+  authorId: string;
+  author: string;
   authorHandle: string;
-  snippet: string;
-  meta: string;
-  hasMedia?: boolean;
-};
+  authorAvatarUrl?: string | null;
+  text: string;
+  createdAt: string;
+  likeCount: number;
+  commentCount: number;
+  mediaUrl?: string | null;
+  source: 'global' | 'team';
+  teamName?: string | null;
+}
 
-type MockTeam = {
+interface TeamResult {
   id: string;
   name: string;
-  description: string;
-  membersLabel: string;
-};
+  slug: string;
+  description?: string | null;
+  avatarUrl?: string | null;
+  memberCount: number;
+}
 
-type MockLive = {
+interface LiveResult {
   id: string;
-  name: string;
-  handle: string;
-  title: string;
-  meta: string;
-};
+  username: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  viewerCount: number;
+  isLive: boolean;
+}
 
-const MOCK_PAGES: MockPage[] = [
-  { id: 'teams', title: 'Teams', description: 'Browse and join teams', icon: 'grid' },
-  { id: 'trending', title: 'Trending', description: 'Trending content', icon: 'trending-up' },
-  { id: 'wallet', title: 'Wallet', description: 'Coins, diamonds, earnings', icon: 'wallet' },
-];
-
-const MOCK_PEOPLE: MockPerson[] = [
-  { id: 'p1', name: 'Samantha Lee', handle: '@samanthalee', badge: 'VERIFIED' },
-  { id: 'p2', name: 'Jordan Kim', handle: '@jordankim', meta: 'Creator • 24.1K followers' },
-  { id: 'p3', name: 'Ava Patel', handle: '@avapatel', badge: 'LIVE', meta: 'Live now' },
-];
-
-const MOCK_POSTS: MockPost[] = [
-  {
-    id: 'post1',
-    authorName: 'StreamQueen',
-    authorHandle: '@streamqueen',
-    snippet: 'Searching should feel intent-first. One bar for people, posts, teams, and live.',
-    meta: 'Post',
-  },
-  {
-    id: 'post2',
-    authorName: 'Brad',
-    authorHandle: '@brad',
-    snippet: 'Try queries like “weekly live drops” or “verified in LA”.',
-    meta: 'Post • Has media',
-    hasMedia: true,
-  },
-];
-
-const MOCK_TEAMS: MockTeam[] = [
-  { id: 't1', name: 'Verified Hosts', description: 'Live creators + collabs', membersLabel: '19 members' },
-  { id: 't2', name: 'Artists Collective', description: 'Share work • find commissions', membersLabel: '842 members' },
-];
-
-const MOCK_LIVE: MockLive[] = [
-  { id: 'l1', name: 'Nova', handle: '@nova', title: 'Ranked grind', meta: '1.5K watching' },
-  { id: 'l2', name: 'Kai', handle: '@kai', title: 'Acoustic set', meta: '321 watching' },
-];
+interface SearchResults {
+  people: PersonResult[];
+  posts: PostResult[];
+  teams: TeamResult[];
+  live: LiveResult[];
+}
 
 function SectionHeader({
   title,
@@ -233,18 +205,78 @@ export default function SearchScreen() {
     live: false,
     following: false,
   });
-  const [recentSearches, setRecentSearches] = useState<string[]>([
-    'verified in LA',
-    'weekly live drops',
-    'teams for artists',
-  ]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [results, setResults] = useState<SearchResults | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
-  const suggestedQueries = useMemo(() => MOCK_SUGGESTED_QUERIES, []);
+  const suggestedQueries = useMemo(() => SUGGESTED_QUERIES, []);
 
-  const handleSubmit = () => {
+  const performSearch = useCallback(async (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) {
+      setResults(null);
+      setHasSearched(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setHasSearched(true);
+
+    try {
+      const url = `${API_BASE_URL}/api/search?q=${encodeURIComponent(trimmed)}&people=10&posts=10&teams=10&live=10`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setResults(data);
+    } catch (err) {
+      console.error('[SearchScreen] Search error:', err);
+      setError(err instanceof Error ? err.message : 'Search failed');
+      setResults(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSubmit = useCallback(() => {
     const trimmed = searchQuery.trim();
     if (!trimmed) return;
     setRecentSearches((prev) => [trimmed, ...prev.filter((x) => x !== trimmed)].slice(0, 10));
+    performSearch(trimmed);
+  }, [searchQuery, performSearch]);
+
+  const handleSuggestionPress = useCallback((term: string) => {
+    setSearchQuery(term);
+    setRecentSearches((prev) => [term, ...prev.filter((x) => x !== term)].slice(0, 10));
+    performSearch(term);
+  }, [performSearch]);
+
+  // Filter results based on active filters
+  const filteredPeople = useMemo(() => {
+    if (!results?.people) return [];
+    let filtered = results.people;
+    if (filters.verified) {
+      filtered = filtered.filter((p) => p.verified || p.isMllPro);
+    }
+    return filtered;
+  }, [results, filters.verified]);
+
+  const filteredLive = useMemo(() => {
+    if (!results?.live) return [];
+    return results.live.filter((l) => l.isLive);
+  }, [results]);
+
+  // Format follower count
+  const formatCount = (count: number): string => {
+    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+    return String(count);
   };
 
   return (
@@ -275,7 +307,7 @@ export default function SearchScreen() {
 
         <View style={styles.tabsContainer}>
           <View style={styles.tabRow}>
-            {PRIMARY_TABS.slice(0, 4).map((tab) => (
+            {PRIMARY_TABS.map((tab) => (
               <TouchableOpacity
                 key={tab.id}
                 style={[styles.tabPill, activeTab === tab.id && styles.tabPillActive]}
@@ -291,38 +323,6 @@ export default function SearchScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
-
-          <View style={styles.tabRow}>
-            {PRIMARY_TABS.slice(4).map((tab) => (
-              <TouchableOpacity
-                key={tab.id}
-                style={[styles.tabPill, activeTab === tab.id && styles.tabPillActive]}
-                onPress={() => setActiveTab(tab.id)}
-              >
-                <Ionicons
-                  name={tab.icon}
-                  size={14}
-                  color={activeTab === tab.id ? '#FFF' : '#6B7280'}
-                />
-                <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={[styles.tabPill, activeTab === 'more' && styles.tabPillActive]}
-              onPress={() => setActiveTab('more')}
-            >
-              <Ionicons
-                name="ellipsis-horizontal"
-                size={14}
-                color={activeTab === 'more' ? '#FFF' : '#6B7280'}
-              />
-              <Text style={[styles.tabLabel, activeTab === 'more' && styles.tabLabelActive]}>
-                More
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -347,7 +347,7 @@ export default function SearchScreen() {
           })}
         </View>
 
-        {/* Recent searches (web has Recents via GlobalSearchTrigger) */}
+        {/* Recent searches */}
         <View style={styles.section}>
           <SectionHeader
             title="Recent searches"
@@ -367,69 +367,96 @@ export default function SearchScreen() {
                   label={term}
                   icon="time"
                   rightIcon="close"
-                  onPress={() => setSearchQuery(term)}
+                  onPress={() => handleSuggestionPress(term)}
                 />
               ))}
             </View>
           )}
         </View>
 
-        {/* Suggested (web has mock suggested queries) */}
+        {/* Suggested (static queries) */}
         <View style={styles.section}>
           <SectionHeader title="Suggested" />
           <View style={styles.chipsWrap}>
             {suggestedQueries.map((term) => (
-              <PillChip key={term} label={term} icon="sparkles" onPress={() => setSearchQuery(term)} />
+              <PillChip key={term} label={term} icon="sparkles" onPress={() => handleSuggestionPress(term)} />
             ))}
           </View>
         </View>
 
-        {/* Mocked results area (UI only; matches web card/list intent) */}
+        {/* Results section */}
         <View style={styles.section}>
-          <SectionHeader title={searchQuery.trim() ? 'Results' : 'Top results'} />
+          <SectionHeader title={hasSearched ? 'Results' : 'Search'} />
 
-          {!searchQuery.trim() ? (
+          {/* Loading state */}
+          {loading && (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color="#8B5CF6" />
+              <Text style={styles.emptyDescription}>Searching...</Text>
+            </View>
+          )}
+
+          {/* Error state */}
+          {error && !loading && (
+            <View style={styles.emptyState}>
+              <Ionicons name="alert-circle" size={48} color="#EF4444" />
+              <Text style={styles.emptyTitle}>Search failed</Text>
+              <Text style={styles.emptyDescription}>{error}</Text>
+            </View>
+          )}
+
+          {/* Initial empty state */}
+          {!hasSearched && !loading && (
             <View style={styles.emptyState}>
               <Ionicons name="sparkles" size={48} color="#8B5CF6" />
               <Text style={styles.emptyTitle}>Search anything</Text>
               <Text style={styles.emptyDescription}>
-                People, posts, teams, live, Link — one bar. Try "weekly live drops" or "verified in LA".
+                People, posts, teams, live streams — one bar. Try "music" or "gaming".
               </Text>
             </View>
-          ) : null}
+          )}
 
-          {(activeTab === 'top' || activeTab === 'people') && (
+          {/* No results state */}
+          {hasSearched && !loading && !error && results && 
+           filteredPeople.length === 0 && 
+           (results.posts?.length ?? 0) === 0 && 
+           (results.teams?.length ?? 0) === 0 && 
+           filteredLive.length === 0 && (
+            <View style={styles.emptyState}>
+              <Ionicons name="search" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>No results found</Text>
+              <Text style={styles.emptyDescription}>
+                Try a different search term or adjust your filters.
+              </Text>
+            </View>
+          )}
+
+          {/* People results */}
+          {(activeTab === 'top' || activeTab === 'people') && filteredPeople.length > 0 && (
             <View style={styles.resultsGroup}>
               <View style={styles.resultsGroupHeader}>
                 <Text style={styles.resultsGroupTitle}>People</Text>
-                <Text style={styles.resultsGroupMeta}>Preview</Text>
+                <Text style={styles.resultsGroupMeta}>{filteredPeople.length} found</Text>
               </View>
-              {MOCK_PEOPLE.map((person) => (
+              {filteredPeople.map((person) => (
                 <ResultCard
                   key={person.id}
                   accessibilityLabel={`Result: ${person.name}`}
                   onPress={() => {}}
                 >
                   <View style={styles.resultRow}>
-                    <Avatar text={person.name} ring={person.badge === 'LIVE' ? 'live' : 'none'} />
+                    <Avatar text={person.name} ring="none" />
                     <View style={styles.resultTextCol}>
                       <View style={styles.resultTitleRow}>
                         <Text style={styles.resultTitle} numberOfLines={1}>
                           {person.name}
                         </Text>
-                        {person.badge === 'VERIFIED' ? (
+                        {(person.verified || person.isMllPro) && (
                           <Ionicons name="checkmark-seal" size={14} color="#8B5CF6" />
-                        ) : null}
-                        {person.badge === 'LIVE' ? (
-                          <View style={styles.livePill}>
-                            <View style={styles.liveDot} />
-                            <Text style={styles.livePillText}>LIVE</Text>
-                          </View>
-                        ) : null}
+                        )}
                       </View>
                       <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        {person.handle}
-                        {person.meta ? ` • ${person.meta}` : ''}
+                        {person.handle} • {formatCount(person.followerCount)} followers
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -439,38 +466,39 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {(activeTab === 'top' || activeTab === 'posts' || activeTab === 'media') && (
+          {/* Posts results */}
+          {(activeTab === 'top' || activeTab === 'posts') && (results?.posts?.length ?? 0) > 0 && (
             <View style={styles.resultsGroup}>
               <View style={styles.resultsGroupHeader}>
                 <Text style={styles.resultsGroupTitle}>Posts</Text>
-                <Text style={styles.resultsGroupMeta}>Preview</Text>
+                <Text style={styles.resultsGroupMeta}>{results?.posts?.length ?? 0} found</Text>
               </View>
-              {MOCK_POSTS.map((post) => (
-                <ResultCard key={post.id} accessibilityLabel={`Result: post by ${post.authorName}`} onPress={() => {}}>
+              {results?.posts?.map((post) => (
+                <ResultCard key={post.id} accessibilityLabel={`Result: post by ${post.author}`} onPress={() => {}}>
                   <View style={styles.postCard}>
                     <View style={styles.postHeader}>
-                      <Avatar text={post.authorName} />
+                      <Avatar text={post.author} />
                       <View style={styles.postHeaderText}>
                         <Text style={styles.postAuthor} numberOfLines={1}>
-                          {post.authorName}
+                          {post.author}
                         </Text>
                         <Text style={styles.postHandle} numberOfLines={1}>
                           {post.authorHandle}
                         </Text>
                       </View>
-                      {post.hasMedia ? (
+                      {post.mediaUrl ? (
                         <View style={styles.postMetaPill}>
                           <Ionicons name="images" size={14} color="#6B7280" />
                           <Text style={styles.postMetaPillText}>Media</Text>
                         </View>
                       ) : (
                         <View style={styles.postMetaPill}>
-                          <Text style={styles.postMetaPillText}>{post.meta}</Text>
+                          <Text style={styles.postMetaPillText}>{post.source === 'team' ? 'Team' : 'Post'}</Text>
                         </View>
                       )}
                     </View>
                     <Text style={styles.postSnippet} numberOfLines={2}>
-                      {post.snippet}
+                      {post.text}
                     </Text>
                   </View>
                 </ResultCard>
@@ -478,13 +506,14 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {(activeTab === 'top' || activeTab === 'teams') && (
+          {/* Teams results */}
+          {(activeTab === 'top' || activeTab === 'teams') && (results?.teams?.length ?? 0) > 0 && (
             <View style={styles.resultsGroup}>
               <View style={styles.resultsGroupHeader}>
                 <Text style={styles.resultsGroupTitle}>Teams</Text>
-                <Text style={styles.resultsGroupMeta}>Preview</Text>
+                <Text style={styles.resultsGroupMeta}>{results?.teams?.length ?? 0} found</Text>
               </View>
-              {MOCK_TEAMS.map((team) => (
+              {results?.teams?.map((team) => (
                 <ResultCard key={team.id} accessibilityLabel={`Result: team ${team.name}`} onPress={() => {}}>
                   <View style={styles.resultRow}>
                     <Avatar text={team.name} variant="square" />
@@ -493,7 +522,7 @@ export default function SearchScreen() {
                         {team.name}
                       </Text>
                       <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        {team.description} • {team.membersLabel}
+                        {team.description ?? 'Team'} • {formatCount(team.memberCount)} members
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -503,20 +532,21 @@ export default function SearchScreen() {
             </View>
           )}
 
-          {(activeTab === 'top' || activeTab === 'live') && (
+          {/* Live results */}
+          {(activeTab === 'top' || activeTab === 'live') && filteredLive.length > 0 && (
             <View style={styles.resultsGroup}>
               <View style={styles.resultsGroupHeader}>
                 <Text style={styles.resultsGroupTitle}>Live now</Text>
-                <Text style={styles.resultsGroupMeta}>Preview</Text>
+                <Text style={styles.resultsGroupMeta}>{filteredLive.length} streaming</Text>
               </View>
-              {MOCK_LIVE.map((live) => (
-                <ResultCard key={live.id} accessibilityLabel={`Result: live by ${live.name}`} onPress={() => {}}>
+              {filteredLive.map((live) => (
+                <ResultCard key={live.id} accessibilityLabel={`Result: live by ${live.displayName}`} onPress={() => {}}>
                   <View style={styles.resultRow}>
-                    <Avatar text={live.name} ring="live" />
+                    <Avatar text={live.displayName} ring="live" />
                     <View style={styles.resultTextCol}>
                       <View style={styles.resultTitleRow}>
                         <Text style={styles.resultTitle} numberOfLines={1}>
-                          {live.name}
+                          {live.displayName}
                         </Text>
                         <View style={styles.livePill}>
                           <View style={styles.liveDot} />
@@ -524,39 +554,12 @@ export default function SearchScreen() {
                         </View>
                       </View>
                       <Text style={styles.resultSubtitle} numberOfLines={1}>
-                        {live.handle} • {live.title}
+                        @{live.username}
                       </Text>
                     </View>
                     <Text style={styles.rightMeta} numberOfLines={1}>
-                      {live.meta}
+                      {formatCount(live.viewerCount)} watching
                     </Text>
-                  </View>
-                </ResultCard>
-              ))}
-            </View>
-          )}
-
-          {activeTab === 'top' && (
-            <View style={styles.resultsGroup}>
-              <View style={styles.resultsGroupHeader}>
-                <Text style={styles.resultsGroupTitle}>Pages</Text>
-                <Text style={styles.resultsGroupMeta}>Quick access</Text>
-              </View>
-              {MOCK_PAGES.map((page) => (
-                <ResultCard key={page.id} accessibilityLabel={`Page: ${page.title}`} onPress={() => {}}>
-                  <View style={styles.pageRow}>
-                    <View style={styles.pageIconWrap}>
-                      <Ionicons name={page.icon} size={18} color="#8B5CF6" />
-                    </View>
-                    <View style={styles.pageTextCol}>
-                      <Text style={styles.pageTitle} numberOfLines={1}>
-                        {page.title}
-                      </Text>
-                      <Text style={styles.pageSubtitle} numberOfLines={1}>
-                        {page.description}
-                      </Text>
-                    </View>
-                    <Ionicons name="arrow-forward" size={18} color="#9CA3AF" />
                   </View>
                 </ResultCard>
               ))}
