@@ -187,31 +187,45 @@ export async function GET(request: NextRequest) {
     const totalChargesCount = safeNumber(overview?.charges_count) || completedPurchases.length;
 
     // Circulation + outstanding balances
-    // ALWAYS use profiles.earnings_balance for diamondsOutstanding (current wallet balance)
-    // This is the authoritative source for payout exposure
+    // Use RPC fallback for coins, but calculate diamonds from topDiamondHolders for consistency
     let coinsInCirculation = safeNumber(overview?.coins_in_circulation);
-    let diamondsOutstanding = 0; // Always calculate from current balances
-    {
+    if (!coinsInCirculation) {
+      // Fallback: sum coin_balance from profiles
       let offset = 0;
       const pageSize = 1000;
       let coinSum = 0;
-      let diamondSum = 0;
       while (offset < 20000) {
         const page = await admin
           .from('profiles')
-          .select('coin_balance, earnings_balance')
+          .select('coin_balance')
+          .gt('coin_balance', 0)
           .range(offset, offset + pageSize - 1);
         if (page.error) break;
         const rows = (page.data ?? []) as any[];
         if (!rows.length) break;
         for (const r of rows) {
           coinSum += safeNumber(r.coin_balance);
-          diamondSum += safeNumber(r.earnings_balance);
         }
         offset += pageSize;
       }
-      if (!coinsInCirculation) coinsInCirculation = coinSum;
-      diamondsOutstanding = diamondSum; // Always use current balance sum
+      coinsInCirculation = coinSum;
+    }
+
+    // Diamonds outstanding: query ALL profiles with earnings_balance > 0
+    // This is the authoritative source for payout exposure
+    let diamondsOutstanding = 0;
+    {
+      const { data: allHolders, error } = await admin
+        .from('profiles')
+        .select('earnings_balance')
+        .gt('earnings_balance', 0);
+
+      if (!error && allHolders) {
+        diamondsOutstanding = allHolders.reduce(
+          (sum: number, h: any) => sum + safeNumber(h.earnings_balance),
+          0
+        );
+      }
     }
 
     // Coins spent + diamonds minted/cashed out are best sourced from a ledger.
