@@ -186,10 +186,12 @@ export async function GET(request: NextRequest) {
 
     const totalChargesCount = safeNumber(overview?.charges_count) || completedPurchases.length;
 
-    // Circulation + outstanding balances (fallback: sum cached balances in profiles)
+    // Circulation + outstanding balances
+    // ALWAYS use profiles.earnings_balance for diamondsOutstanding (current wallet balance)
+    // This is the authoritative source for payout exposure
     let coinsInCirculation = safeNumber(overview?.coins_in_circulation);
-    let diamondsOutstanding = safeNumber(overview?.diamonds_outstanding);
-    if (!coinsInCirculation || !diamondsOutstanding) {
+    let diamondsOutstanding = 0; // Always calculate from current balances
+    {
       let offset = 0;
       const pageSize = 1000;
       let coinSum = 0;
@@ -209,7 +211,7 @@ export async function GET(request: NextRequest) {
         offset += pageSize;
       }
       if (!coinsInCirculation) coinsInCirculation = coinSum;
-      if (!diamondsOutstanding) diamondsOutstanding = diamondSum;
+      diamondsOutstanding = diamondSum; // Always use current balance sum
     }
 
     // Coins spent + diamonds minted/cashed out are best sourced from a ledger.
