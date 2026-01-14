@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  reportType: 'user' | 'stream' | 'profile' | 'chat';
+  reportType: 'user' | 'stream' | 'profile' | 'chat' | 'post';
   reportedUserId?: string;
   reportedUsername?: string;
   contextDetails?: string; // e.g., stream ID, chat message ID
@@ -59,6 +59,18 @@ const REPORT_REASONS = {
     { value: 'spam', label: 'Spam' },
     { value: 'inappropriate_content', label: 'Inappropriate content' },
     { value: 'violence_threats', label: 'Violence / threats' },
+    { value: 'other', label: 'Other' },
+  ],
+  post: [
+    { value: 'sexual_services', label: 'Sexual services / solicitation (prostitution, escorting, sugaring)' },
+    { value: 'grooming_exploitation', label: 'Grooming / exploitation' },
+    { value: 'minor_safety', label: 'Minor safety (under 18)' },
+    { value: 'fraud_scams', label: 'Fraud / scams' },
+    { value: 'harassment_hate', label: 'Harassment / hate' },
+    { value: 'spam', label: 'Spam' },
+    { value: 'inappropriate_content', label: 'Inappropriate content' },
+    { value: 'violence_threats', label: 'Violence / threats' },
+    { value: 'copyright', label: 'Copyright Violation' },
     { value: 'other', label: 'Other' },
   ],
 };

@@ -451,14 +451,14 @@ export default function WatchPage() {
       {/* Report Modal */}
       {showReportModal && moreModalItem && (
         <ReportModal
-          visible={showReportModal}
+          isOpen={showReportModal}
           onClose={() => {
             setShowReportModal(false);
             setMoreModalItem(null);
           }}
           reportType="post"
-          reportedPostId={moreModalItem.postId}
           reportedUserId={moreModalItem.authorId}
+          contextDetails={`Post ID: ${moreModalItem.postId}`}
         />
       )}
     </>

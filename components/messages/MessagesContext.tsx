@@ -106,7 +106,7 @@ function decodeIMContent(
   | { type: 'text'; text: string }
   | { type: 'gift'; giftId?: number; giftName?: string; giftCoins?: number; giftIcon?: string }
   | { type: 'image'; url?: string; mime?: string; width?: number; height?: number }
-  | { type: 'share'; text?: string; url?: string; thumbnail?: string; contentType?: string } {
+  | { type: 'share'; text?: string; url?: string; thumbnail?: string; contentType?: string; teamId?: string; teamName?: string; teamSlug?: string } {
   if (typeof content !== 'string') return { type: 'text', text: '' };
   if (content.startsWith('__img__:')) {
     try {
