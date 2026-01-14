@@ -89,59 +89,59 @@
        HSL format: hue saturation% lightness%
        ------------------------------------------------------------------------- */
     
-    /* Base Surface Colors */
-    --background: 0 0% 98%;
-    --foreground: 240 10% 8%;
+    /* Base Surface Colors - Aligned with Mobile App Theme */
+    --background: 0 0% 100%;          /* #FFFFFF - mobile bg light */
+    --foreground: 222 47% 11%;        /* #0F172A - mobile slate900 */
     
     /* Card/Panel Surfaces */
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 8%;
+    --card: 0 0% 100%;                /* #FFFFFF - mobile surface light */
+    --card-foreground: 222 47% 11%;   /* #0F172A */
     
-    /* Popover/Dropdown Surfaces */
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 8%;
+    /* Popover/Dropdown Surfaces - mobile surface2 #F8FAFC */
+    --popover: 210 40% 98%;           /* #F8FAFC */
+    --popover-foreground: 222 47% 11%;
     
-    /* Primary Brand - Electric Violet */
-    --primary: 258 90% 58%;
+    /* Primary Brand - Pink #EC4899 (matches mobile) */
+    --primary: 330 81% 60%;           /* #EC4899 */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 258 90% 52%;
-    --primary-active: 258 90% 48%;
+    --primary-hover: 330 81% 55%;
+    --primary-active: 330 81% 50%;
     
-    /* Secondary - Soft Lavender */
-    --secondary: 258 20% 95%;
-    --secondary-foreground: 258 50% 30%;
-    --secondary-hover: 258 20% 90%;
+    /* Secondary - Purple #7C3AED (matches mobile) */
+    --secondary: 263 70% 58%;         /* #7C3AED */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 263 70% 53%;
     
-    /* Muted - Neutral Gray */
-    --muted: 240 5% 94%;
-    --muted-foreground: 240 5% 45%;
+    /* Muted - mobile slate100 #F1F5F9 */
+    --muted: 210 40% 96%;             /* #F1F5F9 */
+    --muted-foreground: 215 16% 47%;  /* #64748B - mobile slate500 */
     
-    /* Accent - Hot Pink */
-    --accent: 328 85% 60%;
+    /* Accent - Cyan #22D3EE (matches mobile) */
+    --accent: 189 94% 53%;            /* #22D3EE */
     --accent-foreground: 0 0% 100%;
-    --accent-hover: 328 85% 55%;
+    --accent-hover: 189 94% 48%;
     
-    /* Semantic Colors */
-    --destructive: 0 72% 51%;
+    /* Semantic Colors - match mobile */
+    --destructive: 0 72% 51%;         /* #DC2626 - mobile red600 */
     --destructive-foreground: 0 0% 100%;
     
-    --success: 152 76% 40%;
+    --success: 142 76% 36%;           /* #16A34A - mobile green600 */
     --success-foreground: 0 0% 100%;
     
-    --warning: 38 92% 50%;
+    --warning: 38 92% 50%;            /* #F59E0B - mobile amber500 */
     --warning-foreground: 38 92% 10%;
     
-    --info: 205 100% 50%;
+    --info: 217 91% 60%;              /* #2563EB - mobile blue600 */
     --info-foreground: 0 0% 100%;
     
-    /* Borders & Dividers */
-    --border: 240 5% 88%;
-    --border-hover: 240 5% 78%;
-    --input: 240 5% 88%;
-    --input-focus: 258 90% 58%;
+    /* Borders & Dividers - mobile #E5E7EB */
+    --border: 220 13% 91%;            /* #E5E7EB */
+    --border-hover: 220 13% 85%;
+    --input: 220 13% 91%;
+    --input-focus: 330 81% 60%;       /* Primary pink */
     
-    /* Focus Ring */
-    --ring: 258 90% 58%;
+    /* Focus Ring - primary pink */
+    --ring: 330 81% 60%;
     --ring-offset: 0 0% 100%;
     
     /* -------------------------------------------------------------------------
@@ -221,62 +221,74 @@
   }
 
   /* ===========================================================================
-     DARK MODE TOKENS
+     DARK MODE TOKENS - Aligned with Mobile App Theme
+     Mobile uses: bg #0B0B0F, surface #12121A, surface2 #151521
      =========================================================================== */
   .dark {
-    --background: 240 12% 6%;
-    --foreground: 0 0% 96%;
+    /* Base backgrounds - exact match to mobile theme.ts */
+    --background: 240 7% 4%;          /* #0B0B0F */
+    --foreground: 230 27% 97%;        /* #F5F6FA */
     
-    --card: 240 12% 9%;
-    --card-foreground: 0 0% 96%;
+    /* Card/surface - mobile surface #12121A */
+    --card: 240 18% 8%;               /* #12121A */
+    --card-foreground: 230 27% 97%;   /* #F5F6FA */
     
-    --popover: 240 12% 10%;
-    --popover-foreground: 0 0% 96%;
+    /* Popover - mobile surface2 #151521 */
+    --popover: 240 22% 10%;           /* #151521 */
+    --popover-foreground: 230 27% 97%;
     
-    --primary: 258 85% 65%;
+    /* Primary - mobile uses pink #EC4899 */
+    --primary: 330 81% 60%;           /* #EC4899 */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 258 85% 70%;
-    --primary-active: 258 85% 60%;
+    --primary-hover: 330 81% 65%;
+    --primary-active: 330 81% 55%;
     
-    --secondary: 240 12% 16%;
-    --secondary-foreground: 0 0% 90%;
-    --secondary-hover: 240 12% 20%;
+    /* Secondary - mobile purple #7C3AED */
+    --secondary: 263 70% 58%;         /* #7C3AED */
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 263 70% 63%;
     
-    --muted: 240 12% 14%;
-    --muted-foreground: 240 5% 55%;
+    /* Muted - slightly elevated surface */
+    --muted: 240 18% 10%;             /* Between surface and surface2 */
+    --muted-foreground: 230 10% 62%;  /* rgba(245,246,250,0.62) equivalent */
     
-    --accent: 328 85% 65%;
+    /* Accent - cyan for highlights #22D3EE */
+    --accent: 189 94% 53%;            /* #22D3EE */
     --accent-foreground: 0 0% 100%;
-    --accent-hover: 328 85% 70%;
+    --accent-hover: 189 94% 58%;
     
-    --destructive: 0 72% 55%;
+    /* Semantic colors - match mobile */
+    --destructive: 0 84% 60%;         /* #EF4444 */
     --destructive-foreground: 0 0% 100%;
     
-    --success: 152 70% 50%;
+    --success: 142 71% 45%;           /* #22C55E */
     --success-foreground: 0 0% 100%;
     
-    --warning: 38 92% 55%;
+    --warning: 38 92% 50%;            /* #F59E0B */
     --warning-foreground: 38 92% 10%;
     
-    --info: 205 100% 55%;
+    --info: 217 91% 60%;              /* #60A5FA */
     --info-foreground: 0 0% 100%;
     
-    --border: 240 12% 20%;
-    --border-hover: 240 12% 28%;
-    --input: 240 12% 20%;
-    --input-focus: 258 85% 65%;
+    /* Borders - mobile uses rgba(255,255,255,0.10) */
+    --border: 0 0% 100% / 0.10;       /* White 10% opacity */
+    --border-hover: 0 0% 100% / 0.16;
+    --input: 0 0% 100% / 0.10;
+    --input-focus: 330 81% 60%;
     
-    --ring: 258 85% 65%;
-    --ring-offset: 240 12% 6%;
+    /* Focus ring - primary pink */
+    --ring: 330 81% 60%;
+    --ring-offset: 240 7% 4%;
     
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.25);
-    --shadow: 0 2px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
-    --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 6px -3px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 10px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
-    --shadow-xl: 0 20px 40px -8px rgb(0 0 0 / 0.6), 0 10px 20px -8px rgb(0 0 0 / 0.5);
-    --shadow-primary: 0 4px 14px -3px hsl(258 85% 65% / 0.3);
-    --shadow-accent: 0 4px 14px -3px hsl(328 85% 65% / 0.3);
+    /* Shadows - deeper for dark mode */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.35);
+    --shadow: 0 2px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 6px -3px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 10px 25px -5px rgb(0 0 0 / 0.6), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+    --shadow-xl: 0 20px 40px -8px rgb(0 0 0 / 0.7), 0 10px 20px -8px rgb(0 0 0 / 0.6);
+    --shadow-primary: 0 4px 14px -3px hsl(330 81% 60% / 0.35);
+    --shadow-accent: 0 4px 14px -3px hsl(189 94% 53% / 0.35);
   }
 }
 

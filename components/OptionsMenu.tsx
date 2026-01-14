@@ -83,10 +83,8 @@ export default function OptionsMenu({ className = '' }: OptionsMenuProps) {
   ) => {
     const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
     const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-    const hardcodedIds = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
-    const hardcodedEmails = ['wcba.mo@gmail.com'];
-    const idMatch = userId && (envIds.includes(userId) || hardcodedIds.includes(userId));
-    const emailMatch = email && (envEmails.includes(email.toLowerCase()) || hardcodedEmails.includes(email.toLowerCase()));
+    const idMatch = userId && envIds.includes(userId);
+    const emailMatch = email && envEmails.includes(email.toLowerCase());
     return !!(idMatch || emailMatch);
   };
 

@@ -135,7 +135,7 @@ export default function WatchGiftModal({
         return;
       }
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL?.replace('/rest/v1', '')}/api/gifts/send`, {
+      const response = await fetch('https://www.mylivelinks.com/api/gifts/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

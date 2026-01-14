@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
 import { useTheme } from '../theme/useTheme';
 import { brand } from '../theme/colors';
+import { showComingSoon } from '../lib/showComingSoon';
 
 type RouteParams = {
   otherProfileId: string;
@@ -697,15 +698,8 @@ export default function IMThreadScreen() {
                       accessibilityRole="button"
                       accessibilityLabel="Repost this content"
                       onPress={() => {
-                        if (decoded.url) {
-                          // Navigate to composer with the shared content for reposting
-                          navigation.navigate('ComposerNew', { 
-                            repostUrl: decoded.url,
-                            repostText: decoded.text,
-                            repostThumbnail: decoded.thumbnail,
-                            repostContentType: decoded.contentType,
-                          });
-                        }
+                        // Creator Studio is coming soon - show alert instead of navigating
+                        showComingSoon('Repost to Creator Studio');
                       }}
                       style={({ pressed }) => [
                         { width: 36, height: 36, borderRadius: 18, backgroundColor: stylesVars.mutedBg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: stylesVars.border },

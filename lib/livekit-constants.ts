@@ -64,14 +64,21 @@ export const LIVE_LAUNCH_ENABLED = process.env.NEXT_PUBLIC_LIVE_LAUNCH_ENABLED =
  */
 export const SOLO_LIVE_ENABLED = process.env.NEXT_PUBLIC_SOLO_LIVE_ENABLED !== 'false';
 
-export const LIVE_OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'] as const;
-export const LIVE_OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'] as const;
+// Owner IDs from env vars only (no hardcoded IDs in client bundle)
+function getLiveOwnerIds(): string[] {
+  return (process.env.NEXT_PUBLIC_OWNER_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+function getLiveOwnerEmails(): string[] {
+  return (process.env.NEXT_PUBLIC_OWNER_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
 
 export function isLiveOwnerUser(user: { id?: string; email?: string | null } | null | undefined) {
   const id = user?.id ? String(user.id) : '';
   const email = user?.email ? String(user.email).toLowerCase() : '';
-  const isOwnerById = !!id && (LIVE_OWNER_IDS as readonly string[]).includes(id);
-  const isOwnerByEmail = !!email && (LIVE_OWNER_EMAILS as readonly string[]).includes(email);
+  const ownerIds = getLiveOwnerIds();
+  const ownerEmails = getLiveOwnerEmails();
+  const isOwnerById = !!id && ownerIds.includes(id);
+  const isOwnerByEmail = !!email && ownerEmails.includes(email);
   return isOwnerById || isOwnerByEmail;
 }
 

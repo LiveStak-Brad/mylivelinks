@@ -485,3 +485,240 @@
   }
 }
 
+/* =============================================================================
+   MOBILE WEB VISUAL PARITY - Match Native Mobile App Exactly
+   
+   These styles ensure web-on-mobile looks identical to the native app.
+   Tokens aligned with mobile/theme/colors.ts and mobile/ui/theme.ts
+   
+   Mobile Dark Mode:
+   - bg: #0B0B0F
+   - surface: #12121A  
+   - surface2: #151521
+   - text: #F5F6FA
+   - mutedText: rgba(245,246,250,0.78)
+   - subtleText: rgba(245,246,250,0.62)
+   - border: rgba(255,255,255,0.10)
+   - primary: #EC4899 (pink)
+   - secondary: #7C3AED (purple)
+   - accent: #22D3EE (cyan)
+   
+   Mobile Light Mode:
+   - bg: #FFFFFF
+   - surface: #FFFFFF
+   - surface2: #F8FAFC
+   - text: #0F172A
+   - mutedText: #334155
+   - border: #E5E7EB
+============================================================================= */
+
+/* Mobile web viewport (phones and small tablets) */
+@media (max-width: 767px) {
+  
+  /* =========================================================================
+     MODAL OVERLAYS - Match mobile app modal styling
+     ========================================================================= */
+  
+  /* Modal backdrop - mobile uses rgba(0,0,0,0.55) in dark mode */
+  .dark [data-radix-dialog-overlay],
+  .dark [class*="fixed inset-0"][class*="bg-black"] {
+    background: rgba(0, 0, 0, 0.55) !important;
+  }
+  
+  /* Light mode overlay */
+  [data-radix-dialog-overlay],
+  [class*="fixed inset-0"][class*="bg-black"]:not(.dark *) {
+    background: rgba(15, 23, 42, 0.35) !important;
+  }
+  
+  /* Modal content panels - match mobile surface colors */
+  .dark [data-radix-dialog-content],
+  .dark .modal-content,
+  .dark [class*="rounded-"][class*="bg-"] {
+    background: #12121A !important;
+    border-color: rgba(255, 255, 255, 0.10) !important;
+  }
+  
+  /* =========================================================================
+     CARD SURFACES - Match mobile surface hierarchy
+     ========================================================================= */
+  
+  /* Primary cards - surface color */
+  .dark .card,
+  .dark [class*="bg-card"],
+  .dark [class*="bg-gray-900"],
+  .dark [class*="bg-zinc-900"],
+  .dark [class*="bg-slate-900"] {
+    background: #12121A !important;
+  }
+  
+  /* Secondary/elevated cards - surface2 color */
+  .dark [class*="bg-gray-800"],
+  .dark [class*="bg-zinc-800"],
+  .dark [class*="bg-slate-800"] {
+    background: #151521 !important;
+  }
+  
+  /* Page background */
+  .dark body,
+  .dark [class*="bg-background"],
+  .dark [class*="bg-gray-950"],
+  .dark [class*="bg-zinc-950"],
+  .dark [class*="bg-slate-950"] {
+    background: #0B0B0F !important;
+  }
+  
+  /* =========================================================================
+     TEXT CONTRAST - Ensure readability matches mobile
+     ========================================================================= */
+  
+  /* Primary text - bright white */
+  .dark [class*="text-white"],
+  .dark [class*="text-gray-100"],
+  .dark [class*="text-slate-100"],
+  .dark [class*="text-zinc-100"] {
+    color: #F5F6FA !important;
+  }
+  
+  /* Muted text - 78% opacity */
+  .dark [class*="text-gray-400"],
+  .dark [class*="text-slate-400"],
+  .dark [class*="text-zinc-400"],
+  .dark [class*="text-muted-foreground"] {
+    color: rgba(245, 246, 250, 0.78) !important;
+  }
+  
+  /* Subtle text - 62% opacity */
+  .dark [class*="text-gray-500"],
+  .dark [class*="text-slate-500"],
+  .dark [class*="text-zinc-500"] {
+    color: rgba(245, 246, 250, 0.62) !important;
+  }
+  
+  /* =========================================================================
+     BORDERS - Match mobile 10% white opacity
+     ========================================================================= */
+  
+  .dark [class*="border-gray"],
+  .dark [class*="border-slate"],
+  .dark [class*="border-zinc"],
+  .dark [class*="border-border"] {
+    border-color: rgba(255, 255, 255, 0.10) !important;
+  }
+  
+  /* Dividers */
+  .dark hr,
+  .dark [class*="divide-"] > * + * {
+    border-color: rgba(255, 255, 255, 0.10) !important;
+  }
+  
+  /* =========================================================================
+     INPUT FIELDS - Match mobile input styling
+     ========================================================================= */
+  
+  .dark input,
+  .dark textarea,
+  .dark select {
+    background: #151521 !important;
+    border-color: rgba(255, 255, 255, 0.10) !important;
+    color: #F5F6FA !important;
+  }
+  
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: rgba(245, 246, 250, 0.55) !important;
+  }
+  
+  .dark input:focus,
+  .dark textarea:focus,
+  .dark select:focus {
+    border-color: #EC4899 !important;
+    box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.2) !important;
+  }
+  
+  /* =========================================================================
+     BUTTONS - Match mobile primary/secondary styling
+     ========================================================================= */
+  
+  /* Primary button - pink */
+  .dark [class*="bg-primary"],
+  .dark button[class*="bg-pink"],
+  .dark button[class*="bg-purple"] {
+    background: #EC4899 !important;
+  }
+  
+  .dark [class*="bg-primary"]:hover,
+  .dark button[class*="bg-pink"]:hover {
+    background: #DB2777 !important;
+  }
+  
+  /* Secondary button - purple */
+  .dark [class*="bg-secondary"] {
+    background: #7C3AED !important;
+  }
+  
+  /* =========================================================================
+     TAB BAR - Match mobile tab bar exactly
+     ========================================================================= */
+  
+  .dark .bottom-nav,
+  .dark [class*="tab-bar"],
+  .dark nav[class*="fixed bottom"] {
+    background: #0B0B0F !important;
+    border-top-color: rgba(255, 255, 255, 0.10) !important;
+  }
+  
+  /* Inactive tab icons */
+  .dark .bottom-nav-item:not(.bottom-nav-item-active) svg,
+  .dark [class*="tab-inactive"] {
+    color: rgba(245, 246, 250, 0.55) !important;
+  }
+  
+  /* Active tab - primary pink */
+  .dark .bottom-nav-item-active,
+  .dark .bottom-nav-item-active svg,
+  .dark [class*="tab-active"] {
+    color: #EC4899 !important;
+  }
+  
+  /* =========================================================================
+     LIGHT MODE PARITY
+     ========================================================================= */
+  
+  /* Light mode backgrounds */
+  body:not(.dark),
+  :root:not(.dark) [class*="bg-background"] {
+    background: #FFFFFF !important;
+  }
+  
+  /* Light mode cards */
+  :root:not(.dark) .card,
+  :root:not(.dark) [class*="bg-card"] {
+    background: #FFFFFF !important;
+  }
+  
+  /* Light mode surface2 */
+  :root:not(.dark) [class*="bg-gray-50"],
+  :root:not(.dark) [class*="bg-slate-50"] {
+    background: #F8FAFC !important;
+  }
+  
+  /* Light mode text */
+  :root:not(.dark) [class*="text-gray-900"],
+  :root:not(.dark) [class*="text-slate-900"] {
+    color: #0F172A !important;
+  }
+  
+  /* Light mode muted text */
+  :root:not(.dark) [class*="text-gray-500"],
+  :root:not(.dark) [class*="text-slate-500"] {
+    color: #64748B !important;
+  }
+  
+  /* Light mode borders */
+  :root:not(.dark) [class*="border-gray"],
+  :root:not(.dark) [class*="border-slate"] {
+    border-color: #E5E7EB !important;
+  }
+}
+

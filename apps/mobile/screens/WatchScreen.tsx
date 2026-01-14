@@ -23,6 +23,7 @@ import WatchCaptionOverlay from '../components/watch/WatchCaptionOverlay';
 import WatchContentItem from '../components/watch/WatchContentItem';
 import WatchCommentsModal from '../components/watch/WatchCommentsModal';
 import WatchGiftModal from '../components/watch/WatchGiftModal';
+import WatchUploadModal from '../components/watch/WatchUploadModal';
 import ShareModal from '../components/ShareModal';
 import { useWatchFeed, WatchItem } from '../hooks/useWatchFeed';
 import { supabase } from '../lib/supabase';
@@ -55,6 +56,7 @@ export default function WatchScreen() {
   const [commentsModalVisible, setCommentsModalVisible] = useState(false);
   const [giftModalVisible, setGiftModalVisible] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const [modalTargetItem, setModalTargetItem] = useState<WatchItem | null>(null);
 
   // Real feed data from RPC
@@ -326,9 +328,9 @@ export default function WatchScreen() {
   }, [navigation]);
 
   const handleCreate = useCallback(() => {
-    // Navigate to composer/upload screen
-    (navigation as any).navigate('ComposerScreen');
-  }, [navigation]);
+    // Open upload modal directly (matches web behavior)
+    setUploadModalVisible(true);
+  }, []);
 
   const handleLiveItemPress = useCallback((item: WatchItem) => {
     if (item.type === 'live') {
@@ -556,6 +558,16 @@ export default function WatchScreen() {
           null
         }
         shareContentType={modalTargetItem?.type === 'live' ? 'live' : modalTargetItem?.type === 'photo' ? 'photo' : 'video'}
+      />
+
+      {/* Upload Modal - Direct upload matching web behavior */}
+      <WatchUploadModal
+        visible={uploadModalVisible}
+        onClose={() => setUploadModalVisible(false)}
+        onSuccess={() => {
+          setUploadModalVisible(false);
+          refresh(); // Refresh feed to show new post
+        }}
       />
     </View>
   );

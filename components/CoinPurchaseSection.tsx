@@ -20,9 +20,13 @@ interface UserInfo {
   isOwner: boolean;
 }
 
-// Owner/Admin IDs for override
-const OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
-const OWNER_EMAILS = ['wcba.mo@gmail.com'];
+// Owner/Admin IDs from env vars only (no hardcoded IDs in client bundle)
+function getOwnerIds(): string[] {
+  return (process.env.NEXT_PUBLIC_OWNER_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+function getOwnerEmails(): string[] {
+  return (process.env.NEXT_PUBLIC_OWNER_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
 
 export default function CoinPurchaseSection() {
   const [loading, setLoading] = useState(false);
@@ -42,7 +46,7 @@ export default function CoinPurchaseSection() {
         // Get current user info
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-          const isOwner = OWNER_IDS.includes(user.id) || OWNER_EMAILS.includes(user.email?.toLowerCase() || '');
+          const isOwner = getOwnerIds().includes(user.id) || getOwnerEmails().includes(user.email?.toLowerCase() || '');
           
           // Get user's VIP tier
           const { data: profile } = await supabase

@@ -36,6 +36,17 @@ export default function ComposerPage() {
     >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         
+        {/* Coming Soon Banner */}
+        <div className="mb-6 p-6 rounded-2xl bg-pink-500/10 border border-pink-500/25 text-center animate-fade-in">
+          <span className="inline-block px-4 py-1.5 mb-3 text-xs font-bold tracking-wider text-pink-500 bg-pink-500/20 border border-pink-500/30 rounded-full">
+            COMING SOON
+          </span>
+          <h2 className="text-xl font-bold text-foreground mb-2">Creator Studio</h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Advanced editor — not required for posting. Use the Feed to share content now.
+          </p>
+        </div>
+
         {/* Page Header */}
         <header className="mb-6 animate-fade-in">
           <div className="flex items-center justify-between gap-4 mb-2">
@@ -45,10 +56,10 @@ export default function ComposerPage() {
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-                  Composer
+                  Creator Studio
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Create and manage your video projects
+                  Advanced editor — not required for posting
                 </p>
               </div>
             </div>

@@ -520,6 +520,7 @@ export default function LiveHostScreen() {
           messages={chatMessages}
           isMuted={isMuted}
           isCameraFlipped={isCameraFlipped}
+          liveStreamId={liveStreamId ?? undefined}
           onEndStream={handleEndStream}
           onFlipCamera={() => setIsCameraFlipped((prev) => !prev)}
           onToggleMute={() => setIsMuted((prev) => !prev)}

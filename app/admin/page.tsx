@@ -64,14 +64,12 @@ export default function AdminDashboardPage() {
         return;
       }
 
-      // Check if user is admin
+      // Check if user is admin via env vars only (no hardcoded IDs in client bundle)
       const envIds = (process.env.NEXT_PUBLIC_ADMIN_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
       const envEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-      const hardcodedIds = ['2b4a1178-3c39-4179-94ea-314dd824a818'];
-      const hardcodedEmails = ['wcba.mo@gmail.com'];
       
-      const idMatch = envIds.includes(user.id) || hardcodedIds.includes(user.id);
-      const emailMatch = user.email && (envEmails.includes(user.email.toLowerCase()) || hardcodedEmails.includes(user.email.toLowerCase()));
+      const idMatch = envIds.includes(user.id);
+      const emailMatch = user.email && envEmails.includes(user.email.toLowerCase());
       
       if (!idMatch && !emailMatch) {
         // Not an admin, redirect
@@ -81,15 +79,23 @@ export default function AdminDashboardPage() {
 
       setIsAdmin(true);
       
-      // Load admin stats
-      // TODO: Wire up actual stats from backend
-      // For now, showing placeholder data
-      setStats({
-        pendingReports: 0,
-        pendingApplications: 0,
-        activeUsers: 0,
-        activeStreams: 0,
-      });
+      // Load admin stats from owner summary API
+      try {
+        const res = await fetch('/api/owner/summary');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && data.stats) {
+            setStats({
+              pendingReports: data.stats.reports_pending ?? 0,
+              pendingApplications: data.stats.applications_pending ?? 0,
+              activeUsers: data.stats.users_active_24h ?? 0,
+              activeStreams: data.stats.streams_live ?? 0,
+            });
+          }
+        }
+      } catch (statsErr) {
+        console.error('Failed to load admin stats:', statsErr);
+      }
       
     } catch (error) {
       console.error('Error checking admin access:', error);

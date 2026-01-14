@@ -587,8 +587,8 @@ function MessageBubble({
     };
 
     const handleRepost = () => {
-      // Navigate to composer with repost data
-      window.location.href = `/composer?repost=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+      // Creator Studio is coming soon - show alert instead of navigating
+      alert('Repost to Creator Studio is coming soon!');
     };
 
     return (

@@ -226,7 +226,6 @@ export function GuestsSheet({ visible, onClose }: BaseSheetProps) {
         <Text style={styles.emptyTitle}>No guest requests</Text>
         <Text style={styles.emptySubtitle}>Viewers can request to join your stream</Text>
       </View>
-      <Text style={styles.placeholder}>Guest management is UI-only</Text>
     </SheetContainer>
   );
 }
@@ -243,7 +242,7 @@ export function BattleSheet({ visible, onClose }: BaseSheetProps) {
       <Pressable style={styles.actionButton}>
         <Text style={styles.actionButtonText}>Find Opponent</Text>
       </Pressable>
-      <Text style={styles.placeholder}>Battle mode is UI-only</Text>
+      <Text style={styles.placeholder}>Coming soon</Text>
     </SheetContainer>
   );
 }
@@ -260,7 +259,7 @@ export function CoHostSheet({ visible, onClose }: BaseSheetProps) {
       <Pressable style={[styles.actionButton, { backgroundColor: '#A855F7' }]}>
         <Text style={styles.actionButtonText}>Browse Hosts</Text>
       </Pressable>
-      <Text style={styles.placeholder}>Co-host invites are UI-only</Text>
+      <Text style={styles.placeholder}>Coming soon</Text>
     </SheetContainer>
   );
 }
@@ -475,35 +474,242 @@ export function ShareSheet({ visible, onClose }: BaseSheetProps) {
           <Text style={styles.shareLabel}>Copy Link</Text>
         </Pressable>
       </View>
-      <Text style={styles.placeholder}>Share is UI-only</Text>
     </SheetContainer>
   );
 }
 
 // Viewers Sheet
-export function ViewersSheet({ visible, onClose, viewerCount }: BaseSheetProps & { viewerCount: number }) {
+interface ViewerEntry {
+  profile_id: string;
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+  joined_at: string;
+}
+
+export function ViewersSheet({ 
+  visible, 
+  onClose, 
+  viewerCount,
+  liveStreamId,
+}: BaseSheetProps & { viewerCount: number; liveStreamId?: number }) {
+  const [viewers, setViewers] = useState<ViewerEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!visible || !liveStreamId) return;
+
+    const loadViewers = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('active_viewers')
+          .select(`
+            profile_id,
+            joined_at,
+            profiles!inner (
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .eq('live_stream_id', liveStreamId)
+          .order('joined_at', { ascending: false });
+
+        if (error) {
+          console.error('[ViewersSheet] Error fetching viewers:', error);
+          return;
+        }
+
+        const mapped = (data || []).map((row: any) => ({
+          profile_id: row.profile_id,
+          username: row.profiles?.username || 'Unknown',
+          display_name: row.profiles?.display_name,
+          avatar_url: row.profiles?.avatar_url,
+          joined_at: row.joined_at,
+        }));
+        setViewers(mapped);
+      } catch (err) {
+        console.error('[ViewersSheet] Error loading viewers:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadViewers();
+  }, [visible, liveStreamId]);
+
   return (
     <SheetContainer visible={visible} onClose={onClose} title={`${viewerCount} Watching`}>
-      <View style={styles.emptyState}>
-        <Ionicons name="eye-outline" size={48} color="rgba(255,255,255,0.3)" />
-        <Text style={styles.emptyTitle}>Viewer list</Text>
-        <Text style={styles.emptySubtitle}>See who's watching your stream</Text>
-      </View>
-      <Text style={styles.placeholder}>Viewer list is UI-only</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6366F1" />
+        </View>
+      ) : viewers.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="eye-outline" size={48} color="rgba(255,255,255,0.3)" />
+          <Text style={styles.emptyTitle}>No viewers yet</Text>
+          <Text style={styles.emptySubtitle}>Viewers will appear here when they join</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.trendingScrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.trendingList}>
+            {viewers.map((viewer) => (
+              <View key={viewer.profile_id} style={styles.trendingRow}>
+                {viewer.avatar_url ? (
+                  <Image
+                    source={{ uri: viewer.avatar_url }}
+                    style={styles.trendingAvatarImage}
+                  />
+                ) : (
+                  <View style={styles.trendingAvatar}>
+                    <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
+                  </View>
+                )}
+                <View style={styles.trendingInfo}>
+                  <Text style={styles.trendingUsername} numberOfLines={1}>
+                    {viewer.display_name || viewer.username}
+                  </Text>
+                  <Text style={styles.trendingStat}>@{viewer.username}</Text>
+                </View>
+                <Ionicons name="eye" size={16} color="rgba(255,255,255,0.5)" />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
     </SheetContainer>
   );
 }
 
 // Gifters Sheet
-export function GiftersSheet({ visible, onClose }: BaseSheetProps) {
+interface GifterEntry {
+  profile_id: string;
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+  total_coins: number;
+}
+
+export function GiftersSheet({ 
+  visible, 
+  onClose,
+  liveStreamId,
+}: BaseSheetProps & { liveStreamId?: number }) {
+  const [gifters, setGifters] = useState<GifterEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!visible || !liveStreamId) return;
+
+    const loadGifters = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.rpc('get_stream_top_gifters', {
+          p_live_stream_id: liveStreamId,
+          p_limit: 50,
+        });
+
+        if (error) {
+          console.error('[GiftersSheet] Error fetching gifters:', error);
+          return;
+        }
+
+        const mapped = (data || []).map((row: any) => ({
+          profile_id: row.profile_id,
+          username: row.username || 'Unknown',
+          display_name: row.display_name,
+          avatar_url: row.avatar_url,
+          total_coins: row.total_coins ?? 0,
+        }));
+        setGifters(mapped);
+      } catch (err) {
+        console.error('[GiftersSheet] Error loading gifters:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadGifters();
+  }, [visible, liveStreamId]);
+
   return (
     <SheetContainer visible={visible} onClose={onClose} title="Top Gifters">
-      <View style={styles.emptyState}>
-        <Ionicons name="gift" size={48} color="#FFD700" />
-        <Text style={styles.emptyTitle}>Stream Gifters</Text>
-        <Text style={styles.emptySubtitle}>See who's sent the most gifts</Text>
-      </View>
-      <Text style={styles.placeholder}>Gifter list is UI-only</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FFD700" />
+        </View>
+      ) : gifters.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="gift" size={48} color="#FFD700" />
+          <Text style={styles.emptyTitle}>No gifts yet</Text>
+          <Text style={styles.emptySubtitle}>Gifters will appear here when they send gifts</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.trendingScrollView} showsVerticalScrollIndicator={false}>
+          <View style={styles.trendingList}>
+            {gifters.map((gifter, index) => {
+              const rank = index + 1;
+              return (
+                <View 
+                  key={gifter.profile_id} 
+                  style={[
+                    styles.trendingRow,
+                    rank <= 3 && styles.trendingRowTop3,
+                  ]}
+                >
+                  <Text style={[
+                    styles.trendingRank,
+                    rank === 1 && styles.trendingRank1,
+                    rank === 2 && styles.trendingRank2,
+                    rank === 3 && styles.trendingRank3,
+                  ]}>
+                    {rank}
+                  </Text>
+                  {gifter.avatar_url ? (
+                    <Image
+                      source={{ uri: gifter.avatar_url }}
+                      style={[
+                        styles.trendingAvatarImage,
+                        rank === 1 && styles.trendingAvatar1,
+                        rank === 2 && styles.trendingAvatar2,
+                        rank === 3 && styles.trendingAvatar3,
+                      ]}
+                    />
+                  ) : (
+                    <View style={[
+                      styles.trendingAvatar,
+                      rank === 1 && styles.trendingAvatar1,
+                      rank === 2 && styles.trendingAvatar2,
+                      rank === 3 && styles.trendingAvatar3,
+                    ]}>
+                      <Ionicons name="person" size={16} color="rgba(255,255,255,0.8)" />
+                    </View>
+                  )}
+                  <View style={styles.trendingInfo}>
+                    <Text style={styles.trendingUsername} numberOfLines={1}>
+                      {gifter.display_name || gifter.username}
+                    </Text>
+                    <View style={styles.trendingStats}>
+                      <Ionicons name="gift" size={10} color="#FFD700" />
+                      <Text style={styles.trendingStat}>
+                        {gifter.total_coins.toLocaleString()} coins
+                      </Text>
+                    </View>
+                  </View>
+                  {rank <= 3 && (
+                    <Ionicons 
+                      name="trophy" 
+                      size={16} 
+                      color={rank === 1 ? '#EAB308' : rank === 2 ? '#9CA3AF' : '#F97316'} 
+                    />
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      )}
     </SheetContainer>
   );
 }

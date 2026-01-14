@@ -46,72 +46,6 @@ interface NotiesContextType {
 
 const NotiesContext = createContext<NotiesContextType | undefined>(undefined);
 
-// Mock notifications for development
-const MOCK_NOTIES: Notie[] = [
-  {
-    id: '1',
-    type: 'gift',
-    title: 'New Gift!',
-    message: 'JohnDoe sent you a Rose 🌹',
-    avatarUrl: undefined,
-    avatarFallback: 'JD',
-    isRead: false,
-    createdAt: new Date(Date.now() - 5 * 60 * 1000), // 5 mins ago
-    actionUrl: '/JohnDoe',
-    metadata: { giftName: 'Rose', giftAmount: 50 },
-  },
-  {
-    id: '2',
-    type: 'follow',
-    title: 'New Follower',
-    message: 'Sarah started following you',
-    avatarFallback: 'S',
-    isRead: false,
-    createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 mins ago
-    actionUrl: '/Sarah',
-  },
-  {
-    id: '3',
-    type: 'level_up',
-    title: 'Level Up! 🔥',
-    message: 'You reached VIP Level 12',
-    avatarFallback: '🎯',
-    isRead: false,
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-    actionUrl: '/gifter-levels',
-  },
-  {
-    id: '4',
-    type: 'mention',
-    title: 'Mentioned',
-    message: 'Mike mentioned you in a comment',
-    avatarFallback: 'M',
-    isRead: true,
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // 1 day ago
-    actionUrl: '/Mike',
-  },
-  {
-    id: '5',
-    type: 'purchase',
-    title: 'Purchase Complete',
-    message: 'Your coin purchase was successful 💰',
-    avatarFallback: '✓',
-    isRead: true,
-    createdAt: new Date(Date.now() - 48 * 60 * 60 * 1000), // 2 days ago
-    actionUrl: '/wallet',
-  },
-  {
-    id: '6',
-    type: 'system',
-    title: 'Welcome to MyLiveLinks!',
-    message: 'Complete your profile to get started',
-    avatarFallback: '👋',
-    isRead: true,
-    createdAt: new Date(Date.now() - 72 * 60 * 60 * 1000), // 3 days ago
-    actionUrl: '/settings/profile',
-  },
-];
-
 export function NotiesProvider({ children }: { children: ReactNode }) {
   const [noties, setNoties] = useState<Notie[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -572,11 +506,8 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
       
     } catch (error) {
       console.error('[Noties] Error loading notifications:', error);
-      if (process.env.NODE_ENV !== 'production') {
-        setNoties(MOCK_NOTIES);
-      } else {
-        setNoties([]);
-      }
+      // Always show empty state on error - never use mock data
+      setNoties([]);
     } finally {
       setIsLoading(false);
     }

@@ -50,6 +50,17 @@ export default function ComposerScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Coming Soon Banner */}
+        <View style={styles.comingSoonBanner}>
+          <View style={styles.comingSoonPill}>
+            <Text style={styles.comingSoonPillText}>COMING SOON</Text>
+          </View>
+          <Text style={styles.comingSoonTitle}>Creator Studio</Text>
+          <Text style={styles.comingSoonSubtitle}>
+            Advanced editor — not required for posting. Use the Feed to share content now.
+          </Text>
+        </View>
+
         {/* Page Header (web: /composer header + New Project CTA) */}
         <View style={styles.headerCard}>
           <View style={styles.headerRow}>
@@ -58,8 +69,8 @@ export default function ComposerScreen() {
                 <Ionicons name="film-outline" size={18} color="#FFFFFF" />
               </View>
               <View style={styles.headerTitleCol}>
-                <Text style={styles.headerTitle}>Composer</Text>
-                <Text style={styles.headerSubtitle}>Create and manage your video projects</Text>
+                <Text style={styles.headerTitle}>Creator Studio</Text>
+                <Text style={styles.headerSubtitle}>Advanced editor — not required for posting</Text>
               </View>
             </View>
 
@@ -444,4 +455,40 @@ const styles = StyleSheet.create({
 
   pressed: { transform: [{ scale: 0.99 }], opacity: 0.95 },
   pressedSoft: { opacity: 0.88 },
+
+  comingSoonBanner: {
+    backgroundColor: 'rgba(236,72,153,0.12)',
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(236,72,153,0.25)',
+    alignItems: 'center',
+    gap: 8,
+  },
+  comingSoonPill: {
+    backgroundColor: 'rgba(236,72,153,0.25)',
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(236,72,153,0.4)',
+  },
+  comingSoonPillText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#ec4899',
+    letterSpacing: 1,
+  },
+  comingSoonTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginTop: 4,
+  },
+  comingSoonSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
 });

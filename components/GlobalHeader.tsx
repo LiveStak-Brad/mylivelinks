@@ -22,9 +22,13 @@ import { IconButton } from '@/components/ui/IconButton';
 
 const HEADER_ICON_CLASS = 'global-header-icon';
 
-// Owner credentials
-const OWNER_IDS = ['2b4a1178-3c39-4179-94ea-314dd824a818', '0b47a2d7-43fb-4d38-b321-2d5d0619aabf'];
-const OWNER_EMAILS = ['wcba.mo@gmail.com', 'brad@mylivelinks.com'];
+// Owner credentials from env vars only (no hardcoded IDs in client bundle)
+function getOwnerIds(): string[] {
+  return (process.env.NEXT_PUBLIC_OWNER_PROFILE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+}
+function getOwnerEmails(): string[] {
+  return (process.env.NEXT_PUBLIC_OWNER_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
 
 function NotificationBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -240,7 +244,7 @@ export default function GlobalHeader() {
       if (user) {
         setIsLoggedIn(true);
         const ownerStatus =
-          OWNER_IDS.includes(user.id) || OWNER_EMAILS.includes(user.email?.toLowerCase() || '');
+          getOwnerIds().includes(user.id) || getOwnerEmails().includes(user.email?.toLowerCase() || '');
         setIsOwner(ownerStatus);
       } else {
         setIsLoggedIn(false);

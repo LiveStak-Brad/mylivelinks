@@ -765,7 +765,7 @@ button:active:not(:disabled),
 }
 
 .bottom-nav-item-active {
-  color: hsl(258 90% 58%); /* Purple for active */
+  color: hsl(var(--primary)); /* Primary pink - matches mobile app */
 }
 
 .bottom-nav-label {
@@ -817,9 +817,9 @@ button:active:not(:disabled),
   transition: color 0.2s ease, transform 0.2s ease;
 }
 
-/* Active state - purple highlight */
+/* Active state - primary pink highlight (matches mobile app) */
 .bottom-nav-item-active svg {
-  color: hsl(258 90% 58%) !important; /* Purple for active */
+  color: hsl(var(--primary)) !important; /* Primary pink - matches mobile */
   transform: scale(1.05);
 }
 

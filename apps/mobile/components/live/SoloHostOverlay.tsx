@@ -69,6 +69,9 @@ export interface SoloHostOverlayProps {
 
   // Optional: let host screen mirror/persist options and apply mirror to VideoView immediately
   onHostLiveOptionsChange?: (next: HostLiveOptions) => void;
+
+  // Live stream ID for viewer/gifter sheets
+  liveStreamId?: number;
   
   // Handlers (placeholder)
   onEndStream: () => void;
@@ -98,6 +101,7 @@ export default function SoloHostOverlay({
   cameraDisabled,
   onSetCameraDisabled,
   onHostLiveOptionsChange,
+  liveStreamId,
   onEndStream,
   onShare,
   onFlipCamera,
@@ -346,8 +350,8 @@ export default function SoloHostOverlay({
         }}
       />
       <ShareSheet visible={showShare} onClose={() => setShowShare(false)} />
-      <ViewersSheet visible={showViewers} onClose={() => setShowViewers(false)} viewerCount={viewerCount} />
-      <GiftersSheet visible={showGifters} onClose={() => setShowGifters(false)} />
+      <ViewersSheet visible={showViewers} onClose={() => setShowViewers(false)} viewerCount={viewerCount} liveStreamId={liveStreamId} />
+      <GiftersSheet visible={showGifters} onClose={() => setShowGifters(false)} liveStreamId={liveStreamId} />
       <TrendingSheet visible={showTrending} onClose={() => setShowTrending(false)} />
       <LeaderboardSheet visible={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
     </View>
