@@ -1,6 +1,14 @@
 /**
  * Content View Tracking Hook (Web)
  * 
+ * ⚠️ CRITICAL: DO NOT MODIFY WITHOUT TESTING IN PRODUCTION
+ * This hook tracks ALL content views across the platform.
+ * Breaking this = lost analytics data that cannot be recovered.
+ * 
+ * Dependencies:
+ * - DB function: rpc_track_content_view (5-param or 7-param version)
+ * - Migrations: 20260110_content_views_phase1.sql, 20260114_shared_view_tracking.sql
+ * 
  * Automatically tracks content views using IntersectionObserver
  * - Triggers when content is 50% visible for 2+ seconds
  * - Deduplicates per component mount (DB handles calendar day dedupe)
@@ -63,8 +71,9 @@ export function useContentViewTracking({
           fingerprint = await getCachedViewFingerprint();
         }
 
-        // Call RPC to track view
-        const { error } = await supabase.rpc('rpc_track_content_view', {
+        // Call RPC to track view - try 7-param version first, fall back to 5-param
+        let error: any = null;
+        const { error: err7 } = await supabase.rpc('rpc_track_content_view', {
           p_content_type: contentType,
           p_content_id: contentId,
           p_view_source: viewSource,
@@ -73,6 +82,20 @@ export function useContentViewTracking({
           p_referral_source: referralSource,
           p_sharer_id: sharerId
         });
+        
+        // If 7-param version not found (PGRST202), try 5-param version
+        if (err7?.code === 'PGRST202') {
+          const { error: err5 } = await supabase.rpc('rpc_track_content_view', {
+            p_content_type: contentType,
+            p_content_id: contentId,
+            p_view_source: viewSource,
+            p_view_type: viewType,
+            p_viewer_fingerprint: fingerprint
+          });
+          error = err5;
+        } else {
+          error = err7;
+        }
 
         if (error) {
           console.error('[ViewTracking] Failed to track view:', error);
