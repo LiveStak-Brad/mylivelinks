@@ -9,7 +9,8 @@ interface WatchActionStackProps {
   commentCount: number;
   favoriteCount: number;
   shareCount: number;
-  // Handlers are placeholders - no logic wired yet
+  isLiked?: boolean;
+  isFavorited?: boolean;
   onAvatarPress?: () => void;
   onFollowPress?: () => void;
   onLikePress?: () => void;
@@ -42,6 +43,8 @@ export default function WatchActionStack({
   commentCount,
   favoriteCount,
   shareCount,
+  isLiked = false,
+  isFavorited = false,
   onAvatarPress,
   onFollowPress,
   onLikePress,
@@ -81,7 +84,7 @@ export default function WatchActionStack({
 
       {/* Like */}
       <ActionButton
-        icon={<Ionicons name="heart" size={28} color="#FFFFFF" />}
+        icon={<Ionicons name={isLiked ? "heart" : "heart-outline"} size={28} color={isLiked ? "#EF4444" : "#FFFFFF"} />}
         count={likeCount}
         label="Like"
         onPress={onLikePress}
@@ -97,7 +100,7 @@ export default function WatchActionStack({
 
       {/* Favorite / Bookmark */}
       <ActionButton
-        icon={<Ionicons name="bookmark" size={26} color="#FFFFFF" />}
+        icon={<Ionicons name={isFavorited ? "bookmark" : "bookmark-outline"} size={26} color={isFavorited ? "#FBBF24" : "#FFFFFF"} />}
         count={favoriteCount}
         label="Favorite"
         onPress={onFavoritePress}
@@ -118,20 +121,19 @@ export default function WatchActionStack({
         onPress={onRepostPress}
       />
 
-      {/* Create (+) - Bottom-most, gradient pill style (web parity) */}
+      {/* Create (+) - Simple rounded square with gradient (MyLiveLinks style) */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Create"
         onPress={onCreatePress}
         style={({ pressed }) => [styles.createButton, pressed && styles.createButtonPressed]}
       >
-        {/* Gradient effect via layered backgrounds */}
         <View style={styles.createButtonGradient}>
-          <View style={styles.createButtonGradientLeft} />
-          <View style={styles.createButtonGradientRight} />
-          <View style={styles.createButtonCenter}>
-            <Ionicons name="add" size={24} color="#FFFFFF" />
+          <View style={styles.createButtonGradientBg}>
+            <View style={styles.createButtonGradientLeft} />
+            <View style={styles.createButtonGradientRight} />
           </View>
+          <Ionicons name="add" size={28} color="#FFFFFF" style={styles.createButtonIcon} />
         </View>
       </Pressable>
     </View>
@@ -220,45 +222,36 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
 
-  // Create button - gradient pill style (web parity)
+  // Create button - simple rounded square with gradient background (MyLiveLinks style)
   createButton: {
     marginTop: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   createButtonPressed: {
     opacity: 0.85,
   },
   createButtonGradient: {
-    width: 48,
-    height: 32,
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createButtonGradientBg: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
   },
   createButtonGradientLeft: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: '50%',
+    flex: 1,
     backgroundColor: '#06B6D4', // Cyan
   },
   createButtonGradientRight: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: '50%',
+    flex: 1,
     backgroundColor: '#EC4899', // Pink
   },
-  createButtonCenter: {
-    position: 'absolute',
-    left: 4,
-    right: 4,
-    top: 2,
-    bottom: 2,
-    backgroundColor: '#0F172A', // Dark center
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
+  createButtonIcon: {
+    zIndex: 1,
   },
 });

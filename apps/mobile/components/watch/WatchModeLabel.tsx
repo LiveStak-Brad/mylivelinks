@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-export type WatchMode = 'all' | 'liveOnly' | 'creatorOnly';
+export type WatchMode = 'all' | 'live_only' | 'creator_only';
 
 interface WatchModeLabelProps {
   mode: WatchMode;
@@ -9,8 +9,8 @@ interface WatchModeLabelProps {
 
 const MODE_LABELS: Record<WatchMode, string | null> = {
   all: null, // Don't show label in "All" mode (default)
-  liveOnly: 'LIVE ONLY',
-  creatorOnly: 'CREATOR ONLY',
+  live_only: 'LIVE ONLY',
+  creator_only: 'CREATOR ONLY',
 };
 
 /**

@@ -78,10 +78,21 @@ export function WatchScreen({
   // Watch renders INSIDE the app shell - header and bottom nav remain visible
   // Content area accounts for header (top) and bottom nav (bottom) spacing
 
-  // Keyboard navigation (Up/Down arrows)
+  // Keyboard navigation (Up/Down arrows, j/k for vim-style)
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!scrollContainerRef.current || items.length === 0) return;
+
+      // Skip keyboard navigation when user is typing in an input field
+      const activeElement = document.activeElement;
+      const isTyping = activeElement instanceof HTMLInputElement ||
+                       activeElement instanceof HTMLTextAreaElement ||
+                       activeElement?.getAttribute('contenteditable') === 'true';
+
+      // For j/k keys, only handle if not typing
+      if ((e.key === 'j' || e.key === 'k') && isTyping) {
+        return; // Let the input handle the key
+      }
 
       const container = scrollContainerRef.current;
       const itemHeight = container.clientHeight;

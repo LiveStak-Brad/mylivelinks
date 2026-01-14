@@ -1,5 +1,19 @@
-import React, { useCallback, useState } from 'react';
-import { FlatList, LayoutChangeEvent, StyleSheet, View, ViewToken } from 'react-native';
+import React, { useCallback, useRef, useState, useMemo } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  LayoutChangeEvent,
+  PanResponder,
+  Pressable,
+  RefreshControl,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+  ViewToken,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 import WatchTopTabs, { WatchTabId } from '../components/watch/WatchTopTabs';
 import WatchModeLabel, { WatchMode } from '../components/watch/WatchModeLabel';
@@ -7,216 +21,434 @@ import WatchLiveBadge from '../components/watch/WatchLiveBadge';
 import WatchActionStack from '../components/watch/WatchActionStack';
 import WatchCaptionOverlay from '../components/watch/WatchCaptionOverlay';
 import WatchContentItem from '../components/watch/WatchContentItem';
-
-// ============================================================================
-// MOCK DATA - UI placeholders only
-// ============================================================================
-
-export interface WatchItem {
-  id: string;
-  type: 'video' | 'live';
-  thumbnailUrl: string;
-  username: string;
-  displayName: string;
-  avatarUrl: string;
-  isFollowing: boolean;
-  title: string;
-  caption: string;
-  hashtags: string[];
-  location?: string;
-  likeCount: number;
-  commentCount: number;
-  favoriteCount: number;
-  shareCount: number;
-  isLive: boolean;
-}
-
-const MOCK_ITEMS: WatchItem[] = [
-  {
-    id: 'watch-001',
-    type: 'live',
-    thumbnailUrl: 'https://picsum.photos/seed/watch1/720/1280',
-    username: 'creativelive',
-    displayName: 'Creative Live',
-    avatarUrl: 'https://picsum.photos/seed/avatar1/200/200',
-    isFollowing: false,
-    title: 'Creative session tonight!',
-    caption: 'Live streaming some creative work tonight! Join the vibe and hang out with us.',
-    hashtags: ['creative', 'livestream', 'vibes'],
-    location: 'Los Angeles, CA',
-    likeCount: 1234,
-    commentCount: 89,
-    favoriteCount: 45,
-    shareCount: 12,
-    isLive: true,
-  },
-  {
-    id: 'watch-002',
-    type: 'video',
-    thumbnailUrl: 'https://picsum.photos/seed/watch2/720/1280',
-    username: 'musicmaker',
-    displayName: 'Music Maker',
-    avatarUrl: 'https://picsum.photos/seed/avatar2/200/200',
-    isFollowing: true,
-    title: 'New track sneak peek',
-    caption: 'Here\'s a sneak peek of what I\'ve been working on in the studio. Let me know what you think in the comments!',
-    hashtags: ['music', 'newmusic', 'studio', 'producer'],
-    likeCount: 5678,
-    commentCount: 234,
-    favoriteCount: 123,
-    shareCount: 67,
-    isLive: false,
-  },
-  {
-    id: 'watch-003',
-    type: 'video',
-    thumbnailUrl: 'https://picsum.photos/seed/watch3/720/1280',
-    username: 'comedyking',
-    displayName: 'Comedy King',
-    avatarUrl: 'https://picsum.photos/seed/avatar3/200/200',
-    isFollowing: false,
-    title: 'When your mom asks where all your money went',
-    caption: 'This is too relatable 😂',
-    hashtags: ['comedy', 'funny', 'relatable'],
-    location: 'New York, NY',
-    likeCount: 15200,
-    commentCount: 456,
-    favoriteCount: 890,
-    shareCount: 234,
-    isLive: false,
-  },
-  {
-    id: 'watch-004',
-    type: 'live',
-    thumbnailUrl: 'https://picsum.photos/seed/watch4/720/1280',
-    username: 'gamergirl',
-    displayName: 'Gamer Girl',
-    avatarUrl: 'https://picsum.photos/seed/avatar4/200/200',
-    isFollowing: true,
-    title: 'Ranked grind tonight!',
-    caption: 'Playing ranked tonight! Come watch the grind',
-    hashtags: ['gaming', 'ranked', 'live'],
-    likeCount: 892,
-    commentCount: 156,
-    favoriteCount: 78,
-    shareCount: 23,
-    isLive: true,
-  },
-  {
-    id: 'watch-005',
-    type: 'video',
-    thumbnailUrl: 'https://picsum.photos/seed/watch5/720/1280',
-    username: 'fitnessfam',
-    displayName: 'Fitness Fam',
-    avatarUrl: 'https://picsum.photos/seed/avatar5/200/200',
-    isFollowing: false,
-    title: '10 minute morning workout',
-    caption: 'Quick workout you can do anywhere - no equipment needed!',
-    hashtags: ['fitness', 'workout', 'health', 'motivation'],
-    location: 'Miami, FL',
-    likeCount: 8900,
-    commentCount: 345,
-    favoriteCount: 567,
-    shareCount: 189,
-    isLive: false,
-  },
-];
+import WatchCommentsModal from '../components/watch/WatchCommentsModal';
+import WatchGiftModal from '../components/watch/WatchGiftModal';
+import { useWatchFeed, WatchItem } from '../hooks/useWatchFeed';
+import { supabase } from '../lib/supabase';
 
 // ============================================================================
 // WATCH SCREEN COMPONENT
 // ============================================================================
 
 export default function WatchScreen() {
-  // UI state only - no logic wired
-  const [activeTab, setActiveTab] = useState<WatchTabId>('foryou');
-  const [currentMode] = useState<WatchMode>('all'); // Visual only, mode switching wired later
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const navigation = useNavigation();
+  const flatListRef = useRef<FlatList>(null);
   const [containerHeight, setContainerHeight] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const viewedItemsRef = useRef<Set<string>>(new Set());
+  const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Modal state for comments and gifts
+  const [commentsModalVisible, setCommentsModalVisible] = useState(false);
+  const [giftModalVisible, setGiftModalVisible] = useState(false);
+  const [modalTargetItem, setModalTargetItem] = useState<WatchItem | null>(null);
+
+  // Real feed data from RPC
+  const {
+    items,
+    loading,
+    refreshing,
+    error,
+    hasMore,
+    loadMore,
+    refresh,
+    setTab,
+    setMode,
+    currentTab,
+    currentMode,
+    currentCreatorProfileId,
+    optimisticLike,
+    optimisticFavorite,
+    optimisticRepost,
+    optimisticFollow,
+  } = useWatchFeed();
 
   const onContainerLayout = useCallback((event: LayoutChangeEvent) => {
     setContainerHeight(event.nativeEvent.layout.height);
   }, []);
 
-  // Track visible item for UI updates
+  // Get currently visible item
+  const getCurrentItem = useCallback((): WatchItem | null => {
+    if (items.length === 0) return null;
+    const idx = Math.max(0, Math.min(currentIndex, items.length - 1));
+    return items[idx] || null;
+  }, [items, currentIndex]);
+
+  // ============================================================================
+  // HORIZONTAL SWIPE MODE DETECTION
+  // ============================================================================
+  const panResponder = useMemo(() => {
+    const SWIPE_THRESHOLD = 60;
+    const ANGLE_RATIO = 1.5;
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+        // Only capture horizontal swipes that meet threshold and angle
+        return absDx > SWIPE_THRESHOLD && absDx > absDy * ANGLE_RATIO;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const { dx, dy } = gestureState;
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+
+        if (absDx >= SWIPE_THRESHOLD && absDx > absDy * ANGLE_RATIO) {
+          if (dx > 0) {
+            // Swipe RIGHT (finger left to right) → Live Only or back to All
+            if (currentMode === 'creator_only') {
+              setMode('all');
+            } else if (currentMode === 'all') {
+              setMode('live_only');
+            }
+          } else {
+            // Swipe LEFT (finger right to left) → Creator Only or back to All
+            if (currentMode === 'live_only') {
+              setMode('all');
+            } else if (currentMode === 'all') {
+              const currentItem = getCurrentItem();
+              if (currentItem) {
+                setMode('creator_only', currentItem.authorId);
+              }
+            }
+          }
+          // Scroll to top on mode change
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        }
+      },
+    });
+  }, [currentMode, setMode, getCurrentItem]);
+
+  // ============================================================================
+  // TAB CHANGE HANDLER
+  // ============================================================================
+  const handleTabPress = useCallback((tabId: WatchTabId) => {
+    setTab(tabId);
+    // Scroll to top on tab change
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, [setTab]);
+
+  // ============================================================================
+  // VIEW TRACKING
+  // ============================================================================
+  const trackView = useCallback(async (item: WatchItem) => {
+    if (viewedItemsRef.current.has(item.id)) return;
+    viewedItemsRef.current.add(item.id);
+
+    try {
+      const contentType = item.type === 'live' ? 'live_stream' : 'feed_post';
+      const contentId = item.postId || item.id;
+      
+      await supabase.rpc('rpc_track_content_view', {
+        p_content_type: contentType,
+        p_content_id: contentId,
+        p_view_source: 'mobile',
+        p_view_type: 'viewport',
+      });
+    } catch (err) {
+      console.warn('[WatchScreen] View tracking error:', err);
+    }
+  }, []);
+
+  // Track visible item for UI updates + view tracking
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        setCurrentIndex(viewableItems[0].index);
+        const newIndex = viewableItems[0].index;
+        setCurrentIndex(newIndex);
+
+        // Clear existing timer
+        if (viewTimerRef.current) {
+          clearTimeout(viewTimerRef.current);
+        }
+
+        // Track view after 2s of visibility
+        const item = items[newIndex];
+        if (item) {
+          viewTimerRef.current = setTimeout(() => {
+            trackView(item);
+          }, 2000);
+        }
       }
     },
-    []
+    [items, trackView]
   );
 
-  const viewabilityConfig = {
+  const viewabilityConfig = useMemo(() => ({
     itemVisiblePercentThreshold: 50,
-  };
+  }), []);
 
+  // ============================================================================
+  // ACTION HANDLERS
+  // ============================================================================
+  const handleLike = useCallback(async (item: WatchItem) => {
+    const itemId = item.postId || item.id;
+    optimisticLike(item.id);
+
+    try {
+      if (item.type === 'live') {
+        // Live stream like via trending RPC
+        const { data: liveStream } = await supabase
+          .from('live_streams')
+          .select('id')
+          .eq('profile_id', item.authorId)
+          .is('ended_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (liveStream) {
+          await supabase.rpc('rpc_live_like_toggle', {
+            p_stream_id: liveStream.id,
+          });
+        }
+      } else {
+        // Video post like
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: existing } = await supabase
+          .from('post_likes')
+          .select('post_id')
+          .eq('post_id', itemId)
+          .eq('profile_id', user.id)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from('post_likes')
+            .delete()
+            .eq('post_id', itemId)
+            .eq('profile_id', user.id);
+        } else {
+          await supabase
+            .from('post_likes')
+            .insert({ post_id: itemId, profile_id: user.id });
+        }
+      }
+    } catch (err) {
+      console.error('[WatchScreen] Like error:', err);
+      optimisticLike(item.id); // Revert
+    }
+  }, [optimisticLike]);
+
+  const handleFavorite = useCallback(async (item: WatchItem) => {
+    const itemId = item.postId || item.id;
+    optimisticFavorite(item.id);
+
+    try {
+      await supabase.rpc('rpc_toggle_favorite', { p_post_id: itemId });
+    } catch (err) {
+      console.error('[WatchScreen] Favorite error:', err);
+      optimisticFavorite(item.id); // Revert
+    }
+  }, [optimisticFavorite]);
+
+  const handleRepost = useCallback(async (item: WatchItem) => {
+    const itemId = item.postId || item.id;
+    optimisticRepost(item.id);
+
+    try {
+      await supabase.rpc('rpc_toggle_repost', { p_post_id: itemId });
+    } catch (err) {
+      console.error('[WatchScreen] Repost error:', err);
+      optimisticRepost(item.id); // Revert
+    }
+  }, [optimisticRepost]);
+
+  const handleFollow = useCallback(async (item: WatchItem) => {
+    optimisticFollow(item.authorId);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      if (item.isFollowing) {
+        await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('followee_id', item.authorId);
+      } else {
+        await supabase
+          .from('follows')
+          .insert({ follower_id: user.id, followee_id: item.authorId });
+      }
+    } catch (err) {
+      console.error('[WatchScreen] Follow error:', err);
+      optimisticFollow(item.authorId); // Revert
+    }
+  }, [optimisticFollow]);
+
+  const handleShare = useCallback(async (item: WatchItem) => {
+    try {
+      await Share.share({
+        message: `Check out ${item.displayName} on MyLiveLinks! https://www.mylivelinks.com/${item.username}`,
+        url: `https://www.mylivelinks.com/${item.username}`,
+      });
+    } catch (err) {
+      console.warn('[WatchScreen] Share error:', err);
+    }
+  }, []);
+
+  const handleComment = useCallback((item: WatchItem) => {
+    setModalTargetItem(item);
+    setCommentsModalVisible(true);
+  }, []);
+
+  const handleGift = useCallback((item: WatchItem) => {
+    setModalTargetItem(item);
+    setGiftModalVisible(true);
+  }, []);
+
+  const handleAvatarPress = useCallback((item: WatchItem) => {
+    (navigation as any).navigate('PublicProfileScreen', { username: item.username });
+  }, [navigation]);
+
+  const handleUsernamePress = useCallback((item: WatchItem) => {
+    (navigation as any).navigate('PublicProfileScreen', { username: item.username });
+  }, [navigation]);
+
+  const handleCreate = useCallback(() => {
+    // Navigate to composer/upload screen
+    (navigation as any).navigate('ComposerScreen');
+  }, [navigation]);
+
+  const handleLiveItemPress = useCallback((item: WatchItem) => {
+    if (item.type === 'live') {
+      (navigation as any).navigate('LiveUserScreen', { username: item.username });
+    }
+  }, [navigation]);
+
+  // ============================================================================
+  // RENDER ITEM
+  // ============================================================================
   const renderItem = useCallback(
-    ({ item }: { item: WatchItem }) => (
-      <WatchContentItem thumbnailUrl={item.thumbnailUrl} isLive={item.isLive} height={containerHeight}>
-        {/* Top section: Tabs + Mode label + Live badge */}
-        <View style={styles.topSection}>
-          <WatchTopTabs 
-            activeTab={activeTab} 
-            onTabPress={setActiveTab}
-          />
+    ({ item }: { item: WatchItem }) => {
+      const isLive = item.type === 'live';
+      const thumbnailUrl = item.thumbnailUrl || item.avatarUrl || 'https://picsum.photos/seed/default/720/1280';
 
-          {/* Mode label + Live badge row (below tabs) */}
-          <View style={styles.secondRow}>
-            <View style={styles.secondRowLeft}>
-              {/* Non-interactive mode label (swipe modes wired later) */}
-              <WatchModeLabel mode={currentMode} />
-              <WatchLiveBadge visible={item.isLive} />
+      return (
+        <Pressable onPress={() => isLive && handleLiveItemPress(item)}>
+          <WatchContentItem thumbnailUrl={thumbnailUrl} isLive={isLive} height={containerHeight}>
+            {/* Top section: Tabs + Mode label + Live badge */}
+            <View style={styles.topSection}>
+              <WatchTopTabs 
+                activeTab={currentTab} 
+                onTabPress={handleTabPress}
+              />
+
+              {/* Mode label + Live badge row (below tabs) */}
+              <View style={styles.secondRow}>
+                <View style={styles.secondRowLeft}>
+                  <WatchModeLabel mode={currentMode} />
+                  <WatchLiveBadge visible={isLive} viewerCount={item.viewerCount} />
+                </View>
+              </View>
             </View>
-          </View>
-        </View>
 
-        {/* Right side: Action stack */}
-        <View style={[styles.actionStackContainer, { bottom: 16 }]}>
-          <WatchActionStack
-            avatarUrl={item.avatarUrl}
-            isFollowing={item.isFollowing}
-            likeCount={item.likeCount}
-            commentCount={item.commentCount}
-            favoriteCount={item.favoriteCount}
-            shareCount={item.shareCount}
-            // All handlers are placeholders - no logic
-            onAvatarPress={() => {}}
-            onFollowPress={() => {}}
-            onLikePress={() => {}}
-            onCommentPress={() => {}}
-            onFavoritePress={() => {}}
-            onSharePress={() => {}}
-            onRepostPress={() => {}}
-            onCreatePress={() => {}}
-          />
-        </View>
+            {/* Right side: Action stack */}
+            <View style={[styles.actionStackContainer, { bottom: 16 }]}>
+              <WatchActionStack
+                avatarUrl={item.avatarUrl || ''}
+                isFollowing={item.isFollowing}
+                likeCount={item.likeCount}
+                commentCount={item.commentCount}
+                favoriteCount={item.favoriteCount}
+                shareCount={item.shareCount}
+                isLiked={item.isLiked}
+                isFavorited={item.isFavorited}
+                onAvatarPress={() => handleAvatarPress(item)}
+                onFollowPress={() => handleFollow(item)}
+                onLikePress={() => handleLike(item)}
+                onCommentPress={() => handleComment(item)}
+                onFavoritePress={() => handleFavorite(item)}
+                onSharePress={() => handleShare(item)}
+                onRepostPress={() => handleRepost(item)}
+                onCreatePress={handleCreate}
+              />
+            </View>
 
-        {/* Bottom: Caption overlay */}
-        <View style={[styles.captionContainer, { paddingBottom: 16 }]}>
-          <WatchCaptionOverlay
-            username={item.username}
-            displayName={item.displayName}
-            title={item.title}
-            caption={item.caption}
-            hashtags={item.hashtags}
-            location={item.location}
-            // All handlers are placeholders - no logic
-            onUsernamePress={() => {}}
-            onHashtagPress={() => {}}
-            onLocationPress={() => {}}
-          />
-        </View>
-      </WatchContentItem>
-    ),
-    [activeTab, currentMode, containerHeight]
+            {/* Bottom: Caption overlay */}
+            <View style={[styles.captionContainer, { paddingBottom: 16 }]}>
+              <WatchCaptionOverlay
+                username={item.username}
+                displayName={item.displayName}
+                title={item.title || ''}
+                caption={item.caption || ''}
+                hashtags={item.hashtags}
+                location={item.location || undefined}
+                onUsernamePress={() => handleUsernamePress(item)}
+                onHashtagPress={() => {}}
+                onLocationPress={() => {}}
+              />
+            </View>
+          </WatchContentItem>
+        </Pressable>
+      );
+    },
+    [
+      containerHeight, currentTab, currentMode, handleTabPress,
+      handleAvatarPress, handleFollow, handleLike, handleComment,
+      handleFavorite, handleShare, handleRepost, handleCreate,
+      handleUsernamePress, handleLiveItemPress,
+    ]
   );
 
+  // ============================================================================
+  // LOADING STATE
+  // ============================================================================
+  if (loading && items.length === 0) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#EC4899" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  // ============================================================================
+  // ERROR STATE
+  // ============================================================================
+  if (error && items.length === 0) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+        <Text style={styles.errorText}>{error}</Text>
+        <Pressable style={styles.retryButton} onPress={refresh}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // ============================================================================
+  // EMPTY STATE
+  // ============================================================================
+  if (!loading && items.length === 0) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Ionicons name="videocam-outline" size={48} color="#6B7280" />
+        <Text style={styles.emptyText}>No content yet</Text>
+        <Text style={styles.emptySubtext}>Be the first to post something!</Text>
+        <Pressable style={styles.createButtonEmpty} onPress={handleCreate}>
+          <Text style={styles.createButtonEmptyText}>Create Post</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
   return (
-    <View style={styles.container} onLayout={onContainerLayout}>
+    <View style={styles.container} onLayout={onContainerLayout} {...panResponder.panHandlers}>
       {containerHeight > 0 && (
         <FlatList
-          data={MOCK_ITEMS}
+          ref={flatListRef}
+          data={items}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           pagingEnabled
@@ -231,8 +463,37 @@ export default function WatchScreen() {
             offset: containerHeight * index,
             index,
           })}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refresh}
+              tintColor="#EC4899"
+              colors={['#EC4899']}
+            />
+          }
         />
       )}
+
+      {/* Comments Modal */}
+      <WatchCommentsModal
+        visible={commentsModalVisible}
+        onClose={() => setCommentsModalVisible(false)}
+        postId={modalTargetItem?.postId || modalTargetItem?.id || null}
+        authorUsername={modalTargetItem?.username || ''}
+        commentCount={modalTargetItem?.commentCount || 0}
+      />
+
+      {/* Gift Modal */}
+      <WatchGiftModal
+        visible={giftModalVisible}
+        onClose={() => setGiftModalVisible(false)}
+        recipientUsername={modalTargetItem?.username || ''}
+        recipientDisplayName={modalTargetItem?.displayName || ''}
+        recipientAvatarUrl={modalTargetItem?.avatarUrl || null}
+        isLive={modalTargetItem?.type === 'live'}
+      />
     </View>
   );
 }
@@ -241,6 +502,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   topSection: {
     position: 'absolute',
@@ -270,7 +535,54 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     left: 0,
-    right: 80, // Leave room for action stack
+    right: 80,
     zIndex: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#9CA3AF',
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#EC4899',
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  emptyText: {
+    marginTop: 12,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  emptySubtext: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  createButtonEmpty: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#EC4899',
+    borderRadius: 8,
+  },
+  createButtonEmptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

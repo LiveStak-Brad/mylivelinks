@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-export type WatchTabId = 'trending' | 'new' | 'nearby' | 'following' | 'foryou';
+export type WatchTabId = 'trending' | 'new' | 'nearby' | 'following' | 'for_you';
 
 export interface WatchTab {
   id: WatchTabId;
@@ -13,7 +13,7 @@ const TABS: WatchTab[] = [
   { id: 'new', label: 'New' },
   { id: 'nearby', label: 'Nearby' },
   { id: 'following', label: 'Following' },
-  { id: 'foryou', label: 'For You' },
+  { id: 'for_you', label: 'For You' },
 ];
 
 interface WatchTopTabsProps {
