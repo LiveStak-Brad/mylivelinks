@@ -1,8 +1,24 @@
 /**
  * Creator Studio Section
  * 
- * Displays Creator Studio items on profile with links to canonical routes.
- * Supports inline playback preview + "View" action for full page navigation.
+ * CREATOR STUDIO PROFILE WIRING - GENERIC SECTION COMPONENT
+ * ==========================================================
+ * This is the primary component for displaying Creator Studio content on profiles.
+ * 
+ * Source of Truth: creator_studio_items table
+ * RPC: get_public_creator_studio_items (filters: status='ready', visibility='public')
+ * 
+ * Supported item types: podcast, movie, series_episode, education
+ * (music_video uses MusicVideos.tsx for legacy compatibility)
+ * 
+ * CANONICAL ROUTES:
+ * - /[username]/podcast/[id]
+ * - /[username]/movie/[id]
+ * - /[username]/education/[id]
+ * - /[username]/series/[seriesSlug]/[episodeSlug]
+ * 
+ * Clicking any item card navigates to its canonical route.
+ * See docs/CREATOR_STUDIO_PROFILE_WIRING.md for full documentation.
  */
 
 'use client';

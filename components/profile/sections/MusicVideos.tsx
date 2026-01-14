@@ -1,6 +1,18 @@
 /**
  * Music Videos Section (Musician Profile Type)
  *
+ * CREATOR STUDIO PROFILE WIRING
+ * =============================
+ * This component reads from BOTH data sources:
+ * 1. Creator Studio: creator_studio_items (item_type='music_video') - PRIMARY
+ * 2. Legacy: profile_music_videos - FALLBACK for backward compatibility
+ * 
+ * Creator Studio items appear first, deduped by title.
+ * Navigation links only work for Creator Studio items (canonical routes).
+ * 
+ * Canonical route: /[username]/music-video/[id]
+ * See docs/CREATOR_STUDIO_PROFILE_WIRING.md for full documentation.
+ *
  * Owner:
  * - Add uploaded video OR YouTube URL
  * - Mandatory rights confirmation checkbox + warning
@@ -194,6 +206,17 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
   }
   
   const hasAny = playlistItems.length > 0;
+  
+  // DEV-ONLY: Log warning if profile has legacy items but no Creator Studio items
+  // This helps detect profiles that haven't migrated to Creator Studio
+  if (process.env.NODE_ENV === 'development' && !csLoading && !loading) {
+    if (legacyPlaylistItems.length > 0 && csPlaylistItems.length === 0) {
+      console.warn(
+        `[MusicVideos] Profile ${profileId} has ${legacyPlaylistItems.length} legacy items but 0 Creator Studio items. ` +
+        `Consider migrating to Creator Studio for canonical route support.`
+      );
+    }
+  }
   
   // Link builder for canonical routes (only for Creator Studio items)
   const itemLinkBuilder = useCallback((item: VideoPlaylistItem): string | null => {

@@ -1,6 +1,26 @@
 /**
  * Hook to fetch Creator Studio items for profile display
  * Uses the get_public_creator_studio_items RPC
+ * 
+ * CREATOR STUDIO PROFILE WIRING - SOURCE OF TRUTH
+ * ================================================
+ * Table: creator_studio_items
+ * RPC: get_public_creator_studio_items(p_profile_id, p_item_type, p_limit, p_offset)
+ * 
+ * REQUIRED FILTERS (enforced by RPC):
+ * - status = 'ready'
+ * - visibility = 'public'
+ * - owner_profile_id = p_profile_id
+ * 
+ * CANONICAL ROUTES:
+ * - /[username]/music/[id]
+ * - /[username]/music-video/[id]
+ * - /[username]/podcast/[id]
+ * - /[username]/movie/[id]
+ * - /[username]/education/[id]
+ * - /[username]/series/[seriesSlug]/[episodeSlug]
+ * 
+ * See docs/CREATOR_STUDIO_PROFILE_WIRING.md for full documentation.
  */
 
 import { useState, useEffect, useMemo } from 'react';
