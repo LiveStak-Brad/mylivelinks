@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -15,6 +16,8 @@ import {
   LogOut,
   Lock,
   ShieldCheck,
+  Moon,
+  Sun,
   BarChart3,
   Film,
   Radio,
@@ -49,6 +52,7 @@ export default function UserMenuSheet({
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { toast } = useToast();
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -214,6 +218,23 @@ export default function UserMenuSheet({
             </div>
 
             <div className="p-2 flex-1 overflow-y-auto">
+              {/* Theme Toggle */}
+              <button
+                type="button"
+                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                className="flex items-center justify-between w-full px-3 py-3 mb-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+              >
+                <span className="flex items-center gap-3 text-sm font-medium text-foreground">
+                  {resolvedTheme === 'dark' ? (
+                    <Moon className="w-5 h-5 text-indigo-400" />
+                  ) : (
+                    <Sun className="w-5 h-5 text-amber-500" />
+                  )}
+                  {resolvedTheme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+                </span>
+                <span className="text-xs text-muted-foreground">Tap to switch</span>
+              </button>
+
               <div className="flex flex-col">
                 {menuItems.map((item) => {
                   const row = (
