@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/useTheme';
@@ -16,6 +16,17 @@ export type SlideMenuItem = {
   rightIconName?: React.ComponentProps<typeof Ionicons>['name'];
 };
 
+// Estimate width needed for text + pill/icon + padding
+function estimateItemWidth(item: SlideMenuItem): number {
+  const charWidth = 7.5; // approx width per character at fontSize 13
+  const labelWidth = item.label.length * charWidth;
+  const pillWidth = item.pillText ? item.pillText.length * 6 + 20 : 0;
+  const iconWidth = item.rightIconName ? 24 : 0;
+  const padding = 28; // horizontal padding
+  const gap = (pillWidth || iconWidth) ? 12 : 0;
+  return labelWidth + pillWidth + iconWidth + padding + gap;
+}
+
 export default function SlideMenu({
   side,
   visible,
@@ -31,17 +42,29 @@ export default function SlideMenu({
 }) {
   const { mode, colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const translate = useRef(new Animated.Value(0)).current;
-  const panelWidth = 300;
+  
+  // Calculate minimum width needed based on longest item
+  const panelWidth = useMemo(() => {
+    const titleWidth = title ? title.length * 9 + 28 : 0;
+    const maxItemWidth = items.reduce((max, item) => Math.max(max, estimateItemWidth(item)), 0);
+    const contentWidth = Math.max(titleWidth, maxItemWidth);
+    // Add safe area inset and clamp between 160 and 70% of screen
+    const minWidth = 160;
+    const maxWidth = screenWidth * 0.7;
+    const safeInset = side === 'left' ? insets.left : insets.right;
+    return Math.min(maxWidth, Math.max(minWidth, contentWidth + safeInset + 16));
+  }, [items, title, screenWidth, side, insets.left, insets.right]);
 
-  const closedX = useMemo(() => (side === 'left' ? -panelWidth : panelWidth), [side]);
+  const closedX = useMemo(() => (side === 'left' ? -panelWidth : panelWidth), [side, panelWidth]);
   const pressedBg = mode === 'dark' ? darkPalette.slate800 : lightPalette.slate100;
 
   useEffect(() => {
     if (visible) translate.setValue(closedX);
     Animated.timing(translate, {
       toValue: visible ? 0 : closedX,
-      duration: 220,
+      duration: 200,
       useNativeDriver: true,
     }).start();
   }, [closedX, translate, visible]);
@@ -163,29 +186,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    fontSize: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 8,
+    fontSize: 15,
     fontWeight: '900',
   },
   sectionRow: {
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 6,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 1.2,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   list: {
-    paddingTop: 8,
+    paddingTop: 4,
   },
   row: {
-    minHeight: 48,
-    paddingHorizontal: 16,
+    minHeight: 40,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -195,18 +218,18 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
   },
   pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 999,
   },
   pillText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '900',
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
   },
 });
 

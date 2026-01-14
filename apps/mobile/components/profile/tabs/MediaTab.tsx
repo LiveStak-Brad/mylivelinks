@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, Dimensions, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Image, Pressable, ActivityIndicator, Dimensions, Modal, ScrollView, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Video as ExpoVideo, ResizeMode } from 'expo-av';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -24,6 +24,7 @@ interface MediaItem {
 }
 
 export default function MediaTab({ profileId, colors }: MediaTabProps) {
+  const insets = useSafeAreaInsets();
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
@@ -35,6 +36,19 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
 
   const loadMedia = async () => {
     try {
+      console.log('[MediaTab] Loading media for profileId:', profileId);
+      
+      // First, get ALL posts for this author to debug
+      const { data: allPosts, error: allError } = await supabase
+        .from('posts')
+        .select('id, media_url, visibility, created_at')
+        .eq('author_id', profileId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      console.log('[MediaTab] All posts for author:', allPosts?.length || 0, allPosts?.slice(0, 3));
+      
+      // Now filter for posts with media
       const { data, error } = await supabase
         .from('posts')
         .select(`
@@ -46,15 +60,33 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
           created_at
         `)
         .eq('author_id', profileId)
-        .in('media_type', ['image', 'video'])
         .not('media_url', 'is', null)
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (error) throw error;
-      setMedia((data as any) || []);
+      if (error) {
+        console.error('[MediaTab] Query error:', error);
+        throw error;
+      }
+      
+      console.log('[MediaTab] Posts with media_url:', data?.length || 0, data?.slice(0, 3));
+      
+      // Filter out empty strings and map to media items
+      const mediaItems = (data || [])
+        .filter((item: any) => item.media_url && item.media_url.trim() !== '')
+        .map((item: any) => {
+          const url = (item.media_url || '').toLowerCase();
+          const isVideo = /(\.mp4|\.mov|\.webm|\.mkv|\.avi)(\?|$)/i.test(url);
+          return {
+            ...item,
+            media_type: isVideo ? 'video' : 'image'
+          };
+        });
+      
+      console.log('[MediaTab] Final media items:', mediaItems.length);
+      setMedia(mediaItems);
     } catch (error) {
-      console.error('Error loading media:', error);
+      console.error('[MediaTab] Error loading media:', error);
     } finally {
       setLoading(false);
     }
@@ -137,7 +169,7 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
         onRequestClose={handleCloseModal}
         transparent={false}
       >
-        <View style={[styles.modalContainer, { backgroundColor: colors.bg }]}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <Pressable onPress={handleCloseModal} style={styles.closeButton}>
               <Feather name="x" size={24} color={colors.text} />
@@ -157,13 +189,26 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
 
           <ScrollView contentContainerStyle={styles.modalContent}>
             {selectedMedia?.media_type === 'video' ? (
-              <ExpoVideo
-                source={{ uri: selectedMedia.media_url }}
-                style={styles.modalVideo}
-                useNativeControls
-                resizeMode={ResizeMode.CONTAIN}
-                shouldPlay
-              />
+              <Pressable 
+                style={styles.videoContainer}
+                onPress={() => {
+                  if (selectedMedia?.media_url) {
+                    Linking.openURL(selectedMedia.media_url);
+                  }
+                }}
+              >
+                <Image
+                  source={{ uri: selectedMedia.thumbnail_url || selectedMedia.media_url }}
+                  style={styles.modalVideo}
+                  resizeMode="cover"
+                />
+                <View style={styles.videoPlayOverlay}>
+                  <View style={[styles.videoPlayButton, { backgroundColor: colors.primary }]}>
+                    <Feather name="play" size={32} color="#fff" />
+                  </View>
+                  <Text style={styles.videoPlayText}>Tap to play video</Text>
+                </View>
+              </Pressable>
             ) : (
               <Image
                 source={{ uri: selectedMedia?.media_url }}
@@ -196,6 +241,7 @@ export default function MediaTab({ profileId, colors }: MediaTabProps) {
 const styles = StyleSheet.create({
   gridContainer: {
     paddingBottom: 16,
+    marginHorizontal: -14, // Counteract parent paddingHorizontal: 14
   },
   row: {
     flexDirection: 'row',
@@ -285,6 +331,35 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: SCREEN_WIDTH,
     backgroundColor: '#000',
+  },
+  videoContainer: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH,
+    backgroundColor: '#000',
+    position: 'relative',
+  },
+  videoPlayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  videoPlayButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayText: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 12,
+    fontWeight: '500',
   },
   captionSection: {
     padding: 16,

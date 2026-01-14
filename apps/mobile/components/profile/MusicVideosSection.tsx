@@ -88,7 +88,20 @@ export default function MusicVideosSection({
     try {
       const { data, error } = await supabase
         .from('profile_music_videos')
-        .select('*')
+        .select(`
+          id,
+          profile_id,
+          title,
+          video_type,
+          video_url,
+          youtube_id,
+          thumbnail_url,
+          sort_order,
+          rights_confirmed,
+          rights_confirmed_at,
+          created_at,
+          updated_at
+        `)
         .eq('profile_id', profileId)
         .order('sort_order', { ascending: true });
 

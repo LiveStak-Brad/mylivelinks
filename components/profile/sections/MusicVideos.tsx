@@ -23,10 +23,12 @@ type MusicVideoRow = {
   id: string;
   profile_id: string;
   title: string;
+  description?: string | null;
   video_type: VideoType;
   video_url: string;
   youtube_id: string | null;
   thumbnail_url?: string | null;
+  views_count: number;
   sort_order: number;
   rights_confirmed: boolean;
   rights_confirmed_at: string | null;
@@ -82,19 +84,25 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<MusicVideoRow | null>(null);
   const [formTitle, setFormTitle] = useState('');
+  const [formDescription, setFormDescription] = useState('');
   const [formType, setFormType] = useState<VideoType>('youtube');
   const [formYoutubeUrl, setFormYoutubeUrl] = useState('');
   const [formFile, setFormFile] = useState<File | null>(null);
+  const [formThumbnailFile, setFormThumbnailFile] = useState<File | null>(null);
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
 
   const resetForm = () => {
     setEditing(null);
     setFormTitle('');
+    setFormDescription('');
     setFormType('youtube');
     setFormYoutubeUrl('');
     setFormFile(null);
+    setFormThumbnailFile(null);
     setRightsConfirmed(false);
+    setUploadProgress(null);
   };
 
   const openAdd = () => {
@@ -105,11 +113,14 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
   const openEdit = (row: MusicVideoRow) => {
     setEditing(row);
     setFormTitle(row.title || '');
+    setFormDescription(row.description || '');
     setFormType(row.video_type);
     setFormYoutubeUrl(row.video_type === 'youtube' ? row.video_url : '');
     setFormFile(null);
+    setFormThumbnailFile(null);
     // Always force explicit checkbox on save to meet policy (even if DB has old data).
     setRightsConfirmed(false);
+    setUploadProgress(null);
     setShowModal(true);
   };
 
@@ -203,14 +214,26 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
               <div>
-                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Title *</label>
                 <input
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm"
                   placeholder="e.g., New Single (Official Video)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <textarea
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 px-3 py-2 text-sm resize-none"
+                  placeholder="Add a description for your music video..."
+                  rows={3}
+                  maxLength={2000}
                 />
               </div>
 
@@ -254,18 +277,52 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
                   </div>
                 </div>
               ) : (
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
-                    Upload Video File
-                  </label>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => setFormFile(e.target.files?.[0] ?? null)}
-                    className="w-full text-sm"
-                  />
-                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Tip: MP4/H.264 works best across browsers.
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                      Video File *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,video/*"
+                        onChange={(e) => setFormFile(e.target.files?.[0] ?? null)}
+                        className="flex-1 text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-purple-500/10 file:text-purple-700 dark:file:text-purple-300 file:font-semibold file:cursor-pointer"
+                      />
+                    </div>
+                    {formFile && (
+                      <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <span>✓</span> {formFile.name} ({(formFile.size / 1024 / 1024).toFixed(1)} MB)
+                      </div>
+                    )}
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      MP4/H.264 recommended. Max 500MB.
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                      Custom Thumbnail (optional)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(e) => setFormThumbnailFile(e.target.files?.[0] ?? null)}
+                      className="w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 file:font-semibold file:cursor-pointer"
+                    />
+                    {formThumbnailFile && (
+                      <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <span>✓</span> {formThumbnailFile.name}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {uploadProgress && (
+                <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-3">
+                  <div className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                    {uploadProgress}
                   </div>
                 </div>
               )}
@@ -312,38 +369,56 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
                     setSaving(true);
                     try {
                       let videoUrl = editing?.video_url ?? '';
+                      let thumbnailUrl = editing?.thumbnail_url ?? null;
                       let videoType: VideoType = formType;
                       let rpcId: string | null = editing?.id ?? null;
+                      const storageId = editing?.id ?? crypto.randomUUID();
 
                       if (formType === 'youtube') {
                         const id = getYoutubeIdFromUrl(formYoutubeUrl);
                         if (!id) {
                           alert('Please enter a valid YouTube URL.');
+                          setSaving(false);
                           return;
                         }
                         videoUrl = formYoutubeUrl.trim();
                       } else {
-                        const storageId = editing?.id ?? crypto.randomUUID();
                         if (formFile) {
+                          // Validate file size (500MB max)
+                          if (formFile.size > 500 * 1024 * 1024) {
+                            alert('Video file must be 500MB or less.');
+                            setSaving(false);
+                            return;
+                          }
+                          setUploadProgress('Uploading video...');
                           // Canonical storage path: profile-media/{profile_id}/music/videos/{video_id}/video
-                          // - New: generate videoId so the path is stable
-                          // - Edit: reuse existing id and upsert to replace
                           videoUrl = await uploadToProfileMedia(profileId, storageId, formFile, Boolean(editing));
+                          setUploadProgress('Video uploaded!');
                         }
                         if (!videoUrl) {
                           alert('Please select a video file to upload.');
+                          setSaving(false);
                           return;
                         }
                         videoType = 'upload';
-                        // IMPORTANT: upsert_music_video inserts ONLY when p_id is null.
-                        // We cannot pre-generate an id for DB inserts.
                         rpcId = editing?.id ?? null;
                       }
 
+                      // Upload thumbnail if provided
+                      if (formThumbnailFile) {
+                        setUploadProgress('Uploading thumbnail...');
+                        const thumbPath = `music/videos/${storageId}/thumb`;
+                        thumbnailUrl = await uploadProfileMedia(profileId, thumbPath, formThumbnailFile, { upsert: true });
+                      }
+
+                      setUploadProgress('Saving...');
+
                       const payload: any = {
                         title,
+                        description: formDescription.trim() || null,
                         video_type: videoType,
                         video_url: videoUrl,
+                        thumbnail_url: thumbnailUrl,
                         rights_confirmed: true,
                       };
 
@@ -358,9 +433,10 @@ export default function MusicVideos({ profileId, isOwner, cardStyle, borderRadiu
                       await load();
                     } catch (e) {
                       console.error('[MusicVideos] save failed', e);
-                      alert('Failed to save video.');
+                      alert('Failed to save video. ' + (e instanceof Error ? e.message : ''));
                     } finally {
                       setSaving(false);
+                      setUploadProgress(null);
                     }
                   }}
                 >

@@ -104,7 +104,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
+      { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -137,7 +137,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'music', label: 'Music', icon: 'Music', enabled: true },
       { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
       { id: 'events', label: 'Events', icon: 'Calendar', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
+      { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -167,7 +167,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
       { id: 'events', label: 'Shows', icon: 'Calendar', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
+      { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -226,7 +226,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
-      { id: 'photos', label: 'Photos', icon: 'Image', enabled: true },
+      { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
