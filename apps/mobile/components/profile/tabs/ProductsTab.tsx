@@ -32,26 +32,32 @@ export default function ProductsTab({ profileId, isOwnProfile = false, onAddItem
 
   const loadPortfolioItems = async () => {
     try {
-      const { data, error } = await supabase.rpc('get_profile_portfolio', {
-        p_profile_id: profileId,
-      });
+      // Query table directly since RPC may not be deployed
+      const { data, error } = await supabase
+        .from('profile_portfolio')
+        .select('id, title, subtitle, description, media_type, media_url, thumbnail_url, sort_order')
+        .eq('profile_id', profileId)
+        .order('sort_order', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        // Table might not exist yet - gracefully handle
+        if (error.code === '42P01' || error.code === 'PGRST205') {
+          console.log('[ProductsTab] Table not found, skipping');
+          setItems([]);
+          return;
+        }
+        throw error;
+      }
       
-      const portfolioItems: PortfolioItem[] = (data || []).map((item: any) => ({
-        id: item.id,
-        title: item.title,
-        subtitle: item.subtitle,
-        description: item.description,
-        media_type: item.media_type,
-        media_url: item.media_url,
-        thumbnail_url: item.thumbnail_url,
-        sort_order: item.sort_order,
-      }));
-      
-      setItems(portfolioItems);
-    } catch (error) {
-      console.error('Error loading portfolio items:', error);
+      setItems(data || []);
+    } catch (error: any) {
+      // Gracefully handle missing table
+      if (error?.code === 'PGRST205' || error?.message?.includes('profile_portfolio')) {
+        console.log('[ProductsTab] Table not found, skipping');
+        setItems([]);
+      } else {
+        console.error('Error loading portfolio items:', error);
+      }
     } finally {
       setLoading(false);
     }

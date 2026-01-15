@@ -79,9 +79,10 @@ export default function PortfolioManager({
         sort_order: 0,
       };
 
-      const { error } = await supabase.rpc('upsert_profile_portfolio_item', {
-        p_item: payload,
-      });
+      // Insert directly since RPC may not be deployed
+      const { error } = await supabase
+        .from('profile_portfolio')
+        .insert(payload);
 
       if (error) {
         console.error('[PortfolioManager] Save error:', error);

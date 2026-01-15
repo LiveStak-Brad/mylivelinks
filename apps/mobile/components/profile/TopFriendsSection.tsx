@@ -12,6 +12,11 @@ interface TopFriendsSectionProps {
   maxCount?: number;
   onManage?: () => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 export default function TopFriendsSection({
@@ -22,7 +27,11 @@ export default function TopFriendsSection({
   maxCount = 8,
   onManage,
   colors,
+  cardStyle,
 }: TopFriendsSectionProps) {
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
+  const textColor = cardStyle?.textColor || colors.text;
   const [friends, setFriends] = React.useState<TopFriend[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -63,14 +72,14 @@ export default function TopFriendsSection({
   if (friends.length === 0) {
     if (!isOwnProfile) return null;
     return (
-      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.title, { color: textColor }]}>{title}</Text>
         </View>
         <View style={styles.emptyState}>
-          <Feather name="users" size={40} color={colors.textSecondary || colors.text} style={{ opacity: 0.5 }} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No Top Friends Yet</Text>
-          <Text style={[styles.emptyText, { color: colors.textSecondary || colors.text }]}>
+          <Feather name="users" size={40} color={colors.textSecondary || textColor} style={{ opacity: 0.5 }} />
+          <Text style={[styles.emptyTitle, { color: textColor }]}>No Top Friends Yet</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary || textColor }]}>
             Add your favorite people to show them on your profile!
           </Text>
           {onManage && (
@@ -88,9 +97,9 @@ export default function TopFriendsSection({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.title, { color: textColor }]}>{title}</Text>
         {isOwnProfile && onManage && (
           <Pressable onPress={onManage} style={styles.manageButton}>
             <Text style={[styles.manageText, { color: colors.primary }]}>Manage</Text>

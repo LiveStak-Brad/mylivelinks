@@ -15,6 +15,11 @@ interface TopSupportersSectionProps {
   gifterStatuses?: Record<string, any>;
   onPressProfile: (profileId: string, username: string) => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 export default function TopSupportersSection({
@@ -22,7 +27,12 @@ export default function TopSupportersSection({
   gifterStatuses,
   onPressProfile,
   colors,
+  cardStyle,
 }: TopSupportersSectionProps) {
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
+  const textColor = cardStyle?.textColor || colors.text;
+  
   if (!supporters || supporters.length === 0) {
     return null;
   }
@@ -34,10 +44,10 @@ export default function TopSupportersSection({
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
       <View style={styles.header}>
         <Feather name="award" size={20} color={colors.primary} />
-        <Text style={[styles.title, { color: colors.text }]}>Top Supporters</Text>
+        <Text style={[styles.title, { color: textColor }]}>Top Supporters</Text>
       </View>
       
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>

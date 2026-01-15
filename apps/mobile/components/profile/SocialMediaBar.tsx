@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import { Feather, FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
 
 interface SocialMediaBarProps {
@@ -15,7 +15,14 @@ interface SocialMediaBarProps {
   github?: string | null;
   spotify?: string | null;
   onlyfans?: string | null;
+  isOwnProfile?: boolean;
+  onManage?: () => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 // Convert username/handle to full URL for each platform
@@ -63,7 +70,10 @@ function buildSocialUrl(platform: string, value: string): string {
 }
 
 export default function SocialMediaBar(props: SocialMediaBarProps) {
-  const { colors } = props;
+  const { colors, cardStyle } = props;
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
+  const textColor = cardStyle?.textColor || colors.text;
 
   const socials = [
     { key: 'instagram', value: props.instagram, icon: 'instagram', library: 'Feather' },
@@ -83,7 +93,31 @@ export default function SocialMediaBar(props: SocialMediaBarProps) {
     .map(s => ({ ...s, url: buildSocialUrl(s.key, s.value!) }));
 
   if (socials.length === 0) {
-    return null;
+    if (!props.isOwnProfile) {
+      return null;
+    }
+    
+    // Owner empty state with CTA
+    return (
+      <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
+        <View style={styles.emptyState}>
+          <Feather name="share-2" size={32} color={colors.text} style={{ opacity: 0.5 }} />
+          <Text style={[styles.emptyTitle, { color: textColor }]}>No Social Links Yet</Text>
+          <Text style={[styles.emptyText, { color: textColor }]}>
+            Connect your social accounts to share with visitors
+          </Text>
+          {props.onManage && (
+            <Pressable
+              onPress={props.onManage}
+              style={[styles.addButton, { backgroundColor: colors.primary || '#EC4899' }]}
+            >
+              <Feather name="plus" size={18} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>Add Social Links</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    );
   }
 
   const handlePress = (url: string) => {
@@ -109,7 +143,7 @@ export default function SocialMediaBar(props: SocialMediaBarProps) {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
       <View style={styles.iconsRow}>
         {socials.map((social) => (
           <Pressable
@@ -142,5 +176,35 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     padding: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.7,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

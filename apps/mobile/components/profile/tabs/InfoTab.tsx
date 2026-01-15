@@ -7,17 +7,26 @@ interface InfoTabProps {
   profile: any;
   locationText?: string;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
-export default function InfoTab({ children, profile, locationText, colors }: InfoTabProps) {
+export default function InfoTab({ children, profile, locationText, colors, cardStyle }: InfoTabProps) {
+  const cardBg = cardStyle?.backgroundColor || colors.card;
+  const cardRadius = cardStyle?.borderRadius || 12;
+  const textColor = cardStyle?.textColor || colors.text;
+  
   return (
     <View>
       {(profile.bio || locationText) && (
-        <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.infoCard, { backgroundColor: cardBg, borderColor: colors.border, borderRadius: cardRadius }]}>
           {profile.bio && (
             <View style={styles.bioSection}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
-              <Text style={[styles.bioText, { color: colors.text }]}>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>About</Text>
+              <Text style={[styles.bioText, { color: textColor }]}>
                 {profile.bio}
               </Text>
             </View>
@@ -26,7 +35,7 @@ export default function InfoTab({ children, profile, locationText, colors }: Inf
           {locationText && !profile.location_hidden && (
             <View style={styles.locationSection}>
               <Feather name="map-pin" size={16} color={colors.primary} />
-              <Text style={[styles.locationText, { color: colors.text }]}>
+              <Text style={[styles.locationText, { color: textColor }]}>
                 {locationText}
               </Text>
             </View>

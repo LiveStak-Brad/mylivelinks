@@ -101,21 +101,28 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
       { id: 'reels', label: 'Vlog', icon: 'film', enabled: true },
       { id: 'media', label: 'Media', icon: 'image', enabled: true },
-      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'video', enabled: true },
+      { id: 'events', label: 'Events', icon: 'calendar', enabled: true },
+      { id: 'products', label: 'Products', icon: 'shopping-bag', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
       { id: 'social_counts', enabled: true, order: 2 },
       { id: 'top_supporters', enabled: true, order: 3 },
       { id: 'top_streamers', enabled: true, order: 4 },
-      { id: 'streaming_stats', enabled: true, order: 5 },
-      { id: 'social_media', enabled: true, order: 6 },
-      { id: 'connections', enabled: true, order: 7 },
-      { id: 'referral_network', enabled: true, order: 8 },
-      { id: 'top_friends', enabled: true, order: 9 },
-      { id: 'links', enabled: true, order: 10 },
-      { id: 'profile_stats', enabled: true, order: 11 },
-      { id: 'footer', enabled: true, order: 12 },
+      { id: 'top_friends', enabled: true, order: 5 },
+      { id: 'music_showcase', enabled: true, order: 6 },
+      { id: 'upcoming_events', enabled: true, order: 7 },
+      { id: 'portfolio', enabled: true, order: 8 },
+      { id: 'streaming_stats', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 10 },
+      { id: 'connections', enabled: true, order: 11 },
+      { id: 'referral_network', enabled: true, order: 12 },
+      { id: 'links', enabled: true, order: 13 },
+      { id: 'merchandise', enabled: true, order: 14 },
+      { id: 'business_info', enabled: true, order: 15 },
+      { id: 'profile_stats', enabled: true, order: 16 },
+      { id: 'footer', enabled: true, order: 17 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'user-plus', enabled: true, primary: true },
@@ -133,22 +140,30 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'info', enabled: true },
       { id: 'music', label: 'Music', icon: 'music', enabled: true },
-      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'video', enabled: true },
       { id: 'events', label: 'Events', icon: 'calendar', enabled: true },
       { id: 'media', label: 'Media', icon: 'image', enabled: true },
+      { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
+      { id: 'products', label: 'Products', icon: 'shopping-bag', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
-      { id: 'music_showcase', enabled: true, order: 2 },
-      { id: 'upcoming_events', enabled: true, order: 3 },
-      { id: 'social_counts', enabled: true, order: 4 },
-      { id: 'social_media', enabled: true, order: 5 },
-      { id: 'merchandise', enabled: true, order: 6 },
-      { id: 'connections', enabled: true, order: 7 },
-      { id: 'referral_network', enabled: true, order: 8 },
-      { id: 'top_friends', enabled: true, order: 9 },
-      { id: 'links', enabled: true, order: 10 },
-      { id: 'footer', enabled: true, order: 11 },
+      { id: 'social_counts', enabled: true, order: 2 },
+      { id: 'top_supporters', enabled: true, order: 3 },
+      { id: 'top_streamers', enabled: true, order: 4 },
+      { id: 'top_friends', enabled: true, order: 5 },
+      { id: 'music_showcase', enabled: true, order: 6 },
+      { id: 'upcoming_events', enabled: true, order: 7 },
+      { id: 'portfolio', enabled: true, order: 8 },
+      { id: 'streaming_stats', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 10 },
+      { id: 'connections', enabled: true, order: 11 },
+      { id: 'referral_network', enabled: true, order: 12 },
+      { id: 'links', enabled: true, order: 13 },
+      { id: 'merchandise', enabled: true, order: 14 },
+      { id: 'business_info', enabled: true, order: 15 },
+      { id: 'profile_stats', enabled: true, order: 16 },
+      { id: 'footer', enabled: true, order: 17 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'user-plus', enabled: true, primary: true },
@@ -167,18 +182,27 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
       { id: 'events', label: 'Shows', icon: 'calendar', enabled: true },
       { id: 'media', label: 'Media', icon: 'image', enabled: true },
+      { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
+      { id: 'products', label: 'Products', icon: 'shopping-bag', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
-      { id: 'upcoming_events', enabled: true, order: 2 },
-      { id: 'social_counts', enabled: true, order: 3 },
-      { id: 'social_media', enabled: true, order: 4 },
-      { id: 'merchandise', enabled: true, order: 5 },
-      { id: 'connections', enabled: true, order: 6 },
-      { id: 'referral_network', enabled: true, order: 7 },
-      { id: 'top_friends', enabled: true, order: 8 },
-      { id: 'links', enabled: true, order: 9 },
-      { id: 'footer', enabled: true, order: 10 },
+      { id: 'social_counts', enabled: true, order: 2 },
+      { id: 'top_supporters', enabled: true, order: 3 },
+      { id: 'top_streamers', enabled: true, order: 4 },
+      { id: 'top_friends', enabled: true, order: 5 },
+      { id: 'music_showcase', enabled: true, order: 6 },
+      { id: 'upcoming_events', enabled: true, order: 7 },
+      { id: 'portfolio', enabled: true, order: 8 },
+      { id: 'streaming_stats', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 10 },
+      { id: 'connections', enabled: true, order: 11 },
+      { id: 'referral_network', enabled: true, order: 12 },
+      { id: 'links', enabled: true, order: 13 },
+      { id: 'merchandise', enabled: true, order: 14 },
+      { id: 'business_info', enabled: true, order: 15 },
+      { id: 'profile_stats', enabled: true, order: 16 },
+      { id: 'footer', enabled: true, order: 17 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'user-plus', enabled: true, primary: true },
@@ -196,18 +220,27 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'info', label: 'About', icon: 'info', enabled: true },
       { id: 'products', label: 'Products', icon: 'shopping-cart', enabled: true },
       { id: 'media', label: 'Gallery', icon: 'image', enabled: true },
+      { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
+      { id: 'events', label: 'Events', icon: 'calendar', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
-      { id: 'business_info', enabled: true, order: 2 },
-      { id: 'portfolio', enabled: true, order: 3 },
-      { id: 'social_counts', enabled: true, order: 4 },
-      { id: 'social_media', enabled: true, order: 5 },
-      { id: 'links', enabled: true, order: 6 },
-      { id: 'connections', enabled: true, order: 7 },
-      { id: 'referral_network', enabled: true, order: 8 },
-      { id: 'top_friends', enabled: true, order: 9 },
-      { id: 'footer', enabled: true, order: 10 },
+      { id: 'social_counts', enabled: true, order: 2 },
+      { id: 'top_supporters', enabled: true, order: 3 },
+      { id: 'top_streamers', enabled: true, order: 4 },
+      { id: 'top_friends', enabled: true, order: 5 },
+      { id: 'music_showcase', enabled: true, order: 6 },
+      { id: 'upcoming_events', enabled: true, order: 7 },
+      { id: 'portfolio', enabled: true, order: 8 },
+      { id: 'streaming_stats', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 10 },
+      { id: 'connections', enabled: true, order: 11 },
+      { id: 'referral_network', enabled: true, order: 12 },
+      { id: 'links', enabled: true, order: 13 },
+      { id: 'merchandise', enabled: true, order: 14 },
+      { id: 'business_info', enabled: true, order: 15 },
+      { id: 'profile_stats', enabled: true, order: 16 },
+      { id: 'footer', enabled: true, order: 17 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'user-plus', enabled: true, primary: true },
@@ -225,7 +258,9 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
       { id: 'reels', label: 'Vlog', icon: 'film', enabled: true },
       { id: 'media', label: 'Media', icon: 'image', enabled: true },
-      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'video', enabled: true },
+      { id: 'events', label: 'Events', icon: 'calendar', enabled: true },
+      { id: 'products', label: 'Products', icon: 'shopping-bag', enabled: true },
       { id: 'podcasts', label: 'Podcasts', icon: 'mic', enabled: false },
       { id: 'movies', label: 'Movies', icon: 'film', enabled: false },
       { id: 'series', label: 'Series', icon: 'layers', enabled: false },
@@ -234,14 +269,21 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     sections: [
       { id: 'hero', enabled: true, order: 1 },
       { id: 'social_counts', enabled: true, order: 2 },
-      { id: 'social_media', enabled: true, order: 3 },
-      { id: 'portfolio', enabled: true, order: 4 },
-      { id: 'connections', enabled: true, order: 5 },
-      { id: 'referral_network', enabled: true, order: 6 },
-      { id: 'top_friends', enabled: true, order: 7 },
-      { id: 'links', enabled: true, order: 8 },
-      { id: 'profile_stats', enabled: true, order: 9 },
-      { id: 'footer', enabled: true, order: 10 },
+      { id: 'top_supporters', enabled: true, order: 3 },
+      { id: 'top_streamers', enabled: true, order: 4 },
+      { id: 'top_friends', enabled: true, order: 5 },
+      { id: 'music_showcase', enabled: true, order: 6 },
+      { id: 'upcoming_events', enabled: true, order: 7 },
+      { id: 'portfolio', enabled: true, order: 8 },
+      { id: 'streaming_stats', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 10 },
+      { id: 'connections', enabled: true, order: 11 },
+      { id: 'referral_network', enabled: true, order: 12 },
+      { id: 'links', enabled: true, order: 13 },
+      { id: 'merchandise', enabled: true, order: 14 },
+      { id: 'business_info', enabled: true, order: 15 },
+      { id: 'profile_stats', enabled: true, order: 16 },
+      { id: 'footer', enabled: true, order: 17 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'user-plus', enabled: true, primary: true },
@@ -259,7 +301,10 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
       { id: 'info', label: 'Info', icon: 'info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'grid', enabled: true },
       { id: 'media', label: 'Media', icon: 'image', enabled: true },
-      { id: 'music_videos', label: 'Music Videos', icon: 'music', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'video', enabled: true },
+      { id: 'reels', label: 'Reels', icon: 'film', enabled: true },
+      { id: 'events', label: 'Events', icon: 'calendar', enabled: true },
+      { id: 'products', label: 'Products', icon: 'shopping-bag', enabled: true },
       { id: 'podcasts', label: 'Podcasts', icon: 'mic', enabled: false },
       { id: 'movies', label: 'Movies', icon: 'film', enabled: false },
       { id: 'series', label: 'Series', icon: 'layers', enabled: false },
@@ -268,11 +313,21 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     sections: [
       { id: 'hero', enabled: true, order: 1 },
       { id: 'social_counts', enabled: true, order: 2 },
-      { id: 'social_media', enabled: true, order: 3 },
-      { id: 'connections', enabled: true, order: 4 },
+      { id: 'top_supporters', enabled: true, order: 3 },
+      { id: 'top_streamers', enabled: true, order: 4 },
       { id: 'top_friends', enabled: true, order: 5 },
-      { id: 'links', enabled: true, order: 6 },
-      { id: 'footer', enabled: true, order: 7 },
+      { id: 'music_showcase', enabled: true, order: 6 },
+      { id: 'upcoming_events', enabled: true, order: 7 },
+      { id: 'portfolio', enabled: true, order: 8 },
+      { id: 'streaming_stats', enabled: true, order: 9 },
+      { id: 'social_media', enabled: true, order: 10 },
+      { id: 'connections', enabled: true, order: 11 },
+      { id: 'referral_network', enabled: true, order: 12 },
+      { id: 'links', enabled: true, order: 13 },
+      { id: 'merchandise', enabled: true, order: 14 },
+      { id: 'business_info', enabled: true, order: 15 },
+      { id: 'profile_stats', enabled: true, order: 16 },
+      { id: 'footer', enabled: true, order: 17 },
     ],
     quickActions: [
       { id: 'follow', label: 'Follow', icon: 'user-plus', enabled: true, primary: true },
@@ -310,7 +365,7 @@ export function getEnabledTabs(
   // If user has custom enabled tabs, use those
   // Note: empty array means user intentionally disabled all OPTIONAL tabs.
   if (Array.isArray(customEnabledTabs)) {
-    // Map legacy tab IDs to new ones for backwards compatibility
+    // Map legacy web tab IDs to mobile IDs for backwards compatibility
     const mappedTabs = customEnabledTabs.map(tab => {
       if (tab === 'photos' as any) return 'media';
       if (tab === 'videos' as any) return 'music_videos';
@@ -334,17 +389,24 @@ export function getEnabledSections(
 ): SectionConfig[] {
   const config = getProfileTypeConfig(profileType);
   
-  // If custom list exists, use it (respecting order from config)
-  if (Array.isArray(customEnabledModules)) {
+  // If custom list exists AND has items, use it (respecting order from config)
+  // Empty array means user intentionally disabled all optional modules
+  // null/undefined means use profile_type defaults
+  if (Array.isArray(customEnabledModules) && customEnabledModules.length > 0) {
     const customSet = new Set(customEnabledModules);
     // Always include hero and footer (core sections)
     customSet.add('hero');
     customSet.add('footer');
     
+    console.log('[getEnabledSections] Using custom modules:', Array.from(customSet));
+    
     return config.sections
       .filter(section => customSet.has(section.id))
       .sort((a, b) => a.order - b.order);
   }
+  
+  // Empty array or null/undefined - use profile_type defaults
+  console.log('[getEnabledSections] Using profile_type defaults for:', profileType);
   
   // Fallback to profile_type defaults
   return config.sections

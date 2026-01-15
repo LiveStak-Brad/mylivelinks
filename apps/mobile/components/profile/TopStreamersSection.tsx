@@ -17,13 +17,23 @@ interface TopStreamersSectionProps {
   streamers: TopStreamer[];
   onPressProfile: (profileId: string, username: string) => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 export default function TopStreamersSection({
   streamers,
   onPressProfile,
   colors,
+  cardStyle,
 }: TopStreamersSectionProps) {
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
+  const textColor = cardStyle?.textColor || colors.text;
+  
   if (!streamers || streamers.length === 0) {
     return null;
   }
@@ -35,10 +45,10 @@ export default function TopStreamersSection({
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
       <View style={styles.header}>
         <Feather name="video" size={20} color={colors.primary} />
-        <Text style={[styles.title, { color: colors.text }]}>Top Streamers</Text>
+        <Text style={[styles.title, { color: textColor }]}>Top Streamers</Text>
       </View>
       
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>

@@ -113,8 +113,13 @@ export default function ProfileTabPicker({
   // Initialize defaults when component mounts OR when profile type changes (if no custom selection)
   useEffect(() => {
     if (Array.isArray(currentEnabledTabs)) {
-      // User has custom selection - keep it
-      setEnabledTabs(new Set([...currentEnabledTabs, ...CORE_TABS]));
+      // User has custom selection - map mobile tab IDs to web IDs for compatibility
+      const mappedTabs = currentEnabledTabs.map(tab => {
+        if (tab === 'media' as any) return 'photos';
+        if (tab === 'music_videos' as any) return 'videos';
+        return tab;
+      });
+      setEnabledTabs(new Set([...mappedTabs, ...CORE_TABS]));
     } else {
       // No custom selection - use profile_type defaults
       const defaults = PROFILE_TYPE_CONFIG[profileType].tabs

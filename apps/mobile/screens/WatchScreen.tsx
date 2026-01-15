@@ -159,18 +159,33 @@ export default function WatchScreen() {
     if (viewedItemsRef.current.has(item.id)) return;
     viewedItemsRef.current.add(item.id);
 
+    const contentType = item.type === 'live' ? 'live_stream' : 'feed_post';
+    const contentId = item.postId || item.id;
+
+    console.log('[WATCH VIEW] 📊 Tracking view increment', {
+      itemId: item.id,
+      contentId,
+      contentType,
+      username: item.username,
+      source: 'mobile',
+      totalTracked: viewedItemsRef.current.size,
+    });
+
     try {
-      const contentType = item.type === 'live' ? 'live_stream' : 'feed_post';
-      const contentId = item.postId || item.id;
-      
-      await supabase.rpc('rpc_track_content_view', {
+      const { data, error } = await supabase.rpc('rpc_track_content_view', {
         p_content_type: contentType,
         p_content_id: contentId,
         p_view_source: 'mobile',
         p_view_type: 'viewport',
       });
+
+      if (error) {
+        console.warn('[WATCH VIEW] ❌ View tracking failed', { contentId, error: error.message });
+      } else {
+        console.log('[WATCH VIEW] ✅ View increment SUCCESS', { contentId, contentType, response: data });
+      }
     } catch (err) {
-      console.warn('[WatchScreen] View tracking error:', err);
+      console.warn('[WATCH VIEW] ❌ View tracking exception', { contentId, error: err });
     }
   }, []);
 

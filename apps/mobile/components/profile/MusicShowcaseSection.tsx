@@ -10,6 +10,11 @@ interface MusicShowcaseSectionProps {
   isOwnProfile: boolean;
   onEdit?: () => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 export default function MusicShowcaseSection({
@@ -17,7 +22,11 @@ export default function MusicShowcaseSection({
   isOwnProfile,
   onEdit,
   colors,
+  cardStyle,
 }: MusicShowcaseSectionProps) {
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
+  const textColor = cardStyle?.textColor || colors.text;
   const [tracks, setTracks] = useState<MusicTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
@@ -107,11 +116,11 @@ export default function MusicShowcaseSection({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Feather name="music" size={20} color={colors.primary} />
-          <Text style={[styles.title, { color: colors.text }]}>Music</Text>
+          <Text style={[styles.title, { color: textColor }]}>Music</Text>
         </View>
         {isOwnProfile && onEdit && (
           <Pressable onPress={onEdit} style={styles.editButton}>

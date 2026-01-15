@@ -8,11 +8,20 @@ interface ProfileTabBarProps {
   activeTab: ProfileTab;
   onTabChange: (tab: ProfileTab) => void;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
-export default function ProfileTabBar({ tabs, activeTab, onTabChange, colors }: ProfileTabBarProps) {
+export default function ProfileTabBar({ tabs, activeTab, onTabChange, colors, cardStyle }: ProfileTabBarProps) {
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 0;
+  const textColor = cardStyle?.textColor || colors.text;
+  
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+    <View style={[styles.container, { backgroundColor: cardBg, borderBottomColor: colors.border, borderRadius: cardRadius }]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab;

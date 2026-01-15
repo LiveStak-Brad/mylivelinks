@@ -810,8 +810,15 @@ export default function FeedScreen() {
     if (trackedViewsRef.current.has(postId)) return;
     trackedViewsRef.current.add(postId);
 
+    console.log('[FEED VIEW] 📊 Tracking view increment', {
+      postId,
+      contentType: 'feed_post',
+      source: 'mobile',
+      totalTracked: trackedViewsRef.current.size,
+    });
+
     try {
-      const { error: rpcErr } = await supabase.rpc('rpc_track_content_view', {
+      const { data, error: rpcErr } = await supabase.rpc('rpc_track_content_view', {
         p_content_type: 'feed_post',
         p_content_id: postId,
         p_view_source: 'mobile',
@@ -820,10 +827,12 @@ export default function FeedScreen() {
       });
 
       if (rpcErr) {
-        console.warn('[feed] view tracking failed', { postId, error: rpcErr.message });
+        console.warn('[FEED VIEW] ❌ View tracking failed', { postId, error: rpcErr.message });
+      } else {
+        console.log('[FEED VIEW] ✅ View increment SUCCESS', { postId, response: data });
       }
     } catch (e) {
-      console.warn('[feed] view tracking exception', { postId, error: e });
+      console.warn('[FEED VIEW] ❌ View tracking exception', { postId, error: e });
     }
   }, []);
 

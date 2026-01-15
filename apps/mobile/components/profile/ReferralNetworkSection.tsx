@@ -7,12 +7,21 @@ import { supabase } from '../../lib/supabase';
 interface ReferralNetworkSectionProps {
   profileId: string;
   colors: any;
+  cardStyle?: {
+    backgroundColor: string;
+    borderRadius: number;
+    textColor?: string;
+  };
 }
 
 export default function ReferralNetworkSection({
   profileId,
   colors,
+  cardStyle,
 }: ReferralNetworkSectionProps) {
+  const cardBg = cardStyle?.backgroundColor || colors.surface;
+  const cardRadius = cardStyle?.borderRadius || 12;
+  const textColor = cardStyle?.textColor || colors.text;
   const [stats, setStats] = React.useState<ReferralStats | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -70,7 +79,7 @@ export default function ReferralNetworkSection({
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+      <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius }]}>
         <ActivityIndicator size="small" color={colors.primary} />
       </View>
     );
@@ -84,11 +93,11 @@ export default function ReferralNetworkSection({
   const progressPercent = stats.total_referrals > 0 ? 100 : 0;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[styles.container, { backgroundColor: cardBg, borderRadius: cardRadius, borderColor: colors.border }]}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Feather name="users" size={20} color={colors.primary} />
-          <Text style={[styles.title, { color: colors.text }]}>Referral Network</Text>
+          <Text style={[styles.title, { color: textColor }]}>Referral Network</Text>
         </View>
       </View>
       

@@ -33,6 +33,11 @@ import MusicVideosSection from '../components/profile/MusicVideosSection';
 import TopSupportersSection from '../components/profile/TopSupportersSection';
 import TopStreamersSection from '../components/profile/TopStreamersSection';
 import ProfileBadges from '../components/profile/ProfileBadges';
+import UpcomingEventsSection from '../components/profile/UpcomingEventsSection';
+import PortfolioSection from '../components/profile/PortfolioSection';
+import StreamingStatsSection from '../components/profile/StreamingStatsSection';
+import MerchandiseSection from '../components/profile/MerchandiseSection';
+import BusinessInfoSection from '../components/profile/BusinessInfoSection';
 import LiveIndicatorBanner from '../components/profile/LiveIndicatorBanner';
 import MllProBadge from '../components/shared/MllProBadge';
 import ShareModal from '../components/ShareModal';
@@ -124,11 +129,14 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       cardBg: hexToRgba(cardColor, cardOpacity),
       cardRadius: radiusMap[cardBorderRadius] ?? 16,
       accent: accentColor,
+      // Text colors from profile customization
+      contentTextColor: profile?.content_text_color || stylesVars.text,
+      uiTextColor: profile?.ui_text_color || stylesVars.text,
       // Additional fields for future use (low-risk, already in payload)
       buttonColor: profile?.button_color || null,
       linkColor: profile?.link_color || accentColor,
     };
-  }, [profileData?.profile, stylesVars.primary]);
+  }, [profileData?.profile, stylesVars.primary, stylesVars.text]);
 
   const isOwnProfile = useMemo(() => {
     if (!currentUser.userId || !profileData?.profile?.id) return false;
@@ -137,7 +145,16 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
 
   const enabledSections = useMemo(() => {
     if (!profileData?.profile) return [];
-    return getEnabledSections(profileData.profile.profile_type, profileData.profile.enabled_modules);
+    const rawModules = profileData.profile.enabled_modules;
+    console.log('[ProfileViewScreen] RAW enabled_modules from DB:', JSON.stringify(rawModules));
+    console.log('[ProfileViewScreen] typeof enabled_modules:', typeof rawModules);
+    console.log('[ProfileViewScreen] Array.isArray:', Array.isArray(rawModules));
+    console.log('[ProfileViewScreen] length:', rawModules?.length);
+    console.log('[ProfileViewScreen] profile_type:', profileData.profile.profile_type);
+    
+    const sections = getEnabledSections(profileData.profile.profile_type, rawModules);
+    console.log('[ProfileViewScreen] FINAL enabledSections:', sections.map(s => s.id));
+    return sections;
   }, [profileData?.profile]);
 
   const enabledTabs = useMemo(() => {
@@ -146,7 +163,9 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
   }, [profileData?.profile]);
 
   const shouldShowSection = useCallback((sectionId: string) => {
-    return enabledSections.some(s => s.id === sectionId);
+    const result = enabledSections.some(s => s.id === sectionId);
+    console.log(`[shouldShowSection] ${sectionId}: ${result}`);
+    return result;
   }, [enabledSections]);
 
   const navigateToProfile = useCallback((profileId: string, username: string) => {
@@ -663,31 +682,60 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               github={profile.social_github}
               spotify={profile.social_spotify}
               onlyfans={profile.social_onlyfans}
+              isOwnProfile={isOwnProfile}
+              onManage={() => navigation.navigate('SettingsProfileScreen')}
               colors={stylesVars}
+              cardStyle={{
+                backgroundColor: effectiveCustomization.cardBg,
+                borderRadius: effectiveCustomization.cardRadius,
+                textColor: effectiveCustomization.contentTextColor,
+              }}
             />
           )}
 
-          {shouldShowSection('links') && profileData.links && profileData.links.length > 0 && (
-            <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
-              <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>
-                {profile.links_section_title || 'Links'}
-              </Text>
-              {profileData.links.map((link) => (
-                <Pressable
-                  key={link.id}
-                  style={[styles.linkRow, { backgroundColor: `${effectiveCustomization.linkColor}10`, borderColor: stylesVars.border }]}
-                  onPress={() => link.url && Linking.openURL(link.url).catch(err => console.error('Failed to open link:', err))}
-                >
-                  <View style={styles.linkRowLeft}>
-                    <Feather name="link" size={16} color={effectiveCustomization.linkColor} />
-                    <Text style={[styles.linkTitle, { color: stylesVars.text }]} numberOfLines={1}>
-                      {link.title}
-                    </Text>
-                  </View>
-                  <Feather name="external-link" size={16} color={stylesVars.mutedText} />
-                </Pressable>
-              ))}
-            </View>
+          {shouldShowSection('links') && (
+            (profileData.links && profileData.links.length > 0) ? (
+              <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
+                <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>
+                  {profile.links_section_title || 'Links'}
+                </Text>
+                {profileData.links.map((link) => (
+                  <Pressable
+                    key={link.id}
+                    style={[styles.linkRow, { backgroundColor: `${effectiveCustomization.linkColor}10`, borderColor: stylesVars.border }]}
+                    onPress={() => link.url && Linking.openURL(link.url).catch(err => console.error('Failed to open link:', err))}
+                  >
+                    <View style={styles.linkRowLeft}>
+                      <Feather name="link" size={16} color={effectiveCustomization.linkColor} />
+                      <Text style={[styles.linkTitle, { color: stylesVars.text }]} numberOfLines={1}>
+                        {link.title}
+                      </Text>
+                    </View>
+                    <Feather name="external-link" size={16} color={stylesVars.mutedText} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : isOwnProfile ? (
+              <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
+                <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>
+                  {profile.links_section_title || 'Links'}
+                </Text>
+                <View style={styles.emptyStateContainer}>
+                  <Feather name="link" size={32} color={stylesVars.mutedText} style={{ opacity: 0.5 }} />
+                  <Text style={[styles.emptyStateTitle, { color: stylesVars.text }]}>No Links Yet</Text>
+                  <Text style={[styles.emptyStateText, { color: stylesVars.mutedText }]}>
+                    Add links to share with your visitors
+                  </Text>
+                  <Pressable
+                    onPress={() => navigation.navigate('SettingsProfileScreen')}
+                    style={[styles.emptyStateCta, { backgroundColor: stylesVars.primary }]}
+                  >
+                    <Feather name="plus" size={18} color="#FFFFFF" />
+                    <Text style={styles.emptyStateCtaText}>Add Links</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null
           )}
 
           {enabledTabs.length > 1 && (
@@ -696,6 +744,11 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               activeTab={activeTab}
               onTabChange={setActiveTab}
               colors={stylesVars}
+              cardStyle={{
+                backgroundColor: effectiveCustomization.cardBg,
+                borderRadius: effectiveCustomization.cardRadius,
+                textColor: effectiveCustomization.uiTextColor,
+              }}
             />
           )}
 
@@ -704,23 +757,64 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
               profile={profile}
               locationText={locationText}
               colors={stylesVars}
+              cardStyle={{
+                backgroundColor: effectiveCustomization.cardBg,
+                borderRadius: effectiveCustomization.cardRadius,
+                textColor: effectiveCustomization.contentTextColor,
+              }}
             >
-              {shouldShowSection('top_supporters') && profileData.top_supporters && profileData.top_supporters.length > 0 && (
+              {/* DEBUG: Force render Top Supporters for testing */}
+              {(profileData.top_supporters && profileData.top_supporters.length > 0) ? (
                 <TopSupportersSection
                   supporters={profileData.top_supporters}
                   gifterStatuses={profileData.gifter_statuses}
                   onPressProfile={navigateToProfile}
                   colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
                 />
-              )}
+              ) : isOwnProfile ? (
+                <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius, marginBottom: 16 }]}>
+                  <View style={styles.sectionHeader}>
+                    <Feather name="heart" size={20} color={stylesVars.primary} />
+                    <Text style={[styles.sectionTitle, { color: stylesVars.text, marginBottom: 0 }]}>Top Supporters</Text>
+                  </View>
+                  <View style={styles.emptyStateContainer}>
+                    <Text style={[styles.emptyStateText, { color: stylesVars.mutedText }]}>
+                      No supporters yet. Go live to receive gifts!
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
 
-              {shouldShowSection('top_streamers') && profileData.top_streamers && profileData.top_streamers.length > 0 && (
+              {/* DEBUG: Force render Top Streamers for testing */}
+              {(profileData.top_streamers && profileData.top_streamers.length > 0) ? (
                 <TopStreamersSection
                   streamers={profileData.top_streamers}
                   onPressProfile={navigateToProfile}
                   colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
                 />
-              )}
+              ) : isOwnProfile ? (
+                <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius, marginBottom: 16 }]}>
+                  <View style={styles.sectionHeader}>
+                    <Feather name="video" size={20} color={stylesVars.primary} />
+                    <Text style={[styles.sectionTitle, { color: stylesVars.text, marginBottom: 0 }]}>Top Streamers</Text>
+                  </View>
+                  <View style={styles.emptyStateContainer}>
+                    <Text style={[styles.emptyStateText, { color: stylesVars.mutedText }]}>
+                      No streamers supported yet. Watch streams and send gifts!
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
 
               {shouldShowSection('top_friends') && profile.show_top_friends !== false && (
                 <TopFriendsSection
@@ -732,6 +826,11 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                   maxCount={profile.top_friends_max_count}
                   onManage={() => setShowTopFriendsManager(true)}
                   colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
                 />
               )}
 
@@ -739,58 +838,97 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
                 <ReferralNetworkSection
                   profileId={profile.id}
                   colors={stylesVars}
+                  cardStyle={{
+                    backgroundColor: effectiveCustomization.cardBg,
+                    borderRadius: effectiveCustomization.cardRadius,
+                    textColor: effectiveCustomization.contentTextColor,
+                  }}
                 />
               )}
 
-              {shouldShowSection('music_showcase') && (
-                <MusicShowcaseSection
-                  profileId={profile.id}
-                  isOwnProfile={isOwnProfile}
-                  onEdit={() => {}}
-                  colors={stylesVars}
-                />
-              )}
+              {/* DEBUG: Force render all sections without shouldShowSection checks */}
+              <MusicShowcaseSection
+                profileId={profile.id}
+                isOwnProfile={isOwnProfile}
+                onEdit={() => {}}
+                colors={stylesVars}
+                cardStyle={{
+                  backgroundColor: effectiveCustomization.cardBg,
+                  borderRadius: effectiveCustomization.cardRadius,
+                  textColor: effectiveCustomization.contentTextColor,
+                }}
+              />
 
-              {shouldShowSection('music_showcase') && (
-                <MusicVideosSection
-                  profileId={profile.id}
-                  isOwnProfile={isOwnProfile}
-                  onEdit={() => {}}
-                  colors={stylesVars}
-                />
-              )}
+              <MusicVideosSection
+                profileId={profile.id}
+                isOwnProfile={isOwnProfile}
+                onEdit={() => {}}
+                colors={stylesVars}
+                cardStyle={{
+                  backgroundColor: effectiveCustomization.cardBg,
+                  borderRadius: effectiveCustomization.cardRadius,
+                  textColor: effectiveCustomization.contentTextColor,
+                }}
+              />
 
-              {shouldShowSection('streaming_stats') && !profile.hide_streaming_stats && profileData.stream_stats && profileData.stream_stats.total_streams > 0 && (
-                <View style={[styles.card, { backgroundColor: effectiveCustomization.cardBg, borderColor: stylesVars.border, borderRadius: effectiveCustomization.cardRadius }]}>
-                  <Text style={[styles.sectionTitle, { color: stylesVars.text }]}>Streaming Stats</Text>
-                  <View style={styles.statsGrid}>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: effectiveCustomization.accent }]}>
-                        {profileData.stream_stats.total_streams}
-                      </Text>
-                      <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Total Streams</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: effectiveCustomization.accent }]}>
-                        {profileData.stream_stats.total_viewers.toLocaleString()}
-                      </Text>
-                      <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Total Viewers</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: effectiveCustomization.accent }]}>
-                        {profileData.stream_stats.peak_viewers}
-                      </Text>
-                      <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Peak Viewers</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={[styles.statValue, { color: effectiveCustomization.accent }]}>
-                        {profileData.stream_stats.diamonds_earned_lifetime}
-                      </Text>
-                      <Text style={[styles.statLabel, { color: stylesVars.mutedText }]}>Diamonds</Text>
-                    </View>
-                  </View>
-                </View>
-              )}
+              <UpcomingEventsSection
+                profileId={profile.id}
+                isOwnProfile={isOwnProfile}
+                onAddEvent={() => {}}
+                colors={stylesVars}
+                cardStyle={{
+                  backgroundColor: effectiveCustomization.cardBg,
+                  borderRadius: effectiveCustomization.cardRadius,
+                  textColor: effectiveCustomization.contentTextColor,
+                }}
+              />
+
+              <PortfolioSection
+                profileId={profile.id}
+                isOwnProfile={isOwnProfile}
+                onAddItem={() => setShowPortfolioManager(true)}
+                colors={stylesVars}
+                cardStyle={{
+                  backgroundColor: effectiveCustomization.cardBg,
+                  borderRadius: effectiveCustomization.cardRadius,
+                  textColor: effectiveCustomization.contentTextColor,
+                }}
+              />
+
+              <StreamingStatsSection
+                stats={profileData.stream_stats}
+                isOwnProfile={isOwnProfile}
+                colors={stylesVars}
+                cardStyle={{
+                  backgroundColor: effectiveCustomization.cardBg,
+                  borderRadius: effectiveCustomization.cardRadius,
+                  textColor: effectiveCustomization.contentTextColor,
+                }}
+              />
+
+              <MerchandiseSection
+                profileId={profile.id}
+                isOwnProfile={isOwnProfile}
+                onAddItem={() => {}}
+                colors={stylesVars}
+                cardStyle={{
+                  backgroundColor: effectiveCustomization.cardBg,
+                  borderRadius: effectiveCustomization.cardRadius,
+                  textColor: effectiveCustomization.contentTextColor,
+                }}
+              />
+
+              <BusinessInfoSection
+                profileId={profile.id}
+                isOwnProfile={isOwnProfile}
+                onEdit={() => navigation.navigate('SettingsProfileScreen')}
+                colors={stylesVars}
+                cardStyle={{
+                  backgroundColor: effectiveCustomization.cardBg,
+                  borderRadius: effectiveCustomization.cardRadius,
+                  textColor: effectiveCustomization.contentTextColor,
+                }}
+              />
             </InfoTab>
       ) : activeTab === 'feed' ? (
         <FeedTab 
@@ -1275,6 +1413,42 @@ function createStyles(stylesVars: {
     },
     menuDivider: {
       height: 1,
+    },
+    emptyStateContainer: {
+      alignItems: 'center',
+      paddingVertical: 20,
+    },
+    emptyStateTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginTop: 12,
+      marginBottom: 4,
+    },
+    emptyStateText: {
+      fontSize: 14,
+      textAlign: 'center',
+      opacity: 0.7,
+      marginBottom: 16,
+      paddingHorizontal: 16,
+    },
+    emptyStateCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 24,
+      gap: 8,
+    },
+    emptyStateCtaText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
     },
   });
 }
