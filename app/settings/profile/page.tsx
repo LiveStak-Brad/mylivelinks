@@ -512,12 +512,10 @@ export default function ProfileSettingsPage() {
           font_preset: customization.font_preset,
           accent_color: customization.accent_color,
           links_section_title: customization.links_section_title,
-          // Note: Color fields ready but require migration first
-          // Run: supabase/migrations/20251229_add_granular_color_customization.sql
-          // button_color: customization.button_color || null,
-          // content_text_color: customization.content_text_color || null,
-          // ui_text_color: customization.ui_text_color || null,
-          // link_color: customization.link_color || null,
+          button_color: customization.button_color || null,
+          content_text_color: customization.content_text_color || null,
+          ui_text_color: customization.ui_text_color || null,
+          link_color: customization.link_color || null,
           updated_at: new Date().toISOString(),
         };
 

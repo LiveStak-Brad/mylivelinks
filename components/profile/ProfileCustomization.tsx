@@ -109,10 +109,9 @@ export default function ProfileCustomization({
     setSaving(true);
     try {
       await onSave(settings);
-      alert('Profile customization saved!');
     } catch (error) {
       console.error('Save error:', error);
-      alert('Failed to save customization');
+      alert('Failed to apply customization');
     } finally {
       setSaving(false);
     }
@@ -583,7 +582,7 @@ export default function ProfileCustomization({
           disabled={saving}
           className="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? 'Saving...' : 'Save Customization'}
+          {saving ? 'Applying...' : 'Apply Changes'}
         </button>
       </div>
     </div>
