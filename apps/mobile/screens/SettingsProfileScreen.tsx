@@ -444,6 +444,20 @@ export default function SettingsProfileScreen() {
   const [links, setLinks] = useState<UserLink[]>([]);
   const [linksLoading, setLinksLoading] = useState(false);
   
+  // Pinned post (parity with web lib/pinnedPosts.ts)
+  const [pinnedPost, setPinnedPost] = useState<{
+    id?: number;
+    profile_id: string;
+    caption?: string;
+    media_url: string;
+    media_type: 'image' | 'video';
+  } | null>(null);
+  const [pinnedPostCaption, setPinnedPostCaption] = useState('');
+  const [pinnedPostMediaPreview, setPinnedPostMediaPreview] = useState<string | null>(null);
+  const [pinnedPostMediaType, setPinnedPostMediaType] = useState<'image' | 'video' | null>(null);
+  const [pinnedPostUploading, setPinnedPostUploading] = useState(false);
+  const [pinnedPostDeleting, setPinnedPostDeleting] = useState(false);
+  
   // Referral
   const [referralId, setReferralId] = useState<string | null>(null);
   const [invitedByUsername, setInvitedByUsername] = useState('');
@@ -588,6 +602,37 @@ export default function SettingsProfileScreen() {
     };
     
     loadLinks();
+  }, [userId]);
+
+  // Load pinned post (parity with web getPinnedPost)
+  useEffect(() => {
+    if (!userId) return;
+    
+    const loadPinnedPost = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('pinned_posts')
+          .select('*')
+          .eq('profile_id', userId)
+          .maybeSingle();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error('[SettingsProfileScreen] pinned_posts load error:', error.message);
+          return;
+        }
+        
+        if (data) {
+          setPinnedPost(data as any);
+          setPinnedPostCaption(data.caption || '');
+          setPinnedPostMediaPreview(data.media_url);
+          setPinnedPostMediaType(data.media_type);
+        }
+      } catch (err) {
+        console.error('[SettingsProfileScreen] pinned_posts load exception:', err);
+      }
+    };
+    
+    loadPinnedPost();
   }, [userId]);
 
   // Load referral status
@@ -955,6 +1000,155 @@ export default function SettingsProfileScreen() {
       return updated;
     });
   }, []);
+
+  // Pinned post upload (parity with web uploadPinnedPostMedia + upsertPinnedPost)
+  const handleUploadPinnedPost = useCallback(async () => {
+    if (!userId) return;
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library to upload media.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets[0]?.uri) return;
+
+    setPinnedPostUploading(true);
+    try {
+      const asset = result.assets[0];
+      const isVideo = asset.type === 'video';
+      const mediaType: 'image' | 'video' = isVideo ? 'video' : 'image';
+      const fileExt = asset.uri.split('.').pop()?.toLowerCase() || (isVideo ? 'mp4' : 'jpg');
+      const fileName = `pinned.${fileExt}`;
+      const filePath = `${userId}/${fileName}`;
+
+      // Fetch the media as blob
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+
+      // Upload to pinned-posts bucket (matching web lib/storage.ts uploadPinnedPostMedia)
+      const { error: uploadError } = await supabase.storage
+        .from('pinned-posts')
+        .upload(filePath, blob, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: isVideo ? 'video/mp4' : 'image/jpeg',
+        });
+
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('pinned-posts')
+        .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get media URL');
+      }
+
+      const mediaUrl = urlData.publicUrl;
+
+      // Upsert to pinned_posts table (matching web lib/pinnedPosts.ts upsertPinnedPost)
+      const { data: upsertData, error: upsertError } = await supabase
+        .from('pinned_posts')
+        .upsert({
+          profile_id: userId,
+          caption: pinnedPostCaption,
+          media_url: mediaUrl,
+          media_type: mediaType,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'profile_id',
+        })
+        .select()
+        .single();
+
+      if (upsertError) {
+        throw new Error(`Database save failed: ${upsertError.message}`);
+      }
+
+      // Update local state
+      setPinnedPost(upsertData as any);
+      setPinnedPostMediaPreview(mediaUrl);
+      setPinnedPostMediaType(mediaType);
+
+      Alert.alert('Success', 'Pinned post uploaded!');
+      await currentUser.refresh();
+    } catch (err: any) {
+      console.error('[SettingsProfileScreen] pinned post upload error:', err);
+      Alert.alert('Upload Failed', err?.message || 'Failed to upload pinned post');
+    } finally {
+      setPinnedPostUploading(false);
+    }
+  }, [userId, pinnedPostCaption, currentUser]);
+
+  // Pinned post delete (parity with web deletePinnedPost + deletePinnedPostMedia)
+  const handleDeletePinnedPost = useCallback(async () => {
+    if (!userId) return;
+
+    Alert.alert(
+      'Delete Pinned Post',
+      'Are you sure you want to delete your pinned post?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setPinnedPostDeleting(true);
+            try {
+              // Delete from DB first (authoritative)
+              const { error: deleteError } = await supabase
+                .from('pinned_posts')
+                .delete()
+                .eq('profile_id', userId);
+
+              if (deleteError) {
+                throw new Error(`Database delete failed: ${deleteError.message}`);
+              }
+
+              // Best-effort storage cleanup (matching web lib/storage.ts deletePinnedPostMedia)
+              // Don't block on failure - orphaned files are acceptable
+              try {
+                await supabase.storage
+                  .from('pinned-posts')
+                  .remove([
+                    `${userId}/pinned.jpg`,
+                    `${userId}/pinned.png`,
+                    `${userId}/pinned.mp4`,
+                    `${userId}/pinned.webm`,
+                  ]);
+              } catch (storageErr) {
+                console.warn('[SettingsProfileScreen] pinned post storage cleanup error (non-blocking):', storageErr);
+              }
+
+              // Clear local state
+              setPinnedPost(null);
+              setPinnedPostCaption('');
+              setPinnedPostMediaPreview(null);
+              setPinnedPostMediaType(null);
+
+              Alert.alert('Deleted', 'Pinned post removed.');
+              await currentUser.refresh();
+            } catch (err: any) {
+              console.error('[SettingsProfileScreen] pinned post delete error:', err);
+              Alert.alert('Delete Failed', err?.message || 'Failed to delete pinned post');
+            } finally {
+              setPinnedPostDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [userId, currentUser]);
 
   const handleChangeAvatar = useCallback(async () => {
     if (!userId) return;
@@ -1919,24 +2113,94 @@ export default function SettingsProfileScreen() {
 
         {/* Pinned Post */}
         <Card title="Pinned Post" icon={<Ionicons name="pin-outline" size={18} color={themed.blue600} />}>
+          {/* Preview */}
           <View style={[styles.pinnedPreview, { backgroundColor: themed.card2, borderColor: themed.border }]}>
-            <Text style={[styles.smallMuted, { color: themed.muted }]}>Pinned post preview (image/video)</Text>
+            {pinnedPostMediaPreview ? (
+              pinnedPostMediaType === 'video' ? (
+                <View style={{ alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                  <Ionicons name="videocam" size={40} color={themed.muted} />
+                  <Text style={[styles.smallMuted, { color: themed.muted, marginTop: 8 }]}>Video pinned</Text>
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: pinnedPostMediaPreview }}
+                  style={{ width: '100%', height: '100%', borderRadius: 12 }}
+                  resizeMode="cover"
+                />
+              )
+            ) : (
+              <Text style={[styles.smallMuted, { color: themed.muted }]}>No pinned post yet</Text>
+            )}
+            {(pinnedPostUploading || pinnedPostDeleting) && (
+              <View style={[styles.avatarLoadingOverlay, { borderRadius: 12 }]}>
+                <ActivityIndicator size="large" color={themed.white} />
+              </View>
+            )}
           </View>
+
+          {/* Actions */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            <Button label="Upload Photo/Video" iconName="cloud-upload-outline" tone="primary" disabled />
-            <Button label="Delete Pinned Post" iconName="trash-outline" tone="danger" disabled />
+            <Pressable
+              onPress={handleUploadPinnedPost}
+              disabled={saving || pinnedPostUploading || pinnedPostDeleting}
+              style={({ pressed }) => [
+                styles.btn,
+                styles.btnPrimary,
+                (saving || pinnedPostUploading || pinnedPostDeleting) && styles.btnDisabled,
+                pressed && styles.btnPressed,
+                { flex: 1 },
+              ]}
+            >
+              {pinnedPostUploading ? (
+                <ActivityIndicator size="small" color={themed.white} />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload-outline" size={18} color={themed.white} style={{ marginRight: 6 }} />
+                  <Text style={[styles.btnText, styles.btnPrimaryText]}>
+                    {pinnedPostMediaPreview ? 'Replace Media' : 'Upload Photo/Video'}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+            {pinnedPostMediaPreview && (
+              <Pressable
+                onPress={handleDeletePinnedPost}
+                disabled={saving || pinnedPostUploading || pinnedPostDeleting}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnDanger,
+                  (saving || pinnedPostUploading || pinnedPostDeleting) && styles.btnDisabled,
+                  pressed && styles.btnPressed,
+                ]}
+              >
+                {pinnedPostDeleting ? (
+                  <ActivityIndicator size="small" color="#DC2626" />
+                ) : (
+                  <>
+                    <Ionicons name="trash-outline" size={18} color="#DC2626" style={{ marginRight: 6 }} />
+                    <Text style={[styles.btnText, styles.btnDangerText]}>Delete</Text>
+                  </>
+                )}
+              </Pressable>
+            )}
           </View>
+
+          {/* Caption */}
           <View style={{ marginTop: 12 }}>
-            <Row label="Filter" value="None" hint="Filters available for images on web" />
-            <View style={[styles.chipsWrap, { marginTop: 10 }]}>
-              <Chip label="None" selected />
-              <Chip label="Warm" disabled />
-              <Chip label="Cool" disabled />
-              <Chip label="B&W" disabled />
-            </View>
-          </View>
-          <View style={{ marginTop: 12 }}>
-            <Field label="Caption" placeholder="Write a caption..." multiline maxLength={500} />
+            <Field
+              label="Caption"
+              placeholder="Write a caption..."
+              multiline
+              maxLength={500}
+              value={pinnedPostCaption}
+              onChangeText={setPinnedPostCaption}
+              disabled={saving || pinnedPostUploading}
+            />
+            {pinnedPostMediaPreview && (
+              <Text style={[styles.smallMuted, { color: themed.muted, marginTop: 6 }]}>
+                Caption will be saved when you upload or replace media.
+              </Text>
+            )}
           </View>
         </Card>
 
