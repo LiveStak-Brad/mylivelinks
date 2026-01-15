@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Video, ResizeMode } from 'expo-av';
 import { supabase } from '../../../lib/supabase';
 import ModuleEmptyState from '../ModuleEmptyState';
+
+function getMediaKindFromUrl(url: string): 'image' | 'video' {
+  const clean = url.split('?')[0] ?? url;
+  if (/\.(mp4|mov|m4v|webm|m3u8)$/i.test(clean)) return 'video';
+  if (/\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(clean)) return 'image';
+  return 'image';
+}
 
 interface FeedTabProps {
   profileId: string;
@@ -87,11 +95,30 @@ export default function FeedTab({ profileId, isOwnProfile = false, onAddPost, co
       )}
 
       {item.media_url && (
-        <Image
-          source={{ uri: item.media_url }}
-          style={styles.postImage}
-          resizeMode="cover"
-        />
+        getMediaKindFromUrl(item.media_url) === 'video' ? (
+          <View style={styles.videoContainer}>
+            <Video
+              source={{ uri: item.media_url }}
+              style={styles.postVideo}
+              resizeMode={ResizeMode.CONTAIN}
+              useNativeControls={false}
+              shouldPlay={false}
+              isMuted
+              posterSource={{ uri: item.media_url }}
+            />
+            <View style={styles.playOverlay}>
+              <View style={[styles.playButton, { backgroundColor: colors.primary }]}>
+                <Feather name="play" size={24} color="#fff" />
+              </View>
+            </View>
+          </View>
+        ) : (
+          <Image
+            source={{ uri: item.media_url }}
+            style={styles.postImage}
+            resizeMode="cover"
+          />
+        )
       )}
 
       <View style={styles.postActions}>
@@ -214,6 +241,32 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
     backgroundColor: '#333',
+  },
+  videoContainer: {
+    width: '100%',
+    height: 300,
+    borderRadius: 8,
+    marginBottom: 12,
+    backgroundColor: '#000',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  postVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  playOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  playButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   postActions: {
     flexDirection: 'row',
