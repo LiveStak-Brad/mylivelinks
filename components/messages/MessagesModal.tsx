@@ -55,19 +55,19 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
       const gap = 12; // Gap between button and modal
       const viewportPadding = 16; // Minimum distance from viewport edge
 
-      // Start position: align to button's right edge
-      let left = buttonRect.right - modalWidth;
+      // Start position: align modal's right edge to button's right edge (opens under button on right side)
+      let right = window.innerWidth - buttonRect.right;
       let top = buttonRect.bottom + gap;
 
-      // Ensure modal doesn't overflow right edge
-      const maxLeft = window.innerWidth - modalWidth - viewportPadding;
-      if (left > maxLeft) {
-        left = maxLeft;
+      // Ensure modal doesn't overflow left edge (right value too large means left edge goes negative)
+      const maxRight = window.innerWidth - modalWidth - viewportPadding;
+      if (right > maxRight) {
+        right = maxRight;
       }
 
-      // Ensure modal doesn't overflow left edge
-      if (left < viewportPadding) {
-        left = viewportPadding;
+      // Ensure modal doesn't overflow right edge
+      if (right < viewportPadding) {
+        right = viewportPadding;
       }
 
       // Ensure modal doesn't overflow bottom edge
@@ -76,7 +76,7 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
         top = maxTop;
       }
 
-      setModalPosition({ top, left });
+      setModalPosition({ top, left: 0, right });
     };
 
     calculatePosition();
@@ -218,7 +218,7 @@ export default function MessagesModal({ isOpen, onClose, anchorRef }: MessagesMo
       className="fixed w-[1100px] max-w-[calc(100vw-32px)] bg-card border border-border rounded-xl shadow-2xl overflow-hidden animate-scale-in z-[9999]"
       style={{ 
         top: `${modalPosition.top}px`,
-        left: `${modalPosition.left}px`,
+        right: `${modalPosition.right}px`,
         height: '550px', 
         // Use dvh for better iOS Safari support
         maxHeight: 'calc(100dvh - 120px)' 

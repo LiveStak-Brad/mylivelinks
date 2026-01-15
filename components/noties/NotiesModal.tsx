@@ -9,6 +9,8 @@ import { acceptTeamInvite, declineTeamInvite } from '@/lib/teamInvites';
 import { getAvatarUrl } from '@/lib/defaultAvatar';
 import { useToast } from '@/components/ui';
 import { getNotificationDestination } from '@/lib/noties/getNotificationDestination';
+import GiftQuickReplies from './GiftQuickReplies';
+import { createClient } from '@/lib/supabase';
 
 type TabType = 'all' | 'mentions' | 'gifts' | 'system';
 
@@ -33,6 +35,42 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
   const [modalPosition, setModalPosition] = useState<ModalPosition>({ top: 0, left: 0 });
   const { noties, unreadCount, isLoading, markAsRead, markAllAsRead } = useNoties();
   const { toast } = useToast();
+  
+  // Gift quick replies state (UI-only, no DB writes)
+  const [dismissedGiftIds, setDismissedGiftIds] = useState<Set<string>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const showGiftQuickReplies = true; // Setting enabled by default
+  
+  // Get current user ID
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUserId(user?.id || null);
+    });
+  }, []);
+  
+  const handleDismissGiftReply = (giftId: string) => {
+    setDismissedGiftIds(prev => new Set([...prev, giftId]));
+  };
+  
+  const handleSendGiftReply = async (recipientId: string, message: string): Promise<boolean> => {
+    if (!currentUserId) return false;
+    const supabase = createClient();
+    try {
+      const { error } = await supabase
+        .from('instant_messages')
+        .insert({
+          sender_id: currentUserId,
+          recipient_id: recipientId,
+          content: message,
+        });
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[NotiesModal] Failed to send gift reply:', err);
+      return false;
+    }
+  };
 
   // Mount check for portal
   useEffect(() => {
@@ -58,19 +96,19 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
       const gap = 12; // Gap between button and modal
       const viewportPadding = 16; // Minimum distance from viewport edge
 
-      // Start position: align to button's right edge
-      let left = buttonRect.right - modalWidth;
+      // Start position: align modal's right edge to button's right edge (opens under button on right side)
+      let right = window.innerWidth - buttonRect.right;
       let top = buttonRect.bottom + gap;
 
-      // Ensure modal doesn't overflow right edge
-      const maxLeft = window.innerWidth - modalWidth - viewportPadding;
-      if (left > maxLeft) {
-        left = maxLeft;
+      // Ensure modal doesn't overflow left edge (right value too large means left edge goes negative)
+      const maxRight = window.innerWidth - modalWidth - viewportPadding;
+      if (right > maxRight) {
+        right = maxRight;
       }
 
-      // Ensure modal doesn't overflow left edge
-      if (left < viewportPadding) {
-        left = viewportPadding;
+      // Ensure modal doesn't overflow right edge
+      if (right < viewportPadding) {
+        right = viewportPadding;
       }
 
       // Ensure modal doesn't overflow bottom edge
@@ -79,7 +117,7 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
         top = maxTop;
       }
 
-      setModalPosition({ top, left });
+      setModalPosition({ top, left: 0, right });
     };
 
     calculatePosition();
@@ -305,6 +343,15 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
                   onClick={() => handleNotieClick(notie)}
                   onAcceptInvite={handleAcceptInvite}
                   onDeclineInvite={handleDeclineInvite}
+                  showQuickReplies={
+                    showGiftQuickReplies &&
+                    notie.type === 'gift' &&
+                    !!notie.metadata?.sender_id &&
+                    !!notie.metadata?.gift_id &&
+                    !dismissedGiftIds.has(String(notie.metadata.gift_id))
+                  }
+                  onSendGiftReply={handleSendGiftReply}
+                  onDismissGiftReply={handleDismissGiftReply}
                 />
               ))}
             </div>
@@ -321,7 +368,7 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
       className="fixed w-96 bg-card border border-border rounded-xl shadow-xl overflow-hidden animate-scale-in z-[9999]"
       style={{ 
         top: `${modalPosition.top}px`,
-        left: `${modalPosition.left}px`,
+        right: `${modalPosition.right}px`,
         // Use dvh for better iOS Safari support
         maxHeight: 'calc(100dvh - 120px)' 
       }}
@@ -384,6 +431,15 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
                 onClick={() => handleNotieClick(notie)}
                 onAcceptInvite={handleAcceptInvite}
                 onDeclineInvite={handleDeclineInvite}
+                showQuickReplies={
+                  showGiftQuickReplies &&
+                  notie.type === 'gift' &&
+                  !!notie.metadata?.sender_id &&
+                  !!notie.metadata?.gift_id &&
+                  !dismissedGiftIds.has(String(notie.metadata.gift_id))
+                }
+                onSendGiftReply={handleSendGiftReply}
+                onDismissGiftReply={handleDismissGiftReply}
               />
             ))}
           </div>
@@ -407,6 +463,9 @@ function NotieItem({
   onClick,
   onAcceptInvite,
   onDeclineInvite,
+  showQuickReplies,
+  onSendGiftReply,
+  onDismissGiftReply,
 }: { 
   notie: Notie; 
   icon: React.ReactNode; 
@@ -414,6 +473,9 @@ function NotieItem({
   onClick: () => void;
   onAcceptInvite?: (inviteId: number) => void;
   onDeclineInvite?: (inviteId: number) => void;
+  showQuickReplies?: boolean;
+  onSendGiftReply?: (recipientId: string, message: string) => Promise<boolean>;
+  onDismissGiftReply?: (giftId: string) => void;
 }) {
   const isTeamInvite = notie.type === 'team_invite' && notie.metadata?.invite_id;
 
@@ -466,6 +528,16 @@ function NotieItem({
               Decline
             </button>
           </div>
+        )}
+        
+        {/* Gift quick replies */}
+        {showQuickReplies && onSendGiftReply && onDismissGiftReply && notie.metadata?.gift_id && notie.metadata?.sender_id && (
+          <GiftQuickReplies
+            giftId={String(notie.metadata.gift_id)}
+            senderId={String(notie.metadata.sender_id)}
+            onSendReply={onSendGiftReply}
+            onDismiss={onDismissGiftReply}
+          />
         )}
       </div>
 

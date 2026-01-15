@@ -141,11 +141,15 @@ function HeaderIcons({
   setShowMessagesModal,
   showNotiesModal,
   setShowNotiesModal,
+  messagesButtonRef,
+  notiesButtonRef,
 }: {
   showMessagesModal: boolean;
   setShowMessagesModal: (v: boolean) => void;
   showNotiesModal: boolean;
   setShowNotiesModal: (v: boolean) => void;
+  messagesButtonRef: React.RefObject<HTMLButtonElement>;
+  notiesButtonRef: React.RefObject<HTMLButtonElement>;
 }) {
   const { unreadCount: unreadNoties } = useNoties();
   const { totalUnreadCount: unreadMessages } = useMessages();
@@ -160,6 +164,7 @@ function HeaderIcons({
   return (
     <div className="header-icon-cluster flex items-center" onKeyDown={handleKeyDown}>
       <button
+        ref={messagesButtonRef}
         onClick={() => {
           setShowMessagesModal(!showMessagesModal);
           setShowNotiesModal(false);
@@ -180,6 +185,7 @@ function HeaderIcons({
       </button>
 
       <button
+        ref={notiesButtonRef}
         onClick={() => {
           setShowNotiesModal(!showNotiesModal);
           setShowMessagesModal(false);
@@ -213,6 +219,8 @@ export default function GlobalHeader() {
   const [appMenuOpen, setAppMenuOpen] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
   const [showNotiesModal, setShowNotiesModal] = useState(false);
+  const messagesButtonRef = useRef<HTMLButtonElement>(null);
+  const notiesButtonRef = useRef<HTMLButtonElement>(null);
   const dmHandledRef = useRef<string | null>(null);
 
   const supabase = useMemo(() => createClient(), []);
@@ -354,7 +362,7 @@ export default function GlobalHeader() {
 
             {/* Right side: Messages + Noties + Avatar */}
             <div className="flex items-center gap-1 flex-shrink-0">
-              {isLoggedIn && <HeaderIcons showMessagesModal={showMessagesModal} setShowMessagesModal={setShowMessagesModal} showNotiesModal={showNotiesModal} setShowNotiesModal={setShowNotiesModal} />}
+              {isLoggedIn && <HeaderIcons showMessagesModal={showMessagesModal} setShowMessagesModal={setShowMessagesModal} showNotiesModal={showNotiesModal} setShowNotiesModal={setShowNotiesModal} messagesButtonRef={messagesButtonRef} notiesButtonRef={notiesButtonRef} />}
               <UserMenuSheet className="header-profile-trigger flex-shrink-0" />
             </div>
           </div>
@@ -412,7 +420,7 @@ export default function GlobalHeader() {
             </div>
 
             <div className="flex min-w-[220px] flex-1 items-center justify-end gap-2">
-              {isLoggedIn && <HeaderIcons showMessagesModal={showMessagesModal} setShowMessagesModal={setShowMessagesModal} showNotiesModal={showNotiesModal} setShowNotiesModal={setShowNotiesModal} />}
+              {isLoggedIn && <HeaderIcons showMessagesModal={showMessagesModal} setShowMessagesModal={setShowMessagesModal} showNotiesModal={showNotiesModal} setShowNotiesModal={setShowNotiesModal} messagesButtonRef={messagesButtonRef} notiesButtonRef={notiesButtonRef} />}
               {isOwner && (
                 <Link
                   href="/owner"
@@ -445,10 +453,12 @@ export default function GlobalHeader() {
       <MessagesModal
         isOpen={showMessagesModal}
         onClose={() => setShowMessagesModal(false)}
+        anchorRef={messagesButtonRef}
       />
       <NotiesModal
         isOpen={showNotiesModal}
         onClose={() => setShowNotiesModal(false)}
+        anchorRef={notiesButtonRef}
       />
     </>
   );
