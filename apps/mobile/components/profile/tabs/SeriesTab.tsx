@@ -15,9 +15,10 @@ type SeriesItem = {
 interface SeriesTabProps {
   profileId: string;
   colors: any;
+  isOwnProfile?: boolean;
 }
 
-export default function SeriesTab({ profileId, colors }: SeriesTabProps) {
+export default function SeriesTab({ profileId, colors, isOwnProfile = false }: SeriesTabProps) {
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +82,18 @@ export default function SeriesTab({ profileId, colors }: SeriesTabProps) {
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>No Series Yet</Text>
         <Text style={[styles.emptySubtitle, { color: colors.mutedText }]}>
-          Series will appear here when available
+          {isOwnProfile ? 'Create your first series' : 'Series will appear here when available'}
         </Text>
+        {isOwnProfile && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('CreatorStudioSeriesScreen')}
+            style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.addBtnText}>Create Series</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -194,4 +205,20 @@ const styles = StyleSheet.create({
   },
 
   pressed: { opacity: 0.85 },
+
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#22C55E',
+  },
+  addBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

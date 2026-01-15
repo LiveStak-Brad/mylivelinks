@@ -15,9 +15,10 @@ type PodcastItem = {
 interface PodcastsTabProps {
   profileId: string;
   colors: any;
+  isOwnProfile?: boolean;
 }
 
-export default function PodcastsTab({ profileId, colors }: PodcastsTabProps) {
+export default function PodcastsTab({ profileId, colors, isOwnProfile = false }: PodcastsTabProps) {
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +82,18 @@ export default function PodcastsTab({ profileId, colors }: PodcastsTabProps) {
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>No Podcasts Yet</Text>
         <Text style={[styles.emptySubtitle, { color: colors.mutedText }]}>
-          Podcasts will appear here when available
+          {isOwnProfile ? 'Upload your first podcast episode' : 'Podcasts will appear here when available'}
         </Text>
+        {isOwnProfile && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'podcast' })}
+            style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.addBtnText}>Add Podcast</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -194,4 +205,20 @@ const styles = StyleSheet.create({
   },
 
   pressed: { opacity: 0.85 },
+
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#EC4899',
+  },
+  addBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

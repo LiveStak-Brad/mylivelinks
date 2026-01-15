@@ -40,10 +40,10 @@ const OPTIONAL_TABS: Record<string, TabMetadata> = {
     label: 'Photos',
     description: 'Photo gallery',
   },
-  videos: {
-    id: 'videos',
-    label: 'Videos',
-    description: 'Video gallery',
+  music_videos: {
+    id: 'music_videos',
+    label: 'Music Videos',
+    description: 'Music video gallery',
   },
   
   // Feature Tabs
@@ -116,7 +116,7 @@ export default function ProfileTabPicker({
       // User has custom selection - map mobile tab IDs to web IDs for compatibility
       const mappedTabs = currentEnabledTabs.map(tab => {
         if (tab === 'media' as any) return 'photos';
-        if (tab === 'music_videos' as any) return 'videos';
+        if (tab === 'videos' as any) return 'music_videos';
         return tab;
       });
       setEnabledTabs(new Set([...mappedTabs, ...CORE_TABS]));

@@ -16,9 +16,10 @@ type MovieItem = {
 interface MoviesTabProps {
   profileId: string;
   colors: any;
+  isOwnProfile?: boolean;
 }
 
-export default function MoviesTab({ profileId, colors }: MoviesTabProps) {
+export default function MoviesTab({ profileId, colors, isOwnProfile = false }: MoviesTabProps) {
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,8 +83,18 @@ export default function MoviesTab({ profileId, colors }: MoviesTabProps) {
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>No Movies Yet</Text>
         <Text style={[styles.emptySubtitle, { color: colors.mutedText }]}>
-          Movies and films will appear here when available
+          {isOwnProfile ? 'Upload your first movie or film' : 'Movies and films will appear here when available'}
         </Text>
+        {isOwnProfile && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'movie' })}
+            style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.addBtnText}>Add Movie</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -195,5 +206,21 @@ const styles = StyleSheet.create({
   },
   movieMeta: {
     fontSize: 12,
+  },
+
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#EC4899',
+  },
+  addBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

@@ -851,7 +851,7 @@ export default function ModernProfilePage() {
     feed: LayoutGrid,
     reels: Clapperboard,
     photos: ImageIcon,
-    videos: Video,
+    music_videos: Video,
     music: Music,
     events: Calendar,
     products: ShoppingCart,
@@ -1619,8 +1619,8 @@ export default function ModernProfilePage() {
           />
         )}
         
-        {/* Videos Tab */}
-        {activeTab === 'videos' && (
+        {/* Music Videos Tab */}
+        {activeTab === 'music_videos' && (
           <>
             {profile.profile_type === 'musician' && (
               <MusicVideos
@@ -1645,8 +1645,8 @@ export default function ModernProfilePage() {
               <VlogReelsClient
                 profileId={profile.id}
                 isOwner={isOwnProfile}
-                title="Videos"
-                contentLabel="videos"
+                title="Music Videos"
+                contentLabel="music_videos"
                 cardStyle={cardStyle}
                 borderRadiusClass={borderRadiusClass}
               />
@@ -1656,7 +1656,7 @@ export default function ModernProfilePage() {
               profile.profile_type !== 'comedian' &&
               profile.profile_type !== 'creator' &&
               profile.profile_type !== 'streamer' && (
-                <TabEmptyState type="videos" isOwner={isOwnProfile} />
+                <TabEmptyState type="music_videos" isOwner={isOwnProfile} />
               )}
           </>
         )}

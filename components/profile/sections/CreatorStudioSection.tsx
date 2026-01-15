@@ -231,6 +231,23 @@ export default function CreatorStudioSection({
     );
   }
 
+  // Build type-specific upload URL
+  const getUploadUrl = () => {
+    // Series uses series builder, others use upload with type param
+    if (itemType === 'series_episode') return '/creator-studio/series';
+    return `/creator-studio/upload?type=${itemType}`;
+  };
+
+  const getAddLabel = () => {
+    switch (itemType) {
+      case 'podcast': return '+ Add Podcast';
+      case 'movie': return '+ Add Movie';
+      case 'education': return '+ Add Education';
+      case 'series_episode': return '+ Create Series';
+      default: return '+ Upload Content';
+    }
+  };
+
   if (items.length === 0) {
     return (
       <div
@@ -243,10 +260,10 @@ export default function CreatorStudioSection({
           <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">{emptyText}</p>
           {isOwner && (
             <Link
-              href="/creator-studio/upload"
+              href={getUploadUrl()}
               className="inline-block mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition"
             >
-              + Upload Content
+              {getAddLabel()}
             </Link>
           )}
         </div>
@@ -263,10 +280,10 @@ export default function CreatorStudioSection({
         <h2 className="text-lg font-bold">{title}</h2>
         {isOwner && (
           <Link
-            href="/creator-studio/upload"
+            href={getUploadUrl()}
             className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
           >
-            + Add
+            {getAddLabel()}
           </Link>
         )}
       </div>

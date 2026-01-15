@@ -15,9 +15,10 @@ type EducationItem = {
 interface EducationTabProps {
   profileId: string;
   colors: any;
+  isOwnProfile?: boolean;
 }
 
-export default function EducationTab({ profileId, colors }: EducationTabProps) {
+export default function EducationTab({ profileId, colors, isOwnProfile = false }: EducationTabProps) {
   const navigation = useNavigation<any>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,8 +82,18 @@ export default function EducationTab({ profileId, colors }: EducationTabProps) {
         </View>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>No Education Content Yet</Text>
         <Text style={[styles.emptySubtitle, { color: colors.mutedText }]}>
-          Tutorials and courses will appear here
+          {isOwnProfile ? 'Upload your first tutorial or course' : 'Tutorials and courses will appear here'}
         </Text>
+        {isOwnProfile && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => navigation.navigate('CreatorStudioUploadScreen', { defaultType: 'education' })}
+            style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.addBtnText}>Add Education</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -194,4 +205,20 @@ const styles = StyleSheet.create({
   },
 
   pressed: { opacity: 0.85 },
+
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#3B82F6',
+  },
+  addBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

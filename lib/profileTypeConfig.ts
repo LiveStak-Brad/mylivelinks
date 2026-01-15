@@ -22,7 +22,7 @@ export type ProfileType =
 // TABS DEFINITION
 // ============================================================================
 
-export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'videos' | 'music' | 'events' | 'products' | 'reposts' | 'highlights' | 'podcasts' | 'movies' | 'series' | 'education';
+export type ProfileTab = 'info' | 'feed' | 'reels' | 'photos' | 'music_videos' | 'music' | 'events' | 'products' | 'reposts' | 'highlights' | 'podcasts' | 'movies' | 'series' | 'education';
 
 export interface TabConfig {
   id: ProfileTab;
@@ -99,7 +99,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   // ========================================================================
   streamer: {
     tabs: [
-      { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
       { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
       { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
       { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
@@ -136,7 +136,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
     tabs: [
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'music', label: 'Music', icon: 'Music', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
       { id: 'events', label: 'Events', icon: 'Calendar', enabled: true },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
     ],
@@ -166,7 +166,7 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   comedian: {
     tabs: [
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
-      { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
       { id: 'events', label: 'Shows', icon: 'Calendar', enabled: true },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
     ],
@@ -221,13 +221,18 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   // ========================================================================
   creator: {
     tabs: [
-      { id: 'videos', label: 'Videos', icon: 'Video', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
       { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
       { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
       { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
+      // Long-form Creator Studio tabs (disabled by default, user can enable)
+      { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
+      { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
+      { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
+      { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -284,11 +289,23 @@ export function getEnabledTabs(
     // Map mobile tab IDs to web IDs for compatibility
     const mappedTabs = customEnabledTabs.map(tab => {
       if (tab === 'media' as any) return 'photos';
-      if (tab === 'music_videos' as any) return 'videos';
+      if (tab === 'videos' as any) return 'music_videos';
       return tab;
     });
     const allowed = new Set<ProfileTab>(['info', ...mappedTabs]);
-    return config.tabs.filter(tab => allowed.has(tab.id));
+    
+    // Build master tab list from ALL profile types to support cross-type tab selection
+    const allTabs = new Map<ProfileTab, TabConfig>();
+    Object.values(PROFILE_TYPE_CONFIG).forEach(ptConfig => {
+      ptConfig.tabs.forEach(tab => {
+        if (!allTabs.has(tab.id)) {
+          allTabs.set(tab.id, tab);
+        }
+      });
+    });
+    
+    // Return tabs that user has enabled, using master list for config
+    return Array.from(allTabs.values()).filter(tab => allowed.has(tab.id));
   }
   
   // Otherwise use profile_type defaults

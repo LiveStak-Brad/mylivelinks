@@ -966,13 +966,13 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
           colors={stylesVars} 
         />
       ) : activeTab === 'podcasts' ? (
-        <PodcastsTab profileId={profile.id} colors={stylesVars} />
+        <PodcastsTab profileId={profile.id} colors={stylesVars} isOwnProfile={isOwnProfile} />
       ) : activeTab === 'movies' ? (
-        <MoviesTab profileId={profile.id} colors={stylesVars} />
+        <MoviesTab profileId={profile.id} colors={stylesVars} isOwnProfile={isOwnProfile} />
       ) : activeTab === 'series' ? (
-        <SeriesTab profileId={profile.id} colors={stylesVars} />
+        <SeriesTab profileId={profile.id} colors={stylesVars} isOwnProfile={isOwnProfile} />
       ) : activeTab === 'education' ? (
-        <EducationTab profileId={profile.id} colors={stylesVars} />
+        <EducationTab profileId={profile.id} colors={stylesVars} isOwnProfile={isOwnProfile} />
       ) : null}
       </View>
     </ScrollView>
