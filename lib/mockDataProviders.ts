@@ -109,6 +109,11 @@ export function getEmptyStateText(section: string, profileType?: ProfileType): {
       text: 'Video content will appear here',
       ownerCTA: 'Upload Video',
     },
+    music_videos: {
+      title: 'No Music Videos Yet',
+      text: 'Music video content will appear here',
+      ownerCTA: 'Upload Music Video',
+    },
   };
 
   return emptyStates[section] || {

@@ -11,7 +11,7 @@ import { LayoutGrid, Image as ImageIcon, Video } from 'lucide-react';
 import { getEmptyStateText } from '@/lib/mockDataProviders';
 
 interface EmptyStateProps {
-  type: 'feed' | 'photos' | 'videos';
+  type: 'feed' | 'photos' | 'videos' | 'music_videos';
   isOwner?: boolean;
   onAction?: () => void;
 }
@@ -20,6 +20,7 @@ const iconMap = {
   feed: LayoutGrid,
   photos: ImageIcon,
   videos: Video,
+  music_videos: Video,
 };
 
 export default function TabEmptyState({ type, isOwner = false, onAction }: EmptyStateProps) {
