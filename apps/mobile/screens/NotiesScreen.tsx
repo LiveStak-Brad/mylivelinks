@@ -592,6 +592,28 @@ export default function NotiesScreen() {
         const avatarFallback = (actorDisplayName || actorUsername || message).trim()?.[0]?.toUpperCase() ?? '?';
         const avatarUrl = resolvePublicStorageUrl('avatars', actor?.avatar_url ?? null) ?? undefined;
 
+        // For gift notifications, extract routing context from entity_type/entity_id
+        const entityType = row?.entity_type != null ? String(row.entity_type) : null;
+        const entityId = row?.entity_id != null ? String(row.entity_id) : null;
+        
+        // Determine gift_id and post_id based on entity_type
+        // entity_type='post' means entity_id is the post_id
+        // entity_type='gift' means entity_id is the gift_id
+        let giftId: string | undefined;
+        let postId: string | undefined;
+        
+        if (type === 'gift') {
+          if (entityType === 'post' && entityId) {
+            postId = entityId;
+            // giftId not directly available, but postId is sufficient for routing
+          } else if (entityType === 'gift' && entityId) {
+            giftId = entityId;
+          } else if (entityId) {
+            // Fallback: treat entity_id as gift_id
+            giftId = entityId;
+          }
+        }
+
         return {
           id: String(row?.id ?? ''),
           isRead: Boolean(row?.read),
@@ -603,11 +625,12 @@ export default function NotiesScreen() {
           avatarUrl,
           actorProfileId: actorId || undefined,
           actorUsername: actorUsername || undefined,
-          entityType: row?.entity_type != null ? String(row.entity_type) : null,
-          entityId: row?.entity_id != null ? String(row.entity_id) : null,
-          // For gift notifications, use entity_id as gift_id and actor_id as sender_id
-          giftId: type === 'gift' && row?.entity_id ? String(row.entity_id) : undefined,
+          entityType,
+          entityId,
+          // For gift notifications: giftId for direct gifts, postId for post gifts
+          giftId,
           senderId: type === 'gift' && actorId ? actorId : undefined,
+          postId,
         };
       });
 

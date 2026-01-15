@@ -498,7 +498,72 @@ export function NotiesProvider({ children }: { children: ReactNode }) {
         console.error('[Noties] Support noties error:', err);
       }
 
-      const combined = [...followNoties, ...liveNoties, ...giftNoties, ...purchaseNoties, ...conversionNoties, ...teamInviteNoties, ...supportNoties]
+      // Also fetch gift notifications from notifications table (for post_id context)
+      let giftNotifNoties: Notie[] = [];
+      try {
+        const { data: giftNotifs } = await supabase
+          .from('notifications')
+          .select('id, actor_id, type, entity_type, entity_id, message, read, created_at')
+          .eq('recipient_id', user.id)
+          .eq('type', 'gift')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (giftNotifs && giftNotifs.length > 0) {
+          const actorIds = [...new Set(giftNotifs.map((n: any) => n.actor_id).filter(Boolean))];
+          const { data: actorProfiles } = actorIds.length
+            ? await supabase.from('profiles').select('id, username, avatar_url, display_name').in('id', actorIds)
+            : { data: [] as any[] };
+
+          const actorById = new Map<string, any>();
+          for (const p of actorProfiles || []) {
+            if (p?.id) actorById.set(String(p.id), p);
+          }
+
+          giftNotifNoties = giftNotifs.map((n: any) => {
+            const id = `notif:gift:${n.id}`;
+            const actor = actorById.get(String(n.actor_id));
+            const username = actor?.username || 'Someone';
+            const displayName = actor?.display_name || username;
+            const avatarFallback = (displayName?.[0] || '?').toUpperCase();
+            
+            // Determine post_id from entity_type/entity_id
+            const postId = n.entity_type === 'post' ? n.entity_id : undefined;
+            const giftId = n.entity_type === 'gift' ? n.entity_id : undefined;
+            
+            // Route to post if available, otherwise to sender profile
+            const actionUrl = postId ? `/post/${postId}` : `/${username}`;
+
+            return {
+              id,
+              type: 'gift' as NotieType,
+              title: 'New Gift',
+              message: n.message || `${displayName} sent you a gift`,
+              avatarUrl: actor?.avatar_url,
+              avatarFallback,
+              isRead: readIds.has(id) || n.read,
+              createdAt: new Date(n.created_at),
+              actionUrl,
+              metadata: {
+                gift_id: giftId,
+                sender_id: n.actor_id,
+                post_id: postId,
+              },
+            };
+          });
+        }
+      } catch (err) {
+        console.error('[Noties] Gift notifications error:', err);
+      }
+
+      // Deduplicate gift noties - prefer notifications table entries (have post_id) over ledger entries
+      const giftNotifIds = new Set(giftNotifNoties.map(n => n.metadata?.gift_id).filter(Boolean));
+      const dedupedGiftNoties = [
+        ...giftNotifNoties,
+        ...giftNoties.filter(n => !giftNotifIds.has(n.metadata?.gift_id)),
+      ];
+
+      const combined = [...followNoties, ...liveNoties, ...dedupedGiftNoties, ...purchaseNoties, ...conversionNoties, ...teamInviteNoties, ...supportNoties]
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(0, 100);
 
