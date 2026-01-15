@@ -55,8 +55,36 @@ export default function TopFriendsSection({
     }
   };
 
-  if (loading || friends.length === 0) {
+  if (loading) {
     return null;
+  }
+
+  // Empty state with CTA for owner
+  if (friends.length === 0) {
+    if (!isOwnProfile) return null;
+    return (
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <Feather name="users" size={40} color={colors.textSecondary || colors.text} style={{ opacity: 0.5 }} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No Top Friends Yet</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary || colors.text }]}>
+            Add your favorite people to show them on your profile!
+          </Text>
+          {onManage && (
+            <Pressable 
+              onPress={onManage} 
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+            >
+              <Feather name="plus" size={18} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>Add Top Friends</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -134,5 +162,35 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 12,
     textAlign: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    opacity: 0.7,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    gap: 8,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

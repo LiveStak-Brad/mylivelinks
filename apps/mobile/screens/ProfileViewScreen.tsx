@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, View, Text, ActivityIndicator, RefreshControl, Linking } from 'react-native';
+import { Alert, Image, ImageBackground, Modal, Pressable, ScrollView, StyleSheet, View, Text, ActivityIndicator, RefreshControl, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/useTheme';
@@ -24,6 +24,7 @@ import MoviesTab from '../components/profile/tabs/MoviesTab';
 import SeriesTab from '../components/profile/tabs/SeriesTab';
 import EducationTab from '../components/profile/tabs/EducationTab';
 import TopFriendsSection from '../components/profile/TopFriendsSection';
+import TopFriendsManager from '../components/profile/TopFriendsManager';
 import ReferralNetworkSection from '../components/profile/ReferralNetworkSection';
 import SocialMediaBar from '../components/profile/SocialMediaBar';
 import MusicShowcaseSection from '../components/profile/MusicShowcaseSection';
@@ -68,6 +69,8 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
   const [blockLoading, setBlockLoading] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showTopFriendsManager, setShowTopFriendsManager] = useState(false);
+  const [topFriendsReloadKey, setTopFriendsReloadKey] = useState(0);
 
   const loadingRef = useRef(false);
   const mountedRef = useRef(true);
@@ -191,6 +194,16 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       mountedRef.current = false;
     };
   }, [loadProfile]);
+
+  // Refresh profile when screen comes into focus (e.g., after editing settings)
+  useFocusEffect(
+    useCallback(() => {
+      if (profileData) {
+        // Only refresh if we already have data (avoid double-load on initial mount)
+        loadProfile();
+      }
+    }, [loadProfile, profileData])
+  );
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -439,22 +452,24 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
   const { profile } = profileData;
   const locationText = profile.location_label || (profile.location_city && profile.location_region ? `${profile.location_city}, ${profile.location_region}` : profile.location_city || profile.location_region);
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: stylesVars.bg }]} edges={['left', 'right', 'bottom']}>
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomGuard }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={stylesVars.primary}
-          />
-        }
-      >
-        <View style={styles.container}>
-          {profile.is_live && (
-            <LiveIndicatorBanner
+  // Calculate background overlay color
+  const bgOverlayColor = profile.profile_bg_overlay === 'dark-heavy' ? 'rgba(0,0,0,0.7)' : profile.profile_bg_overlay === 'dark-medium' ? 'rgba(0,0,0,0.5)' : profile.profile_bg_overlay === 'dark-light' ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.5)';
+
+  const scrollContent = (
+    <ScrollView
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomGuard }]}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={stylesVars.primary}
+        />
+      }
+    >
+      <View style={styles.container}>
+        {profile.is_live && (
+          <LiveIndicatorBanner
               onWatchLive={() => navigation.navigate('LiveUserScreen', { username: profile.username })}
               colors={stylesVars}
             />
@@ -668,12 +683,13 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
 
               {shouldShowSection('top_friends') && profile.show_top_friends !== false && (
                 <TopFriendsSection
+                  key={topFriendsReloadKey}
                   profileId={profile.id}
                   isOwnProfile={isOwnProfile}
                   title={profile.top_friends_title}
                   avatarStyle={profile.top_friends_avatar_style}
                   maxCount={profile.top_friends_max_count}
-                  onManage={() => navigation.navigate('SettingsProfileScreen', { section: 'top_friends' })}
+                  onManage={() => setShowTopFriendsManager(true)}
                   colors={stylesVars}
                 />
               )}
@@ -758,8 +774,25 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
       ) : activeTab === 'education' ? (
         <EducationTab profileId={profile.id} colors={stylesVars} />
       ) : null}
-        </View>
-      </ScrollView>
+      </View>
+    </ScrollView>
+  );
+
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: stylesVars.bg }]} edges={['left', 'right', 'bottom']}>
+      {profile.profile_bg_url ? (
+        <ImageBackground
+          source={{ uri: profile.profile_bg_url }}
+          style={styles.backgroundImage}
+          resizeMode="cover"
+        >
+          <View style={[styles.backgroundOverlay, { backgroundColor: bgOverlayColor }]}>
+            {scrollContent}
+          </View>
+        </ImageBackground>
+      ) : (
+        scrollContent
+      )}
 
       {/* Block/Unblock Menu Modal */}
       <Modal
@@ -829,6 +862,24 @@ export default function ProfileViewScreen({ routeParams }: ProfileViewScreenProp
         reportedUsername={profile.username}
         contextDetails={`Profile page for @${profile.username}`}
       />
+
+      {/* Top Friends Manager Modal */}
+      {isOwnProfile && (
+        <TopFriendsManager
+          profileId={profile.id}
+          isOpen={showTopFriendsManager}
+          onClose={() => setShowTopFriendsManager(false)}
+          onSave={() => setTopFriendsReloadKey(k => k + 1)}
+          colors={{
+            bg: stylesVars.bg,
+            card: stylesVars.card,
+            text: stylesVars.text,
+            textSecondary: stylesVars.mutedText,
+            border: stylesVars.border,
+            primary: stylesVars.primary,
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -851,6 +902,14 @@ function createStyles(stylesVars: {
     },
     container: {
       gap: 12,
+    },
+    backgroundImage: {
+      flex: 1,
+      width: '100%',
+    },
+    backgroundOverlay: {
+      flex: 1,
+      width: '100%',
     },
     card: {
       borderRadius: 16,
