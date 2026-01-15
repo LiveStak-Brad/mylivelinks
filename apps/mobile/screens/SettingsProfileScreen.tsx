@@ -20,7 +20,12 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../theme/useTheme';
-import type { ProfileSection, ProfileTab, ProfileType } from '../config/profileTypeConfig';
+import { 
+  type ProfileSection, 
+  type ProfileTab, 
+  type ProfileType,
+  PROFILE_TYPE_CONFIG,
+} from '../config/profileTypeConfig';
 
 // Gender enum matching web (lib/link/dating-types.ts)
 type GenderEnum = 'male' | 'female' | 'nonbinary' | 'other' | 'prefer_not_to_say';
@@ -1410,22 +1415,29 @@ export default function SettingsProfileScreen() {
     if (Array.isArray(enabledModules)) {
       return enabledModules.includes(moduleId);
     }
-    // Default: use profile type config defaults (simplified - enable common ones)
-    const defaultEnabled: ProfileSection[] = ['social_counts', 'social_media', 'links', 'streaming_stats', 'top_supporters', 'top_friends'];
-    return defaultEnabled.includes(moduleId);
-  }, [enabledModules]);
+    // Use profile type config defaults (excluding core sections hero/footer)
+    const config = PROFILE_TYPE_CONFIG[profileType] || PROFILE_TYPE_CONFIG.default;
+    const section = config.sections.find(s => s.id === moduleId);
+    return section?.enabled ?? false;
+  }, [enabledModules, profileType]);
 
-  // Toggle a module
+  // Toggle a module - uses profile type defaults when enabledModules is null
   const toggleModule = useCallback((moduleId: ProfileSection) => {
     setEnabledModules(prev => {
-      const current = Array.isArray(prev) ? prev : ['social_counts', 'social_media', 'links', 'streaming_stats', 'top_supporters', 'top_friends'];
+      // If null, initialize from profile type config defaults (excluding core hero/footer)
+      const config = PROFILE_TYPE_CONFIG[profileType] || PROFILE_TYPE_CONFIG.default;
+      const defaultModules = config.sections
+        .filter(s => s.enabled && s.id !== 'hero' && s.id !== 'footer')
+        .map(s => s.id);
+      const current = Array.isArray(prev) ? prev : defaultModules;
+      
       if (current.includes(moduleId)) {
         return current.filter(m => m !== moduleId);
       } else {
         return [...current, moduleId];
       }
     });
-  }, []);
+  }, [profileType]);
 
   // Check if a tab is enabled
   const isTabEnabled = useCallback((tabId: ProfileTab): boolean => {
@@ -1433,23 +1445,30 @@ export default function SettingsProfileScreen() {
     if (Array.isArray(enabledTabs)) {
       return enabledTabs.includes(tabId);
     }
-    // Default: use profile type config defaults
-    const defaultEnabled: ProfileTab[] = ['feed', 'media', 'music_videos'];
-    return defaultEnabled.includes(tabId);
-  }, [enabledTabs]);
+    // Use profile type config defaults
+    const config = PROFILE_TYPE_CONFIG[profileType] || PROFILE_TYPE_CONFIG.default;
+    const tab = config.tabs.find(t => t.id === tabId);
+    return tab?.enabled ?? false;
+  }, [enabledTabs, profileType]);
 
-  // Toggle a tab
+  // Toggle a tab - uses profile type defaults when enabledTabs is null
   const toggleTab = useCallback((tabId: ProfileTab) => {
     if (tabId === 'info') return; // Can't toggle core tab
     setEnabledTabs(prev => {
-      const current = Array.isArray(prev) ? prev : ['feed', 'media', 'music_videos'];
+      // If null, initialize from profile type config defaults (excluding core 'info' tab)
+      const config = PROFILE_TYPE_CONFIG[profileType] || PROFILE_TYPE_CONFIG.default;
+      const defaultTabs = config.tabs
+        .filter(t => t.enabled && t.id !== 'info')
+        .map(t => t.id);
+      const current = Array.isArray(prev) ? prev : defaultTabs;
+      
       if (current.includes(tabId)) {
         return current.filter(t => t !== tabId);
       } else {
         return [...current, tabId];
       }
     });
-  }, []);
+  }, [profileType]);
 
   return (
     <ThemedColorsContext.Provider value={themed}>
