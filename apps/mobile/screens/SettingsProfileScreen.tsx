@@ -42,6 +42,15 @@ const PROFILE_TYPE_OPTIONS: { value: ProfileType; label: string; description: st
   { value: 'business', label: 'Business / Brand', description: 'Companies, brands, services' },
 ];
 
+// UserLink type matching web (app/settings/profile/page.tsx)
+interface UserLink {
+  id?: number;
+  title: string;
+  url: string;
+  display_order: number;
+  is_active: boolean;
+}
+
 // Location type matching web (lib/location.ts)
 interface ProfileLocation {
   zip: string | null;
@@ -431,6 +440,10 @@ export default function SettingsProfileScreen() {
   const [hideStreamingStats, setHideStreamingStats] = useState(false);
   const [defaultPostVisibility, setDefaultPostVisibility] = useState<'public' | 'followers' | 'friends'>('public');
   
+  // User links (parity with web)
+  const [links, setLinks] = useState<UserLink[]>([]);
+  const [linksLoading, setLinksLoading] = useState(false);
+  
   // Referral
   const [referralId, setReferralId] = useState<string | null>(null);
   const [invitedByUsername, setInvitedByUsername] = useState('');
@@ -547,6 +560,35 @@ export default function SettingsProfileScreen() {
     
     setProfileLoaded(true);
   }, [profile, profileBio, profileDisplayName, saving]);
+
+  // Load user links (parity with web)
+  useEffect(() => {
+    if (!userId) return;
+    
+    const loadLinks = async () => {
+      setLinksLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('user_links')
+          .select('*')
+          .eq('profile_id', userId)
+          .order('display_order');
+        
+        if (error) {
+          console.error('[SettingsProfileScreen] user_links load error:', error.message);
+          return;
+        }
+        
+        setLinks(data || []);
+      } catch (err) {
+        console.error('[SettingsProfileScreen] user_links load exception:', err);
+      } finally {
+        setLinksLoading(false);
+      }
+    };
+    
+    loadLinks();
+  }, [userId]);
 
   // Load referral status
   useEffect(() => {
@@ -817,6 +859,56 @@ export default function SettingsProfileScreen() {
         return;
       }
 
+      // Save user_links (delete-all + insert-all pattern matching web exactly)
+      // Delete all existing links for this profile
+      const { error: deleteLinksError } = await supabase
+        .from('user_links')
+        .delete()
+        .eq('profile_id', userId);
+      
+      if (deleteLinksError) {
+        console.error('[SettingsProfileScreen] user_links delete error:', deleteLinksError.message);
+        Alert.alert('Save failed', `Links delete failed: ${deleteLinksError.message}`);
+        return;
+      }
+
+      // Insert updated links (matching web logic exactly)
+      if (links.length > 0) {
+        const linksToInsert = links
+          .filter(link => link.title.trim() && link.url.trim())
+          .map((link, index) => {
+            let url = link.url.trim();
+            
+            // Clean up URL - remove our domain if accidentally prepended (matching web)
+            url = url.replace(/^https?:\/\/(www\.)?mylivelinks\.com\//gi, '');
+            
+            // Auto-add https:// if no protocol specified
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+              url = 'https://' + url;
+            }
+
+            return {
+              profile_id: userId,
+              title: link.title.trim(),
+              url,
+              display_order: index,
+              is_active: true,
+            };
+          });
+
+        if (linksToInsert.length > 0) {
+          const { error: insertLinksError } = await supabase
+            .from('user_links')
+            .insert(linksToInsert);
+
+          if (insertLinksError) {
+            console.error('[SettingsProfileScreen] user_links insert error:', insertLinksError.message);
+            Alert.alert('Save failed', `Links insert failed: ${insertLinksError.message}`);
+            return;
+          }
+        }
+      }
+
       await currentUser.refresh();
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (e: any) {
@@ -832,8 +924,37 @@ export default function SettingsProfileScreen() {
     socialTwitch, socialDiscord, socialSnapchat, socialLinkedin, socialGithub,
     socialSpotify, socialOnlyfans, profileType, enabledModules, enabledTabs,
     showTopFriends, topFriendsTitle, topFriendsAvatarStyle, topFriendsMaxCount,
-    hideStreamingStats, defaultPostVisibility
+    hideStreamingStats, defaultPostVisibility, links
   ]);
+
+  // Link CRUD functions (matching web exactly)
+  const addLink = useCallback(() => {
+    setLinks(prev => [...prev, { title: '', url: '', display_order: prev.length, is_active: true }]);
+  }, []);
+
+  const updateLink = useCallback((index: number, field: keyof UserLink, value: string) => {
+    setLinks(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  }, []);
+
+  const removeLink = useCallback((index: number) => {
+    setLinks(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const moveLink = useCallback((index: number, direction: 'up' | 'down') => {
+    setLinks(prev => {
+      if (direction === 'up' && index === 0) return prev;
+      if (direction === 'down' && index === prev.length - 1) return prev;
+      
+      const updated = [...prev];
+      const newIndex = direction === 'up' ? index - 1 : index + 1;
+      [updated[index], updated[newIndex]] = [updated[newIndex], updated[index]];
+      return updated;
+    });
+  }, []);
 
   const handleChangeAvatar = useCallback(async () => {
     if (!userId) return;
@@ -1704,6 +1825,98 @@ export default function SettingsProfileScreen() {
           </View>
         </Card>
 
+        {/* Links (parity with web) */}
+        <Card title="Links" icon={<Ionicons name="link-outline" size={18} color={themed.blue600} />}>
+          <View style={{ marginBottom: 12 }}>
+            <Pressable
+              onPress={addLink}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.btn,
+                styles.btnPrimary,
+                saving && styles.btnDisabled,
+                pressed && styles.btnPressed,
+              ]}
+            >
+              <Ionicons name="add" size={18} color={themed.white} style={{ marginRight: 6 }} />
+              <Text style={[styles.btnText, styles.btnPrimaryText]}>Add Link</Text>
+            </Pressable>
+          </View>
+
+          {linksLoading ? (
+            <ActivityIndicator size="small" color={themed.blue600} />
+          ) : links.length === 0 ? (
+            <Text style={[styles.smallMuted, { color: themed.muted, textAlign: 'center', paddingVertical: 16 }]}>
+              No links yet. Click "Add Link" to get started.
+            </Text>
+          ) : (
+            <View style={{ gap: 16 }}>
+              {links.map((link, index) => (
+                <View key={index} style={[styles.linkItem, { backgroundColor: themed.card2, borderColor: themed.border }]}>
+                  <View style={{ flex: 1, gap: 8 }}>
+                    <TextInput
+                      placeholder="Link title"
+                      placeholderTextColor={themed.muted}
+                      value={link.title}
+                      onChangeText={(text) => updateLink(index, 'title', text)}
+                      editable={!saving}
+                      style={[styles.input, { color: themed.text, backgroundColor: themed.inputBg, borderColor: themed.inputBorder, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 }]}
+                    />
+                    <TextInput
+                      placeholder="https://example.com"
+                      placeholderTextColor={themed.muted}
+                      value={link.url}
+                      onChangeText={(text) => updateLink(index, 'url', text)}
+                      editable={!saving}
+                      autoCapitalize="none"
+                      keyboardType="url"
+                      style={[styles.input, { color: themed.text, backgroundColor: themed.inputBg, borderColor: themed.inputBorder, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 }]}
+                    />
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                    <Pressable
+                      onPress={() => moveLink(index, 'up')}
+                      disabled={saving || index === 0}
+                      style={({ pressed }) => [
+                        styles.linkActionBtn,
+                        { backgroundColor: themed.inputBg, borderColor: themed.border },
+                        (saving || index === 0) && { opacity: 0.4 },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Ionicons name="arrow-up" size={16} color={themed.text} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveLink(index, 'down')}
+                      disabled={saving || index === links.length - 1}
+                      style={({ pressed }) => [
+                        styles.linkActionBtn,
+                        { backgroundColor: themed.inputBg, borderColor: themed.border },
+                        (saving || index === links.length - 1) && { opacity: 0.4 },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Ionicons name="arrow-down" size={16} color={themed.text} />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => removeLink(index)}
+                      disabled={saving}
+                      style={({ pressed }) => [
+                        styles.linkActionBtn,
+                        { backgroundColor: '#FEE2E2', borderColor: '#FECACA' },
+                        saving && { opacity: 0.4 },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </Card>
+
         {/* Pinned Post */}
         <Card title="Pinned Post" icon={<Ionicons name="pin-outline" size={18} color={themed.blue600} />}>
           <View style={[styles.pinnedPreview, { backgroundColor: themed.card2, borderColor: themed.border }]}>
@@ -2006,6 +2219,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+  },
+
+  linkItem: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+  },
+  linkActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   saveBar: {
