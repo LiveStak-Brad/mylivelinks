@@ -716,6 +716,49 @@ export default function SettingsProfileScreen() {
     setGender((prev) => (prev === value ? null : value));
   }, []);
 
+  // Handle ZIP location resolution via RPC (parity with web LocationEditor)
+  const handleSetLocation = useCallback(async () => {
+    const trimmedZip = locationZip.trim();
+    if (trimmedZip.length < 5) {
+      Alert.alert('Invalid ZIP', 'Enter a 5-digit ZIP code.');
+      return;
+    }
+
+    setLocationLoading(true);
+    try {
+      const { data, error: rpcError } = await (supabase as any).rpc('rpc_update_profile_location', {
+        p_zip: trimmedZip,
+        p_label: locationLabel.trim() || null,
+        p_hide: locationHidden,
+        p_show_zip: locationShowZip,
+      });
+
+      if (rpcError) {
+        throw new Error(rpcError.message);
+      }
+
+      const payload = Array.isArray(data) ? data[0] : data;
+      if (!payload) {
+        throw new Error('Missing response from server');
+      }
+
+      // Update local state with resolved values
+      setLocationCity(payload.location_city || '');
+      setLocationRegion(payload.location_region || '');
+      setLocationZip(payload.location_zip || trimmedZip);
+      
+      Alert.alert('Location Set', `Resolved to ${payload.location_city}, ${payload.location_region}`);
+      
+      // Refresh profile to sync
+      await currentUser.refresh();
+    } catch (err: any) {
+      console.error('[SettingsProfileScreen] location RPC error:', err);
+      Alert.alert('Location Error', err?.message || 'Failed to resolve ZIP code');
+    } finally {
+      setLocationLoading(false);
+    }
+  }, [locationZip, locationLabel, locationHidden, locationShowZip, currentUser]);
+
   const handleSave = useCallback(async () => {
     if (!userId) return;
 
@@ -1149,10 +1192,27 @@ export default function SettingsProfileScreen() {
                   maxLength={5}
                   value={locationZip}
                   onChangeText={setLocationZip}
-                  editable={!saving}
+                  editable={!saving && !locationLoading}
                   style={[styles.input, { color: themed.text }]}
                 />
               </View>
+              <Pressable
+                onPress={handleSetLocation}
+                disabled={saving || locationLoading || locationZip.trim().length < 5}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnPrimary,
+                  (saving || locationLoading || locationZip.trim().length < 5) && styles.btnDisabled,
+                  pressed && styles.btnPressed,
+                  { minWidth: 60 },
+                ]}
+              >
+                {locationLoading ? (
+                  <ActivityIndicator size="small" color={themed.white} />
+                ) : (
+                  <Text style={[styles.btnText, styles.btnPrimaryText]}>Set</Text>
+                )}
+              </Pressable>
             </View>
           </View>
 
