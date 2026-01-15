@@ -1,4 +1,4 @@
-﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 import { supabase } from '../lib/supabase';
 import { useCurrentUser } from '../hooks/useCurrentUser';
@@ -388,6 +388,16 @@ export default function SettingsProfileScreen() {
   const currentUser = useCurrentUser();
   const navigation = useNavigation<any>();
 
+  // Track if we've initialized state from profile (prevents refresh from overwriting unsaved changes)
+  const hasInitialized = useRef(false);
+
+  // Reset hasInitialized when component unmounts so next mount initializes fresh
+  useEffect(() => {
+    return () => {
+      hasInitialized.current = false;
+    };
+  }, []);
+
   // Avatar upload state
   const [avatarUploading, setAvatarUploading] = useState(false);
 
@@ -523,10 +533,11 @@ export default function SettingsProfileScreen() {
   const [bio, setBio] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Load all profile fields when profile data arrives
+  // Load all profile fields when profile data arrives (ONCE per mount)
   useEffect(() => {
-    // Initialize (and re-sync when profile refreshes) as long as the user isn't actively editing/saving.
-    if (saving || !profile) return;
+    // Only initialize once per mount - prevents refresh from overwriting unsaved changes
+    if (hasInitialized.current || saving || !profile) return;
+    hasInitialized.current = true;
     
     const p = profile as any;
     
@@ -729,6 +740,31 @@ export default function SettingsProfileScreen() {
     // Display preferences
     if (hideStreamingStats !== (p.hide_streaming_stats || false)) return true;
     
+    // Enabled modules and tabs
+    const currentModules = Array.isArray(enabledModules) ? enabledModules : null;
+    const profileModules = Array.isArray(p.enabled_modules) ? p.enabled_modules : null;
+    if (JSON.stringify(currentModules) !== JSON.stringify(profileModules)) return true;
+    
+    const currentTabs = Array.isArray(enabledTabs) ? enabledTabs : null;
+    const profileTabs = Array.isArray(p.enabled_tabs) ? (p.enabled_tabs as ProfileTab[]).filter((t: ProfileTab) => t !== 'info') : null;
+    if (JSON.stringify(currentTabs) !== JSON.stringify(profileTabs)) return true;
+    
+    // Profile customization - use string comparison for URLs to handle null/undefined/empty
+    const currentBgUrl = profileBgUrl ?? '';
+    const savedBgUrl = p.profile_bg_url ?? '';
+    if (currentBgUrl !== savedBgUrl) return true;
+    if (profileBgOverlay !== (p.profile_bg_overlay || 'dark-medium')) return true;
+    if (cardColor !== (p.card_color || '#FFFFFF')) return true;
+    if (cardOpacity !== (p.card_opacity ?? 0.95)) return true;
+    if (cardBorderRadius !== (p.card_border_radius || 'medium')) return true;
+    if (fontPreset !== (p.font_preset || 'modern')) return true;
+    if (accentColor !== (p.accent_color || '#3B82F6')) return true;
+    if (linksSectionTitle !== (p.links_section_title || 'My Links')) return true;
+    if ((buttonColor ?? '') !== (p.button_color ?? '')) return true;
+    if ((contentTextColor ?? '') !== (p.content_text_color ?? '')) return true;
+    if ((uiTextColor ?? '') !== (p.ui_text_color ?? '')) return true;
+    if ((linkColor ?? '') !== (p.link_color ?? '')) return true;
+    
     return false;
   }, [
     profile, profileLoaded, displayName, profileDisplayName, bio, profileBio, gender,
@@ -736,7 +772,11 @@ export default function SettingsProfileScreen() {
     socialInstagram, socialTwitter, socialYoutube, socialTiktok, socialFacebook,
     socialTwitch, socialDiscord, socialSnapchat, socialLinkedin, socialGithub,
     socialSpotify, socialOnlyfans, profileType, showTopFriends, topFriendsTitle,
-    topFriendsAvatarStyle, topFriendsMaxCount, hideStreamingStats
+    topFriendsAvatarStyle, topFriendsMaxCount, hideStreamingStats,
+    enabledModules, enabledTabs,
+    profileBgUrl, profileBgOverlay, cardColor, cardOpacity, cardBorderRadius,
+    fontPreset, accentColor, linksSectionTitle, buttonColor, contentTextColor,
+    uiTextColor, linkColor
   ]);
 
   const canSave = Boolean(userId) && !currentUser.loading && !saving && dirty;
@@ -940,12 +980,14 @@ export default function SettingsProfileScreen() {
         updated_at: new Date().toISOString(),
       };
 
+      console.log('[SettingsProfileScreen] Saving profile with profile_bg_url:', updates.profile_bg_url);
       const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
       if (error) {
         console.error('[SettingsProfileScreen] profiles update error:', error.message);
         Alert.alert('Save failed', error.message);
         return;
       }
+      console.log('[SettingsProfileScreen] Profile saved successfully');
 
       // Save user_links (delete-all + insert-all pattern matching web exactly)
       // Delete all existing links for this profile
@@ -1074,14 +1116,14 @@ export default function SettingsProfileScreen() {
       const fileName = `pinned.${fileExt}`;
       const filePath = `${userId}/${fileName}`;
 
-      // Fetch the media as blob
+      // Read file as ArrayBuffer for React Native compatibility
       const response = await fetch(asset.uri);
-      const blob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
 
       // Upload to pinned-posts bucket (matching web lib/storage.ts uploadPinnedPostMedia)
       const { error: uploadError } = await supabase.storage
         .from('pinned-posts')
-        .upload(filePath, blob, {
+        .upload(filePath, arrayBuffer, {
           cacheControl: '3600',
           upsert: true,
           contentType: isVideo ? 'video/mp4' : 'image/jpeg',
@@ -1219,18 +1261,18 @@ export default function SettingsProfileScreen() {
     try {
       const asset = result.assets[0];
       const fileExt = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `background.${fileExt}`;
-      const filePath = `${userId}/${fileName}`;
+      // Match web: uploads to 'avatars' bucket with {userId}_bg_{timestamp}.{ext} format
+      const fileName = `${userId}_bg_${Date.now()}.${fileExt}`;
 
       const response = await fetch(asset.uri);
-      const blob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
 
       const { error: uploadError } = await supabase.storage
-        .from('profile-media')
-        .upload(filePath, blob, {
+        .from('avatars')
+        .upload(fileName, arrayBuffer, {
           cacheControl: '3600',
           upsert: true,
-          contentType: 'image/jpeg',
+          contentType: `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`,
         });
 
       if (uploadError) {
@@ -1238,15 +1280,16 @@ export default function SettingsProfileScreen() {
       }
 
       const { data: urlData } = supabase.storage
-        .from('profile-media')
-        .getPublicUrl(filePath);
+        .from('avatars')
+        .getPublicUrl(fileName);
 
       if (!urlData?.publicUrl) {
         throw new Error('Failed to get background URL');
       }
 
+      console.log('[SettingsProfileScreen] Background uploaded, URL:', urlData.publicUrl);
       setProfileBgUrl(urlData.publicUrl);
-      Alert.alert('Success', 'Background uploaded! Save to apply.');
+      Alert.alert('Success', 'Background uploaded! Tap Save Profile to apply.');
     } catch (err: any) {
       console.error('[SettingsProfileScreen] background upload error:', err);
       Alert.alert('Upload Failed', err?.message || 'Failed to upload background');
@@ -1282,21 +1325,24 @@ export default function SettingsProfileScreen() {
       const asset = result.assets[0];
       const fileExt = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${userId}/avatar.${fileExt}`;
+      const contentType = `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
 
-      // Fetch the image as blob
+      // Read file as base64 for React Native compatibility
       const response = await fetch(asset.uri);
-      const blob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage using ArrayBuffer (works reliably in RN)
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, blob, { upsert: true, contentType: `image/${fileExt}` });
+        .upload(fileName, arrayBuffer, { upsert: true, contentType });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
+      // Get public URL with cache-busting timestamp
       const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
       const avatarUrl = urlData?.publicUrl ? `${urlData.publicUrl}?t=${Date.now()}` : null;
+
+      if (!avatarUrl) throw new Error('Failed to get avatar URL');
 
       // Update profile
       const { error: updateError } = await supabase
@@ -1319,17 +1365,28 @@ export default function SettingsProfileScreen() {
   const [modulesModalOpen, setModulesModalOpen] = useState(false);
   const [tabsModalOpen, setTabsModalOpen] = useState(false);
 
-  // Module definitions with toggle handlers
+  // Module definitions with toggle handlers (matching web OPTIONAL_MODULES for parity)
   const MODULE_DEFINITIONS: { id: ProfileSection; label: string; description: string }[] = [
+    // Profile modules
     { id: 'social_counts', label: 'Social Counts', description: 'Follower/following/friends counts' },
     { id: 'social_media', label: 'Social Media Links', description: 'Instagram, Twitter, TikTok icons' },
     { id: 'links', label: 'Custom Links', description: 'Your Linktree-style link section' },
     { id: 'connections', label: 'Connections', description: 'Friends and followers display' },
-    { id: 'streaming_stats', label: 'Streaming Stats', description: 'Live hours, viewer counts' },
-    { id: 'top_supporters', label: 'Top Supporters', description: 'Users who gifted you' },
-    { id: 'top_friends', label: 'Top Friends', description: 'Your favorite people' },
-    { id: 'portfolio', label: 'Portfolio / Products', description: 'Your work showcase' },
+    // Community
     { id: 'referral_network', label: 'Referral Network', description: 'Your referral connections' },
+    { id: 'top_friends', label: 'Top Friends', description: 'Your favorite people' },
+    // Content
+    { id: 'music_showcase', label: 'Music Tracks', description: 'Your music library' },
+    { id: 'upcoming_events', label: 'Events / Shows', description: 'Your event schedule' },
+    // Stats
+    { id: 'streaming_stats', label: 'Streaming Stats', description: 'Live hours, viewer counts' },
+    { id: 'profile_stats', label: 'Profile Stats', description: 'Account age, join date' },
+    { id: 'top_supporters', label: 'Top Supporters', description: 'Users who gifted you' },
+    { id: 'top_streamers', label: 'Top Streamers', description: 'Streamers you support' },
+    // Business
+    { id: 'merchandise', label: 'Merchandise', description: 'Your merch store' },
+    { id: 'portfolio', label: 'Portfolio / Products', description: 'Your work showcase' },
+    { id: 'business_info', label: 'Business Info', description: 'Hours, location, contact' },
   ];
 
   // Tab definitions
@@ -1337,11 +1394,15 @@ export default function SettingsProfileScreen() {
     { id: 'info', label: 'Info', description: 'Core tab (always on)', core: true },
     { id: 'feed', label: 'Feed', description: 'Photo/video feed grid' },
     { id: 'reels', label: 'Reels', description: 'Short-form video content' },
-    { id: 'media', label: 'Media', description: 'Photo gallery' },
-    { id: 'music_videos', label: 'Music Videos', description: 'Video gallery' },
+    { id: 'media', label: 'Media', description: 'Photos & videos gallery' },
+    { id: 'music_videos', label: 'Music Videos', description: 'Music video gallery' },
     { id: 'music', label: 'Music', description: 'Music tracks & playlists' },
     { id: 'events', label: 'Events', description: 'Shows & performances' },
     { id: 'products', label: 'Products', description: 'Merchandise & portfolio' },
+    { id: 'podcasts', label: 'Podcasts', description: 'Podcast episodes & shows' },
+    { id: 'movies', label: 'Movies', description: 'Films & long-form content' },
+    { id: 'series', label: 'Series', description: 'Episodic content & shows' },
+    { id: 'education', label: 'Education', description: 'Tutorials & courses' },
   ];
 
   // Check if a module is enabled (uses profile type defaults if enabledModules is null)
@@ -2667,7 +2728,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   previewTitle: { color: COLORS.text, fontWeight: '900', textAlign: 'center', marginBottom: 10 },
-  previewGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
+  previewGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 208, alignSelf: 'center' },
   previewTile: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(124,58,237,0.30)' },
 
   customizationTitle: { color: COLORS.text, fontSize: 22, fontWeight: '900', marginTop: 10 },

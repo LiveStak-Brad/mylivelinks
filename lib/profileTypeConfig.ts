@@ -51,6 +51,7 @@ export type ProfileSection =
   | 'portfolio'
   | 'business_info'
   | 'referral_network'
+  | 'top_friends'
   | 'footer';
 
 export interface SectionConfig {
@@ -280,7 +281,13 @@ export function getEnabledTabs(
   // If user has custom enabled tabs, use those
   // Note: empty array means user intentionally disabled all OPTIONAL tabs.
   if (Array.isArray(customEnabledTabs)) {
-    const allowed = new Set<ProfileTab>(['info', ...customEnabledTabs]);
+    // Map mobile tab IDs to web IDs for compatibility
+    const mappedTabs = customEnabledTabs.map(tab => {
+      if (tab === 'media' as any) return 'photos';
+      if (tab === 'music_videos' as any) return 'videos';
+      return tab;
+    });
+    const allowed = new Set<ProfileTab>(['info', ...mappedTabs]);
     return config.tabs.filter(tab => allowed.has(tab.id));
   }
   

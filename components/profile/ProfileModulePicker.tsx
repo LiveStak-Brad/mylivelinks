@@ -57,6 +57,12 @@ const OPTIONAL_MODULES: Record<string, ModuleMetadata> = {
     description: 'Your referral stats and network tree',
     category: 'Community',
   },
+  top_friends: {
+    id: 'top_friends',
+    label: 'Top Friends',
+    description: 'Your favorite people',
+    category: 'Community',
+  },
   
   // Music & Entertainment
   music_showcase: {
