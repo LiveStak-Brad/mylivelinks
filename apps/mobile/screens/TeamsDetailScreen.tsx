@@ -823,9 +823,22 @@ export default function TeamsDetailScreen() {
                     placeholder="Type a message..."
                     placeholderTextColor="rgba(255,255,255,0.4)"
                     value={chatInput}
-                    onChangeText={setChatInput}
+                    onChangeText={(text) => {
+                      // Check if user pressed Enter (newline at end)
+                      if (text.endsWith('\n')) {
+                        const trimmed = text.slice(0, -1).trim();
+                        if (trimmed && !sendingMessage) {
+                          setChatInput(trimmed);
+                          handleSendMessage();
+                          return;
+                        }
+                      }
+                      setChatInput(text);
+                    }}
                     multiline
                     maxLength={500}
+                    returnKeyType="send"
+                    blurOnSubmit={false}
                   />
                   <Pressable
                     style={[styles.chatSendButton, (!chatInput.trim() || sendingMessage) && styles.disabled]}

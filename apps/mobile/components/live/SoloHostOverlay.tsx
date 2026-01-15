@@ -9,6 +9,7 @@ const PRO_BADGE_IMAGE = require('../../assets/pro.png');
 import ChatOverlay, { ChatMessage, ChatFontColor } from './ChatOverlay';
 import TopGifterBubbles, { TopGifter } from './TopGifterBubbles';
 import HostControlsBar from './HostControlsBar';
+import ShareModal from '../../components/ShareModal';
 import { DEFAULT_HOST_CAMERA_FILTERS, loadHostCameraFilters, saveHostCameraFilters, type HostCameraFilters } from '../../lib/hostCameraFilters';
 import { DEFAULT_HOST_LIVE_OPTIONS, loadHostLiveOptions, saveHostLiveOptions, type HostLiveOptions } from '../../lib/hostLiveOptions';
 import {
@@ -17,7 +18,6 @@ import {
   BattleSheet,
   CoHostSheet,
   FiltersSheet,
-  ShareSheet,
   ViewersSheet,
   GiftersSheet,
   TrendingSheet,
@@ -349,7 +349,14 @@ export default function SoloHostOverlay({
           });
         }}
       />
-      <ShareSheet visible={showShare} onClose={() => setShowShare(false)} />
+      <ShareModal
+        visible={showShare}
+        onClose={() => setShowShare(false)}
+        shareUrl={`https://www.mylivelinks.com/live/${encodeURIComponent(hostName)}`}
+        shareText={`Watch ${hostName}'s live stream on MyLiveLinks!`}
+        shareThumbnail={hostAvatarUrl}
+        shareContentType="live"
+      />
       <ViewersSheet visible={showViewers} onClose={() => setShowViewers(false)} viewerCount={viewerCount} liveStreamId={liveStreamId} />
       <GiftersSheet visible={showGifters} onClose={() => setShowGifters(false)} liveStreamId={liveStreamId} />
       <TrendingSheet visible={showTrending} onClose={() => setShowTrending(false)} />

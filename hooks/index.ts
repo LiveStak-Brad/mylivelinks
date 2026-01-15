@@ -23,6 +23,15 @@ export { useSupportBadgeCounts, useOwnerSupportTickets } from './useOwnerSupport
 export { useTeamChatStyle } from './useTeamChatStyle';
 export type { TeamChatStyle } from './useTeamChatStyle';
 
+// Gift reply status hook
+export { useGiftReplyStatus, getGiftReplyStatus } from './useGiftReplyStatus';
+export type {
+  Gift as GiftReplyGift,
+  GiftReplyStatus,
+  UseGiftReplyStatusOptions,
+  UseGiftReplyStatusReturn,
+} from './useGiftReplyStatus';
+
 // Team hooks
 export {
   useTeam,

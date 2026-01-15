@@ -63,6 +63,7 @@ interface AnalyticsResponse {
       totalCoins: number;
       giftCount: number;
       tierKey: string;
+      tierLevel: number;
     }>;
   };
   
@@ -373,7 +374,7 @@ export async function GET(request: NextRequest) {
         
         if (senders) {
           // Get gifter status for top gifters
-          const gifterStatuses = new Map<string, string>();
+          const gifterStatuses = new Map<string, { tierKey: string; level: number }>();
           for (const senderId of senderIds.slice(0, 5)) {
             try {
               const statusRes = await fetch(
@@ -382,10 +383,13 @@ export async function GET(request: NextRequest) {
               );
               if (statusRes.ok) {
                 const status = await statusRes.json();
-                gifterStatuses.set(senderId, status.tier_key || 'starter');
+                gifterStatuses.set(senderId, {
+                  tierKey: status.tier_key || 'starter',
+                  level: status.level_in_tier || 1,
+                });
               }
             } catch {
-              gifterStatuses.set(senderId, 'starter');
+              gifterStatuses.set(senderId, { tierKey: 'starter', level: 1 });
             }
           }
           
@@ -397,7 +401,8 @@ export async function GET(request: NextRequest) {
               avatarUrl: s.avatar_url || '',
               totalCoins: senderMap.get(s.id)?.coins || 0,
               giftCount: senderMap.get(s.id)?.count || 0,
-              tierKey: gifterStatuses.get(s.id) || 'starter',
+              tierKey: gifterStatuses.get(s.id)?.tierKey || 'starter',
+              tierLevel: gifterStatuses.get(s.id)?.level || 1,
             }))
             .sort((a, b) => b.totalCoins - a.totalCoins)
             .slice(0, 5);

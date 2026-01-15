@@ -36,10 +36,27 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
   const { noties, unreadCount, isLoading, markAsRead, markAllAsRead } = useNoties();
   const { toast } = useToast();
   
-  // Gift quick replies state (UI-only, no DB writes)
+  // Gift quick replies state - persisted to localStorage
   const [dismissedGiftIds, setDismissedGiftIds] = useState<Set<string>>(new Set());
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const showGiftQuickReplies = true; // Setting enabled by default
+  
+  const HANDLED_GIFTS_KEY = 'handledGiftIds';
+  
+  // Load handled gift IDs from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(HANDLED_GIFTS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setDismissedGiftIds(new Set(parsed.map(String)));
+        }
+      }
+    } catch (err) {
+      console.warn('[NotiesModal] Failed to load handled gift IDs:', err);
+    }
+  }, []);
   
   // Get current user ID
   useEffect(() => {
@@ -50,13 +67,110 @@ export default function NotiesModal({ isOpen, onClose, anchorRef }: NotiesModalP
   }, []);
   
   const handleDismissGiftReply = (giftId: string) => {
-    setDismissedGiftIds(prev => new Set([...prev, giftId]));
+    setDismissedGiftIds(prev => {
+      const next = new Set([...prev, giftId]);
+      // Persist to localStorage
+      try {
+        localStorage.setItem(HANDLED_GIFTS_KEY, JSON.stringify(Array.from(next)));
+      } catch (err) {
+        console.warn('[NotiesModal] Failed to persist handled gift IDs:', err);
+      }
+      return next;
+    });
   };
   
-  const handleSendGiftReply = async (recipientId: string, message: string): Promise<boolean> => {
+  const handleSendGiftReply = async (
+    recipientId: string,
+    message: string,
+    giftId?: string,
+    postId?: string,
+    creatorStudioItemId?: string
+  ): Promise<boolean> => {
     if (!currentUserId) return false;
     const supabase = createClient();
+    
     try {
+      // Determine routing based on gift context
+      // Priority: post_id > creator_studio_item_id > DM
+      
+      // If we have a post_id, create a post comment
+      if (postId) {
+        const { error } = await supabase
+          .from('post_comments')
+          .insert({
+            post_id: postId,
+            author_id: currentUserId,
+            content: message,
+          });
+        if (error) throw error;
+        return true;
+      }
+      
+      // If we have a creator_studio_item_id, create a watch comment
+      // Note: creator_studio_comments table may not exist yet - fall through to DM if it fails
+      if (creatorStudioItemId) {
+        try {
+          const { error } = await supabase
+            .from('creator_studio_comments')
+            .insert({
+              item_id: creatorStudioItemId,
+              author_id: currentUserId,
+              content: message,
+            });
+          if (!error) return true;
+          console.warn('[NotiesModal] creator_studio_comments insert failed, falling back to DM:', error.message);
+        } catch (err) {
+          console.warn('[NotiesModal] creator_studio_comments not available, falling back to DM');
+        }
+      }
+      
+      // If we have a giftId but no context, try to look up the gift context
+      if (giftId) {
+        // Check if this gift is associated with a post
+        const { data: postGift } = await supabase
+          .from('post_gifts')
+          .select('post_id')
+          .eq('gift_id', giftId)
+          .maybeSingle();
+        
+        if (postGift?.post_id) {
+          const { error } = await supabase
+            .from('post_comments')
+            .insert({
+              post_id: postGift.post_id,
+              author_id: currentUserId,
+              content: message,
+            });
+          if (error) throw error;
+          return true;
+        }
+        
+        // Check if this gift is associated with a creator studio item
+        // Note: creator_studio_item_gifts table may not exist yet - skip if query fails
+        try {
+          const { data: watchGift } = await supabase
+            .from('creator_studio_item_gifts')
+            .select('item_id')
+            .eq('gift_id', giftId)
+            .maybeSingle();
+          
+          if (watchGift?.item_id) {
+            const { error } = await supabase
+              .from('creator_studio_comments')
+              .insert({
+                item_id: watchGift.item_id,
+                author_id: currentUserId,
+                content: message,
+              });
+            if (!error) return true;
+            console.warn('[NotiesModal] creator_studio_comments insert failed, falling back to DM:', error.message);
+          }
+        } catch (err) {
+          // Table doesn't exist yet, skip this lookup
+        }
+      }
+      
+      // Fallback: Send as DM (for message-based gifts or when context lookup fails)
       const { error } = await supabase
         .from('instant_messages')
         .insert({
@@ -474,7 +588,7 @@ function NotieItem({
   onAcceptInvite?: (inviteId: number) => void;
   onDeclineInvite?: (inviteId: number) => void;
   showQuickReplies?: boolean;
-  onSendGiftReply?: (recipientId: string, message: string) => Promise<boolean>;
+  onSendGiftReply?: (recipientId: string, message: string, giftId?: string, postId?: string, creatorStudioItemId?: string) => Promise<boolean>;
   onDismissGiftReply?: (giftId: string) => void;
 }) {
   const isTeamInvite = notie.type === 'team_invite' && notie.metadata?.invite_id;
@@ -535,6 +649,8 @@ function NotieItem({
           <GiftQuickReplies
             giftId={String(notie.metadata.gift_id)}
             senderId={String(notie.metadata.sender_id)}
+            postId={notie.metadata?.post_id ? String(notie.metadata.post_id) : undefined}
+            creatorStudioItemId={notie.metadata?.creator_studio_item_id ? String(notie.metadata.creator_studio_item_id) : undefined}
             onSendReply={onSendGiftReply}
             onDismiss={onDismissGiftReply}
           />

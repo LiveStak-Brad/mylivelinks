@@ -163,9 +163,48 @@ export default function IMThreadScreen() {
     contentType?: 'video' | 'live' | 'photo';
   } | null>(null);
   const listRef = useRef<FlatList>(null);
+  const [fetchedProfile, setFetchedProfile] = useState<{ displayName?: string; avatarUrl?: string } | null>(null);
+  const [myAvatarUrl, setMyAvatarUrl] = useState<string | null>(null);
 
   const myId = user?.id ?? null;
-  const title = useMemo(() => otherDisplayName || 'Message', [otherDisplayName]);
+  
+  // Fetch current user's avatar
+  useEffect(() => {
+    if (myId) {
+      supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', myId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setMyAvatarUrl((data as any).avatar_url || null);
+          }
+        });
+    }
+  }, [myId]);
+  
+  // Fetch other profile info if not provided in navigation params
+  useEffect(() => {
+    if (otherProfileId && !otherDisplayName) {
+      supabase
+        .from('profiles')
+        .select('display_name, username, avatar_url')
+        .eq('id', otherProfileId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setFetchedProfile({
+              displayName: (data as any).display_name || (data as any).username || undefined,
+              avatarUrl: (data as any).avatar_url || undefined,
+            });
+          }
+        });
+    }
+  }, [otherProfileId, otherDisplayName]);
+
+  const title = useMemo(() => otherDisplayName || fetchedProfile?.displayName || 'Message', [otherDisplayName, fetchedProfile?.displayName]);
+  const headerAvatarUrl = otherAvatarUrl || fetchedProfile?.avatarUrl;
 
   const stylesVars = useMemo<StylesVars>(
     () => ({
@@ -212,6 +251,11 @@ export default function IMThreadScreen() {
     );
     setMessages(uniqueRows);
     setLoading(false);
+    
+    // Auto-scroll to bottom after messages load
+    setTimeout(() => {
+      listRef.current?.scrollToEnd({ animated: false });
+    }, 100);
 
     // Mark unread messages from the other user as read.
     const { error: markError } = await supabase.rpc('mark_messages_read', { p_user_id: myId, p_sender_id: otherProfileId });
@@ -521,7 +565,7 @@ export default function IMThreadScreen() {
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Image
-            source={otherAvatarUrl ? { uri: otherAvatarUrl } : NO_PROFILE_PIC}
+            source={headerAvatarUrl && headerAvatarUrl.trim() ? { uri: headerAvatarUrl } : NO_PROFILE_PIC}
             style={styles.headerAvatar}
             resizeMode="cover"
           />
@@ -552,8 +596,14 @@ export default function IMThreadScreen() {
           renderItem={({ item }) => {
             const mine = myId && String(item.sender_id) === myId;
             const decoded = decodeImContent(item.content);
+            const avatarSource = mine 
+              ? (myAvatarUrl && myAvatarUrl.trim() ? { uri: myAvatarUrl } : NO_PROFILE_PIC)
+              : (headerAvatarUrl && headerAvatarUrl.trim() ? { uri: headerAvatarUrl } : NO_PROFILE_PIC);
             return (
               <View style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}>
+                {!mine && (
+                  <Image source={avatarSource} style={styles.messageAvatar} />
+                )}
                 {decoded.type === 'image' && decoded.url ? (
                   <Pressable
                     accessibilityRole="button"
@@ -716,6 +766,9 @@ export default function IMThreadScreen() {
                     </Text>
                   </View>
                 )}
+                {mine && (
+                  <Image source={avatarSource} style={styles.messageAvatar} />
+                )}
               </View>
             );
           }}
@@ -742,12 +795,25 @@ export default function IMThreadScreen() {
           </Pressable>
           <TextInput
             value={composerText}
-            onChangeText={setComposerText}
+            onChangeText={(text) => {
+              // Check if user pressed Enter (newline at end)
+              if (text.endsWith('\n')) {
+                const trimmed = text.slice(0, -1).trim();
+                if (trimmed && !isSending) {
+                  setComposerText(trimmed);
+                  send();
+                  return;
+                }
+              }
+              setComposerText(text);
+            }}
             placeholder="Message…"
             placeholderTextColor={stylesVars.mutedText}
             style={styles.composerInput}
             multiline
             editable={!isSending}
+            returnKeyType="send"
+            blurOnSubmit={false}
           />
           <Pressable
             accessibilityRole="button"
@@ -935,6 +1001,12 @@ function createStyles(stylesVars: StylesVars) {
   },
   rowTheirs: {
     justifyContent: 'flex-start',
+  },
+  messageAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginHorizontal: 8,
   },
   bubble: {
     maxWidth: '82%',

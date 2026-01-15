@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../state/AuthContext';
@@ -72,7 +72,7 @@ function AvatarPlaceholder({
     <View style={styles.avatarOuter}>
       <View style={[styles.avatarRing, isLive ? styles.avatarRingLive : undefined]}>
         <Image
-          source={avatarUrl ? { uri: avatarUrl } : NO_PROFILE_PIC}
+          source={avatarUrl && avatarUrl.trim() ? { uri: avatarUrl } : NO_PROFILE_PIC}
           style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
           resizeMode="cover"
         />
@@ -100,7 +100,7 @@ function FriendsStrip({ friends, styles, stylesVars, navigation }: { friends: Mo
         contentContainerStyle={styles.friendsListContent}
         renderItem={({ item }) => {
           return (
-            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('ProfileViewScreen', { profileId: item.id, username: item.displayName })} style={({ pressed }) => [styles.friendItem, pressed && styles.pressed]}>
+            <Pressable accessibilityRole="button" onPress={() => navigation.navigate('IMThreadScreen', { otherProfileId: item.id, otherDisplayName: item.displayName, otherAvatarUrl: item.avatarUrl })} style={({ pressed }) => [styles.friendItem, pressed && styles.pressed]}>
               <View>
                 <AvatarPlaceholder
                   label={item.displayName}
@@ -430,13 +430,13 @@ export default function MessagesScreen() {
     setLoading(false);
   }, [user?.id]);
 
-  useEffect(() => {
-    void loadInbox();
-  }, [loadInbox]);
-
-  useEffect(() => {
-    void loadFriends();
-  }, [loadFriends]);
+  // Refresh inbox and friends when screen gains focus (e.g., returning from IMThreadScreen)
+  useFocusEffect(
+    useCallback(() => {
+      void loadInbox();
+      void loadFriends();
+    }, [loadInbox, loadFriends])
+  );
 
   const filteredConversations = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

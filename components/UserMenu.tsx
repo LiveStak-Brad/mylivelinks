@@ -163,7 +163,7 @@ export default function UserMenu({ className = '' }: UserMenuProps) {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     // Clear the home redirect flag so next login will redirect to watch
     try { sessionStorage.removeItem('mll:home_redirected'); } catch {}
     setShowMenu(false);

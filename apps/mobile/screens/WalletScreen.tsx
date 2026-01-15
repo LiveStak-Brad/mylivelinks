@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Alert, Linking, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { Product, Purchase, PurchaseError } from 'react-native-iap';
@@ -259,34 +259,35 @@ export default function WalletScreen() {
       return;
     }
 
+    const { coins, valid } = calculateConversion(diamonds);
+    if (!valid) {
+      setConversionError(`Conversion too small. Minimum ${MIN_DIAMONDS} diamonds required to yield 1 coin`);
+      return;
+    }
+
     setConverting(true);
     setConversionError(null);
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session?.access_token) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/wallet/convert-diamonds`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${sessionData.session.access_token}`,
-        },
-        body: JSON.stringify({ diamonds }),
+      // Call RPC function directly like web does
+      const { data, error: rpcError } = await (supabase.rpc as any)('convert_diamonds_to_coins', {
+        p_profile_id: user.id,
+        p_diamonds_in: diamonds,
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || 'Conversion failed');
+      if (rpcError) {
+        throw new Error(rpcError.message || 'Conversion failed');
       }
 
-      const result = await response.json();
       await fetchBalances();
       setConversionModalVisible(false);
       setDiamondsToConvert('');
-      Alert.alert('Success!', `Converted ${diamonds} diamonds to ${result.coins || Math.floor(diamonds * CONVERSION_RATE)} coins!`);
+      Alert.alert('Success!', `Converted ${diamonds} diamonds to ${coins} coins!`);
     } catch (err: any) {
       console.error('[wallet] Conversion error:', err);
       setConversionError(err?.message || 'Conversion failed');
@@ -650,7 +651,14 @@ export default function WalletScreen() {
                 keyboardType="numeric"
                 placeholder={`Min ${MIN_DIAMONDS}`}
                 placeholderTextColor={themed.subtleText}
+                returnKeyType="done"
               />
+              <TouchableOpacity
+                style={[styles.convertAllButton, { backgroundColor: themed.primary || '#a855f7' }]}
+                onPress={() => setDiamondsToConvert(String(diamondBalance))}
+              >
+                <Text style={styles.convertAllButtonText}>All</Text>
+              </TouchableOpacity>
             </View>
 
             {diamondsToConvert && parseInt(diamondsToConvert) >= MIN_DIAMONDS && (
@@ -1032,6 +1040,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 18,
     fontWeight: '600',
+  },
+  convertAllButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  convertAllButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   conversionPreview: {
     alignItems: 'center',

@@ -80,6 +80,7 @@ interface AnalyticsData {
       totalCoins: number;
       giftCount: number;
       tierKey: string;
+      tierLevel: number;
     }>;
   };
   streams: {
@@ -713,7 +714,7 @@ export default function AdminUserAnalyticsPage() {
                 avatarUrl: g.avatarUrl,
                 primaryValue: g.totalCoins,
                 secondaryValue: g.giftCount,
-                badge: <GifterBadge tier_key={g.tierKey} level={1} size="sm" showLevel={false} />,
+                badge: <GifterBadge tier_key={g.tierKey} level={g.tierLevel} size="sm" />,
               }))}
               columns={{
                 primary: { label: 'Coins Given', suffix: ' 🪙' },

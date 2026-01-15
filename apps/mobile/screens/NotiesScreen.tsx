@@ -11,6 +11,7 @@ import { getNotificationDestination } from '../lib/noties/getNotificationDestina
 import { resolveNotieAction } from '../lib/noties/resolveNotieAction';
 import { useTheme } from '../theme/useTheme';
 import { brand, darkPalette, lightPalette } from '../theme/colors';
+import GiftQuickReplies from '../components/GiftQuickReplies';
 
 type NotieRowItem = {
   id: string;
@@ -25,6 +26,10 @@ type NotieRowItem = {
   actorUsername?: string;
   entityType?: string | null;
   entityId?: string | null;
+  giftId?: string;
+  senderId?: string;
+  postId?: string;
+  creatorStudioItemId?: string;
 };
 
 function NotieRow({
@@ -32,11 +37,25 @@ function NotieRow({
   onPress,
   onLongPress,
   styles,
+  showQuickReplies,
+  onSendGiftReply,
+  onDismissGiftReply,
+  quickReplyColors,
 }: {
   item: NotieRowItem;
   onPress: (id: string) => void;
   onLongPress: (id: string) => void;
   styles: any;
+  showQuickReplies?: boolean;
+  onSendGiftReply?: (recipientId: string, message: string, giftId?: string, postId?: string, creatorStudioItemId?: string) => Promise<boolean>;
+  onDismissGiftReply?: (giftId: string) => void;
+  quickReplyColors?: {
+    primary: string;
+    text: string;
+    mutedText: string;
+    surface: string;
+    border: string;
+  };
 }) {
   const [avatarError, setAvatarError] = useState(false);
   const avatarSource = avatarError ? DEFAULT_AVATAR : getAvatarSource(item.avatarUrl);
@@ -73,6 +92,19 @@ function NotieRow({
         <View style={styles.notieContent}>
           <Text style={styles.notieMessage}>{item.message}</Text>
           <Text style={styles.notieTimestamp}>{item.timestamp}</Text>
+          
+          {/* Gift quick replies */}
+          {showQuickReplies && onSendGiftReply && onDismissGiftReply && item.giftId && item.senderId && quickReplyColors && (
+            <GiftQuickReplies
+              giftId={item.giftId}
+              senderId={item.senderId}
+              postId={item.postId}
+              creatorStudioItemId={item.creatorStudioItemId}
+              onSendReply={onSendGiftReply}
+              onDismiss={onDismissGiftReply}
+              colors={quickReplyColors}
+            />
+          )}
         </View>
 
         {!item.isRead ? <View style={styles.unreadDot} /> : null}
@@ -300,6 +332,157 @@ export default function NotiesScreen() {
   const [noties, setNoties] = useState<NotieRowItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const isMountedRef = useRef(true);
+  
+  // Gift quick replies state - persisted to AsyncStorage
+  const [dismissedGiftIds, setDismissedGiftIds] = useState<Set<string>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const showGiftQuickReplies = true; // Setting enabled by default
+  
+  const HANDLED_GIFTS_KEY = 'handledGiftIds';
+  
+  // Load handled gift IDs from AsyncStorage on mount
+  useEffect(() => {
+    const loadHandledGifts = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(HANDLED_GIFTS_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setDismissedGiftIds(new Set(parsed.map(String)));
+          }
+        }
+      } catch (err) {
+        console.warn('[NotiesScreen] Failed to load handled gift IDs:', err);
+      }
+    };
+    void loadHandledGifts();
+  }, []);
+  
+  // Quick reply colors derived from theme
+  const quickReplyColors = useMemo(() => ({
+    primary: stylesVars.primary,
+    text: stylesVars.text,
+    mutedText: stylesVars.mutedText,
+    surface: stylesVars.card,
+    border: stylesVars.border,
+  }), [stylesVars]);
+  
+  const handleDismissGiftReply = useCallback((giftId: string) => {
+    setDismissedGiftIds(prev => {
+      const next = new Set([...prev, giftId]);
+      // Persist to AsyncStorage
+      AsyncStorage.setItem(HANDLED_GIFTS_KEY, JSON.stringify(Array.from(next))).catch(err => {
+        console.warn('[NotiesScreen] Failed to persist handled gift IDs:', err);
+      });
+      return next;
+    });
+  }, []);
+  
+  const handleSendGiftReply = useCallback(async (
+    recipientId: string,
+    message: string,
+    giftId?: string,
+    postId?: string,
+    creatorStudioItemId?: string
+  ): Promise<boolean> => {
+    if (!currentUserId) return false;
+    
+    try {
+      // Determine routing based on gift context
+      // Priority: post_id > creator_studio_item_id > DM
+      
+      // If we have a post_id, create a post comment
+      if (postId) {
+        const { error } = await supabase
+          .from('post_comments')
+          .insert({
+            post_id: postId,
+            author_id: currentUserId,
+            content: message,
+          });
+        if (error) throw error;
+        return true;
+      }
+      
+      // If we have a creator_studio_item_id, create a watch comment
+      // Note: creator_studio_comments table may not exist yet - fall through to DM if it fails
+      if (creatorStudioItemId) {
+        try {
+          const { error } = await supabase
+            .from('creator_studio_comments')
+            .insert({
+              item_id: creatorStudioItemId,
+              author_id: currentUserId,
+              content: message,
+            });
+          if (!error) return true;
+          console.warn('[NotiesScreen] creator_studio_comments insert failed, falling back to DM:', error.message);
+        } catch (err) {
+          console.warn('[NotiesScreen] creator_studio_comments not available, falling back to DM');
+        }
+      }
+      
+      // If we have a giftId but no context, try to look up the gift context
+      if (giftId) {
+        // Check if this gift is associated with a post
+        const { data: postGift } = await supabase
+          .from('post_gifts')
+          .select('post_id')
+          .eq('gift_id', giftId)
+          .maybeSingle();
+        
+        if (postGift?.post_id) {
+          const { error } = await supabase
+            .from('post_comments')
+            .insert({
+              post_id: postGift.post_id,
+              author_id: currentUserId,
+              content: message,
+            });
+          if (error) throw error;
+          return true;
+        }
+        
+        // Check if this gift is associated with a creator studio item
+        // Note: creator_studio_item_gifts table may not exist yet - skip if query fails
+        try {
+          const { data: watchGift } = await supabase
+            .from('creator_studio_item_gifts')
+            .select('item_id')
+            .eq('gift_id', giftId)
+            .maybeSingle();
+          
+          if (watchGift?.item_id) {
+            const { error } = await supabase
+              .from('creator_studio_comments')
+              .insert({
+                item_id: watchGift.item_id,
+                author_id: currentUserId,
+                content: message,
+              });
+            if (!error) return true;
+            console.warn('[NotiesScreen] creator_studio_comments insert failed, falling back to DM:', error.message);
+          }
+        } catch (err) {
+          // Table doesn't exist yet, skip this lookup
+        }
+      }
+      
+      // Fallback: Send as DM (for message-based gifts or when context lookup fails)
+      const { error } = await supabase
+        .from('instant_messages')
+        .insert({
+          sender_id: currentUserId,
+          recipient_id: recipientId,
+          content: message,
+        });
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[NotiesScreen] Failed to send gift reply:', err);
+      return false;
+    }
+  }, [currentUserId]);
 
   const typeToEmoji = useMemo<Record<string, string>>(
     () => ({
@@ -362,6 +545,9 @@ export default function NotiesScreen() {
         if (isMountedRef.current) setNoties([]);
         return;
       }
+      
+      // Store current user ID for gift replies
+      if (isMountedRef.current) setCurrentUserId(user.id);
 
       // Sort newest first (created_at). If your schema also has a due date field, we can switch to that;
       // for now we use created_at which is proven by existing codepaths in the repo.
@@ -419,6 +605,9 @@ export default function NotiesScreen() {
           actorUsername: actorUsername || undefined,
           entityType: row?.entity_type != null ? String(row.entity_type) : null,
           entityId: row?.entity_id != null ? String(row.entity_id) : null,
+          // For gift notifications, use entity_id as gift_id and actor_id as sender_id
+          giftId: type === 'gift' && row?.entity_id ? String(row.entity_id) : undefined,
+          senderId: type === 'gift' && actorId ? actorId : undefined,
         };
       });
 
@@ -651,7 +840,22 @@ export default function NotiesScreen() {
         data={filteredNoties}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <NotieRow item={item} onPress={handlePressNotie} onLongPress={handleLongPressNotie} styles={styles} />
+          <NotieRow
+            item={item}
+            onPress={handlePressNotie}
+            onLongPress={handleLongPressNotie}
+            styles={styles}
+            showQuickReplies={
+              showGiftQuickReplies &&
+              item.type === 'gift' &&
+              !!item.giftId &&
+              !!item.senderId &&
+              !dismissedGiftIds.has(item.giftId)
+            }
+            onSendGiftReply={handleSendGiftReply}
+            onDismissGiftReply={handleDismissGiftReply}
+            quickReplyColors={quickReplyColors}
+          />
         )}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.listContent, { paddingBottom: bottomGuard }]}

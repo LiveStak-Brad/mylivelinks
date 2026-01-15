@@ -352,7 +352,7 @@ export default function LiveUserScreen() {
           const tierInfo = getGifterTierFromCoins(msg.profiles?.lifetime_coins_gifted || 0);
           return {
             id: String(msg.id),
-            type: msg.message_type === 'gift' ? 'gift' : msg.message_type === 'follow' ? 'follow' : 'chat',
+            type: msg.message_type === 'gift' ? 'gift' : msg.message_type === 'follow' ? 'follow' : msg.message_type === 'system' ? 'system' : 'chat',
             username: msg.profiles?.username || 'User',
             text: msg.content || '',
             avatarUrl: msg.profiles?.avatar_url,
@@ -392,7 +392,7 @@ export default function LiveUserScreen() {
             const tierInfo = getGifterTierFromCoins(profile.lifetime_coins_gifted || 0);
             const newMsg: ChatMessage = {
               id: String(payload.new.id),
-              type: payload.new.message_type === 'gift' ? 'gift' : payload.new.message_type === 'follow' ? 'follow' : 'chat',
+              type: payload.new.message_type === 'gift' ? 'gift' : payload.new.message_type === 'follow' ? 'follow' : payload.new.message_type === 'system' ? 'system' : 'chat',
               username: profile.username || 'User',
               text: payload.new.content || '',
               avatarUrl: profile.avatar_url,

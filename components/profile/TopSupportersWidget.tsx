@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Gift } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import UserNameWithBadges from '@/components/shared/UserNameWithBadges';
+import { GifterBadge } from '@/components/gifter';
 import type { GifterStatus } from '@/lib/gifter-status';
 
 interface Supporter {
@@ -60,12 +60,8 @@ export default function TopSupportersWidget({
         </h3>
         
         <div className="space-y-3">
-          {supporters.map((supporter, index) => (
-            (() => {
+          {supporters.map((supporter, index) => {
               const status = gifterStatuses?.[supporter.id];
-              const level = status && Number(status.lifetime_coins ?? 0) > 0
-                ? Number(status.level_in_tier ?? 0)
-                : 0;
 
               return (
             <Link
@@ -108,21 +104,18 @@ export default function TopSupportersWidget({
                 </p>
               </div>
               
-              {level > 0 && (
-                <div 
-                  className="text-xs font-bold px-2 py-1 rounded-full text-white"
-                  style={{ backgroundColor: accentColor }}
-                >
-                  Lv.{level}
-                </div>
+              {status && Number(status.level_in_tier ?? 0) > 0 && (
+                <GifterBadge
+                  tier_key={status.tier_key}
+                  level={status.level_in_tier}
+                  size="md"
+                />
               )}
             </Link>
               );
-            })()
-          ))}
+            })}
         </div>
       </div>
     </div>
   );
 }
-

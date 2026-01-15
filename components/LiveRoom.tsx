@@ -28,6 +28,7 @@ import { Room, RoomEvent } from 'livekit-client';
 import { useIsMobileWeb } from '@/hooks/useIsMobileWeb';
 import MobileWebWatchLayout from './mobile/MobileWebWatchLayout';
 import RoomBanner from './RoomBanner';
+import { ShareModal } from './ShareModal';
 import type { GifterStatus } from '@/lib/gifter-status';
 import { fetchGifterStatuses } from '@/lib/gifter-status-client';
 import Drawer from '@/components/owner/ui-kit/Drawer';
@@ -270,6 +271,9 @@ export default function LiveRoom({
 
   // Check if auth is disabled for testing
   const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Shared LiveKit room connection - connect once, stay connected
   const [sharedRoom, setSharedRoom] = useState<Room | null>(null);
@@ -3431,7 +3435,7 @@ export default function LiveRoom({
 
               {/* Chat - Middle (fills remaining space) */}
               <div className={`flex-1 min-h-0 h-full overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-w-[350px] md:min-w-[360px] lg:min-w-[400px] xl:min-w-[420px] ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
-                <Chat roomSlug={scopeRoomId} />
+                <Chat roomSlug={scopeRoomId} onShareClick={() => setShowShareModal(true)} />
               </div>
 
               {/* Viewers + Stats - Right */}
@@ -3486,7 +3490,7 @@ export default function LiveRoom({
 
               <div className={`min-h-0 overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
                 <div className="min-h-0 h-full min-w-[460px]">
-                  <Chat roomSlug={scopeRoomId} />
+                  <Chat roomSlug={scopeRoomId} onShareClick={() => setShowShareModal(true)} />
                 </div>
               </div>
 
@@ -3528,7 +3532,7 @@ export default function LiveRoom({
               </div>
 
               <div className={`flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-800 ${!uiPanels.chatOpen ? 'hidden' : ''}`}>
-                <Chat roomSlug={scopeRoomId} />
+                <Chat roomSlug={scopeRoomId} onShareClick={() => setShowShareModal(true)} />
               </div>
 
               <Drawer
@@ -3551,6 +3555,15 @@ export default function LiveRoom({
         </>
         )}
       </div>
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        title={`${roomConfig.branding.name} - Live Room`}
+        url={typeof window !== 'undefined' ? window.location.href : `https://www.mylivelinks.com/live`}
+        contentType="live"
+      />
     </div>
   );
 }

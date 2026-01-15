@@ -301,14 +301,30 @@ export async function GET(
         // ignore
       }
 
+      // Count consecutive days with activity.
+      // If today has no activity yet, start from yesterday to preserve the streak display.
+      const todayKey = todayUtc.toISOString().slice(0, 10);
+      const hasActivityToday = activityDates.has(todayKey);
+      const startOffset = hasActivityToday ? 0 : 1;
+
+      console.log('[STREAK DEBUG]', {
+        profileId,
+        todayKey,
+        hasActivityToday,
+        startOffset,
+        activityDatesCount: activityDates.size,
+        activityDates: Array.from(activityDates).sort().slice(-10),
+      });
+
       let count = 0;
-      for (let i = 0; i < 60; i++) {
+      for (let i = startOffset; i < 60; i++) {
         const day = new Date(todayUtc.getTime() - i * 24 * 60 * 60 * 1000);
         const key = day.toISOString().slice(0, 10);
         if (!activityDates.has(key)) break;
         count++;
       }
       streak_days = count;
+      console.log('[STREAK DEBUG] Final streak_days:', streak_days);
     }
 
     return NextResponse.json(

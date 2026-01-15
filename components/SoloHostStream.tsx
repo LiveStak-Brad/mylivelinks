@@ -46,6 +46,7 @@ import ViewersModal from './ViewersModal';
 import TrendingModal from './TrendingModal';
 import StreamGiftersModal from './StreamGiftersModal';
 import MiniProfileModal from './MiniProfileModal';
+import { ShareModal } from './ShareModal';
 import HostStreamSettingsModal, { loadSavedDevices } from './HostStreamSettingsModal';
 import CoHostInviteModal from './CoHostInviteModal';
 import GuestRequestsModal from './GuestRequestsModal';
@@ -361,6 +362,9 @@ export default function SoloHostStream() {
   const [guestOverlayKey, setGuestOverlayKey] = useState(0);
   const lastResetRef = useRef<number>(0);
 
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
+
   // Share guard - prevents stream disconnect when using Share button
   // Valid for 30 seconds after share is initiated
   const isShareActiveRef = useRef<boolean>(false);
@@ -379,37 +383,13 @@ export default function SoloHostStream() {
     return true;
   }, []);
 
-  // Handle share button click
-  const handleShare = useCallback(async () => {
-    if (!navigator.share) {
-      console.log('[SoloHostStream] Web Share API not supported');
-      return;
-    }
-
+  // Handle share button click - open share modal
+  const handleShare = useCallback(() => {
     console.log('[SoloHostStream] Share initiated - enabling share guard');
     isShareActiveRef.current = true;
     shareStartTimeRef.current = Date.now();
-
-    try {
-      await navigator.share({
-        title: `Watch ${streamer?.display_name || streamer?.username} live!`,
-        url: window.location.href,
-      });
-      console.log('[SoloHostStream] Share completed successfully');
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log('[SoloHostStream] Share cancelled by user');
-      } else {
-        console.error('[SoloHostStream] Share error:', err);
-      }
-    }
-
-    // Clear share guard after a short delay (user has returned)
-    setTimeout(() => {
-      console.log('[SoloHostStream] Clearing share guard');
-      isShareActiveRef.current = false;
-    }, 1000);
-  }, [streamer?.display_name, streamer?.username]);
+    setShowShareModal(true);
+  }, []);
 
   // Load saved devices and filters on mount
   useEffect(() => {
@@ -2328,6 +2308,22 @@ export default function SoloHostStream() {
           onClose={() => setShowCooldown(false)}
         />
       )}
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => {
+          setShowShareModal(false);
+          // Clear share guard after modal closes
+          setTimeout(() => {
+            isShareActiveRef.current = false;
+          }, 1000);
+        }}
+        title={`${streamer?.display_name || streamer?.username}'s Live Stream`}
+        url={typeof window !== 'undefined' ? window.location.href : `https://www.mylivelinks.com/live/${streamer?.username || ''}`}
+        thumbnailUrl={streamer?.avatar_url}
+        contentType="live"
+      />
     </div>
   );
 }

@@ -48,6 +48,7 @@ import TrendingModal from './TrendingModal';
 import MiniProfileModal from './MiniProfileModal';
 import StreamGiftersModal from './StreamGiftersModal';
 import RequestGuestModal from './RequestGuestModal';
+import { ShareModal } from './ShareModal';
 import GuestVideoOverlay from './GuestVideoOverlay';
 import BattleGridWrapper from './battle/BattleGridWrapper';
 import { useBattleSession } from '@/hooks/useBattleSession';
@@ -191,6 +192,7 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
   const [showTrending, setShowTrending] = useState(false);
   const [showMiniProfile, setShowMiniProfile] = useState(false);
   const [showRequestGuest, setShowRequestGuest] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [recommendedStreams, setRecommendedStreams] = useState<RecommendedStream[]>([]);
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
   
@@ -1752,23 +1754,10 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
     }
   };
 
-  // Handle share
+  // Handle share - open share modal
   const handleShare = () => {
     if (!streamer) return;
-    const shareUrl = `https://www.mylivelinks.com/live/${encodeURIComponent(streamer.username)}`;
-    if (navigator.share) {
-      navigator
-        .share({
-          title: `${streamer.display_name || streamer.username}'s Live Stream`,
-          text: `Watch ${streamer.display_name || streamer.username} live on MyLiveLinks!`,
-          url: shareUrl,
-        })
-        .catch(() => {
-          navigator.clipboard.writeText(shareUrl);
-        });
-    } else {
-      navigator.clipboard.writeText(shareUrl);
-    }
+    setShowShareModal(true);
   };
 
   // Handle volume change
@@ -2427,6 +2416,16 @@ export default function SoloStreamViewer({ username }: SoloStreamViewerProps) {
         onRequestSent={() => {
           console.log('[SoloStreamViewer] Guest request sent');
         }}
+      />
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        title={`${streamer.display_name || streamer.username}'s Live Stream`}
+        url={`https://www.mylivelinks.com/live/${encodeURIComponent(streamer.username)}`}
+        thumbnailUrl={streamer.avatar_url}
+        contentType="live"
       />
     </div>
   );
