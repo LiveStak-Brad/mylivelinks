@@ -762,6 +762,7 @@ export default function SettingsProfileScreen() {
         
         // Display preferences
         hide_streaming_stats: hideStreamingStats,
+        default_post_visibility: defaultPostVisibility,
         
         updated_at: new Date().toISOString(),
       };
@@ -788,7 +789,7 @@ export default function SettingsProfileScreen() {
     socialTwitch, socialDiscord, socialSnapchat, socialLinkedin, socialGithub,
     socialSpotify, socialOnlyfans, profileType, enabledModules, enabledTabs,
     showTopFriends, topFriendsTitle, topFriendsAvatarStyle, topFriendsMaxCount,
-    hideStreamingStats
+    hideStreamingStats, defaultPostVisibility
   ]);
 
   const handleChangeAvatar = useCallback(async () => {
