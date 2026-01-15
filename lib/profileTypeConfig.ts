@@ -99,13 +99,20 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   // ========================================================================
   streamer: {
     tabs: [
-      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
-      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
-      { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
-      { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
+      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
+      { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
+      { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
+      { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
+      { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'events', label: 'Events', icon: 'Calendar', enabled: true },
+      { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: false },
+      { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
+      { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -135,10 +142,17 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   musician: {
     tabs: [
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
-      { id: 'music', label: 'Music', icon: 'Music', enabled: true },
-      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
-      { id: 'events', label: 'Events', icon: 'Calendar', enabled: true },
+      { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: false },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
+      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: false },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: true },
+      { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
+      { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
+      { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
+      { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'events', label: 'Events', icon: 'Calendar', enabled: true },
+      { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: false },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -166,9 +180,17 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   comedian: {
     tabs: [
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
-      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
-      { id: 'events', label: 'Shows', icon: 'Calendar', enabled: true },
+      { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: false },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
+      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: false },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
+      { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
+      { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
+      { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
+      { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'events', label: 'Shows', icon: 'Calendar', enabled: true },
+      { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: false },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -195,8 +217,17 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   business: {
     tabs: [
       { id: 'info', label: 'About', icon: 'Info', enabled: true },
-      { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: true },
+      { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: false },
       { id: 'photos', label: 'Gallery', icon: 'Image', enabled: true },
+      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: false },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: false },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
+      { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
+      { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
+      { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
+      { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'events', label: 'Events', icon: 'Calendar', enabled: false },
+      { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
@@ -221,18 +252,20 @@ export const PROFILE_TYPE_CONFIG: Record<ProfileType, ProfileTypeConfig> = {
   // ========================================================================
   creator: {
     tabs: [
-      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
-      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
-      { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
-      { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
       { id: 'info', label: 'Info', icon: 'Info', enabled: true },
       { id: 'feed', label: 'Feed', icon: 'LayoutGrid', enabled: true },
       { id: 'photos', label: 'Media', icon: 'Image', enabled: true },
-      // Long-form Creator Studio tabs (disabled by default, user can enable)
+      { id: 'reels', label: 'Vlogs', icon: 'Clapperboard', enabled: true },
+      { id: 'music_videos', label: 'Music Videos', icon: 'Video', enabled: true },
+      { id: 'music', label: 'Music', icon: 'Music', enabled: false },
       { id: 'podcasts', label: 'Podcasts', icon: 'Mic', enabled: false },
-      { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
       { id: 'series', label: 'Series', icon: 'Layers', enabled: false },
+      { id: 'movies', label: 'Movies', icon: 'Clapperboard', enabled: false },
       { id: 'education', label: 'Education', icon: 'BookOpen', enabled: false },
+      { id: 'events', label: 'Events', icon: 'Calendar', enabled: false },
+      { id: 'products', label: 'Products', icon: 'ShoppingCart', enabled: false },
+      { id: 'reposts', label: 'Reposts', icon: 'Repeat2', enabled: true },
+      { id: 'highlights', label: 'Highlights', icon: 'Bookmark', enabled: true },
     ],
     sections: [
       { id: 'hero', enabled: true, order: 1 },
