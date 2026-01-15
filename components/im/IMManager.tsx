@@ -178,7 +178,14 @@ export default function IMManager({ currentUserId }: IMManagerProps) {
       position: getNewWindowPosition(chatWindows.length),
     };
 
-    setChatWindows(prev => [...prev, newWindow]);
+    // Use functional update to prevent race conditions with duplicate chats
+    setChatWindows(prev => {
+      // Double-check inside setState to prevent race conditions
+      if (prev.some(c => c.recipientId === recipientId)) {
+        return prev.map(c => c.recipientId === recipientId ? { ...c, isMinimized: false } : c);
+      }
+      return [...prev, newWindow];
+    });
     setFocusedChatId(chatId);
 
     // Load existing messages
